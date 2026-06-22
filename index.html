@@ -371,6 +371,68 @@ select:focus,input:focus{border-color:#5DCAA5}
         <p style="font-size:12px;color:#999" id="currentUserEmail"></p>
       </div>
 
+      <!-- 조건 설정 -->
+      <div class="panel" style="margin-bottom:1rem">
+        <p class="slabel" style="margin:0 0 0.75rem">📋 조건 설정</p>
+        <div class="row">
+          <div class="field">
+            <label class="label">혼인 상태</label>
+            <select id="set_marital">
+              <option value="">선택하세요</option>
+              <option value="newborn">신생아 가구 (2년 내 출산)</option>
+              <option value="married_7">신혼부부 (혼인 7년 이내)</option>
+              <option value="pre">예비 신혼부부</option>
+              <option value="single_parent">한부모 가족</option>
+              <option value="married_child6">유자녀 혼인가구 (6세 이하)</option>
+              <option value="married">혼인가구 (기타)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="label">자녀 수 (미성년)</label>
+            <input type="number" id="set_children" min="0" max="10" placeholder="예: 1">
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label class="label">가구원 수</label>
+            <input type="number" id="set_members" min="1" max="10" placeholder="예: 3">
+          </div>
+          <div class="field">
+            <label class="label">세대 월평균 소득 (만원)</label>
+            <input type="number" id="set_income" min="0" placeholder="예: 450">
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label class="label">총 자산 (만원)</label>
+            <input type="number" id="set_assets" min="0" placeholder="예: 15000">
+          </div>
+          <div class="field">
+            <label class="label">최대 보증금 (만원)</label>
+            <input type="number" id="set_maxDeposit" min="0" placeholder="예: 20000">
+          </div>
+        </div>
+        <div class="field">
+          <label class="label">최소 방 수</label>
+          <select id="set_minRooms">
+            <option value="0">상관없음</option>
+            <option value="2">2개 이상</option>
+            <option value="3">3개 이상</option>
+            <option value="4">4개 이상</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="label">희망 지역 (복수 선택 가능)</label>
+          <div class="chip-group" id="settingsRegionChips"></div>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label class="label">주택 유형 (복수 선택 가능)</label>
+          <div class="chip-group" id="settingsTypeChips"></div>
+        </div>
+        <button class="btn btn-primary" style="margin-top:1rem" onclick="saveSettings()">조건 저장하기</button>
+        <p id="settingsSaveMsg" style="font-size:12px;margin-top:8px;color:#888"></p>
+      </div>
+
       <div class="panel" style="margin-bottom:1rem">
         <p class="slabel" style="margin:0 0 0.75rem">🔔 알림 설정</p>
         <div class="setting-row">
@@ -657,41 +719,44 @@ function fmt(n){return Math.round(n/10000).toLocaleString()+'만원';}
 function fmtR(n){return (Math.round(n/1000)/10).toLocaleString()+'만원';}
 
 // ── 지역/유형 칩을 데이터에서 동적으로 생성 (행정구역이 바뀌어도 자동 대응) ──
+let settingsRegions=new Set();
+let settingsTypes=new Set();
+
 function buildChipOptions(){
   const regions=[...new Set(HOUSES.map(h=>h.city))].sort();
-  const regionWrap=document.getElementById('regionChips');
-  regionWrap.innerHTML='';
+  const types=[...new Set(HOUSES.map(h=>h.type))].sort();
+
+  // 추천 탭 칩
+  buildChipGroup('regionChips',regions,selectedRegions,
+    r=>toggleRegion(r), ()=>toggleAllRegions());
+  buildChipGroup('typeChips',types,selectedTypes,
+    t=>toggleType(t), ()=>toggleAllTypes());
+
+  // 설정 탭 칩
+  buildChipGroup('settingsRegionChips',regions,settingsRegions,
+    r=>{ settingsRegions.has(r)?settingsRegions.delete(r):settingsRegions.add(r); renderChipState('settingsRegionChips',settingsRegions); },
+    ()=>{ settingsRegions.clear(); renderChipState('settingsRegionChips',settingsRegions); });
+  buildChipGroup('settingsTypeChips',types,settingsTypes,
+    t=>{ settingsTypes.has(t)?settingsTypes.delete(t):settingsTypes.add(t); renderChipState('settingsTypeChips',settingsTypes); },
+    ()=>{ settingsTypes.clear(); renderChipState('settingsTypeChips',settingsTypes); });
+}
+
+function buildChipGroup(wrapId,options,selSet,onItem,onAll){
+  const wrap=document.getElementById(wrapId);
+  wrap.innerHTML='';
   const allChip=document.createElement('div');
   allChip.className='chip chip-all sel';
   allChip.textContent='전체';
   allChip.dataset.value='__all__';
-  allChip.onclick=()=>toggleAllRegions();
-  regionWrap.appendChild(allChip);
-  regions.forEach(r=>{
+  allChip.onclick=onAll;
+  wrap.appendChild(allChip);
+  options.forEach(v=>{
     const c=document.createElement('div');
     c.className='chip';
-    c.textContent=r;
-    c.dataset.value=r;
-    c.onclick=()=>toggleRegion(r);
-    regionWrap.appendChild(c);
-  });
-
-  const types=[...new Set(HOUSES.map(h=>h.type))].sort();
-  const typeWrap=document.getElementById('typeChips');
-  typeWrap.innerHTML='';
-  const allTypeChip=document.createElement('div');
-  allTypeChip.className='chip chip-all sel';
-  allTypeChip.textContent='전체';
-  allTypeChip.dataset.value='__all__';
-  allTypeChip.onclick=()=>toggleAllTypes();
-  typeWrap.appendChild(allTypeChip);
-  types.forEach(t=>{
-    const c=document.createElement('div');
-    c.className='chip';
-    c.textContent=t;
-    c.dataset.value=t;
-    c.onclick=()=>toggleType(t);
-    typeWrap.appendChild(c);
+    c.textContent=v;
+    c.dataset.value=v;
+    c.onclick=()=>onItem(v);
+    wrap.appendChild(c);
   });
 }
 
@@ -1130,11 +1195,64 @@ async function loginWithEmail(prefillEmail){
 }
 
 function applySettingsToUI(p){
+  // 알림/화면 설정
   document.getElementById('toggleAlertOn').checked = p.alert_on!==false && p.alert_on!=='N';
   document.getElementById('toggleNewNotice').checked = p.new_notice_alert!==false && p.new_notice_alert!=='N';
   document.getElementById('toggleMarketing').checked = p.marketing_alert===true || p.marketing_alert==='Y';
   setTheme(p.theme==='dark'?'dark':'light',true);
   setFontSize(p.font_size||'normal',true);
+
+  // 조건 설정 폼
+  const sv=(id,val)=>{ const el=document.getElementById(id); if(el&&val!=null) el.value=val; };
+  sv('set_marital', p.marital||'');
+  sv('set_children', p.children!=null?p.children:'');
+  sv('set_members', p.members!=null?p.members:'');
+  sv('set_income', p.income||'');
+  sv('set_assets', p.assets||'');
+  sv('set_maxDeposit', p.max_deposit||'');
+  sv('set_minRooms', p.min_rooms||0);
+
+  // 지역/유형 칩 복원
+  const savedRegions=Array.isArray(p.regions)?p.regions:(typeof p.regions==='string'?p.regions.split(',').filter(Boolean):[]);
+  const savedTypes=Array.isArray(p.types)?p.types:(typeof p.types==='string'?p.types.split(',').filter(Boolean):[]);
+  settingsRegions=new Set(savedRegions);
+  settingsTypes=new Set(savedTypes);
+  renderChipState('settingsRegionChips',settingsRegions);
+  renderChipState('settingsTypeChips',settingsTypes);
+}
+
+async function saveSettings(){
+  if(!currentUser) return;
+  const msgEl=document.getElementById('settingsSaveMsg');
+  msgEl.style.color='#888';
+  msgEl.textContent='저장 중...';
+  const payload={
+    email: currentUser.email,
+    marital: document.getElementById('set_marital').value||'',
+    children: document.getElementById('set_children').value||'',
+    members: document.getElementById('set_members').value||'',
+    income: document.getElementById('set_income').value||'',
+    assets: document.getElementById('set_assets').value||'',
+    maxDeposit: document.getElementById('set_maxDeposit').value||'',
+    minRooms: document.getElementById('set_minRooms').value||'0',
+    regions: [...settingsRegions].join(','),
+    types: [...settingsTypes].join(','),
+    alertOn: document.getElementById('toggleAlertOn').checked?'Y':'N',
+    newNoticeAlert: document.getElementById('toggleNewNotice').checked?'Y':'N',
+    marketingAlert: document.getElementById('toggleMarketing').checked?'Y':'N',
+    theme: document.querySelector('[data-theme].sel')?.dataset.theme||'light',
+    fontSize: document.querySelector('[data-fontsize].sel')?.dataset.fontsize||'normal',
+  };
+  try{
+    const res=await fetch(PROFILE_API_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    currentUser={...currentUser,...payload,max_deposit:payload.maxDeposit,min_rooms:payload.minRooms};
+    msgEl.style.color='#0F6E56';
+    msgEl.textContent='✅ 조건이 저장됐어요.';
+  }catch(err){
+    msgEl.style.color='#A32D2D';
+    msgEl.textContent='저장에 실패했어요. ('+err.message+')';
+  }
 }
 
 function setTheme(theme,silent){
