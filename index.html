@@ -1046,7 +1046,7 @@ async function saveUserProfile(lvl){
   };
 
   try{
-    const res=await fetch('https://hook.us2.make.com/ix65xgm9vzkxortb5xvvxmlwm152n3z3',{
+    const res=await fetch('https://khdpjjyspmlqtzperoqg.supabase.co/functions/v1/save-user-profile',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify(payload)
@@ -1079,7 +1079,7 @@ buildChipOptions();
 
 // ===== 환경설정 / 이메일 식별 시스템 =====
 const PROFILE_CSV_URL = "REPLACE_WITH_PROFILE_V2_CSV_URL"; // 다운님이 웹에 게시 후 받은 링크로 교체 예정
-const PROFILE_WEBHOOK_URL = "https://hook.us2.make.com/ix65xgm9vzkxortb5xvvxmlwm152n3z3";
+const PROFILE_WEBHOOK_URL = "https://khdpjjyspmlqtzperoqg.supabase.co/functions/v1/save-user-profile";
 let currentUser = null; // { email, marital, children, ... }
 const ZF_COOKIE = 'zipfit_email';
 
@@ -1127,7 +1127,7 @@ async function loginWithEmail(prefillEmail){
 
   currentUser=profile;
   setCookie(ZF_COOKIE,email,365);
-  applySettingsToUI(profile);
+  applySettingsToUI(profile);ix65xgm9vzkxortb5xvvxmlwm152n3z3
   document.getElementById('loginGate').classList.add('hidden');
   document.getElementById('settingsBody').classList.remove('hidden');
   document.getElementById('currentUserEmail').textContent=email+'님 환영해요';
