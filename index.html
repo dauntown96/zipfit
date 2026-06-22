@@ -1078,7 +1078,7 @@ document.getElementById('dday-num').textContent=diff>0?`D-${diff}`:'D-Day';
 buildChipOptions();
 
 // ===== 환경설정 / 이메일 식별 시스템 =====
-const PROFILE_CSV_URL = "REPLACE_WITH_PROFILE_V2_CSV_URL"; // 다운님이 웹에 게시 후 받은 링크로 교체 예정
+const PROFILE_CSV_URL = "https://docs.google.com/spreadsheets/d/1im0FmeYLK0djR8GNIpDWpizdTIwcl8bp1fmBL8-Lmww/pub?output=csv";
 const PROFILE_WEBHOOK_URL = "https://khdpjjyspmlqtzperoqg.supabase.co/functions/v1/save-user-profile";
 let currentUser = null; // { email, marital, children, ... }
 const ZF_COOKIE = 'zipfit_email';
