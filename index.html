@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZipFit — LH 신혼·신생아 매입임대 맞춤 매칭</title>
+<script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=58c490c9bded159ee35575e80345d783&amp;libraries=services&amp;autoload=false"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f0;color:#1a1a1a;min-height:100vh}
+body.theme-dark{background:#16181d;color:#e8e8e8}
+body.theme-dark .hero,body.theme-dark .panel,body.theme-dark .hcard{background:#1f2229;border-color:#2c2f38}
+body.theme-dark .label,body.theme-dark .sub,body.theme-dark .haddr,body.theme-dark .building-desc{color:#9aa0aa}
+body.theme-dark select,body.theme-dark input{background:#262932;border-color:#3a3e48;color:#e8e8e8}
+body.theme-dark .maintabs{background:#262932}
+body.theme-dark .maintab.active{background:#1f2229;color:#5DCAA5}
+body.fs-small{font-size:13px}
+body.fs-large{font-size:17px}
+.wrap{max-width:720px;margin:0 auto;padding:1.5rem 1rem}
+.hero{background:#fff;border-radius:16px;padding:2rem 1.5rem 1.5rem;margin-bottom:1.5rem;border:1px solid #e8e8e0;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+.logo{font-size:24px;font-weight:600;color:#111;margin-bottom:0.5rem}
+.logo span{color:#1D9E75}
+.sub{font-size:14px;color:#666;line-height:1.7}
+.badge{display:inline-block;font-size:11px;padding:4px 12px;border-radius:20px;background:#E1F5EE;color:#085041;margin-top:0.75rem;font-weight:500}
+.steps{display:flex;gap:8px;margin-bottom:1.5rem}
+/* 대탭 (메인 카테고리) */
+.maintabs{display:flex;gap:6px;margin-bottom:1rem;background:#ece9e0;padding:5px;border-radius:14px}
+.maintab{flex:1;padding:0.65rem 0.2rem;border-radius:10px;font-size:11.5px;font-weight:600;color:#777;text-align:center;cursor:pointer;transition:all 0.15s;border:none;background:transparent}
+.maintab.active{background:#fff;color:#0F6E56;box-shadow:0 1px 3px rgba(0,0,0,0.08)}
+.maintab-icon{display:block;font-size:18px;margin-bottom:2px}
+/* 소탭 (서브 네비게이션) */
+.subtabs{display:flex;gap:8px;margin-bottom:1.25rem}
+.subtab{flex:1;padding:0.6rem 0.5rem;border-radius:10px;border:1px solid #e0e0d8;font-size:13px;color:#888;text-align:center;cursor:pointer;background:#fff;font-weight:500}
+.subtab.active{background:#E1F5EE;border-color:#5DCAA5;color:#085041}
+.subtab.done{background:#f5f5f0;color:#aaa;border-color:#e8e8e0}
+/* 짓는 중 placeholder */
+.building-box{text-align:center;padding:3rem 1.5rem;background:#fafaf6;border-radius:16px;border:1.5px dashed #d8d4c8}
+.building-icon{font-size:48px;margin-bottom:1rem}
+.building-title{font-size:17px;font-weight:700;color:#444;margin-bottom:8px}
+.building-desc{font-size:13px;color:#999;line-height:1.7;max-width:320px;margin:0 auto}
+.building-progress{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #e8e8e0;border-radius:20px;padding:6px 16px;margin-top:1.25rem;font-size:12px;color:#1D9E75;font-weight:600}
+/* 환경설정 - 토글 스위치 */
+.setting-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #f0f0e8;gap:12px}
+.setting-row:last-child{border-bottom:none}
+.setting-label{font-size:13px;font-weight:500;color:#111}
+.setting-sub{font-size:11px;color:#999;margin-top:2px}
+.toggle{position:relative;display:inline-block;width:42px;height:24px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#ddd;border-radius:24px;transition:0.2s}
+.toggle-slider:before{position:absolute;content:"";height:18px;width:18px;left:3px;bottom:3px;background-color:#fff;border-radius:50%;transition:0.2s}
+.toggle input:checked + .toggle-slider{background-color:#1D9E75}
+.toggle input:checked + .toggle-slider:before{transform:translateX(18px)}
+.step{flex:1;padding:0.65rem 0.5rem;border-radius:10px;border:1px solid #e0e0d8;font-size:12px;color:#888;text-align:center;cursor:pointer;background:#fff;transition:all 0.15s;font-weight:500}
+.step.active{background:#E1F5EE;border-color:#5DCAA5;color:#085041}
+.step.done{background:#f5f5f0;color:#aaa;border-color:#e8e8e0}
+.panel{background:#fff;border:1px solid #e8e8e0;border-radius:16px;padding:1.5rem;box-shadow:0 1px 3px rgba(0,0,0,0.04)}
+.panel-title{font-size:17px;font-weight:600;margin-bottom:1.25rem;color:#111}
+.field{margin-bottom:1rem}
+.label{font-size:13px;color:#555;margin-bottom:6px;display:block;font-weight:500}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+select,input[type=number],input[type=text]{width:100%;padding:9px 12px;font-size:14px;border:1px solid #ddd;border-radius:8px;background:#fff;color:#111;outline:none;transition:border 0.15s}
+select:focus,input:focus{border-color:#5DCAA5}
+.btn{width:100%;padding:11px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;border:none;margin-top:0.5rem;transition:all 0.15s}
+.btn-primary{background:#1D9E75;color:#fff}
+.btn-primary:hover{background:#0F6E56}
+.btn-sec{background:#f5f5f0;color:#333;border:1px solid #ddd}
+.btn-sm{width:auto;padding:7px 14px;font-size:12px;font-weight:500;border-radius:8px}
+.result{margin-top:1rem}
+.rbox{border-radius:10px;padding:1rem 1.25rem;margin-bottom:0.75rem}
+.ok{background:#E1F5EE;border:1px solid #9FE1CB}
+.warn{background:#FAEEDA;border:1px solid #FAC775}
+.err{background:#FCEBEB;border:1px solid #F7C1C1}
+.rtitle{font-size:14px;font-weight:600;margin-bottom:5px}
+.rdesc{font-size:13px;line-height:1.65}
+.ok .rtitle{color:#085041}.ok .rdesc{color:#0F6E56}
+.warn .rtitle{color:#633806}.warn .rdesc{color:#854F0B}
+.err .rtitle{color:#501313}.err .rdesc{color:#A32D2D}
+.hcard{background:#fff;border:1px solid #e8e8e0;border-radius:14px;padding:1rem 1.25rem;margin-bottom:0.75rem;transition:border-color 0.15s}
+.hcard.top1{border:2px solid #1D9E75}
+.htop{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;gap:8px}
+.hname{font-size:14px;font-weight:600;color:#111;margin-top:4px}
+.htag{font-size:11px;padding:3px 10px;border-radius:10px;font-weight:500;white-space:nowrap;flex-shrink:0}
+.tag-apt{background:#E6F1FB;color:#0C447C}
+.tag-ofi{background:#EEEDFE;color:#3C3489}
+.tag-mix{background:#EAF3DE;color:#27500A}
+.haddr{font-size:12px;color:#888;margin-bottom:10px;line-height:1.5}
+.hgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.mcard{background:#f8f8f4;border-radius:8px;padding:7px 8px;text-align:center}
+.mlabel{font-size:10px;color:#999;margin-bottom:2px}
+.mval{font-size:13px;font-weight:600;color:#111}
+.best{font-size:11px;background:#1D9E75;color:#fff;padding:3px 10px;border-radius:10px;margin-right:6px}
+.rank{font-size:11px;color:#aaa}
+.checklist{list-style:none}
+.checklist li{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid #f0f0e8;font-size:13px;line-height:1.55}
+.checklist li:last-child{border-bottom:none}
+.cicon{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;font-size:10px;font-weight:700}
+.creq{background:#E1F5EE;color:#085041}
+.ccond{background:#FAEEDA;color:#633806}
+.slabel{font-size:11px;font-weight:600;color:#aaa;margin:1rem 0 0.5rem;text-transform:uppercase;letter-spacing:0.06em}
+.dday{text-align:center;background:#E1F5EE;border-radius:10px;padding:1rem;margin-bottom:1.25rem;border:1px solid #9FE1CB}
+.dday-num{font-size:26px;font-weight:700;color:#085041}
+.dday-sub{font-size:12px;color:#0F6E56;margin-top:2px}
+.hidden{display:none}
+.count-info{font-size:13px;color:#888;margin-bottom:0.75rem;display:flex;justify-content:space-between;align-items:center}
+/* 다중선택 칩 */
+.chip-group{display:flex;flex-wrap:wrap;gap:6px}
+.chip{padding:7px 14px;border-radius:20px;border:1px solid #ddd;background:#fff;font-size:13px;color:#444;cursor:pointer;transition:all 0.12s;user-select:none}
+.chip:hover{border-color:#5DCAA5}
+.chip.sel{background:#1D9E75;border-color:#1D9E75;color:#fff;font-weight:500}
+.chip-all{font-weight:600}
+/* 범위 입력 */
+.range-row{display:flex;align-items:center;gap:8px}
+.range-row input{flex:1}
+.range-sep{font-size:13px;color:#999;flex-shrink:0}
+/* 정렬 탭 */
+.sort-row{display:flex;gap:6px;margin-bottom:0.75rem;flex-wrap:wrap}
+.sort-btn{padding:6px 12px;font-size:12px;border-radius:8px;border:1px solid #ddd;background:#fff;color:#555;cursor:pointer;white-space:nowrap}
+.sort-btn.active{background:#111;border-color:#111;color:#fff;font-weight:500}
+.more-btn{width:100%;padding:10px;border-radius:10px;border:1px dashed #ccc;background:#fafaf6;color:#666;font-size:13px;cursor:pointer;margin-top:0.5rem}
+.alert-signup-box{background:#E1F5EE;border:1px solid #9FE1CB;border-radius:14px;padding:16px 18px;margin-top:1rem}
+.alert-signup-box input[type=email]{padding:9px 12px;font-size:13px;border:1px solid #c5e8da;border-radius:8px}
+.more-btn:hover{background:#f0f0e8}
+.detail-toggle-btn{width:100%;padding:8px;margin-top:8px;border-radius:8px;border:1px solid #e0e0d8;background:#fafaf6;color:#1D9E75;font-size:12px;font-weight:500;cursor:pointer}
+.detail-toggle-btn:hover{background:#E1F5EE}
+.detail-box{margin-top:8px;padding-top:8px;border-top:1px dashed #e0e0d8}
+.detail-inner{display:flex;flex-direction:column;gap:8px}
+.detail-row{display:flex;gap:8px;flex-wrap:wrap}
+.detail-link{flex:1;min-width:140px;text-align:center;padding:8px 10px;background:#f8f8f4;border-radius:8px;font-size:12px;color:#0C447C;text-decoration:none;border:1px solid #e8e8e0}
+.detail-link:hover{background:#E6F1FB}
+.detail-note{font-size:11px;color:#999;line-height:1.6;padding:0 2px}
+.map-box{width:100%;height:220px;border-radius:10px;overflow:hidden;border:1px solid #e8e8e0;background:#f0f0e8}
+.poi-section{margin-top:8px}
+.poi-tabs{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap}
+.poi-tab{padding:5px 11px;font-size:11px;border-radius:14px;border:1px solid #ddd;background:#fff;color:#666;cursor:pointer}
+.poi-tab.active{background:#1D9E75;border-color:#1D9E75;color:#fff;font-weight:500}
+.poi-list{display:flex;flex-direction:column;gap:4px;max-height:140px;overflow-y:auto}
+.poi-item{display:flex;justify-content:space-between;font-size:12px;color:#444;padding:6px 8px;background:#f8f8f4;border-radius:6px}
+.poi-dist{color:#999;font-size:11px}
+.poi-loading{font-size:12px;color:#999;padding:8px;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <div class="logo">🏠 <span>Zip</span>Fit</div>
+    <p class="sub">LH 신혼·신생아 매입임대Ⅱ 전세형 · 경기북부 맞춤 주택 매칭 서비스<br>내 조건에 딱 맞는 집을 3분 만에 찾아드립니다.</p>
+    <span class="badge">📢 2026년 경기북부 2차 공고 · 신청기간 6.30~7.2</span>
+  </div>
+
+  <div class="maintabs">
+    <button class="maintab active" id="m1" onclick="goMain(1)"><span class="maintab-icon">🏠</span>추천</button>
+    <button class="maintab" id="m2" onclick="goMain(2)"><span class="maintab-icon">📋</span>공고</button>
+    <button class="maintab" id="m3" onclick="goMain(3)"><span class="maintab-icon">📊</span>인사이트</button>
+    <button class="maintab" id="m4" onclick="goMain(4)"><span class="maintab-icon">📁</span>관리</button>
+    <button class="maintab" id="m5" onclick="goMain(5)"><span class="maintab-icon">⚙️</span>설정</button>
+  </div>
+
+  <!-- ===== 대탭 1: 맞춤 추천 ===== -->
+  <div id="main1" class="main-section">
+  <div class="subtabs">
+    <div class="step active" id="s1" onclick="goStep(1)">① 자격 진단</div>
+    <div class="step" id="s2" onclick="goStep(2)">② 주택 매칭</div>
+  </div>
+
+  <!-- STEP 1 -->
+  <div id="panel1" class="panel">
+    <p class="panel-title">내 신청 자격을 확인해요</p>
+    <div class="row">
+      <div class="field">
+        <label class="label">혼인 상태</label>
+        <select id="marital">
+          <option value="">선택하세요</option>
+          <option value="newborn">신생아 가구 (2년 내 출산)</option>
+          <option value="married_7">신혼부부 (혼인 7년 이내)</option>
+          <option value="pre">예비 신혼부부</option>
+          <option value="single_parent">한부모 가족</option>
+          <option value="married_child6">유자녀 혼인가구 (6세 이하)</option>
+          <option value="married">혼인가구 (기타)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="label">자녀 수 (미성년)</label>
+        <select id="children">
+          <option value="0">없음</option>
+          <option value="1">1명</option>
+          <option value="2">2명</option>
+          <option value="3">3명 이상</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label class="label">가구원 수</label>
+        <select id="members">
+          <option value="1">1인</option>
+          <option value="2" selected>2인</option>
+          <option value="3">3인</option>
+          <option value="4">4인</option>
+          <option value="5">5인 이상</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="label">세대 월평균 소득 (만원)</label>
+        <input type="number" id="income" placeholder="예: 450" min="0">
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label class="label">총 자산 (만원)</label>
+        <input type="number" id="assets" placeholder="예: 15000" min="0">
+      </div>
+      <div class="field">
+        <label class="label">주택 소유 여부</label>
+        <select id="owned">
+          <option value="no">없음 (무주택)</option>
+          <option value="yes">있음</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="diagnose()">자격 진단하기 →</button>
+    <div id="diag-result" class="result hidden"></div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div id="panel2" class="panel hidden">
+    <p class="panel-title">내 조건에 맞는 주택을 찾아요</p>
+
+    <div class="field">
+      <label class="label">희망 지역 (복수 선택 가능)</label>
+      <div class="chip-group" id="regionChips"></div>
+    </div>
+
+    <div class="field">
+      <label class="label">임대보증금 범위 (만원)</label>
+      <div class="range-row">
+        <input type="number" id="minDeposit" placeholder="최소 (예: 5000)" min="0">
+        <span class="range-sep">~</span>
+        <input type="number" id="maxDeposit" placeholder="최대 (예: 20000)" min="0">
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label class="label">최소 방 수</label>
+        <select id="minRooms">
+          <option value="0">상관없음</option>
+          <option value="2">2개 이상</option>
+          <option value="3">3개 이상</option>
+          <option value="4">4개 이상</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="label">소득 구간 (임대조건 선택)</label>
+        <select id="incomeLevel">
+          <option value="low">80% 이하 — 시세 70%</option>
+          <option value="high">80% 초과 — 시세 80%</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="label">주택 유형 (복수 선택 가능)</label>
+      <div class="chip-group" id="typeChips"></div>
+    </div>
+
+    <button class="btn btn-primary" onclick="matchHouses()">맞춤 주택 찾기 →</button>
+    <div id="match-result" class="result hidden"></div>
+  </div>
+  </div> <!-- /main1 -->
+
+  <!-- ===== 대탭 2: 전체 공고 ===== -->
+  <div id="main2" class="main-section hidden">
+
+  <!-- STEP 4: 전체 공고 (실시간 DB 연동) -->
+  <div id="panel4" class="panel">
+    <p class="panel-title">실시간 LH 공고 전체 목록</p>
+    <p class="sub" style="margin-bottom:1rem">매일 자동 수집되는 LH 전국 공고예요. ZipFit이 신혼·신생아·청년 타깃과 수도권 여부를 자동으로 표시해드려요.</p>
+
+    <div class="field">
+      <label class="label">공고 유형</label>
+      <div class="chip-group" id="noticeTypeChips"></div>
+    </div>
+    <div class="field">
+      <label class="label">지역</label>
+      <div class="chip-group" id="noticeRegionChips"></div>
+    </div>
+    <div class="field">
+      <label class="label">공고 상태</label>
+      <div class="chip-group" id="noticeStatusChips"></div>
+    </div>
+    <div class="field" style="display:flex;align-items:center;gap:8px">
+      <input type="checkbox" id="hideClosedChk" checked style="width:16px;height:16px;cursor:pointer">
+      <label for="hideClosedChk" style="font-size:13px;color:#555;cursor:pointer;margin:0">마감된 공고 숨기기</label>
+    </div>
+
+    <div id="notice-status" class="rbox warn"><p class="rtitle">⏳ 공고 데이터 불러오는 중...</p></div>
+    <div id="notice-list"></div>
+  </div>
+  </div> <!-- /main2 -->
+
+  <!-- ===== 대탭 3: AI 인사이트 (짓는 중) ===== -->
+  <div id="main3" class="main-section hidden">
+    <div class="panel">
+      <div class="building-box">
+        <div class="building-icon">🚧</div>
+        <p class="building-title">짓는 중이에요</p>
+        <p class="building-desc">국토부 정책, 금리 동향, 지역별 공급 추이를 분석해서<br>"지금이 신청하기 좋은 시기인지" 알려드릴 AI 인사이트를<br>준비하고 있어요. 조금만 기다려주세요!</p>
+        <div class="building-progress">🔨 골조 작업 중 · 데이터 수집 단계</div>
+      </div>
+    </div>
+  </div> <!-- /main3 -->
+
+  <!-- ===== 대탭 4: 내 신청관리 ===== -->
+  <div id="main4" class="main-section hidden">
+  <div class="subtabs">
+    <div class="step active" id="s3" onclick="goStep(3)">① 서류 체크</div>
+    <div class="step" id="s5" onclick="goStep(5)">② 저장한 공고</div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div id="panel3" class="panel">
+    <p class="panel-title">신청에 필요한 서류를 확인해요</p>
+    <div class="dday">
+      <div class="dday-num" id="dday-num">D-?</div>
+      <div class="dday-sub">신청 마감 2026.07.02(목) 16:00</div>
+    </div>
+    <p class="slabel">📋 공통 제출 서류</p>
+    <ul class="checklist" id="checklist-common"></ul>
+    <p class="slabel" style="margin-top:1.25rem">📎 자격별 추가 서류</p>
+    <ul class="checklist" id="checklist-cond"></ul>
+    <p class="slabel" style="margin-top:1.25rem">📌 신청 방법</p>
+    <ul class="checklist">
+      <li><span class="cicon creq">✓</span><span>LH청약플러스 (apply.lh.or.kr) 또는 모바일 앱으로 신청</span></li>
+      <li><span class="cicon creq">✓</span><span>공동인증서 또는 민간인증서(네이버·토스·KB국민) 미리 준비 필수</span></li>
+      <li><span class="cicon creq">✓</span><span>서류제출 기간: 7.6(월)~7.8(수), 온라인 제출만 가능 (우편 불가)</span></li>
+      <li><span class="cicon creq">✓</span><span>서류 발급: 공고일(2026.06.18) 이후 발급본만 인정</span></li>
+    </ul>
+    <button class="btn btn-sec" style="margin-top:1.25rem" onclick="window.open('https://apply.lh.or.kr','_blank')">LH청약플러스 바로가기 →</button>
+  </div>
+
+  <!-- STEP 5: 저장한 공고 (짓는 중) -->
+  <div id="panel5" class="panel hidden">
+    <div class="building-box">
+      <div class="building-icon">🧱</div>
+      <p class="building-title">기초공사 중이에요</p>
+      <p class="building-desc">마음에 드는 공고를 저장하고<br>표로 한눈에 비교할 수 있는 기능을<br>준비하고 있어요!</p>
+      <div class="building-progress">📐 설계 단계</div>
+    </div>
+  </div>
+  </div> <!-- /main4 -->
+
+  <!-- ===== 대탭 5: 환경설정 ===== -->
+  <div id="main5" class="main-section hidden">
+
+    <!-- 로그인 전: 이메일로 시작하기 -->
+    <div id="loginGate" class="panel">
+      <p class="panel-title">이메일로 시작하기</p>
+      <p class="sub" style="margin-bottom:1rem">이메일을 입력하면 저장하신 조건과 알림 설정을 불러올 수 있어요. (별도 비밀번호는 필요 없어요)</p>
+      <div class="field">
+        <label class="label">이메일 주소</label>
+        <input type="email" id="loginEmail" placeholder="example@email.com">
+      </div>
+      <button class="btn btn-primary" onclick="loginWithEmail()">시작하기 →</button>
+      <p id="loginMsg" style="font-size:12px;margin-top:8px;color:#888"></p>
+    </div>
+
+    <!-- 로그인 후: 환경설정 본체 -->
+    <div id="settingsBody" class="hidden">
+      <div class="panel" style="margin-bottom:1rem">
+        <p class="panel-title" style="margin-bottom:4px">⚙️ 환경설정</p>
+        <p style="font-size:12px;color:#999" id="currentUserEmail"></p>
+      </div>
+
+      <div class="panel" style="margin-bottom:1rem">
+        <p class="slabel" style="margin:0 0 0.75rem">🔔 알림 설정</p>
+        <div class="setting-row">
+          <div><div class="setting-label">전체 알림</div><div class="setting-sub">모든 알림을 받을지 결정해요</div></div>
+          <label class="toggle"><input type="checkbox" id="toggleAlertOn" checked onchange="onSettingChange()"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="setting-row">
+          <div><div class="setting-label">저장 조건 신규공고 알림</div><div class="setting-sub">내가 저장한 조건에 맞는 공고가 뜨면 알려드려요</div></div>
+          <label class="toggle"><input type="checkbox" id="toggleNewNotice" checked onchange="onSettingChange()"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="setting-row">
+          <div><div class="setting-label">마케팅 소식 알림</div><div class="setting-sub">ZipFit 이벤트, 새 기능 소식 등을 받아요</div></div>
+          <label class="toggle"><input type="checkbox" id="toggleMarketing" onchange="onSettingChange()"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom:1rem">
+        <p class="slabel" style="margin:0 0 0.75rem">🎨 화면 설정</p>
+        <div class="field">
+          <label class="label">테마</label>
+          <div class="chip-group">
+            <div class="chip sel" data-theme="light" onclick="setTheme('light')">☀️ 라이트</div>
+            <div class="chip" data-theme="dark" onclick="setTheme('dark')">🌙 다크</div>
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label class="label">글자 크기</label>
+          <div class="chip-group">
+            <div class="chip" data-fontsize="small" onclick="setFontSize('small')">작게</div>
+            <div class="chip sel" data-fontsize="normal" onclick="setFontSize('normal')">보통</div>
+            <div class="chip" data-fontsize="large" onclick="setFontSize('large')">크게</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <p class="slabel" style="margin:0 0 0.75rem">🚪 계정</p>
+        <button class="btn btn-sec" onclick="logoutUser()">다른 이메일로 전환</button>
+      </div>
+    </div>
+  </div> <!-- /main5 -->
+
+</div> <!-- /wrap -->
+
+<script>
+const NOTICE_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSgOU5GKWK2M_8UepwL53kEoyeXtZu2EcHCDFt-2GjCt41o0NMjUNRHQQhLhObxV6DiZ5ONUFfDhZ87/pub?output=csv";
+let noticeData = [];
+let noticeLoaded = false;
+
+function parseCSVLine(line){
+  const result=[];
+  let cur='', inQuotes=false;
+  for(let i=0;i<line.length;i++){
+    const c=line[i];
+    if(c==='"'){
+      if(inQuotes && line[i+1]==='"'){cur+='"';i++;}
+      else inQuotes=!inQuotes;
+    } else if(c===',' && !inQuotes){
+      result.push(cur); cur='';
+    } else cur+=c;
+  }
+  result.push(cur);
+  return result;
+}
+
+function parseCSV(text){
+  const lines=text.split(/\r?\n/).filter(l=>l.trim().length>0);
+  if(!lines.length) return [];
+  const headers=parseCSVLine(lines[0]).map(h=>h.trim());
+  return lines.slice(1).map(line=>{
+    const cols=parseCSVLine(line);
+    const obj={};
+    headers.forEach((h,i)=>obj[h]=(cols[i]||'').trim());
+    return obj;
+  });
+}
+
+async function loadNoticeData(){
+  const statusEl=document.getElementById('notice-status');
+  try{
+    const res=await fetch(NOTICE_CSV_URL+'&t='+Date.now());
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const text=await res.text();
+    noticeData=parseCSV(text);
+    noticeLoaded=true;
+    buildNoticeFilters();
+    renderNoticeList();
+  }catch(err){
+    statusEl.className='rbox err';
+    statusEl.innerHTML='<p class="rtitle">❌ 공고 데이터를 불러오지 못했어요</p><p class="rdesc">('+err.message+') 잠시 후 다시 시도해주세요.</p>';
+    console.error('ZipFit 공고 데이터 로드 실패:',err);
+  }
+}
+
+// 공급유형 텍스트에서 대분류 추출 (LH 원본 텍스트가 기관마다 달라질 수 있어 키워드 기반으로 분류)
+function classifyNoticeType(typeText,nameText){
+  const t=(typeText||'')+' '+(nameText||'');
+  if(t.includes('토지')) return '토지';
+  if(t.includes('상가') || t.includes('점포')) return '상가';
+  if(t.includes('분양')) return '분양주택';
+  if(t.includes('매입임대') || t.includes('전세임대')) return '매입·전세임대';
+  if(t.includes('행복주택')) return '행복주택';
+  if(t.includes('영구임대')) return '영구임대';
+  if(t.includes('국민임대')) return '국민임대';
+  if(t.includes('공공임대')) return '공공임대';
+  return '기타';
+}
+
+// 계층 뱃지 — 공고명/공급유형에서 대상 계층 키워드 추출 (복수 해당 가능)
+function classifyDemographics(typeText,nameText){
+  const t=(typeText||'')+' '+(nameText||'');
+  const tags=[];
+  if(t.includes('신혼')||t.includes('신생아')) tags.push({label:'신혼·신생아',color:'#1D9E75'});
+  if(t.includes('청년')) tags.push({label:'청년',color:'#378ADD'});
+  if(t.includes('대학생')) tags.push({label:'대학생',color:'#7F77DD'});
+  if(t.includes('고령자')||t.includes('노인')) tags.push({label:'고령자',color:'#EF9F27'});
+  if(t.includes('한부모')) tags.push({label:'한부모가족',color:'#D85A30'});
+  if(t.includes('장애인')) tags.push({label:'장애인',color:'#5DCAA5'});
+  return tags;
+}
+
+// 날짜 문자열(YYYY.MM.DD 또는 YYYY-MM-DD)을 Date로 안전 변환
+function parseNoticeDate(s){
+  if(!s) return null;
+  const cleaned=s.replace(/\./g,'-').trim();
+  const d=new Date(cleaned);
+  return isNaN(d.getTime())?null:d;
+}
+
+function isNewNotice(collectedAt){
+  const d=parseNoticeDate(collectedAt);
+  if(!d) return false;
+  const diffDays=(new Date()-d)/(1000*60*60*24);
+  return diffDays<=2;
+}
+
+function isClosingSoon(deadline){
+  const d=parseNoticeDate(deadline);
+  if(!d) return false;
+  const diffDays=(d-new Date())/(1000*60*60*24);
+  return diffDays>=0 && diffDays<=3;
+}
+
+// 지역 텍스트에서 시/도 단위 추출 (행정구역이 바뀌어도 자동 대응)
+function extractRegionTop(regionText){
+  if(!regionText) return '기타';
+  const r=regionText.trim();
+  const match=r.match(/^(\S+?[시도])/);
+  return match?match[1]:r.split(' ')[0]||'기타';
+}
+
+let selectedNoticeTypes=new Set();
+let selectedNoticeRegions=new Set();
+let selectedNoticeStatuses=new Set();
+
+function buildNoticeFilters(){
+  const types=[...new Set(noticeData.map(n=>classifyNoticeType(n['공급유형'],n['공고명'])))].sort();
+  const regions=[...new Set(noticeData.map(n=>extractRegionTop(n['지역'])))].sort();
+  const statuses=[...new Set(noticeData.map(n=>n['처리상태']).filter(Boolean))].sort();
+
+  buildFilterChips('noticeTypeChips',types,selectedNoticeTypes,renderNoticeList);
+  buildFilterChips('noticeRegionChips',regions,selectedNoticeRegions,renderNoticeList);
+  buildFilterChips('noticeStatusChips',statuses,selectedNoticeStatuses,renderNoticeList);
+
+  document.getElementById('hideClosedChk').onchange=renderNoticeList;
+}
+
+function buildFilterChips(wrapId,options,selSet,onChange){
+  const wrap=document.getElementById(wrapId);
+  wrap.innerHTML='';
+  const allChip=document.createElement('div');
+  allChip.className='chip chip-all sel';
+  allChip.textContent='전체';
+  allChip.dataset.value='__all__';
+  allChip.onclick=()=>{selSet.clear();renderChipState(wrapId,selSet);onChange();};
+  wrap.appendChild(allChip);
+  options.forEach(opt=>{
+    const c=document.createElement('div');
+    c.className='chip';
+    c.textContent=opt;
+    c.dataset.value=opt;
+    c.onclick=()=>{
+      if(selSet.has(opt))selSet.delete(opt);else selSet.add(opt);
+      renderChipState(wrapId,selSet);
+      onChange();
+    };
+    wrap.appendChild(c);
+  });
+}
+
+function renderNoticeList(){
+  const statusEl=document.getElementById('notice-status');
+  const listEl=document.getElementById('notice-list');
+  if(!noticeData.length){
+    statusEl.className='rbox warn';
+    statusEl.innerHTML='<p class="rtitle">⚠ 아직 수집된 공고가 없어요</p>';
+    return;
+  }
+
+  const hideClosed=document.getElementById('hideClosedChk').checked;
+  let filtered=noticeData.filter(n=>{
+    const isClosed=n['처리상태']==='접수마감' || n['처리상태']==='마감';
+    if(hideClosed && isClosed) return false;
+    if(selectedNoticeTypes.size>0 && !selectedNoticeTypes.has(classifyNoticeType(n['공급유형'],n['공고명']))) return false;
+    if(selectedNoticeRegions.size>0 && !selectedNoticeRegions.has(extractRegionTop(n['지역']))) return false;
+    if(selectedNoticeStatuses.size>0 && !selectedNoticeStatuses.has(n['처리상태'])) return false;
+    return true;
+  });
+
+  statusEl.className='rbox ok';
+  statusEl.innerHTML='<p class="rtitle">✅ 조건에 맞는 공고 '+filtered.length+'건 (전체 '+noticeData.length+'건 중)</p><p class="rdesc">매일 오전 9시 자동 업데이트</p>';
+
+  const sorted=[...filtered].reverse();
+  let html='';
+  sorted.forEach(n=>{
+    const isClosed = n['처리상태']==='접수마감' || n['처리상태']==='마감';
+    const isMetro = n['수도권여부']==='Y';
+    const demoTags = classifyDemographics(n['공급유형'],n['공고명']);
+    const isNew = !isClosed && isNewNotice(n['수집일시']);
+    const closingSoon = !isClosed && isClosingSoon(n['신청마감일']);
+    html+=`<div class="hcard" style="${isClosed?'opacity:0.5':''}">
+      <div class="htop">
+        <p class="hname">${n['공고명']||'(공고명 없음)'}</p>
+        <span class="htag ${isClosed?'tag-mix':'tag-apt'}">${n['처리상태']||'-'}</span>
+      </div>
+      <p class="haddr">${n['지역']||''} · ${classifyNoticeType(n['공급유형'],n['공고명'])} · ${n['공급유형']||''}</p>
+      <div class="chip-row" style="margin:8px 0;gap:5px">
+        ${isNew?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
+        ${closingSoon?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
+        ${demoTags.map(t=>`<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:${t.color};border-color:${t.color}">${t.label}</span>`).join('')}
+        ${isMetro?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#378ADD;border-color:#378ADD">수도권</span>':''}
+      </div>
+      <p style="font-size:12px;color:#888;margin-bottom:8px">신청기간: ${n['신청시작일']||'-'} ~ ${n['신청마감일']||'-'}</p>
+      ${n['공고URL']?`<a class="detail-link" href="${n['공고URL']}" target="_blank" style="display:block">📄 공고 원문 보기</a>`:''}
+    </div>`;
+  });
+  listEl.innerHTML=html || '<div class="rbox warn"><p class="rtitle">⚠ 조건에 맞는 공고가 없어요</p></div>';
+}
+</script>
+
+<script>
+const HOUSES=[
+  {id:1,city:"고양",name:"고양시 원흥동 (휴로스센트럴)",addr:"덕양구 서오릉로 644 휴로스센트럴 302동 1809호",type:"오피스텔",rooms:2,floor:18,area:48.75,dL:132718000,rL:158850,dH:151677000,rH:177800},
+  {id:2,city:"고양",name:"고양시 행신동 (라온팰리스) 607호",addr:"덕양구 소원로 111 라온팰리스빌딩 607호",type:"오피스텔",rooms:3,floor:6,area:77.4,dL:177385000,rL:249530,dH:202725000,rH:280670},
+  {id:3,city:"고양",name:"고양시 행신동 (라온팰리스) 706호",addr:"덕양구 소원로 111 라온팰리스빌딩 706호",type:"오피스텔",rooms:4,floor:7,area:81.68,dL:193325000,rL:270620,dH:220943000,rH:304570},
+  {id:4,city:"구리",name:"구리시 갈매동 (지웰에스테이트1차)",addr:"갈매순환로204번길 113 별내역 지웰에스테이트 1차 101동 1004호",type:"오피스텔",rooms:3,floor:10,area:84.82,dL:218447000,rL:332730,dH:249655000,rH:371100},
+  {id:5,city:"구리",name:"구리시 갈매동 (지웰에스테이트2차)",addr:"갈매중앙로 201-6 별내역 지웰에스테이트 2차 202동 404호",type:"오피스텔",rooms:3,floor:4,area:84.82,dL:196322000,rL:298850,dH:224367000,rH:333330},
+  {id:6,city:"김포",name:"김포시 구래동 (구래역한강리슈빌)",addr:"김포한강8로 377 구래역한강리슈빌 202동 303호",type:"아파트",rooms:3,floor:3,area:84.9,dL:134226000,rL:167600,dH:153402000,rH:184380},
+  {id:7,city:"김포",name:"김포시 마산동 (반도유보라3차) 1103호",addr:"김포한강8로 173-28 한강신도시 반도유보라3차 102동 1103호",type:"아파트",rooms:3,floor:11,area:60.0,dL:125602000,rL:169400,dH:143546000,rH:186600},
+  {id:8,city:"김포",name:"김포시 마산동 (반도유보라3차) 604호",addr:"김포한강8로 173-28 한강신도시 반도유보라3차 106동 604호",type:"아파트",rooms:3,floor:6,area:60.0,dL:125714000,rL:169470,dH:143674000,rH:186680},
+  {id:9,city:"김포",name:"김포시 마산동 (한강힐스테이트) 502동",addr:"김포한강7로22번길 22 한강힐스테이트 502동 601호",type:"아파트",rooms:3,floor:6,area:84.92,dL:135082000,rL:168980,dH:154380000,rH:185860},
+  {id:10,city:"김포",name:"김포시 마산동 (한강힐스테이트) 508동",addr:"김포한강7로22번길 22 한강힐스테이트 508동 603호",type:"아파트",rooms:3,floor:6,area:84.91,dL:139615000,rL:160780,dH:159560000,rH:179480},
+  {id:11,city:"김포",name:"김포시 운양동 (라비드퐁네프)",addr:"김포한강1로 238 라비드퐁네프 레드동 601호",type:"오피스텔",rooms:2,floor:6,area:47.65,dL:100042000,rL:144240,dH:114335000,rH:161810},
+  {id:12,city:"김포",name:"김포시 장기동 (모아미래도엘가)",addr:"김포한강2로 273 청송마을 모아미래도엘가 507동 205호",type:"아파트",rooms:3,floor:2,area:84.82,dL:143128000,rL:176820,dH:163575000,rH:194710},
+  {id:13,city:"남양주",name:"남양주시 다산동 (와이시티) 202호",addr:"경춘로 360 다산 와이시티 어반플랫 202호",type:"오피스텔",rooms:2,floor:2,area:55.94,dL:165380000,rL:240350,dH:189006000,rH:269380},
+  {id:14,city:"남양주",name:"남양주시 다산동 (와이시티) 203호",addr:"경춘로 360 다산 와이시티 어반플랫 203호",type:"오피스텔",rooms:2,floor:2,area:55.94,dL:165380000,rL:240350,dH:189006000,rH:269380},
+  {id:15,city:"남양주",name:"남양주시 다산동 (와이시티) 302호",addr:"경춘로 360 다산 와이시티 어반플랫 302호",type:"오피스텔",rooms:2,floor:3,area:55.94,dL:167049000,rL:242510,dH:190913000,rH:271830},
+  {id:16,city:"남양주",name:"남양주시 다산동 (와이시티) 402호",addr:"경춘로 360 다산 와이시티 어반플랫 402호",type:"오피스텔",rooms:2,floor:4,area:55.94,dL:168954000,rL:244910,dH:193090000,rH:274590},
+  {id:17,city:"남양주",name:"남양주시 다산동 (와이시티) 403호",addr:"경춘로 360 다산 와이시티 어반플랫 403호",type:"오피스텔",rooms:2,floor:4,area:55.94,dL:168954000,rL:244910,dH:193090000,rH:274590},
+  {id:18,city:"남양주",name:"남양주시 다산동 (와이시티) 503호",addr:"경춘로 360 다산 와이시티 어반플랫 503호",type:"오피스텔",rooms:2,floor:5,area:55.94,dL:170621000,rL:247010,dH:194996000,rH:276970},
+  {id:19,city:"남양주",name:"남양주시 다산동 (와이시티) 710호",addr:"경춘로 360 다산 와이시티 어반플랫 710호",type:"오피스텔",rooms:2,floor:7,area:55.94,dL:174989000,rL:252910,dH:199987000,rH:283630},
+  {id:20,city:"남양주",name:"남양주시 다산동 (와이시티) 802호",addr:"경춘로 360 다산 와이시티 어반플랫 802호",type:"오피스텔",rooms:2,floor:8,area:55.94,dL:172368000,rL:249340,dH:196993000,rH:279600},
+  {id:21,city:"남양주",name:"남양주시 다산동 (와이시티) 1003호",addr:"경춘로 360 다산 와이시티 어반플랫 1003호",type:"오피스텔",rooms:2,floor:10,area:55.94,dL:174035000,rL:251390,dH:198898000,rH:281940},
+  {id:22,city:"파주",name:"파주시 금촌동 (행복채)",addr:"황골로 74-6 행복채 701호",type:"혼합형",rooms:3,floor:7,area:72.49,dL:94999000,rL:129760,dH:108570000,rH:144460},
+  {id:23,city:"파주",name:"파주시 와동동 (레이크필드 위버젠) 2302호",addr:"경의로 1232 레이크필드 운정 위버젠 101동 2302호",type:"오피스텔",rooms:3,floor:23,area:83.79,dL:158125000,rL:256360,dH:180715000,rH:285530},
+  {id:24,city:"파주",name:"파주시 와동동 (레이크필드 위버젠) 2601호",addr:"경의로 1232 레이크필드 운정 위버젠 101동 2601호",type:"오피스텔",rooms:3,floor:26,area:83.79,dL:158125000,rL:256360,dH:180715000,rH:285530},
+  {id:25,city:"파주",name:"파주시 와동동 (레이크필드 위버젠) 801호",addr:"경의로 1232 레이크필드 운정 위버젠 103동 801호",type:"오피스텔",rooms:3,floor:8,area:83.45,dL:163229000,rL:251910,dH:186547000,rH:280570},
+  {id:26,city:"파주",name:"파주시 와동동 (레이크필드 위버젠) 902호 103동",addr:"경의로 1232 레이크필드 운정 위버젠 103동 902호",type:"오피스텔",rooms:3,floor:9,area:83.45,dL:166555000,rL:256190,dH:190349000,rH:285440},
+  {id:27,city:"파주",name:"파주시 와동동 (레이크필드 위버젠) 902호 104동",addr:"경의로 1232 레이크필드 운정 위버젠 104동 902호",type:"오피스텔",rooms:3,floor:9,area:83.79,dL:162958000,rL:251730,dH:186238000,rH:280340},
+  {id:28,city:"파주",name:"파주시 와동동 (레이크필드 위버젠) 1201호",addr:"경의로 1232 레이크필드 운정 위버젠 104동 1201호",type:"오피스텔",rooms:3,floor:12,area:83.79,dL:153505000,rL:250020,dH:175435000,rH:278340},
+  {id:29,city:"파주",name:"파주시 와동동 (레이크필드 위버젠) 1301호",addr:"경의로 1232 레이크필드 운정 위버젠 104동 1301호",type:"오피스텔",rooms:3,floor:13,area:83.79,dL:153505000,rL:250020,dH:175435000,rH:278340}
+];
+
+const LIMIT130={1:5720045,2:8212778,3:10618958,4:11442863,5:12125081};
+const LIMIT200={1:8389399,2:12319167,3:16336858,4:17604404,5:18653970};
+let diagMarital='';
+let selectedRegions=new Set();
+let selectedTypes=new Set();
+let currentSort='deposit-asc';
+let visibleCount=3;
+let lastFiltered=[];
+
+function fmt(n){return Math.round(n/10000).toLocaleString()+'만원';}
+function fmtR(n){return (Math.round(n/1000)/10).toLocaleString()+'만원';}
+
+// ── 지역/유형 칩을 데이터에서 동적으로 생성 (행정구역이 바뀌어도 자동 대응) ──
+function buildChipOptions(){
+  const regions=[...new Set(HOUSES.map(h=>h.city))].sort();
+  const regionWrap=document.getElementById('regionChips');
+  regionWrap.innerHTML='';
+  const allChip=document.createElement('div');
+  allChip.className='chip chip-all sel';
+  allChip.textContent='전체';
+  allChip.dataset.value='__all__';
+  allChip.onclick=()=>toggleAllRegions();
+  regionWrap.appendChild(allChip);
+  regions.forEach(r=>{
+    const c=document.createElement('div');
+    c.className='chip';
+    c.textContent=r;
+    c.dataset.value=r;
+    c.onclick=()=>toggleRegion(r);
+    regionWrap.appendChild(c);
+  });
+
+  const types=[...new Set(HOUSES.map(h=>h.type))].sort();
+  const typeWrap=document.getElementById('typeChips');
+  typeWrap.innerHTML='';
+  const allTypeChip=document.createElement('div');
+  allTypeChip.className='chip chip-all sel';
+  allTypeChip.textContent='전체';
+  allTypeChip.dataset.value='__all__';
+  allTypeChip.onclick=()=>toggleAllTypes();
+  typeWrap.appendChild(allTypeChip);
+  types.forEach(t=>{
+    const c=document.createElement('div');
+    c.className='chip';
+    c.textContent=t;
+    c.dataset.value=t;
+    c.onclick=()=>toggleType(t);
+    typeWrap.appendChild(c);
+  });
+}
+
+function toggleRegion(r){
+  if(selectedRegions.has(r))selectedRegions.delete(r);else selectedRegions.add(r);
+  renderChipState('regionChips',selectedRegions);
+}
+function toggleAllRegions(){
+  selectedRegions.clear();
+  renderChipState('regionChips',selectedRegions);
+}
+function toggleType(t){
+  if(selectedTypes.has(t))selectedTypes.delete(t);else selectedTypes.add(t);
+  renderChipState('typeChips',selectedTypes);
+}
+function toggleAllTypes(){
+  selectedTypes.clear();
+  renderChipState('typeChips',selectedTypes);
+}
+function renderChipState(wrapId,selSet){
+  const wrap=document.getElementById(wrapId);
+  [...wrap.children].forEach(c=>{
+    if(c.dataset.value==='__all__'){
+      c.classList.toggle('sel',selSet.size===0);
+    } else {
+      c.classList.toggle('sel',selSet.has(c.dataset.value));
+    }
+  });
+}
+
+function goMain(n){
+  [1,2,3,4,5].forEach(i=>{
+    document.getElementById('main'+i).classList.toggle('hidden',i!==n);
+    document.getElementById('m'+i).classList.toggle('active',i===n);
+  });
+  if(n===2 && !noticeLoaded) loadNoticeData();
+  if(n===5) renderSettingsGate();
+}
+
+function goStep(n){
+  // 맞춤추천 그룹(1,2)
+  if(n===1||n===2){
+    [1,2].forEach(i=>{
+      document.getElementById('panel'+i).classList.toggle('hidden',i!==n);
+      const s=document.getElementById('s'+i);
+      s.className='step'+(i===n?' active':i<n?' done':'');
+    });
+    return;
+  }
+  // 내신청관리 그룹(3,5)
+  if(n===3||n===5){
+    const map={3:'panel3',5:'panel5'};
+    [3,5].forEach(i=>{
+      document.getElementById(map[i]).classList.toggle('hidden',i!==n);
+      const s=document.getElementById('s'+i);
+      s.className='step'+(i===n?' active':'');
+    });
+    if(n===3) buildChecklist();
+    return;
+  }
+}
+
+function diagnose(){
+  const marital=document.getElementById('marital').value;
+  const children=parseInt(document.getElementById('children').value)||0;
+  const members=Math.min(parseInt(document.getElementById('members').value)||2,5);
+  const income=(parseFloat(document.getElementById('income').value)||0)*10000;
+  const assets=(parseFloat(document.getElementById('assets').value)||0)*10000;
+  const owned=document.getElementById('owned').value;
+  const r=document.getElementById('diag-result');
+  r.classList.remove('hidden'); r.innerHTML='';
+
+  if(!marital){r.innerHTML='<div class="rbox warn"><p class="rtitle">⚠ 혼인 상태를 선택해주세요</p></div>';return;}
+  if(owned==='yes'){r.innerHTML='<div class="rbox err"><p class="rtitle">❌ 신청 불가 — 주택 소유자</p><p class="rdesc">세대구성원 전원이 무주택이어야 신청 가능합니다. 주택 처분 후 무주택 기간을 확인해주세요.</p></div>';return;}
+
+  const lim130=LIMIT130[members], lim200=LIMIT200[members];
+  let incomeOk=true,incomeMsg='';
+  if(income>0){
+    if(income>lim200){incomeOk=false;incomeMsg=`소득 기준 초과 (맞벌이 기준 ${fmt(lim200)})`;}
+    else if(income>lim130) incomeMsg=`맞벌이 기준(${fmt(lim200)}) 충족 · 단독소득 기준(${fmt(lim130)}) 초과`;
+    else incomeMsg=`소득 기준 충족 (기준: ${fmt(lim130)})`;
+  }
+
+  const assetLim=362000000;
+  let assetOk=true,assetMsg='';
+  if(assets>0){assetOk=assets<=assetLim;assetMsg=assetOk?`자산 기준 충족 (기준: 3억 6,200만원)`:`자산 기준 초과 (기준: 3억 6,200만원)`;}
+
+  const rankMap={newborn:'1순위 (신생아 가구)',single_parent:'1순위 (지원대상 한부모가족)',married_7:children>0?'2순위 (미성년 자녀 있는 신혼부부)':'3순위 (미성년 자녀 없는 신혼부부)',pre:children>0?'2순위':'3순위',married_child6:'4순위 (6세 이하 자녀 혼인가구)',married:'5순위 (혼인가구)'};
+  const rank=rankMap[marital]||'확인 필요';
+  diagMarital=marital;
+
+  let html='';
+  if(!incomeOk||!assetOk){
+    html=`<div class="rbox err"><p class="rtitle">❌ 조건 미충족 가능성</p><p class="rdesc">${!incomeOk?'· '+incomeMsg+'<br>':''}${!assetOk?'· '+assetMsg:''}</p></div>`;
+  } else {
+    html=`<div class="rbox ok"><p class="rtitle">✅ 신청 가능 — ${rank}</p><p class="rdesc">${incomeMsg?'· '+incomeMsg+'<br>':''}${assetMsg?'· '+assetMsg+'<br>':''}· 신청기간: 2026.06.30(화) ~ 07.02(목) 16:00</p></div>`;
+    let gp=0;
+    if(children>=3)gp+=4;else if(children===2)gp+=3;else if(children===1)gp+=2;
+    if(gp)html+=`<div class="rbox warn"><p class="rtitle">📊 예상 가점: ${gp}점 (자녀 항목)</p><p class="rdesc">청약저축 납입횟수, 해당 시 거주기간, 장애인 등 추가 가점을 확인하세요.</p></div>`;
+    html+=`<button class="btn btn-primary" onclick="goStep(2)" style="margin-top:0.5rem">주택 매칭하러 가기 →</button>`;
+  }
+  r.innerHTML=html;
+}
+
+function matchHouses(){
+  const minDep=(parseFloat(document.getElementById('minDeposit').value)||0)*10000;
+  const maxDep=(parseFloat(document.getElementById('maxDeposit').value)||Infinity)*10000;
+  const minR=parseInt(document.getElementById('minRooms').value)||0;
+  const lvl=document.getElementById('incomeLevel').value;
+
+  let list=HOUSES.filter(h=>{
+    const d=lvl==='low'?h.dL:h.dH;
+    // 마감/접수마감 공고는 매칭 결과에서 자동 제외 (DB에는 보존, 추후 히스토리 비교용으로 활용)
+    if(h.status && (h.status==='접수마감' || h.status==='마감')) return false;
+    if(selectedRegions.size>0 && !selectedRegions.has(h.city))return false;
+    if(d<minDep || d>maxDep)return false;
+    if(h.rooms<minR)return false;
+    if(selectedTypes.size>0 && !selectedTypes.has(h.type))return false;
+    return true;
+  });
+
+  lastFiltered=list;
+  visibleCount=3;
+  currentSort='deposit-asc';
+  renderMatchResults(lvl);
+}
+
+let kakaoLoaded=false;
+let kakaoLoadPromise=null;
+
+function loadKakao(){
+  if(kakaoLoadPromise) return kakaoLoadPromise;
+  kakaoLoadPromise=new Promise((resolve,reject)=>{
+    let tries=0;
+    const check=()=>{
+      tries++;
+      if(typeof kakao!=='undefined' && kakao.maps && kakao.maps.load){
+        kakao.maps.load(()=>{kakaoLoaded=true;resolve();});
+        return;
+      }
+      if(tries>50){reject('카카오맵 SDK 로드 실패 (10초 초과)');return;}
+      setTimeout(check,200);
+    };
+    check();
+  });
+  return kakaoLoadPromise;
+}
+
+const POI_CATS={subway:{code:'SW8',label:'🚇 지하철'},park:{code:'AT4',label:'🌳 공원'},hospital:{code:'HP8',label:'🏥 병원'},childcare:{code:'PS3',label:'👶 어린이집'},school:{code:'SC4',label:'🏫 학교'},store:{code:'CS2',label:'🏪 편의점'},mart:{code:'MT1',label:'🛒 마트'}};
+
+function toggleDetail(id){
+  const el=document.getElementById('detail-'+id);
+  if(!el)return;
+  el.classList.toggle('hidden');
+  const h=HOUSES.find(x=>x.id===id);
+  if(!el.classList.contains('hidden') && !el.dataset.loaded){
+    el.dataset.loaded='1';
+    const q=encodeURIComponent(h.addr+' '+h.name);
+    el.innerHTML=`
+      <div class="detail-inner">
+        <div class="map-box" id="map-${id}"><div class="poi-loading">지도를 불러오는 중...</div></div>
+        <div class="poi-section">
+          <div class="poi-tabs" id="poitabs-${id}"></div>
+          <div class="poi-list" id="poilist-${id}"><div class="poi-loading">탭을 선택하면 주변 시설이 표시돼요</div></div>
+        </div>
+        <div class="detail-row">
+          <a class="detail-link" href="https://map.kakao.com/?q=${q}" target="_blank">📍 카카오맵 새 창</a>
+          <a class="detail-link" href="https://map.naver.com/p/search/${q}" target="_blank">📍 네이버지도</a>
+        </div>
+        <a class="detail-link" href="https://apply.lh.or.kr/lhapply/apply/wt/wrtanc/selectWrtancInfo.do?panId=2015122300020157&ccrCnntSysDsCd=03&uppAisTpCd=13&aisTpCd=26&mi=1026" target="_blank">📄 LH 공고 원문에서 평면도 확인</a>
+      </div>`;
+    initMapForHouse(h,id);
+  }
+}
+
+function initMapForHouse(h,id){
+  loadKakao().then(()=>{
+    const geocoder=new kakao.maps.services.Geocoder();
+    geocoder.addressSearch(h.addr,(result,status)=>{
+      const mapEl=document.getElementById('map-'+id);
+      if(status!==kakao.maps.services.Status.OK || !result.length){
+        mapEl.innerHTML='<div class="poi-loading">주소로 위치를 찾지 못했어요. 위 링크로 직접 확인해주세요.</div>';
+        return;
+      }
+      const coords=new kakao.maps.LatLng(result[0].y,result[0].x);
+      const map=new kakao.maps.Map(mapEl,{center:coords,level:4});
+      new kakao.maps.Marker({position:coords,map});
+      buildPoiTabs(id,coords);
+    });
+  }).catch((err)=>{
+    document.getElementById('map-'+id).innerHTML='<div class="poi-loading">지도를 불러올 수 없어요 ('+err+'). 카카오맵 새 창 링크를 이용해주세요.</div>';
+    console.error('ZipFit 지도 로드 실패:',err);
+  });
+}
+
+function buildPoiTabs(id,coords){
+  const tabWrap=document.getElementById('poitabs-'+id);
+  tabWrap.innerHTML='';
+  Object.entries(POI_CATS).forEach(([key,cat],i)=>{
+    const btn=document.createElement('button');
+    btn.className='poi-tab'+(i===0?' active':'');
+    btn.textContent=cat.label;
+    btn.onclick=()=>{
+      [...tabWrap.children].forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      searchPoi(id,coords,cat.code);
+    };
+    tabWrap.appendChild(btn);
+  });
+  searchPoi(id,coords,POI_CATS.subway.code);
+}
+
+function searchPoi(id,coords,catCode){
+  const listEl=document.getElementById('poilist-'+id);
+  listEl.innerHTML='<div class="poi-loading">검색 중...</div>';
+  const places=new kakao.maps.services.Places();
+  places.categorySearch(catCode,(data,status)=>{
+    if(status!==kakao.maps.services.Status.OK || !data.length){
+      listEl.innerHTML='<div class="poi-loading">반경 내 결과가 없어요</div>';
+      return;
+    }
+    const top=data.slice(0,5);
+    listEl.innerHTML=top.map(p=>`<div class="poi-item"><span>${p.place_name}</span><span class="poi-dist">${Math.round(p.distance)}m</span></div>`).join('');
+  },{location:coords,radius:1000,sort:kakao.maps.services.SortBy.DISTANCE});
+}
+
+function sortHouses(list,sortKey,lvl){
+  const dep=h=>lvl==='low'?h.dL:h.dH;
+  const rent=h=>lvl==='low'?h.rL:h.rH;
+  const sorted=[...list];
+  switch(sortKey){
+    case 'deposit-asc': sorted.sort((a,b)=>dep(a)-dep(b)); break;
+    case 'deposit-desc': sorted.sort((a,b)=>dep(b)-dep(a)); break;
+    case 'area-asc': sorted.sort((a,b)=>a.area-b.area); break;
+    case 'area-desc': sorted.sort((a,b)=>b.area-a.area); break;
+    case 'rent-asc': sorted.sort((a,b)=>rent(a)-rent(b)); break;
+    case 'rent-desc': sorted.sort((a,b)=>rent(b)-rent(a)); break;
+    case 'floor-asc': sorted.sort((a,b)=>a.floor-b.floor); break;
+    case 'floor-desc': sorted.sort((a,b)=>b.floor-a.floor); break;
+  }
+  return sorted;
+}
+
+function setSort(key){
+  currentSort=key;
+  visibleCount=3;
+  const lvl=document.getElementById('incomeLevel').value;
+  renderMatchResults(lvl);
+}
+
+function showMore(){
+  visibleCount+=5;
+  const lvl=document.getElementById('incomeLevel').value;
+  renderMatchResults(lvl);
+}
+
+function renderMatchResults(lvl){
+  const r=document.getElementById('match-result');
+  r.classList.remove('hidden');
+
+  if(!lastFiltered.length){
+    r.innerHTML='<div class="rbox warn"><p class="rtitle">⚠ 조건에 맞는 주택이 없습니다</p><p class="rdesc">보증금 범위를 넓히거나 지역·유형 선택을 늘려보세요.</p></div>';
+    return;
+  }
+
+  const sorted=sortHouses(lastFiltered,currentSort,lvl);
+  const shown=sorted.slice(0,visibleCount);
+
+  const sortLabels={'deposit-asc':'보증금↑','deposit-desc':'보증금↓','rent-asc':'월세↑','rent-desc':'월세↓','area-asc':'면적↑','area-desc':'면적↓','floor-asc':'층수↑','floor-desc':'층수↓'};
+
+  let html=`<div class="count-info"><span>총 ${sorted.length}개 주택 조건 충족</span></div>`;
+  html+=`<div class="sort-row">`;
+  Object.keys(sortLabels).forEach(k=>{
+    html+=`<button class="sort-btn ${currentSort===k?'active':''}" onclick="setSort('${k}')">${sortLabels[k]}</button>`;
+  });
+  html+=`</div>`;
+
+  shown.forEach((h,i)=>{
+    const d=lvl==='low'?h.dL:h.dH, rt=lvl==='low'?h.rL:h.rH;
+    const tc=h.type==='아파트'?'tag-apt':h.type==='오피스텔'?'tag-ofi':'tag-mix';
+    html+=`<div class="hcard ${i===0?'top1':''}">
+      <div class="htop">
+        <div>${i===0?'<span class="best">🏆 최적 추천</span>':''}<span class="rank">${i+1}위</span><p class="hname">${h.name}</p></div>
+        <span class="htag ${tc}">${h.type}</span>
+      </div>
+      <p class="haddr">${h.addr}</p>
+      <div class="hgrid">
+        <div class="mcard"><div class="mlabel">임대보증금</div><div class="mval">${fmt(d)}</div></div>
+        <div class="mcard"><div class="mlabel">월 임대료</div><div class="mval">${fmtR(rt)}</div></div>
+        <div class="mcard"><div class="mlabel">전용면적</div><div class="mval">${h.area}㎡</div></div>
+        <div class="mcard"><div class="mlabel">방 수</div><div class="mval">${h.rooms}개</div></div>
+        <div class="mcard"><div class="mlabel">층 수</div><div class="mval">${h.floor}층</div></div>
+        <div class="mcard"><div class="mlabel">승강기</div><div class="mval">있음</div></div>
+      </div>
+      <button class="detail-toggle-btn" onclick="toggleDetail(${h.id})">📍 위치·주변시설·평면도 더 보기 ▾</button>
+      <div class="detail-box hidden" id="detail-${h.id}"></div>
+    </div>`;
+  });
+
+  if(visibleCount<sorted.length){
+    html+=`<button class="more-btn" onclick="showMore()">더 보기 (${sorted.length-visibleCount}개 더 있음) ↓</button>`;
+  }
+
+  html+=`<div class="alert-signup-box" id="alertSignupBox">
+    <p style="font-size:14px;font-weight:600;color:#111;margin-bottom:6px">💾 이 검색 조건을 저장할까요?</p>
+    <p style="font-size:12px;color:#888;margin-bottom:12px">저장해두면 다음에 다시 입력하지 않아도 바로 검색할 수 있어요.</p>
+    ${currentUser?`<p style="font-size:12px;color:#0F6E56;margin-bottom:10px">✅ ${currentUser.email}로 저장됩니다</p>`:`<input type="email" id="alertEmail" placeholder="이메일 주소" style="width:100%;margin-bottom:10px">`}
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#444;margin-bottom:12px;cursor:pointer">
+      <input type="checkbox" id="newNoticeOptIn" checked style="width:16px;height:16px">
+      저장한 조건으로 새 공고가 뜨면 알림 받기
+    </label>
+    <button class="btn btn-primary" style="margin:0" onclick="saveUserProfile('${lvl}')">조건 저장하기</button>
+    <p id="alertSignupMsg" style="font-size:12px;margin-top:8px"></p>
+  </div>`;
+
+  html+=`<button class="btn btn-primary" onclick="goMain(4);goStep(3)" style="margin-top:0.5rem">서류 체크리스트 보기 →</button>`;
+
+  r.innerHTML=html;
+}
+
+async function saveUserProfile(lvl){
+  const emailInput=document.getElementById('alertEmail');
+  const email=currentUser?currentUser.email:(emailInput?emailInput.value.trim():'');
+  const msgEl=document.getElementById('alertSignupMsg');
+  if(!email || !email.includes('@')){
+    msgEl.style.color='#A32D2D';
+    msgEl.textContent='올바른 이메일 주소를 입력해주세요.';
+    return;
+  }
+  msgEl.style.color='#888';
+  msgEl.textContent='저장 중...';
+
+  const newNoticeOn=document.getElementById('newNoticeOptIn')?.checked?'Y':'N';
+
+  const payload={
+    userId: (currentUser&&currentUser['사용자ID'])||('u_'+Date.now()),
+    email: email,
+    marital: diagMarital||'',
+    children: document.getElementById('children').value||'',
+    members: document.getElementById('members').value||'',
+    income: document.getElementById('income').value||'',
+    assets: document.getElementById('assets').value||'',
+    regions: [...selectedRegions].join(','),
+    maxDeposit: document.getElementById('maxDeposit').value||'',
+    minRooms: document.getElementById('minRooms').value||'',
+    types: [...selectedTypes].join(','),
+    alertOn: 'Y',
+    newNoticeAlert: newNoticeOn,
+    marketingAlert: (currentUser&&currentUser['마케팅알림여부'])||'N',
+    theme: (currentUser&&currentUser['테마'])||'light',
+    fontSize: (currentUser&&currentUser['글자크기'])||'normal'
+  };
+
+  try{
+    const res=await fetch('https://hook.us2.make.com/ix65xgm9vzkxortb5xvvxmlwm152n3z3',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(payload)
+    });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    msgEl.style.color='#0F6E56';
+    msgEl.textContent = newNoticeOn==='Y' ? '✅ 조건 저장 완료! 새 공고가 뜨면 메일로 알려드릴게요.' : '✅ 조건이 저장됐어요.';
+    if(currentUser) currentUser.email=email; else { setCookie(ZF_COOKIE,email,365); currentUser={email}; }
+    if(emailInput) emailInput.value='';
+  }catch(err){
+    msgEl.style.color='#A32D2D';
+    msgEl.textContent='저장에 실패했어요. 잠시 후 다시 시도해주세요. ('+err.message+')';
+    console.error('ZipFit 사용자 프로필 저장 실패:',err);
+  }
+}
+
+function buildChecklist(){
+  const common=['주민등록표등본 — 세대구성원·전입일·사유 전부 표기 (주민번호 13자리)','주민등록표초본 — 과거 주소변동 이력 포함 발급','가족관계증명서 — 상세발급 (주민번호 13자리)','혼인관계증명서 (한부모·신생아 외)','개인정보 수집·이용 및 제3자 제공 동의서 — 세대원 전원 서명','금융정보 등 제공 동의서 — 세대원 전원 서명 (2란 모두)','자산 보유사실 확인서 — 임차보증금·분양권 해당 시 첨부 포함'];
+  const condMap={newborn:['출생증명서 또는 가족관계증명서 + 주민등록표등본 (출생 신고 전이면 출생증명서)','임신 중인 경우: 공고일(6.18) 이후 1개월 이내 발급 임신진단서'],single_parent:['지원대상 한부모가족 증명서 (행정복지센터)'],married_child6:['6세 이하 자녀 출생 관련 서류 (가족관계증명서로 확인)'],pre:['예비배우자 주민등록표등본','세대구성 확인서 (신청자·예비배우자 날인) — 공고문 첨부 양식 사용'],married_7:[],married:[]};
+  document.getElementById('checklist-common').innerHTML=common.map(t=>`<li><span class="cicon creq">✓</span><span>${t}</span></li>`).join('');
+  const conds=condMap[diagMarital]||[];
+  document.getElementById('checklist-cond').innerHTML=conds.length?conds.map(t=>`<li><span class="cicon ccond">!</span><span>${t}</span></li>`).join(''):'<li><span class="cicon creq">✓</span><span>추가 서류 없음 — 공통 서류로 충분합니다</span></li>';
+}
+
+const deadline=new Date('2026-07-02T16:00:00');
+const diff=Math.ceil((deadline-new Date())/(864e5));
+document.getElementById('dday-num').textContent=diff>0?`D-${diff}`:'D-Day';
+
+buildChipOptions();
+
+// ===== 환경설정 / 이메일 식별 시스템 =====
+const PROFILE_CSV_URL = "REPLACE_WITH_PROFILE_V2_CSV_URL"; // 다운님이 웹에 게시 후 받은 링크로 교체 예정
+const PROFILE_WEBHOOK_URL = "https://hook.us2.make.com/ix65xgm9vzkxortb5xvvxmlwm152n3z3";
+let currentUser = null; // { email, marital, children, ... }
+const ZF_COOKIE = 'zipfit_email';
+
+function setCookie(name,value,days){
+  const d=new Date(); d.setTime(d.getTime()+days*24*60*60*1000);
+  document.cookie = name+'='+encodeURIComponent(value)+';expires='+d.toUTCString()+';path=/';
+}
+function getCookie(name){
+  const match=document.cookie.match(new RegExp('(^| )'+name+'=([^;]+)'));
+  return match?decodeURIComponent(match[2]):null;
+}
+
+function renderSettingsGate(){
+  const saved=getCookie(ZF_COOKIE);
+  if(saved){
+    loginWithEmail(saved);
+  } else {
+    document.getElementById('loginGate').classList.remove('hidden');
+    document.getElementById('settingsBody').classList.add('hidden');
+  }
+}
+
+async function loginWithEmail(prefillEmail){
+  const email=(prefillEmail||document.getElementById('loginEmail').value||'').trim();
+  const msgEl=document.getElementById('loginMsg');
+  if(!email||!email.includes('@')){
+    if(msgEl){msgEl.style.color='#A32D2D';msgEl.textContent='올바른 이메일 주소를 입력해주세요.';}
+    return;
+  }
+  if(msgEl){msgEl.style.color='#888';msgEl.textContent='불러오는 중...';}
+
+  let profile={email};
+  try{
+    if(PROFILE_CSV_URL.startsWith('http')){
+      const res=await fetch(PROFILE_CSV_URL+'&t='+Date.now());
+      if(res.ok){
+        const text=await res.text();
+        const rows=parseCSV(text).filter(r=>r['이메일']===email);
+        if(rows.length) profile=rows[rows.length-1]; // 가장 최근 저장값
+      }
+    }
+  }catch(err){
+    console.warn('ZipFit 프로필 불러오기 실패(신규 사용자일 수 있음):',err);
+  }
+
+  currentUser=profile;
+  setCookie(ZF_COOKIE,email,365);
+  applySettingsToUI(profile);
+  document.getElementById('loginGate').classList.add('hidden');
+  document.getElementById('settingsBody').classList.remove('hidden');
+  document.getElementById('currentUserEmail').textContent=email+'님 환영해요';
+}
+
+function applySettingsToUI(p){
+  document.getElementById('toggleAlertOn').checked = p['알림수신여부']!=='N';
+  document.getElementById('toggleNewNotice').checked = p['신규공고알림여부']!=='N';
+  document.getElementById('toggleMarketing').checked = p['마케팅알림여부']==='Y';
+  setTheme(p['테마']==='dark'?'dark':'light',true);
+  setFontSize(p['글자크기']||'normal',true);
+}
+
+function setTheme(theme,silent){
+  document.body.classList.toggle('theme-dark',theme==='dark');
+  document.querySelectorAll('[data-theme]').forEach(c=>c.classList.toggle('sel',c.dataset.theme===theme));
+  if(!silent) onSettingChange();
+}
+function setFontSize(size,silent){
+  document.body.classList.remove('fs-small','fs-large');
+  if(size==='small') document.body.classList.add('fs-small');
+  if(size==='large') document.body.classList.add('fs-large');
+  document.querySelectorAll('[data-fontsize]').forEach(c=>c.classList.toggle('sel',c.dataset.fontsize===size));
+  if(!silent) onSettingChange();
+}
+
+async function onSettingChange(){
+  if(!currentUser) return;
+  const theme=document.querySelector('[data-theme].sel')?.dataset.theme||'light';
+  const fontSize=document.querySelector('[data-fontsize].sel')?.dataset.fontsize||'normal';
+  const payload={
+    userId: currentUser['사용자ID']||('u_'+Date.now()),
+    email: currentUser.email,
+    marital: currentUser['혼인상태']||'',
+    children: currentUser['자녀수']||'',
+    members: currentUser['가구원수']||'',
+    income: currentUser['월소득']||'',
+    assets: currentUser['총자산']||'',
+    regions: currentUser['희망지역']||'',
+    maxDeposit: currentUser['최대보증금']||'',
+    minRooms: currentUser['최소방수']||'',
+    types: currentUser['주택유형']||'',
+    alertOn: document.getElementById('toggleAlertOn').checked?'Y':'N',
+    newNoticeAlert: document.getElementById('toggleNewNotice').checked?'Y':'N',
+    marketingAlert: document.getElementById('toggleMarketing').checked?'Y':'N',
+    theme, fontSize
+  };
+  try{
+    await fetch(PROFILE_WEBHOOK_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  }catch(err){console.error('ZipFit 설정 저장 실패:',err);}
+}
+
+function logoutUser(){
+  document.cookie = ZF_COOKIE+'=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;';
+  currentUser=null;
+  document.getElementById('settingsBody').classList.add('hidden');
+  document.getElementById('loginGate').classList.remove('hidden');
+  document.getElementById('loginEmail').value='';
+}
+</script>
+</body>
+</html>
