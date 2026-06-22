@@ -1078,7 +1078,7 @@ document.getElementById('dday-num').textContent=diff>0?`D-${diff}`:'D-Day';
 buildChipOptions();
 
 // ===== 환경설정 / 이메일 식별 시스템 =====
-const PROFILE_WEBHOOK_URL = "https://khdpjjyspmlqtzperoqg.supabase.co/functions/v1/save-user-profile";
+const PROFILE_API_URL = "https://khdpjjyspmlqtzperoqg.supabase.co/functions/v1/save-user-profile";
 let currentUser = null; // { email, marital, children, ... }
 const ZF_COOKIE = 'zipfit_email';
 
@@ -1112,7 +1112,7 @@ async function loginWithEmail(prefillEmail){
 
   let profile={email};
   try{
-    const res=await fetch(PROFILE_WEBHOOK_URL+'?email='+encodeURIComponent(email));
+    const res=await fetch(PROFILE_API_URL+'?email='+encodeURIComponent(email));
     if(res.ok){
       const json=await res.json();
       if(json.data) profile={email,...json.data};
@@ -1171,7 +1171,7 @@ async function onSettingChange(){
     theme, fontSize
   };
   try{
-    await fetch(PROFILE_WEBHOOK_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    await fetch(PROFILE_API_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
   }catch(err){console.error('ZipFit 설정 저장 실패:',err);}
 }
 
