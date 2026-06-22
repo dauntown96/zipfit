@@ -1040,9 +1040,9 @@ async function saveUserProfile(lvl){
     types: [...selectedTypes].join(','),
     alertOn: 'Y',
     newNoticeAlert: newNoticeOn,
-    marketingAlert: (currentUser&&currentUser['마케팅알림여부'])||'N',
-    theme: (currentUser&&currentUser['테마'])||'light',
-    fontSize: (currentUser&&currentUser['글자크기'])||'normal'
+    marketingAlert: (currentUser&&currentUser.marketing_alert===true)?'Y':'N',
+    theme: (currentUser&&currentUser.theme)||'light',
+    fontSize: (currentUser&&currentUser.font_size)||'normal'
   };
 
   try{
@@ -1078,7 +1078,6 @@ document.getElementById('dday-num').textContent=diff>0?`D-${diff}`:'D-Day';
 buildChipOptions();
 
 // ===== 환경설정 / 이메일 식별 시스템 =====
-const PROFILE_CSV_URL = "https://docs.google.com/spreadsheets/d/1im0FmeYLK0djR8GNIpDWpizdTIwcl8bp1fmBL8-Lmww/pub?output=csv";
 const PROFILE_WEBHOOK_URL = "https://khdpjjyspmlqtzperoqg.supabase.co/functions/v1/save-user-profile";
 let currentUser = null; // { email, marital, children, ... }
 const ZF_COOKIE = 'zipfit_email';
@@ -1113,13 +1112,10 @@ async function loginWithEmail(prefillEmail){
 
   let profile={email};
   try{
-    if(PROFILE_CSV_URL.startsWith('http')){
-      const res=await fetch(PROFILE_CSV_URL+'&t='+Date.now());
-      if(res.ok){
-        const text=await res.text();
-        const rows=parseCSV(text).filter(r=>r['이메일']===email);
-        if(rows.length) profile=rows[rows.length-1]; // 가장 최근 저장값
-      }
+    const res=await fetch(PROFILE_WEBHOOK_URL+'?email='+encodeURIComponent(email));
+    if(res.ok){
+      const json=await res.json();
+      if(json.data) profile={email,...json.data};
     }
   }catch(err){
     console.warn('ZipFit 프로필 불러오기 실패(신규 사용자일 수 있음):',err);
@@ -1134,11 +1130,11 @@ async function loginWithEmail(prefillEmail){
 }
 
 function applySettingsToUI(p){
-  document.getElementById('toggleAlertOn').checked = p['알림수신여부']!=='N';
-  document.getElementById('toggleNewNotice').checked = p['신규공고알림여부']!=='N';
-  document.getElementById('toggleMarketing').checked = p['마케팅알림여부']==='Y';
-  setTheme(p['테마']==='dark'?'dark':'light',true);
-  setFontSize(p['글자크기']||'normal',true);
+  document.getElementById('toggleAlertOn').checked = p.alert_on!==false && p.alert_on!=='N';
+  document.getElementById('toggleNewNotice').checked = p.new_notice_alert!==false && p.new_notice_alert!=='N';
+  document.getElementById('toggleMarketing').checked = p.marketing_alert===true || p.marketing_alert==='Y';
+  setTheme(p.theme==='dark'?'dark':'light',true);
+  setFontSize(p.font_size||'normal',true);
 }
 
 function setTheme(theme,silent){
@@ -1159,17 +1155,16 @@ async function onSettingChange(){
   const theme=document.querySelector('[data-theme].sel')?.dataset.theme||'light';
   const fontSize=document.querySelector('[data-fontsize].sel')?.dataset.fontsize||'normal';
   const payload={
-    userId: currentUser['사용자ID']||('u_'+Date.now()),
     email: currentUser.email,
-    marital: currentUser['혼인상태']||'',
-    children: currentUser['자녀수']||'',
-    members: currentUser['가구원수']||'',
-    income: currentUser['월소득']||'',
-    assets: currentUser['총자산']||'',
-    regions: currentUser['희망지역']||'',
-    maxDeposit: currentUser['최대보증금']||'',
-    minRooms: currentUser['최소방수']||'',
-    types: currentUser['주택유형']||'',
+    marital: currentUser.marital||'',
+    children: currentUser.children||'',
+    members: currentUser.members||'',
+    income: currentUser.income||'',
+    assets: currentUser.assets||'',
+    regions: Array.isArray(currentUser.regions)?currentUser.regions.join(','):(currentUser.regions||''),
+    maxDeposit: currentUser.max_deposit||'',
+    minRooms: currentUser.min_rooms||'',
+    types: Array.isArray(currentUser.types)?currentUser.types.join(','):(currentUser.types||''),
     alertOn: document.getElementById('toggleAlertOn').checked?'Y':'N',
     newNoticeAlert: document.getElementById('toggleNewNotice').checked?'Y':'N',
     marketingAlert: document.getElementById('toggleMarketing').checked?'Y':'N',
