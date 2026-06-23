@@ -493,6 +493,7 @@ select:focus,input:focus{border-color:#5DCAA5}
 const NOTICE_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSgOU5GKWK2M_8UepwL53kEoyeXtZu2EcHCDFt-2GjCt41o0NMjUNRHQQhLhObxV6DiZ5ONUFfDhZ87/pub?output=csv";
 let noticeData = [];
 let noticeLoaded = false;
+let noticeLoading = false;
 
 function parseCSVLine(line){
   const result=[];
@@ -523,6 +524,8 @@ function parseCSV(text){
 }
 
 async function loadNoticeData(){
+  if(noticeLoading||noticeLoaded) return;
+  noticeLoading=true;
   const statusEl=document.getElementById('notice-status');
   try{
     const res=await fetch(NOTICE_CSV_URL+'&t='+Date.now());
@@ -536,6 +539,8 @@ async function loadNoticeData(){
     statusEl.className='rbox err';
     statusEl.innerHTML='<p class="rtitle">❌ 공고 데이터를 불러오지 못했어요</p><p class="rdesc">('+err.message+') 잠시 후 다시 시도해주세요.</p>';
     console.error('ZipFit 공고 데이터 로드 실패:',err);
+  }finally{
+    noticeLoading=false;
   }
 }
 
@@ -643,6 +648,7 @@ function buildFilterChips(wrapId,options,selSet,onChange){
 function renderNoticeList(){
   const statusEl=document.getElementById('notice-status');
   const listEl=document.getElementById('notice-list');
+  listEl.innerHTML='';
   if(!noticeData.length){
     statusEl.className='rbox warn';
     statusEl.innerHTML='<p class="rtitle">⚠ 아직 수집된 공고가 없어요</p>';
