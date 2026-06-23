@@ -490,48 +490,35 @@ select:focus,input:focus{border-color:#5DCAA5}
 </div> <!-- /wrap -->
 
 <script>
-const NOTICE_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSgOU5GKWK2M_8UepwL53kEoyeXtZu2EcHCDFt-2GjCt41o0NMjUNRHQQhLhObxV6DiZ5ONUFfDhZ87/pub?output=csv";
 let noticeData = [];
 let noticeLoaded = false;
 let noticeLoading = false;
-
-function parseCSVLine(line){
-  const result=[];
-  let cur='', inQuotes=false;
-  for(let i=0;i<line.length;i++){
-    const c=line[i];
-    if(c==='"'){
-      if(inQuotes && line[i+1]==='"'){cur+='"';i++;}
-      else inQuotes=!inQuotes;
-    } else if(c===',' && !inQuotes){
-      result.push(cur); cur='';
-    } else cur+=c;
-  }
-  result.push(cur);
-  return result;
-}
-
-function parseCSV(text){
-  const lines=text.split(/\r?\n/).filter(l=>l.trim().length>0);
-  if(!lines.length) return [];
-  const headers=parseCSVLine(lines[0]).map(h=>h.trim());
-  return lines.slice(1).map(line=>{
-    const cols=parseCSVLine(line);
-    const obj={};
-    headers.forEach((h,i)=>obj[h]=(cols[i]||'').trim());
-    return obj;
-  });
-}
 
 async function loadNoticeData(){
   if(noticeLoading||noticeLoaded) return;
   noticeLoading=true;
   const statusEl=document.getElementById('notice-status');
   try{
-    const res=await fetch(NOTICE_CSV_URL+'&t='+Date.now());
+    const res=await fetch(
+      `${SUPABASE_URL}/rest/v1/announcements_deduped?select=*&order=created_at.desc&limit=500`,
+      {headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY}}
+    );
     if(!res.ok) throw new Error('HTTP '+res.status);
-    const text=await res.text();
-    noticeData=parseCSV(text);
+    const rows=await res.json();
+    noticeData=rows.map(r=>({
+      '공고명': r.title||'',
+      '지역': r.region||'',
+      '공급유형': r.housing_type||'',
+      '공급기관': r.supply_org||'',
+      '신청시작일': r.apply_start||'',
+      '신청마감일': r.apply_end||'',
+      '처리상태': r.status||'',
+      '공고URL': r.url||'',
+      '수집일시': r.created_at||'',
+      'created_at': r.created_at||'',
+      'apply_start': r.apply_start||'',
+      'apply_end': r.apply_end||'',
+    }));
     noticeLoaded=true;
     buildNoticeFilters();
     renderNoticeList();
