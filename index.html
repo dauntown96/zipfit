@@ -745,8 +745,8 @@ let settingsTypes=new Set();
 async function loadRegionsFromSupabase(){
   try{
     const res=await fetch(
-      `${SUPABASE_URL}/rest/v1/announcements_deduped?select=region&region=not.is.null`,
-      {headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY}}
+      `${SUPABASE_URL}/rest/v1/rpc/get_announcements_deduped`,
+      {method:'POST', headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY,'Content-Type':'application/json'}, body:'{}'}
     );
     if(res.ok){
       const rows=await res.json();
@@ -906,6 +906,9 @@ function goMain(n){
   if(n===2 && !noticeLoaded) loadNoticeData();
   if(n===5) renderSettingsGate();
 }
+
+// 페이지 로드 시 전국 지역 목록 초기화
+loadRegionsFromSupabase();
 
 function goStep(n){
   // 맞춤추천 그룹(1,2)
