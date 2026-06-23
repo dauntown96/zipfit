@@ -143,7 +143,7 @@ select:focus,input:focus{border-color:#5DCAA5}
 <div class="wrap">
   <div class="hero">
     <div class="logo">🏠 <span>Zip</span>Fit</div>
-    <p class="sub">LH 신혼·신생아 매입임대Ⅱ 전세형 · 경기북부 맞춤 주택 매칭 서비스<br>내 조건에 딱 맞는 집을 3분 만에 찾아드립니다.</p>
+    <p class="sub">전국 공공임대·분양 공고 맞춤 매칭 서비스<br>LH·SH·GH 등 공공기관 공고를 한 곳에서. 내 조건에 맞는 집을 빠르게 찾아드립니다.</p>
     <span class="badge">📢 2026년 경기북부 2차 공고 · 신청기간 6.30~7.2</span>
   </div>
 
@@ -157,6 +157,18 @@ select:focus,input:focus{border-color:#5DCAA5}
 
   <!-- ===== 대탭 1: 맞춤 추천 ===== -->
   <div id="main1" class="main-section">
+
+  <!-- 맞춤 공고 추천 (로그인 사용자 전용) -->
+  <div id="personalizedPanel" class="panel" style="margin-bottom:1rem;display:none">
+    <p class="panel-title" style="margin-bottom:0.5rem">🎯 맞춤 추천 공고</p>
+    <p style="font-size:12px;color:#999;margin-bottom:1rem" id="personalizedDesc"></p>
+    <div id="personalizedList"></div>
+  </div>
+  <div id="personalizedPrompt" class="rbox warn" style="margin-bottom:1rem;display:none">
+    <p class="rtitle">💡 맞춤 추천을 받으려면?</p>
+    <p class="rdesc">설정 탭에서 이메일로 로그인하고 조건을 저장하면 내 조건에 맞는 공고를 바로 추천해드려요.</p>
+  </div>
+
   <div class="subtabs">
     <div class="step active" id="s1" onclick="goStep(1)">① 자격 진단</div>
     <div class="step" id="s2" onclick="goStep(2)">② 주택 매칭</div>
@@ -562,15 +574,20 @@ function parseNoticeDate(s){
   return isNaN(d.getTime())?null:d;
 }
 
-function isNewNotice(collectedAt){
-  const d=parseNoticeDate(collectedAt);
+function isNewNotice(row){
+  // CSV: 수집일시 / Supabase: created_at
+  const raw=row['수집일시']||row['created_at']||(typeof row==='string'?row:'');
+  const d=parseNoticeDate(raw);
   if(!d) return false;
-  const diffDays=(new Date()-d)/(1000*60*60*24);
-  return diffDays<=2;
+  // 한국시간 기준 48시간 이내
+  const diffHours=(new Date()-d)/3600000;
+  return diffHours<=48;
 }
 
-function isClosingSoon(deadline){
-  const d=parseNoticeDate(deadline);
+function isClosingSoon(row){
+  // CSV: 신청마감일 / Supabase: apply_end
+  const raw=row['신청마감일']||row['apply_end']||(typeof row==='string'?row:'');
+  const d=parseNoticeDate(raw);
   if(!d) return false;
   const diffDays=(d-new Date())/(1000*60*60*24);
   return diffDays>=0 && diffDays<=3;
@@ -651,22 +668,28 @@ function renderNoticeList(){
     const isClosed = n['처리상태']==='접수마감' || n['처리상태']==='마감';
     const isMetro = n['수도권여부']==='Y';
     const demoTags = classifyDemographics(n['공급유형'],n['공고명']);
-    const isNew = !isClosed && isNewNotice(n['수집일시']);
-    const closingSoon = !isClosed && isClosingSoon(n['신청마감일']);
+    const isNew = !isClosed && isNewNotice(n);
+    const closingSoon = !isClosed && isClosingSoon(n);
+    const announcementDate = n['모집공고일']||n['announcement_date']||'';
+    const applyStart = n['신청시작일']||n['apply_start']||'';
+    const applyEnd = n['신청마감일']||n['apply_end']||'';
+    const dateLine = announcementDate
+      ? `모집공고: ${announcementDate} / 접수기간: ${applyStart||'-'} ~ ${applyEnd||'-'}`
+      : `접수기간: ${applyStart||'-'} ~ ${applyEnd||'-'}`;
     html+=`<div class="hcard" style="${isClosed?'opacity:0.5':''}">
       <div class="htop">
-        <p class="hname">${n['공고명']||'(공고명 없음)'}</p>
-        <span class="htag ${isClosed?'tag-mix':'tag-apt'}">${n['처리상태']||'-'}</span>
+        <p class="hname">${n['공고명']||n['name']||'(공고명 없음)'}</p>
+        <span class="htag ${isClosed?'tag-mix':'tag-apt'}">${n['처리상태']||n['status']||'-'}</span>
       </div>
-      <p class="haddr">${n['지역']||''} · ${classifyNoticeType(n['공급유형'],n['공고명'])} · ${n['공급유형']||''}</p>
+      <p class="haddr">${n['지역']||n['region']||''} · ${classifyNoticeType(n['공급유형']||n['housing_type']||'',n['공고명']||n['name']||'')} · ${n['공급유형']||n['housing_type']||''}</p>
       <div class="chip-row" style="margin:8px 0;gap:5px">
         ${isNew?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
         ${closingSoon?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
         ${demoTags.map(t=>`<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:${t.color};border-color:${t.color}">${t.label}</span>`).join('')}
         ${isMetro?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#378ADD;border-color:#378ADD">수도권</span>':''}
       </div>
-      <p style="font-size:12px;color:#888;margin-bottom:8px">신청기간: ${n['신청시작일']||'-'} ~ ${n['신청마감일']||'-'}</p>
-      ${n['공고URL']?`<a class="detail-link" href="${n['공고URL']}" target="_blank" style="display:block">📄 공고 원문 보기</a>`:''}
+      <p style="font-size:12px;color:#888;margin-bottom:8px">${dateLine}</p>
+      ${(n['공고URL']||n['url'])?`<a class="detail-link" href="${n['공고URL']||n['url']}" target="_blank" style="display:block">📄 공고 원문 보기</a>`:''}
     </div>`;
   });
   listEl.innerHTML=html || '<div class="rbox warn"><p class="rtitle">⚠ 조건에 맞는 공고가 없어요</p></div>';
@@ -719,11 +742,34 @@ function fmt(n){return Math.round(n/10000).toLocaleString()+'만원';}
 function fmtR(n){return (Math.round(n/1000)/10).toLocaleString()+'만원';}
 
 // ── 지역/유형 칩을 데이터에서 동적으로 생성 (행정구역이 바뀌어도 자동 대응) ──
+const SUPABASE_URL='https://khdpjjyspmlqtzperoqg.supabase.co';
+const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtoZHBqanlzcG1scXR6cGVyb3FnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk2MDM3MDYsImV4cCI6MjA2NTE3OTcwNn0.xtpHFCSSudXO5b5UXIy0yAHDFX_HgNWQCqXYJjMFZPc';
+
+let allRegions=[]; // Supabase에서 로드한 전국 지역 목록
 let settingsRegions=new Set();
 let settingsTypes=new Set();
 
+async function loadRegionsFromSupabase(){
+  try{
+    const res=await fetch(
+      `${SUPABASE_URL}/rest/v1/announcements?select=region&region=not.is.null`,
+      {headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY}}
+    );
+    if(res.ok){
+      const rows=await res.json();
+      const seen=new Set(rows.map(r=>extractRegionTop(r.region)).filter(Boolean));
+      allRegions=[...seen].sort();
+    }
+  }catch(e){
+    console.warn('지역 목록 로드 실패, HOUSES 기반 사용:',e);
+  }
+  // fallback: HOUSES cities
+  if(!allRegions.length) allRegions=[...new Set(HOUSES.map(h=>h.city))].sort();
+  buildChipOptions();
+}
+
 function buildChipOptions(){
-  const regions=[...new Set(HOUSES.map(h=>h.city))].sort();
+  const regions=allRegions.length?allRegions:[...new Set(HOUSES.map(h=>h.city))].sort();
   const types=[...new Set(HOUSES.map(h=>h.type))].sort();
 
   // 추천 탭 칩
@@ -787,11 +833,83 @@ function renderChipState(wrapId,selSet){
   });
 }
 
+function renderPersonalizedRecommendations(){
+  const panel=document.getElementById('personalizedPanel');
+  const prompt=document.getElementById('personalizedPrompt');
+  if(!panel||!prompt) return;
+
+  if(!currentUser){
+    panel.style.display='none';
+    prompt.style.display='block';
+    return;
+  }
+
+  const savedRegions=Array.isArray(currentUser.regions)?currentUser.regions:(typeof currentUser.regions==='string'?currentUser.regions.split(',').filter(Boolean):[]);
+  const savedTypes=Array.isArray(currentUser.types)?currentUser.types:(typeof currentUser.types==='string'?currentUser.types.split(',').filter(Boolean):[]);
+  const hasConditions=savedRegions.length||savedTypes.length;
+
+  prompt.style.display='none';
+  panel.style.display='block';
+
+  if(!noticeLoaded || !noticeData.length){
+    document.getElementById('personalizedList').innerHTML='<div class="rbox warn"><p class="rtitle">⏳ 공고 데이터를 불러오는 중이에요</p></div>';
+    document.getElementById('personalizedDesc').textContent='';
+    return;
+  }
+
+  let filtered=noticeData.filter(n=>{
+    const isClosed=n['처리상태']==='접수마감'||n['처리상태']==='마감';
+    if(isClosed) return false;
+    if(savedRegions.length && !savedRegions.includes(extractRegionTop(n['지역']))) return false;
+    if(savedTypes.length && !savedTypes.some(t=>classifyNoticeType(n['공급유형'],n['공고명'])===t||n['공급유형']?.includes(t))) return false;
+    return true;
+  });
+
+  const desc=document.getElementById('personalizedDesc');
+  if(!hasConditions){
+    filtered=noticeData.filter(n=>n['처리상태']!=='접수마감'&&n['처리상태']!=='마감').slice(0,5);
+    desc.textContent='저장된 조건이 없어 전체 공고를 표시해요. 설정 탭에서 조건을 저장하면 맞춤 추천을 받을 수 있어요.';
+  } else {
+    desc.textContent=`저장된 조건 기준 ${filtered.length}건 매칭됐어요.`;
+  }
+
+  const shown=filtered.slice(0,5);
+  if(!shown.length){
+    document.getElementById('personalizedList').innerHTML='<div class="rbox warn"><p class="rtitle">⚠ 조건에 맞는 공고가 없어요</p><p class="rdesc">설정에서 조건을 조정해보세요.</p></div>';
+    return;
+  }
+
+  let html='';
+  shown.forEach(n=>{
+    const announcementDate=n['모집공고일']||n['announcement_date']||'';
+    const applyStart=n['신청시작일']||n['apply_start']||'';
+    const applyEnd=n['신청마감일']||n['apply_end']||'';
+    const dateLine=announcementDate?`모집공고: ${announcementDate} / 접수기간: ${applyStart||'-'} ~ ${applyEnd||'-'}`:`접수기간: ${applyStart||'-'} ~ ${applyEnd||'-'}`;
+    const closingSoon=isClosingSoon(n);
+    html+=`<div class="hcard">
+      <div class="htop">
+        <p class="hname">${n['공고명']||n['name']||'(공고명 없음)'}</p>
+        <span class="htag tag-apt">${n['처리상태']||'-'}</span>
+      </div>
+      <p class="haddr">${n['지역']||''} · ${n['공급유형']||''}</p>
+      <div class="chip-row" style="margin:6px 0;gap:5px">
+        ${isNewNotice(n)?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
+        ${closingSoon?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
+      </div>
+      <p style="font-size:12px;color:#888;margin-bottom:8px">${dateLine}</p>
+      ${(n['공고URL']||n['url'])?`<a class="detail-link" href="${n['공고URL']||n['url']}" target="_blank" style="display:block">📄 공고 원문 보기</a>`:''}
+    </div>`;
+  });
+  if(filtered.length>5) html+=`<p style="font-size:12px;color:#888;text-align:center;margin-top:8px">외 ${filtered.length-5}건 더 — 공고 탭에서 전체 확인</p>`;
+  document.getElementById('personalizedList').innerHTML=html;
+}
+
 function goMain(n){
   [1,2,3,4,5].forEach(i=>{
     document.getElementById('main'+i).classList.toggle('hidden',i!==n);
     document.getElementById('m'+i).classList.toggle('active',i===n);
   });
+  if(n===1) renderPersonalizedRecommendations();
   if(n===2 && !noticeLoaded) loadNoticeData();
   if(n===5) renderSettingsGate();
 }
@@ -1140,7 +1258,7 @@ const deadline=new Date('2026-07-02T16:00:00');
 const diff=Math.ceil((deadline-new Date())/(864e5));
 document.getElementById('dday-num').textContent=diff>0?`D-${diff}`:'D-Day';
 
-buildChipOptions();
+loadRegionsFromSupabase(); // ② 전국 지역 동적 로드 후 buildChipOptions() 호출
 
 // ===== 환경설정 / 이메일 식별 시스템 =====
 const PROFILE_API_URL = "https://khdpjjyspmlqtzperoqg.supabase.co/functions/v1/save-user-profile";
