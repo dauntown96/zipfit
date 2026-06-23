@@ -500,8 +500,8 @@ async function loadNoticeData(){
   const statusEl=document.getElementById('notice-status');
   try{
     const res=await fetch(
-      `${SUPABASE_URL}/rest/v1/announcements_deduped?select=*&order=created_at.desc&limit=500`,
-      {headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY}}
+      `${SUPABASE_URL}/rest/v1/rpc/get_announcements_deduped`,
+      {method:'POST',headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY,'Content-Type':'application/json'},body:'{}'}
     );
     if(!res.ok) throw new Error('HTTP '+res.status);
     const rows=await res.json();
