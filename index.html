@@ -288,21 +288,28 @@ select:focus,input:focus{border-color:#5DCAA5}
     <p class="panel-title">실시간 LH 공고 전체 목록</p>
     <p class="sub" style="margin-bottom:1rem">매일 자동 수집되는 LH 전국 공고예요. ZipFit이 신혼·신생아·청년 타깃과 수도권 여부를 자동으로 표시해드려요.</p>
 
-    <div class="field">
-      <label class="label">공고 유형</label>
-      <div class="chip-group" id="noticeTypeChips"></div>
-    </div>
-    <div class="field">
-      <label class="label">지역</label>
-      <div class="chip-group" id="noticeRegionChips"></div>
-    </div>
-    <div class="field">
-      <label class="label">공고 상태</label>
-      <div class="chip-group" id="noticeStatusChips"></div>
-    </div>
-    <div class="field" style="display:flex;align-items:center;gap:8px">
-      <input type="checkbox" id="hideClosedChk" checked style="width:16px;height:16px;cursor:pointer">
-      <label for="hideClosedChk" style="font-size:13px;color:#555;cursor:pointer;margin:0">마감된 공고 숨기기</label>
+    <!-- 필터 토글 버튼 -->
+    <button class="detail-toggle-btn" id="filterToggleBtn" onclick="toggleNoticeFilter()" style="margin-bottom:0.75rem;text-align:left">
+      🔍 필터 열기 ▾
+    </button>
+    <!-- 필터 패널 (기본 닫힘) -->
+    <div id="noticeFilterPanel" class="hidden" style="background:#fafaf6;border-radius:12px;padding:1rem;margin-bottom:0.75rem;border:1px solid #e8e8e0">
+      <div class="field">
+        <label class="label">공고 유형</label>
+        <div class="chip-group" id="noticeTypeChips"></div>
+      </div>
+      <div class="field">
+        <label class="label">지역</label>
+        <div class="chip-group" id="noticeRegionChips"></div>
+      </div>
+      <div class="field" style="margin-bottom:0.5rem">
+        <label class="label">공고 상태</label>
+        <div class="chip-group" id="noticeStatusChips"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:0.5rem">
+        <input type="checkbox" id="hideClosedChk" checked style="width:16px;height:16px;cursor:pointer">
+        <label for="hideClosedChk" style="font-size:13px;color:#555;cursor:pointer;margin:0">마감된 공고 숨기기</label>
+      </div>
     </div>
 
     <div id="notice-status" class="rbox warn"><p class="rtitle">⏳ 공고 데이터 불러오는 중...</p></div>
@@ -553,7 +560,15 @@ function extractRegionTop(regionText){
   return m ? m[1] : regionText.trim().split(' ')[0] || '기타';
 }
 
-// ── 필터 칩 목록: 첫 로드 시 전체 데이터에서 추출해 저장 ──
+// ── 필터 토글 ──
+function toggleNoticeFilter(){
+  const panel = document.getElementById('noticeFilterPanel');
+  const btn   = document.getElementById('filterToggleBtn');
+  const open  = panel.classList.toggle('hidden');
+  btn.textContent = open ? '🔍 필터 열기 ▾' : '🔍 필터 닫기 ▴';
+}
+
+// ── 필터 칩 목록: 첫 로드 시 region_top·status_normalized 사용 (중복 없음) ──
 async function initNoticeFilters(){
   try{
     const res = await fetch(
@@ -562,9 +577,10 @@ async function initNoticeFilters(){
     );
     if(!res.ok) throw new Error('HTTP '+res.status);
     const rows = await res.json();
-    const regions  = [...new Set(rows.map(r => extractRegionTop(r.region)).filter(Boolean))].sort();
+    // region_top, status_normalized는 RPC에서 이미 정규화된 값
+    const regions  = [...new Set(rows.map(r => r.region_top).filter(Boolean))].sort();
     const types    = [...new Set(rows.map(r => classifyNoticeType(r.housing_type||'', r.title||'')))].sort();
-    const statuses = [...new Set(rows.map(r => r.status).filter(Boolean))].sort();
+    const statuses = [...new Set(rows.map(r => r.status_normalized).filter(Boolean))].sort();
     noticeFilterOptions = { regions, types, statuses };
     buildNoticeFilterChips();
     noticeLoaded = true;
@@ -646,11 +662,13 @@ async function loadNoticeData(){
     noticeData = rows.map(r => ({
       '공고명':    r.title||'',
       '지역':      r.region||'',
+      '지역대분류': r.region_top||'',
       '공급유형':  r.housing_type||'',
       '공급기관':  r.supply_org||'',
       '신청시작일': r.apply_start||'',
       '신청마감일': r.apply_end||'',
       '처리상태':  r.status||'',
+      '처리상태정규화': r.status_normalized||r.status||'',
       '공고URL':   r.url||'',
       '수집일시':  r.created_at||'',
       'created_at': r.created_at||'',
@@ -659,10 +677,10 @@ async function loadNoticeData(){
       'announcement_date': r.announcement_date||'',
     }));
 
-    // 마감 숨기기 (status 칩 직접 선택 없을 때만)
+    // 마감 숨기기 (status 칩 직접 선택 없을 때만, 정규화 상태 기준)
     let filtered = noticeData;
     if(hideClosed && !activeNoticeStatus){
-      filtered = noticeData.filter(n => n['처리상태'] !== '접수마감' && n['처리상태'] !== '마감');
+      filtered = noticeData.filter(n => n['처리상태정규화'] !== '접수마감');
     }
 
     renderNoticeList(filtered, noticeData.length);
@@ -692,7 +710,7 @@ function renderNoticeList(filtered, totalCount){
   const sorted = [...filtered].reverse();
   let html = '';
   sorted.forEach(n => {
-    const isClosed   = n['처리상태']==='접수마감' || n['처리상태']==='마감';
+    const isClosed   = n['처리상태정규화']==='접수마감';
     const demoTags   = classifyDemographics(n['공급유형'], n['공고명']);
     const isNew      = !isClosed && isNewNotice(n);
     const closingSoon = !isClosed && isClosingSoon(n);
