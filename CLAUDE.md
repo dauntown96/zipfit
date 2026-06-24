@@ -123,8 +123,9 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
    - `updateBannerFromDB()` 추가 — 접수중 공고 우선, 없으면 최신 공고 1건으로 배너 자동 업데이트
 
 ### 🟡 기능 개선
-- NEW 배지 동적 계산 (`created_at` 기준 48시간)
-- 마감임박 배지 (`apply_end` 기준 3일 이내)
+- ✅ NEW 배지 동적 계산 (`created_at` 기준 48시간) — 이미 구현됨 확인
+- ✅ 마감임박 배지 (`apply_end` 기준 3일 이내) — 이미 구현됨 확인
+- ✅ 공고 탭 헤더 "전국 공공임대·분양 공고 전체 목록" 수정 완료
 - 정정공고 처리 (`[정정공고]` 감지 → 기존 공고 숨김)
 - 공고 카드에 `area_min/max`, `total_units`, `move_in_date` 표시
 
@@ -141,6 +142,7 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-06-25 | 공고 탭 헤더 전국화, NEW/마감임박 배지 동적 구현 확인 |
 | 2026-06-25 | 확성기 배너 동적화 — updateBannerFromDB() 추가, DB 최신/접수중 공고 자동 표시 |
 | 2026-06-25 | 알림 설정 저장 버그 수정 — saveSettings() currentUser 알림 필드 누락 수정 |
 | 2026-06-24 | CLAUDE.md 단일 세이브포인트 체계 + 슬래시 커맨드 도입 |
