@@ -2,7 +2,7 @@
 
 > **이 파일이 유일한 세이브포인트입니다.**
 > Claude Code와 claude.ai 모두 이 파일을 기준으로 작업합니다.
-> **마지막 업데이트**: 2026-06-24
+> **마지막 업데이트**: 2026-06-25
 
 ---
 
@@ -116,9 +116,8 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 1. ✅ ~~**맞춤추천 `currentUser` 타이밍 버그**~~ (완료 2026-06-23)
    - `loginWithEmail()` 내 `currentUser=profile` 직후 `renderPersonalizedRecommendations()` 재호출 추가
 
-2. **알림 설정 저장 버그**
-   - 증상: 전체알림·신규공고알림·마케팅알림 토글 저장 안 됨
-   - 원인: `onSettingChange()` 호출 시 `currentUser` 필드 누락으로 덮어쓰기 발생
+2. ✅ ~~**알림 설정 저장 버그**~~ (완료 2026-06-25)
+   - `saveSettings()` 내 `currentUser` 업데이트 시 `alert_on`, `new_notice_alert`, `marketing_alert` 필드 누락 수정
 
 3. **확성기 배너 동적화**
    - 증상: `.badge` 텍스트 하드코딩 ("2026년 경기북부 2차 공고")
@@ -143,6 +142,7 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-06-25 | 알림 설정 저장 버그 수정 — saveSettings() currentUser 알림 필드 누락 수정 |
 | 2026-06-24 | CLAUDE.md 단일 세이브포인트 체계 + 슬래시 커맨드 도입 |
 | 2026-06-23 | 맞춤추천 `currentUser` 타이밍 버그 수정 |
 | 2026-06-23 | 지역 필터 전국화, Supabase RPC 전환, GitHub Pages 배포 전환 |

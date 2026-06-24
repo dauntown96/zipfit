@@ -1411,7 +1411,7 @@ async function saveSettings(){
   try{
     const res=await fetch(PROFILE_API_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     if(!res.ok) throw new Error('HTTP '+res.status);
-    currentUser={...currentUser,...payload,max_deposit:payload.maxDeposit,min_rooms:payload.minRooms};
+    currentUser={...currentUser,...payload,alert_on:payload.alertOn,new_notice_alert:payload.newNoticeAlert,marketing_alert:payload.marketingAlert,max_deposit:payload.maxDeposit,min_rooms:payload.minRooms};
     msgEl.style.color='#0F6E56';
     msgEl.textContent='✅ 조건이 저장됐어요.';
   }catch(err){
