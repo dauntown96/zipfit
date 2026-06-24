@@ -2,7 +2,7 @@
 
 > **이 파일이 유일한 세이브포인트입니다.**
 > Claude Code와 claude.ai 모두 이 파일을 기준으로 작업합니다.
-> **마지막 업데이트**: 2026-06-25 (모바일 UX 개선 — 탭바 sticky, detail-grid 반응형, hgrid 2열, hname 2줄 말줄임)
+> **마지막 업데이트**: 2026-06-25 (Supabase API 에러 처리 전면 보강 — 4개 함수 에러 메시지·재시도 버튼·body 검증)
 
 ---
 
@@ -149,6 +149,7 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-06-25 | Supabase API 에러 처리 전면 보강 — initNoticeFilters/loadNoticeData/matchHouses/saveSettings 에러 UI·재시도 버튼·응답 body 검증 추가 |
 | 2026-06-25 | 모바일 UX 개선 — .maintabs sticky top:0, .detail-grid @media 1열 전환, .hgrid @media 2열 전환, .hname 2줄 말줄임 |
 | 2026-06-25 | 공고 탭 필터 UX 개선 — 필터 초기화 버튼, 필터 적용 중 버튼 텍스트 표시, 전체/필터 시 공고 수 문구 분기 |
 | 2026-06-25 | 추천탭 매칭 카드 공고탭 수준 통일 — 배지(정정·NEW·마감임박·인구통계), accordion 상세펼침, 날짜 중복 개선, 버튼 클릭 시 matchHouses() 자동 호출 |
