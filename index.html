@@ -789,6 +789,21 @@ async function loadNoticeData(){
   }
 }
 
+async function shareNotice(btn, title, region, type, url){
+  const shareUrl = url || 'https://dauntown96.github.io/zipfit';
+  const text = [region, type].filter(Boolean).join(' · ') + ' | ZipFit';
+  if(navigator.share){
+    try{ await navigator.share({ title, text, url: shareUrl }); }catch(e){ if(e.name!=='AbortError') console.warn('공유 실패:', e); }
+  } else {
+    try{
+      await navigator.clipboard.writeText(shareUrl);
+      const orig = btn.textContent;
+      btn.textContent = '✅ 링크 복사됨!';
+      setTimeout(() => { btn.textContent = orig; }, 1500);
+    }catch(e){ console.warn('클립보드 복사 실패:', e); }
+  }
+}
+
 function renderNoticeList(filtered, totalCount){
   const statusEl = document.getElementById('notice-status');
   const listEl   = document.getElementById('notice-list');
@@ -841,14 +856,22 @@ function renderNoticeList(filtered, totalCount){
     if(annDate) detailRows.push(['공고일', annDate]);
     if(applyStart||applyEnd) detailRows.push(['접수기간', (applyStart||'-')+' ~ '+(applyEnd||'-')]);
 
+    const nTitle = (n['공고명']||'').replace(/'/g,"\\'");
+    const nRegion = (n['지역']||'').replace(/'/g,"\\'");
+    const nType = (n['공급유형']||'').replace(/'/g,"\\'");
+    const nUrl = (n['공고URL']||'').replace(/'/g,"\\'");
+    const shareBtn = `<button class="detail-link" style="border:1px solid #1D9E75;color:#1D9E75;background:#fff;cursor:pointer;margin-top:10px" onclick="event.stopPropagation();shareNotice(this,'${nTitle}','${nRegion}','${nType}','${nUrl}')">🔗 이 공고 공유하기</button>`;
     const detailHTML = detailRows.length
       ? `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px;transition:all 0.2s">
           <div class="detail-grid">
             ${detailRows.map(([k,v])=>`<div style="font-size:12px"><span style="color:#999">${k}</span><br><span style="color:#333;font-weight:500">${v}</span></div>`).join('')}
           </div>
-          ${n['공고URL']?`<a class="detail-link" href="${n['공고URL']}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block;margin-top:10px">📄 공고 원문 보기</a>`:''}
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+            ${n['공고URL']?`<a class="detail-link" href="${n['공고URL']}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a>`:''}
+            ${shareBtn}
+          </div>
         </div>`
-      : (n['공고URL']?`<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px"><a class="detail-link" href="${n['공고URL']}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a></div>`:'');
+      : `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px"><div style="display:flex;gap:8px;flex-wrap:wrap">${n['공고URL']?`<a class="detail-link" href="${n['공고URL']}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a>`:''} ${shareBtn}</div></div>`;
 
     html += `<div class="hcard" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="(function(el){var d=el.querySelector('[id^=ncard-detail]');if(!d)return;var open=d.style.display==='block';d.style.display=open?'none':'block';el.style.borderColor=open?'':'#1D9E75';})(this)">
       <div class="htop">
@@ -1403,14 +1426,22 @@ function renderMatchResults(rows){
     if(annDate) detailRows.push(['공고일', annDate]);
     if(applyStart||applyEnd) detailRows.push(['접수기간', (applyStart||'-')+' ~ '+(applyEnd||'-')]);
 
+    const mTitle = (n.title||'').replace(/'/g,"\\'");
+    const mRegion = (n.region||'').replace(/'/g,"\\'");
+    const mType = (n.housing_type||'').replace(/'/g,"\\'");
+    const mUrl = (n.url||'').replace(/'/g,"\\'");
+    const mShareBtn = `<button class="detail-link" style="border:1px solid #1D9E75;color:#1D9E75;background:#fff;cursor:pointer" onclick="event.stopPropagation();shareNotice(this,'${mTitle}','${mRegion}','${mType}','${mUrl}')">🔗 이 공고 공유하기</button>`;
     const detailHTML = detailRows.length
       ? `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px">
           <div class="detail-grid">
             ${detailRows.map(([k,v])=>`<div style="font-size:12px"><span style="color:#999">${k}</span><br><span style="color:#333;font-weight:500">${v}</span></div>`).join('')}
           </div>
-          ${n.url?`<a class="detail-link" href="${n.url}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block;margin-top:10px">📄 공고 원문 보기</a>`:''}
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+            ${n.url?`<a class="detail-link" href="${n.url}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a>`:''}
+            ${mShareBtn}
+          </div>
         </div>`
-      : (n.url?`<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px"><a class="detail-link" href="${n.url}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a></div>`:'');
+      : `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px"><div style="display:flex;gap:8px;flex-wrap:wrap">${n.url?`<a class="detail-link" href="${n.url}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a>`:''} ${mShareBtn}</div></div>`;
 
     html += `<div class="hcard" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="(function(el){var d=el.querySelector('[id^=mcard-detail]');if(!d)return;var open=d.style.display==='block';d.style.display=open?'none':'block';el.style.borderColor=open?'':'#1D9E75';})(this)">
       <div class="htop">
