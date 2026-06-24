@@ -529,6 +529,8 @@ select:focus,input:focus{border-color:#5DCAA5}
 let noticeData = [];
 let noticeLoaded = false;   // 필터 칩 초기 로드 여부
 let noticeLoading = false;
+let noticeVisibleCount = 20;
+let noticeFiltered = [];
 
 // 현재 선택된 필터값 (단일 선택, null = 전체)
 let activeNoticeRegion = null;
@@ -778,6 +780,8 @@ async function loadNoticeData(){
       return 0;
     });
 
+    noticeFiltered = filtered;
+    noticeVisibleCount = 20;
     renderNoticeList(filtered, noticeData.length);
     updateFilterToggleBtn();
   }catch(err){
@@ -822,8 +826,9 @@ function renderNoticeList(filtered, totalCount){
   statusEl.className = 'rbox ok';
   statusEl.innerHTML = '<p class="rtitle">✅ '+countText+'</p><p class="rdesc">매일 오전 9시 자동 업데이트</p>';
 
+  const shown = filtered.slice(0, noticeVisibleCount);
   let html = '';
-  filtered.forEach((n, idx) => {
+  shown.forEach((n, idx) => {
     const isClosed   = n['처리상태정규화']==='접수마감';
     const isAmended  = (n['공고명']||'').includes('[정정공고]');
     const demoTags   = classifyDemographics(n['공급유형'], n['공고명']);
@@ -889,7 +894,15 @@ function renderNoticeList(filtered, totalCount){
       ${detailHTML}
     </div>`;
   });
+  if(noticeVisibleCount < filtered.length){
+    html += `<button class="more-btn" onclick="noticeShowMore()">더 보기 (${filtered.length - noticeVisibleCount}건 더) ↓</button>`;
+  }
   listEl.innerHTML = html;
+}
+
+function noticeShowMore(){
+  noticeVisibleCount += 20;
+  renderNoticeList(noticeFiltered, noticeData.length);
 }
 </script>
 <script>
