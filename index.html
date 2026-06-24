@@ -675,6 +675,10 @@ async function loadNoticeData(){
       'apply_start': r.apply_start||'',
       'apply_end':   r.apply_end||'',
       'announcement_date': r.announcement_date||'',
+      'area_min': r.area_min,
+      'area_max': r.area_max,
+      'total_units': r.total_units,
+      'move_in_date': r.move_in_date,
     }));
 
     // 마감 숨기기 (status 칩 직접 선택 없을 때만, 정규화 상태 기준)
@@ -734,6 +738,7 @@ function renderNoticeList(filtered, totalCount){
         ${demoTags.map(t=>`<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:${t.color};border-color:${t.color}">${t.label}</span>`).join('')}
       </div>
       <p style="font-size:12px;color:#888;margin-bottom:8px">${dateLine}</p>
+      ${(n['area_min']||n['total_units']||n['move_in_date'])?`<p style="font-size:12px;color:#888;margin-bottom:8px">${n['area_min']?`전용 ${parseFloat(n['area_min']).toFixed(1)}㎡`:''} ${n['area_min']&&n['area_max']&&n['area_min']!==n['area_max']?`~ ${parseFloat(n['area_max']).toFixed(1)}㎡`:''} ${n['total_units']?`· ${n['total_units']}세대`:''} ${n['move_in_date']?`· 입주 ${n['move_in_date']}`:''}</p>`:''}
       ${n['공고URL']?`<a class="detail-link" href="${n['공고URL']}" target="_blank" style="display:block">📄 공고 원문 보기</a>`:''}
     </div>`;
   });

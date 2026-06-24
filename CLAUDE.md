@@ -2,7 +2,7 @@
 
 > **이 파일이 유일한 세이브포인트입니다.**
 > Claude Code와 claude.ai 모두 이 파일을 기준으로 작업합니다.
-> **마지막 업데이트**: 2026-06-25 (정정공고 배지 추가)
+> **마지막 업데이트**: 2026-06-25 (공고 카드 면적·세대수·입주예정 표시 추가)
 
 ---
 
@@ -127,7 +127,7 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 - ✅ 마감임박 배지 (`apply_end` 기준 3일 이내) — 이미 구현됨 확인
 - ✅ 공고 탭 헤더 "전국 공공임대·분양 공고 전체 목록" 수정 완료
 - ✅ 정정공고 처리 (`[정정공고]` 감지 → 배지 표시) (완료 2026-06-25)
-- 공고 카드에 `area_min/max`, `total_units`, `move_in_date` 표시
+- ✅ 공고 카드에 `area_min/max`, `total_units`, `move_in_date` 표시 (완료 2026-06-25)
 
 ### 🟢 중장기
 - SH·GH 등 추가 공공기관 API 연동
@@ -142,6 +142,7 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-06-25 | 공고 카드 필드 추가 — 면적(area_min/max), 세대수(total_units), 입주예정(move_in_date) 표시 |
 | 2026-06-25 | 정정공고 배지 추가 — renderNoticeList()에 isAmended 감지 + 🔄 정정 배지 렌더링 |
 | 2026-06-25 | 공고 탭 헤더 전국화, NEW/마감임박 배지 동적 구현 확인 |
 | 2026-06-25 | 확성기 배너 동적화 — updateBannerFromDB() 추가, DB 최신/접수중 공고 자동 표시 |
