@@ -25,7 +25,7 @@ body.fs-large{font-size:17px}
 .badge{display:inline-block;font-size:11px;padding:4px 12px;border-radius:20px;background:#E1F5EE;color:#085041;margin-top:0.75rem;font-weight:500}
 .steps{display:flex;gap:8px;margin-bottom:1.5rem}
 /* 대탭 (메인 카테고리) */
-.maintabs{display:flex;gap:6px;margin-bottom:1rem;background:#ece9e0;padding:5px;border-radius:14px}
+.maintabs{display:flex;gap:6px;margin-bottom:1rem;background:#ece9e0;padding:5px;border-radius:14px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,0.08)}
 .maintab{flex:1;padding:0.65rem 0.2rem;border-radius:10px;font-size:11.5px;font-weight:600;color:#777;text-align:center;cursor:pointer;transition:all 0.15s;border:none;background:transparent}
 .maintab.active{background:#fff;color:#0F6E56;box-shadow:0 1px 3px rgba(0,0,0,0.08)}
 .maintab-icon{display:block;font-size:18px;margin-bottom:2px}
@@ -79,13 +79,15 @@ select:focus,input:focus{border-color:#5DCAA5}
 .hcard{background:#fff;border:1px solid #e8e8e0;border-radius:14px;padding:1rem 1.25rem;margin-bottom:0.75rem;transition:border-color 0.15s}
 .hcard.top1{border:2px solid #1D9E75}
 .htop{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;gap:8px}
-.hname{font-size:14px;font-weight:600;color:#111;margin-top:4px}
+.hname{font-size:14px;font-weight:600;color:#111;margin-top:4px;flex:1;min-width:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .htag{font-size:11px;padding:3px 10px;border-radius:10px;font-weight:500;white-space:nowrap;flex-shrink:0}
 .tag-apt{background:#E6F1FB;color:#0C447C}
 .tag-ofi{background:#EEEDFE;color:#3C3489}
 .tag-mix{background:#EAF3DE;color:#27500A}
 .haddr{font-size:12px;color:#888;margin-bottom:10px;line-height:1.5}
 .hgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px}
+@media(max-width:400px){.hgrid{grid-template-columns:repeat(2,1fr)}.detail-grid{grid-template-columns:1fr}}
 .mcard{background:#f8f8f4;border-radius:8px;padding:7px 8px;text-align:center}
 .mlabel{font-size:10px;color:#999;margin-bottom:2px}
 .mval{font-size:13px;font-weight:600;color:#111}
@@ -827,7 +829,7 @@ function renderNoticeList(filtered, totalCount){
 
     const detailHTML = detailRows.length
       ? `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px;transition:all 0.2s">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px">
+          <div class="detail-grid">
             ${detailRows.map(([k,v])=>`<div style="font-size:12px"><span style="color:#999">${k}</span><br><span style="color:#333;font-weight:500">${v}</span></div>`).join('')}
           </div>
           ${n['공고URL']?`<a class="detail-link" href="${n['공고URL']}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block;margin-top:10px">📄 공고 원문 보기</a>`:''}
@@ -1384,7 +1386,7 @@ function renderMatchResults(rows){
 
     const detailHTML = detailRows.length
       ? `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px">
+          <div class="detail-grid">
             ${detailRows.map(([k,v])=>`<div style="font-size:12px"><span style="color:#999">${k}</span><br><span style="color:#333;font-weight:500">${v}</span></div>`).join('')}
           </div>
           ${n.url?`<a class="detail-link" href="${n.url}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block;margin-top:10px">📄 공고 원문 보기</a>`:''}
