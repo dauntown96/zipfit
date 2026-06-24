@@ -817,10 +817,10 @@ function renderNoticeList(filtered, totalCount){
 </script>
 <script>
 const HOUSING_CRITERIA = {
-  '매입임대':     { incomePct: 100, assetLimit: 36200, targets: ['신혼부부','신생아가구','한부모가족','유자녀혼인가구'] },
-  '행복주택':     { incomePct: 120, assetLimit: 36200, targets: ['신혼부부','청년','대학생','고령자','주거급여수급자'] },
-  '국민임대':     { incomePct: 70,  assetLimit: 36200, targets: ['전체'] },
-  '영구임대':     { incomePct: 50,  assetLimit: 36200, targets: ['전체'] },
+  '매입임대':     { incomePct: 100, assetLimit: 36200, targets: ['신혼부부','신생아가구','한부모가족','유자녀혼인가구','청년'] },
+  '행복주택':     { incomePct: 120, assetLimit: 36200, targets: ['신혼부부','청년','대학생','고령자','장애인','주거급여수급자'] },
+  '국민임대':     { incomePct: 70,  assetLimit: 36200, targets: ['전체','청년','장애인','고령자'] },
+  '영구임대':     { incomePct: 50,  assetLimit: 24100, targets: ['전체'] },
   '통합공공임대': { incomePct: 150, assetLimit: 36200, targets: ['전체'] },
   '분양':         { incomePct: 160, assetLimit: 50000, targets: ['전체'] },
 };
@@ -1108,13 +1108,16 @@ function diagnose(){
   renderChipState('typeChips', selectedTypes);
 
   let html='';
-  if(!incomeOk||!assetOk){
-    html=`<div class="rbox err"><p class="rtitle">❌ 조건 미충족 가능성</p><p class="rdesc">${!incomeOk?'· '+incomeMsg+'<br>':''}${!assetOk?'· '+assetMsg:''}</p></div>`;
+  if(window.eligibleTypes.length === 0){
+    html=`<div class="rbox err"><p class="rtitle">❌ 신청 가능한 유형 없음</p><p class="rdesc">입력하신 소득·자산 조건으로는 신청 가능한 유형이 없어요.<br>소득·자산 기준을 다시 확인해보세요.</p></div>`;
   } else {
-    html=`<div class="rbox ok"><p class="rtitle">✅ 신청 가능 — ${rank}</p><p class="rdesc">${incomeMsg?'· '+incomeMsg+'<br>':''}${assetMsg?'· '+assetMsg+'<br>':''}· 신청기간: 2026.06.30(화) ~ 07.02(목) 16:00</p></div>`;
+    const typeList = window.eligibleTypes.map(t=>`· ${t}`).join(' ');
+    html=`<div class="rbox ok"><p class="rtitle">✅ 신청 가능한 주택 유형</p><p class="rdesc">${typeList}<br><span style="font-size:11px;color:#999">소득·자산 기준을 충족한 유형이에요. 정확한 자격은 각 공고문을 확인하세요.</span></p></div>`;
+    if(incomeMsg) html+=`<div class="rbox warn" style="margin-top:6px"><p class="rdesc" style="margin:0">· ${incomeMsg}</p></div>`;
+    if(assetMsg)  html+=`<div class="rbox warn" style="margin-top:6px"><p class="rdesc" style="margin:0">· ${assetMsg}</p></div>`;
     let gp=0;
     if(children>=3)gp+=4;else if(children===2)gp+=3;else if(children===1)gp+=2;
-    if(gp)html+=`<div class="rbox warn"><p class="rtitle">📊 예상 가점: ${gp}점 (자녀 항목)</p><p class="rdesc">청약저축 납입횟수, 해당 시 거주기간, 장애인 등 추가 가점을 확인하세요.</p></div>`;
+    if(gp)html+=`<div class="rbox warn" style="margin-top:6px"><p class="rtitle">📊 예상 가점: ${gp}점 (자녀 항목)</p><p class="rdesc">청약저축 납입횟수, 해당 시 거주기간, 장애인 등 추가 가점을 확인하세요.</p></div>`;
     html+=`<button class="btn btn-primary" onclick="goStep(2)" style="margin-top:0.5rem">주택 매칭하러 가기 →</button>`;
   }
   r.innerHTML=html;
