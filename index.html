@@ -759,6 +759,8 @@ async function loadNoticeData(){
       'deposit_min': r.deposit_min,
       'rent_min': r.rent_min,
       'is_revised': r.is_revised||false,
+      'sido_nm': r.sido_nm||'',
+      'sigungu_nm': r.sigungu_nm||'',
     }));
 
     // 마감 숨기기 (status 칩 직접 선택 없을 때만, 정규화 상태 기준)
@@ -888,7 +890,7 @@ function renderNoticeList(filtered, totalCount){
         </div>`
       : `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px"><div style="display:flex;gap:8px;flex-wrap:wrap">${n['공고URL']?`<a class="detail-link" href="${n['공고URL']}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a>`:''} ${shareBtn}</div></div>`;
 
-    html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="(function(el){var d=el.querySelector('[id^=ncard-detail]');if(!d)return;var open=d.style.display==='block';d.style.display=open?'none':'block';el.style.borderColor=open?'':'#1D9E75';el.setAttribute('aria-expanded',open?'false':'true');})(this)" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
+    html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n['지역']||'').replace(/"/g,'&quot;')}" data-sido="${(n['sido_nm']||'').replace(/"/g,'&quot;')}" data-sigungu="${(n['sigungu_nm']||'').replace(/"/g,'&quot;')}" data-title="${(n['공고명']||'').replace(/"/g,'&quot;')}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this)" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
       <div class="htop">
         <p class="hname">${n['공고명']||'(공고명 없음)'}</p>
         <span class="htag ${isClosed?'tag-mix':'tag-apt'}">${n['처리상태']||'-'}</span>
@@ -1309,48 +1311,72 @@ function loadKakao(){
 
 const POI_CATS={subway:{code:'SW8',label:'🚇 지하철'},park:{code:'AT4',label:'🌳 공원'},hospital:{code:'HP8',label:'🏥 병원'},childcare:{code:'PS3',label:'👶 어린이집'},school:{code:'SC4',label:'🏫 학교'},store:{code:'CS2',label:'🏪 편의점'},mart:{code:'MT1',label:'🛒 마트'}};
 
-function toggleDetail(id){
-  const el=document.getElementById('detail-'+id);
-  if(!el)return;
-  el.classList.toggle('hidden');
-  const h=null; // HOUSES 배열 제거됨 — 카카오맵 기능 미사용
-  if(!el.classList.contains('hidden') && !el.dataset.loaded && h){
-    el.dataset.loaded='1';
-    const q=encodeURIComponent(h.addr+' '+h.name);
-    el.innerHTML=`
-      <div class="detail-inner">
-        <div class="map-box" id="map-${id}"><div class="poi-loading">지도를 불러오는 중...</div></div>
-        <div class="poi-section">
-          <div class="poi-tabs" id="poitabs-${id}"></div>
-          <div class="poi-list" id="poilist-${id}"><div class="poi-loading">탭을 선택하면 주변 시설이 표시돼요</div></div>
-        </div>
-        <div class="detail-row">
-          <a class="detail-link" href="https://map.kakao.com/?q=${q}" target="_blank">📍 카카오맵 새 창</a>
-          <a class="detail-link" href="https://map.naver.com/p/search/${q}" target="_blank">📍 네이버지도</a>
-        </div>
-        <a class="detail-link" href="https://apply.lh.or.kr/lhapply/apply/wt/wrtanc/selectWrtancInfo.do?panId=2015122300020157&ccrCnntSysDsCd=03&uppAisTpCd=13&aisTpCd=26&mi=1026" target="_blank">📄 LH 공고 원문에서 평면도 확인</a>
+function toggleDetail(id, card){
+  const detailEl = document.getElementById(id);
+  if(!detailEl) return;
+  const open = detailEl.style.display === 'block';
+  detailEl.style.display = open ? 'none' : 'block';
+  const cardEl = card || document.querySelector(`[data-card-id="${id}"]`);
+  if(cardEl){
+    cardEl.style.borderColor = open ? '' : '#1D9E75';
+    cardEl.setAttribute('aria-expanded', open ? 'false' : 'true');
+  }
+  if(!open && !detailEl.dataset.mapLoaded && cardEl){
+    detailEl.dataset.mapLoaded = '1';
+    const sido = cardEl.dataset.sido || '';
+    const sigungu = cardEl.dataset.sigungu || '';
+    const region = cardEl.dataset.region || '';
+    const addr = [sido, sigungu].filter(Boolean).join(' ') || region;
+    const name = cardEl.dataset.title || '';
+    const h = { addr, name };
+    const mapWrap = document.createElement('div');
+    mapWrap.style.cssText = 'margin-top:12px;border-top:1px solid #e8e8e0;padding-top:12px';
+    mapWrap.innerHTML = `
+      <div id="map-${id}" class="map-box"><div class="poi-loading">📍 지도를 불러오는 중...</div></div>
+      <div class="poi-section">
+        <div class="poi-tabs" id="poitabs-${id}"></div>
+        <div class="poi-list" id="poilist-${id}"><div class="poi-loading">탭을 선택하면 주변 시설이 표시돼요</div></div>
       </div>`;
-    initMapForHouse(h,id);
+    detailEl.appendChild(mapWrap);
+    initMapForHouse(h, id);
   }
 }
 
 function initMapForHouse(h,id){
+  const renderMap = (result) => {
+    const mapEl = document.getElementById('map-'+id);
+    if(!mapEl) return;
+    const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
+    const map = new kakao.maps.Map(mapEl, {center:coords, level:5});
+    new kakao.maps.Marker({position:coords, map});
+    buildPoiTabs(id, coords);
+  };
   loadKakao().then(()=>{
-    const geocoder=new kakao.maps.services.Geocoder();
-    geocoder.addressSearch(h.addr,(result,status)=>{
-      const mapEl=document.getElementById('map-'+id);
-      if(status!==kakao.maps.services.Status.OK || !result.length){
-        mapEl.innerHTML='<div class="poi-loading">주소로 위치를 찾지 못했어요. 위 링크로 직접 확인해주세요.</div>';
-        return;
+    const geocoder = new kakao.maps.services.Geocoder();
+    geocoder.addressSearch(h.addr, (result, status) => {
+      if(status === kakao.maps.services.Status.OK && result.length){
+        renderMap(result);
+      } else {
+        const fallback = h.addr.split(' ')[0];
+        if(fallback && fallback !== h.addr){
+          geocoder.addressSearch(fallback, (r2, s2) => {
+            if(s2 === kakao.maps.services.Status.OK && r2.length){
+              renderMap(r2);
+            } else {
+              const mapEl = document.getElementById('map-'+id);
+              if(mapEl) mapEl.innerHTML = '<p style="text-align:center;padding:80px 0;color:#999;font-size:13px">📍 지도 정보를 불러올 수 없어요</p>';
+            }
+          });
+        } else {
+          const mapEl = document.getElementById('map-'+id);
+          if(mapEl) mapEl.innerHTML = '<p style="text-align:center;padding:80px 0;color:#999;font-size:13px">📍 지도 정보를 불러올 수 없어요</p>';
+        }
       }
-      const coords=new kakao.maps.LatLng(result[0].y,result[0].x);
-      const map=new kakao.maps.Map(mapEl,{center:coords,level:4});
-      new kakao.maps.Marker({position:coords,map});
-      buildPoiTabs(id,coords);
     });
-  }).catch((err)=>{
-    document.getElementById('map-'+id).innerHTML='<div class="poi-loading">지도를 불러올 수 없어요 ('+err+'). 카카오맵 새 창 링크를 이용해주세요.</div>';
-    console.error('ZipFit 지도 로드 실패:',err);
+  }).catch(err=>{
+    const mapEl = document.getElementById('map-'+id);
+    if(mapEl) mapEl.innerHTML = '<p style="text-align:center;padding:80px 0;color:#999;font-size:13px">📍 지도를 불러올 수 없어요</p>';
+    console.error('ZipFit 지도 로드 실패:', err);
   });
 }
 
@@ -1474,7 +1500,7 @@ function renderMatchResults(rows){
         </div>`
       : `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px"><div style="display:flex;gap:8px;flex-wrap:wrap">${n.url?`<a class="detail-link" href="${n.url}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a>`:''} ${mShareBtn}</div></div>`;
 
-    html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="(function(el){var d=el.querySelector('[id^=mcard-detail]');if(!d)return;var open=d.style.display==='block';d.style.display=open?'none':'block';el.style.borderColor=open?'':'#1D9E75';el.setAttribute('aria-expanded',open?'false':'true');})(this)" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
+    html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n.region||'').replace(/"/g,'&quot;')}" data-sido="${(n.sido_nm||'').replace(/"/g,'&quot;')}" data-sigungu="${(n.sigungu_nm||'').replace(/"/g,'&quot;')}" data-title="${(n.title||'').replace(/"/g,'&quot;')}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this)" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
       <div class="htop">
         <p class="hname">${n.title||'(공고명 없음)'}</p>
         <span class="htag ${isClosed?'tag-mix':'tag-apt'}">${n.status||'-'}</span>
