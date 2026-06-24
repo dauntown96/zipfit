@@ -2,7 +2,7 @@
 
 > **이 파일이 유일한 세이브포인트입니다.**
 > Claude Code와 claude.ai 모두 이 파일을 기준으로 작업합니다.
-> **마지막 업데이트**: 2026-06-25 (자격진단 필수 관문화 + eligibleTypes 필터 수정)
+> **마지막 업데이트**: 2026-06-25 (collect-announcements v7 — 마이홈포털(MYHOME) 수집 로직 추가)
 
 ---
 
@@ -135,6 +135,7 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 - 커스텀 도메인 (zipfit.kr)
 - Supabase Auth 마이그레이션
 - ✅ HOUSES[] → DB 연동 (완료 2026-06-25)
+- ✅ 마이홈포털(MYHOME) 공고 수집 — collect-announcements v7 (완료 2026-06-25)
 
 ---
 
@@ -142,6 +143,7 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-06-25 | collect-announcements v7 배포 — 마이홈포털(MYHOME) 수집 로직 추가 (fetchMyHome, mapMyHomeRow) |
 | 2026-06-25 | 자격진단 필수 관문화 — Step2 초기 비활성, diagnose() 완료 시 활성화 + 유형칩 자동선택, eligibleTypes 필터 activeTypes로 수정 |
 | 2026-06-25 | matchHouses p_status null 변경 + 접수마감 클라이언트 필터 추가 |
 | 2026-06-25 | 추천탭 전면 개선 — HOUSES[] 제거, HOUSING_CRITERIA/MEDIAN_INCOME 추가, matchHouses→DB RPC, renderMatchResults→공고 카드, eligibleTypes 자격 필터 |
