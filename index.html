@@ -342,14 +342,11 @@ select:focus,input:focus{border-color:#5DCAA5}
   </div>
   </div> <!-- /main2 -->
 
-  <!-- ===== 대탭 3: AI 인사이트 (짓는 중) ===== -->
+  <!-- ===== 대탭 3: 인사이트 ===== -->
   <div id="main3" class="main-section hidden">
-    <div class="panel">
-      <div class="building-box">
-        <div class="building-icon">🚧</div>
-        <p class="building-title">짓는 중이에요</p>
-        <p class="building-desc">국토부 정책, 금리 동향, 지역별 공급 추이를 분석해서<br>"지금이 신청하기 좋은 시기인지" 알려드릴 AI 인사이트를<br>준비하고 있어요. 조금만 기다려주세요!</p>
-        <div class="building-progress">🔨 골조 작업 중 · 데이터 수집 단계</div>
+    <div id="insightContent">
+      <div class="rbox" style="text-align:center;padding:2rem 1rem">
+        <p style="color:#888;font-size:14px">📊 통계 데이터를 불러오는 중...</p>
       </div>
     </div>
   </div> <!-- /main3 -->
@@ -1182,6 +1179,7 @@ function goMain(n){
   if(n===1) renderPersonalizedRecommendations();
   if(n===2 && !noticeLoaded) initNoticeFilters();
   else if(n===2) loadNoticeData();
+  if(n===3) loadInsightData();
   if(n===4) renderSavedNotices();
   if(n===5) renderSettingsGate();
 }
@@ -1189,6 +1187,135 @@ function goMain(n){
 // 페이지 로드 시 전국 지역 목록 초기화
 loadRegionsFromSupabase();
 updateSaveBadge();
+
+// ===== 인사이트 탭 =====
+let insightLoaded = false;
+
+async function loadInsightData(){
+  const wrap = document.getElementById('insightContent');
+  if(!wrap) return;
+  if(insightLoaded) return;
+  wrap.innerHTML = '<div class="rbox" style="text-align:center;padding:2rem 1rem"><p style="color:#888;font-size:14px">📊 통계 데이터를 불러오는 중...</p></div>';
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_announcements_deduped`,
+      {method:'POST', headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY,'Content-Type':'application/json'}, body:'{}'});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const rows = await res.json();
+    if(!Array.isArray(rows)) throw new Error('응답 형식 오류');
+    insightLoaded = true;
+    renderInsight(rows, wrap);
+  }catch(e){
+    wrap.innerHTML = `<div class="rbox err"><p class="rtitle">⚠️ 데이터를 불러오지 못했어요</p><p class="rdesc">네트워크 연결을 확인하고 다시 시도해주세요.</p><button class="btn btn-sec btn-sm" style="margin-top:8px" onclick="insightLoaded=false;loadInsightData()">새로고침</button></div>`;
+    console.error('인사이트 로드 실패:', e);
+  }
+}
+
+function renderInsight(rows, wrap){
+  const total = rows.length;
+
+  // ① 지역별 (sido_nm) 집계
+  const regionMap = {};
+  rows.forEach(r=>{ const k=r.sido_nm||r.region||'기타'; regionMap[k]=(regionMap[k]||0)+1; });
+  const regionTop = Object.entries(regionMap).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const regionMax = regionTop[0]?.[1]||1;
+
+  // ② 유형별 (housing_type) 집계
+  const typeMap = {};
+  rows.forEach(r=>{ const k=r.housing_type||'기타'; typeMap[k]=(typeMap[k]||0)+1; });
+  const typeSorted = Object.entries(typeMap).sort((a,b)=>b[1]-a[1]);
+
+  // ③ 상태별 집계
+  const statusMap = {'접수중':0,'공고중':0,'접수마감':0};
+  rows.forEach(r=>{
+    const s = r.status_normalized||r.status||'';
+    if(s==='접수중') statusMap['접수중']++;
+    else if(s==='공고중') statusMap['공고중']++;
+    else if(s==='접수마감') statusMap['접수마감']++;
+  });
+
+  // ④ 최근 30일 추이 (announcement_date)
+  const now = new Date();
+  const d30ago = new Date(now); d30ago.setDate(d30ago.getDate()-30);
+  const trendMap = {};
+  rows.forEach(r=>{
+    if(!r.announcement_date) return;
+    const d = new Date(r.announcement_date.replace(/\./g,'-'));
+    if(isNaN(d)||d<d30ago) return;
+    const key = r.announcement_date.slice(0,10);
+    trendMap[key]=(trendMap[key]||0)+1;
+  });
+  const trendEntries = Object.entries(trendMap).sort((a,b)=>a[0]<b[0]?-1:1);
+  const trendMax = Math.max(1,...trendEntries.map(e=>e[1]));
+
+  // 색상 팔레트
+  const COLORS = ['#1D9E75','#378ADD','#EF9F27','#D85A30','#7F77DD','#5DCAA5','#E96B8A','#8BAC3B','#A67C52','#6C757D'];
+
+  wrap.innerHTML = `
+    <div class="panel">
+      <p class="panel-title" style="margin-bottom:4px">📊 공고 통계 인사이트</p>
+      <p style="font-size:13px;color:#888;margin-bottom:0">현재 전국 <strong style="color:#1D9E75">${total.toLocaleString()}개</strong> 공고가 수집되어 있어요. 매일 오전 9시 자동 업데이트.</p>
+    </div>
+
+    <div class="panel">
+      <p class="panel-title">③ 공고 상태 현황</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <div style="flex:1;min-width:90px;background:#E8F5F0;border-radius:12px;padding:14px 10px;text-align:center">
+          <p style="font-size:26px;font-weight:700;color:#1D9E75;margin:0">${statusMap['접수중'].toLocaleString()}</p>
+          <p style="font-size:12px;color:#555;margin-top:4px">🟢 접수중</p>
+        </div>
+        <div style="flex:1;min-width:90px;background:#EEF4FB;border-radius:12px;padding:14px 10px;text-align:center">
+          <p style="font-size:26px;font-weight:700;color:#378ADD;margin:0">${statusMap['공고중'].toLocaleString()}</p>
+          <p style="font-size:12px;color:#555;margin-top:4px">🔵 공고중</p>
+        </div>
+        <div style="flex:1;min-width:90px;background:#F5F5F5;border-radius:12px;padding:14px 10px;text-align:center">
+          <p style="font-size:26px;font-weight:700;color:#999;margin:0">${statusMap['접수마감'].toLocaleString()}</p>
+          <p style="font-size:12px;color:#555;margin-top:4px">⚪ 접수마감</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <p class="panel-title">① 지역별 공고 수 (상위 10개 시/도)</p>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${regionTop.map(([region,cnt],i)=>`
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;color:#555;margin-bottom:3px">
+              <span>${region}</span><span style="font-weight:600;color:#111">${cnt}건</span>
+            </div>
+            <div style="background:#e8e8e0;border-radius:4px;height:10px;overflow:hidden">
+              <div style="background:${COLORS[i%COLORS.length]};height:100%;width:${Math.round(cnt/regionMax*100)}%;border-radius:4px;transition:width 0.4s"></div>
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <div class="panel">
+      <p class="panel-title">② 주택 유형별 공고 수</p>
+      <div class="chip-row" style="flex-wrap:wrap;gap:8px">
+        ${typeSorted.map(([type,cnt],i)=>`
+          <div style="display:flex;align-items:center;gap:6px;background:#f4f4f0;border-radius:20px;padding:6px 12px">
+            <span style="width:10px;height:10px;border-radius:50%;background:${COLORS[i%COLORS.length]};display:inline-block;flex-shrink:0"></span>
+            <span style="font-size:13px;color:#333">${type}</span>
+            <span style="font-size:13px;font-weight:700;color:#1D9E75">${cnt}</span>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <div class="panel">
+      <p class="panel-title">④ 최근 30일 공고 추이</p>
+      ${trendEntries.length===0
+        ? '<p style="font-size:13px;color:#aaa;text-align:center;padding:20px 0">최근 30일 데이터가 없어요</p>'
+        : `<div style="display:flex;align-items:flex-end;gap:4px;height:80px;overflow-x:auto;padding-bottom:4px">
+            ${trendEntries.map(([date,cnt])=>`
+              <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;min-width:24px" title="${date}: ${cnt}건">
+                <span style="font-size:9px;color:#888;margin-bottom:2px">${cnt}</span>
+                <div style="background:#1D9E75;border-radius:3px 3px 0 0;width:18px;height:${Math.round(cnt/trendMax*60)+4}px"></div>
+                <span style="font-size:8px;color:#bbb;margin-top:2px;writing-mode:vertical-rl;text-orientation:mixed">${date.slice(5)}</span>
+              </div>`).join('')}
+          </div>`
+      }
+    </div>`;
+}
 
 async function updateBannerFromDB(){
   try{
