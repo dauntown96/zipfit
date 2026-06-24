@@ -313,6 +313,20 @@ select:focus,input:focus{border-color:#5DCAA5}
       </div>
     </div>
 
+    <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:8px">
+      <select id="noticeSortSel" style="font-size:13px;padding:5px 8px;border:1px solid #e0e0e0;border-radius:8px;background:#fff;color:#333;cursor:pointer" onchange="loadNoticeData()">
+        <option value="date-desc">최신 공고순</option>
+        <option value="end-asc">마감 임박순</option>
+        <option value="start-asc">접수 시작순</option>
+        <option value="units-desc">세대수 많은순</option>
+        <option value="deposit-asc">보증금 낮은순</option>
+        <option value="rent-asc">월임대료 낮은순</option>
+        <option value="area-desc">면적 넓은순</option>
+        <option value="region-asc">지역명순</option>
+        <option value="org-asc">공급기관순</option>
+        <option value="revised-first">정정공고 우선</option>
+      </select>
+    </div>
     <div id="notice-status" class="rbox warn"><p class="rtitle">⏳ 공고 데이터 불러오는 중...</p></div>
     <div id="notice-list"></div>
   </div>
@@ -585,6 +599,7 @@ async function initNoticeFilters(){
     noticeFilterOptions = { regions, types, statuses };
     buildNoticeFilterChips();
     noticeLoaded = true;
+    loadNoticeData();
   }catch(e){
     console.error('ZipFit 필터 초기화 실패:', e);
   }
@@ -680,6 +695,9 @@ async function loadNoticeData(){
       'area_max': r.area_max,
       'total_units': r.total_units,
       'move_in_date': r.move_in_date,
+      'deposit_min': r.deposit_min,
+      'rent_min': r.rent_min,
+      'is_revised': r.is_revised||false,
     }));
 
     // 마감 숨기기 (status 칩 직접 선택 없을 때만, 정규화 상태 기준)
@@ -687,6 +705,29 @@ async function loadNoticeData(){
     if(hideClosed && !activeNoticeStatus){
       filtered = noticeData.filter(n => n['처리상태정규화'] !== '접수마감');
     }
+
+    // 정렬
+    const sortVal = document.getElementById('noticeSortSel')?.value || 'date-desc';
+    const nullLast = (a, b, fn, desc) => {
+      const va = fn(a), vb = fn(b);
+      if(va==null && vb==null) return 0;
+      if(va==null) return 1;
+      if(vb==null) return -1;
+      return desc ? (vb > va ? 1 : vb < va ? -1 : 0) : (va > vb ? 1 : va < vb ? -1 : 0);
+    };
+    filtered = [...filtered].sort((a,b) => {
+      if(sortVal==='date-desc')     return nullLast(a,b,n=>n['announcement_date'],true);
+      if(sortVal==='end-asc')       return nullLast(a,b,n=>n['apply_end'],false);
+      if(sortVal==='start-asc')     return nullLast(a,b,n=>n['apply_start'],false);
+      if(sortVal==='units-desc')    return nullLast(a,b,n=>n['total_units']?Number(n['total_units']):null,true);
+      if(sortVal==='deposit-asc')   return nullLast(a,b,n=>n['deposit_min']?Number(n['deposit_min']):null,false);
+      if(sortVal==='rent-asc')      return nullLast(a,b,n=>n['rent_min']?Number(n['rent_min']):null,false);
+      if(sortVal==='area-desc')     return nullLast(a,b,n=>n['area_max']?Number(n['area_max']):null,true);
+      if(sortVal==='region-asc')    return (a['지역']||'').localeCompare(b['지역']||'');
+      if(sortVal==='org-asc')       return (a['공급기관']||'').localeCompare(b['공급기관']||'');
+      if(sortVal==='revised-first') return (b['is_revised']?1:0)-(a['is_revised']?1:0);
+      return 0;
+    });
 
     renderNoticeList(filtered, noticeData.length);
   }catch(err){
@@ -712,9 +753,8 @@ function renderNoticeList(filtered, totalCount){
   statusEl.className = 'rbox ok';
   statusEl.innerHTML = '<p class="rtitle">✅ 조건에 맞는 공고 '+filtered.length+'건'+(totalCount && totalCount!==filtered.length ? ' (전체 '+totalCount+'건 중)':'')+'</p><p class="rdesc">매일 오전 9시 자동 업데이트</p>';
 
-  const sorted = [...filtered].reverse();
   let html = '';
-  sorted.forEach((n, idx) => {
+  filtered.forEach((n, idx) => {
     const isClosed   = n['처리상태정규화']==='접수마감';
     const isAmended  = (n['공고명']||'').includes('[정정공고]');
     const demoTags   = classifyDemographics(n['공급유형'], n['공고명']);
@@ -723,9 +763,13 @@ function renderNoticeList(filtered, totalCount){
     const applyStart = n['신청시작일']||n['apply_start']||'';
     const applyEnd   = n['신청마감일']||n['apply_end']||'';
     const annDate    = n['announcement_date']||'';
-    const dateLine   = annDate
-      ? `모집공고: ${annDate} / 접수기간: ${applyStart||'-'} ~ ${applyEnd||'-'}`
-      : `접수기간: ${applyStart||'-'} ~ ${applyEnd||'-'}`;
+    // 모집공고일 = 접수시작일이면 중복 제거
+    const sameAsStart = annDate && applyStart && annDate === applyStart;
+    const dateLine   = sameAsStart
+      ? `모집공고: ${annDate} / 접수마감: ${applyEnd||'-'}`
+      : annDate
+        ? `모집공고: ${annDate} / 접수기간: ${applyStart||'-'} ~ ${applyEnd||'-'}`
+        : `접수기간: ${applyStart||'-'} ~ ${applyEnd||'-'}`;
     const cardId = 'ncard-detail-'+idx;
 
     // 상세 영역 항목 구성
@@ -963,7 +1007,7 @@ function goMain(n){
   });
   if(n===1) renderPersonalizedRecommendations();
   if(n===2 && !noticeLoaded) initNoticeFilters();
-  else if(n===2 && noticeLoaded) loadNoticeData();
+  else if(n===2) loadNoticeData();
   if(n===5) renderSettingsGate();
 }
 
