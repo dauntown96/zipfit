@@ -2,7 +2,7 @@
 
 > **이 파일이 유일한 세이브포인트입니다.**
 > Claude Code와 claude.ai 모두 이 파일을 기준으로 작업합니다.
-> **마지막 업데이트**: 2026-06-25 (인사이트 탭 기본 구현 + 관리 탭 저장한 공고 기능 완성)
+> **마지막 업데이트**: 2026-06-25 (sw.js 캐시 버전 v2 갱신 — 인사이트 탭·저장 기능 캐시 갱신)
 
 ---
 
@@ -149,6 +149,7 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-06-25 | sw.js CACHE_NAME v1→v2 갱신 — 인사이트 탭·저장 기능 변경사항 브라우저 캐시 강제 갱신. index.html 수정 시 버전 동시 올리기 원칙 수립 |
 | 2026-06-25 | 인사이트 탭 기본 구현 — loadInsightData(), 지역별/유형별/상태별/30일 추이 CSS 차트 4종, 외부 라이브러리 없음 |
 | 2026-06-25 | 관리 탭 저장한 공고 기능 완성 — localStorage 기반 toggleSaveNotice/renderSavedNotices, 공고·추천 탭 저장 버튼, 탭바 배지 |
 | 2026-06-25 | 카카오맵 지도+POI 복구 — toggleDetail(id,card) 재구현, hcard에 data-sido/sigungu/region/title 저장, loadNoticeData 매핑에 sido_nm/sigungu_nm 추가, geocoder sido fallback, initMapForHouse 리팩토링 |
@@ -193,6 +194,7 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 6. **프레임워크 금지** — React, Vue, npm, 번들러 모두 금지
 7. **기존 클래스명·ID 변경 금지**
 8. **Make.com 건드리지 말 것**
+9. **index.html 수정 시 sw.js CACHE_NAME 버전도 +1** — 브라우저 캐시 강제 갱신 필요
 
 ---
 
