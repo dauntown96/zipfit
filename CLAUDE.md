@@ -2,7 +2,7 @@
 
 > **이 파일이 유일한 세이브포인트입니다.**
 > Claude Code와 claude.ai 모두 이 파일을 기준으로 작업합니다.
-> **마지막 업데이트**: 2026-06-25 (favicon 404 제거)
+> **마지막 업데이트**: 2026-06-25 (추천탭 전면 개선 — DB 기반 공고 매칭)
 
 ---
 
@@ -134,7 +134,7 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 - 공고별 동적 자격 진단 시스템
 - 커스텀 도메인 (zipfit.kr)
 - Supabase Auth 마이그레이션
-- HOUSES[] → DB 연동
+- ✅ HOUSES[] → DB 연동 (완료 2026-06-25)
 
 ---
 
@@ -142,6 +142,7 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-06-25 | 추천탭 전면 개선 — HOUSES[] 제거, HOUSING_CRITERIA/MEDIAN_INCOME 추가, matchHouses→DB RPC, renderMatchResults→공고 카드, eligibleTypes 자격 필터 |
 | 2026-06-25 | favicon 404 제거 — `<link rel="icon" href="data:,">` 추가, jsdom 정적 분석으로 ID/fetch/문법 이상 없음 확인 |
 | 2026-06-25 | 공고 카드 필드 추가 — 면적(area_min/max), 세대수(total_units), 입주예정(move_in_date) 표시 |
 | 2026-06-25 | 정정공고 배지 추가 — renderNoticeList()에 isAmended 감지 + 🔄 정정 배지 렌더링 |
