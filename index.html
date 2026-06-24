@@ -155,12 +155,12 @@ select:focus,input:focus{border-color:#5DCAA5}
     <span class="badge">📢 2026년 경기북부 2차 공고 · 신청기간 6.30~7.2</span>
   </div>
 
-  <div class="maintabs">
-    <button class="maintab active" id="m1" onclick="goMain(1)"><span class="maintab-icon">🏠</span>추천</button>
-    <button class="maintab" id="m2" onclick="goMain(2)"><span class="maintab-icon">📋</span>공고</button>
-    <button class="maintab" id="m3" onclick="goMain(3)"><span class="maintab-icon">📊</span>인사이트</button>
-    <button class="maintab" id="m4" onclick="goMain(4)"><span class="maintab-icon">📁</span>관리</button>
-    <button class="maintab" id="m5" onclick="goMain(5)"><span class="maintab-icon">⚙️</span>설정</button>
+  <div class="maintabs" role="tablist" aria-label="메인 탭">
+    <button class="maintab active" id="m1" role="tab" aria-selected="true" onclick="goMain(1)"><span class="maintab-icon" aria-hidden="true">🏠</span>추천</button>
+    <button class="maintab" id="m2" role="tab" aria-selected="false" onclick="goMain(2)"><span class="maintab-icon" aria-hidden="true">📋</span>공고</button>
+    <button class="maintab" id="m3" role="tab" aria-selected="false" onclick="goMain(3)"><span class="maintab-icon" aria-hidden="true">📊</span>인사이트</button>
+    <button class="maintab" id="m4" role="tab" aria-selected="false" onclick="goMain(4)"><span class="maintab-icon" aria-hidden="true">📁</span>관리</button>
+    <button class="maintab" id="m5" role="tab" aria-selected="false" onclick="goMain(5)"><span class="maintab-icon" aria-hidden="true">⚙️</span>설정</button>
   </div>
 
   <!-- ===== 대탭 1: 맞춤 추천 ===== -->
@@ -301,7 +301,7 @@ select:focus,input:focus{border-color:#5DCAA5}
       🔍 필터 열기 ▾
     </button>
     <!-- 필터 패널 (기본 닫힘) -->
-    <div id="noticeFilterPanel" class="hidden" style="background:#fafaf6;border-radius:12px;padding:1rem;margin-bottom:0.75rem;border:1px solid #e8e8e0">
+    <div id="noticeFilterPanel" class="hidden" aria-label="공고 필터" style="background:#fafaf6;border-radius:12px;padding:1rem;margin-bottom:0.75rem;border:1px solid #e8e8e0">
       <div class="field">
         <label class="label">공고 유형</label>
         <div class="chip-group" id="noticeTypeChips"></div>
@@ -338,7 +338,7 @@ select:focus,input:focus{border-color:#5DCAA5}
       </select>
     </div>
     <div id="notice-status" class="rbox warn"><p class="rtitle">⏳ 공고 데이터 불러오는 중...</p></div>
-    <div id="notice-list"></div>
+    <div id="notice-list" aria-label="공고 목록" aria-live="polite"></div>
   </div>
   </div> <!-- /main2 -->
 
@@ -420,7 +420,7 @@ select:focus,input:focus{border-color:#5DCAA5}
         <p class="slabel" style="margin:0 0 0.75rem">📋 조건 설정</p>
         <div class="row">
           <div class="field">
-            <label class="label">혼인 상태</label>
+            <label class="label" for="set_marital">혼인 상태</label>
             <select id="set_marital">
               <option value="">선택하세요</option>
               <option value="newborn">신생아 가구 (2년 내 출산)</option>
@@ -432,32 +432,32 @@ select:focus,input:focus{border-color:#5DCAA5}
             </select>
           </div>
           <div class="field">
-            <label class="label">자녀 수 (미성년)</label>
+            <label class="label" for="set_children">자녀 수 (미성년)</label>
             <input type="number" id="set_children" min="0" max="10" placeholder="예: 1">
           </div>
         </div>
         <div class="row">
           <div class="field">
-            <label class="label">가구원 수</label>
+            <label class="label" for="set_members">가구원 수</label>
             <input type="number" id="set_members" min="1" max="10" placeholder="예: 3">
           </div>
           <div class="field">
-            <label class="label">세대 월평균 소득 (만원)</label>
+            <label class="label" for="set_income">세대 월평균 소득 (만원)</label>
             <input type="number" id="set_income" min="0" placeholder="예: 450">
           </div>
         </div>
         <div class="row">
           <div class="field">
-            <label class="label">총 자산 (만원)</label>
+            <label class="label" for="set_assets">총 자산 (만원)</label>
             <input type="number" id="set_assets" min="0" placeholder="예: 15000">
           </div>
           <div class="field">
-            <label class="label">최대 보증금 (만원)</label>
+            <label class="label" for="set_maxDeposit">최대 보증금 (만원)</label>
             <input type="number" id="set_maxDeposit" min="0" placeholder="예: 20000">
           </div>
         </div>
         <div class="field">
-          <label class="label">최소 방 수</label>
+          <label class="label" for="set_minRooms">최소 방 수</label>
           <select id="set_minRooms">
             <option value="0">상관없음</option>
             <option value="2">2개 이상</option>
@@ -667,18 +667,26 @@ function buildSingleSelectChips(wrapId, options, getActive, setActive){
   const allChip = document.createElement('div');
   allChip.className = 'chip chip-all sel';
   allChip.textContent = '전체';
+  allChip.setAttribute('role', 'button');
+  allChip.setAttribute('tabindex', '0');
+  allChip.setAttribute('aria-pressed', 'true');
   allChip.onclick = () => { setActive(null); refreshChipSel(wrapId, null); };
+  allChip.onkeydown = e => { if(e.key==='Enter'||e.key===' '){ allChip.click(); e.preventDefault(); } };
   wrap.appendChild(allChip);
   options.forEach(opt => {
     const c = document.createElement('div');
     c.className = 'chip';
     c.textContent = opt;
     c.dataset.value = opt;
+    c.setAttribute('role', 'button');
+    c.setAttribute('tabindex', '0');
+    c.setAttribute('aria-pressed', 'false');
     c.onclick = () => {
       const cur = getActive();
-      setActive(cur === opt ? null : opt);  // 같은 칩 재클릭 시 해제
+      setActive(cur === opt ? null : opt);
       refreshChipSel(wrapId, getActive());
     };
+    c.onkeydown = e => { if(e.key==='Enter'||e.key===' '){ c.click(); e.preventDefault(); } };
     wrap.appendChild(c);
   });
 }
@@ -687,7 +695,9 @@ function refreshChipSel(wrapId, activeVal){
   const wrap = document.getElementById(wrapId);
   if(!wrap) return;
   [...wrap.children].forEach(c => {
-    c.classList.toggle('sel', c.dataset.value ? c.dataset.value === activeVal : activeVal === null);
+    const isSel = c.dataset.value ? c.dataset.value === activeVal : activeVal === null;
+    c.classList.toggle('sel', isSel);
+    c.setAttribute('aria-pressed', isSel ? 'true' : 'false');
   });
 }
 
@@ -878,7 +888,7 @@ function renderNoticeList(filtered, totalCount){
         </div>`
       : `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px"><div style="display:flex;gap:8px;flex-wrap:wrap">${n['공고URL']?`<a class="detail-link" href="${n['공고URL']}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a>`:''} ${shareBtn}</div></div>`;
 
-    html += `<div class="hcard" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="(function(el){var d=el.querySelector('[id^=ncard-detail]');if(!d)return;var open=d.style.display==='block';d.style.display=open?'none':'block';el.style.borderColor=open?'':'#1D9E75';})(this)">
+    html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="(function(el){var d=el.querySelector('[id^=ncard-detail]');if(!d)return;var open=d.style.display==='block';d.style.display=open?'none':'block';el.style.borderColor=open?'':'#1D9E75';el.setAttribute('aria-expanded',open?'false':'true');})(this)" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
       <div class="htop">
         <p class="hname">${n['공고명']||'(공고명 없음)'}</p>
         <span class="htag ${isClosed?'tag-mix':'tag-apt'}">${n['처리상태']||'-'}</span>
@@ -980,14 +990,22 @@ function buildChipGroup(wrapId,options,selSet,onItem,onAll){
   allChip.className='chip chip-all sel';
   allChip.textContent='전체';
   allChip.dataset.value='__all__';
+  allChip.setAttribute('role','button');
+  allChip.setAttribute('tabindex','0');
+  allChip.setAttribute('aria-pressed','true');
   allChip.onclick=onAll;
+  allChip.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ allChip.click(); e.preventDefault(); } };
   wrap.appendChild(allChip);
   options.forEach(v=>{
     const c=document.createElement('div');
     c.className='chip';
     c.textContent=v;
     c.dataset.value=v;
+    c.setAttribute('role','button');
+    c.setAttribute('tabindex','0');
+    c.setAttribute('aria-pressed', selSet.has(v)?'true':'false');
     c.onclick=()=>onItem(v);
+    c.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ c.click(); e.preventDefault(); } };
     wrap.appendChild(c);
   });
 }
@@ -1011,11 +1029,9 @@ function toggleAllTypes(){
 function renderChipState(wrapId,selSet){
   const wrap=document.getElementById(wrapId);
   [...wrap.children].forEach(c=>{
-    if(c.dataset.value==='__all__'){
-      c.classList.toggle('sel',selSet.size===0);
-    } else {
-      c.classList.toggle('sel',selSet.has(c.dataset.value));
-    }
+    const isSel = c.dataset.value==='__all__' ? selSet.size===0 : selSet.has(c.dataset.value);
+    c.classList.toggle('sel', isSel);
+    c.setAttribute('aria-pressed', isSel ? 'true' : 'false');
   });
 }
 
@@ -1093,7 +1109,9 @@ function renderPersonalizedRecommendations(){
 function goMain(n){
   [1,2,3,4,5].forEach(i=>{
     document.getElementById('main'+i).classList.toggle('hidden',i!==n);
-    document.getElementById('m'+i).classList.toggle('active',i===n);
+    const tab = document.getElementById('m'+i);
+    tab.classList.toggle('active',i===n);
+    tab.setAttribute('aria-selected', i===n ? 'true' : 'false');
   });
   if(n===1) renderPersonalizedRecommendations();
   if(n===2 && !noticeLoaded) initNoticeFilters();
@@ -1456,7 +1474,7 @@ function renderMatchResults(rows){
         </div>`
       : `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px"><div style="display:flex;gap:8px;flex-wrap:wrap">${n.url?`<a class="detail-link" href="${n.url}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a>`:''} ${mShareBtn}</div></div>`;
 
-    html += `<div class="hcard" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="(function(el){var d=el.querySelector('[id^=mcard-detail]');if(!d)return;var open=d.style.display==='block';d.style.display=open?'none':'block';el.style.borderColor=open?'':'#1D9E75';})(this)">
+    html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="(function(el){var d=el.querySelector('[id^=mcard-detail]');if(!d)return;var open=d.style.display==='block';d.style.display=open?'none':'block';el.style.borderColor=open?'':'#1D9E75';el.setAttribute('aria-expanded',open?'false':'true');})(this)" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
       <div class="htop">
         <p class="hname">${n.title||'(공고명 없음)'}</p>
         <span class="htag ${isClosed?'tag-mix':'tag-apt'}">${n.status||'-'}</span>
