@@ -1055,7 +1055,7 @@ async function matchHouses(){
   const body = {
     p_region: regions.length === 1 ? regions[0] : null,
     p_type: null,
-    p_status: '접수중'
+    p_status: null
   };
 
   try {
@@ -1070,6 +1070,7 @@ async function matchHouses(){
     });
     let rows = await res.json();
 
+    rows = rows.filter(r => r.status !== '접수마감' && r.status_normalized !== '접수마감');
     if(regions.length > 0) {
       rows = rows.filter(r => regions.some(rg => (r.region||'').includes(rg)));
     }
