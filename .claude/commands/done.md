@@ -35,7 +35,38 @@ git push origin main
 
 Notion MCP 도구: `mcp__Notion__notion-update-page` 또는 `mcp__Notion__notion-fetch` 후 수정
 
-## 4. 완료 보고
+## 4. Playwright 배포 검증
+GitHub Pages 반영까지 보통 30초~1분 소요. push 후 잠시 대기 후 실행.
+
+```js
+// Node.js + Playwright로 실행
+const { chromium } = require('playwright');
+(async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage();
+  await page.goto('https://dauntown96.github.io/zipfit', { waitUntil: 'networkidle' });
+
+  // 1. 페이지 정상 로드 확인
+  const title = await page.title();
+  console.log('페이지 제목:', title);
+
+  // 2. 방금 수정한 기능 동작 확인 (수정 내용에 맞게 selector 조정)
+  // 예: await page.click('#m2'); // 공고 탭
+  // 예: await page.waitForSelector('.hcard');
+
+  // 3. 스크린샷 저장
+  await page.screenshot({ path: '/tmp/zipfit-verify.png', fullPage: false });
+
+  await browser.close();
+})();
+```
+
+### 4-1. 검증 후 Notion에 결과 기록
+`mcp__Notion__notion-update-page`로 방금 추가한 작업 이력 항목에 결과 append:
+- ✅ 성공: `→ 배포 확인 완료 (스크린샷 첨부)`
+- ❌ 실패: `→ 배포 확인 실패: [오류 내용]` + 원인 파악 후 재수정
+
+## 5. 완료 보고
 다운님께 아래 형식으로 보고:
 ```
 ✅ [작업명] 완료
@@ -44,6 +75,7 @@ Notion MCP 도구: `mcp__Notion__notion-update-page` 또는 `mcp__Notion__notion
 - index.html: [수정 내용]
 - CLAUDE.md: 진척도 업데이트
 - Notion: 버그 취소선 처리 + 작업 이력 추가 + 날짜 갱신
+- 배포 검증: ✅ 정상 / ❌ 실패 (원인: )
 
 배포: https://dauntown96.github.io/zipfit
 다음: /bug3 또는 /status 로 확인
