@@ -2,7 +2,7 @@
 
 > **이 파일이 유일한 세이브포인트입니다.**
 > Claude Code와 claude.ai 모두 이 파일을 기준으로 작업합니다.
-> **마지막 업데이트**: 2026-06-25
+> **마지막 업데이트**: 2026-06-25 (버그3 완료)
 
 ---
 
@@ -119,9 +119,8 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 2. ✅ ~~**알림 설정 저장 버그**~~ (완료 2026-06-25)
    - `saveSettings()` 내 `currentUser` 업데이트 시 `alert_on`, `new_notice_alert`, `marketing_alert` 필드 누락 수정
 
-3. **확성기 배너 동적화**
-   - 증상: `.badge` 텍스트 하드코딩 ("2026년 경기북부 2차 공고")
-   - 수정: DB 최신 공고 기준 자동 업데이트
+3. ✅ ~~**확성기 배너 동적화**~~ (완료 2026-06-25)
+   - `updateBannerFromDB()` 추가 — 접수중 공고 우선, 없으면 최신 공고 1건으로 배너 자동 업데이트
 
 ### 🟡 기능 개선
 - NEW 배지 동적 계산 (`created_at` 기준 48시간)
@@ -142,6 +141,7 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-06-25 | 확성기 배너 동적화 — updateBannerFromDB() 추가, DB 최신/접수중 공고 자동 표시 |
 | 2026-06-25 | 알림 설정 저장 버그 수정 — saveSettings() currentUser 알림 필드 누락 수정 |
 | 2026-06-24 | CLAUDE.md 단일 세이브포인트 체계 + 슬래시 커맨드 도입 |
 | 2026-06-23 | 맞춤추천 `currentUser` 타이밍 버그 수정 |
