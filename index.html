@@ -307,9 +307,12 @@ select:focus,input:focus{border-color:#5DCAA5}
         <label class="label">공고 상태</label>
         <div class="chip-group" id="noticeStatusChips"></div>
       </div>
-      <div style="display:flex;align-items:center;gap:8px;margin-top:0.5rem">
-        <input type="checkbox" id="hideClosedChk" checked style="width:16px;height:16px;cursor:pointer">
-        <label for="hideClosedChk" style="font-size:13px;color:#555;cursor:pointer;margin:0">마감된 공고 숨기기</label>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:0.5rem">
+        <div style="display:flex;align-items:center;gap:8px">
+          <input type="checkbox" id="hideClosedChk" checked style="width:16px;height:16px;cursor:pointer">
+          <label for="hideClosedChk" style="font-size:13px;color:#555;cursor:pointer;margin:0">마감된 공고 숨기기</label>
+        </div>
+        <button onclick="resetNoticeFilters()" style="font-size:12px;padding:5px 12px;border:1px solid #ddd;border-radius:8px;background:#fff;color:#666;cursor:pointer">필터 초기화</button>
       </div>
     </div>
 
@@ -578,9 +581,39 @@ function extractRegionTop(regionText){
 // ── 필터 토글 ──
 function toggleNoticeFilter(){
   const panel = document.getElementById('noticeFilterPanel');
+  const isNowHidden = panel.classList.toggle('hidden');
+  updateFilterToggleBtn(isNowHidden);
+}
+
+function updateFilterToggleBtn(forceHidden){
   const btn   = document.getElementById('filterToggleBtn');
-  const open  = panel.classList.toggle('hidden');
-  btn.textContent = open ? '🔍 필터 열기 ▾' : '🔍 필터 닫기 ▴';
+  if(!btn) return;
+  const panel = document.getElementById('noticeFilterPanel');
+  const hidden = forceHidden !== undefined ? forceHidden : panel.classList.contains('hidden');
+  const hasFilter = activeNoticeRegion || activeNoticeType || activeNoticeStatus
+    || !(document.getElementById('hideClosedChk')?.checked ?? true);
+  if(!hidden){
+    btn.textContent = '🔍 필터 닫기 ▴';
+  } else if(hasFilter){
+    btn.textContent = '🔍 필터 적용 중 ●';
+    btn.style.color = '#1D9E75';
+  } else {
+    btn.textContent = '🔍 필터 열기 ▾';
+    btn.style.color = '';
+  }
+}
+
+function resetNoticeFilters(){
+  activeNoticeRegion = null;
+  activeNoticeType   = null;
+  activeNoticeStatus = null;
+  const chk = document.getElementById('hideClosedChk');
+  if(chk) chk.checked = true;
+  refreshChipSel('noticeRegionChips',  null);
+  refreshChipSel('noticeTypeChips',    null);
+  refreshChipSel('noticeStatusChips',  null);
+  updateFilterToggleBtn();
+  loadNoticeData();
 }
 
 // ── 필터 칩 목록: 첫 로드 시 region_top·status_normalized 사용 (중복 없음) ──
@@ -730,6 +763,7 @@ async function loadNoticeData(){
     });
 
     renderNoticeList(filtered, noticeData.length);
+    updateFilterToggleBtn();
   }catch(err){
     statusEl.className = 'rbox err';
     statusEl.innerHTML = '<p class="rtitle">❌ 공고 데이터를 불러오지 못했어요</p><p class="rdesc">('+err.message+') 잠시 후 다시 시도해주세요.</p>';
@@ -750,8 +784,12 @@ function renderNoticeList(filtered, totalCount){
     return;
   }
 
+  const isFiltered = totalCount && totalCount !== filtered.length;
+  const countText = isFiltered
+    ? '조건에 맞는 공고 '+filtered.length+'건 (전체 '+totalCount+'건 중)'
+    : '전체 공고 '+filtered.length+'건';
   statusEl.className = 'rbox ok';
-  statusEl.innerHTML = '<p class="rtitle">✅ 조건에 맞는 공고 '+filtered.length+'건'+(totalCount && totalCount!==filtered.length ? ' (전체 '+totalCount+'건 중)':'')+'</p><p class="rdesc">매일 오전 9시 자동 업데이트</p>';
+  statusEl.innerHTML = '<p class="rtitle">✅ '+countText+'</p><p class="rdesc">매일 오전 9시 자동 업데이트</p>';
 
   let html = '';
   filtered.forEach((n, idx) => {
