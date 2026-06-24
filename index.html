@@ -172,7 +172,7 @@ select:focus,input:focus{border-color:#5DCAA5}
 
   <div class="subtabs">
     <div class="step active" id="s1" onclick="goStep(1)">① 자격 진단</div>
-    <div class="step" id="s2" onclick="goStep(2)">② 주택 매칭</div>
+    <div class="step" id="s2" onclick="goStep(2)" style="opacity:0.4;pointer-events:none;" title="자격 진단을 먼저 완료해주세요">② 주택 매칭</div>
   </div>
 
   <!-- STEP 1 -->
@@ -1029,6 +1029,15 @@ function diagnose(){
     })
     .map(([type]) => type);
 
+  // Step2 활성화
+  const s2 = document.getElementById('s2');
+  if(s2){ s2.style.opacity='1'; s2.style.pointerEvents='auto'; s2.removeAttribute('title'); }
+
+  // eligibleTypes 기반 주택 유형 칩 자동 선택
+  selectedTypes.clear();
+  window.eligibleTypes.forEach(t => selectedTypes.add(t));
+  renderChipState('typeChips', selectedTypes);
+
   let html='';
   if(!incomeOk||!assetOk){
     html=`<div class="rbox err"><p class="rtitle">❌ 조건 미충족 가능성</p><p class="rdesc">${!incomeOk?'· '+incomeMsg+'<br>':''}${!assetOk?'· '+assetMsg:''}</p></div>`;
@@ -1045,7 +1054,7 @@ function diagnose(){
 async function matchHouses(){
   const minRooms = parseInt(document.getElementById('minRooms')?.value)||0;
   const regions = [...selectedRegions];
-  const types = [...selectedTypes];
+  const activeTypes = [...selectedTypes].filter(t => t !== '전체');
   const eligibleTypes = window.eligibleTypes || [];
 
   const r = document.getElementById('match-result');
@@ -1074,8 +1083,8 @@ async function matchHouses(){
     if(regions.length > 0) {
       rows = rows.filter(r => regions.some(rg => (r.region||'').includes(rg)));
     }
-    if(types.length > 0) {
-      rows = rows.filter(r => types.some(t => (r.housing_type||'').includes(t)));
+    if(activeTypes.length > 0) {
+      rows = rows.filter(r => activeTypes.some(t => (r.housing_type||'').includes(t)));
     } else if(eligibleTypes.length > 0) {
       rows = rows.filter(r => eligibleTypes.some(t => (r.housing_type||'').includes(t)));
     }
