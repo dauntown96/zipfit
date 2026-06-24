@@ -5,6 +5,11 @@
 <link rel="icon" href="data:,">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ZipFit — LH 신혼·신생아 매입임대 맞춤 매칭</title>
+<link rel="manifest" href="/zipfit/manifest.json">
+<meta name="theme-color" content="#1D9E75">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="ZipFit">
 <script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=58c490c9bded159ee35575e80345d783&amp;libraries=services&amp;autoload=false"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -1671,6 +1676,13 @@ function logoutUser(){
   document.getElementById('settingsBody').classList.add('hidden');
   document.getElementById('loginGate').classList.remove('hidden');
   document.getElementById('loginEmail').value='';
+}
+</script>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/zipfit/sw.js').catch(e => console.warn('SW 등록 실패:', e));
+  });
 }
 </script>
 </body>
