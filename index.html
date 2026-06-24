@@ -159,7 +159,7 @@ select:focus,input:focus{border-color:#5DCAA5}
     <button class="maintab active" id="m1" role="tab" aria-selected="true" onclick="goMain(1)"><span class="maintab-icon" aria-hidden="true">🏠</span>추천</button>
     <button class="maintab" id="m2" role="tab" aria-selected="false" onclick="goMain(2)"><span class="maintab-icon" aria-hidden="true">📋</span>공고</button>
     <button class="maintab" id="m3" role="tab" aria-selected="false" onclick="goMain(3)"><span class="maintab-icon" aria-hidden="true">📊</span>인사이트</button>
-    <button class="maintab" id="m4" role="tab" aria-selected="false" onclick="goMain(4)"><span class="maintab-icon" aria-hidden="true">📁</span>관리</button>
+    <button class="maintab" id="m4" role="tab" aria-selected="false" onclick="goMain(4)"><span class="maintab-icon" aria-hidden="true">📁</span>관리<span id="savedBadge" style="display:none;background:#D85A30;color:#fff;border-radius:10px;font-size:10px;padding:1px 5px;margin-left:3px;vertical-align:middle"></span></button>
     <button class="maintab" id="m5" role="tab" aria-selected="false" onclick="goMain(5)"><span class="maintab-icon" aria-hidden="true">⚙️</span>설정</button>
   </div>
 
@@ -382,14 +382,10 @@ select:focus,input:focus{border-color:#5DCAA5}
     <button class="btn btn-sec" style="margin-top:1.25rem" onclick="window.open('https://apply.lh.or.kr','_blank')">LH청약플러스 바로가기 →</button>
   </div>
 
-  <!-- STEP 5: 저장한 공고 (짓는 중) -->
+  <!-- STEP 5: 저장한 공고 -->
   <div id="panel5" class="panel hidden">
-    <div class="building-box">
-      <div class="building-icon">🧱</div>
-      <p class="building-title">기초공사 중이에요</p>
-      <p class="building-desc">마음에 드는 공고를 저장하고<br>표로 한눈에 비교할 수 있는 기능을<br>준비하고 있어요!</p>
-      <div class="building-progress">📐 설계 단계</div>
-    </div>
+    <p class="panel-title">🔖 저장한 공고</p>
+    <div id="savedNoticeList"></div>
   </div>
   </div> <!-- /main4 -->
 
@@ -805,6 +801,70 @@ async function loadNoticeData(){
   }
 }
 
+// ===== 저장한 공고 =====
+const SAVED_KEY = 'zipfit_saved_notices';
+function getSavedNotices(){ try{ return JSON.parse(localStorage.getItem(SAVED_KEY)||'[]'); }catch(e){ return []; } }
+function setSavedNotices(arr){ localStorage.setItem(SAVED_KEY, JSON.stringify(arr)); }
+
+function toggleSaveNotice(id, title, region, type, url){
+  let saved = getSavedNotices();
+  const idx = saved.findIndex(s=>s.id===id);
+  if(idx>=0){
+    saved.splice(idx,1);
+  } else {
+    saved.unshift({ id, title, region, type, url, savedAt: new Date().toISOString() });
+  }
+  setSavedNotices(saved);
+  updateSaveBtn(id);
+  updateSaveBadge();
+}
+
+function updateSaveBtn(id){
+  const saved = getSavedNotices();
+  const isSaved = saved.some(s=>s.id===id);
+  document.querySelectorAll(`[data-save-id="${id}"]`).forEach(btn=>{
+    btn.textContent = isSaved ? '🔖 저장됨' : '🔖 저장';
+    btn.style.color = isSaved ? '#1D9E75' : '#888';
+    btn.style.borderColor = isSaved ? '#1D9E75' : '#ccc';
+  });
+}
+
+function updateSaveBadge(){
+  const count = getSavedNotices().length;
+  const badge = document.getElementById('savedBadge');
+  if(badge){ badge.textContent = count>0 ? count : ''; badge.style.display = count>0?'inline':'none'; }
+}
+
+function renderSavedNotices(){
+  const el = document.getElementById('savedNoticeList');
+  if(!el) return;
+  const saved = getSavedNotices();
+  if(!saved.length){
+    el.innerHTML = `<div class="rbox" style="text-align:center;padding:2rem 1rem">
+      <p style="font-size:2rem;margin-bottom:8px">🔖</p>
+      <p style="font-weight:600;color:#333;margin-bottom:6px">아직 저장한 공고가 없어요</p>
+      <p style="font-size:13px;color:#888">공고 카드에서 🔖 저장 버튼을 눌러보세요</p>
+    </div>`;
+    return;
+  }
+  let html = `<p style="font-size:13px;color:#888;margin-bottom:12px">총 ${saved.length}건 저장됨</p>`;
+  saved.forEach(s=>{
+    const dateStr = s.savedAt ? new Date(s.savedAt).toLocaleDateString('ko-KR') : '';
+    html += `<div class="hcard">
+      <div class="htop">
+        <p class="hname">${s.title||'(공고명 없음)'}</p>
+        <button style="background:none;border:none;font-size:18px;cursor:pointer;padding:2px 4px;color:#ccc" title="저장 삭제" onclick="toggleSaveNotice('${s.id.replace(/'/g,"\\'")}','${(s.title||'').replace(/'/g,"\\'")}','${(s.region||'').replace(/'/g,"\\'")}','${(s.type||'').replace(/'/g,"\\'")}','${(s.url||'').replace(/'/g,"\\'")}');renderSavedNotices()">✕</button>
+      </div>
+      <p class="haddr">${s.region||''} · ${s.type||''}</p>
+      ${dateStr?`<p style="font-size:11px;color:#bbb;margin-top:4px">저장일: ${dateStr}</p>`:''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+        ${s.url?`<a class="detail-link" href="${s.url}" target="_blank">📄 공고 원문 보기</a>`:''}
+      </div>
+    </div>`;
+  });
+  el.innerHTML = html;
+}
+
 async function shareNotice(btn, title, region, type, url){
   const shareUrl = url || 'https://dauntown96.github.io/zipfit';
   const text = [region, type].filter(Boolean).join(' · ') + ' | ZipFit';
@@ -877,7 +937,10 @@ function renderNoticeList(filtered, totalCount){
     const nRegion = (n['지역']||'').replace(/'/g,"\\'");
     const nType = (n['공급유형']||'').replace(/'/g,"\\'");
     const nUrl = (n['공고URL']||'').replace(/'/g,"\\'");
+    const nId = (n['announcement_id']||String(idx)).replace(/'/g,"\\'");
+    const nSaved = getSavedNotices().some(s=>s.id===n['announcement_id']||String(idx));
     const shareBtn = `<button class="detail-link" style="border:1px solid #1D9E75;color:#1D9E75;background:#fff;cursor:pointer;margin-top:10px" onclick="event.stopPropagation();shareNotice(this,'${nTitle}','${nRegion}','${nType}','${nUrl}')">🔗 이 공고 공유하기</button>`;
+    const saveBtn = `<button data-save-id="${n['announcement_id']||idx}" class="detail-link" style="border:1px solid ${nSaved?'#1D9E75':'#ccc'};color:${nSaved?'#1D9E75':'#888'};background:#fff;cursor:pointer;margin-top:10px" onclick="event.stopPropagation();toggleSaveNotice('${nId}','${nTitle}','${nRegion}','${nType}','${nUrl}')">${nSaved?'🔖 저장됨':'🔖 저장'}</button>`;
     const detailHTML = detailRows.length
       ? `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px;transition:all 0.2s">
           <div class="detail-grid">
@@ -886,9 +949,10 @@ function renderNoticeList(filtered, totalCount){
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
             ${n['공고URL']?`<a class="detail-link" href="${n['공고URL']}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a>`:''}
             ${shareBtn}
+            ${saveBtn}
           </div>
         </div>`
-      : `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px"><div style="display:flex;gap:8px;flex-wrap:wrap">${n['공고URL']?`<a class="detail-link" href="${n['공고URL']}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a>`:''} ${shareBtn}</div></div>`;
+      : `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px"><div style="display:flex;gap:8px;flex-wrap:wrap">${n['공고URL']?`<a class="detail-link" href="${n['공고URL']}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a>`:''} ${shareBtn} ${saveBtn}</div></div>`;
 
     html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n['지역']||'').replace(/"/g,'&quot;')}" data-sido="${(n['sido_nm']||'').replace(/"/g,'&quot;')}" data-sigungu="${(n['sigungu_nm']||'').replace(/"/g,'&quot;')}" data-title="${(n['공고명']||'').replace(/"/g,'&quot;')}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this)" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
       <div class="htop">
@@ -1118,11 +1182,13 @@ function goMain(n){
   if(n===1) renderPersonalizedRecommendations();
   if(n===2 && !noticeLoaded) initNoticeFilters();
   else if(n===2) loadNoticeData();
+  if(n===4) renderSavedNotices();
   if(n===5) renderSettingsGate();
 }
 
 // 페이지 로드 시 전국 지역 목록 초기화
 loadRegionsFromSupabase();
+updateSaveBadge();
 
 async function updateBannerFromDB(){
   try{
@@ -1487,7 +1553,10 @@ function renderMatchResults(rows){
     const mRegion = (n.region||'').replace(/'/g,"\\'");
     const mType = (n.housing_type||'').replace(/'/g,"\\'");
     const mUrl = (n.url||'').replace(/'/g,"\\'");
+    const mId = (n.announcement_id||'m'+idx).replace(/'/g,"\\'");
+    const mSaved = getSavedNotices().some(s=>s.id===(n.announcement_id||'m'+idx));
     const mShareBtn = `<button class="detail-link" style="border:1px solid #1D9E75;color:#1D9E75;background:#fff;cursor:pointer" onclick="event.stopPropagation();shareNotice(this,'${mTitle}','${mRegion}','${mType}','${mUrl}')">🔗 이 공고 공유하기</button>`;
+    const mSaveBtn = `<button data-save-id="${n.announcement_id||'m'+idx}" class="detail-link" style="border:1px solid ${mSaved?'#1D9E75':'#ccc'};color:${mSaved?'#1D9E75':'#888'};background:#fff;cursor:pointer" onclick="event.stopPropagation();toggleSaveNotice('${mId}','${mTitle}','${mRegion}','${mType}','${mUrl}')">${mSaved?'🔖 저장됨':'🔖 저장'}</button>`;
     const detailHTML = detailRows.length
       ? `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px">
           <div class="detail-grid">
@@ -1496,9 +1565,10 @@ function renderMatchResults(rows){
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
             ${n.url?`<a class="detail-link" href="${n.url}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a>`:''}
             ${mShareBtn}
+            ${mSaveBtn}
           </div>
         </div>`
-      : `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px"><div style="display:flex;gap:8px;flex-wrap:wrap">${n.url?`<a class="detail-link" href="${n.url}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a>`:''} ${mShareBtn}</div></div>`;
+      : `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px"><div style="display:flex;gap:8px;flex-wrap:wrap">${n.url?`<a class="detail-link" href="${n.url}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a>`:''} ${mShareBtn} ${mSaveBtn}</div></div>`;
 
     html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n.region||'').replace(/"/g,'&quot;')}" data-sido="${(n.sido_nm||'').replace(/"/g,'&quot;')}" data-sigungu="${(n.sigungu_nm||'').replace(/"/g,'&quot;')}" data-title="${(n.title||'').replace(/"/g,'&quot;')}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this)" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
       <div class="htop">
