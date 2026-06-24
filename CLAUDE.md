@@ -2,7 +2,7 @@
 
 > **이 파일이 유일한 세이브포인트입니다.**
 > Claude Code와 claude.ai 모두 이 파일을 기준으로 작업합니다.
-> **마지막 업데이트**: 2026-06-25 (a11y 기본 보완 — 탭바 aria-selected, 카드 aria-expanded+키보드, 칩 aria-pressed, label for 연결)
+> **마지막 업데이트**: 2026-06-25 (카카오맵 지도+POI 복구 — toggleDetail 재구현, hcard data속성, sido_nm 매핑, geocoder fallback)
 
 ---
 
@@ -149,6 +149,7 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-06-25 | 카카오맵 지도+POI 복구 — toggleDetail(id,card) 재구현, hcard에 data-sido/sigungu/region/title 저장, loadNoticeData 매핑에 sido_nm/sigungu_nm 추가, geocoder sido fallback, initMapForHouse 리팩토링 |
 | 2026-06-25 | 접근성(a11y) 기본 보완 — 탭바 role=tablist/aria-selected, hcard role=button/aria-expanded/키보드Enter·Space, 칩 aria-pressed, notice-list aria-live=polite, 설정탭 label for 명시 연결 |
 | 2026-06-25 | 공고 탭 더 보기 버튼 추가 — noticeVisibleCount=20 전역, 20건씩 추가(noticeShowMore), 필터/정렬 변경 시 초기화, more-btn 스타일 통일 |
 | 2026-06-25 | 공고 공유 기능 추가 — shareNotice(btn,title,region,type,url), 모바일 navigator.share / PC 클립보드 복사+1.5초 텍스트 변경, 공고탭·추천탭 accordion 버튼 추가 |
