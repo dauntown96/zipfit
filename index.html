@@ -1118,7 +1118,7 @@ function diagnose(){
     let gp=0;
     if(children>=3)gp+=4;else if(children===2)gp+=3;else if(children===1)gp+=2;
     if(gp)html+=`<div class="rbox warn" style="margin-top:6px"><p class="rtitle">📊 예상 가점: ${gp}점 (자녀 항목)</p><p class="rdesc">청약저축 납입횟수, 해당 시 거주기간, 장애인 등 추가 가점을 확인하세요.</p></div>`;
-    html+=`<button class="btn btn-primary" onclick="goStep(2)" style="margin-top:0.5rem">주택 매칭하러 가기 →</button>`;
+    html+=`<button class="btn btn-primary" onclick="goStep(2);matchHouses()" style="margin-top:0.5rem">주택 매칭하러 가기 →</button>`;
   }
   r.innerHTML=html;
 }
@@ -1313,23 +1313,60 @@ function renderMatchResults(rows){
   const shown = rows.slice(0, visibleCount);
   let html = `<div class="count-info"><span>총 ${rows.length}건 매칭</span></div>`;
 
-  shown.forEach(n => {
-    const isClosed = (n.status_normalized||n.status||'') === '접수마감';
-    const applyStart = n.apply_start||'';
-    const applyEnd   = n.apply_end||'';
-    const annDate    = n.announcement_date||'';
-    const dateLine   = annDate
-      ? `모집공고: ${annDate} / 접수기간: ${applyStart||'-'} ~ ${applyEnd||'-'}`
-      : `접수기간: ${applyStart||'-'} ~ ${applyEnd||'-'}`;
-    html += `<div class="hcard" style="${isClosed?'opacity:0.5':''}">
+  shown.forEach((n, idx) => {
+    const isClosed    = (n.status_normalized||n.status||'') === '접수마감';
+    const isAmended   = (n.title||'').includes('[정정공고]') || n.is_revised;
+    const demoTags    = classifyDemographics(n.housing_type||'', n.title||'');
+    const isNew       = !isClosed && isNewNotice({'created_at': n.created_at||'', 'apply_end': n.apply_end||''});
+    const closingSoon = !isClosed && isClosingSoon({'apply_end': n.apply_end||''});
+    const applyStart  = n.apply_start||'';
+    const applyEnd    = n.apply_end||'';
+    const annDate     = n.announcement_date||'';
+    const sameAsStart = annDate && applyStart && annDate === applyStart;
+    const dateLine    = sameAsStart
+      ? `모집공고: ${annDate} / 접수마감: ${applyEnd||'-'}`
+      : annDate
+        ? `모집공고: ${annDate} / 접수기간: ${applyStart||'-'} ~ ${applyEnd||'-'}`
+        : `접수기간: ${applyStart||'-'} ~ ${applyEnd||'-'}`;
+    const cardId = 'mcard-detail-'+idx;
+
+    const detailRows = [];
+    if(n.supply_org) detailRows.push(['공급기관', n.supply_org]);
+    if(n.area_min){
+      const areaStr = parseFloat(n.area_min).toFixed(1)+'㎡' +
+        (n.area_max&&n.area_max!==n.area_min ? ' ~ '+parseFloat(n.area_max).toFixed(1)+'㎡' : '');
+      detailRows.push(['전용면적', areaStr]);
+    }
+    if(n.total_units) detailRows.push(['총 세대수', n.total_units+'세대']);
+    if(n.move_in_date) detailRows.push(['입주예정', n.move_in_date]);
+    if(n.deposit_min) detailRows.push(['보증금', Number(n.deposit_min).toLocaleString()+'원']);
+    if(n.rent_min) detailRows.push(['월임대료', Number(n.rent_min).toLocaleString()+'원']);
+    if(annDate) detailRows.push(['공고일', annDate]);
+    if(applyStart||applyEnd) detailRows.push(['접수기간', (applyStart||'-')+' ~ '+(applyEnd||'-')]);
+
+    const detailHTML = detailRows.length
+      ? `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px">
+            ${detailRows.map(([k,v])=>`<div style="font-size:12px"><span style="color:#999">${k}</span><br><span style="color:#333;font-weight:500">${v}</span></div>`).join('')}
+          </div>
+          ${n.url?`<a class="detail-link" href="${n.url}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block;margin-top:10px">📄 공고 원문 보기</a>`:''}
+        </div>`
+      : (n.url?`<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px"><a class="detail-link" href="${n.url}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a></div>`:'');
+
+    html += `<div class="hcard" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="(function(el){var d=el.querySelector('[id^=mcard-detail]');if(!d)return;var open=d.style.display==='block';d.style.display=open?'none':'block';el.style.borderColor=open?'':'#1D9E75';})(this)">
       <div class="htop">
         <p class="hname">${n.title||'(공고명 없음)'}</p>
-        <span class="htag tag-apt">${n.status||'-'}</span>
+        <span class="htag ${isClosed?'tag-mix':'tag-apt'}">${n.status||'-'}</span>
       </div>
       <p class="haddr">${n.region||''} · ${classifyNoticeType(n.housing_type||'',n.title||'')} · ${n.housing_type||''}</p>
+      <div class="chip-row" style="margin:8px 0;gap:5px">
+        ${isAmended?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#7B5EA7;border-color:#7B5EA7">🔄 정정</span>':''}
+        ${isNew?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
+        ${closingSoon?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
+        ${demoTags.map(t=>`<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:${t.color};border-color:${t.color}">${t.label}</span>`).join('')}
+      </div>
       <p style="font-size:12px;color:#888;margin-bottom:8px">${dateLine}</p>
-      ${(n.area_min||n.total_units||n.move_in_date)?`<p style="font-size:12px;color:#888;margin-bottom:8px">${n.area_min?`전용 ${parseFloat(n.area_min).toFixed(1)}㎡`:''} ${n.area_min&&n.area_max&&n.area_min!==n.area_max?`~ ${parseFloat(n.area_max).toFixed(1)}㎡`:''} ${n.total_units?`· ${n.total_units}세대`:''} ${n.move_in_date?`· 입주 ${n.move_in_date}`:''}</p>`:''}
-      ${n.url?`<a class="detail-link" href="${n.url}" target="_blank" style="display:block">📄 공고 원문 보기</a>`:''}
+      ${detailHTML}
     </div>`;
   });
 
