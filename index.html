@@ -960,6 +960,26 @@ function goMain(n){
 // 페이지 로드 시 전국 지역 목록 초기화
 loadRegionsFromSupabase();
 
+async function updateBannerFromDB(){
+  try{
+    const res=await fetch(
+      `${SUPABASE_URL}/rest/v1/rpc/get_announcements_deduped`,
+      {method:'POST',headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY,'Content-Type':'application/json'},body:'{}'}
+    );
+    if(!res.ok) return;
+    const rows=await res.json();
+    if(!rows||!rows.length) return;
+    const active=rows.find(r=>r.status==='접수중')||rows[0];
+    const titleShort=(active.title||'').slice(0,20);
+    const start=active.apply_start||'';
+    const end=active.apply_end||'';
+    const datePart=(start||end)?` · ${start||'-'}~${end||'-'}`:'';
+    const el=document.querySelector('.badge');
+    if(el) el.textContent=`📢 ${titleShort}${datePart}`;
+  }catch(e){console.warn('배너 업데이트 실패:',e);}
+}
+document.addEventListener('DOMContentLoaded', updateBannerFromDB);
+
 function goStep(n){
   // 맞춤추천 그룹(1,2)
   if(n===1||n===2){
