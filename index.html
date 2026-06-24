@@ -711,6 +711,7 @@ function renderNoticeList(filtered, totalCount){
   let html = '';
   sorted.forEach(n => {
     const isClosed   = n['처리상태정규화']==='접수마감';
+    const isAmended  = (n['공고명']||'').includes('[정정공고]');
     const demoTags   = classifyDemographics(n['공급유형'], n['공고명']);
     const isNew      = !isClosed && isNewNotice(n);
     const closingSoon = !isClosed && isClosingSoon(n);
@@ -727,6 +728,7 @@ function renderNoticeList(filtered, totalCount){
       </div>
       <p class="haddr">${n['지역']||''} · ${classifyNoticeType(n['공급유형'],n['공고명'])} · ${n['공급유형']||''}</p>
       <div class="chip-row" style="margin:8px 0;gap:5px">
+        ${isAmended?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#7B5EA7;border-color:#7B5EA7">🔄 정정</span>':''}
         ${isNew?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
         ${closingSoon?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
         ${demoTags.map(t=>`<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:${t.color};border-color:${t.color}">${t.label}</span>`).join('')}
