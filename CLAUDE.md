@@ -2,7 +2,7 @@
 
 > **이 파일이 유일한 세이브포인트입니다.**
 > Claude Code와 claude.ai 모두 이 파일을 기준으로 작업합니다.
-> **마지막 업데이트**: 2026-06-25 (collect-announcements v7 — 마이홈포털(MYHOME) 수집 로직 추가)
+> **마지막 업데이트**: 2026-06-25 (MYHOME announcement_id 버그 이슈 등록 + 스프린트 2 로드맵 추가)
 
 ---
 
@@ -129,6 +129,13 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 - ✅ 정정공고 처리 (`[정정공고]` 감지 → 배지 표시) (완료 2026-06-25)
 - ✅ 공고 카드에 `area_min/max`, `total_units`, `move_in_date` 표시 (완료 2026-06-25)
 
+### 🔴 즉시 수정 필요 (스프린트 2)
+
+4. **MYHOME `announcement_id` 생성 로직 버그**
+   - 현재: `pblancId + "_" + houseSn` → 지역별 중복 구분 불가
+   - 수정: `pblancId + "_" + houseSn + "_" + brtcNm + "_" + signguNm` 조합으로 변경
+   - 현재 16건만 수집 (실제 366건이어야 함) — collect-announcements v8로 수정 필요
+
 ### 🟢 중장기
 - SH·GH 등 추가 공공기관 API 연동
 - 공고별 동적 자격 진단 시스템
@@ -143,6 +150,7 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-06-25 | MYHOME announcement_id 버그 이슈 등록 — pblancId+houseSn 중복 문제, v8 수정 필요 (실제 366건 → 현재 16건만 수집) |
 | 2026-06-25 | collect-announcements v7 배포 — 마이홈포털(MYHOME) 수집 로직 추가 (fetchMyHome, mapMyHomeRow) |
 | 2026-06-25 | 자격진단 필수 관문화 — Step2 초기 비활성, diagnose() 완료 시 활성화 + 유형칩 자동선택, eligibleTypes 필터 activeTypes로 수정 |
 | 2026-06-25 | matchHouses p_status null 변경 + 접수마감 클라이언트 필터 추가 |
