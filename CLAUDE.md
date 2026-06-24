@@ -2,7 +2,7 @@
 
 > **이 파일이 유일한 세이브포인트입니다.**
 > Claude Code와 claude.ai 모두 이 파일을 기준으로 작업합니다.
-> **마지막 업데이트**: 2026-06-25 (PWA 기본 설정 추가 — manifest.json, sw.js 오프라인 캐싱, 아이콘 2종, Apple 메타태그)
+> **마지막 업데이트**: 2026-06-25 (공고 공유 기능 추가 — shareNotice(), 모바일 navigator.share / PC 클립보드 복사, 공고탭·추천탭 accordion 버튼)
 
 ---
 
@@ -149,6 +149,7 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-06-25 | 공고 공유 기능 추가 — shareNotice(btn,title,region,type,url), 모바일 navigator.share / PC 클립보드 복사+1.5초 텍스트 변경, 공고탭·추천탭 accordion 버튼 추가 |
 | 2026-06-25 | PWA 기본 설정 추가 — manifest.json(start_url /zipfit/), sw.js(install 캐싱+오프라인 대응), icon-192/512.png(Pillow 생성), Apple 메타태그, SW 등록 스크립트 |
 | 2026-06-25 | Supabase API 에러 처리 전면 보강 — initNoticeFilters/loadNoticeData/matchHouses/saveSettings 에러 UI·재시도 버튼·응답 body 검증 추가 |
 | 2026-06-25 | 모바일 UX 개선 — .maintabs sticky top:0, .detail-grid @media 1열 전환, .hgrid @media 2열 전환, .hname 2줄 말줄임 |
