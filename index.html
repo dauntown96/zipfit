@@ -637,6 +637,11 @@ async function initNoticeFilters(){
     loadNoticeData();
   }catch(e){
     console.error('ZipFit 필터 초기화 실패:', e);
+    const statusEl = document.getElementById('notice-status');
+    if(statusEl){
+      statusEl.className = 'rbox err';
+      statusEl.innerHTML = '<p class="rtitle">⚠️ 공고 데이터를 불러오지 못했어요</p><p class="rdesc">네트워크 연결을 확인하고 다시 시도해주세요.</p><button class="btn btn-sec btn-sm" style="margin-top:8px" onclick="initNoticeFilters()">새로고침</button>';
+    }
   }
 }
 
@@ -708,6 +713,10 @@ async function loadNoticeData(){
     );
     if(!res.ok) throw new Error('HTTP '+res.status);
     const rows = await res.json();
+    if(!Array.isArray(rows)){
+      const msg = rows?.message || rows?.error || JSON.stringify(rows);
+      throw new Error('Supabase 오류: ' + msg);
+    }
 
     // 마감 숨기기는 status 칩 미선택 시 클라이언트에서 최종 처리
     noticeData = rows.map(r => ({
@@ -768,7 +777,7 @@ async function loadNoticeData(){
     updateFilterToggleBtn();
   }catch(err){
     statusEl.className = 'rbox err';
-    statusEl.innerHTML = '<p class="rtitle">❌ 공고 데이터를 불러오지 못했어요</p><p class="rdesc">('+err.message+') 잠시 후 다시 시도해주세요.</p>';
+    statusEl.innerHTML = '<p class="rtitle">⚠️ 공고 데이터를 불러오지 못했어요</p><p class="rdesc">잠시 후 다시 시도해주세요.</p><button class="btn btn-sec btn-sm" style="margin-top:8px" onclick="loadNoticeData()">새로고침</button>';
     console.error('ZipFit 공고 로드 실패:', err);
   }finally{
     noticeLoading = false;
@@ -1189,7 +1198,12 @@ async function matchHouses(){
       },
       body: JSON.stringify(body)
     });
+    if(!res.ok) throw new Error('HTTP '+res.status);
     let rows = await res.json();
+    if(!Array.isArray(rows)){
+      const msg = rows?.message || rows?.error || JSON.stringify(rows);
+      throw new Error('Supabase 오류: ' + msg);
+    }
 
     rows = rows.filter(r => r.status !== '접수마감' && r.status_normalized !== '접수마감');
     if(regions.length > 0) {
@@ -1208,7 +1222,7 @@ async function matchHouses(){
     visibleCount = 5;
     renderMatchResults(rows);
   } catch(err) {
-    r.innerHTML = '<div class="rbox err"><p class="rtitle">❌ 공고를 불러오지 못했어요</p><p class="rdesc">잠시 후 다시 시도해주세요.</p></div>';
+    r.innerHTML = '<div class="rbox err"><p class="rtitle">⚠️ 매칭 중 오류가 발생했어요</p><p class="rdesc">잠시 후 다시 시도해주세요.</p><button class="btn btn-sec btn-sm" style="margin-top:8px" onclick="matchHouses()">다시 시도</button></div>';
     console.error('matchHouses 오류:', err);
   }
 }
@@ -1537,7 +1551,8 @@ async function loginWithEmail(prefillEmail){
       if(json.data) profile={email,...json.data};
     }
   }catch(err){
-    console.warn('ZipFit 프로필 불러오기 실패(신규 사용자일 수 있음):',err);
+    console.warn('ZipFit 프로필 불러오기 실패(신규 사용자로 진행):', err);
+    if(msgEl){ msgEl.style.color='#A32D2D'; msgEl.textContent='설정을 불러오지 못했어요. 네트워크 연결을 확인해주세요.'; }
   }
 
   currentUser=profile;
@@ -1601,12 +1616,14 @@ async function saveSettings(){
   try{
     const res=await fetch(PROFILE_API_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     if(!res.ok) throw new Error('HTTP '+res.status);
+    const json=await res.json().catch(()=>({}));
+    if(json.error || json.message?.toLowerCase().includes('error')) throw new Error(json.error||json.message||'서버 오류');
     currentUser={...currentUser,...payload,alert_on:payload.alertOn,new_notice_alert:payload.newNoticeAlert,marketing_alert:payload.marketingAlert,max_deposit:payload.maxDeposit,min_rooms:payload.minRooms};
     msgEl.style.color='#0F6E56';
     msgEl.textContent='✅ 조건이 저장됐어요.';
   }catch(err){
     msgEl.style.color='#A32D2D';
-    msgEl.textContent='저장에 실패했어요. ('+err.message+')';
+    msgEl.textContent='설정 저장에 실패했어요. 네트워크 연결을 확인해주세요.';
   }
 }
 
