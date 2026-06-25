@@ -571,7 +571,12 @@ function parseNoticeDate(s){
   return isNaN(d.getTime()) ? null : d;
 }
 function isNewNotice(row){
-  const d = parseNoticeDate(row['created_at']||row['수집일시']||'');
+  // 기준: announcement_date(모집공고일) → apply_start → created_at 순 fallback
+  const d = parseNoticeDate(
+    row['announcement_date'] ||
+    row['apply_start'] || row['신청시작일'] ||
+    row['created_at'] || row['수집일시'] || ''
+  );
   return d ? (new Date() - d) / 3600000 <= 48 : false;
 }
 function isClosingSoon(row){
@@ -909,9 +914,9 @@ function renderNoticeList(filtered, totalCount){
   // [배지 디버그] 브라우저 콘솔에서 확인 후 제거 예정
   console.log('[배지 디버그] 공고 샘플:', JSON.stringify(filtered.slice(0,3).map(n=>({
     title: (n['공고명']||n.title||'').slice(0,15),
+    announcement_date: n['announcement_date'],
+    apply_start: n['신청시작일']||n['apply_start'],
     created_at: n['created_at'],
-    parsed_created_at: parseNoticeDate(n['created_at'])?.toISOString()||null,
-    isClosed: n['처리상태정규화'] === '접수마감',
     isNew: isNewNotice(n),
     closingSoon: isClosingSoon(n)
   }))));
