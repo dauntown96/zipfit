@@ -1230,105 +1230,190 @@ async function loadInsightData(){
 }
 
 function renderInsight(rows, wrap){
-  const total = rows.length;
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0,10);
 
-  // ① 지역별 (sido_nm) 집계
-  const regionMap = {};
-  rows.forEach(r=>{ const k=r.sido_nm||r.region||'기타'; regionMap[k]=(regionMap[k]||0)+1; });
-  const regionTop = Object.entries(regionMap).sort((a,b)=>b[1]-a[1]).slice(0,10);
-  const regionMax = regionTop[0]?.[1]||1;
+  // ① KPI
+  const kpiActive = rows.filter(r=>(r.status_normalized||r.status||'')==='접수중').length;
+  const d7ago = new Date(today); d7ago.setDate(d7ago.getDate()-7);
+  const kpiNew = rows.filter(r=>{
+    if(!r.announcement_date) return false;
+    const d = parseNoticeDate(r.announcement_date);
+    return d && d >= d7ago;
+  }).length;
+  const kpiClosing = rows.filter(r=>isClosingSoon(r)).length;
 
-  // ② 유형별 (housing_type) 집계
-  const typeMap = {};
-  rows.forEach(r=>{ const k=r.housing_type||'기타'; typeMap[k]=(typeMap[k]||0)+1; });
-  const typeSorted = Object.entries(typeMap).sort((a,b)=>b[1]-a[1]);
-
-  // ③ 상태별 집계
-  const statusMap = {'접수중':0,'공고중':0,'접수마감':0};
+  // ② 마감 임박 타임라인 (오늘~14일 후)
+  const timelineMap = {};
+  for(let i=0;i<14;i++){
+    const d = new Date(today); d.setDate(d.getDate()+i);
+    timelineMap[d.toISOString().slice(0,10)] = 0;
+  }
   rows.forEach(r=>{
-    const s = r.status_normalized||r.status||'';
-    if(s==='접수중') statusMap['접수중']++;
-    else if(s==='공고중') statusMap['공고중']++;
-    else if(s==='접수마감') statusMap['접수마감']++;
+    const raw = r.apply_end||'';
+    if(!raw) return;
+    const d = parseNoticeDate(raw);
+    if(!d) return;
+    const key = d.toISOString().slice(0,10);
+    if(key in timelineMap) timelineMap[key]++;
   });
+  const timelineEntries = Object.entries(timelineMap).sort((a,b)=>a[0]<b[0]?-1:1);
+  const timelineMax = Math.max(1,...timelineEntries.map(e=>e[1]));
+  const tomorrowStr = new Date(new Date(today).setDate(today.getDate()+1)).toISOString().slice(0,10);
 
-  // ④ 최근 30일 추이 (announcement_date)
-  const now = new Date();
-  const d30ago = new Date(now); d30ago.setDate(d30ago.getDate()-30);
+  // ③ 지역별 (sido_nm||region) — 공고수 + 세대수 합계
+  const regionMap = {};
+  rows.forEach(r=>{
+    const k = r.sido_nm||r.region||'기타';
+    if(!regionMap[k]) regionMap[k]={cnt:0,units:0};
+    regionMap[k].cnt++;
+    if(r.total_units) regionMap[k].units += Number(r.total_units)||0;
+  });
+  const regionTop = Object.entries(regionMap).sort((a,b)=>b[1].cnt-a[1].cnt).slice(0,10);
+  const regionMaxCnt = Math.max(1,...regionTop.map(e=>e[1].cnt));
+  const regionMaxUnits = Math.max(1,...regionTop.map(e=>e[1].units));
+
+  // ④ 유형별 보증금·임대료 (공고수 상위 6)
+  const typeMap = {};
+  rows.forEach(r=>{
+    const k = r.housing_type||'기타';
+    if(!typeMap[k]) typeMap[k]={cnt:0,deposits:[],rents:[]};
+    typeMap[k].cnt++;
+    if(r.deposit_min!=null && r.deposit_min!==0) typeMap[k].deposits.push(Number(r.deposit_min));
+    if(r.rent_min!=null && r.rent_min!==0) typeMap[k].rents.push(Number(r.rent_min));
+  });
+  const typeTop6 = Object.entries(typeMap).sort((a,b)=>b[1].cnt-a[1].cnt).slice(0,6);
+  const avg = arr => arr.length ? Math.round(arr.reduce((s,v)=>s+v,0)/arr.length) : null;
+  const typeStats = typeTop6.map(([type,v])=>({
+    type, cnt:v.cnt,
+    deposit: avg(v.deposits),
+    rent: avg(v.rents)
+  }));
+  const maxDeposit = Math.max(1,...typeStats.map(t=>t.deposit||0));
+  const maxRent = Math.max(1,...typeStats.map(t=>t.rent||0));
+
+  // ⑤ 최근 30일 추이
+  const d30ago = new Date(today); d30ago.setDate(d30ago.getDate()-30);
   const trendMap = {};
   rows.forEach(r=>{
     if(!r.announcement_date) return;
-    const d = new Date(r.announcement_date.replace(/\./g,'-'));
-    if(isNaN(d)||d<d30ago) return;
-    const key = r.announcement_date.slice(0,10);
+    const d = parseNoticeDate(r.announcement_date);
+    if(!d||d<d30ago) return;
+    const key = d.toISOString().slice(0,10);
     trendMap[key]=(trendMap[key]||0)+1;
   });
   const trendEntries = Object.entries(trendMap).sort((a,b)=>a[0]<b[0]?-1:1);
   const trendMax = Math.max(1,...trendEntries.map(e=>e[1]));
 
-  // 색상 팔레트
-  const COLORS = ['#1D9E75','#378ADD','#EF9F27','#D85A30','#7F77DD','#5DCAA5','#E96B8A','#8BAC3B','#A67C52','#6C757D'];
+  const S = 'background:#fff;border-radius:14px;padding:20px;margin-bottom:16px;box-shadow:0 1px 6px rgba(0,0,0,0.07)';
+  const T = 'font-size:15px;font-weight:700;margin-bottom:14px;color:#333;margin-top:0';
 
   wrap.innerHTML = `
-    <div class="panel">
-      <p class="panel-title" style="margin-bottom:4px">📊 공고 통계 인사이트</p>
-      <p style="font-size:13px;color:#888;margin-bottom:0">현재 전국 <strong style="color:#1D9E75">${total.toLocaleString()}개</strong> 공고가 수집되어 있어요. 매일 오전 9시 자동 업데이트.</p>
+    <div style="${S}">
+      <p style="${T}">📊 공고 통계 인사이트</p>
+      <p style="font-size:13px;color:#888;margin:0">전국 <strong style="color:#5a7af7">${rows.length.toLocaleString()}개</strong> 공고 · 매일 오전 9시 자동 업데이트</p>
     </div>
 
-    <div class="panel">
-      <p class="panel-title">③ 공고 상태 현황</p>
-      <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <div style="flex:1;min-width:90px;background:#E8F5F0;border-radius:12px;padding:14px 10px;text-align:center">
-          <p style="font-size:26px;font-weight:700;color:#1D9E75;margin:0">${statusMap['접수중'].toLocaleString()}</p>
-          <p style="font-size:12px;color:#555;margin-top:4px">🟢 접수중</p>
+    <div style="${S}">
+      <p style="${T}">📌 주요 현황</p>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+        <div style="background:#f0f3ff;border-radius:12px;padding:16px;text-align:center;box-shadow:0 1px 4px rgba(90,122,247,0.08)">
+          <p style="font-size:28px;font-weight:700;color:#5a7af7;margin:0">${kpiActive.toLocaleString()}</p>
+          <p style="font-size:12px;color:#888;margin-top:6px">🟢 접수중</p>
         </div>
-        <div style="flex:1;min-width:90px;background:#EEF4FB;border-radius:12px;padding:14px 10px;text-align:center">
-          <p style="font-size:26px;font-weight:700;color:#378ADD;margin:0">${statusMap['공고중'].toLocaleString()}</p>
-          <p style="font-size:12px;color:#555;margin-top:4px">🔵 공고중</p>
+        <div style="background:#f0faf5;border-radius:12px;padding:16px;text-align:center;box-shadow:0 1px 4px rgba(29,158,117,0.08)">
+          <p style="font-size:28px;font-weight:700;color:#1D9E75;margin:0">${kpiNew.toLocaleString()}</p>
+          <p style="font-size:12px;color:#888;margin-top:6px">🆕 이번주 신규</p>
         </div>
-        <div style="flex:1;min-width:90px;background:#F5F5F5;border-radius:12px;padding:14px 10px;text-align:center">
-          <p style="font-size:26px;font-weight:700;color:#999;margin:0">${statusMap['접수마감'].toLocaleString()}</p>
-          <p style="font-size:12px;color:#555;margin-top:4px">⚪ 접수마감</p>
+        <div style="background:#fff7f0;border-radius:12px;padding:16px;text-align:center;box-shadow:0 1px 4px rgba(239,159,39,0.08)">
+          <p style="font-size:28px;font-weight:700;color:#EF9F27;margin:0">${kpiClosing.toLocaleString()}</p>
+          <p style="font-size:12px;color:#888;margin-top:6px">⏰ 마감임박</p>
         </div>
       </div>
     </div>
 
-    <div class="panel">
-      <p class="panel-title">① 지역별 공고 수 (상위 10개 시/도)</p>
-      <div style="display:flex;flex-direction:column;gap:8px">
-        ${regionTop.map(([region,cnt],i)=>`
+    <div style="${S}">
+      <p style="${T}">📅 마감 임박 타임라인</p>
+      <div style="display:flex;align-items:flex-end;gap:6px;overflow-x:auto;padding-bottom:6px;min-height:100px">
+        ${timelineEntries.map(([date,cnt])=>{
+          const isToday = date===todayStr;
+          const isTomorrow = date===tomorrowStr;
+          const label = isToday?'오늘':isTomorrow?'내일':date.slice(5);
+          const barH = cnt>0 ? Math.round(cnt/timelineMax*60)+8 : 4;
+          const barColor = isToday?'#5a7af7':isTomorrow?'#EF9F27':'#a0b4fa';
+          const labelColor = (isToday||isTomorrow)?'#5a7af7':'#bbb';
+          return `<div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;min-width:34px">
+            <span style="font-size:10px;color:#666;margin-bottom:2px;font-weight:${cnt>0?'600':'400'}">${cnt||''}</span>
+            <div style="background:${barColor};border-radius:3px 3px 0 0;width:22px;height:${barH}px;opacity:${cnt>0?1:0.2}"></div>
+            <span style="font-size:9px;color:${labelColor};margin-top:3px;font-weight:${isToday||isTomorrow?'700':'400'}">${label}</span>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <div style="${S}">
+      <p style="${T}">📍 지역별 공고 현황 (상위 10)</p>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        ${regionTop.map(([region,v])=>`
           <div>
-            <div style="display:flex;justify-content:space-between;font-size:12px;color:#555;margin-bottom:3px">
-              <span>${region}</span><span style="font-weight:600;color:#111">${cnt}건</span>
+            <div style="display:flex;justify-content:space-between;font-size:12px;color:#555;margin-bottom:4px">
+              <span style="font-weight:600">${region}</span>
+              <span style="color:#888">${v.cnt}건${v.units>0?' · '+v.units.toLocaleString()+'세대':''}</span>
             </div>
-            <div style="background:#e8e8e0;border-radius:4px;height:10px;overflow:hidden">
-              <div style="background:${COLORS[i%COLORS.length]};height:100%;width:${Math.round(cnt/regionMax*100)}%;border-radius:4px;transition:width 0.4s"></div>
+            <div style="display:flex;flex-direction:column;gap:3px">
+              <div style="background:#eee;border-radius:4px;height:8px;overflow:hidden">
+                <div style="background:#5a7af7;height:100%;width:${Math.round(v.cnt/regionMaxCnt*100)}%;border-radius:4px;transition:width 0.4s"></div>
+              </div>
+              ${v.units>0?`<div style="background:#eee;border-radius:4px;height:8px;overflow:hidden">
+                <div style="background:#1D9E75;height:100%;width:${Math.round(v.units/regionMaxUnits*100)}%;border-radius:4px;transition:width 0.4s"></div>
+              </div>`:''}
+            </div>
+          </div>`).join('')}
+      </div>
+      <div style="display:flex;gap:12px;margin-top:10px">
+        <span style="font-size:11px;color:#888;display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#5a7af7"></span>공고수</span>
+        <span style="font-size:11px;color:#888;display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#1D9E75"></span>세대수</span>
+      </div>
+    </div>
+
+    <div style="${S}">
+      <p style="${T}">💰 유형별 평균 보증금·임대료</p>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        ${typeStats.map(t=>`
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px">
+              <span style="font-weight:600;color:#333">${t.type}</span>
+              <span style="color:#888">${t.cnt}건</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:3px">
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="font-size:10px;color:#5a7af7;width:36px;flex-shrink:0">보증금</span>
+                ${t.deposit!=null
+                  ? `<div style="flex:1;background:#eee;border-radius:4px;height:8px;overflow:hidden"><div style="background:#5a7af7;height:100%;width:${Math.round(t.deposit/maxDeposit*100)}%;border-radius:4px"></div></div>
+                     <span style="font-size:10px;color:#555;width:60px;text-align:right;flex-shrink:0">${(t.deposit/10000).toFixed(0)}만원</span>`
+                  : `<span style="font-size:10px;color:#ccc">정보없음</span>`}
+              </div>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="font-size:10px;color:#EF9F27;width:36px;flex-shrink:0">월임대료</span>
+                ${t.rent!=null
+                  ? `<div style="flex:1;background:#eee;border-radius:4px;height:8px;overflow:hidden"><div style="background:#EF9F27;height:100%;width:${Math.round(t.rent/maxRent*100)}%;border-radius:4px"></div></div>
+                     <span style="font-size:10px;color:#555;width:60px;text-align:right;flex-shrink:0">${(t.rent/10000).toFixed(1)}만원</span>`
+                  : `<span style="font-size:10px;color:#ccc">정보없음</span>`}
+              </div>
             </div>
           </div>`).join('')}
       </div>
     </div>
 
-    <div class="panel">
-      <p class="panel-title">② 주택 유형별 공고 수</p>
-      <div class="chip-row" style="flex-wrap:wrap;gap:8px">
-        ${typeSorted.map(([type,cnt],i)=>`
-          <div style="display:flex;align-items:center;gap:6px;background:#f4f4f0;border-radius:20px;padding:6px 12px">
-            <span style="width:10px;height:10px;border-radius:50%;background:${COLORS[i%COLORS.length]};display:inline-block;flex-shrink:0"></span>
-            <span style="font-size:13px;color:#333">${type}</span>
-            <span style="font-size:13px;font-weight:700;color:#1D9E75">${cnt}</span>
-          </div>`).join('')}
-      </div>
-    </div>
-
-    <div class="panel">
-      <p class="panel-title">④ 최근 30일 공고 추이</p>
+    <div style="${S}">
+      <p style="${T}">📈 최근 30일 공고 추이</p>
       ${trendEntries.length===0
         ? '<p style="font-size:13px;color:#aaa;text-align:center;padding:20px 0">최근 30일 데이터가 없어요</p>'
-        : `<div style="display:flex;align-items:flex-end;gap:4px;height:80px;overflow-x:auto;padding-bottom:4px">
+        : `<div style="display:flex;align-items:flex-end;gap:4px;overflow-x:auto;padding-bottom:4px;min-height:84px">
             ${trendEntries.map(([date,cnt])=>`
               <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;min-width:24px" title="${date}: ${cnt}건">
                 <span style="font-size:9px;color:#888;margin-bottom:2px">${cnt}</span>
-                <div style="background:#1D9E75;border-radius:3px 3px 0 0;width:18px;height:${Math.round(cnt/trendMax*60)+4}px"></div>
+                <div style="background:#5a7af7;border-radius:3px 3px 0 0;width:18px;height:${Math.round(cnt/trendMax*60)+4}px"></div>
                 <span style="font-size:8px;color:#bbb;margin-top:2px;writing-mode:vertical-rl;text-orientation:mixed">${date.slice(5)}</span>
               </div>`).join('')}
           </div>`
