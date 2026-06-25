@@ -561,7 +561,9 @@ function classifyDemographics(typeText, nameText){
 
 function parseNoticeDate(s){
   if(!s) return null;
-  const d = new Date(s.replace(/\./g, '-').trim());
+  let str = s.trim();
+  str = str.replace(/(\.\d{3})\d+/, '$1'); // 밀리초 3자리 초과 제거
+  const d = new Date(str.replace(/\./g, '-'));
   return isNaN(d.getTime()) ? null : d;
 }
 function isNewNotice(row){
@@ -904,10 +906,8 @@ function renderNoticeList(filtered, totalCount){
   console.log('[배지 디버그] 공고 샘플:', JSON.stringify(filtered.slice(0,3).map(n=>({
     title: (n['공고명']||n.title||'').slice(0,15),
     created_at: n['created_at'],
-    status_normalized: n['status_normalized'],
-    처리상태정규화: n['처리상태정규화'],
+    parsed_created_at: parseNoticeDate(n['created_at'])?.toISOString()||null,
     isClosed: n['처리상태정규화'] === '접수마감',
-    apply_end: n['신청마감일']||n['apply_end'],
     isNew: isNewNotice(n),
     closingSoon: isClosingSoon(n)
   }))));
