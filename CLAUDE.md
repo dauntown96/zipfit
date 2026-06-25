@@ -2,7 +2,7 @@
 
 > **이 파일이 유일한 세이브포인트입니다.**
 > Claude Code와 claude.ai 모두 이 파일을 기준으로 작업합니다.
-> **마지막 업데이트**: 2026-06-25 (parseNoticeDate ISO 8601 T 분기 처리 + sw.js v7)
+> **마지막 업데이트**: 2026-06-25 (isNewNotice 기준 announcement_date 우선 적용 — 오래된 모집공고에 NEW 배지 오표시 버그 수정 + sw.js v8)
 
 ---
 
@@ -149,6 +149,7 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-06-25 | isNewNotice 기준 수정 — created_at(수집일시) 대신 announcement_date→apply_start→created_at 순 fallback. 오래된 모집공고에 NEW 배지 오표시 버그 수정, sw.js v8 |
 | 2026-06-25 | parseNoticeDate ISO 8601 T 분기 처리 — T 포함 시 replace 없이 직접 파싱, 날짜 문자열만 . → - 치환, sw.js v7 |
 | 2026-06-25 | parseNoticeDate 밀리초 정규화 — ISO 8601 소수점 초 6자리(Supabase 타임스탬프) → 3자리로 잘라 파싱 정상화, 배지 디버그 로그 parsed_created_at 추가, sw.js v6 |
 | 2026-06-25 | 정렬·배지 버그 수정 3종 — 지역 정렬 sido_nm/sigungu_nm, date-desc created_at fallback, isNewNotice created_at 우선순위, 배지 디버그 로그(JSON.stringify), sw.js v4 |
