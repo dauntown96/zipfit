@@ -562,7 +562,11 @@ function classifyDemographics(typeText, nameText){
 function parseNoticeDate(s){
   if(!s) return null;
   let str = s.trim();
-  str = str.replace(/(\.\d{3})\d+/, '$1'); // 밀리초 3자리 초과 제거
+  if(str.includes('T')){
+    str = str.replace(/(\.\d{3})\d+/, '$1');
+    const d = new Date(str);
+    return isNaN(d.getTime()) ? null : d;
+  }
   const d = new Date(str.replace(/\./g, '-'));
   return isNaN(d.getTime()) ? null : d;
 }
