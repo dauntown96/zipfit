@@ -2,8 +2,14 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
+<link rel="icon" href="data:,">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ZipFit — LH 신혼·신생아 매입임대 맞춤 매칭</title>
+<link rel="manifest" href="/zipfit/manifest.json">
+<meta name="theme-color" content="#1D9E75">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="ZipFit">
 <script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=58c490c9bded159ee35575e80345d783&amp;libraries=services&amp;autoload=false"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -24,7 +30,7 @@ body.fs-large{font-size:17px}
 .badge{display:inline-block;font-size:11px;padding:4px 12px;border-radius:20px;background:#E1F5EE;color:#085041;margin-top:0.75rem;font-weight:500}
 .steps{display:flex;gap:8px;margin-bottom:1.5rem}
 /* 대탭 (메인 카테고리) */
-.maintabs{display:flex;gap:6px;margin-bottom:1rem;background:#ece9e0;padding:5px;border-radius:14px}
+.maintabs{display:flex;gap:6px;margin-bottom:1rem;background:#ece9e0;padding:5px;border-radius:14px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,0.08)}
 .maintab{flex:1;padding:0.65rem 0.2rem;border-radius:10px;font-size:11.5px;font-weight:600;color:#777;text-align:center;cursor:pointer;transition:all 0.15s;border:none;background:transparent}
 .maintab.active{background:#fff;color:#0F6E56;box-shadow:0 1px 3px rgba(0,0,0,0.08)}
 .maintab-icon{display:block;font-size:18px;margin-bottom:2px}
@@ -78,13 +84,15 @@ select:focus,input:focus{border-color:#5DCAA5}
 .hcard{background:#fff;border:1px solid #e8e8e0;border-radius:14px;padding:1rem 1.25rem;margin-bottom:0.75rem;transition:border-color 0.15s}
 .hcard.top1{border:2px solid #1D9E75}
 .htop{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;gap:8px}
-.hname{font-size:14px;font-weight:600;color:#111;margin-top:4px}
+.hname{font-size:14px;font-weight:600;color:#111;margin-top:4px;flex:1;min-width:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .htag{font-size:11px;padding:3px 10px;border-radius:10px;font-weight:500;white-space:nowrap;flex-shrink:0}
 .tag-apt{background:#E6F1FB;color:#0C447C}
 .tag-ofi{background:#EEEDFE;color:#3C3489}
 .tag-mix{background:#EAF3DE;color:#27500A}
 .haddr{font-size:12px;color:#888;margin-bottom:10px;line-height:1.5}
 .hgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px}
+@media(max-width:400px){.hgrid{grid-template-columns:repeat(2,1fr)}.detail-grid{grid-template-columns:1fr}}
 .mcard{background:#f8f8f4;border-radius:8px;padding:7px 8px;text-align:center}
 .mlabel{font-size:10px;color:#999;margin-bottom:2px}
 .mval{font-size:13px;font-weight:600;color:#111}
@@ -143,23 +151,35 @@ select:focus,input:focus{border-color:#5DCAA5}
 <div class="wrap">
   <div class="hero">
     <div class="logo">🏠 <span>Zip</span>Fit</div>
-    <p class="sub">LH 신혼·신생아 매입임대Ⅱ 전세형 · 경기북부 맞춤 주택 매칭 서비스<br>내 조건에 딱 맞는 집을 3분 만에 찾아드립니다.</p>
+    <p class="sub">전국 공공임대·분양 공고 맞춤 매칭 서비스<br>LH·SH·GH 등 공공기관 공고를 한 곳에서. 내 조건에 맞는 집을 빠르게 찾아드립니다.</p>
     <span class="badge">📢 2026년 경기북부 2차 공고 · 신청기간 6.30~7.2</span>
   </div>
 
-  <div class="maintabs">
-    <button class="maintab active" id="m1" onclick="goMain(1)"><span class="maintab-icon">🏠</span>추천</button>
-    <button class="maintab" id="m2" onclick="goMain(2)"><span class="maintab-icon">📋</span>공고</button>
-    <button class="maintab" id="m3" onclick="goMain(3)"><span class="maintab-icon">📊</span>인사이트</button>
-    <button class="maintab" id="m4" onclick="goMain(4)"><span class="maintab-icon">📁</span>관리</button>
-    <button class="maintab" id="m5" onclick="goMain(5)"><span class="maintab-icon">⚙️</span>설정</button>
+  <div class="maintabs" role="tablist" aria-label="메인 탭">
+    <button class="maintab active" id="m1" role="tab" aria-selected="true" onclick="goMain(1)"><span class="maintab-icon" aria-hidden="true">🏠</span>추천</button>
+    <button class="maintab" id="m2" role="tab" aria-selected="false" onclick="goMain(2)"><span class="maintab-icon" aria-hidden="true">📋</span>공고</button>
+    <button class="maintab" id="m3" role="tab" aria-selected="false" onclick="goMain(3)"><span class="maintab-icon" aria-hidden="true">📊</span>인사이트</button>
+    <button class="maintab" id="m4" role="tab" aria-selected="false" onclick="goMain(4)"><span class="maintab-icon" aria-hidden="true">📁</span>관리<span id="savedBadge" style="display:none;background:#D85A30;color:#fff;border-radius:10px;font-size:10px;padding:1px 5px;margin-left:3px;vertical-align:middle"></span></button>
+    <button class="maintab" id="m5" role="tab" aria-selected="false" onclick="goMain(5)"><span class="maintab-icon" aria-hidden="true">⚙️</span>설정</button>
   </div>
 
   <!-- ===== 대탭 1: 맞춤 추천 ===== -->
   <div id="main1" class="main-section">
+
+  <!-- 맞춤 공고 추천 (로그인 사용자 전용) -->
+  <div id="personalizedPanel" class="panel" style="margin-bottom:1rem;display:none">
+    <p class="panel-title" style="margin-bottom:0.5rem">🎯 맞춤 추천 공고</p>
+    <p style="font-size:12px;color:#999;margin-bottom:1rem" id="personalizedDesc"></p>
+    <div id="personalizedList"></div>
+  </div>
+  <div id="personalizedPrompt" class="rbox warn" style="margin-bottom:1rem;display:none">
+    <p class="rtitle">💡 맞춤 추천을 받으려면?</p>
+    <p class="rdesc">설정 탭에서 이메일로 로그인하고 조건을 저장하면 내 조건에 맞는 공고를 바로 추천해드려요.</p>
+  </div>
+
   <div class="subtabs">
     <div class="step active" id="s1" onclick="goStep(1)">① 자격 진단</div>
-    <div class="step" id="s2" onclick="goStep(2)">② 주택 매칭</div>
+    <div class="step" id="s2" onclick="goStep(2)" style="opacity:0.4;pointer-events:none;" title="자격 진단을 먼저 완료해주세요">② 주택 매칭</div>
   </div>
 
   <!-- STEP 1 -->
@@ -273,39 +293,60 @@ select:focus,input:focus{border-color:#5DCAA5}
 
   <!-- STEP 4: 전체 공고 (실시간 DB 연동) -->
   <div id="panel4" class="panel">
-    <p class="panel-title">실시간 LH 공고 전체 목록</p>
+    <p class="panel-title">전국 공공임대·분양 공고 전체 목록</p>
     <p class="sub" style="margin-bottom:1rem">매일 자동 수집되는 LH 전국 공고예요. ZipFit이 신혼·신생아·청년 타깃과 수도권 여부를 자동으로 표시해드려요.</p>
 
-    <div class="field">
-      <label class="label">공고 유형</label>
-      <div class="chip-group" id="noticeTypeChips"></div>
-    </div>
-    <div class="field">
-      <label class="label">지역</label>
-      <div class="chip-group" id="noticeRegionChips"></div>
-    </div>
-    <div class="field">
-      <label class="label">공고 상태</label>
-      <div class="chip-group" id="noticeStatusChips"></div>
-    </div>
-    <div class="field" style="display:flex;align-items:center;gap:8px">
-      <input type="checkbox" id="hideClosedChk" checked style="width:16px;height:16px;cursor:pointer">
-      <label for="hideClosedChk" style="font-size:13px;color:#555;cursor:pointer;margin:0">마감된 공고 숨기기</label>
+    <!-- 필터 토글 버튼 -->
+    <button class="detail-toggle-btn" id="filterToggleBtn" onclick="toggleNoticeFilter()" style="margin-bottom:0.75rem;text-align:left">
+      🔍 필터 열기 ▾
+    </button>
+    <!-- 필터 패널 (기본 닫힘) -->
+    <div id="noticeFilterPanel" class="hidden" aria-label="공고 필터" style="background:#fafaf6;border-radius:12px;padding:1rem;margin-bottom:0.75rem;border:1px solid #e8e8e0">
+      <div class="field">
+        <label class="label">공고 유형</label>
+        <div class="chip-group" id="noticeTypeChips"></div>
+      </div>
+      <div class="field">
+        <label class="label">지역</label>
+        <div class="chip-group" id="noticeRegionChips"></div>
+      </div>
+      <div class="field" style="margin-bottom:0.5rem">
+        <label class="label">공고 상태</label>
+        <div class="chip-group" id="noticeStatusChips"></div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:0.5rem">
+        <div style="display:flex;align-items:center;gap:8px">
+          <input type="checkbox" id="hideClosedChk" checked style="width:16px;height:16px;cursor:pointer">
+          <label for="hideClosedChk" style="font-size:13px;color:#555;cursor:pointer;margin:0">마감된 공고 숨기기</label>
+        </div>
+        <button onclick="resetNoticeFilters()" style="font-size:12px;padding:5px 12px;border:1px solid #ddd;border-radius:8px;background:#fff;color:#666;cursor:pointer">필터 초기화</button>
+      </div>
     </div>
 
+    <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:8px">
+      <select id="noticeSortSel" style="font-size:13px;padding:5px 8px;border:1px solid #e0e0e0;border-radius:8px;background:#fff;color:#333;cursor:pointer" onchange="loadNoticeData()">
+        <option value="date-desc">최신 공고순</option>
+        <option value="end-asc">마감 임박순</option>
+        <option value="start-asc">접수 시작순</option>
+        <option value="units-desc">세대수 많은순</option>
+        <option value="deposit-asc">보증금 낮은순</option>
+        <option value="rent-asc">월임대료 낮은순</option>
+        <option value="area-desc">면적 넓은순</option>
+        <option value="region-asc">지역명순</option>
+        <option value="org-asc">공급기관순</option>
+        <option value="revised-first">정정공고 우선</option>
+      </select>
+    </div>
     <div id="notice-status" class="rbox warn"><p class="rtitle">⏳ 공고 데이터 불러오는 중...</p></div>
-    <div id="notice-list"></div>
+    <div id="notice-list" aria-label="공고 목록" aria-live="polite"></div>
   </div>
   </div> <!-- /main2 -->
 
-  <!-- ===== 대탭 3: AI 인사이트 (짓는 중) ===== -->
+  <!-- ===== 대탭 3: 인사이트 ===== -->
   <div id="main3" class="main-section hidden">
-    <div class="panel">
-      <div class="building-box">
-        <div class="building-icon">🚧</div>
-        <p class="building-title">짓는 중이에요</p>
-        <p class="building-desc">국토부 정책, 금리 동향, 지역별 공급 추이를 분석해서<br>"지금이 신청하기 좋은 시기인지" 알려드릴 AI 인사이트를<br>준비하고 있어요. 조금만 기다려주세요!</p>
-        <div class="building-progress">🔨 골조 작업 중 · 데이터 수집 단계</div>
+    <div id="insightContent">
+      <div class="rbox" style="text-align:center;padding:2rem 1rem">
+        <p style="color:#888;font-size:14px">📊 통계 데이터를 불러오는 중...</p>
       </div>
     </div>
   </div> <!-- /main3 -->
@@ -338,14 +379,10 @@ select:focus,input:focus{border-color:#5DCAA5}
     <button class="btn btn-sec" style="margin-top:1.25rem" onclick="window.open('https://apply.lh.or.kr','_blank')">LH청약플러스 바로가기 →</button>
   </div>
 
-  <!-- STEP 5: 저장한 공고 (짓는 중) -->
+  <!-- STEP 5: 저장한 공고 -->
   <div id="panel5" class="panel hidden">
-    <div class="building-box">
-      <div class="building-icon">🧱</div>
-      <p class="building-title">기초공사 중이에요</p>
-      <p class="building-desc">마음에 드는 공고를 저장하고<br>표로 한눈에 비교할 수 있는 기능을<br>준비하고 있어요!</p>
-      <div class="building-progress">📐 설계 단계</div>
-    </div>
+    <p class="panel-title">🔖 저장한 공고</p>
+    <div id="savedNoticeList"></div>
   </div>
   </div> <!-- /main4 -->
 
@@ -369,6 +406,68 @@ select:focus,input:focus{border-color:#5DCAA5}
       <div class="panel" style="margin-bottom:1rem">
         <p class="panel-title" style="margin-bottom:4px">⚙️ 환경설정</p>
         <p style="font-size:12px;color:#999" id="currentUserEmail"></p>
+      </div>
+
+      <!-- 조건 설정 -->
+      <div class="panel" style="margin-bottom:1rem">
+        <p class="slabel" style="margin:0 0 0.75rem">📋 조건 설정</p>
+        <div class="row">
+          <div class="field">
+            <label class="label" for="set_marital">혼인 상태</label>
+            <select id="set_marital">
+              <option value="">선택하세요</option>
+              <option value="newborn">신생아 가구 (2년 내 출산)</option>
+              <option value="married_7">신혼부부 (혼인 7년 이내)</option>
+              <option value="pre">예비 신혼부부</option>
+              <option value="single_parent">한부모 가족</option>
+              <option value="married_child6">유자녀 혼인가구 (6세 이하)</option>
+              <option value="married">혼인가구 (기타)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="label" for="set_children">자녀 수 (미성년)</label>
+            <input type="number" id="set_children" min="0" max="10" placeholder="예: 1">
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label class="label" for="set_members">가구원 수</label>
+            <input type="number" id="set_members" min="1" max="10" placeholder="예: 3">
+          </div>
+          <div class="field">
+            <label class="label" for="set_income">세대 월평균 소득 (만원)</label>
+            <input type="number" id="set_income" min="0" placeholder="예: 450">
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label class="label" for="set_assets">총 자산 (만원)</label>
+            <input type="number" id="set_assets" min="0" placeholder="예: 15000">
+          </div>
+          <div class="field">
+            <label class="label" for="set_maxDeposit">최대 보증금 (만원)</label>
+            <input type="number" id="set_maxDeposit" min="0" placeholder="예: 20000">
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="set_minRooms">최소 방 수</label>
+          <select id="set_minRooms">
+            <option value="0">상관없음</option>
+            <option value="2">2개 이상</option>
+            <option value="3">3개 이상</option>
+            <option value="4">4개 이상</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="label">희망 지역 (복수 선택 가능)</label>
+          <div class="chip-group" id="settingsRegionChips"></div>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label class="label">주택 유형 (복수 선택 가능)</label>
+          <div class="chip-group" id="settingsTypeChips"></div>
+        </div>
+        <button class="btn btn-primary" style="margin-top:1rem" onclick="saveSettings()">조건 저장하기</button>
+        <p id="settingsSaveMsg" style="font-size:12px;margin-top:8px;color:#888"></p>
       </div>
 
       <div class="panel" style="margin-bottom:1rem">
@@ -415,59 +514,28 @@ select:focus,input:focus{border-color:#5DCAA5}
 
 </div> <!-- /wrap -->
 
+
 <script>
-const NOTICE_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSgOU5GKWK2M_8UepwL53kEoyeXtZu2EcHCDFt-2GjCt41o0NMjUNRHQQhLhObxV6DiZ5ONUFfDhZ87/pub?output=csv";
+// ===== 공고 탭: 서버사이드 필터링 구조 =====
+// 필터 선택 시 RPC를 파라미터와 함께 재호출 → 클라이언트 필터링 제거
+
 let noticeData = [];
-let noticeLoaded = false;
+let noticeLoaded = false;   // 필터 칩 초기 로드 여부
+let noticeLoading = false;
+let noticeVisibleCount = 20;
+let noticeFiltered = [];
 
-function parseCSVLine(line){
-  const result=[];
-  let cur='', inQuotes=false;
-  for(let i=0;i<line.length;i++){
-    const c=line[i];
-    if(c==='"'){
-      if(inQuotes && line[i+1]==='"'){cur+='"';i++;}
-      else inQuotes=!inQuotes;
-    } else if(c===',' && !inQuotes){
-      result.push(cur); cur='';
-    } else cur+=c;
-  }
-  result.push(cur);
-  return result;
-}
+// 현재 선택된 필터값 (단일 선택, null = 전체)
+let activeNoticeRegion = null;
+let activeNoticeType   = null;
+let activeNoticeStatus = null;
 
-function parseCSV(text){
-  const lines=text.split(/\r?\n/).filter(l=>l.trim().length>0);
-  if(!lines.length) return [];
-  const headers=parseCSVLine(lines[0]).map(h=>h.trim());
-  return lines.slice(1).map(line=>{
-    const cols=parseCSVLine(line);
-    const obj={};
-    headers.forEach((h,i)=>obj[h]=(cols[i]||'').trim());
-    return obj;
-  });
-}
+// 필터 칩 목록 (DB에서 한 번만 가져옴)
+let noticeFilterOptions = { regions:[], types:[], statuses:[] };
 
-async function loadNoticeData(){
-  const statusEl=document.getElementById('notice-status');
-  try{
-    const res=await fetch(NOTICE_CSV_URL+'&t='+Date.now());
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    const text=await res.text();
-    noticeData=parseCSV(text);
-    noticeLoaded=true;
-    buildNoticeFilters();
-    renderNoticeList();
-  }catch(err){
-    statusEl.className='rbox err';
-    statusEl.innerHTML='<p class="rtitle">❌ 공고 데이터를 불러오지 못했어요</p><p class="rdesc">('+err.message+') 잠시 후 다시 시도해주세요.</p>';
-    console.error('ZipFit 공고 데이터 로드 실패:',err);
-  }
-}
-
-// 공급유형 텍스트에서 대분류 추출 (LH 원본 텍스트가 기관마다 달라질 수 있어 키워드 기반으로 분류)
-function classifyNoticeType(typeText,nameText){
-  const t=(typeText||'')+' '+(nameText||'');
+// ── 공고 유형 분류 (클라이언트용, 칩 표시에도 사용) ──
+function classifyNoticeType(typeText, nameText){
+  const t = (typeText||'') + ' ' + (nameText||'');
   if(t.includes('토지')) return '토지';
   if(t.includes('상가') || t.includes('점포')) return '상가';
   if(t.includes('분양')) return '분양주택';
@@ -479,170 +547,467 @@ function classifyNoticeType(typeText,nameText){
   return '기타';
 }
 
-// 계층 뱃지 — 공고명/공급유형에서 대상 계층 키워드 추출 (복수 해당 가능)
-function classifyDemographics(typeText,nameText){
-  const t=(typeText||'')+' '+(nameText||'');
-  const tags=[];
-  if(t.includes('신혼')||t.includes('신생아')) tags.push({label:'신혼·신생아',color:'#1D9E75'});
-  if(t.includes('청년')) tags.push({label:'청년',color:'#378ADD'});
-  if(t.includes('대학생')) tags.push({label:'대학생',color:'#7F77DD'});
-  if(t.includes('고령자')||t.includes('노인')) tags.push({label:'고령자',color:'#EF9F27'});
-  if(t.includes('한부모')) tags.push({label:'한부모가족',color:'#D85A30'});
-  if(t.includes('장애인')) tags.push({label:'장애인',color:'#5DCAA5'});
+function classifyDemographics(typeText, nameText){
+  const t = (typeText||'') + ' ' + (nameText||'');
+  const tags = [];
+  if(t.includes('신혼')||t.includes('신생아')) tags.push({label:'신혼·신생아', color:'#1D9E75'});
+  if(t.includes('청년')) tags.push({label:'청년', color:'#378ADD'});
+  if(t.includes('대학생')) tags.push({label:'대학생', color:'#7F77DD'});
+  if(t.includes('고령자')||t.includes('노인')) tags.push({label:'고령자', color:'#EF9F27'});
+  if(t.includes('한부모')) tags.push({label:'한부모가족', color:'#D85A30'});
+  if(t.includes('장애인')) tags.push({label:'장애인', color:'#5DCAA5'});
   return tags;
 }
 
-// 날짜 문자열(YYYY.MM.DD 또는 YYYY-MM-DD)을 Date로 안전 변환
 function parseNoticeDate(s){
   if(!s) return null;
-  const cleaned=s.replace(/\./g,'-').trim();
-  const d=new Date(cleaned);
-  return isNaN(d.getTime())?null:d;
+  let str = s.trim();
+  if(str.includes('T')){
+    str = str.replace(/(\.\d{3})\d+/, '$1');
+    const d = new Date(str);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const d = new Date(str.replace(/\./g, '-'));
+  return isNaN(d.getTime()) ? null : d;
 }
-
-function isNewNotice(collectedAt){
-  const d=parseNoticeDate(collectedAt);
+function isNewNotice(row){
+  // 기준: announcement_date(모집공고일) → apply_start → created_at 순 fallback
+  const d = parseNoticeDate(
+    row['announcement_date'] ||
+    row['apply_start'] || row['신청시작일'] ||
+    row['created_at'] || row['수집일시'] || ''
+  );
+  return d ? (new Date() - d) / 3600000 <= 48 : false;
+}
+function isClosingSoon(row){
+  const d = parseNoticeDate(row['신청마감일']||row['apply_end']||'');
   if(!d) return false;
-  const diffDays=(new Date()-d)/(1000*60*60*24);
-  return diffDays<=2;
+  const endOfDay = new Date(d);
+  if(!row['신청마감일']?.includes('T') && !row['apply_end']?.includes('T')){
+    endOfDay.setHours(23, 59, 59, 999);
+  }
+  const diff = (endOfDay - new Date()) / (1000*60*60*24);
+  return diff >= 0 && diff <= 3;
 }
-
-function isClosingSoon(deadline){
-  const d=parseNoticeDate(deadline);
-  if(!d) return false;
-  const diffDays=(d-new Date())/(1000*60*60*24);
-  return diffDays>=0 && diffDays<=3;
-}
-
-// 지역 텍스트에서 시/도 단위 추출 (행정구역이 바뀌어도 자동 대응)
 function extractRegionTop(regionText){
   if(!regionText) return '기타';
-  const r=regionText.trim();
-  const match=r.match(/^(\S+?[시도])/);
-  return match?match[1]:r.split(' ')[0]||'기타';
+  const m = regionText.trim().match(/^(\S+?[시도])/);
+  return m ? m[1] : regionText.trim().split(' ')[0] || '기타';
 }
 
-let selectedNoticeTypes=new Set();
-let selectedNoticeRegions=new Set();
-let selectedNoticeStatuses=new Set();
-
-function buildNoticeFilters(){
-  const types=[...new Set(noticeData.map(n=>classifyNoticeType(n['공급유형'],n['공고명'])))].sort();
-  const regions=[...new Set(noticeData.map(n=>extractRegionTop(n['지역'])))].sort();
-  const statuses=[...new Set(noticeData.map(n=>n['처리상태']).filter(Boolean))].sort();
-
-  buildFilterChips('noticeTypeChips',types,selectedNoticeTypes,renderNoticeList);
-  buildFilterChips('noticeRegionChips',regions,selectedNoticeRegions,renderNoticeList);
-  buildFilterChips('noticeStatusChips',statuses,selectedNoticeStatuses,renderNoticeList);
-
-  document.getElementById('hideClosedChk').onchange=renderNoticeList;
+// ── 필터 토글 ──
+function toggleNoticeFilter(){
+  const panel = document.getElementById('noticeFilterPanel');
+  const isNowHidden = panel.classList.toggle('hidden');
+  updateFilterToggleBtn(isNowHidden);
 }
 
-function buildFilterChips(wrapId,options,selSet,onChange){
-  const wrap=document.getElementById(wrapId);
-  wrap.innerHTML='';
-  const allChip=document.createElement('div');
-  allChip.className='chip chip-all sel';
-  allChip.textContent='전체';
-  allChip.dataset.value='__all__';
-  allChip.onclick=()=>{selSet.clear();renderChipState(wrapId,selSet);onChange();};
+function updateFilterToggleBtn(forceHidden){
+  const btn   = document.getElementById('filterToggleBtn');
+  if(!btn) return;
+  const panel = document.getElementById('noticeFilterPanel');
+  const hidden = forceHidden !== undefined ? forceHidden : panel.classList.contains('hidden');
+  const hasFilter = activeNoticeRegion || activeNoticeType || activeNoticeStatus
+    || !(document.getElementById('hideClosedChk')?.checked ?? true);
+  if(!hidden){
+    btn.textContent = '🔍 필터 닫기 ▴';
+  } else if(hasFilter){
+    btn.textContent = '🔍 필터 적용 중 ●';
+    btn.style.color = '#1D9E75';
+  } else {
+    btn.textContent = '🔍 필터 열기 ▾';
+    btn.style.color = '';
+  }
+}
+
+function resetNoticeFilters(){
+  activeNoticeRegion = null;
+  activeNoticeType   = null;
+  activeNoticeStatus = null;
+  const chk = document.getElementById('hideClosedChk');
+  if(chk) chk.checked = true;
+  refreshChipSel('noticeRegionChips',  null);
+  refreshChipSel('noticeTypeChips',    null);
+  refreshChipSel('noticeStatusChips',  null);
+  updateFilterToggleBtn();
+  loadNoticeData();
+}
+
+// ── 필터 칩 목록: 첫 로드 시 region_top·status_normalized 사용 (중복 없음) ──
+async function initNoticeFilters(){
+  try{
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/rpc/get_announcements_deduped`,
+      {method:'POST', headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY,'Content-Type':'application/json'}, body:'{}'}
+    );
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const rows = await res.json();
+    // region_top, status_normalized는 RPC에서 이미 정규화된 값
+    const regions  = [...new Set(rows.map(r => r.region_top).filter(Boolean))].sort();
+    const types    = [...new Set(rows.map(r => classifyNoticeType(r.housing_type||'', r.title||'')))].sort();
+    const statuses = [...new Set(rows.map(r => r.status_normalized).filter(Boolean))].sort();
+    noticeFilterOptions = { regions, types, statuses };
+    buildNoticeFilterChips();
+    noticeLoaded = true;
+    loadNoticeData();
+  }catch(e){
+    console.error('ZipFit 필터 초기화 실패:', e);
+    const statusEl = document.getElementById('notice-status');
+    if(statusEl){
+      statusEl.className = 'rbox err';
+      statusEl.innerHTML = '<p class="rtitle">⚠️ 공고 데이터를 불러오지 못했어요</p><p class="rdesc">네트워크 연결을 확인하고 다시 시도해주세요.</p><button class="btn btn-sec btn-sm" style="margin-top:8px" onclick="initNoticeFilters()">새로고침</button>';
+    }
+  }
+}
+
+function buildNoticeFilterChips(){
+  buildSingleSelectChips('noticeRegionChips',  noticeFilterOptions.regions,  ()=>activeNoticeRegion,  v=>{ activeNoticeRegion=v;  loadNoticeData(); });
+  buildSingleSelectChips('noticeTypeChips',    noticeFilterOptions.types,    ()=>activeNoticeType,    v=>{ activeNoticeType=v;    loadNoticeData(); });
+  buildSingleSelectChips('noticeStatusChips',  noticeFilterOptions.statuses, ()=>activeNoticeStatus,  v=>{ activeNoticeStatus=v;  loadNoticeData(); });
+  document.getElementById('hideClosedChk').onchange = () => loadNoticeData();
+}
+
+// 단일 선택 칩 빌더 (전체 = null)
+function buildSingleSelectChips(wrapId, options, getActive, setActive){
+  const wrap = document.getElementById(wrapId);
+  if(!wrap) return;
+  wrap.innerHTML = '';
+  const allChip = document.createElement('div');
+  allChip.className = 'chip chip-all sel';
+  allChip.textContent = '전체';
+  allChip.setAttribute('role', 'button');
+  allChip.setAttribute('tabindex', '0');
+  allChip.setAttribute('aria-pressed', 'true');
+  allChip.onclick = () => { setActive(null); refreshChipSel(wrapId, null); };
+  allChip.onkeydown = e => { if(e.key==='Enter'||e.key===' '){ allChip.click(); e.preventDefault(); } };
   wrap.appendChild(allChip);
-  options.forEach(opt=>{
-    const c=document.createElement('div');
-    c.className='chip';
-    c.textContent=opt;
-    c.dataset.value=opt;
-    c.onclick=()=>{
-      if(selSet.has(opt))selSet.delete(opt);else selSet.add(opt);
-      renderChipState(wrapId,selSet);
-      onChange();
+  options.forEach(opt => {
+    const c = document.createElement('div');
+    c.className = 'chip';
+    c.textContent = opt;
+    c.dataset.value = opt;
+    c.setAttribute('role', 'button');
+    c.setAttribute('tabindex', '0');
+    c.setAttribute('aria-pressed', 'false');
+    c.onclick = () => {
+      const cur = getActive();
+      setActive(cur === opt ? null : opt);
+      refreshChipSel(wrapId, getActive());
     };
+    c.onkeydown = e => { if(e.key==='Enter'||e.key===' '){ c.click(); e.preventDefault(); } };
     wrap.appendChild(c);
   });
 }
 
-function renderNoticeList(){
-  const statusEl=document.getElementById('notice-status');
-  const listEl=document.getElementById('notice-list');
-  if(!noticeData.length){
-    statusEl.className='rbox warn';
-    statusEl.innerHTML='<p class="rtitle">⚠ 아직 수집된 공고가 없어요</p>';
+function refreshChipSel(wrapId, activeVal){
+  const wrap = document.getElementById(wrapId);
+  if(!wrap) return;
+  [...wrap.children].forEach(c => {
+    const isSel = c.dataset.value ? c.dataset.value === activeVal : activeVal === null;
+    c.classList.toggle('sel', isSel);
+    c.setAttribute('aria-pressed', isSel ? 'true' : 'false');
+  });
+}
+
+// ── 핵심: 필터 변경 시 RPC 재호출 ──
+async function loadNoticeData(){
+  noticeLoading = true;
+  const statusEl = document.getElementById('notice-status');
+  const listEl   = document.getElementById('notice-list');
+  statusEl.className = 'rbox warn';
+  statusEl.innerHTML = '<p class="rtitle">⏳ 불러오는 중...</p>';
+  listEl.innerHTML = '';
+
+  const hideClosed = document.getElementById('hideClosedChk').checked;
+
+  // p_status: 마감 숨기기 체크박스 + 필터 칩 조합
+  let p_status = activeNoticeStatus || null;
+  // hideClosed가 체크돼 있고 status 필터가 없으면 서버에서 마감 제외
+  // (단, status 칩 직접 선택 시엔 칩 우선)
+
+  const body = JSON.stringify({
+    p_region: activeNoticeRegion || null,
+    p_type:   activeNoticeType   || null,
+    p_status: p_status
+  });
+
+  try{
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/rpc/get_announcements_deduped`,
+      {method:'POST', headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY,'Content-Type':'application/json'}, body}
+    );
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const rows = await res.json();
+    if(!Array.isArray(rows)){
+      const msg = rows?.message || rows?.error || JSON.stringify(rows);
+      throw new Error('Supabase 오류: ' + msg);
+    }
+
+    // 마감 숨기기는 status 칩 미선택 시 클라이언트에서 최종 처리
+    noticeData = rows.map(r => ({
+      '공고명':    r.title||'',
+      '지역':      r.region||'',
+      '지역대분류': r.region_top||'',
+      '공급유형':  r.housing_type||'',
+      '공급기관':  r.supply_org||'',
+      '신청시작일': r.apply_start||'',
+      '신청마감일': r.apply_end||'',
+      '처리상태':  r.status||'',
+      '처리상태정규화': r.status_normalized||r.status||'',
+      '공고URL':   r.url||'',
+      '수집일시':  r.created_at||'',
+      'created_at': r.created_at||'',
+      'apply_start': r.apply_start||'',
+      'apply_end':   r.apply_end||'',
+      'announcement_date': r.announcement_date||'',
+      'area_min': r.area_min,
+      'area_max': r.area_max,
+      'total_units': r.total_units,
+      'move_in_date': r.move_in_date,
+      'deposit_min': r.deposit_min,
+      'rent_min': r.rent_min,
+      'is_revised': r.is_revised||false,
+      'sido_nm': r.sido_nm||'',
+      'sigungu_nm': r.sigungu_nm||'',
+    }));
+
+    // 마감 숨기기 (status 칩 직접 선택 없을 때만, 정규화 상태 기준)
+    let filtered = noticeData;
+    if(hideClosed && !activeNoticeStatus){
+      filtered = noticeData.filter(n => n['처리상태정규화'] !== '접수마감');
+    }
+
+    // 정렬
+    const sortVal = document.getElementById('noticeSortSel')?.value || 'date-desc';
+    const nullLast = (a, b, fn, desc) => {
+      const va = fn(a), vb = fn(b);
+      if(va==null && vb==null) return 0;
+      if(va==null) return 1;
+      if(vb==null) return -1;
+      return desc ? (vb > va ? 1 : vb < va ? -1 : 0) : (va > vb ? 1 : va < vb ? -1 : 0);
+    };
+    filtered = [...filtered].sort((a,b) => {
+      if(sortVal==='date-desc')     return nullLast(a,b,n=>n['announcement_date']||n['created_at'],true);
+      if(sortVal==='end-asc')       return nullLast(a,b,n=>n['apply_end'],false);
+      if(sortVal==='start-asc')     return nullLast(a,b,n=>n['apply_start'],false);
+      if(sortVal==='units-desc')    return nullLast(a,b,n=>n['total_units']?Number(n['total_units']):null,true);
+      if(sortVal==='deposit-asc')   return nullLast(a,b,n=>n['deposit_min']?Number(n['deposit_min']):null,false);
+      if(sortVal==='rent-asc')      return nullLast(a,b,n=>n['rent_min']?Number(n['rent_min']):null,false);
+      if(sortVal==='area-desc')     return nullLast(a,b,n=>n['area_max']?Number(n['area_max']):null,true);
+      if(sortVal==='region-asc'){
+        const regionA = (a['sido_nm']||a['지역']||'') + ' ' + (a['sigungu_nm']||'');
+        const regionB = (b['sido_nm']||b['지역']||'') + ' ' + (b['sigungu_nm']||'');
+        return regionA.localeCompare(regionB, 'ko');
+      }
+      if(sortVal==='org-asc')       return (a['org_nm']||a['공급기관']||'').localeCompare(b['org_nm']||b['공급기관']||'', 'ko');
+      if(sortVal==='revised-first') return (b['is_revised']?1:0)-(a['is_revised']?1:0);
+      return 0;
+    });
+
+    noticeFiltered = filtered;
+    noticeVisibleCount = 20;
+    renderNoticeList(filtered, noticeData.length);
+    updateFilterToggleBtn();
+  }catch(err){
+    statusEl.className = 'rbox err';
+    statusEl.innerHTML = '<p class="rtitle">⚠️ 공고 데이터를 불러오지 못했어요</p><p class="rdesc">잠시 후 다시 시도해주세요.</p><button class="btn btn-sec btn-sm" style="margin-top:8px" onclick="loadNoticeData()">새로고침</button>';
+    console.error('ZipFit 공고 로드 실패:', err);
+  }finally{
+    noticeLoading = false;
+  }
+}
+
+// ===== 저장한 공고 =====
+const SAVED_KEY = 'zipfit_saved_notices';
+function getSavedNotices(){ try{ return JSON.parse(localStorage.getItem(SAVED_KEY)||'[]'); }catch(e){ return []; } }
+function setSavedNotices(arr){ localStorage.setItem(SAVED_KEY, JSON.stringify(arr)); }
+
+function toggleSaveNotice(id, title, region, type, url){
+  let saved = getSavedNotices();
+  const idx = saved.findIndex(s=>s.id===id);
+  if(idx>=0){
+    saved.splice(idx,1);
+  } else {
+    saved.unshift({ id, title, region, type, url, savedAt: new Date().toISOString() });
+  }
+  setSavedNotices(saved);
+  updateSaveBtn(id);
+  updateSaveBadge();
+}
+
+function updateSaveBtn(id){
+  const saved = getSavedNotices();
+  const isSaved = saved.some(s=>s.id===id);
+  document.querySelectorAll(`[data-save-id="${id}"]`).forEach(btn=>{
+    btn.textContent = isSaved ? '🔖 저장됨' : '🔖 저장';
+    btn.style.color = isSaved ? '#1D9E75' : '#888';
+    btn.style.borderColor = isSaved ? '#1D9E75' : '#ccc';
+  });
+}
+
+function updateSaveBadge(){
+  const count = getSavedNotices().length;
+  const badge = document.getElementById('savedBadge');
+  if(badge){ badge.textContent = count>0 ? count : ''; badge.style.display = count>0?'inline':'none'; }
+}
+
+function renderSavedNotices(){
+  const el = document.getElementById('savedNoticeList');
+  if(!el) return;
+  const saved = getSavedNotices();
+  if(!saved.length){
+    el.innerHTML = `<div class="rbox" style="text-align:center;padding:2rem 1rem">
+      <p style="font-size:2rem;margin-bottom:8px">🔖</p>
+      <p style="font-weight:600;color:#333;margin-bottom:6px">아직 저장한 공고가 없어요</p>
+      <p style="font-size:13px;color:#888">공고 카드에서 🔖 저장 버튼을 눌러보세요</p>
+    </div>`;
+    return;
+  }
+  let html = `<p style="font-size:13px;color:#888;margin-bottom:12px">총 ${saved.length}건 저장됨</p>`;
+  saved.forEach(s=>{
+    const dateStr = s.savedAt ? new Date(s.savedAt).toLocaleDateString('ko-KR') : '';
+    html += `<div class="hcard">
+      <div class="htop">
+        <p class="hname">${s.title||'(공고명 없음)'}</p>
+        <button style="background:none;border:none;font-size:18px;cursor:pointer;padding:2px 4px;color:#ccc" title="저장 삭제" onclick="toggleSaveNotice('${s.id.replace(/'/g,"\\'")}','${(s.title||'').replace(/'/g,"\\'")}','${(s.region||'').replace(/'/g,"\\'")}','${(s.type||'').replace(/'/g,"\\'")}','${(s.url||'').replace(/'/g,"\\'")}');renderSavedNotices()">✕</button>
+      </div>
+      <p class="haddr">${s.region||''} · ${s.type||''}</p>
+      ${dateStr?`<p style="font-size:11px;color:#bbb;margin-top:4px">저장일: ${dateStr}</p>`:''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+        ${s.url?`<a class="detail-link" href="${s.url}" target="_blank">📄 공고 원문 보기</a>`:''}
+      </div>
+    </div>`;
+  });
+  el.innerHTML = html;
+}
+
+async function shareNotice(btn, title, region, type, url){
+  const shareUrl = url || 'https://dauntown96.github.io/zipfit';
+  const text = [region, type].filter(Boolean).join(' · ') + ' | ZipFit';
+  if(navigator.share){
+    try{ await navigator.share({ title, text, url: shareUrl }); }catch(e){ if(e.name!=='AbortError') console.warn('공유 실패:', e); }
+  } else {
+    try{
+      await navigator.clipboard.writeText(shareUrl);
+      const orig = btn.textContent;
+      btn.textContent = '✅ 링크 복사됨!';
+      setTimeout(() => { btn.textContent = orig; }, 1500);
+    }catch(e){ console.warn('클립보드 복사 실패:', e); }
+  }
+}
+
+function renderNoticeList(filtered, totalCount){
+  const statusEl = document.getElementById('notice-status');
+  const listEl   = document.getElementById('notice-list');
+  listEl.innerHTML = '';
+
+  if(!filtered.length){
+    statusEl.className = 'rbox warn';
+    statusEl.innerHTML = '<p class="rtitle">⚠ 조건에 맞는 공고가 없어요</p>';
     return;
   }
 
-  const hideClosed=document.getElementById('hideClosedChk').checked;
-  let filtered=noticeData.filter(n=>{
-    const isClosed=n['처리상태']==='접수마감' || n['처리상태']==='마감';
-    if(hideClosed && isClosed) return false;
-    if(selectedNoticeTypes.size>0 && !selectedNoticeTypes.has(classifyNoticeType(n['공급유형'],n['공고명']))) return false;
-    if(selectedNoticeRegions.size>0 && !selectedNoticeRegions.has(extractRegionTop(n['지역']))) return false;
-    if(selectedNoticeStatuses.size>0 && !selectedNoticeStatuses.has(n['처리상태'])) return false;
-    return true;
-  });
+  const isFiltered = totalCount && totalCount !== filtered.length;
+  const countText = isFiltered
+    ? '조건에 맞는 공고 '+filtered.length+'건 (전체 '+totalCount+'건 중)'
+    : '전체 공고 '+filtered.length+'건';
+  statusEl.className = 'rbox ok';
+  statusEl.innerHTML = '<p class="rtitle">✅ '+countText+'</p><p class="rdesc">매일 오전 9시 자동 업데이트</p>';
 
-  statusEl.className='rbox ok';
-  statusEl.innerHTML='<p class="rtitle">✅ 조건에 맞는 공고 '+filtered.length+'건 (전체 '+noticeData.length+'건 중)</p><p class="rdesc">매일 오전 9시 자동 업데이트</p>';
+  const shown = filtered.slice(0, noticeVisibleCount);
+  let html = '';
+  shown.forEach((n, idx) => {
+    const isClosed   = n['처리상태정규화']==='접수마감';
+    const isAmended  = (n['공고명']||'').includes('[정정공고]');
+    const demoTags   = classifyDemographics(n['공급유형'], n['공고명']);
+    const isNew      = !isClosed && isNewNotice(n);
+    const closingSoon = !isClosed && isClosingSoon(n);
+    const applyStart = n['신청시작일']||n['apply_start']||'';
+    const applyEnd   = n['신청마감일']||n['apply_end']||'';
+    const annDate    = n['announcement_date']||'';
+    // 모집공고일 = 접수시작일이면 중복 제거
+    const sameAsStart = annDate && applyStart && annDate === applyStart;
+    const dateLine   = sameAsStart
+      ? `모집공고: ${annDate} / 접수마감: ${applyEnd||'-'}`
+      : annDate
+        ? `모집공고: ${annDate} / 접수기간: ${applyStart||'-'} ~ ${applyEnd||'-'}`
+        : `접수기간: ${applyStart||'-'} ~ ${applyEnd||'-'}`;
+    const cardId = 'ncard-detail-'+idx;
 
-  const sorted=[...filtered].reverse();
-  let html='';
-  sorted.forEach(n=>{
-    const isClosed = n['처리상태']==='접수마감' || n['처리상태']==='마감';
-    const isMetro = n['수도권여부']==='Y';
-    const demoTags = classifyDemographics(n['공급유형'],n['공고명']);
-    const isNew = !isClosed && isNewNotice(n['수집일시']);
-    const closingSoon = !isClosed && isClosingSoon(n['신청마감일']);
-    html+=`<div class="hcard" style="${isClosed?'opacity:0.5':''}">
+    // 상세 영역 항목 구성
+    const detailRows = [];
+    if(n['공급기관']) detailRows.push(['공급기관', n['공급기관']]);
+    if(n['area_min']){
+      const areaStr = parseFloat(n['area_min']).toFixed(1) + '㎡' +
+        (n['area_max']&&n['area_max']!==n['area_min'] ? ' ~ '+parseFloat(n['area_max']).toFixed(1)+'㎡' : '');
+      detailRows.push(['전용면적', areaStr]);
+    }
+    if(n['total_units']) detailRows.push(['총 세대수', n['total_units']+'세대']);
+    if(n['move_in_date']) detailRows.push(['입주예정', n['move_in_date']]);
+    if(n['deposit_min']) detailRows.push(['보증금', Number(n['deposit_min']).toLocaleString()+'원']);
+    if(n['rent_min']) detailRows.push(['월임대료', Number(n['rent_min']).toLocaleString()+'원']);
+    if(annDate) detailRows.push(['공고일', annDate]);
+    if(applyStart||applyEnd) detailRows.push(['접수기간', (applyStart||'-')+' ~ '+(applyEnd||'-')]);
+
+    const nTitle = (n['공고명']||'').replace(/'/g,"\\'");
+    const nRegion = (n['지역']||'').replace(/'/g,"\\'");
+    const nType = (n['공급유형']||'').replace(/'/g,"\\'");
+    const nUrl = (n['공고URL']||'').replace(/'/g,"\\'");
+    const nId = (n['announcement_id']||String(idx)).replace(/'/g,"\\'");
+    const nSaved = getSavedNotices().some(s=>s.id===n['announcement_id']||String(idx));
+    const shareBtn = `<button class="detail-link" style="border:1px solid #1D9E75;color:#1D9E75;background:#fff;cursor:pointer;margin-top:10px" onclick="event.stopPropagation();shareNotice(this,'${nTitle}','${nRegion}','${nType}','${nUrl}')">🔗 이 공고 공유하기</button>`;
+    const saveBtn = `<button data-save-id="${n['announcement_id']||idx}" class="detail-link" style="border:1px solid ${nSaved?'#1D9E75':'#ccc'};color:${nSaved?'#1D9E75':'#888'};background:#fff;cursor:pointer;margin-top:10px" onclick="event.stopPropagation();toggleSaveNotice('${nId}','${nTitle}','${nRegion}','${nType}','${nUrl}')">${nSaved?'🔖 저장됨':'🔖 저장'}</button>`;
+    const detailHTML = detailRows.length
+      ? `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px;transition:all 0.2s">
+          <div class="detail-grid">
+            ${detailRows.map(([k,v])=>`<div style="font-size:12px"><span style="color:#999">${k}</span><br><span style="color:#333;font-weight:500">${v}</span></div>`).join('')}
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+            ${n['공고URL']?`<a class="detail-link" href="${n['공고URL']}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a>`:''}
+            ${shareBtn}
+            ${saveBtn}
+          </div>
+        </div>`
+      : `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px"><div style="display:flex;gap:8px;flex-wrap:wrap">${n['공고URL']?`<a class="detail-link" href="${n['공고URL']}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a>`:''} ${shareBtn} ${saveBtn}</div></div>`;
+
+    html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n['지역']||'').replace(/"/g,'&quot;')}" data-sido="${(n['sido_nm']||'').replace(/"/g,'&quot;')}" data-sigungu="${(n['sigungu_nm']||'').replace(/"/g,'&quot;')}" data-title="${(n['공고명']||'').replace(/"/g,'&quot;')}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this)" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
       <div class="htop">
         <p class="hname">${n['공고명']||'(공고명 없음)'}</p>
         <span class="htag ${isClosed?'tag-mix':'tag-apt'}">${n['처리상태']||'-'}</span>
       </div>
       <p class="haddr">${n['지역']||''} · ${classifyNoticeType(n['공급유형'],n['공고명'])} · ${n['공급유형']||''}</p>
       <div class="chip-row" style="margin:8px 0;gap:5px">
+        ${isAmended?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#7B5EA7;border-color:#7B5EA7">🔄 정정</span>':''}
         ${isNew?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
         ${closingSoon?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
         ${demoTags.map(t=>`<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:${t.color};border-color:${t.color}">${t.label}</span>`).join('')}
-        ${isMetro?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#378ADD;border-color:#378ADD">수도권</span>':''}
       </div>
-      <p style="font-size:12px;color:#888;margin-bottom:8px">신청기간: ${n['신청시작일']||'-'} ~ ${n['신청마감일']||'-'}</p>
-      ${n['공고URL']?`<a class="detail-link" href="${n['공고URL']}" target="_blank" style="display:block">📄 공고 원문 보기</a>`:''}
+      <p style="font-size:12px;color:#888;margin-bottom:8px">${dateLine}</p>
+      ${detailHTML}
     </div>`;
   });
-  listEl.innerHTML=html || '<div class="rbox warn"><p class="rtitle">⚠ 조건에 맞는 공고가 없어요</p></div>';
+  if(noticeVisibleCount < filtered.length){
+    html += `<button class="more-btn" onclick="noticeShowMore()">더 보기 (${filtered.length - noticeVisibleCount}건 더) ↓</button>`;
+  }
+  listEl.innerHTML = html;
+}
+
+function noticeShowMore(){
+  noticeVisibleCount += 20;
+  renderNoticeList(noticeFiltered, noticeData.length);
 }
 </script>
-
 <script>
-const HOUSES=[
-  {id:1,city:"고양",name:"고양시 원흥동 (휴로스센트럴)",addr:"덕양구 서오릉로 644 휴로스센트럴 302동 1809호",type:"오피스텔",rooms:2,floor:18,area:48.75,dL:132718000,rL:158850,dH:151677000,rH:177800},
-  {id:2,city:"고양",name:"고양시 행신동 (라온팰리스) 607호",addr:"덕양구 소원로 111 라온팰리스빌딩 607호",type:"오피스텔",rooms:3,floor:6,area:77.4,dL:177385000,rL:249530,dH:202725000,rH:280670},
-  {id:3,city:"고양",name:"고양시 행신동 (라온팰리스) 706호",addr:"덕양구 소원로 111 라온팰리스빌딩 706호",type:"오피스텔",rooms:4,floor:7,area:81.68,dL:193325000,rL:270620,dH:220943000,rH:304570},
-  {id:4,city:"구리",name:"구리시 갈매동 (지웰에스테이트1차)",addr:"갈매순환로204번길 113 별내역 지웰에스테이트 1차 101동 1004호",type:"오피스텔",rooms:3,floor:10,area:84.82,dL:218447000,rL:332730,dH:249655000,rH:371100},
-  {id:5,city:"구리",name:"구리시 갈매동 (지웰에스테이트2차)",addr:"갈매중앙로 201-6 별내역 지웰에스테이트 2차 202동 404호",type:"오피스텔",rooms:3,floor:4,area:84.82,dL:196322000,rL:298850,dH:224367000,rH:333330},
-  {id:6,city:"김포",name:"김포시 구래동 (구래역한강리슈빌)",addr:"김포한강8로 377 구래역한강리슈빌 202동 303호",type:"아파트",rooms:3,floor:3,area:84.9,dL:134226000,rL:167600,dH:153402000,rH:184380},
-  {id:7,city:"김포",name:"김포시 마산동 (반도유보라3차) 1103호",addr:"김포한강8로 173-28 한강신도시 반도유보라3차 102동 1103호",type:"아파트",rooms:3,floor:11,area:60.0,dL:125602000,rL:169400,dH:143546000,rH:186600},
-  {id:8,city:"김포",name:"김포시 마산동 (반도유보라3차) 604호",addr:"김포한강8로 173-28 한강신도시 반도유보라3차 106동 604호",type:"아파트",rooms:3,floor:6,area:60.0,dL:125714000,rL:169470,dH:143674000,rH:186680},
-  {id:9,city:"김포",name:"김포시 마산동 (한강힐스테이트) 502동",addr:"김포한강7로22번길 22 한강힐스테이트 502동 601호",type:"아파트",rooms:3,floor:6,area:84.92,dL:135082000,rL:168980,dH:154380000,rH:185860},
-  {id:10,city:"김포",name:"김포시 마산동 (한강힐스테이트) 508동",addr:"김포한강7로22번길 22 한강힐스테이트 508동 603호",type:"아파트",rooms:3,floor:6,area:84.91,dL:139615000,rL:160780,dH:159560000,rH:179480},
-  {id:11,city:"김포",name:"김포시 운양동 (라비드퐁네프)",addr:"김포한강1로 238 라비드퐁네프 레드동 601호",type:"오피스텔",rooms:2,floor:6,area:47.65,dL:100042000,rL:144240,dH:114335000,rH:161810},
-  {id:12,city:"김포",name:"김포시 장기동 (모아미래도엘가)",addr:"김포한강2로 273 청송마을 모아미래도엘가 507동 205호",type:"아파트",rooms:3,floor:2,area:84.82,dL:143128000,rL:176820,dH:163575000,rH:194710},
-  {id:13,city:"남양주",name:"남양주시 다산동 (와이시티) 202호",addr:"경춘로 360 다산 와이시티 어반플랫 202호",type:"오피스텔",rooms:2,floor:2,area:55.94,dL:165380000,rL:240350,dH:189006000,rH:269380},
-  {id:14,city:"남양주",name:"남양주시 다산동 (와이시티) 203호",addr:"경춘로 360 다산 와이시티 어반플랫 203호",type:"오피스텔",rooms:2,floor:2,area:55.94,dL:165380000,rL:240350,dH:189006000,rH:269380},
-  {id:15,city:"남양주",name:"남양주시 다산동 (와이시티) 302호",addr:"경춘로 360 다산 와이시티 어반플랫 302호",type:"오피스텔",rooms:2,floor:3,area:55.94,dL:167049000,rL:242510,dH:190913000,rH:271830},
-  {id:16,city:"남양주",name:"남양주시 다산동 (와이시티) 402호",addr:"경춘로 360 다산 와이시티 어반플랫 402호",type:"오피스텔",rooms:2,floor:4,area:55.94,dL:168954000,rL:244910,dH:193090000,rH:274590},
-  {id:17,city:"남양주",name:"남양주시 다산동 (와이시티) 403호",addr:"경춘로 360 다산 와이시티 어반플랫 403호",type:"오피스텔",rooms:2,floor:4,area:55.94,dL:168954000,rL:244910,dH:193090000,rH:274590},
-  {id:18,city:"남양주",name:"남양주시 다산동 (와이시티) 503호",addr:"경춘로 360 다산 와이시티 어반플랫 503호",type:"오피스텔",rooms:2,floor:5,area:55.94,dL:170621000,rL:247010,dH:194996000,rH:276970},
-  {id:19,city:"남양주",name:"남양주시 다산동 (와이시티) 710호",addr:"경춘로 360 다산 와이시티 어반플랫 710호",type:"오피스텔",rooms:2,floor:7,area:55.94,dL:174989000,rL:252910,dH:199987000,rH:283630},
-  {id:20,city:"남양주",name:"남양주시 다산동 (와이시티) 802호",addr:"경춘로 360 다산 와이시티 어반플랫 802호",type:"오피스텔",rooms:2,floor:8,area:55.94,dL:172368000,rL:249340,dH:196993000,rH:279600},
-  {id:21,city:"남양주",name:"남양주시 다산동 (와이시티) 1003호",addr:"경춘로 360 다산 와이시티 어반플랫 1003호",type:"오피스텔",rooms:2,floor:10,area:55.94,dL:174035000,rL:251390,dH:198898000,rH:281940},
-  {id:22,city:"파주",name:"파주시 금촌동 (행복채)",addr:"황골로 74-6 행복채 701호",type:"혼합형",rooms:3,floor:7,area:72.49,dL:94999000,rL:129760,dH:108570000,rH:144460},
-  {id:23,city:"파주",name:"파주시 와동동 (레이크필드 위버젠) 2302호",addr:"경의로 1232 레이크필드 운정 위버젠 101동 2302호",type:"오피스텔",rooms:3,floor:23,area:83.79,dL:158125000,rL:256360,dH:180715000,rH:285530},
-  {id:24,city:"파주",name:"파주시 와동동 (레이크필드 위버젠) 2601호",addr:"경의로 1232 레이크필드 운정 위버젠 101동 2601호",type:"오피스텔",rooms:3,floor:26,area:83.79,dL:158125000,rL:256360,dH:180715000,rH:285530},
-  {id:25,city:"파주",name:"파주시 와동동 (레이크필드 위버젠) 801호",addr:"경의로 1232 레이크필드 운정 위버젠 103동 801호",type:"오피스텔",rooms:3,floor:8,area:83.45,dL:163229000,rL:251910,dH:186547000,rH:280570},
-  {id:26,city:"파주",name:"파주시 와동동 (레이크필드 위버젠) 902호 103동",addr:"경의로 1232 레이크필드 운정 위버젠 103동 902호",type:"오피스텔",rooms:3,floor:9,area:83.45,dL:166555000,rL:256190,dH:190349000,rH:285440},
-  {id:27,city:"파주",name:"파주시 와동동 (레이크필드 위버젠) 902호 104동",addr:"경의로 1232 레이크필드 운정 위버젠 104동 902호",type:"오피스텔",rooms:3,floor:9,area:83.79,dL:162958000,rL:251730,dH:186238000,rH:280340},
-  {id:28,city:"파주",name:"파주시 와동동 (레이크필드 위버젠) 1201호",addr:"경의로 1232 레이크필드 운정 위버젠 104동 1201호",type:"오피스텔",rooms:3,floor:12,area:83.79,dL:153505000,rL:250020,dH:175435000,rH:278340},
-  {id:29,city:"파주",name:"파주시 와동동 (레이크필드 위버젠) 1301호",addr:"경의로 1232 레이크필드 운정 위버젠 104동 1301호",type:"오피스텔",rooms:3,floor:13,area:83.79,dL:153505000,rL:250020,dH:175435000,rH:278340}
-];
+const HOUSING_CRITERIA = {
+  '매입임대':     { incomePct: 100, assetLimit: 36200, targets: ['신혼부부','신생아가구','한부모가족','유자녀혼인가구','청년'] },
+  '행복주택':     { incomePct: 120, assetLimit: 36200, targets: ['신혼부부','청년','대학생','고령자','장애인','주거급여수급자'] },
+  '국민임대':     { incomePct: 70,  assetLimit: 36200, targets: ['전체','청년','장애인','고령자'] },
+  '영구임대':     { incomePct: 50,  assetLimit: 24100, targets: ['전체'] },
+  '통합공공임대': { incomePct: 150, assetLimit: 36200, targets: ['전체'] },
+  '분양':         { incomePct: 160, assetLimit: 50000, targets: ['전체'] },
+};
+// 가구원수별 중위소득 100% 기준 (2026년, 만원)
+const MEDIAN_INCOME = { 1:228, 2:381, 3:492, 4:602, 5:708, 6:814 };
 
 const LIMIT130={1:5720045,2:8212778,3:10618958,4:11442863,5:12125081};
 const LIMIT200={1:8389399,2:12319167,3:16336858,4:17604404,5:18653970};
@@ -657,41 +1022,73 @@ function fmt(n){return Math.round(n/10000).toLocaleString()+'만원';}
 function fmtR(n){return (Math.round(n/1000)/10).toLocaleString()+'만원';}
 
 // ── 지역/유형 칩을 데이터에서 동적으로 생성 (행정구역이 바뀌어도 자동 대응) ──
+const SUPABASE_URL='https://khdpjjyspmlqtzperoqg.supabase.co';
+const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtoZHBqanlzcG1scXR6cGVyb3FnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxMTYyNDUsImV4cCI6MjA5NzY5MjI0NX0.XwSOuOk2UJiR8vTnwwqDZayJWOUstzD2DeB1COG4azs';
+
+let allRegions=[]; // Supabase에서 로드한 전국 지역 목록
+let settingsRegions=new Set();
+let settingsTypes=new Set();
+
+async function loadRegionsFromSupabase(){
+  try{
+    const res=await fetch(
+      `${SUPABASE_URL}/rest/v1/rpc/get_announcements_deduped`,
+      {method:'POST', headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY,'Content-Type':'application/json'}, body:'{}'}
+    );
+    if(res.ok){
+      const rows=await res.json();
+      const seen=new Set(rows.map(r=>extractRegionTop(r.region)).filter(Boolean));
+      allRegions=[...seen].sort();
+    }
+  }catch(e){
+    console.warn('지역 목록 로드 실패:',e);
+  }
+  buildChipOptions();
+}
+
 function buildChipOptions(){
-  const regions=[...new Set(HOUSES.map(h=>h.city))].sort();
-  const regionWrap=document.getElementById('regionChips');
-  regionWrap.innerHTML='';
+  const regions=allRegions.length?allRegions:[];
+  const types=Object.keys(HOUSING_CRITERIA);
+
+  // 추천 탭 칩
+  buildChipGroup('regionChips',regions,selectedRegions,
+    r=>toggleRegion(r), ()=>toggleAllRegions());
+  buildChipGroup('typeChips',types,selectedTypes,
+    t=>toggleType(t), ()=>toggleAllTypes());
+
+  // 설정 탭 칩
+  buildChipGroup('settingsRegionChips',regions,settingsRegions,
+    r=>{ settingsRegions.has(r)?settingsRegions.delete(r):settingsRegions.add(r); renderChipState('settingsRegionChips',settingsRegions); },
+    ()=>{ settingsRegions.clear(); renderChipState('settingsRegionChips',settingsRegions); });
+  buildChipGroup('settingsTypeChips',types,settingsTypes,
+    t=>{ settingsTypes.has(t)?settingsTypes.delete(t):settingsTypes.add(t); renderChipState('settingsTypeChips',settingsTypes); },
+    ()=>{ settingsTypes.clear(); renderChipState('settingsTypeChips',settingsTypes); });
+}
+
+function buildChipGroup(wrapId,options,selSet,onItem,onAll){
+  const wrap=document.getElementById(wrapId);
+  wrap.innerHTML='';
   const allChip=document.createElement('div');
   allChip.className='chip chip-all sel';
   allChip.textContent='전체';
   allChip.dataset.value='__all__';
-  allChip.onclick=()=>toggleAllRegions();
-  regionWrap.appendChild(allChip);
-  regions.forEach(r=>{
+  allChip.setAttribute('role','button');
+  allChip.setAttribute('tabindex','0');
+  allChip.setAttribute('aria-pressed','true');
+  allChip.onclick=onAll;
+  allChip.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ allChip.click(); e.preventDefault(); } };
+  wrap.appendChild(allChip);
+  options.forEach(v=>{
     const c=document.createElement('div');
     c.className='chip';
-    c.textContent=r;
-    c.dataset.value=r;
-    c.onclick=()=>toggleRegion(r);
-    regionWrap.appendChild(c);
-  });
-
-  const types=[...new Set(HOUSES.map(h=>h.type))].sort();
-  const typeWrap=document.getElementById('typeChips');
-  typeWrap.innerHTML='';
-  const allTypeChip=document.createElement('div');
-  allTypeChip.className='chip chip-all sel';
-  allTypeChip.textContent='전체';
-  allTypeChip.dataset.value='__all__';
-  allTypeChip.onclick=()=>toggleAllTypes();
-  typeWrap.appendChild(allTypeChip);
-  types.forEach(t=>{
-    const c=document.createElement('div');
-    c.className='chip';
-    c.textContent=t;
-    c.dataset.value=t;
-    c.onclick=()=>toggleType(t);
-    typeWrap.appendChild(c);
+    c.textContent=v;
+    c.dataset.value=v;
+    c.setAttribute('role','button');
+    c.setAttribute('tabindex','0');
+    c.setAttribute('aria-pressed', selSet.has(v)?'true':'false');
+    c.onclick=()=>onItem(v);
+    c.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ c.click(); e.preventDefault(); } };
+    wrap.appendChild(c);
   });
 }
 
@@ -714,22 +1111,250 @@ function toggleAllTypes(){
 function renderChipState(wrapId,selSet){
   const wrap=document.getElementById(wrapId);
   [...wrap.children].forEach(c=>{
-    if(c.dataset.value==='__all__'){
-      c.classList.toggle('sel',selSet.size===0);
-    } else {
-      c.classList.toggle('sel',selSet.has(c.dataset.value));
-    }
+    const isSel = c.dataset.value==='__all__' ? selSet.size===0 : selSet.has(c.dataset.value);
+    c.classList.toggle('sel', isSel);
+    c.setAttribute('aria-pressed', isSel ? 'true' : 'false');
   });
+}
+
+function renderPersonalizedRecommendations(){
+  const panel=document.getElementById('personalizedPanel');
+  const prompt=document.getElementById('personalizedPrompt');
+  if(!panel||!prompt) return;
+
+  if(!currentUser){
+    panel.style.display='none';
+    prompt.style.display='block';
+    return;
+  }
+
+  const savedRegions=Array.isArray(currentUser.regions)?currentUser.regions:(typeof currentUser.regions==='string'?currentUser.regions.split(',').filter(Boolean):[]);
+  const savedTypes=Array.isArray(currentUser.types)?currentUser.types:(typeof currentUser.types==='string'?currentUser.types.split(',').filter(Boolean):[]);
+  const hasConditions=savedRegions.length||savedTypes.length;
+
+  prompt.style.display='none';
+  panel.style.display='block';
+
+  if(!noticeLoaded || !noticeData.length){
+    document.getElementById('personalizedList').innerHTML='<div class="rbox warn"><p class="rtitle">⏳ 공고 데이터를 불러오는 중이에요</p></div>';
+    document.getElementById('personalizedDesc').textContent='';
+    return;
+  }
+
+  let filtered=noticeData.filter(n=>{
+    const isClosed=n['처리상태']==='접수마감'||n['처리상태']==='마감';
+    if(isClosed) return false;
+    if(savedRegions.length && !savedRegions.includes(extractRegionTop(n['지역']))) return false;
+    if(savedTypes.length && !savedTypes.some(t=>classifyNoticeType(n['공급유형'],n['공고명'])===t||n['공급유형']?.includes(t))) return false;
+    return true;
+  });
+
+  const desc=document.getElementById('personalizedDesc');
+  if(!hasConditions){
+    filtered=noticeData.filter(n=>n['처리상태']!=='접수마감'&&n['처리상태']!=='마감').slice(0,5);
+    desc.textContent='저장된 조건이 없어 전체 공고를 표시해요. 설정 탭에서 조건을 저장하면 맞춤 추천을 받을 수 있어요.';
+  } else {
+    desc.textContent=`저장된 조건 기준 ${filtered.length}건 매칭됐어요.`;
+  }
+
+  const shown=filtered.slice(0,5);
+  if(!shown.length){
+    document.getElementById('personalizedList').innerHTML='<div class="rbox warn"><p class="rtitle">⚠ 조건에 맞는 공고가 없어요</p><p class="rdesc">설정에서 조건을 조정해보세요.</p></div>';
+    return;
+  }
+
+  let html='';
+  shown.forEach(n=>{
+    const announcementDate=n['모집공고일']||n['announcement_date']||'';
+    const applyStart=n['신청시작일']||n['apply_start']||'';
+    const applyEnd=n['신청마감일']||n['apply_end']||'';
+    const dateLine=announcementDate?`모집공고: ${announcementDate} / 접수기간: ${applyStart||'-'} ~ ${applyEnd||'-'}`:`접수기간: ${applyStart||'-'} ~ ${applyEnd||'-'}`;
+    const closingSoon=isClosingSoon(n);
+    html+=`<div class="hcard">
+      <div class="htop">
+        <p class="hname">${n['공고명']||n['name']||'(공고명 없음)'}</p>
+        <span class="htag tag-apt">${n['처리상태']||'-'}</span>
+      </div>
+      <p class="haddr">${n['지역']||''} · ${n['공급유형']||''}</p>
+      <div class="chip-row" style="margin:6px 0;gap:5px">
+        ${isNewNotice(n)?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
+        ${closingSoon?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
+      </div>
+      <p style="font-size:12px;color:#888;margin-bottom:8px">${dateLine}</p>
+      ${(n['공고URL']||n['url'])?`<a class="detail-link" href="${n['공고URL']||n['url']}" target="_blank" style="display:block">📄 공고 원문 보기</a>`:''}
+    </div>`;
+  });
+  if(filtered.length>5) html+=`<p style="font-size:12px;color:#888;text-align:center;margin-top:8px">외 ${filtered.length-5}건 더 — 공고 탭에서 전체 확인</p>`;
+  document.getElementById('personalizedList').innerHTML=html;
 }
 
 function goMain(n){
   [1,2,3,4,5].forEach(i=>{
     document.getElementById('main'+i).classList.toggle('hidden',i!==n);
-    document.getElementById('m'+i).classList.toggle('active',i===n);
+    const tab = document.getElementById('m'+i);
+    tab.classList.toggle('active',i===n);
+    tab.setAttribute('aria-selected', i===n ? 'true' : 'false');
   });
-  if(n===2 && !noticeLoaded) loadNoticeData();
+  if(n===1) renderPersonalizedRecommendations();
+  if(n===2 && !noticeLoaded) initNoticeFilters();
+  else if(n===2) loadNoticeData();
+  if(n===3) loadInsightData();
+  if(n===4) renderSavedNotices();
   if(n===5) renderSettingsGate();
 }
+
+// 페이지 로드 시 전국 지역 목록 초기화
+loadRegionsFromSupabase();
+updateSaveBadge();
+
+// ===== 인사이트 탭 =====
+let insightLoaded = false;
+
+async function loadInsightData(){
+  const wrap = document.getElementById('insightContent');
+  if(!wrap) return;
+  if(insightLoaded) return;
+  wrap.innerHTML = '<div class="rbox" style="text-align:center;padding:2rem 1rem"><p style="color:#888;font-size:14px">📊 통계 데이터를 불러오는 중...</p></div>';
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_announcements_deduped`,
+      {method:'POST', headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY,'Content-Type':'application/json'}, body:'{}'});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const rows = await res.json();
+    if(!Array.isArray(rows)) throw new Error('응답 형식 오류');
+    insightLoaded = true;
+    renderInsight(rows, wrap);
+  }catch(e){
+    wrap.innerHTML = `<div class="rbox err"><p class="rtitle">⚠️ 데이터를 불러오지 못했어요</p><p class="rdesc">네트워크 연결을 확인하고 다시 시도해주세요.</p><button class="btn btn-sec btn-sm" style="margin-top:8px" onclick="insightLoaded=false;loadInsightData()">새로고침</button></div>`;
+    console.error('인사이트 로드 실패:', e);
+  }
+}
+
+function renderInsight(rows, wrap){
+  const total = rows.length;
+
+  // ① 지역별 (sido_nm) 집계
+  const regionMap = {};
+  rows.forEach(r=>{ const k=r.sido_nm||r.region||'기타'; regionMap[k]=(regionMap[k]||0)+1; });
+  const regionTop = Object.entries(regionMap).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const regionMax = regionTop[0]?.[1]||1;
+
+  // ② 유형별 (housing_type) 집계
+  const typeMap = {};
+  rows.forEach(r=>{ const k=r.housing_type||'기타'; typeMap[k]=(typeMap[k]||0)+1; });
+  const typeSorted = Object.entries(typeMap).sort((a,b)=>b[1]-a[1]);
+
+  // ③ 상태별 집계
+  const statusMap = {'접수중':0,'공고중':0,'접수마감':0};
+  rows.forEach(r=>{
+    const s = r.status_normalized||r.status||'';
+    if(s==='접수중') statusMap['접수중']++;
+    else if(s==='공고중') statusMap['공고중']++;
+    else if(s==='접수마감') statusMap['접수마감']++;
+  });
+
+  // ④ 최근 30일 추이 (announcement_date)
+  const now = new Date();
+  const d30ago = new Date(now); d30ago.setDate(d30ago.getDate()-30);
+  const trendMap = {};
+  rows.forEach(r=>{
+    if(!r.announcement_date) return;
+    const d = new Date(r.announcement_date.replace(/\./g,'-'));
+    if(isNaN(d)||d<d30ago) return;
+    const key = r.announcement_date.slice(0,10);
+    trendMap[key]=(trendMap[key]||0)+1;
+  });
+  const trendEntries = Object.entries(trendMap).sort((a,b)=>a[0]<b[0]?-1:1);
+  const trendMax = Math.max(1,...trendEntries.map(e=>e[1]));
+
+  // 색상 팔레트
+  const COLORS = ['#1D9E75','#378ADD','#EF9F27','#D85A30','#7F77DD','#5DCAA5','#E96B8A','#8BAC3B','#A67C52','#6C757D'];
+
+  wrap.innerHTML = `
+    <div class="panel">
+      <p class="panel-title" style="margin-bottom:4px">📊 공고 통계 인사이트</p>
+      <p style="font-size:13px;color:#888;margin-bottom:0">현재 전국 <strong style="color:#1D9E75">${total.toLocaleString()}개</strong> 공고가 수집되어 있어요. 매일 오전 9시 자동 업데이트.</p>
+    </div>
+
+    <div class="panel">
+      <p class="panel-title">③ 공고 상태 현황</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <div style="flex:1;min-width:90px;background:#E8F5F0;border-radius:12px;padding:14px 10px;text-align:center">
+          <p style="font-size:26px;font-weight:700;color:#1D9E75;margin:0">${statusMap['접수중'].toLocaleString()}</p>
+          <p style="font-size:12px;color:#555;margin-top:4px">🟢 접수중</p>
+        </div>
+        <div style="flex:1;min-width:90px;background:#EEF4FB;border-radius:12px;padding:14px 10px;text-align:center">
+          <p style="font-size:26px;font-weight:700;color:#378ADD;margin:0">${statusMap['공고중'].toLocaleString()}</p>
+          <p style="font-size:12px;color:#555;margin-top:4px">🔵 공고중</p>
+        </div>
+        <div style="flex:1;min-width:90px;background:#F5F5F5;border-radius:12px;padding:14px 10px;text-align:center">
+          <p style="font-size:26px;font-weight:700;color:#999;margin:0">${statusMap['접수마감'].toLocaleString()}</p>
+          <p style="font-size:12px;color:#555;margin-top:4px">⚪ 접수마감</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <p class="panel-title">① 지역별 공고 수 (상위 10개 시/도)</p>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${regionTop.map(([region,cnt],i)=>`
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;color:#555;margin-bottom:3px">
+              <span>${region}</span><span style="font-weight:600;color:#111">${cnt}건</span>
+            </div>
+            <div style="background:#e8e8e0;border-radius:4px;height:10px;overflow:hidden">
+              <div style="background:${COLORS[i%COLORS.length]};height:100%;width:${Math.round(cnt/regionMax*100)}%;border-radius:4px;transition:width 0.4s"></div>
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <div class="panel">
+      <p class="panel-title">② 주택 유형별 공고 수</p>
+      <div class="chip-row" style="flex-wrap:wrap;gap:8px">
+        ${typeSorted.map(([type,cnt],i)=>`
+          <div style="display:flex;align-items:center;gap:6px;background:#f4f4f0;border-radius:20px;padding:6px 12px">
+            <span style="width:10px;height:10px;border-radius:50%;background:${COLORS[i%COLORS.length]};display:inline-block;flex-shrink:0"></span>
+            <span style="font-size:13px;color:#333">${type}</span>
+            <span style="font-size:13px;font-weight:700;color:#1D9E75">${cnt}</span>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <div class="panel">
+      <p class="panel-title">④ 최근 30일 공고 추이</p>
+      ${trendEntries.length===0
+        ? '<p style="font-size:13px;color:#aaa;text-align:center;padding:20px 0">최근 30일 데이터가 없어요</p>'
+        : `<div style="display:flex;align-items:flex-end;gap:4px;height:80px;overflow-x:auto;padding-bottom:4px">
+            ${trendEntries.map(([date,cnt])=>`
+              <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;min-width:24px" title="${date}: ${cnt}건">
+                <span style="font-size:9px;color:#888;margin-bottom:2px">${cnt}</span>
+                <div style="background:#1D9E75;border-radius:3px 3px 0 0;width:18px;height:${Math.round(cnt/trendMax*60)+4}px"></div>
+                <span style="font-size:8px;color:#bbb;margin-top:2px;writing-mode:vertical-rl;text-orientation:mixed">${date.slice(5)}</span>
+              </div>`).join('')}
+          </div>`
+      }
+    </div>`;
+}
+
+async function updateBannerFromDB(){
+  try{
+    const res=await fetch(
+      `${SUPABASE_URL}/rest/v1/rpc/get_announcements_deduped`,
+      {method:'POST',headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY,'Content-Type':'application/json'},body:'{}'}
+    );
+    if(!res.ok) return;
+    const rows=await res.json();
+    if(!rows||!rows.length) return;
+    const active=rows.find(r=>r.status==='접수중')||rows[0];
+    const titleShort=(active.title||'').slice(0,20);
+    const start=active.apply_start||'';
+    const end=active.apply_end||'';
+    const datePart=(start||end)?` · ${start||'-'}~${end||'-'}`:'';
+    const el=document.querySelector('.badge');
+    if(el) el.textContent=`📢 ${titleShort}${datePart}`;
+  }catch(e){console.warn('배너 업데이트 실패:',e);}
+}
+document.addEventListener('DOMContentLoaded', updateBannerFromDB);
 
 function goStep(n){
   // 맞춤추천 그룹(1,2)
@@ -783,40 +1408,96 @@ function diagnose(){
   const rank=rankMap[marital]||'확인 필요';
   diagMarital=marital;
 
+  // 주택 유형별 자격 필터 계산
+  const medianBase = (MEDIAN_INCOME[members]||MEDIAN_INCOME[6]) * 10000;
+  window.eligibleTypes = Object.entries(HOUSING_CRITERIA)
+    .filter(([, c]) => {
+      const incLim = medianBase * c.incomePct / 100;
+      const assetLim = c.assetLimit * 10000;
+      const incOk = income === 0 || income <= incLim;
+      const assetOk = assets === 0 || assets <= assetLim;
+      return incOk && assetOk;
+    })
+    .map(([type]) => type);
+
+  // Step2 활성화
+  const s2 = document.getElementById('s2');
+  if(s2){ s2.style.opacity='1'; s2.style.pointerEvents='auto'; s2.removeAttribute('title'); }
+
+  // eligibleTypes 기반 주택 유형 칩 자동 선택
+  selectedTypes.clear();
+  window.eligibleTypes.forEach(t => selectedTypes.add(t));
+  renderChipState('typeChips', selectedTypes);
+
   let html='';
-  if(!incomeOk||!assetOk){
-    html=`<div class="rbox err"><p class="rtitle">❌ 조건 미충족 가능성</p><p class="rdesc">${!incomeOk?'· '+incomeMsg+'<br>':''}${!assetOk?'· '+assetMsg:''}</p></div>`;
+  if(window.eligibleTypes.length === 0){
+    html=`<div class="rbox err"><p class="rtitle">❌ 신청 가능한 유형 없음</p><p class="rdesc">입력하신 소득·자산 조건으로는 신청 가능한 유형이 없어요.<br>소득·자산 기준을 다시 확인해보세요.</p></div>`;
   } else {
-    html=`<div class="rbox ok"><p class="rtitle">✅ 신청 가능 — ${rank}</p><p class="rdesc">${incomeMsg?'· '+incomeMsg+'<br>':''}${assetMsg?'· '+assetMsg+'<br>':''}· 신청기간: 2026.06.30(화) ~ 07.02(목) 16:00</p></div>`;
+    const typeList = window.eligibleTypes.map(t=>`· ${t}`).join(' ');
+    html=`<div class="rbox ok"><p class="rtitle">✅ 신청 가능한 주택 유형</p><p class="rdesc">${typeList}<br><span style="font-size:11px;color:#999">소득·자산 기준을 충족한 유형이에요. 정확한 자격은 각 공고문을 확인하세요.</span></p></div>`;
+    if(incomeMsg) html+=`<div class="rbox warn" style="margin-top:6px"><p class="rdesc" style="margin:0">· ${incomeMsg}</p></div>`;
+    if(assetMsg)  html+=`<div class="rbox warn" style="margin-top:6px"><p class="rdesc" style="margin:0">· ${assetMsg}</p></div>`;
     let gp=0;
     if(children>=3)gp+=4;else if(children===2)gp+=3;else if(children===1)gp+=2;
-    if(gp)html+=`<div class="rbox warn"><p class="rtitle">📊 예상 가점: ${gp}점 (자녀 항목)</p><p class="rdesc">청약저축 납입횟수, 해당 시 거주기간, 장애인 등 추가 가점을 확인하세요.</p></div>`;
-    html+=`<button class="btn btn-primary" onclick="goStep(2)" style="margin-top:0.5rem">주택 매칭하러 가기 →</button>`;
+    if(gp)html+=`<div class="rbox warn" style="margin-top:6px"><p class="rtitle">📊 예상 가점: ${gp}점 (자녀 항목)</p><p class="rdesc">청약저축 납입횟수, 해당 시 거주기간, 장애인 등 추가 가점을 확인하세요.</p></div>`;
+    html+=`<button class="btn btn-primary" onclick="goStep(2);matchHouses()" style="margin-top:0.5rem">주택 매칭하러 가기 →</button>`;
   }
   r.innerHTML=html;
 }
 
-function matchHouses(){
-  const minDep=(parseFloat(document.getElementById('minDeposit').value)||0)*10000;
-  const maxDep=(parseFloat(document.getElementById('maxDeposit').value)||Infinity)*10000;
-  const minR=parseInt(document.getElementById('minRooms').value)||0;
-  const lvl=document.getElementById('incomeLevel').value;
+async function matchHouses(){
+  const minRooms = parseInt(document.getElementById('minRooms')?.value)||0;
+  const regions = [...selectedRegions];
+  const activeTypes = [...selectedTypes].filter(t => t !== '전체');
+  const eligibleTypes = window.eligibleTypes || [];
 
-  let list=HOUSES.filter(h=>{
-    const d=lvl==='low'?h.dL:h.dH;
-    // 마감/접수마감 공고는 매칭 결과에서 자동 제외 (DB에는 보존, 추후 히스토리 비교용으로 활용)
-    if(h.status && (h.status==='접수마감' || h.status==='마감')) return false;
-    if(selectedRegions.size>0 && !selectedRegions.has(h.city))return false;
-    if(d<minDep || d>maxDep)return false;
-    if(h.rooms<minR)return false;
-    if(selectedTypes.size>0 && !selectedTypes.has(h.type))return false;
-    return true;
-  });
+  const r = document.getElementById('match-result');
+  r.classList.remove('hidden');
+  r.innerHTML = '<div class="rbox warn"><p class="rtitle">⏳ 조건에 맞는 공고를 찾는 중...</p></div>';
 
-  lastFiltered=list;
-  visibleCount=3;
-  currentSort='deposit-asc';
-  renderMatchResults(lvl);
+  const body = {
+    p_region: regions.length === 1 ? regions[0] : null,
+    p_type: null,
+    p_status: null
+  };
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_announcements_deduped`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+      },
+      body: JSON.stringify(body)
+    });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    let rows = await res.json();
+    if(!Array.isArray(rows)){
+      const msg = rows?.message || rows?.error || JSON.stringify(rows);
+      throw new Error('Supabase 오류: ' + msg);
+    }
+
+    rows = rows.filter(r => r.status !== '접수마감' && r.status_normalized !== '접수마감');
+    if(regions.length > 0) {
+      rows = rows.filter(r => regions.some(rg => (r.region||'').includes(rg)));
+    }
+    if(activeTypes.length > 0) {
+      rows = rows.filter(r => activeTypes.some(t => (r.housing_type||'').includes(t)));
+    } else if(eligibleTypes.length > 0) {
+      rows = rows.filter(r => eligibleTypes.some(t => (r.housing_type||'').includes(t)));
+    }
+    if(minRooms > 0) {
+      rows = rows.filter(r => !r.min_rooms || parseInt(r.min_rooms) >= minRooms);
+    }
+
+    lastFiltered = rows;
+    visibleCount = 5;
+    renderMatchResults(rows);
+  } catch(err) {
+    r.innerHTML = '<div class="rbox err"><p class="rtitle">⚠️ 매칭 중 오류가 발생했어요</p><p class="rdesc">잠시 후 다시 시도해주세요.</p><button class="btn btn-sec btn-sm" style="margin-top:8px" onclick="matchHouses()">다시 시도</button></div>';
+    console.error('matchHouses 오류:', err);
+  }
 }
 
 let kakaoLoaded=false;
@@ -842,48 +1523,72 @@ function loadKakao(){
 
 const POI_CATS={subway:{code:'SW8',label:'🚇 지하철'},park:{code:'AT4',label:'🌳 공원'},hospital:{code:'HP8',label:'🏥 병원'},childcare:{code:'PS3',label:'👶 어린이집'},school:{code:'SC4',label:'🏫 학교'},store:{code:'CS2',label:'🏪 편의점'},mart:{code:'MT1',label:'🛒 마트'}};
 
-function toggleDetail(id){
-  const el=document.getElementById('detail-'+id);
-  if(!el)return;
-  el.classList.toggle('hidden');
-  const h=HOUSES.find(x=>x.id===id);
-  if(!el.classList.contains('hidden') && !el.dataset.loaded){
-    el.dataset.loaded='1';
-    const q=encodeURIComponent(h.addr+' '+h.name);
-    el.innerHTML=`
-      <div class="detail-inner">
-        <div class="map-box" id="map-${id}"><div class="poi-loading">지도를 불러오는 중...</div></div>
-        <div class="poi-section">
-          <div class="poi-tabs" id="poitabs-${id}"></div>
-          <div class="poi-list" id="poilist-${id}"><div class="poi-loading">탭을 선택하면 주변 시설이 표시돼요</div></div>
-        </div>
-        <div class="detail-row">
-          <a class="detail-link" href="https://map.kakao.com/?q=${q}" target="_blank">📍 카카오맵 새 창</a>
-          <a class="detail-link" href="https://map.naver.com/p/search/${q}" target="_blank">📍 네이버지도</a>
-        </div>
-        <a class="detail-link" href="https://apply.lh.or.kr/lhapply/apply/wt/wrtanc/selectWrtancInfo.do?panId=2015122300020157&ccrCnntSysDsCd=03&uppAisTpCd=13&aisTpCd=26&mi=1026" target="_blank">📄 LH 공고 원문에서 평면도 확인</a>
+function toggleDetail(id, card){
+  const detailEl = document.getElementById(id);
+  if(!detailEl) return;
+  const open = detailEl.style.display === 'block';
+  detailEl.style.display = open ? 'none' : 'block';
+  const cardEl = card || document.querySelector(`[data-card-id="${id}"]`);
+  if(cardEl){
+    cardEl.style.borderColor = open ? '' : '#1D9E75';
+    cardEl.setAttribute('aria-expanded', open ? 'false' : 'true');
+  }
+  if(!open && !detailEl.dataset.mapLoaded && cardEl){
+    detailEl.dataset.mapLoaded = '1';
+    const sido = cardEl.dataset.sido || '';
+    const sigungu = cardEl.dataset.sigungu || '';
+    const region = cardEl.dataset.region || '';
+    const addr = [sido, sigungu].filter(Boolean).join(' ') || region;
+    const name = cardEl.dataset.title || '';
+    const h = { addr, name };
+    const mapWrap = document.createElement('div');
+    mapWrap.style.cssText = 'margin-top:12px;border-top:1px solid #e8e8e0;padding-top:12px';
+    mapWrap.innerHTML = `
+      <div id="map-${id}" class="map-box"><div class="poi-loading">📍 지도를 불러오는 중...</div></div>
+      <div class="poi-section">
+        <div class="poi-tabs" id="poitabs-${id}"></div>
+        <div class="poi-list" id="poilist-${id}"><div class="poi-loading">탭을 선택하면 주변 시설이 표시돼요</div></div>
       </div>`;
-    initMapForHouse(h,id);
+    detailEl.appendChild(mapWrap);
+    initMapForHouse(h, id);
   }
 }
 
 function initMapForHouse(h,id){
+  const renderMap = (result) => {
+    const mapEl = document.getElementById('map-'+id);
+    if(!mapEl) return;
+    const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
+    const map = new kakao.maps.Map(mapEl, {center:coords, level:5});
+    new kakao.maps.Marker({position:coords, map});
+    buildPoiTabs(id, coords);
+  };
   loadKakao().then(()=>{
-    const geocoder=new kakao.maps.services.Geocoder();
-    geocoder.addressSearch(h.addr,(result,status)=>{
-      const mapEl=document.getElementById('map-'+id);
-      if(status!==kakao.maps.services.Status.OK || !result.length){
-        mapEl.innerHTML='<div class="poi-loading">주소로 위치를 찾지 못했어요. 위 링크로 직접 확인해주세요.</div>';
-        return;
+    const geocoder = new kakao.maps.services.Geocoder();
+    geocoder.addressSearch(h.addr, (result, status) => {
+      if(status === kakao.maps.services.Status.OK && result.length){
+        renderMap(result);
+      } else {
+        const fallback = h.addr.split(' ')[0];
+        if(fallback && fallback !== h.addr){
+          geocoder.addressSearch(fallback, (r2, s2) => {
+            if(s2 === kakao.maps.services.Status.OK && r2.length){
+              renderMap(r2);
+            } else {
+              const mapEl = document.getElementById('map-'+id);
+              if(mapEl) mapEl.innerHTML = '<p style="text-align:center;padding:80px 0;color:#999;font-size:13px">📍 지도 정보를 불러올 수 없어요</p>';
+            }
+          });
+        } else {
+          const mapEl = document.getElementById('map-'+id);
+          if(mapEl) mapEl.innerHTML = '<p style="text-align:center;padding:80px 0;color:#999;font-size:13px">📍 지도 정보를 불러올 수 없어요</p>';
+        }
       }
-      const coords=new kakao.maps.LatLng(result[0].y,result[0].x);
-      const map=new kakao.maps.Map(mapEl,{center:coords,level:4});
-      new kakao.maps.Marker({position:coords,map});
-      buildPoiTabs(id,coords);
     });
-  }).catch((err)=>{
-    document.getElementById('map-'+id).innerHTML='<div class="poi-loading">지도를 불러올 수 없어요 ('+err+'). 카카오맵 새 창 링크를 이용해주세요.</div>';
-    console.error('ZipFit 지도 로드 실패:',err);
+  }).catch(err=>{
+    const mapEl = document.getElementById('map-'+id);
+    if(mapEl) mapEl.innerHTML = '<p style="text-align:center;padding:80px 0;color:#999;font-size:13px">📍 지도를 불러올 수 없어요</p>';
+    console.error('ZipFit 지도 로드 실패:', err);
   });
 }
 
@@ -944,58 +1649,95 @@ function setSort(key){
 
 function showMore(){
   visibleCount+=5;
-  const lvl=document.getElementById('incomeLevel').value;
-  renderMatchResults(lvl);
+  renderMatchResults(lastFiltered);
 }
 
-function renderMatchResults(lvl){
+function renderMatchResults(rows){
   const r=document.getElementById('match-result');
   r.classList.remove('hidden');
 
-  if(!lastFiltered.length){
-    r.innerHTML='<div class="rbox warn"><p class="rtitle">⚠ 조건에 맞는 주택이 없습니다</p><p class="rdesc">보증금 범위를 넓히거나 지역·유형 선택을 늘려보세요.</p></div>';
+  if(!rows||!rows.length){
+    r.innerHTML='<div class="rbox warn"><p class="rtitle">⚠ 현재 접수중인 공고가 없어요</p><p class="rdesc">공고 탭에서 전체 공고를 확인해보세요.</p></div>';
     return;
   }
 
-  const sorted=sortHouses(lastFiltered,currentSort,lvl);
-  const shown=sorted.slice(0,visibleCount);
+  const shown = rows.slice(0, visibleCount);
+  let html = `<div class="count-info"><span>총 ${rows.length}건 매칭</span></div>`;
 
-  const sortLabels={'deposit-asc':'보증금↑','deposit-desc':'보증금↓','rent-asc':'월세↑','rent-desc':'월세↓','area-asc':'면적↑','area-desc':'면적↓','floor-asc':'층수↑','floor-desc':'층수↓'};
+  shown.forEach((n, idx) => {
+    const isClosed    = (n.status_normalized||n.status||'') === '접수마감';
+    const isAmended   = (n.title||'').includes('[정정공고]') || n.is_revised;
+    const demoTags    = classifyDemographics(n.housing_type||'', n.title||'');
+    const isNew       = !isClosed && isNewNotice({'created_at': n.created_at||'', 'apply_end': n.apply_end||''});
+    const closingSoon = !isClosed && isClosingSoon({'apply_end': n.apply_end||''});
+    const applyStart  = n.apply_start||'';
+    const applyEnd    = n.apply_end||'';
+    const annDate     = n.announcement_date||'';
+    const sameAsStart = annDate && applyStart && annDate === applyStart;
+    const dateLine    = sameAsStart
+      ? `모집공고: ${annDate} / 접수마감: ${applyEnd||'-'}`
+      : annDate
+        ? `모집공고: ${annDate} / 접수기간: ${applyStart||'-'} ~ ${applyEnd||'-'}`
+        : `접수기간: ${applyStart||'-'} ~ ${applyEnd||'-'}`;
+    const cardId = 'mcard-detail-'+idx;
 
-  let html=`<div class="count-info"><span>총 ${sorted.length}개 주택 조건 충족</span></div>`;
-  html+=`<div class="sort-row">`;
-  Object.keys(sortLabels).forEach(k=>{
-    html+=`<button class="sort-btn ${currentSort===k?'active':''}" onclick="setSort('${k}')">${sortLabels[k]}</button>`;
-  });
-  html+=`</div>`;
+    const detailRows = [];
+    if(n.supply_org) detailRows.push(['공급기관', n.supply_org]);
+    if(n.area_min){
+      const areaStr = parseFloat(n.area_min).toFixed(1)+'㎡' +
+        (n.area_max&&n.area_max!==n.area_min ? ' ~ '+parseFloat(n.area_max).toFixed(1)+'㎡' : '');
+      detailRows.push(['전용면적', areaStr]);
+    }
+    if(n.total_units) detailRows.push(['총 세대수', n.total_units+'세대']);
+    if(n.move_in_date) detailRows.push(['입주예정', n.move_in_date]);
+    if(n.deposit_min) detailRows.push(['보증금', Number(n.deposit_min).toLocaleString()+'원']);
+    if(n.rent_min) detailRows.push(['월임대료', Number(n.rent_min).toLocaleString()+'원']);
+    if(annDate) detailRows.push(['공고일', annDate]);
+    if(applyStart||applyEnd) detailRows.push(['접수기간', (applyStart||'-')+' ~ '+(applyEnd||'-')]);
 
-  shown.forEach((h,i)=>{
-    const d=lvl==='low'?h.dL:h.dH, rt=lvl==='low'?h.rL:h.rH;
-    const tc=h.type==='아파트'?'tag-apt':h.type==='오피스텔'?'tag-ofi':'tag-mix';
-    html+=`<div class="hcard ${i===0?'top1':''}">
+    const mTitle = (n.title||'').replace(/'/g,"\\'");
+    const mRegion = (n.region||'').replace(/'/g,"\\'");
+    const mType = (n.housing_type||'').replace(/'/g,"\\'");
+    const mUrl = (n.url||'').replace(/'/g,"\\'");
+    const mId = (n.announcement_id||'m'+idx).replace(/'/g,"\\'");
+    const mSaved = getSavedNotices().some(s=>s.id===(n.announcement_id||'m'+idx));
+    const mShareBtn = `<button class="detail-link" style="border:1px solid #1D9E75;color:#1D9E75;background:#fff;cursor:pointer" onclick="event.stopPropagation();shareNotice(this,'${mTitle}','${mRegion}','${mType}','${mUrl}')">🔗 이 공고 공유하기</button>`;
+    const mSaveBtn = `<button data-save-id="${n.announcement_id||'m'+idx}" class="detail-link" style="border:1px solid ${mSaved?'#1D9E75':'#ccc'};color:${mSaved?'#1D9E75':'#888'};background:#fff;cursor:pointer" onclick="event.stopPropagation();toggleSaveNotice('${mId}','${mTitle}','${mRegion}','${mType}','${mUrl}')">${mSaved?'🔖 저장됨':'🔖 저장'}</button>`;
+    const detailHTML = detailRows.length
+      ? `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px">
+          <div class="detail-grid">
+            ${detailRows.map(([k,v])=>`<div style="font-size:12px"><span style="color:#999">${k}</span><br><span style="color:#333;font-weight:500">${v}</span></div>`).join('')}
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+            ${n.url?`<a class="detail-link" href="${n.url}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a>`:''}
+            ${mShareBtn}
+            ${mSaveBtn}
+          </div>
+        </div>`
+      : `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px"><div style="display:flex;gap:8px;flex-wrap:wrap">${n.url?`<a class="detail-link" href="${n.url}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a>`:''} ${mShareBtn} ${mSaveBtn}</div></div>`;
+
+    html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n.region||'').replace(/"/g,'&quot;')}" data-sido="${(n.sido_nm||'').replace(/"/g,'&quot;')}" data-sigungu="${(n.sigungu_nm||'').replace(/"/g,'&quot;')}" data-title="${(n.title||'').replace(/"/g,'&quot;')}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this)" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
       <div class="htop">
-        <div>${i===0?'<span class="best">🏆 최적 추천</span>':''}<span class="rank">${i+1}위</span><p class="hname">${h.name}</p></div>
-        <span class="htag ${tc}">${h.type}</span>
+        <p class="hname">${n.title||'(공고명 없음)'}</p>
+        <span class="htag ${isClosed?'tag-mix':'tag-apt'}">${n.status||'-'}</span>
       </div>
-      <p class="haddr">${h.addr}</p>
-      <div class="hgrid">
-        <div class="mcard"><div class="mlabel">임대보증금</div><div class="mval">${fmt(d)}</div></div>
-        <div class="mcard"><div class="mlabel">월 임대료</div><div class="mval">${fmtR(rt)}</div></div>
-        <div class="mcard"><div class="mlabel">전용면적</div><div class="mval">${h.area}㎡</div></div>
-        <div class="mcard"><div class="mlabel">방 수</div><div class="mval">${h.rooms}개</div></div>
-        <div class="mcard"><div class="mlabel">층 수</div><div class="mval">${h.floor}층</div></div>
-        <div class="mcard"><div class="mlabel">승강기</div><div class="mval">있음</div></div>
+      <p class="haddr">${n.region||''} · ${classifyNoticeType(n.housing_type||'',n.title||'')} · ${n.housing_type||''}</p>
+      <div class="chip-row" style="margin:8px 0;gap:5px">
+        ${isAmended?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#7B5EA7;border-color:#7B5EA7">🔄 정정</span>':''}
+        ${isNew?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
+        ${closingSoon?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
+        ${demoTags.map(t=>`<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:${t.color};border-color:${t.color}">${t.label}</span>`).join('')}
       </div>
-      <button class="detail-toggle-btn" onclick="toggleDetail(${h.id})">📍 위치·주변시설·평면도 더 보기 ▾</button>
-      <div class="detail-box hidden" id="detail-${h.id}"></div>
+      <p style="font-size:12px;color:#888;margin-bottom:8px">${dateLine}</p>
+      ${detailHTML}
     </div>`;
   });
 
-  if(visibleCount<sorted.length){
-    html+=`<button class="more-btn" onclick="showMore()">더 보기 (${sorted.length-visibleCount}개 더 있음) ↓</button>`;
+  if(visibleCount < rows.length){
+    html += `<button class="more-btn" onclick="showMore()">더 보기 (${rows.length-visibleCount}개 더 있음) ↓</button>`;
   }
 
-  html+=`<div class="alert-signup-box" id="alertSignupBox">
+  html += `<div class="alert-signup-box" id="alertSignupBox">
     <p style="font-size:14px;font-weight:600;color:#111;margin-bottom:6px">💾 이 검색 조건을 저장할까요?</p>
     <p style="font-size:12px;color:#888;margin-bottom:12px">저장해두면 다음에 다시 입력하지 않아도 바로 검색할 수 있어요.</p>
     ${currentUser?`<p style="font-size:12px;color:#0F6E56;margin-bottom:10px">✅ ${currentUser.email}로 저장됩니다</p>`:`<input type="email" id="alertEmail" placeholder="이메일 주소" style="width:100%;margin-bottom:10px">`}
@@ -1003,13 +1745,13 @@ function renderMatchResults(lvl){
       <input type="checkbox" id="newNoticeOptIn" checked style="width:16px;height:16px">
       저장한 조건으로 새 공고가 뜨면 알림 받기
     </label>
-    <button class="btn btn-primary" style="margin:0" onclick="saveUserProfile('${lvl}')">조건 저장하기</button>
+    <button class="btn btn-primary" style="margin:0" onclick="saveUserProfile('low')">조건 저장하기</button>
     <p id="alertSignupMsg" style="font-size:12px;margin-top:8px"></p>
   </div>`;
 
-  html+=`<button class="btn btn-primary" onclick="goMain(4);goStep(3)" style="margin-top:0.5rem">서류 체크리스트 보기 →</button>`;
+  html += `<button class="btn btn-primary" onclick="goMain(4);goStep(3)" style="margin-top:0.5rem">서류 체크리스트 보기 →</button>`;
 
-  r.innerHTML=html;
+  r.innerHTML = html;
 }
 
 async function saveUserProfile(lvl){
@@ -1075,7 +1817,7 @@ const deadline=new Date('2026-07-02T16:00:00');
 const diff=Math.ceil((deadline-new Date())/(864e5));
 document.getElementById('dday-num').textContent=diff>0?`D-${diff}`:'D-Day';
 
-buildChipOptions();
+loadRegionsFromSupabase(); // ② 전국 지역 동적 로드 후 buildChipOptions() 호출
 
 // ===== 환경설정 / 이메일 식별 시스템 =====
 const PROFILE_API_URL = "https://khdpjjyspmlqtzperoqg.supabase.co/functions/v1/save-user-profile";
@@ -1118,23 +1860,80 @@ async function loginWithEmail(prefillEmail){
       if(json.data) profile={email,...json.data};
     }
   }catch(err){
-    console.warn('ZipFit 프로필 불러오기 실패(신규 사용자일 수 있음):',err);
+    console.warn('ZipFit 프로필 불러오기 실패(신규 사용자로 진행):', err);
+    if(msgEl){ msgEl.style.color='#A32D2D'; msgEl.textContent='설정을 불러오지 못했어요. 네트워크 연결을 확인해주세요.'; }
   }
 
   currentUser=profile;
   setCookie(ZF_COOKIE,email,365);
   applySettingsToUI(profile);
+  renderPersonalizedRecommendations();
   document.getElementById('loginGate').classList.add('hidden');
   document.getElementById('settingsBody').classList.remove('hidden');
   document.getElementById('currentUserEmail').textContent=email+'님 환영해요';
 }
 
 function applySettingsToUI(p){
+  // 알림/화면 설정
   document.getElementById('toggleAlertOn').checked = p.alert_on!==false && p.alert_on!=='N';
   document.getElementById('toggleNewNotice').checked = p.new_notice_alert!==false && p.new_notice_alert!=='N';
   document.getElementById('toggleMarketing').checked = p.marketing_alert===true || p.marketing_alert==='Y';
   setTheme(p.theme==='dark'?'dark':'light',true);
   setFontSize(p.font_size||'normal',true);
+
+  // 조건 설정 폼
+  const sv=(id,val)=>{ const el=document.getElementById(id); if(el&&val!=null) el.value=val; };
+  sv('set_marital', p.marital||'');
+  sv('set_children', p.children!=null?p.children:'');
+  sv('set_members', p.members!=null?p.members:'');
+  sv('set_income', p.income||'');
+  sv('set_assets', p.assets||'');
+  sv('set_maxDeposit', p.max_deposit||'');
+  sv('set_minRooms', p.min_rooms||0);
+
+  // 지역/유형 칩 복원
+  const savedRegions=Array.isArray(p.regions)?p.regions:(typeof p.regions==='string'?p.regions.split(',').filter(Boolean):[]);
+  const savedTypes=Array.isArray(p.types)?p.types:(typeof p.types==='string'?p.types.split(',').filter(Boolean):[]);
+  settingsRegions=new Set(savedRegions);
+  settingsTypes=new Set(savedTypes);
+  renderChipState('settingsRegionChips',settingsRegions);
+  renderChipState('settingsTypeChips',settingsTypes);
+}
+
+async function saveSettings(){
+  if(!currentUser) return;
+  const msgEl=document.getElementById('settingsSaveMsg');
+  msgEl.style.color='#888';
+  msgEl.textContent='저장 중...';
+  const payload={
+    email: currentUser.email,
+    marital: document.getElementById('set_marital').value||'',
+    children: document.getElementById('set_children').value||'',
+    members: document.getElementById('set_members').value||'',
+    income: document.getElementById('set_income').value||'',
+    assets: document.getElementById('set_assets').value||'',
+    maxDeposit: document.getElementById('set_maxDeposit').value||'',
+    minRooms: document.getElementById('set_minRooms').value||'0',
+    regions: [...settingsRegions].join(','),
+    types: [...settingsTypes].join(','),
+    alertOn: document.getElementById('toggleAlertOn').checked?'Y':'N',
+    newNoticeAlert: document.getElementById('toggleNewNotice').checked?'Y':'N',
+    marketingAlert: document.getElementById('toggleMarketing').checked?'Y':'N',
+    theme: document.querySelector('[data-theme].sel')?.dataset.theme||'light',
+    fontSize: document.querySelector('[data-fontsize].sel')?.dataset.fontsize||'normal',
+  };
+  try{
+    const res=await fetch(PROFILE_API_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const json=await res.json().catch(()=>({}));
+    if(json.error || json.message?.toLowerCase().includes('error')) throw new Error(json.error||json.message||'서버 오류');
+    currentUser={...currentUser,...payload,alert_on:payload.alertOn,new_notice_alert:payload.newNoticeAlert,marketing_alert:payload.marketingAlert,max_deposit:payload.maxDeposit,min_rooms:payload.minRooms};
+    msgEl.style.color='#0F6E56';
+    msgEl.textContent='✅ 조건이 저장됐어요.';
+  }catch(err){
+    msgEl.style.color='#A32D2D';
+    msgEl.textContent='설정 저장에 실패했어요. 네트워크 연결을 확인해주세요.';
+  }
 }
 
 function setTheme(theme,silent){
@@ -1181,6 +1980,13 @@ function logoutUser(){
   document.getElementById('settingsBody').classList.add('hidden');
   document.getElementById('loginGate').classList.remove('hidden');
   document.getElementById('loginEmail').value='';
+}
+</script>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/zipfit/sw.js').catch(e => console.warn('SW 등록 실패:', e));
+  });
 }
 </script>
 </body>
