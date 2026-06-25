@@ -904,6 +904,9 @@ function renderNoticeList(filtered, totalCount){
   console.log('[배지 디버그] 공고 샘플:', JSON.stringify(filtered.slice(0,3).map(n=>({
     title: (n['공고명']||n.title||'').slice(0,15),
     created_at: n['created_at'],
+    status_normalized: n['status_normalized'],
+    처리상태정규화: n['처리상태정규화'],
+    isClosed: n['처리상태정규화'] === '접수마감',
     apply_end: n['신청마감일']||n['apply_end'],
     isNew: isNewNotice(n),
     closingSoon: isClosingSoon(n)
