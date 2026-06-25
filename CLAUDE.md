@@ -2,7 +2,7 @@
 
 > **이 파일이 유일한 세이브포인트입니다.**
 > Claude Code와 claude.ai 모두 이 파일을 기준으로 작업합니다.
-> **마지막 업데이트**: 2026-06-25 (인사이트 탭 renderInsight() 전면 개편 5개 섹션 + sw.js v11)
+> **마지막 업데이트**: 2026-06-25 (renderInsight() 5섹션 누락 코드 재적용 + main push 확인)
 
 ---
 
@@ -149,6 +149,7 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-06-25 | renderInsight() 5섹션 누락 코드 재적용 — 브랜치 전환 시 git checkout main --으로 덮어쓰인 신규 코드 main에 직접 재적용 |
 | 2026-06-25 | 인사이트 탭 renderInsight() 전면 개편 — KPI 카드 3종·마감임박 타임라인·지역별 이중막대·유형별 보증금임대료·30일 추이, sw.js v11 |
 | 2026-06-25 | 배지 디버그 로그 제거 + sw.js v10 |
 | 2026-06-25 | isClosingSoon 마감일 23:59:59 보정 — 날짜만 있는 경우 당일 23:59:59로 보정, 당일 낮에 마감임박 배지 사라지는 문제 방지, sw.js v9 |
