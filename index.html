@@ -582,7 +582,11 @@ function isNewNotice(row){
 function isClosingSoon(row){
   const d = parseNoticeDate(row['신청마감일']||row['apply_end']||'');
   if(!d) return false;
-  const diff = (d - new Date()) / (1000*60*60*24);
+  const endOfDay = new Date(d);
+  if(!row['신청마감일']?.includes('T') && !row['apply_end']?.includes('T')){
+    endOfDay.setHours(23, 59, 59, 999);
+  }
+  const diff = (endOfDay - new Date()) / (1000*60*60*24);
   return diff >= 0 && diff <= 3;
 }
 function extractRegionTop(regionText){
