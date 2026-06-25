@@ -565,7 +565,7 @@ function parseNoticeDate(s){
   return isNaN(d.getTime()) ? null : d;
 }
 function isNewNotice(row){
-  const d = parseNoticeDate(row['수집일시']||row['created_at']||'');
+  const d = parseNoticeDate(row['created_at']||row['수집일시']||'');
   return d ? (new Date() - d) / 3600000 <= 48 : false;
 }
 function isClosingSoon(row){
@@ -772,15 +772,19 @@ async function loadNoticeData(){
       return desc ? (vb > va ? 1 : vb < va ? -1 : 0) : (va > vb ? 1 : va < vb ? -1 : 0);
     };
     filtered = [...filtered].sort((a,b) => {
-      if(sortVal==='date-desc')     return nullLast(a,b,n=>n['announcement_date'],true);
+      if(sortVal==='date-desc')     return nullLast(a,b,n=>n['announcement_date']||n['created_at'],true);
       if(sortVal==='end-asc')       return nullLast(a,b,n=>n['apply_end'],false);
       if(sortVal==='start-asc')     return nullLast(a,b,n=>n['apply_start'],false);
       if(sortVal==='units-desc')    return nullLast(a,b,n=>n['total_units']?Number(n['total_units']):null,true);
       if(sortVal==='deposit-asc')   return nullLast(a,b,n=>n['deposit_min']?Number(n['deposit_min']):null,false);
       if(sortVal==='rent-asc')      return nullLast(a,b,n=>n['rent_min']?Number(n['rent_min']):null,false);
       if(sortVal==='area-desc')     return nullLast(a,b,n=>n['area_max']?Number(n['area_max']):null,true);
-      if(sortVal==='region-asc')    return (a['지역']||'').localeCompare(b['지역']||'');
-      if(sortVal==='org-asc')       return (a['공급기관']||'').localeCompare(b['공급기관']||'');
+      if(sortVal==='region-asc'){
+        const regionA = (a['sido_nm']||a['지역']||'') + ' ' + (a['sigungu_nm']||'');
+        const regionB = (b['sido_nm']||b['지역']||'') + ' ' + (b['sigungu_nm']||'');
+        return regionA.localeCompare(regionB, 'ko');
+      }
+      if(sortVal==='org-asc')       return (a['org_nm']||a['공급기관']||'').localeCompare(b['org_nm']||b['공급기관']||'', 'ko');
       if(sortVal==='revised-first') return (b['is_revised']?1:0)-(a['is_revised']?1:0);
       return 0;
     });
@@ -896,6 +900,14 @@ function renderNoticeList(filtered, totalCount){
   statusEl.innerHTML = '<p class="rtitle">✅ '+countText+'</p><p class="rdesc">매일 오전 9시 자동 업데이트</p>';
 
   const shown = filtered.slice(0, noticeVisibleCount);
+  // [배지 디버그] 브라우저 콘솔에서 확인 후 제거 예정
+  console.log('[배지 디버그] 공고 샘플:', filtered.slice(0,3).map(n=>({
+    title: (n['공고명']||n.title||'').slice(0,20),
+    created_at: n['created_at'],
+    apply_end: n['신청마감일']||n['apply_end'],
+    isNew: isNewNotice(n),
+    closingSoon: isClosingSoon(n)
+  })));
   let html = '';
   shown.forEach((n, idx) => {
     const isClosed   = n['처리상태정규화']==='접수마감';
