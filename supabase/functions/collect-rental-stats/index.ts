@@ -97,9 +97,19 @@ Deno.serve(async (req) => {
       const rows = await fetchAllPages(api.path)
       console.log(`${api.name} API 수집: ${rows.length}건`)
 
+      // 같은 단지명+형명 중복 제거 (API 데이터 자체 중복 방어)
+      const seen = new Set<string>()
+      const dedupedRows = rows.filter(row => {
+        const key = `${row['단지명']}||${row['형명']}`
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+      console.log(`${api.name} 중복 제거: ${rows.length}건 → ${dedupedRows.length}건`)
+
       const BATCH = 500
-      for (let i = 0; i < rows.length; i += BATCH) {
-        const batch = rows.slice(i, i + BATCH)
+      for (let i = 0; i < dedupedRows.length; i += BATCH) {
+        const batch = dedupedRows.slice(i, i + BATCH)
         const payload = batch.map(row => ({
           임대종류: api.name,
           광역시도: row['광역시도'] ?? '',
@@ -135,7 +145,7 @@ Deno.serve(async (req) => {
           totalUpserted += batch.length
         }
       }
-      console.log(`${api.name} 완료: ${rows.length}건`)
+      console.log(`${api.name} 완료: ${dedupedRows.length}건`)
     }
 
     return new Response(JSON.stringify({
