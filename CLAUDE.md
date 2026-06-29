@@ -2,7 +2,7 @@
 
 > **이 파일이 유일한 세이브포인트입니다.**
 > Claude Code와 claude.ai 모두 이 파일을 기준으로 작업합니다.
-> **마지막 업데이트**: 2026-06-29 (collect-rental-stats v9 — 공공임대 5종 수집 완료, 중복제거 로직 추가)
+> **마지막 업데이트**: 2026-06-29 (인사이트 탭 rental_housing_stats 섹션 2개 추가 + 세대수 합산 버그 수정 — get_rental_stats_summary RPC 신규)
 
 ---
 
@@ -149,6 +149,8 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-06-29 | 인사이트 탭 재고 세대수 합산 버그 수정 — Supabase max_rows 1,000행 제한이 원인, get_rental_stats_summary() RPC 신규 생성으로 서버 집계 전환, sw.js v13 |
+| 2026-06-29 | 인사이트 탭 rental_housing_stats 기반 섹션 2개 추가 — 섹션A(재고 vs 공고 갭), 섹션B(유형별 평균 임대 조건), Promise.all 동시 호출, 기존 공고 기반 유형별 보증금 섹션 제거, sw.js v11~v12 |
 | 2026-06-29 | collect-rental-stats v1~v9 — 공공임대 5종(영구/행복/장기전세/50년/국민) 수집 Edge Function 신규 개발, rental_housing_stats+history 테이블 생성, target별 선택 수집, 중복제거, BATCH 500, 총 6,894건 수집 완료 |
 | 2026-06-25 | renderInsight() 5섹션 누락 코드 재적용 — 브랜치 전환 시 git checkout main --으로 덮어쓰인 신규 코드 main에 직접 재적용 |
 | 2026-06-25 | 인사이트 탭 renderInsight() 전면 개편 — KPI 카드 3종·마감임박 타임라인·지역별 이중막대·유형별 보증금임대료·30일 추이, sw.js v11 |
