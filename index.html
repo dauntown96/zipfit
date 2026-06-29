@@ -1245,20 +1245,7 @@ function renderInsight(rows, wrap, statsRows){
   const todayStr = today.toISOString().slice(0,10);
 
   // ① KPI
-  const kpiActive = rows.filter(r=>{
-    const s = r.status_normalized||r.status||'';
-    if(s==='접수중') return true;
-    // '공고중'/'정정공고중' 중 apply_start~apply_end 기간 내 공고도 실질 접수중으로 집계
-    if(s==='공고중'||s==='정정공고중'){
-      const start = parseNoticeDate(r.apply_start||'');
-      const end = parseNoticeDate(r.apply_end||'');
-      if(!end) return false;
-      const endOfDay = new Date(end);
-      if(!(r.apply_end||'').includes('T')) endOfDay.setHours(23,59,59,999);
-      return (!start||start<=today) && endOfDay>=today;
-    }
-    return false;
-  }).length;
+  const kpiActive = rows.filter(r=>(r.status_normalized||r.status||'')==='접수중').length;
   const d7ago = new Date(today); d7ago.setDate(d7ago.getDate()-7);
   const kpiNew = rows.filter(r=>{
     if(!r.announcement_date) return false;
