@@ -1219,7 +1219,7 @@ async function loadInsightData(){
     const [res, statsRes] = await Promise.all([
       fetch(`${SUPABASE_URL}/rest/v1/rpc/get_announcements_deduped`,
         {method:'POST', headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY,'Content-Type':'application/json'}, body:'{}'}),
-      fetch(`${SUPABASE_URL}/rest/v1/rental_housing_stats?select=임대종류,광역시도,세대수,임대보증금,월임대료`,
+      fetch(`${SUPABASE_URL}/rest/v1/rental_housing_stats?select=임대종류,광역시도,세대수,임대보증금,월임대료&limit=10000`,
         {headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY}}).catch(()=>null)
     ]);
     if(!res.ok) throw new Error('HTTP '+res.status);
@@ -1284,26 +1284,7 @@ function renderInsight(rows, wrap, statsRows){
   const regionMaxCnt = Math.max(1,...regionTop.map(e=>e[1].cnt));
   const regionMaxUnits = Math.max(1,...regionTop.map(e=>e[1].units));
 
-  // ④ 유형별 보증금·임대료 (공고수 상위 6)
-  const typeMap = {};
-  rows.forEach(r=>{
-    const k = r.housing_type||'기타';
-    if(!typeMap[k]) typeMap[k]={cnt:0,deposits:[],rents:[]};
-    typeMap[k].cnt++;
-    if(r.deposit_min!=null && r.deposit_min!==0) typeMap[k].deposits.push(Number(r.deposit_min));
-    if(r.rent_min!=null && r.rent_min!==0) typeMap[k].rents.push(Number(r.rent_min));
-  });
-  const typeTop6 = Object.entries(typeMap).sort((a,b)=>b[1].cnt-a[1].cnt).slice(0,6);
-  const avg = arr => arr.length ? Math.round(arr.reduce((s,v)=>s+v,0)/arr.length) : null;
-  const typeStats = typeTop6.map(([type,v])=>({
-    type, cnt:v.cnt,
-    deposit: avg(v.deposits),
-    rent: avg(v.rents)
-  }));
-  const maxDeposit = Math.max(1,...typeStats.map(t=>t.deposit||0));
-  const maxRent = Math.max(1,...typeStats.map(t=>t.rent||0));
-
-  // ⑤ 최근 30일 추이
+  // ④ 최근 30일 추이
   const d30ago = new Date(today); d30ago.setDate(d30ago.getDate()-30);
   const trendMap = {};
   rows.forEach(r=>{
@@ -1384,35 +1365,6 @@ function renderInsight(rows, wrap, statsRows){
       <div style="display:flex;gap:12px;margin-top:10px">
         <span style="font-size:11px;color:#888;display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#5a7af7"></span>공고수</span>
         <span style="font-size:11px;color:#888;display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#1D9E75"></span>세대수</span>
-      </div>
-    </div>
-
-    <div style="${S}">
-      <p style="${T}">💰 유형별 평균 보증금·임대료</p>
-      <div style="display:flex;flex-direction:column;gap:12px">
-        ${typeStats.map(t=>`
-          <div>
-            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px">
-              <span style="font-weight:600;color:#333">${t.type}</span>
-              <span style="color:#888">${t.cnt}건</span>
-            </div>
-            <div style="display:flex;flex-direction:column;gap:3px">
-              <div style="display:flex;align-items:center;gap:6px">
-                <span style="font-size:10px;color:#5a7af7;width:36px;flex-shrink:0">보증금</span>
-                ${t.deposit!=null
-                  ? `<div style="flex:1;background:#eee;border-radius:4px;height:8px;overflow:hidden"><div style="background:#5a7af7;height:100%;width:${Math.round(t.deposit/maxDeposit*100)}%;border-radius:4px"></div></div>
-                     <span style="font-size:10px;color:#555;width:60px;text-align:right;flex-shrink:0">${(t.deposit/10000).toFixed(0)}만원</span>`
-                  : `<span style="font-size:10px;color:#ccc">정보없음</span>`}
-              </div>
-              <div style="display:flex;align-items:center;gap:6px">
-                <span style="font-size:10px;color:#EF9F27;width:36px;flex-shrink:0">월임대료</span>
-                ${t.rent!=null
-                  ? `<div style="flex:1;background:#eee;border-radius:4px;height:8px;overflow:hidden"><div style="background:#EF9F27;height:100%;width:${Math.round(t.rent/maxRent*100)}%;border-radius:4px"></div></div>
-                     <span style="font-size:10px;color:#555;width:60px;text-align:right;flex-shrink:0">${(t.rent/10000).toFixed(1)}만원</span>`
-                  : `<span style="font-size:10px;color:#ccc">정보없음</span>`}
-              </div>
-            </div>
-          </div>`).join('')}
       </div>
     </div>
 
