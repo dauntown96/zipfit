@@ -77,53 +77,87 @@ async function detectAndRecordChanges(
 
 Deno.serve(async (req) => {
   try {
-    // 환경변수 확인
-    console.log('SUPABASE_URL:', Deno.env.get('SUPABASE_URL') ? '✅' : '❌ 없음')
-    console.log('SUPABASE_SERVICE_ROLE_KEY:', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ? '✅' : '❌ 없음')
-    console.log('ODCLOUD_API_KEY:', Deno.env.get('ODCLOUD_API_KEY') ? '✅' : '❌ 없음')
+    console.log('환경변수 확인:')
+    console.log('SUPABASE_URL:', Deno.env.get('SUPABASE_URL') ? '✅' : '❌')
+    console.log('SERVICE_KEY:', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ? '✅' : '❌')
+    console.log('API_KEY:', Deno.env.get('ODCLOUD_API_KEY') ? '✅' : '❌')
 
-    // 국민임대 1페이지 1건만 테스트
-    const testPath = '/15084926/v1/uddi:bc7f22b9-b711-4a07-9de3-f0668c1d64c6'
-    const url = `${BASE_URL}${testPath}?page=1&perPage=1&serviceKey=${API_KEY}`
-    console.log('API 호출 URL:', url.replace(API_KEY, '***'))
+    let totalInserted = 0
+    let totalUpdated = 0
 
-    const res = await fetch(url)
-    console.log('API 응답 status:', res.status)
+    for (const api of APIS) {
+      console.log(`수집 시작: ${api.name}`)
+      const rows = await fetchAllPages(api.path)
+      console.log(`${api.name} 수집 완료: ${rows.length}건`)
 
-    const json = await res.json()
-    console.log('API 응답 totalCount:', json.totalCount)
-    console.log('API 응답 data[0]:', JSON.stringify(json.data?.[0]))
+      for (const row of rows) {
+        const 단지명 = row['단지명'] ?? ''
+        const 형명 = row['형명'] ?? ''
 
-    // DB insert 테스트
-    const row = json.data?.[0]
-    if (row) {
-      const { data, error } = await supabase
-        .from('rental_housing_stats')
-        .insert({
-          임대종류: '국민임대',
+        const { data: existing, error: selectError } = await supabase
+          .from('rental_housing_stats')
+          .select('*')
+          .eq('단지명', 단지명)
+          .eq('형명', 형명)
+          .eq('임대종류', api.name)
+          .maybeSingle()
+
+        if (selectError) {
+          console.error('select 오류:', selectError)
+          continue
+        }
+
+        const payload = {
+          임대종류: api.name,
           광역시도: row['광역시도'] ?? '',
           시군구: row['시군구'] ?? '',
-          단지명: row['단지명'] ?? '',
-          형명: row['형명'] ?? '',
+          도로명주소: row['도로명주소'] ?? '',
+          단지명,
+          형명,
+          세대수: row['세대수'] ?? null,
+          주택유형: row['주택유형'] ?? '',
+          임대사업자: row['임대사업자'] ?? '',
+          준공일자: row['준공일자'] ?? '',
+          건물형태: row['건물형태'] ?? '',
+          난방방식: row['난방방식'] ?? '',
+          공급면적_전용: row['공급면적(전용)'] ?? '',
+          공급면적_공용: row['공급면적(공용)'] ?? '',
           임대보증금: row['임대보증금'] ?? null,
           월임대료: row['월임대료'] ?? null,
-          source_updated_at: '2026-05-13',
+          전환보증금: row['전환보증금'] ?? null,
+          source_updated_at: SOURCE_UPDATED_AT,
           collected_at: new Date().toISOString(),
-        })
-        .select()
+        }
 
-      console.log('DB insert 결과:', JSON.stringify({ data, error }))
+        if (!existing) {
+          const { error } = await supabase
+            .from('rental_housing_stats')
+            .insert(payload)
+          if (error) console.error('insert 오류:', JSON.stringify(error))
+          else totalInserted++
+        } else {
+          await detectAndRecordChanges(단지명, 형명, existing, payload)
+          const { error } = await supabase
+            .from('rental_housing_stats')
+            .update(payload)
+            .eq('id', existing.id)
+          if (error) console.error('update 오류:', JSON.stringify(error))
+          else totalUpdated++
+        }
+      }
+
+      console.log(`${api.name} 처리 완료: 신규 ${totalInserted}건`)
     }
 
     return new Response(JSON.stringify({
       success: true,
-      totalCount: json.totalCount,
-      sample: json.data?.[0],
-      message: '디버그 테스트 완료'
+      inserted: totalInserted,
+      updated: totalUpdated,
+      message: `수집 완료: 신규 ${totalInserted}건, 업데이트 ${totalUpdated}건`
     }), { headers: { 'Content-Type': 'application/json' } })
 
   } catch (e) {
-    console.error('오류:', e)
+    console.error('Edge Function 오류:', String(e))
     return new Response(JSON.stringify({
       success: false,
       error: String(e),
