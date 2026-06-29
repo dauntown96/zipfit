@@ -8,10 +8,10 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 // 5개 API 엔드포인트
 const APIS = [
-  { name: '50년임대', path: '/15084925/v1/uddi:8a83a554-025d-4d9d-9ead-974ceb24d356', updated: '2026-05-14' },
-  { name: '장기전세', path: '/15084929/v1/uddi:40e59900-e957-485b-84aa-b6b969c08eb0', updated: '2026-05-14' },
   { name: '영구임대', path: '/15084928/v1/uddi:c9e71f1d-583e-442f-be76-eabcf906de9d', updated: '2026-05-14' },
   { name: '행복주택', path: '/15084930/v1/uddi:3b58c31a-5326-42ea-86ff-c20f76a0f084', updated: '2026-05-14' },
+  { name: '장기전세', path: '/15084929/v1/uddi:40e59900-e957-485b-84aa-b6b969c08eb0', updated: '2026-05-14' },
+  { name: '50년임대', path: '/15084925/v1/uddi:8a83a554-025d-4d9d-9ead-974ceb24d356', updated: '2026-05-14' },
   { name: '국민임대', path: '/15084926/v1/uddi:bc7f22b9-b711-4a07-9de3-f0668c1d64c6', updated: '2026-05-13' },
 ]
 
@@ -33,7 +33,6 @@ async function fetchAllPages(path: string): Promise<any[]> {
     const json = await res.json()
     const data = json.data ?? []
     results.push(...data)
-    await new Promise(r => setTimeout(r, 200))
 
     if (results.length >= json.totalCount) break
     page++
@@ -98,7 +97,7 @@ Deno.serve(async (req) => {
       const rows = await fetchAllPages(api.path)
       console.log(`${api.name} API 수집: ${rows.length}건`)
 
-      const BATCH = 100
+      const BATCH = 500
       for (let i = 0; i < rows.length; i += BATCH) {
         const batch = rows.slice(i, i + BATCH)
         const payload = batch.map(row => ({
