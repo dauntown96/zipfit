@@ -77,43 +77,26 @@ async function detectAndRecordChanges(
 
 Deno.serve(async (req) => {
   try {
-    console.log('환경변수 확인:')
-    console.log('SUPABASE_URL:', Deno.env.get('SUPABASE_URL') ? '✅' : '❌')
-    console.log('SERVICE_KEY:', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ? '✅' : '❌')
-    console.log('API_KEY:', Deno.env.get('ODCLOUD_API_KEY') ? '✅' : '❌')
+    console.log('수집 시작')
 
-    let totalInserted = 0
-    let totalUpdated = 0
+    let totalUpserted = 0
 
     for (const api of APIS) {
       console.log(`수집 시작: ${api.name}`)
       const rows = await fetchAllPages(api.path)
-      console.log(`${api.name} 수집 완료: ${rows.length}건`)
+      console.log(`${api.name} API 수집: ${rows.length}건`)
 
-      for (const row of rows) {
-        const 단지명 = row['단지명'] ?? ''
-        const 형명 = row['형명'] ?? ''
-
-        const { data: existing, error: selectError } = await supabase
-          .from('rental_housing_stats')
-          .select('*')
-          .eq('단지명', 단지명)
-          .eq('형명', 형명)
-          .eq('임대종류', api.name)
-          .maybeSingle()
-
-        if (selectError) {
-          console.error('select 오류:', selectError)
-          continue
-        }
-
-        const payload = {
+      // 100건씩 배치 UPSERT
+      const BATCH = 100
+      for (let i = 0; i < rows.length; i += BATCH) {
+        const batch = rows.slice(i, i + BATCH)
+        const payload = batch.map(row => ({
           임대종류: api.name,
           광역시도: row['광역시도'] ?? '',
           시군구: row['시군구'] ?? '',
           도로명주소: row['도로명주소'] ?? '',
-          단지명,
-          형명,
+          단지명: row['단지명'] ?? '',
+          형명: row['형명'] ?? '',
           세대수: row['세대수'] ?? null,
           주택유형: row['주택유형'] ?? '',
           임대사업자: row['임대사업자'] ?? '',
@@ -127,44 +110,35 @@ Deno.serve(async (req) => {
           전환보증금: row['전환보증금'] ?? null,
           source_updated_at: SOURCE_UPDATED_AT,
           collected_at: new Date().toISOString(),
-        }
+        }))
 
-        if (!existing) {
-          const { error } = await supabase
-            .from('rental_housing_stats')
-            .insert(payload)
-          if (error) console.error('insert 오류:', JSON.stringify(error))
-          else totalInserted++
+        const { error } = await supabase
+          .from('rental_housing_stats')
+          .upsert(payload, {
+            onConflict: '단지명,형명,source_updated_at',
+            ignoreDuplicates: false
+          })
+
+        if (error) {
+          console.error(`upsert 오류 (${api.name} batch ${i}):`, JSON.stringify(error))
         } else {
-          await detectAndRecordChanges(단지명, 형명, existing, payload)
-          const { error } = await supabase
-            .from('rental_housing_stats')
-            .update(payload)
-            .eq('id', existing.id)
-          if (error) console.error('update 오류:', JSON.stringify(error))
-          else totalUpdated++
+          totalUpserted += batch.length
+          console.log(`${api.name} ${i + batch.length}/${rows.length} 완료`)
         }
       }
-
-      console.log(`${api.name} 처리 완료: 신규 ${totalInserted}건`)
     }
 
     return new Response(JSON.stringify({
       success: true,
-      inserted: totalInserted,
-      updated: totalUpdated,
-      message: `수집 완료: 신규 ${totalInserted}건, 업데이트 ${totalUpdated}건`
+      upserted: totalUpserted,
+      message: `수집 완료: ${totalUpserted}건 upsert`
     }), { headers: { 'Content-Type': 'application/json' } })
 
   } catch (e) {
-    console.error('Edge Function 오류:', String(e))
+    console.error('오류:', String(e))
     return new Response(JSON.stringify({
       success: false,
-      error: String(e),
-      stack: e instanceof Error ? e.stack : undefined
-    }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    })
+      error: String(e)
+    }), { status: 500, headers: { 'Content-Type': 'application/json' } })
   }
 })
