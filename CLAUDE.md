@@ -2,7 +2,7 @@
 
 > **이 파일이 유일한 세이브포인트입니다.**
 > Claude Code와 claude.ai 모두 이 파일을 기준으로 작업합니다.
-> **마지막 업데이트**: 2026-06-29 (인사이트 탭 rental_housing_stats 섹션 2개 추가 + 세대수 합산 버그 수정 — get_rental_stats_summary RPC 신규)
+> **마지막 업데이트**: 2026-06-29 (관리 탭 서류 체크리스트 범용화 + 버그 2종 수정 — sw.js v15)
 
 ---
 
@@ -149,6 +149,8 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-06-29 | 관리 탭 버그 2종 수정 — 더보기 후 전체 저장됨 오표시(연산자 우선순위 버그), 드롭다운 이중 표기 제거, sw.js v15 |
+| 2026-06-29 | 관리 탭 서류 체크리스트 범용화 — 저장 공고 기반 드롭다운, housing_type별 서류 매핑, D-Day·신청링크 동적화, 하드코딩 전부 제거, sw.js v14 |
 | 2026-06-29 | 인사이트 탭 재고 세대수 합산 버그 수정 — Supabase max_rows 1,000행 제한이 원인, get_rental_stats_summary() RPC 신규 생성으로 서버 집계 전환, sw.js v13 |
 | 2026-06-29 | 인사이트 탭 rental_housing_stats 기반 섹션 2개 추가 — 섹션A(재고 vs 공고 갭), 섹션B(유형별 평균 임대 조건), Promise.all 동시 호출, 기존 공고 기반 유형별 보증금 섹션 제거, sw.js v11~v12 |
 | 2026-06-29 | collect-rental-stats v1~v9 — 공공임대 5종(영구/행복/장기전세/50년/국민) 수집 Edge Function 신규 개발, rental_housing_stats+history 테이블 생성, target별 선택 수집, 중복제거, BATCH 500, 총 6,894건 수집 완료 |
