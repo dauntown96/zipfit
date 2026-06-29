@@ -1219,8 +1219,8 @@ async function loadInsightData(){
     const [res, statsRes] = await Promise.all([
       fetch(`${SUPABASE_URL}/rest/v1/rpc/get_announcements_deduped`,
         {method:'POST', headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY,'Content-Type':'application/json'}, body:'{}'}),
-      fetch(`${SUPABASE_URL}/rest/v1/rental_housing_stats?select=임대종류,광역시도,세대수,임대보증금,월임대료&limit=10000`,
-        {headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY}}).catch(()=>null)
+      fetch(`${SUPABASE_URL}/rest/v1/rpc/get_rental_stats_summary`,
+        {method:'POST', headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY,'Content-Type':'application/json'}, body:'{}'}).catch(()=>null)
     ]);
     if(!res.ok) throw new Error('HTTP '+res.status);
     const rows = await res.json();
@@ -1394,7 +1394,7 @@ function renderInsight(rows, wrap, statsRows){
       const SB = 'background:#fff;border-radius:14px;padding:20px;margin-bottom:16px;box-shadow:0 1px 6px rgba(0,0,0,0.07)';
       const TB = 'font-size:15px;font-weight:700;margin-bottom:14px;color:#333;margin-top:0';
 
-      // 임대종류 정의
+      // 임대종류 정의 (RPC 결과 기반 — 집계는 서버에서 완료)
       const TYPES = [
         {label:'국민임대', keyword:'국민'},
         {label:'행복주택', keyword:'행복'},
@@ -1403,17 +1403,14 @@ function renderInsight(rows, wrap, statsRows){
         {label:'50년임대', keyword:'50년'},
       ];
 
-      // 재고 합산
-      const stockByType = {};
-      statsRows.forEach(r=>{
-        const k = r['임대종류']||'';
-        if(!stockByType[k]) stockByType[k]=0;
-        stockByType[k] += Number(r['세대수'])||0;
-      });
+      // statsRows = get_rental_stats_summary() 결과 (5행, 이미 집계됨)
+      const statsByType = {};
+      statsRows.forEach(r=>{ statsByType[r['임대종류']] = r; });
 
       // === 섹션 A: 재고 vs 공고 갭 ===
       const gapRows = TYPES.map(({label, keyword})=>{
-        const stock = stockByType[label]||0;
+        const stat = statsByType[label]||{};
+        const stock = Number(stat['총세대수'])||0;
         const noticeCnt = rows.filter(r=>{
           const ht = r.housing_type||'';
           return ht.includes(keyword) && (r.status_normalized||r.status||'')==='접수중';
@@ -1441,22 +1438,13 @@ function renderInsight(rows, wrap, statsRows){
         <p style="font-size:11px;color:#bbb;margin:10px 0 0;text-align:right">출처: 공공데이터포털 (2026.05 기준)</p>
       </div>`;
 
-      // === 섹션 B: 유형별 실거주 임대 조건 ===
-      const condByType = {};
-      statsRows.forEach(r=>{
-        const k = r['임대종류']||'기타';
-        if(!condByType[k]) condByType[k]={deposits:[],rents:[]};
-        const dep = Number(r['임대보증금']);
-        const rent = Number(r['월임대료']);
-        if(dep>0) condByType[k].deposits.push(dep);
-        if(rent>0) condByType[k].rents.push(rent);
+      // === 섹션 B: 유형별 실거주 임대 조건 (RPC 집계값 직접 사용) ===
+      const condRows = TYPES.map(({label})=>{
+        const stat = statsByType[label]||{};
+        const dep = Number(stat['평균보증금'])||0;
+        const rent = Number(stat['평균월임대료'])||0;
+        return {label, deposit: dep>0?dep:null, rent: rent>0?rent:null};
       });
-      const avgArr = arr => arr.length ? Math.round(arr.reduce((s,v)=>s+v,0)/arr.length) : null;
-      const condRows = TYPES.map(({label})=>({
-        label,
-        deposit: avgArr(condByType[label]?.deposits||[]),
-        rent: avgArr(condByType[label]?.rents||[]),
-      }));
 
       const secB = `<div style="${SB}">
         <p style="${TB}">💰 유형별 평균 임대 조건</p>
