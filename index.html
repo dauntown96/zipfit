@@ -954,7 +954,7 @@ function renderNoticeList(filtered, totalCount){
     const nId = (n['announcement_id']||String(idx)).replace(/'/g,"\\'");
     const nApplyEnd = (n['신청마감일']||n['apply_end']||'').replace(/'/g,"\\'");
     const nSource = (n['source']||'').replace(/'/g,"\\'");
-    const nSaved = getSavedNotices().some(s=>s.id===n['announcement_id']||String(idx));
+    const nSaved = getSavedNotices().some(s=>s.id===(n['announcement_id']||String(idx)));
     const shareBtn = `<button class="detail-link" style="border:1px solid #1D9E75;color:#1D9E75;background:#fff;cursor:pointer;margin-top:10px" onclick="event.stopPropagation();shareNotice(this,'${nTitle}','${nRegion}','${nType}','${nUrl}')">🔗 이 공고 공유하기</button>`;
     const saveBtn = `<button data-save-id="${n['announcement_id']||idx}" class="detail-link" style="border:1px solid ${nSaved?'#1D9E75':'#ccc'};color:${nSaved?'#1D9E75':'#888'};background:#fff;cursor:pointer;margin-top:10px" onclick="event.stopPropagation();toggleSaveNotice('${nId}','${nTitle}','${nRegion}','${nType}','${nUrl}','${nApplyEnd}','${nSource}')">${nSaved?'🔖 저장됨':'🔖 저장'}</button>`;
     const detailHTML = detailRows.length
@@ -2027,9 +2027,8 @@ function buildChecklist(){
   const prevId = document.getElementById('noticeSelect')?.value;
   const options = saved.map(s=>{
     const endDate = s.apply_end ? s.apply_end.slice(5,10).replace('-','.') : '미정';
-    const typeLabel = s.type ? '['+s.type.slice(0,4)+'] ' : '';
-    const shortTitle = (s.title||'').slice(0,20);
-    return `<option value="${s.id}"${s.id===prevId?' selected':''}>${typeLabel}${shortTitle} (마감: ${endDate})</option>`;
+    const shortTitle = (s.title||'').slice(0,25);
+    return `<option value="${s.id}"${s.id===prevId?' selected':''}>${shortTitle} (마감: ${endDate})</option>`;
   }).join('');
 
   selectorEl.innerHTML = `<div style="margin-bottom:16px">
