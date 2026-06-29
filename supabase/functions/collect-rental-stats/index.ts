@@ -78,16 +78,26 @@ async function detectAndRecordChanges(
 
 Deno.serve(async (req) => {
   try {
-    console.log('수집 시작')
+    // body에서 target 읽기 (없으면 전체)
+    let target: string | null = null
+    try {
+      const body = await req.json()
+      target = body.target ?? null
+    } catch {}
+
+    const apisToRun = target
+      ? APIS.filter(a => a.name === target)
+      : APIS
+
+    console.log(`실행 대상: ${apisToRun.map(a => a.name).join(', ')}`)
 
     let totalUpserted = 0
 
-    for (const api of APIS) {
+    for (const api of apisToRun) {
       console.log(`수집 시작: ${api.name}`)
       const rows = await fetchAllPages(api.path)
       console.log(`${api.name} API 수집: ${rows.length}건`)
 
-      // 100건씩 배치 UPSERT
       const BATCH = 100
       for (let i = 0; i < rows.length; i += BATCH) {
         const batch = rows.slice(i, i + BATCH)
@@ -121,16 +131,17 @@ Deno.serve(async (req) => {
           })
 
         if (error) {
-          console.error(`upsert 오류 (${api.name} batch ${i}):`, JSON.stringify(error))
+          console.error(`upsert 오류:`, JSON.stringify(error))
         } else {
           totalUpserted += batch.length
-          console.log(`${api.name} ${i + batch.length}/${rows.length} 완료`)
         }
       }
+      console.log(`${api.name} 완료: ${rows.length}건`)
     }
 
     return new Response(JSON.stringify({
       success: true,
+      target: target ?? 'ALL',
       upserted: totalUpserted,
       message: `수집 완료: ${totalUpserted}건 upsert`
     }), { headers: { 'Content-Type': 'application/json' } })
