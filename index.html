@@ -310,9 +310,13 @@ select:focus,input:focus{border-color:#5DCAA5}
         <label class="label">지역</label>
         <div class="chip-group" id="noticeRegionChips"></div>
       </div>
-      <div class="field" style="margin-bottom:0.5rem">
+      <div class="field">
         <label class="label">공고 상태</label>
         <div class="chip-group" id="noticeStatusChips"></div>
+      </div>
+      <div class="field" style="margin-bottom:0.5rem">
+        <label class="label">대상 계층</label>
+        <div class="chip-group" id="noticeTargetChips"></div>
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-top:0.5rem">
         <div style="display:flex;align-items:center;gap:8px">
@@ -527,6 +531,7 @@ let noticeFiltered = [];
 let activeNoticeRegion = null;
 let activeNoticeType   = null;
 let activeNoticeStatus = null;
+let activeNoticeTarget = null;
 
 // 필터 칩 목록 (DB에서 한 번만 가져옴)
 let noticeFilterOptions = { regions:[], types:[], statuses:[] };
@@ -622,11 +627,13 @@ function resetNoticeFilters(){
   activeNoticeRegion = null;
   activeNoticeType   = null;
   activeNoticeStatus = null;
+  activeNoticeTarget = null;
   const chk = document.getElementById('hideClosedChk');
   if(chk) chk.checked = true;
   refreshChipSel('noticeRegionChips',  null);
   refreshChipSel('noticeTypeChips',    null);
   refreshChipSel('noticeStatusChips',  null);
+  refreshChipSel('noticeTargetChips',  null);
   updateFilterToggleBtn();
   loadNoticeData();
 }
@@ -662,6 +669,8 @@ function buildNoticeFilterChips(){
   buildSingleSelectChips('noticeRegionChips',  noticeFilterOptions.regions,  ()=>activeNoticeRegion,  v=>{ activeNoticeRegion=v;  loadNoticeData(); });
   buildSingleSelectChips('noticeTypeChips',    noticeFilterOptions.types,    ()=>activeNoticeType,    v=>{ activeNoticeType=v;    loadNoticeData(); });
   buildSingleSelectChips('noticeStatusChips',  noticeFilterOptions.statuses, ()=>activeNoticeStatus,  v=>{ activeNoticeStatus=v;  loadNoticeData(); });
+  const targetOptions = ['청년','신혼·신생아','대학생','고령자','한부모가족','장애인'];
+  buildSingleSelectChips('noticeTargetChips',  targetOptions,                ()=>activeNoticeTarget,  v=>{ activeNoticeTarget=v;  loadNoticeData(); });
   document.getElementById('hideClosedChk').onchange = () => loadNoticeData();
 }
 
@@ -773,6 +782,13 @@ async function loadNoticeData(){
     let filtered = noticeData;
     if(hideClosed && !activeNoticeStatus){
       filtered = noticeData.filter(n => n['처리상태정규화'] !== '접수마감');
+    }
+    // 대상 계층 필터 (클라이언트 사이드, classifyDemographics 결과 활용)
+    if(activeNoticeTarget){
+      filtered = filtered.filter(n => {
+        const tags = classifyDemographics(n['공급유형'], n['공고명']);
+        return tags.some(t => t.label === activeNoticeTarget);
+      });
     }
 
     // 정렬
