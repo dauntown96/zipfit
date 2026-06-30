@@ -237,6 +237,23 @@ select:focus,input:focus{border-color:#5DCAA5}
         </select>
       </div>
     </div>
+    <div class="row">
+      <div class="field">
+        <label class="label">주택청약종합저축 보유</label>
+        <select id="hasSavings">
+          <option value="unknown">모름</option>
+          <option value="yes">있음</option>
+          <option value="no">없음</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="label">최하층 우선배정 신청 여부</label>
+        <select id="wantsGroundFloor">
+          <option value="no">해당 없음</option>
+          <option value="yes">신청 희망 (장애인·노약자)</option>
+        </select>
+      </div>
+    </div>
     <button class="btn btn-primary" onclick="diagnose()">자격 진단하기 →</button>
     <div id="diag-result" class="result hidden"></div>
   </div>
@@ -560,6 +577,28 @@ function classifyDemographics(typeText, nameText){
   if(t.includes('한부모')) tags.push({label:'한부모가족', color:'#D85A30'});
   if(t.includes('장애인')) tags.push({label:'장애인', color:'#5DCAA5'});
   return tags;
+}
+
+// 신청 편의도 미니뱃지 생성 (mymy/supply_form/application_method/recruit_multiplier)
+function buildConvBadges(mymy, supplyForm, appMethod, recruitMult){
+  const badges = [];
+  if(mymy === true || mymy === 'true'){
+    badges.push('<span class="chip sel" style="cursor:default;padding:3px 8px;font-size:10px;background:#0F6E56;border-color:#0F6E56">📱 MyMy가능</span>');
+  }
+  if(supplyForm && supplyForm !== '일반'){
+    const sfMap = {'전세형':'🏠 전세형','기숙사형':'🏢 기숙사형','공동거주형':'👥 공동거주형','건설형':'🏗 건설형','분양전환형':'🔑 분양전환형'};
+    const label = sfMap[supplyForm] || supplyForm;
+    badges.push(`<span class="chip sel" style="cursor:default;padding:3px 8px;font-size:10px;background:#5DCAA5;border-color:#5DCAA5">${label}</span>`);
+  }
+  if(appMethod && appMethod !== 'online'){
+    const amMap = {'email':'📧 이메일신청','online_offline':'🏢 현장접수가능','local_gov':'🏛 지자체신청'};
+    const label = amMap[appMethod] || appMethod;
+    badges.push(`<span class="chip sel" style="cursor:default;padding:3px 8px;font-size:10px;background:#7F77DD;border-color:#7F77DD">${label}</span>`);
+  }
+  if(recruitMult){
+    badges.push(`<span class="chip sel" style="cursor:default;padding:3px 8px;font-size:10px;background:#888;border-color:#888">모집${recruitMult}배수</span>`);
+  }
+  return badges.join('');
 }
 
 function parseNoticeDate(s){
@@ -936,6 +975,8 @@ function renderNoticeList(filtered, totalCount){
     const demoTags   = classifyDemographics(n['공급유형'], n['공고명']);
     const isNew      = !isClosed && isNewNotice(n);
     const closingSoon = !isClosed && isClosingSoon(n);
+    const convBadges = buildConvBadges(n['mymy_applicable'], n['supply_form'], n['application_method'], n['recruit_multiplier']);
+    const pairKey    = n['pair_announcement_key']||'';
     const applyStart = n['신청시작일']||n['apply_start']||'';
     const applyEnd   = n['신청마감일']||n['apply_end']||'';
     const annDate    = n['announcement_date']||'';
@@ -997,7 +1038,9 @@ function renderNoticeList(filtered, totalCount){
         ${isNew?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
         ${closingSoon?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
         ${demoTags.map(t=>`<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:${t.color};border-color:${t.color}">${t.label}</span>`).join('')}
+        ${convBadges}
       </div>
+      ${pairKey?`<div style="font-size:11px;color:#A32D2D;background:#FFF3F3;border:1px solid #F5C2C2;border-radius:8px;padding:5px 10px;margin-bottom:6px">⚠️ 동일 회차 짝공고와 <b>중복 신청 시 자동 탈락</b>될 수 있어요. 공고문을 반드시 확인하세요.</div>`:''}
       <p style="font-size:12px;color:#888;margin-bottom:8px">${dateLine}</p>
       ${detailHTML}
     </div>`;
@@ -1532,46 +1575,73 @@ function goStep(n){
   }
 }
 
-function diagnose(){
+// eligibility_criteria 테이블 캐시 (페이지 로드 1회 조회)
+let _eligibilityCriteria = null;
+async function loadEligibilityCriteria(){
+  if(_eligibilityCriteria) return _eligibilityCriteria;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/eligibility_criteria?select=housing_type,supply_form,income_pct,income_pct_dual_income,asset_limit&order=housing_type`,
+      {headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY}});
+    if(res.ok){
+      const rows = await res.json();
+      if(Array.isArray(rows) && rows.length > 0){ _eligibilityCriteria = rows; return rows; }
+    }
+  } catch(e){ console.warn('eligibility_criteria 로드 실패, fallback 사용:', e); }
+  // fallback: HOUSING_CRITERIA 상수 → 동일 구조로 변환
+  _eligibilityCriteria = Object.entries(HOUSING_CRITERIA).map(([ht, c]) => ({
+    housing_type: ht, supply_form: '일반',
+    income_pct: c.incomePct, income_pct_dual_income: c.incomePct, asset_limit: c.assetLimit * 10000
+  }));
+  return _eligibilityCriteria;
+}
+
+async function diagnose(){
   const marital=document.getElementById('marital').value;
   const children=parseInt(document.getElementById('children').value)||0;
   const members=Math.min(parseInt(document.getElementById('members').value)||2,5);
   const income=(parseFloat(document.getElementById('income').value)||0)*10000;
   const assets=(parseFloat(document.getElementById('assets').value)||0)*10000;
   const owned=document.getElementById('owned').value;
+  const hasSavings=document.getElementById('hasSavings')?.value||'unknown';
+  const wantsGroundFloor=document.getElementById('wantsGroundFloor')?.value||'no';
   const r=document.getElementById('diag-result');
-  r.classList.remove('hidden'); r.innerHTML='';
+  r.classList.remove('hidden'); r.innerHTML='<div class="rbox warn"><p class="rtitle">⏳ 자격 기준을 확인하는 중...</p></div>';
 
   if(!marital){r.innerHTML='<div class="rbox warn"><p class="rtitle">⚠ 혼인 상태를 선택해주세요</p></div>';return;}
   if(owned==='yes'){r.innerHTML='<div class="rbox err"><p class="rtitle">❌ 신청 불가 — 주택 소유자</p><p class="rdesc">세대구성원 전원이 무주택이어야 신청 가능합니다. 주택 처분 후 무주택 기간을 확인해주세요.</p></div>';return;}
 
   const lim130=LIMIT130[members], lim200=LIMIT200[members];
-  let incomeOk=true,incomeMsg='';
+  let incomeMsg='';
   if(income>0){
-    if(income>lim200){incomeOk=false;incomeMsg=`소득 기준 초과 (맞벌이 기준 ${fmt(lim200)})`;}
+    if(income>lim200){ incomeMsg=`소득 기준 초과 (맞벌이 기준 ${fmt(lim200)})`; }
     else if(income>lim130) incomeMsg=`맞벌이 기준(${fmt(lim200)}) 충족 · 단독소득 기준(${fmt(lim130)}) 초과`;
     else incomeMsg=`소득 기준 충족 (기준: ${fmt(lim130)})`;
   }
-
   const assetLim=362000000;
-  let assetOk=true,assetMsg='';
-  if(assets>0){assetOk=assets<=assetLim;assetMsg=assetOk?`자산 기준 충족 (기준: 3억 6,200만원)`:`자산 기준 초과 (기준: 3억 6,200만원)`;}
+  let assetMsg='';
+  if(assets>0){ assetMsg=(assets<=assetLim)?`자산 기준 충족 (기준: 3억 6,200만원)`:`자산 기준 초과 (기준: 3억 6,200만원)`; }
 
   const rankMap={newborn:'1순위 (신생아 가구)',single_parent:'1순위 (지원대상 한부모가족)',married_7:children>0?'2순위 (미성년 자녀 있는 신혼부부)':'3순위 (미성년 자녀 없는 신혼부부)',pre:children>0?'2순위':'3순위',married_child6:'4순위 (6세 이하 자녀 혼인가구)',married:'5순위 (혼인가구)'};
-  const rank=rankMap[marital]||'확인 필요';
   diagMarital=marital;
 
-  // 주택 유형별 자격 필터 계산
+  // DB에서 자격기준 로드 (유형×공급형태 매트릭스)
+  const criteria = await loadEligibilityCriteria();
   const medianBase = (MEDIAN_INCOME[members]||MEDIAN_INCOME[6]) * 10000;
-  window.eligibleTypes = Object.entries(HOUSING_CRITERIA)
-    .filter(([, c]) => {
-      const incLim = medianBase * c.incomePct / 100;
-      const assetLim = c.assetLimit * 10000;
-      const incOk = income === 0 || income <= incLim;
-      const assetOk = assets === 0 || assets <= assetLim;
-      return incOk && assetOk;
-    })
-    .map(([type]) => type);
+
+  // 공급형태별 신청가능 여부: 맞벌이 소득은 income_pct_dual_income 기준
+  const eligibleEntries = criteria.filter(c => {
+    const isDualIncome = incomeMsg.includes('맞벌이 기준') && !incomeMsg.includes('초과');
+    const pct = (isDualIncome && c.income_pct_dual_income) ? c.income_pct_dual_income : c.income_pct;
+    const incLim = medianBase * pct / 100;
+    const assetLimC = c.asset_limit || 362000000;
+    const incOk = income === 0 || income <= incLim;
+    const assetOk = assets === 0 || assets <= assetLimC;
+    return incOk && assetOk;
+  });
+
+  // 유형 목록 (중복 제거, housing_type 기준)
+  const eligibleTypeSet = new Set(eligibleEntries.map(c => c.housing_type));
+  window.eligibleTypes = [...eligibleTypeSet];
 
   // Step2 활성화
   const s2 = document.getElementById('s2');
@@ -1586,13 +1656,32 @@ function diagnose(){
   if(window.eligibleTypes.length === 0){
     html=`<div class="rbox err"><p class="rtitle">❌ 신청 가능한 유형 없음</p><p class="rdesc">입력하신 소득·자산 조건으로는 신청 가능한 유형이 없어요.<br>소득·자산 기준을 다시 확인해보세요.</p></div>`;
   } else {
-    const typeList = window.eligibleTypes.map(t=>`· ${t}`).join(' ');
-    html=`<div class="rbox ok"><p class="rtitle">✅ 신청 가능한 주택 유형</p><p class="rdesc">${typeList}<br><span style="font-size:11px;color:#999">소득·자산 기준을 충족한 유형이에요. 정확한 자격은 각 공고문을 확인하세요.</span></p></div>`;
+    // 공급형태별 세분화 목록
+    const entryLabels = eligibleEntries.map(c => {
+      const sf = (c.supply_form && c.supply_form !== '일반') ? `(${c.supply_form})` : '';
+      return `· ${c.housing_type}${sf}`;
+    }).join(' ');
+    html=`<div class="rbox ok"><p class="rtitle">✅ 신청 가능한 주택 유형</p><p class="rdesc">${entryLabels}<br><span style="font-size:11px;color:#999">소득·자산 기준을 충족한 유형이에요. 공급형태(전세형 등)별로 소득 기준이 다를 수 있어요.</span></p></div>`;
     if(incomeMsg) html+=`<div class="rbox warn" style="margin-top:6px"><p class="rdesc" style="margin:0">· ${incomeMsg}</p></div>`;
     if(assetMsg)  html+=`<div class="rbox warn" style="margin-top:6px"><p class="rdesc" style="margin:0">· ${assetMsg}</p></div>`;
+
+    // 청약통장 안내
+    if(hasSavings === 'no'){
+      html+=`<div class="rbox warn" style="margin-top:6px"><p class="rtitle">📋 주택청약종합저축 미보유</p><p class="rdesc">건설형 행복주택·공공분양 신청 시 청약통장이 필수예요. 매입임대·기숙사형 등은 불필요하니 공고문을 확인하세요.</p></div>`;
+    } else if(hasSavings === 'yes'){
+      html+=`<div class="rbox ok" style="margin-top:6px"><p class="rdesc" style="margin:0">✅ 청약통장 보유 — 모든 유형 신청 가능 (납입횟수 가점 확인 권장)</p></div>`;
+    }
+
+    // 최하층 우선배정 안내
+    if(wantsGroundFloor === 'yes'){
+      html+=`<div class="rbox warn" style="margin-top:6px"><p class="rtitle">♿ 최하층 우선배정</p><p class="rdesc">일부 공고(광명도시공사 등)에서 장애인·노약자 대상 최하층 우선배정을 지원해요. 공고 상세에서 <b>별첨 확인서</b>를 준비하세요.</p></div>`;
+    }
+
+    // 가점 계산
     let gp=0;
     if(children>=3)gp+=4;else if(children===2)gp+=3;else if(children===1)gp+=2;
-    if(gp)html+=`<div class="rbox warn" style="margin-top:6px"><p class="rtitle">📊 예상 가점: ${gp}점 (자녀 항목)</p><p class="rdesc">청약저축 납입횟수, 해당 시 거주기간, 장애인 등 추가 가점을 확인하세요.</p></div>`;
+    if(gp) html+=`<div class="rbox warn" style="margin-top:6px"><p class="rtitle">📊 예상 가점: ${gp}점 (자녀 항목)</p><p class="rdesc">지역본부마다 가점 평가항목이 달라요 (경남/광주전남=6항목, 부산울산=4항목). 청약저축 납입횟수·거주기간·장애인 항목도 확인하세요.</p></div>`;
+
     html+=`<button class="btn btn-primary" onclick="goStep(2);matchHouses()" style="margin-top:0.5rem">주택 매칭하러 가기 →</button>`;
   }
   r.innerHTML=html;
@@ -1823,6 +1912,8 @@ function renderMatchResults(rows){
     const demoTags    = classifyDemographics(n.housing_type||'', n.title||'');
     const isNew       = !isClosed && isNewNotice({'created_at': n.created_at||'', 'apply_end': n.apply_end||''});
     const closingSoon = !isClosed && isClosingSoon({'apply_end': n.apply_end||''});
+    const convBadgesM = buildConvBadges(n.mymy_applicable, n.supply_form, n.application_method, n.recruit_multiplier);
+    const pairKeyM    = n.pair_announcement_key||'';
     const applyStart  = n.apply_start||'';
     const applyEnd    = n.apply_end||'';
     const annDate     = n.announcement_date||'';
@@ -1882,7 +1973,9 @@ function renderMatchResults(rows){
         ${isNew?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
         ${closingSoon?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
         ${demoTags.map(t=>`<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:${t.color};border-color:${t.color}">${t.label}</span>`).join('')}
+        ${convBadgesM}
       </div>
+      ${pairKeyM?`<div style="font-size:11px;color:#A32D2D;background:#FFF3F3;border:1px solid #F5C2C2;border-radius:8px;padding:5px 10px;margin-bottom:6px">⚠️ 동일 회차 짝공고와 <b>중복 신청 시 자동 탈락</b>될 수 있어요. 공고문을 반드시 확인하세요.</div>`:''}
       <p style="font-size:12px;color:#888;margin-bottom:8px">${dateLine}</p>
       ${detailHTML}
     </div>`;
