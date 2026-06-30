@@ -2,7 +2,7 @@
 
 > **이 파일이 유일한 세이브포인트입니다.**
 > Claude Code와 claude.ai 모두 이 파일을 기준으로 작업합니다.
-> **마지막 업데이트**: 2026-06-30 (공고 탭 대상 계층 필터 추가 + 상세 패널 버블링 차단 + 인사이트 KPI 조건 통일 — sw.js v18)
+> **마지막 업데이트**: 2026-06-30 (pg_cron timeout 120초 상향 + 공고 수집 하루 2회로 증가 KST 09:00/15:00)
 
 ---
 
@@ -45,7 +45,7 @@
 |---|---|
 | 프론트엔드 | HTML/CSS/JS 단일 파일 (index.html) |
 | 공고 데이터 | Supabase RPC `get_announcements_deduped()` |
-| 데이터 수집 | Edge Function `collect-announcements` v3 + pg_cron (매일 KST 09:00) |
+| 데이터 수집 | Edge Function `collect-announcements` v3 + pg_cron (매일 KST 09:00, 15:00 — 2회, timeout 120초) |
 | 사용자 프로필 | Edge Function `save-user-profile` v5 (GET/POST, CORS 완료) |
 | 알림·트리거 | Make.com Free 플랜 (알림·이메일 전용) |
 | 외부 API | LH 분양임대공고 API, 마이홈포털 API, 카카오맵 API |
@@ -149,6 +149,7 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-06-30 | pg_cron timeout 60초→120초 상향 + 공고 수집 하루 2회(KST 09:00/15:00) — zipfit-collect-announcements-pm 잡 신규 생성 (jobid 3) |
 | 2026-06-30 | 공고 탭 대상 계층 필터 칩 추가 — 청년/신혼·신생아/대학생/고령자/한부모가족/장애인, classifyDemographics 기반 클라이언트 필터링, sw.js v18 |
 | 2026-06-30 | 인사이트 KPI 접수중 조건 공고탭 필터와 통일 — status_normalized 단일 조건으로 단순화, sw.js v17 |
 | 2026-06-30 | 상세 패널 내부 클릭 버블링 차단 — detail div 4곳에 onclick stopPropagation 추가, sw.js v16 |
