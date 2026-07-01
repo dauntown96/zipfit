@@ -2,7 +2,7 @@
 
 > **이 파일이 유일한 세이브포인트입니다.**
 > Claude Code와 claude.ai 모두 이 파일을 기준으로 작업합니다.
-> **마지막 업데이트**: 2026-06-30 (자격진단 엔진 DB 전환 + 신청편의도 뱃지 + 짝공고 경고 — sw.js v19)
+> **마지막 업데이트**: 2026-07-01 (loadNoticeData 매핑 누락 8개 필드 추가 — 뱃지·짝공고 경고 표시 버그 수정 — sw.js v20)
 
 ---
 
@@ -149,6 +149,7 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-07-01 | loadNoticeData 매핑 누락 버그 수정 — mymy_applicable/supply_form/application_method/recruit_multiplier/pair_announcement_key/housing_change_allowed/source/announcement_id 8개 필드 추가, 뱃지·짝공고 경고 표시 정상화, sw.js v20 |
 | 2026-06-30 | 자격진단 엔진 개편(2순위) + 신청편의도 뱃지 + 짝공고 경고(3순위) — eligibility_criteria DB 조회 전환, buildConvBadges(MyMy/공급형태/신청방법/모집배수), pair_announcement_key 경고 배너, 청약통장·최하층우선배정 입력 추가, sw.js v19 |
 | 2026-06-30 | pg_cron timeout 60초→120초 상향 + 공고 수집 하루 2회(KST 09:00/15:00) — zipfit-collect-announcements-pm 잡 신규 생성 (jobid 3) |
 | 2026-06-30 | 공고 탭 대상 계층 필터 칩 추가 — 청년/신혼·신생아/대학생/고령자/한부모가족/장애인, classifyDemographics 기반 클라이언트 필터링, sw.js v18 |
