@@ -815,6 +815,14 @@ async function loadNoticeData(){
       'is_revised': r.is_revised||false,
       'sido_nm': r.sido_nm||'',
       'sigungu_nm': r.sigungu_nm||'',
+      'source': r.source||'',
+      'announcement_id': r.announcement_id||'',
+      'mymy_applicable': r.mymy_applicable,
+      'supply_form': r.supply_form||'',
+      'application_method': r.application_method||'',
+      'recruit_multiplier': r.recruit_multiplier||'',
+      'pair_announcement_key': r.pair_announcement_key||'',
+      'housing_change_allowed': r.housing_change_allowed,
     }));
 
     // 마감 숨기기 (status 칩 직접 선택 없을 때만, 정규화 상태 기준)
