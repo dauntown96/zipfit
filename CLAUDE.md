@@ -2,7 +2,7 @@
 
 > **이 파일이 유일한 세이브포인트입니다.**
 > Claude Code와 claude.ai 모두 이 파일을 기준으로 작업합니다.
-> **마지막 업데이트**: 2026-07-01 (loadNoticeData 매핑 누락 8개 필드 추가 — 뱃지·짝공고 경고 표시 버그 수정 — sw.js v20)
+> **마지막 업데이트**: 2026-07-01 (announcement_extras 4순위 배치 완료 — 폴더 16~20 적재, 총 355건)
 
 ---
 
@@ -149,6 +149,7 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-07-01 | announcement_extras 4순위 배치 완료 — 폴더 16~20 (대전충남 기숙사형/신혼신생아I/신혼신생아II전세형, 부산울산 기숙사형) 적재, 총 355건 |
 | 2026-07-01 | loadNoticeData 매핑 누락 버그 수정 — mymy_applicable/supply_form/application_method/recruit_multiplier/pair_announcement_key/housing_change_allowed/source/announcement_id 8개 필드 추가, 뱃지·짝공고 경고 표시 정상화, sw.js v20 |
 | 2026-06-30 | 자격진단 엔진 개편(2순위) + 신청편의도 뱃지 + 짝공고 경고(3순위) — eligibility_criteria DB 조회 전환, buildConvBadges(MyMy/공급형태/신청방법/모집배수), pair_announcement_key 경고 배너, 청약통장·최하층우선배정 입력 추가, sw.js v19 |
 | 2026-06-30 | pg_cron timeout 60초→120초 상향 + 공고 수집 하루 2회(KST 09:00/15:00) — zipfit-collect-announcements-pm 잡 신규 생성 (jobid 3) |
