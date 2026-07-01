@@ -2,7 +2,7 @@
 
 > **이 파일이 유일한 세이브포인트입니다.**
 > Claude Code와 claude.ai 모두 이 파일을 기준으로 작업합니다.
-> **마지막 업데이트**: 2026-07-01 (다크모드 텍스트 가독성 버그 수정 — .logo/.setting-label/.panel-title/.hname/.mval 색상 #e8e8e8 지정, sw.js v21)
+> **마지막 업데이트**: 2026-07-01 (Notion 공고 분석 파이프라인 확정 + 공고 분석 로그 source of truth 주석 추가)
 
 ---
 
@@ -149,6 +149,7 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-07-01 | Notion 공고 분석 파이프라인 확정 — 작업 원칙 페이지에 6단계 파이프라인·data_categories 레지스트리·5배치 재검증 안전장치 추가; 공고 분석 로그 source of truth 주석 추가 |
 | 2026-07-01 | 다크모드 텍스트 가독성 버그 수정 — .logo/.setting-label/.panel-title/.hname/.mval 다크모드에서 color:#e8e8e8 지정, sw.js v21 |
 | 2026-07-01 | announcement_extras 4순위 배치 완료 — 폴더 16~20 (대전충남 기숙사형/신혼신생아I/신혼신생아II전세형, 부산울산 기숙사형) 적재, 총 355건 |
 | 2026-07-01 | loadNoticeData 매핑 누락 버그 수정 — mymy_applicable/supply_form/application_method/recruit_multiplier/pair_announcement_key/housing_change_allowed/source/announcement_id 8개 필드 추가, 뱃지·짝공고 경고 표시 정상화, sw.js v20 |
