@@ -15,12 +15,14 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f0;color:#1a1a1a;min-height:100vh}
 body.theme-dark{background:#16181d;color:#e8e8e8}
-body.theme-dark .hero,body.theme-dark .panel,body.theme-dark .hcard,body.theme-dark .hu-row{background:#1f2229;border-color:#2c2f38}
-body.theme-dark .label,body.theme-dark .sub,body.theme-dark .haddr,body.theme-dark .building-desc,body.theme-dark .hu-label{color:#9aa0aa}
+body.theme-dark .hero,body.theme-dark .panel,body.theme-dark .hcard,body.theme-dark .hu-row,body.theme-dark .hu-group-head,body.theme-dark .hu-group-body{background:#1f2229;border-color:#2c2f38}
+body.theme-dark .label,body.theme-dark .sub,body.theme-dark .haddr,body.theme-dark .building-desc,body.theme-dark .hu-label,body.theme-dark .hu-group-count{color:#9aa0aa}
 body.theme-dark select,body.theme-dark input{background:#262932;border-color:#3a3e48;color:#e8e8e8}
 body.theme-dark .maintabs{background:#262932}
 body.theme-dark .maintab.active{background:#1f2229;color:#5DCAA5}
-body.theme-dark .logo,body.theme-dark .setting-label,body.theme-dark .panel-title,body.theme-dark .hname,body.theme-dark .mval,body.theme-dark .hu-title,body.theme-dark .hu-addr,body.theme-dark .hu-value{color:#e8e8e8}
+body.theme-dark .logo,body.theme-dark .setting-label,body.theme-dark .panel-title,body.theme-dark .hname,body.theme-dark .mval,body.theme-dark .hu-title,body.theme-dark .hu-addr,body.theme-dark .hu-value,body.theme-dark .hu-group-name{color:#e8e8e8}
+body.theme-dark .hu-group-head.hu-group-active{background:#1d3d33;border-color:#5DCAA5}
+body.theme-dark .hu-group-head:hover{background:#262932}
 body.fs-small{font-size:13px}
 body.fs-large{font-size:17px}
 .wrap{max-width:720px;margin:0 auto;padding:1.5rem 1rem}
@@ -149,6 +151,14 @@ select:focus,input:focus{border-color:#5DCAA5}
 .hu-value{color:#333;font-weight:500}
 .hu-more-btn{width:100%;padding:8px;border-radius:8px;border:1px dashed #ccc;background:#fafaf6;color:#666;font-size:12px;cursor:pointer;margin-top:4px}
 .hu-more-btn:hover{background:#f0f0e8}
+.hu-group{border:1px solid #e8e8e0;border-radius:10px;overflow:hidden}
+.hu-group-head{display:flex;justify-content:space-between;align-items:center;gap:8px;background:#f8f8f8;padding:8px 10px;cursor:pointer;font-size:12px}
+.hu-group-head:hover{background:#f0f0e8}
+.hu-group-head.hu-group-active{background:#E1F5EE;border-color:#1D9E75}
+.hu-group-name{font-weight:600;color:#333;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hu-group-count{color:#888;white-space:nowrap;font-size:11px}
+.hu-group-body{display:flex;flex-direction:column;gap:6px;padding:8px;background:#fff}
+.hu-group-body .hu-row{background:#fafaf6}
 .poi-section{margin-top:8px}
 .poi-tabs{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap}
 .poi-tab{padding:5px 11px;font-size:11px;border-radius:14px;border:1px solid #ddd;background:#fff;color:#666;cursor:pointer}
@@ -1822,6 +1832,9 @@ function toggleDetail(id, card){
 }
 
 const huUnitsCache = {};
+const huGroupsCache = {};
+const huActiveGroup = {};
+const huMapState = {};
 
 function loadHousingUnits(annId, detailEl, id){
   if(!annId) return;
@@ -1830,41 +1843,102 @@ function loadHousingUnits(annId, detailEl, id){
   }).then(r => r.ok ? r.json() : []).then(units => {
     if(!Array.isArray(units) || units.length === 0) return;
     huUnitsCache[id] = units;
+    huGroupsCache[id] = groupHousingUnits(units);
     const wrap = document.createElement('div');
     wrap.className = 'hu-wrap';
     wrap.innerHTML = `<div class="hu-title">🏠 세대별 정보 (${units.length}건)</div><div class="hu-list" id="hu-list-${id}"></div>`;
     detailEl.appendChild(wrap);
-    renderHousingUnitRows(id, 5);
+    renderHousingGroupRows(id, 5);
   }).catch(err => {
     console.error('ZipFit 세대정보 로드 실패:', err);
   });
 }
 
-function renderHousingUnitRows(id, visibleCount){
-  const units = huUnitsCache[id];
+// 같은 건물(building_name 우선, 없으면 address)로 세대를 묶어서 2단 아코디언 구성
+function groupHousingUnits(units){
+  const map = new Map();
+  units.forEach(u => {
+    const key = (u.building_name && u.building_name.trim()) || u.address || '주소 정보 없음';
+    if(!map.has(key)){
+      map.set(key, { building_name: u.building_name || '', address: u.address || key, units: [] });
+    }
+    map.get(key).units.push(u);
+  });
+  return Array.from(map.values());
+}
+
+function renderHousingGroupRows(id, visibleCount){
+  const groups = huGroupsCache[id];
   const listEl = document.getElementById('hu-list-'+id);
-  if(!units || !listEl) return;
-  const shown = units.slice(0, visibleCount);
-  let rowsHtml = shown.map(u => {
-    const addr = [u.building_name, u.address].filter(Boolean).join(' ') || '주소 정보 없음';
-    const area = u.area_sqm != null ? parseFloat(u.area_sqm).toFixed(1)+'㎡' : '-';
-    const deposit = u.deposit != null ? Number(u.deposit).toLocaleString()+'원' : '-';
-    const rent = (u.monthly_rent == null || Number(u.monthly_rent) === 0) ? '월세없음' : Number(u.monthly_rent).toLocaleString()+'원';
-    const conv = u.conversion_date ? `<div class="hu-item"><span class="hu-label">분양전환</span><span class="hu-value">${u.conversion_date}</span></div>` : '';
-    return `<div class="hu-row">
-      <div class="hu-addr">${addr}</div>
-      <div class="hu-fields">
-        <div class="hu-item"><span class="hu-label">전용면적</span><span class="hu-value">${area}</span></div>
-        <div class="hu-item"><span class="hu-label">보증금</span><span class="hu-value">${deposit}</span></div>
-        <div class="hu-item"><span class="hu-label">월임대료</span><span class="hu-value">${rent}</span></div>
-        ${conv}
+  if(!groups || !listEl) return;
+  const shown = groups.slice(0, visibleCount);
+  let html = shown.map((g, idx) => {
+    const label = g.building_name || g.address;
+    return `<div class="hu-group">
+      <div class="hu-group-head" id="hu-group-head-${id}-${idx}" onclick="event.stopPropagation();toggleHousingGroup('${id}',${idx})">
+        <span class="hu-group-name">${label}</span>
+        <span class="hu-group-count">${g.units.length}건 ▾</span>
       </div>
+      <div class="hu-group-body" id="hu-group-body-${id}-${idx}" style="display:none"></div>
     </div>`;
   }).join('');
-  if(units.length > visibleCount){
-    rowsHtml += `<button class="hu-more-btn" onclick="event.stopPropagation();renderHousingUnitRows('${id}',${visibleCount+10})">더 보기 (${units.length-visibleCount}건 더) ↓</button>`;
+  if(groups.length > visibleCount){
+    html += `<button class="hu-more-btn" onclick="event.stopPropagation();renderHousingGroupRows('${id}',${visibleCount+10})">더 보기 (건물 ${groups.length-visibleCount}개 더) ↓</button>`;
   }
-  listEl.innerHTML = rowsHtml;
+  listEl.innerHTML = html;
+  // "더보기"로 목록을 다시 그려도 기존에 선택돼있던 건물의 강조 표시는 유지
+  const activeIdx = huActiveGroup[id];
+  if(activeIdx != null){
+    const headEl = document.getElementById(`hu-group-head-${id}-${activeIdx}`);
+    if(headEl) headEl.classList.add('hu-group-active');
+  }
+}
+
+function renderHousingUnitRow(u){
+  const addr = u.address || '주소 정보 없음';
+  const area = u.area_sqm != null ? parseFloat(u.area_sqm).toFixed(1)+'㎡' : '-';
+  const deposit = u.deposit != null ? Number(u.deposit).toLocaleString()+'원' : '-';
+  const rent = (u.monthly_rent == null || Number(u.monthly_rent) === 0) ? '월세없음' : Number(u.monthly_rent).toLocaleString()+'원';
+  const conv = u.conversion_date ? `<div class="hu-item"><span class="hu-label">분양전환</span><span class="hu-value">${u.conversion_date}</span></div>` : '';
+  return `<div class="hu-row">
+    <div class="hu-addr">${addr}</div>
+    <div class="hu-fields">
+      <div class="hu-item"><span class="hu-label">전용면적</span><span class="hu-value">${area}</span></div>
+      <div class="hu-item"><span class="hu-label">보증금</span><span class="hu-value">${deposit}</span></div>
+      <div class="hu-item"><span class="hu-label">월임대료</span><span class="hu-value">${rent}</span></div>
+      ${conv}
+    </div>
+  </div>`;
+}
+
+// 건물 그룹 행 클릭 → 개별 호 목록 펼치기/접기 + 지도 마커를 그 건물 위치로 이동
+function toggleHousingGroup(id, idx){
+  const groups = huGroupsCache[id];
+  const g = groups && groups[idx];
+  if(!g) return;
+  const bodyEl = document.getElementById(`hu-group-body-${id}-${idx}`);
+  if(!bodyEl) return;
+  const isOpen = bodyEl.style.display === 'block';
+  bodyEl.style.display = isOpen ? 'none' : 'block';
+  if(!isOpen && !bodyEl.dataset.rendered){
+    bodyEl.dataset.rendered = '1';
+    bodyEl.innerHTML = g.units.map(renderHousingUnitRow).join('');
+  }
+  setActiveHousingGroup(id, idx);
+  const addr = g.address || g.building_name;
+  if(addr) initMapForHouse({ addr, name: g.building_name || '' }, id);
+}
+
+// 여러 건물을 눌러도 지도엔 항상 마커 1개만 유지 — 현재 선택된 건물 행만 강조
+function setActiveHousingGroup(id, idx){
+  const prev = huActiveGroup[id];
+  if(prev != null && prev !== idx){
+    const prevHead = document.getElementById(`hu-group-head-${id}-${prev}`);
+    if(prevHead) prevHead.classList.remove('hu-group-active');
+  }
+  const curHead = document.getElementById(`hu-group-head-${id}-${idx}`);
+  if(curHead) curHead.classList.add('hu-group-active');
+  huActiveGroup[id] = idx;
 }
 
 function initMapForHouse(h,id){
@@ -1872,8 +1946,17 @@ function initMapForHouse(h,id){
     const mapEl = document.getElementById('map-'+id);
     if(!mapEl) return;
     const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
-    const map = new kakao.maps.Map(mapEl, {center:coords, level:5});
-    new kakao.maps.Marker({position:coords, map});
+    const state = huMapState[id];
+    // 지도는 처음 한 번만 생성하고, 이후 건물 클릭 시에는 기존 지도/마커를 그 위치로 옮겨서
+    // 항상 마커가 1개만 유지되도록 함
+    if(state && state.map && state.marker){
+      state.map.setCenter(coords);
+      state.marker.setPosition(coords);
+    } else {
+      const map = new kakao.maps.Map(mapEl, {center:coords, level:5});
+      const marker = new kakao.maps.Marker({position:coords, map});
+      huMapState[id] = { map, marker };
+    }
     buildPoiTabs(id, coords);
   };
   loadKakao().then(()=>{
@@ -1887,12 +1970,12 @@ function initMapForHouse(h,id){
           geocoder.addressSearch(fallback, (r2, s2) => {
             if(s2 === kakao.maps.services.Status.OK && r2.length){
               renderMap(r2);
-            } else {
+            } else if(!huMapState[id]){
               const mapEl = document.getElementById('map-'+id);
               if(mapEl) mapEl.innerHTML = '<p style="text-align:center;padding:80px 0;color:#999;font-size:13px">📍 지도 정보를 불러올 수 없어요</p>';
             }
           });
-        } else {
+        } else if(!huMapState[id]){
           const mapEl = document.getElementById('map-'+id);
           if(mapEl) mapEl.innerHTML = '<p style="text-align:center;padding:80px 0;color:#999;font-size:13px">📍 지도 정보를 불러올 수 없어요</p>';
         }

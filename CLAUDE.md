@@ -2,10 +2,10 @@
 
 > **이 파일이 유일한 세이브포인트입니다.**
 > Claude Code와 claude.ai 모두 이 파일을 기준으로 작업합니다.
-> **마지막 업데이트**: 2026-07-02 (공고 상세 아코디언에 housing_units 호별 세대정보 섹션 추가 — sw.js v22 배포 완료)
+> **마지막 업데이트**: 2026-07-02 (세대별 정보 리스트를 건물 단위로 그룹핑 + 지도 연동 — sw.js v23 배포 완료)
 
 ## 🔜 다음 세션 작업 예정
-- **프론트엔드에 나머지 신규 데이터 노출**: scoring_criteria(가점표), eligibility_criteria(순위별 소득·자산기준), announcement_policies(정책 원문) — housing_units는 이번 세션에 반영 완료. 자격진단 결과·가점 계산 등에 반영 필요
+- **프론트엔드에 나머지 신규 데이터 노출**: scoring_criteria(가점표), eligibility_criteria(순위별 소득·자산기준), announcement_policies(정책 원문) — housing_units는 반영 완료. 자격진단 결과·가점 계산 등에 반영 필요
 
 ---
 
@@ -164,6 +164,7 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-07-02 | 세대별 정보 리스트를 건물 단위로 그룹핑 + 지도 연동 — housing_units를 building_name(없으면 address) 기준으로 묶어 "건물명 (N건)" 2단 아코디언으로 표시, 건물 그룹 클릭 시 기존 initMapForHouse()를 재사용해 지도 마커를 그 건물 위치로 이동. initMapForHouse가 카드당 지도/마커 인스턴스를 huMapState에 캐싱해 재호출 시 새로 생성하지 않고 setCenter/setPosition으로 위치만 갱신 → 여러 건물을 눌러도 마커 항상 1개만 유지. 현재 선택된 건물 행은 .hu-group-active 클래스로 강조, "더보기"로 목록을 다시 그려도 강조 상태 유지. 건물 그룹 목록도 기존 더보기 패턴(초기 5개+10개씩 증분) 적용. sw.js v22→v23. Playwright에 kakao.maps 모의 객체(addInitScript)를 주입해 지도 생성 호출 횟수·마커 좌표 이동·활성 강조 전환을 프로그래매틱하게 검증(실제 카카오맵 SDK도 이 세션에서는 egress 정책상 로드 불가하여 모킹) |
 | 2026-07-02 | 공고 상세 아코디언에 housing_units 호별 세대정보 섹션 추가 — hcard에 data-announcement-id 속성 추가(공고탭·추천탭 카드 공통), toggleDetail()에 지도 지연로딩과 동일 패턴(dataset.unitsLoaded)으로 최초 펼침 시 1회 fetch, 0건이면 섹션 숨김·1건 이상이면 "🏠 세대별 정보 (N건)" 렌더링. 건물명/주소·전용면적·보증금·월임대료(0원↔"월세없음")·분양전환시점 표시, 기본 5건+더보기(10건씩 증분) 방식으로 100건 이상 공고(대구경북 132건 등)도 안전하게 렌더링. 다크모드 텍스트 가시성 규칙(.hu-title/.hu-addr/.hu-value → #e8e8e8, .hu-label → #9aa0aa, .hu-row 배경 다크 대응) 기존 패턴 재사용. sw.js v22 배포. Playwright route mocking으로 있음/없음 공고 양쪽, 더보기 확장, 다크모드 색상 프로그래매틱 검증 완료(egress 정책상 브라우저의 실제 Supabase 직접 호출은 세션에서 차단되어 mock으로 검증) |
 | 2026-07-02 | collect-announcements Edge Function 수정 (v9→v10) — 2026.07.01 광주광역시+전라남도 행정통합("전남광주통합특별시") 반영, LH/MYHOME 원본 API의 과도기 sido_nm 값("광주광역시"/"전라남도")을 저장 직전 자동 치환하는 MERGED_SIDO_MAP 추가. 대전광역시/충청남도는 통합 미법제화 상태라 매핑 대상에서 제외. 기존 announcements 173건은 이미 정리됨(claude.ai 작업분), 이번 변경은 향후 신규 수집분에 적용 |
 | 2026-07-02 | 3단계 세션 마무리 — 긴급 버그 5건 수정(pg_cron 수집 중단, 정정공고 중복 노출, 대전충남 신혼신생아Ⅱ 중복공고, 다크모드 가독성, 카카오맵 구청표시 보류), housing_units/scoring_criteria/eligibility_criteria/announcement_policies 데이터 정합성 정리(category값을 data_categories.category_name과 일치시킴, housing_type "신혼신생아Ⅰ"/"신혼신생아매입임대" 표기 통일). announcements 테이블에 operator_type/recruitment_zone/subscription_account_required/included_appliances 4개 컬럼 신규 추가. 최종 상태: housing_units 878행, scoring_criteria 44행(청년매입임대18/신혼신생아매입임대26), eligibility_criteria 35행, announcement_policies 21행(정책원문 6종), data_categories 31개 |
