@@ -15,12 +15,12 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f0;color:#1a1a1a;min-height:100vh}
 body.theme-dark{background:#16181d;color:#e8e8e8}
-body.theme-dark .hero,body.theme-dark .panel,body.theme-dark .hcard{background:#1f2229;border-color:#2c2f38}
-body.theme-dark .label,body.theme-dark .sub,body.theme-dark .haddr,body.theme-dark .building-desc{color:#9aa0aa}
+body.theme-dark .hero,body.theme-dark .panel,body.theme-dark .hcard,body.theme-dark .hu-row{background:#1f2229;border-color:#2c2f38}
+body.theme-dark .label,body.theme-dark .sub,body.theme-dark .haddr,body.theme-dark .building-desc,body.theme-dark .hu-label{color:#9aa0aa}
 body.theme-dark select,body.theme-dark input{background:#262932;border-color:#3a3e48;color:#e8e8e8}
 body.theme-dark .maintabs{background:#262932}
 body.theme-dark .maintab.active{background:#1f2229;color:#5DCAA5}
-body.theme-dark .logo,body.theme-dark .setting-label,body.theme-dark .panel-title,body.theme-dark .hname,body.theme-dark .mval{color:#e8e8e8}
+body.theme-dark .logo,body.theme-dark .setting-label,body.theme-dark .panel-title,body.theme-dark .hname,body.theme-dark .mval,body.theme-dark .hu-title,body.theme-dark .hu-addr,body.theme-dark .hu-value{color:#e8e8e8}
 body.fs-small{font-size:13px}
 body.fs-large{font-size:17px}
 .wrap{max-width:720px;margin:0 auto;padding:1.5rem 1rem}
@@ -138,6 +138,17 @@ select:focus,input:focus{border-color:#5DCAA5}
 .detail-link:hover{background:#E6F1FB}
 .detail-note{font-size:11px;color:#999;line-height:1.6;padding:0 2px}
 .map-box{width:100%;height:220px;border-radius:10px;overflow:hidden;border:1px solid #e8e8e0;background:#f0f0e8}
+.hu-wrap{margin-top:12px;border-top:1px solid #e8e8e0;padding-top:12px}
+.hu-title{font-size:13px;font-weight:600;color:#333;margin-bottom:8px}
+.hu-list{display:flex;flex-direction:column;gap:8px}
+.hu-row{background:#f8f8f8;border:1px solid #e8e8e0;border-radius:10px;padding:8px 10px}
+.hu-addr{font-size:12px;font-weight:600;color:#333;margin-bottom:6px}
+.hu-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:4px 8px}
+.hu-item{font-size:12px}
+.hu-label{color:#999;margin-right:4px}
+.hu-value{color:#333;font-weight:500}
+.hu-more-btn{width:100%;padding:8px;border-radius:8px;border:1px dashed #ccc;background:#fafaf6;color:#666;font-size:12px;cursor:pointer;margin-top:4px}
+.hu-more-btn:hover{background:#f0f0e8}
 .poi-section{margin-top:8px}
 .poi-tabs{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap}
 .poi-tab{padding:5px 11px;font-size:11px;border-radius:14px;border:1px solid #ddd;background:#fff;color:#666;cursor:pointer}
@@ -1036,7 +1047,7 @@ function renderNoticeList(filtered, totalCount){
         </div>`
       : `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px" onclick="event.stopPropagation()"><div style="display:flex;gap:8px;flex-wrap:wrap">${n['공고URL']?`<a class="detail-link" href="${n['공고URL']}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a>`:''} ${shareBtn} ${saveBtn}</div></div>`;
 
-    html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n['지역']||'').replace(/"/g,'&quot;')}" data-sido="${(n['sido_nm']||'').replace(/"/g,'&quot;')}" data-sigungu="${(n['sigungu_nm']||'').replace(/"/g,'&quot;')}" data-title="${(n['공고명']||'').replace(/"/g,'&quot;')}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this)" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
+    html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n['지역']||'').replace(/"/g,'&quot;')}" data-sido="${(n['sido_nm']||'').replace(/"/g,'&quot;')}" data-sigungu="${(n['sigungu_nm']||'').replace(/"/g,'&quot;')}" data-title="${(n['공고명']||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this)" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
       <div class="htop">
         <p class="hname">${n['공고명']||'(공고명 없음)'}</p>
         <span class="htag ${isClosed?'tag-mix':'tag-apt'}">${n['처리상태']||'-'}</span>
@@ -1803,6 +1814,57 @@ function toggleDetail(id, card){
     detailEl.appendChild(mapWrap);
     initMapForHouse(h, id);
   }
+  if(!open && !detailEl.dataset.unitsLoaded && cardEl){
+    detailEl.dataset.unitsLoaded = '1';
+    const annId = cardEl.dataset.announcementId || '';
+    loadHousingUnits(annId, detailEl, id);
+  }
+}
+
+const huUnitsCache = {};
+
+function loadHousingUnits(annId, detailEl, id){
+  if(!annId) return;
+  fetch(`${SUPABASE_URL}/rest/v1/housing_units?announcement_id=eq.${encodeURIComponent(annId)}&order=deposit.asc`, {
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
+  }).then(r => r.ok ? r.json() : []).then(units => {
+    if(!Array.isArray(units) || units.length === 0) return;
+    huUnitsCache[id] = units;
+    const wrap = document.createElement('div');
+    wrap.className = 'hu-wrap';
+    wrap.innerHTML = `<div class="hu-title">🏠 세대별 정보 (${units.length}건)</div><div class="hu-list" id="hu-list-${id}"></div>`;
+    detailEl.appendChild(wrap);
+    renderHousingUnitRows(id, 5);
+  }).catch(err => {
+    console.error('ZipFit 세대정보 로드 실패:', err);
+  });
+}
+
+function renderHousingUnitRows(id, visibleCount){
+  const units = huUnitsCache[id];
+  const listEl = document.getElementById('hu-list-'+id);
+  if(!units || !listEl) return;
+  const shown = units.slice(0, visibleCount);
+  let rowsHtml = shown.map(u => {
+    const addr = [u.building_name, u.address].filter(Boolean).join(' ') || '주소 정보 없음';
+    const area = u.area_sqm != null ? parseFloat(u.area_sqm).toFixed(1)+'㎡' : '-';
+    const deposit = u.deposit != null ? Number(u.deposit).toLocaleString()+'원' : '-';
+    const rent = (u.monthly_rent == null || Number(u.monthly_rent) === 0) ? '월세없음' : Number(u.monthly_rent).toLocaleString()+'원';
+    const conv = u.conversion_date ? `<div class="hu-item"><span class="hu-label">분양전환</span><span class="hu-value">${u.conversion_date}</span></div>` : '';
+    return `<div class="hu-row">
+      <div class="hu-addr">${addr}</div>
+      <div class="hu-fields">
+        <div class="hu-item"><span class="hu-label">전용면적</span><span class="hu-value">${area}</span></div>
+        <div class="hu-item"><span class="hu-label">보증금</span><span class="hu-value">${deposit}</span></div>
+        <div class="hu-item"><span class="hu-label">월임대료</span><span class="hu-value">${rent}</span></div>
+        ${conv}
+      </div>
+    </div>`;
+  }).join('');
+  if(units.length > visibleCount){
+    rowsHtml += `<button class="hu-more-btn" onclick="event.stopPropagation();renderHousingUnitRows('${id}',${visibleCount+10})">더 보기 (${units.length-visibleCount}건 더) ↓</button>`;
+  }
+  listEl.innerHTML = rowsHtml;
 }
 
 function initMapForHouse(h,id){
@@ -1971,7 +2033,7 @@ function renderMatchResults(rows){
         </div>`
       : `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px" onclick="event.stopPropagation()"><div style="display:flex;gap:8px;flex-wrap:wrap">${n.url?`<a class="detail-link" href="${n.url}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a>`:''} ${mShareBtn} ${mSaveBtn}</div></div>`;
 
-    html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n.region||'').replace(/"/g,'&quot;')}" data-sido="${(n.sido_nm||'').replace(/"/g,'&quot;')}" data-sigungu="${(n.sigungu_nm||'').replace(/"/g,'&quot;')}" data-title="${(n.title||'').replace(/"/g,'&quot;')}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this)" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
+    html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n.region||'').replace(/"/g,'&quot;')}" data-sido="${(n.sido_nm||'').replace(/"/g,'&quot;')}" data-sigungu="${(n.sigungu_nm||'').replace(/"/g,'&quot;')}" data-title="${(n.title||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this)" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
       <div class="htop">
         <p class="hname">${n.title||'(공고명 없음)'}</p>
         <span class="htag ${isClosed?'tag-mix':'tag-apt'}">${n.status||'-'}</span>

@@ -2,10 +2,10 @@
 
 > **이 파일이 유일한 세이브포인트입니다.**
 > Claude Code와 claude.ai 모두 이 파일을 기준으로 작업합니다.
-> **마지막 업데이트**: 2026-07-02 (collect-announcements Edge Function에 광주·전남 행정통합 sido_nm 정규화 로직 추가 — v10 배포 완료)
+> **마지막 업데이트**: 2026-07-02 (공고 상세 아코디언에 housing_units 호별 세대정보 섹션 추가 — sw.js v22 배포 완료)
 
 ## 🔜 다음 세션 작업 예정
-- **프론트엔드에 신규 데이터 노출**: housing_units(호별 상세), scoring_criteria(가점표), eligibility_criteria(순위별 소득·자산기준), announcement_policies(정책 원문) — 지금까지는 DB 적재만 완료된 상태이며 index.html에서 아직 활용하지 않음. 공고 상세 패널·자격진단 결과·가점 계산 등에 반영 필요
+- **프론트엔드에 나머지 신규 데이터 노출**: scoring_criteria(가점표), eligibility_criteria(순위별 소득·자산기준), announcement_policies(정책 원문) — housing_units는 이번 세션에 반영 완료. 자격진단 결과·가점 계산 등에 반영 필요
 
 ---
 
@@ -164,6 +164,7 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-07-02 | 공고 상세 아코디언에 housing_units 호별 세대정보 섹션 추가 — hcard에 data-announcement-id 속성 추가(공고탭·추천탭 카드 공통), toggleDetail()에 지도 지연로딩과 동일 패턴(dataset.unitsLoaded)으로 최초 펼침 시 1회 fetch, 0건이면 섹션 숨김·1건 이상이면 "🏠 세대별 정보 (N건)" 렌더링. 건물명/주소·전용면적·보증금·월임대료(0원↔"월세없음")·분양전환시점 표시, 기본 5건+더보기(10건씩 증분) 방식으로 100건 이상 공고(대구경북 132건 등)도 안전하게 렌더링. 다크모드 텍스트 가시성 규칙(.hu-title/.hu-addr/.hu-value → #e8e8e8, .hu-label → #9aa0aa, .hu-row 배경 다크 대응) 기존 패턴 재사용. sw.js v22 배포. Playwright route mocking으로 있음/없음 공고 양쪽, 더보기 확장, 다크모드 색상 프로그래매틱 검증 완료(egress 정책상 브라우저의 실제 Supabase 직접 호출은 세션에서 차단되어 mock으로 검증) |
 | 2026-07-02 | collect-announcements Edge Function 수정 (v9→v10) — 2026.07.01 광주광역시+전라남도 행정통합("전남광주통합특별시") 반영, LH/MYHOME 원본 API의 과도기 sido_nm 값("광주광역시"/"전라남도")을 저장 직전 자동 치환하는 MERGED_SIDO_MAP 추가. 대전광역시/충청남도는 통합 미법제화 상태라 매핑 대상에서 제외. 기존 announcements 173건은 이미 정리됨(claude.ai 작업분), 이번 변경은 향후 신규 수집분에 적용 |
 | 2026-07-02 | 3단계 세션 마무리 — 긴급 버그 5건 수정(pg_cron 수집 중단, 정정공고 중복 노출, 대전충남 신혼신생아Ⅱ 중복공고, 다크모드 가독성, 카카오맵 구청표시 보류), housing_units/scoring_criteria/eligibility_criteria/announcement_policies 데이터 정합성 정리(category값을 data_categories.category_name과 일치시킴, housing_type "신혼신생아Ⅰ"/"신혼신생아매입임대" 표기 통일). announcements 테이블에 operator_type/recruitment_zone/subscription_account_required/included_appliances 4개 컬럼 신규 추가. 최종 상태: housing_units 878행, scoring_criteria 44행(청년매입임대18/신혼신생아매입임대26), eligibility_criteria 35행, announcement_policies 21행(정책원문 6종), data_categories 31개 |
 | 2026-07-01 | 1단계 공고 원문 전수조사 완료 — 20개 Drive 폴더 공고문·엑셀·QnA 분석, category_discovery_log batch_no=1 총 120건 적재 (신규 후보 20건, 기존 카테고리 매칭 100건) |
