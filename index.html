@@ -1968,7 +1968,7 @@ function initMapForHouse(h,id){
       if(status === kakao.maps.services.Status.OK && result.length){
         renderMap(result);
       } else {
-        const fallback = h.addr.split(' ')[0];
+        const fallback = h.addr.split(' ').slice(0,2).join(' ');
         if(fallback && fallback !== h.addr){
           geocoder.addressSearch(fallback, (r2, s2) => {
             if(s2 === kakao.maps.services.Status.OK && r2.length){

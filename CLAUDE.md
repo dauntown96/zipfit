@@ -2,7 +2,7 @@
 
 > **이 파일이 유일한 세이브포인트입니다.**
 > Claude Code와 claude.ai 모두 이 파일을 기준으로 작업합니다.
-> **마지막 업데이트**: 2026-07-02 (announcements.precise_address 컬럼 프론트엔드 반영 — 지도 표시 우선순위 로직에 범용 적용, sw.js v24 배포 완료)
+> **마지막 업데이트**: 2026-07-02 (initMapForHouse 지오코딩 폴백 로직 개선 — 시/도만→시/도+시군구 2단어로 정밀화, sw.js v25 배포 완료)
 
 ## 🔜 다음 세션 작업 예정
 - **프론트엔드에 나머지 신규 데이터 노출**: scoring_criteria(가점표), eligibility_criteria(순위별 소득·자산기준), announcement_policies(정책 원문) — housing_units는 반영 완료. 자격진단 결과·가점 계산 등에 반영 필요
@@ -164,6 +164,7 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-07-02 | initMapForHouse() 지오코딩 폴백 로직 개선 — 1차 지오코딩 실패 시 fallback을 h.addr.split(' ')[0](시/도만)에서 slice(0,2)(시/도+시군구 2단어)로 변경. precise_address에 다양한 형태의 주소가 들어와도 폴백 검색 범위가 과도하게 넓어지지 않도록 정밀화. sw.js v24→v25 |
 | 2026-07-02 | announcements.precise_address 컬럼 프론트엔드 반영 — get_announcements_deduped() RPC에 precise_address 추가(DROP FUNCTION 후 재생성), 공고탭(loadNoticeData)·추천탭(matchHouses) 양쪽 카드에 data-precise-address 속성 추가. toggleDetail() 최초 지도 로딩 시 precise_address 유무만으로 분기(있으면 그 주소, 없으면 기존 sido+sigungu 방식) — 특정 공고 하드코딩 없이 앞으로 이 필드가 채워지는 모든 공고에 자동 적용되는 범용 로직. 세대별 정보 아코디언은 기존 housing_units 유무 판단 그대로 유지. sw.js v23→v24. Playwright kakao.maps 모의 객체로 precise_address 있음/없음 양쪽 지오코딩 호출 인자와 세대별 정보 섹션 미노출을 프로그래매틱 검증 |
 | 2026-07-02 | housing_units.building_name 데이터 정제 — building_name에 "매입다가구(지역명)" 카테고리성 자리표시자가 잘못 들어간 241건을 address 원문을 직접 읽고 판단해 실제 단지명(아파트·빌라·오피스텔명) 또는 단지명이 없는 순수 다가구/다세대는 법정동명으로 교체(정규식 일괄처리 아닌 케이스별 수동 판단). 예: "매입다가구(대전서구)" → "더 프라임 시티"(단지명 있는 경우), "매입다가구(대전서구)" → "도마동"(지번만 있는 순수 다가구). 검증: building_name LIKE '매입다가구(%' 0건 확인, 총 행수(881행) 불변 확인 |
 | 2026-07-02 | 세대별 정보 리스트를 건물 단위로 그룹핑 + 지도 연동 — housing_units를 building_name(없으면 address) 기준으로 묶어 "건물명 (N건)" 2단 아코디언으로 표시, 건물 그룹 클릭 시 기존 initMapForHouse()를 재사용해 지도 마커를 그 건물 위치로 이동. initMapForHouse가 카드당 지도/마커 인스턴스를 huMapState에 캐싱해 재호출 시 새로 생성하지 않고 setCenter/setPosition으로 위치만 갱신 → 여러 건물을 눌러도 마커 항상 1개만 유지. 현재 선택된 건물 행은 .hu-group-active 클래스로 강조, "더보기"로 목록을 다시 그려도 강조 상태 유지. 건물 그룹 목록도 기존 더보기 패턴(초기 5개+10개씩 증분) 적용. sw.js v22→v23. Playwright에 kakao.maps 모의 객체(addInitScript)를 주입해 지도 생성 호출 횟수·마커 좌표 이동·활성 강조 전환을 프로그래매틱하게 검증(실제 카카오맵 SDK도 이 세션에서는 egress 정책상 로드 불가하여 모킹) |
