@@ -2,7 +2,7 @@
 
 > **이 파일이 유일한 세이브포인트입니다.**
 > Claude Code와 claude.ai 모두 이 파일을 기준으로 작업합니다.
-> **마지막 업데이트**: 2026-07-01 (1단계 공고 원문 전수조사 완료 — 20개 폴더 120건 발견사항 category_discovery_log 적재, 신규 후보 20건 확인)
+> **마지막 업데이트**: 2026-07-02 (2단계 housing_units 실데이터 대량 적재 — 대구경북 분양전환형 119행·비분양전환형 128행 완료, 누적 총 653행)
 
 ---
 
@@ -151,6 +151,7 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 |---|---|
 | 2026-07-01 | 1단계 공고 원문 전수조사 완료 — 20개 Drive 폴더 공고문·엑셀·QnA 분석, category_discovery_log batch_no=1 총 120건 적재 (신규 후보 20건, 기존 카테고리 매칭 100건) |
 | 2026-07-01 | Notion 공고 분석 파이프라인 확정 — 작업 원칙 페이지에 6단계 파이프라인·data_categories 레지스트리·5배치 재검증 안전장치 추가; 공고 분석 로그 source of truth 주석 추가 |
+| 2026-07-02 | 2단계 housing_units 실데이터 대량 적재 — 대구경북_분양전환형(경주 해링턴플레이스 신경주역 101동·102동) 119행, 대구경북_비분양전환형(수성헤센더테라스·경산부영·달서구·달성군 20개 건물) 128행 삽입, 누적 총 653행 |
 | 2026-07-01 | 다크모드 텍스트 가독성 버그 수정 — .logo/.setting-label/.panel-title/.hname/.mval 다크모드에서 color:#e8e8e8 지정, sw.js v21 |
 | 2026-07-01 | announcement_extras 4순위 배치 완료 — 폴더 16~20 (대전충남 기숙사형/신혼신생아I/신혼신생아II전세형, 부산울산 기숙사형) 적재, 총 355건 |
 | 2026-07-01 | loadNoticeData 매핑 누락 버그 수정 — mymy_applicable/supply_form/application_method/recruit_multiplier/pair_announcement_key/housing_change_allowed/source/announcement_id 8개 필드 추가, 뱃지·짝공고 경고 표시 정상화, sw.js v20 |
