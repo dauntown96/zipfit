@@ -2,7 +2,10 @@
 
 > **이 파일이 유일한 세이브포인트입니다.**
 > Claude Code와 claude.ai 모두 이 파일을 기준으로 작업합니다.
-> **마지막 업데이트**: 2026-07-02 (2단계 실데이터 대량 적재 완료 — 20개 폴더 전량 처리, housing_units 누적 974행 + eligibility_criteria 35행 + scoring_criteria 44행 + announcement_policies 21행)
+> **마지막 업데이트**: 2026-07-02 (긴급 버그 5건 수정 + 공고 분석 파이프라인 구축 + 데이터 정합성 정리 완료 — housing_units 878행 / scoring_criteria 44행 / eligibility_criteria 35행 / announcement_policies 21행 / data_categories 31개)
+
+## 🔜 다음 세션 작업 예정
+- **프론트엔드에 신규 데이터 노출**: housing_units(호별 상세), scoring_criteria(가점표), eligibility_criteria(순위별 소득·자산기준), announcement_policies(정책 원문) — 지금까지는 DB 적재만 완료된 상태이며 index.html에서 아직 활용하지 않음. 공고 상세 패널·자격진단 결과·가점 계산 등에 반영 필요
 
 ---
 
@@ -122,6 +125,18 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 3. ✅ ~~**확성기 배너 동적화**~~ (완료 2026-06-25)
    - `updateBannerFromDB()` 추가 — 접수중 공고 우선, 없으면 최신 공고 1건으로 배너 자동 업데이트
 
+4. ✅ ~~**pg_cron 공고 수집 중단**~~ (완료 2026-07-02)
+   - 헤더 JSON 이스케이프 오류로 collect-announcements 트리거 실패 → cron job 재생성(jobid 4, 5)으로 수정, 매일 09:00/15:00 정상 작동 확인
+
+5. ✅ ~~**정정공고 시 원본 공고 중복 노출**~~ (완료 2026-07-02)
+   - `get_announcements_deduped()` RPC 수정 — 제목 접두어 "[정정공고]" 무시하고 매칭하도록 변경
+
+6. ✅ ~~**대전충남 신혼신생아Ⅱ 중복 공고**~~ (완료 2026-07-02)
+   - 동일 RPC에서 제목 공백 정규화로 해결
+
+7. 🔵 **카카오맵 구청 표시 문제** — 보류 (2026-07-02)
+   - 호별 주소 데이터 구조상 현재 구현 불가로 판단, 추후 재검토
+
 ### 🟡 기능 개선
 - ✅ NEW 배지 동적 계산 (`created_at` 기준 48시간) — 이미 구현됨 확인
 - ✅ 마감임박 배지 (`apply_end` 기준 3일 이내) — 이미 구현됨 확인
@@ -149,6 +164,7 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-07-02 | 3단계 세션 마무리 — 긴급 버그 5건 수정(pg_cron 수집 중단, 정정공고 중복 노출, 대전충남 신혼신생아Ⅱ 중복공고, 다크모드 가독성, 카카오맵 구청표시 보류), housing_units/scoring_criteria/eligibility_criteria/announcement_policies 데이터 정합성 정리(category값을 data_categories.category_name과 일치시킴, housing_type "신혼신생아Ⅰ"/"신혼신생아매입임대" 표기 통일). announcements 테이블에 operator_type/recruitment_zone/subscription_account_required/included_appliances 4개 컬럼 신규 추가. 최종 상태: housing_units 878행, scoring_criteria 44행(청년매입임대18/신혼신생아매입임대26), eligibility_criteria 35행, announcement_policies 21행(정책원문 6종), data_categories 31개 |
 | 2026-07-01 | 1단계 공고 원문 전수조사 완료 — 20개 Drive 폴더 공고문·엑셀·QnA 분석, category_discovery_log batch_no=1 총 120건 적재 (신규 후보 20건, 기존 카테고리 매칭 100건) |
 | 2026-07-01 | Notion 공고 분석 파이프라인 확정 — 작업 원칙 페이지에 6단계 파이프라인·data_categories 레지스트리·5배치 재검증 안전장치 추가; 공고 분석 로그 source of truth 주석 추가 |
 | 2026-07-02 | 2단계 실데이터 대량 적재 최종 완료 — 미완료 8개 폴더 전량 처리(서울대방/광명1R/광명4R 행복주택, 광주전남 기숙사형·신혼신생아Ⅰ·Ⅱ전세형·청년매입임대, 대전충남_청년매입임대). housing_units 신규 274행(대전충남_청년매입임대 110, 광주전남_청년매입임대 49, 광주전남_신혼신생아Ⅰ 37, 광주전남_신혼신생아Ⅱ전세형 22, 광주전남_기숙사형 3, 대구경북_비분양전환형 누락분 4). eligibility_criteria 35행, scoring_criteria 44행, announcement_policies 21행 신규 적재. 대구경북_분양전환형 sigungu_nm 오염값("매입다가구(경북경주시)" 등) 정리(경주시/중구). housing_units 누적 총 974행 |
