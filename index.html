@@ -15,12 +15,12 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f0;color:#1a1a1a;min-height:100vh}
 body.theme-dark{background:#16181d;color:#e8e8e8}
-body.theme-dark .hero,body.theme-dark .panel,body.theme-dark .hcard,body.theme-dark .hu-row,body.theme-dark .hu-group-head,body.theme-dark .hu-group-body{background:#1f2229;border-color:#2c2f38}
+body.theme-dark .hero,body.theme-dark .panel,body.theme-dark .hcard,body.theme-dark .hu-row,body.theme-dark .hu-group-head,body.theme-dark .hu-group-body,body.theme-dark .policy-item{background:#1f2229;border-color:#2c2f38}
 body.theme-dark .label,body.theme-dark .sub,body.theme-dark .haddr,body.theme-dark .building-desc,body.theme-dark .hu-label,body.theme-dark .hu-group-count{color:#9aa0aa}
 body.theme-dark select,body.theme-dark input{background:#262932;border-color:#3a3e48;color:#e8e8e8}
 body.theme-dark .maintabs{background:#262932}
 body.theme-dark .maintab.active{background:#1f2229;color:#5DCAA5}
-body.theme-dark .logo,body.theme-dark .setting-label,body.theme-dark .panel-title,body.theme-dark .hname,body.theme-dark .mval,body.theme-dark .hu-title,body.theme-dark .hu-addr,body.theme-dark .hu-value,body.theme-dark .hu-group-name{color:#e8e8e8}
+body.theme-dark .logo,body.theme-dark .setting-label,body.theme-dark .panel-title,body.theme-dark .hname,body.theme-dark .mval,body.theme-dark .hu-title,body.theme-dark .hu-addr,body.theme-dark .hu-value,body.theme-dark .hu-group-name,body.theme-dark .policy-title,body.theme-dark .policy-content{color:#e8e8e8}
 body.theme-dark .hu-group-head.hu-group-active{background:#1d3d33;border-color:#5DCAA5}
 body.theme-dark .hu-group-head:hover{background:#262932}
 body.fs-small{font-size:13px}
@@ -142,6 +142,12 @@ select:focus,input:focus{border-color:#5DCAA5}
 .map-box{width:100%;height:220px;border-radius:10px;overflow:hidden;border:1px solid #e8e8e0;background:#f0f0e8}
 .hu-wrap{margin-top:12px;border-top:1px solid #e8e8e0;padding-top:12px}
 .hu-title{font-size:13px;font-weight:600;color:#333;margin-bottom:8px}
+.policy-wrap{margin-top:12px;border-top:1px solid #e8e8e0;padding-top:12px}
+.policy-title{font-size:13px;font-weight:600;color:#333;margin-bottom:8px}
+.policy-item{border:1px solid #e8e8e0;border-radius:10px;padding:10px 12px;margin-bottom:8px}
+.policy-item:last-child{margin-bottom:0}
+.policy-category{font-size:12px;font-weight:600;color:#1D9E75;margin-bottom:4px}
+.policy-content{font-size:12px;color:#555;line-height:1.5;white-space:pre-wrap}
 .hu-list{display:flex;flex-direction:column;gap:8px}
 .hu-row{background:#f8f8f8;border:1px solid #e8e8e0;border-radius:10px;padding:8px 10px}
 .hu-addr{font-size:12px;font-weight:600;color:#333;margin-bottom:6px}
@@ -1838,6 +1844,38 @@ function toggleDetail(id, card){
     const annId = cardEl.dataset.announcementId || '';
     loadHousingUnits(annId, detailEl, id);
   }
+  if(!open && !detailEl.dataset.policiesLoaded && cardEl){
+    detailEl.dataset.policiesLoaded = '1';
+    const annId = cardEl.dataset.announcementId || '';
+    loadAnnouncementPolicies(annId, detailEl, id);
+  }
+}
+
+function escapeHtml(s){
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function loadAnnouncementPolicies(annId, detailEl, id){
+  if(!annId) return;
+  fetch(`${SUPABASE_URL}/rest/v1/announcement_policies?announcement_id=eq.${encodeURIComponent(annId)}&order=category`, {
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
+  }).then(r => r.ok ? r.json() : []).then(policies => {
+    if(!Array.isArray(policies) || policies.length === 0) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'policy-wrap';
+    wrap.innerHTML = `<div class="policy-title">📋 정책 안내 (${policies.length}건)</div>` +
+      policies.map(p => `
+        <div class="policy-item">
+          <div class="policy-category">${escapeHtml(p.category || '')}</div>
+          <div class="policy-content">${escapeHtml(p.content_raw || '')}</div>
+        </div>
+      `).join('');
+    detailEl.appendChild(wrap);
+  }).catch(err => {
+    console.error('ZipFit 정책안내 로드 실패:', err);
+  });
 }
 
 const huUnitsCache = {};
