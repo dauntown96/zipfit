@@ -15,12 +15,12 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f0;color:#1a1a1a;min-height:100vh}
 body.theme-dark{background:#16181d;color:#e8e8e8}
-body.theme-dark .hero,body.theme-dark .panel,body.theme-dark .hcard,body.theme-dark .hu-row,body.theme-dark .hu-group-head,body.theme-dark .hu-group-body,body.theme-dark .policy-item{background:#1f2229;border-color:#2c2f38}
+body.theme-dark .hero,body.theme-dark .panel,body.theme-dark .hcard,body.theme-dark .hu-row,body.theme-dark .hu-group-head,body.theme-dark .hu-group-body,body.theme-dark .policy-item,body.theme-dark .elig-item{background:#1f2229;border-color:#2c2f38}
 body.theme-dark .label,body.theme-dark .sub,body.theme-dark .haddr,body.theme-dark .building-desc,body.theme-dark .hu-label,body.theme-dark .hu-group-count{color:#9aa0aa}
 body.theme-dark select,body.theme-dark input{background:#262932;border-color:#3a3e48;color:#e8e8e8}
 body.theme-dark .maintabs{background:#262932}
 body.theme-dark .maintab.active{background:#1f2229;color:#5DCAA5}
-body.theme-dark .logo,body.theme-dark .setting-label,body.theme-dark .panel-title,body.theme-dark .hname,body.theme-dark .mval,body.theme-dark .hu-title,body.theme-dark .hu-addr,body.theme-dark .hu-value,body.theme-dark .hu-group-name,body.theme-dark .policy-title,body.theme-dark .policy-content{color:#e8e8e8}
+body.theme-dark .logo,body.theme-dark .setting-label,body.theme-dark .panel-title,body.theme-dark .hname,body.theme-dark .mval,body.theme-dark .hu-title,body.theme-dark .hu-addr,body.theme-dark .hu-value,body.theme-dark .hu-group-name,body.theme-dark .policy-title,body.theme-dark .policy-content,body.theme-dark .elig-title{color:#e8e8e8}
 body.theme-dark .hu-group-head.hu-group-active{background:#1d3d33;border-color:#5DCAA5}
 body.theme-dark .hu-group-head:hover{background:#262932}
 body.fs-small{font-size:13px}
@@ -148,6 +148,12 @@ select:focus,input:focus{border-color:#5DCAA5}
 .policy-item:last-child{margin-bottom:0}
 .policy-category{font-size:12px;font-weight:600;color:#1D9E75;margin-bottom:4px}
 .policy-content{font-size:12px;color:#555;line-height:1.5;white-space:pre-wrap}
+.elig-wrap{margin-top:12px;border-top:1px solid #e8e8e0;padding-top:12px}
+.elig-title{font-size:13px;font-weight:600;color:#333;margin-bottom:8px}
+.elig-item{border:1px solid #e8e8e0;border-radius:10px;padding:10px 12px;margin-bottom:8px;font-size:12px}
+.elig-item:last-child{margin-bottom:0}
+.elig-head{font-weight:600;color:#1D9E75;margin-bottom:4px}
+.elig-row{display:flex;justify-content:space-between;color:#555;padding:2px 0}
 .hu-list{display:flex;flex-direction:column;gap:8px}
 .hu-row{background:#f8f8f8;border:1px solid #e8e8e0;border-radius:10px;padding:8px 10px}
 .hu-addr{font-size:12px;font-weight:600;color:#333;margin-bottom:6px}
@@ -1617,7 +1623,7 @@ let _eligibilityCriteria = null;
 async function loadEligibilityCriteria(){
   if(_eligibilityCriteria) return _eligibilityCriteria;
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/eligibility_criteria?select=housing_type,supply_form,income_pct,income_pct_dual_income,asset_limit&order=housing_type`,
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/eligibility_criteria?source_announcement_id=eq.기본기준&select=housing_type,supply_form,income_pct,income_pct_dual_income,asset_limit&order=housing_type`,
       {headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY}});
     if(res.ok){
       const rows = await res.json();
@@ -1849,6 +1855,11 @@ function toggleDetail(id, card){
     const annId = cardEl.dataset.announcementId || '';
     loadAnnouncementPolicies(annId, detailEl, id);
   }
+  if(!open && !detailEl.dataset.eligLoaded && cardEl){
+    detailEl.dataset.eligLoaded = '1';
+    const annId = cardEl.dataset.announcementId || '';
+    loadPreciseEligibility(annId, detailEl, id);
+  }
 }
 
 function escapeHtml(s){
@@ -1875,6 +1886,35 @@ function loadAnnouncementPolicies(annId, detailEl, id){
     detailEl.appendChild(wrap);
   }).catch(err => {
     console.error('ZipFit 정책안내 로드 실패:', err);
+  });
+}
+
+function loadPreciseEligibility(annId, detailEl, id){
+  if(!annId) return;
+  fetch(`${SUPABASE_URL}/rest/v1/eligibility_criteria?announcement_id=eq.${encodeURIComponent(annId)}&order=supply_form,rank`, {
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
+  }).then(r => r.ok ? r.json() : []).then(rows => {
+    if(!Array.isArray(rows) || rows.length === 0) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'elig-wrap';
+    wrap.innerHTML = `<div class="elig-title">🎯 이 공고 정밀 자격기준 (${rows.length}건)</div>` +
+      rows.map(r => {
+        const sf = r.supply_form ? escapeHtml(r.supply_form) : '일반';
+        const rk = r.rank ? `${r.rank}순위` : '';
+        const income = r.income_pct ? `소득 ${r.income_pct}%` : '';
+        const dual = r.income_pct_dual_income ? ` (맞벌이 ${r.income_pct_dual_income}%)` : '';
+        const asset = r.asset_limit ? `자산 ${(r.asset_limit/10000).toLocaleString()}만원` : '';
+        const car = r.car_limit ? `차량가액 ${(r.car_limit/10000).toLocaleString()}만원` : '';
+        return `<div class="elig-item">
+          <div class="elig-head">${sf}${rk ? ' · '+rk : ''}</div>
+          ${income ? `<div class="elig-row"><span>소득기준</span><span>${income}${dual}</span></div>` : ''}
+          ${asset ? `<div class="elig-row"><span>자산기준</span><span>${asset}</span></div>` : ''}
+          ${car ? `<div class="elig-row"><span>차량가액</span><span>${car}</span></div>` : ''}
+        </div>`;
+      }).join('');
+    detailEl.appendChild(wrap);
+  }).catch(err => {
+    console.error('ZipFit 정밀자격기준 로드 실패:', err);
   });
 }
 

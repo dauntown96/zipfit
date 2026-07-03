@@ -2,11 +2,11 @@
 
 > **이 파일이 유일한 세이브포인트입니다.**
 > Claude Code와 claude.ai 모두 이 파일을 기준으로 작업합니다.
-> **마지막 업데이트**: 2026-07-03 (announcement_policies 정책 카테고리 6종 백필 완료 — DB만, 코드 변경 없음)
+> **마지막 업데이트**: 2026-07-03 (eligibility_criteria 전역진단 오염 버그 수정 + 공고별 정밀 자격기준 노출 완료 — sw.js v30 배포 완료)
 
 ## 🔜 다음 세션 작업 예정
 - **🔴 지오코딩 진단로그 실사용 확인 필요**: F12 콘솔에서 `[ZipFit geocode]` 로그를 여러 공고에서 직접 확인 — Lv1 실패→Lv2 성공 비율(정제 효과 입증), Lv1·Lv2 모두 실패→Lv3까지 가는 비율(높으면 정제 로직 추가 보완 필요). 확인 후 진단용 console.warn 제거 검토
-- **프론트엔드에 나머지 신규 데이터 노출**: scoring_criteria(가점표), eligibility_criteria(순위별 소득·자산기준) — housing_units·announcement_policies는 반영 완료. 자격진단 결과·가점 계산 등에 반영 필요. eligibility_criteria는 지역/순위 미반영 이슈로 별도 논의 필요
+- **프론트엔드에 나머지 신규 데이터 노출**: scoring_criteria(가점표) — housing_units·announcement_policies·eligibility_criteria(전역+정밀 둘 다)는 반영 완료. 자격진단 결과·가점 계산 등에 scoring_criteria 반영 필요
 
 ---
 
@@ -165,6 +165,7 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-07-03 | eligibility_criteria 전역진단 오염 버그 수정 + 공고별 정밀 자격기준 노출 — `eligibility_criteria` 35건이 사실 `source_announcement_id`로 이미 두 그룹(전국 공통 '기본기준' 8건 vs 특정 공고 전용 27건)이 나뉘어 있었는데 `diagnose()` 1단계 전역 조회 쿼리가 이 구분 없이 35건을 몽땅 섞어 써서, 전역 진단인데 특정 지역 기준까지 비교에 섞이는 오염 상태였음. `announcement_id` 컬럼 신규 추가 후 27건을 housing_units/기존 announcement_policies에서 이미 검증된 id로 매핑(새로 추론 없음), `loadEligibilityCriteria()` fetch URL에 `source_announcement_id=eq.기본기준` 필터 추가해 전역 진단은 8건만 쓰도록 수정. 27건은 오늘 만든 announcement_policies와 동일 패턴으로 `loadPreciseEligibility()` 신규 구현해 공고 상세에 "🎯 이 공고 정밀 자격기준" 섹션으로 노출(`.elig-*` CSS, 다크모드 배경·텍스트 선택자 포함). sw.js v29→v30. 검증: 27건 전부 announcement_id 확정 및 get_announcements_deduped() 매칭 성공(matched=true), '기본기준' 8건은 housing_type 8종 커버(매입임대만 supply_form 2종) — 기존 대비 실질적 자격진단 커버리지 축소 없이 노이즈만 제거됨 확인. Playwright 모의 fetch로 전역조회 URL 필터·8건 로드·공고별 정밀기준 렌더링(2건 케이스: 소득·자산·차량가액 필드별 표시, 값 없는 필드는 생략)·정밀기준 없는 공고 무표시·다크모드 텍스트 색상(#e8e8e8) 검증 완료 |
 | 2026-07-03 | announcement_policies 정책 카테고리 6종 백필 — category_discovery_log(20개 공고 원문 전수조사 기록)에서 재계약 최장거주기간·조건부 연장/예비입주자 자격 유효기간/혼인관계 특수조건/기숙사 성별분리 공급/기숙사 운영규정·퇴거승인 조항/입주 전 실사 조건부 공급 6개 카테고리 관련 finding 36건을 ILIKE 패턴으로 조회 후 눈으로 검토, 부천시_취창업청년의 "재계약 시 임대조건 변경 규칙"(재계약 기간이 아닌 임대료 재산정 내용이라 최장거주기간 카테고리와 무관) 1건을 오탐으로 제외하고 35건 채택. announcement_id는 housing_units.announcement_label 매핑을 우선 재사용하고, housing_units에 없는 3개 라벨(광명제1R구역_행복주택_매입형/서울대방_신혼희망타운_건설형/대구경북_든든전세_분양전환형)은 기존 announcement_policies 적재분 및 get_announcements_deduped() title 매칭으로 재확인, 14개 공고 전부 announcement_id 확정(NULL 처리 없음). 같은 공고·카테고리 내 복수 finding은 하나의 content_raw 문단으로 합쳐 33행 INSERT(재계약 9/예비입주자 8/혼인관계 4/기숙사 성별분리 4/기숙사 운영규정 4/입주전 실사 4), data_categories 6종 status를 설계완료_미적재→반영완료로 갱신. 검증: 카테고리별 건수 정확히 일치, 정책 노출 공고 수 5→17건으로 증가, get_announcements_deduped() 매칭 실패 0건 확인. 코드 변경 없음(기존 loadAnnouncementPolicies()가 새 행을 자동 노출) |
 | 2026-07-03 | 공고별 정책 안내(announcement_policies) 프론트엔드 노출 — housing_units와 동일 패턴(카드 상세 오픈 시 announcement_id로 fetch)으로 `loadAnnouncementPolicies()` 신규 구현, 카테고리별 리스트(중복신청탈락규칙/보증금-월세전환/청약통장요구여부/동호수배정방식/위임장제출서류/최하층우선배정) 렌더링. `escapeHtml()` 헬퍼 신규 추가(파일 내 기존 이스케이프 유틸 없었음 확인 후 추가) — content_raw가 원문 텍스트라 이스케이프 없이 넣으면 XSS·레이아웃 깨짐 위험. `.policy-*` CSS를 기존 `.hu-*` 톤에 맞춰 추가, 다크모드 배경(`.policy-item`)·텍스트(`.policy-title`/`.policy-content`) 선택자도 누락 없이 반영(과거 세션에 다크모드 텍스트 미반영 사고가 있었던 지점이라 특별히 확인). sw.js v28→v29. DB 조회 결과 실제로 매칭 가능한 공고는 5건(2015122300020202, 2015122300020209, 20647_1_경기도_광명시, 20648_1_경기도_광명시, 20652_1_서울특별시_영등포구) — 나머지 2건(보증금-월세전환/위임장 카테고리, 대전충남 청년매입임대 추정)은 announcement_id가 의도적으로 NULL 유지된 상태라 프론트엔드에 노출되지 않음(작업 지시서의 "6개 공고"와 달리 5개 공고에서만 실제로 섹션이 뜸, 나머지는 애초에 매칭 불가한 데이터 상태). Playwright 모의 fetch로 정책 있음(HTML 특수문자 포함 content_raw로 XSS 이스케이프 확인)/없음 두 케이스와 다크모드 텍스트 색상(#e8e8e8 정상 적용) 검증 완료 |
 | 2026-07-02 | 🟡 지오코딩 3단계 폴백 + 진단로깅 추가 (실사용 검증 대기중, "해결완료" 아님) — `initMapForHouse()`의 기존 폴백이 전체 상세주소 실패 시 곧바로 "시/도+시군구"로 떨어져, 오늘 넣은 "건물주소 우선" 로직이 무색해지고 다시 시청/구청급 좌표가 뜨는 문제 재발견. `toGeocodeAddress()` 헬퍼(괄호 이후 제거, 없으면 번지수 이후 건물명/호수 토큰 제거)를 추가해 Lv1(전체주소)→Lv2(정제된 도로명)→Lv3(시/도+시군구, 최후수단) 3단계 폴백으로 재구성, 각 단계 결과를 `console.warn('[ZipFit geocode] ...')`로 진단 로깅(임시, 검증 후 제거 예정). sw.js v27→v28. 오늘 처음으로 실제 카카오 API가 왜 실패하는지 마주한 이슈라 Playwright 모의 검증(로직 흐름 자체가 의도대로 동작함만 확인 — Lv1 실패→Lv2 성공 케이스, Lv1·Lv2 실패→Lv3 성공 케이스)만으로는 완료로 간주하지 않음. **다음 세션에서 실제 사이트 F12 콘솔로 `[ZipFit geocode]` 로그를 여러 공고에서 직접 확인 후 결과에 따라 정제 로직 추가 보완 필요** |
