@@ -15,12 +15,12 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f0;color:#1a1a1a;min-height:100vh}
 body.theme-dark{background:#16181d;color:#e8e8e8}
-body.theme-dark .hero,body.theme-dark .panel,body.theme-dark .hcard,body.theme-dark .hu-row,body.theme-dark .hu-group-head,body.theme-dark .hu-group-body,body.theme-dark .policy-item,body.theme-dark .elig-item{background:#1f2229;border-color:#2c2f38}
+body.theme-dark .hero,body.theme-dark .panel,body.theme-dark .hcard,body.theme-dark .hu-row,body.theme-dark .hu-group-head,body.theme-dark .hu-group-body,body.theme-dark .policy-item,body.theme-dark .elig-item,body.theme-dark .extras-thumb{background:#1f2229;border-color:#2c2f38}
 body.theme-dark .label,body.theme-dark .sub,body.theme-dark .haddr,body.theme-dark .building-desc,body.theme-dark .hu-label,body.theme-dark .hu-group-count{color:#9aa0aa}
 body.theme-dark select,body.theme-dark input{background:#262932;border-color:#3a3e48;color:#e8e8e8}
 body.theme-dark .maintabs{background:#262932}
 body.theme-dark .maintab.active{background:#1f2229;color:#5DCAA5}
-body.theme-dark .logo,body.theme-dark .setting-label,body.theme-dark .panel-title,body.theme-dark .hname,body.theme-dark .mval,body.theme-dark .hu-title,body.theme-dark .hu-addr,body.theme-dark .hu-value,body.theme-dark .hu-group-name,body.theme-dark .policy-title,body.theme-dark .policy-content,body.theme-dark .elig-title,body.theme-dark .elig-row{color:#e8e8e8}
+body.theme-dark .logo,body.theme-dark .setting-label,body.theme-dark .panel-title,body.theme-dark .hname,body.theme-dark .mval,body.theme-dark .hu-title,body.theme-dark .hu-addr,body.theme-dark .hu-value,body.theme-dark .hu-group-name,body.theme-dark .policy-title,body.theme-dark .policy-content,body.theme-dark .elig-title,body.theme-dark .elig-row,body.theme-dark .extras-title,body.theme-dark .extras-group-label{color:#e8e8e8}
 body.theme-dark .hu-group-head.hu-group-active{background:#1d3d33;border-color:#5DCAA5}
 body.theme-dark .hu-group-head:hover{background:#262932}
 body.fs-small{font-size:13px}
@@ -154,6 +154,13 @@ select:focus,input:focus{border-color:#5DCAA5}
 .elig-item:last-child{margin-bottom:0}
 .elig-head{font-weight:600;color:#1D9E75;margin-bottom:4px}
 .elig-row{display:flex;justify-content:space-between;color:#555;padding:2px 0}
+.extras-wrap{margin-top:12px;border-top:1px solid #e8e8e0;padding-top:12px}
+.extras-title{font-size:13px;font-weight:600;color:#333;margin-bottom:8px}
+.extras-group-label{font-size:12px;font-weight:600;color:#555;margin:8px 0 6px}
+.extras-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px}
+.extras-thumb{display:block;border-radius:8px;overflow:hidden;border:1px solid #e8e8e0;aspect-ratio:1/1;position:relative;background:#f8f8f8}
+.extras-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.extras-thumb-label{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.55);color:#fff;font-size:9px;padding:3px 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hu-list{display:flex;flex-direction:column;gap:8px}
 .hu-row{background:#f8f8f8;border:1px solid #e8e8e0;border-radius:10px;padding:8px 10px}
 .hu-addr{font-size:12px;font-weight:600;color:#333;margin-bottom:6px}
@@ -1853,6 +1860,7 @@ function toggleDetail(id, card){
     slots.innerHTML =
       `<div id="elig-slot-${id}"></div>` +
       `<div id="hu-slot-${id}"></div>` +
+      `<div id="extras-slot-${id}"></div>` +
       `<div id="policy-slot-${id}"></div>`;
     detailEl.appendChild(slots);
   }
@@ -1860,6 +1868,11 @@ function toggleDetail(id, card){
     detailEl.dataset.unitsLoaded = '1';
     const annId = cardEl.dataset.announcementId || '';
     loadHousingUnits(annId, detailEl, id);
+  }
+  if(!open && !detailEl.dataset.extrasLoaded && cardEl){
+    detailEl.dataset.extrasLoaded = '1';
+    const annId = cardEl.dataset.announcementId || '';
+    loadAnnouncementExtras(annId, detailEl, id);
   }
   if(!open && !detailEl.dataset.policiesLoaded && cardEl){
     detailEl.dataset.policiesLoaded = '1';
@@ -1877,6 +1890,43 @@ function escapeHtml(s){
   const d = document.createElement('div');
   d.textContent = s;
   return d.innerHTML;
+}
+
+function driveFileIdFrom(url){
+  const m = (url||'').match(/\/d\/([^/]+)\//);
+  return m ? m[1] : null;
+}
+
+function loadAnnouncementExtras(annId, detailEl, id){
+  if(!annId) return;
+  fetch(`${SUPABASE_URL}/rest/v1/announcement_extras?announcement_id=eq.${encodeURIComponent(annId)}&order=extra_type,building_address`, {
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
+  }).then(r => r.ok ? r.json() : []).then(rows => {
+    if(!Array.isArray(rows) || rows.length === 0) return;
+    const photos = rows.filter(r => r.extra_type === 'photo');
+    const floorplans = rows.filter(r => r.extra_type === 'floorplan');
+    const renderGroup = (label, items) => {
+      if(items.length === 0) return '';
+      return `<div class="extras-group-label">${label} (${items.length}건)</div><div class="extras-grid">` +
+        items.map(it => {
+          const fid = driveFileIdFrom(it.file_url);
+          const thumbSrc = fid ? `https://drive.google.com/thumbnail?id=${fid}&sz=w300` : '';
+          const caption = [it.building_address, it.dong_ho].filter(Boolean).join(' ');
+          return `<a class="extras-thumb" href="${escapeHtml(it.file_url||'#')}" target="_blank" rel="noopener">
+            ${thumbSrc ? `<img src="${thumbSrc}" loading="lazy" alt="${escapeHtml(caption)}">` : ''}
+            ${caption ? `<span class="extras-thumb-label">${escapeHtml(caption)}</span>` : ''}
+          </a>`;
+        }).join('') + `</div>`;
+    };
+    const wrap = document.createElement('div');
+    wrap.className = 'extras-wrap';
+    wrap.innerHTML = `<div class="extras-title">📷 사진·평면도 (${rows.length}건)</div>` +
+      renderGroup('사진', photos) + renderGroup('평면도', floorplans);
+    const slot = document.getElementById('extras-slot-'+id);
+    if(slot) slot.appendChild(wrap);
+  }).catch(err => {
+    console.error('ZipFit 사진/평면도 로드 실패:', err);
+  });
 }
 
 function loadAnnouncementPolicies(annId, detailEl, id){
