@@ -1845,6 +1845,17 @@ function toggleDetail(id, card){
       huRegionFallback[id] = { addr: [sido, sigungu].filter(Boolean).join(' ') || region, name };
     }
   }
+  // 자격기준/세대정보/정책안내가 로드 완료 순서와 무관하게 항상 같은 순서로 보이도록
+  // 고정 슬롯을 미리 만들어둔다 (자격기준 → 세대정보 → 정책안내)
+  if(!open && !detailEl.dataset.slotsCreated && cardEl){
+    detailEl.dataset.slotsCreated = '1';
+    const slots = document.createElement('div');
+    slots.innerHTML =
+      `<div id="elig-slot-${id}"></div>` +
+      `<div id="hu-slot-${id}"></div>` +
+      `<div id="policy-slot-${id}"></div>`;
+    detailEl.appendChild(slots);
+  }
   if(!open && !detailEl.dataset.unitsLoaded && cardEl){
     detailEl.dataset.unitsLoaded = '1';
     const annId = cardEl.dataset.announcementId || '';
@@ -1883,7 +1894,8 @@ function loadAnnouncementPolicies(annId, detailEl, id){
           <div class="policy-content">${escapeHtml(p.content_raw || '')}</div>
         </div>
       `).join('');
-    detailEl.appendChild(wrap);
+    const slot = document.getElementById('policy-slot-'+id);
+    if(slot) slot.appendChild(wrap);
   }).catch(err => {
     console.error('ZipFit 정책안내 로드 실패:', err);
   });
@@ -1912,7 +1924,8 @@ function loadPreciseEligibility(annId, detailEl, id){
           ${car ? `<div class="elig-row"><span>차량가액</span><span>${car}</span></div>` : ''}
         </div>`;
       }).join('');
-    detailEl.appendChild(wrap);
+    const slot = document.getElementById('elig-slot-'+id);
+    if(slot) slot.appendChild(wrap);
   }).catch(err => {
     console.error('ZipFit 정밀자격기준 로드 실패:', err);
   });
@@ -1940,7 +1953,8 @@ function loadHousingUnits(annId, detailEl, id){
     const wrap = document.createElement('div');
     wrap.className = 'hu-wrap';
     wrap.innerHTML = `<div class="hu-title">🏠 세대별 정보 (${units.length}건)</div><div class="hu-list" id="hu-list-${id}"></div>`;
-    detailEl.appendChild(wrap);
+    const slot = document.getElementById('hu-slot-'+id);
+    if(slot) slot.appendChild(wrap);
     renderHousingGroupRows(id, 5);
   }).catch(err => {
     console.error('ZipFit 세대정보 로드 실패:', err);
