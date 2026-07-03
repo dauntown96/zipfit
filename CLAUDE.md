@@ -2,7 +2,7 @@
 
 > **이 파일이 유일한 세이브포인트입니다.**
 > Claude Code와 claude.ai 모두 이 파일을 기준으로 작업합니다.
-> **마지막 업데이트**: 2026-07-02 (세대정보 아코디언 지도 자동 초기화 — 지역 지오코딩 실패 시 첫 건물 위치로 자동 폴백, sw.js v26 배포 완료)
+> **마지막 업데이트**: 2026-07-02 (get_announcements_deduped() 지도 위치정보 회귀 수정 — 대표행 선정(LH 우선)과 위치정보(sido/sigungu/precise_address)를 분리, DB만 변경)
 
 ## 🔜 다음 세션 작업 예정
 - **프론트엔드에 나머지 신규 데이터 노출**: scoring_criteria(가점표), eligibility_criteria(순위별 소득·자산기준), announcement_policies(정책 원문) — housing_units는 반영 완료. 자격진단 결과·가점 계산 등에 반영 필요
@@ -164,6 +164,7 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-07-02 | get_announcements_deduped() 지도 위치정보 회귀 수정 — 오늘 오전 대표행 소스 우선순위를 LH로 바꾼 부작용으로, LH 원본은 sigungu_nm을 채우지 않아 대표행이 LH로 바뀐 공고 상당수(439건 중 379건)에서 카드 상세 최초 지도가 시/도 단위로만 지오코딩돼 엉뚱한 위치(예: 부천 공고가 수원으로, 대전/부산 공고가 시청 위치로)에 표시되는 회귀 발생. 대표행 선정 로직(id/url/extras 매칭용, LH 우선 + id ASC 타이브레이커)은 그대로 두고, 위치정보(sido_nm/sigungu_nm/precise_address)만 같은 dedup_key 그룹 내에서 가장 정밀한 값(precise_address > sigungu_nm 있는 값 > 나머지)을 별도로 골라 채우도록 RPC를 CTE(base/best_location/winner) 구조로 재작성(apply_migration: fix_dedup_location_fields_group_best_value). 카드 총량 439건 불변, sigungu_nm null 379→287건(92건 개선), housing_units/announcement_extras 매칭 재확인 결과 회귀 없음(둘 다 unmatched 0건), 실제 문제 사례 3건(부천 취창업청년/대전 청년매입임대/부산 청년매입임대) 전부 정상 시군구로 채워짐 확인 |
 | 2026-07-02 | 세대정보 아코디언 지도 자동 초기화 — 기존엔 toggleHousingGroup()(건물 클릭 시)에서만 initMapForHouse()가 호출돼, 카드 대표주소(sido+sigungu 등) 지오코딩이 실패하는 공고(세대정보는 있지만 지역 단위 주소가 부정확한 케이스)는 건물을 직접 클릭하기 전까지 지도가 "정보를 불러올 수 없어요" 상태로 방치됨. renderHousingGroupRows()에 huAutoMapTried 가드를 추가해, 지역 단위 지오코딩이 실패해 huMapState[id]가 비어있는 경우에 한해 첫 번째 건물 주소로 자동 폴백 지오코딩(목록 본문은 접힌 채 유지, 헤더만 강조). 지역 지오코딩이 이미 성공한 정상 케이스는 폴백이 스킵되어 회귀 없음. 지도 관련 두 곳의 안내 문구를 "지도 정보를 불러올 수 없어요" → "주소 위치를 찾을 수 없어요"로 변경(실제로는 지도 자체가 아니라 주소 인식 실패인 케이스를 정확히 설명). sw.js v25→v26. Playwright kakao.maps 모의 객체로 지역지오코딩 성공/실패 양쪽 시나리오와 이후 건물 클릭 시 마커 재사용(인스턴스 1개 유지) 회귀 없음을 프로그래매틱 검증 |
 | 2026-07-02 | get_announcements_deduped() 대표행 비결정성 버그 근본 수정 — MYHOME 소스가 시군구별로 제목·공고일·소스·수집시각까지 완전 동일한 행을 여러 개 만드는데 ORDER BY에 최종 타이브레이커가 없어 pg_cron UPSERT마다 대표행이 바뀔 수 있었음(세대정보 아코디언 소실 원인). ORDER BY 소스우선순위를 MYHOME>LH에서 LH>MYHOME으로 역전하고 마지막에 `id ASC` 결정적 타이브레이커 추가(apply_migration: fix_dedup_rpc_deterministic_tiebreak_lh_priority). housing_units 17개 라벨 878건 전량 재매칭 확인, announcement_extras 355건 중 326건(9개 유효 id) 재매칭 성공·나머지 29건(5개 id)은 애초에 announcements에 존재하지 않는 orphaned 레거시 id로 이번 버그와 무관한 별개 이슈로 확인(미해결 상태 유지). announcement_policies 가짜 라벨 5건(2개 그룹, "3건"으로 알려졌던 것보다 많음) 확인 후 실제 announcement_id로 재매핑(extras 매칭 결과와 교차검증). 카드 총량 439건 불변 확인(그룹핑 안전). announcement_id=NULL인 policies 2건은 의도된 설계(불확실 시 NULL 유지 원칙)로 정상 |
 | 2026-07-02 | initMapForHouse() 지오코딩 폴백 로직 개선 — 1차 지오코딩 실패 시 fallback을 h.addr.split(' ')[0](시/도만)에서 slice(0,2)(시/도+시군구 2단어)로 변경. precise_address에 다양한 형태의 주소가 들어와도 폴백 검색 범위가 과도하게 넓어지지 않도록 정밀화. sw.js v24→v25 |
