@@ -1808,14 +1808,11 @@ function toggleDetail(id, card){
   }
   if(!open && !detailEl.dataset.mapLoaded && cardEl){
     detailEl.dataset.mapLoaded = '1';
-    // precise_address(단지 확정 주소)가 있으면 그걸로, 없으면 기존처럼 지역 단위 주소로 지도 표시
     const preciseAddr = cardEl.dataset.preciseAddress || '';
     const sido = cardEl.dataset.sido || '';
     const sigungu = cardEl.dataset.sigungu || '';
     const region = cardEl.dataset.region || '';
-    const addr = preciseAddr || [sido, sigungu].filter(Boolean).join(' ') || region;
     const name = cardEl.dataset.title || '';
-    const h = { addr, name };
     const mapWrap = document.createElement('div');
     mapWrap.style.cssText = 'margin-top:12px;border-top:1px solid #e8e8e0;padding-top:12px';
     mapWrap.innerHTML = `
@@ -1825,7 +1822,16 @@ function toggleDetail(id, card){
         <div class="poi-list" id="poilist-${id}"><div class="poi-loading">탭을 선택하면 주변 시설이 표시돼요</div></div>
       </div>`;
     detailEl.appendChild(mapWrap);
-    initMapForHouse(h, id);
+
+    if(preciseAddr){
+      // precise_address(단지 확정 주소, 건설형 등)는 이미 가장 정확한 정보라 바로 사용
+      initMapForHouse({ addr: preciseAddr, name }, id);
+    } else {
+      // 세대별 정보(housing_units)가 있으면 그 안의 실제 건물 주소가 시/군/구 단위보다 훨씬
+      // 정확하므로, 시군구 지오코딩은 바로 시도하지 않고 세대별 정보 로드를 기다린다.
+      // 세대별 정보가 아예 없는 공고에 한해서만 아래 huRegionFallback을 최후수단으로 사용.
+      huRegionFallback[id] = { addr: [sido, sigungu].filter(Boolean).join(' ') || region, name };
+    }
   }
   if(!open && !detailEl.dataset.unitsLoaded && cardEl){
     detailEl.dataset.unitsLoaded = '1';
@@ -1838,14 +1844,19 @@ const huUnitsCache = {};
 const huGroupsCache = {};
 const huActiveGroup = {};
 const huMapState = {};
-const huAutoMapTried = {};
+const huRegionFallback = {};
 
 function loadHousingUnits(annId, detailEl, id){
   if(!annId) return;
   fetch(`${SUPABASE_URL}/rest/v1/housing_units?announcement_id=eq.${encodeURIComponent(annId)}&order=deposit.asc`, {
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
   }).then(r => r.ok ? r.json() : []).then(units => {
-    if(!Array.isArray(units) || units.length === 0) return;
+    if(!Array.isArray(units) || units.length === 0){
+      // 세대별 정보가 없는 공고 — 시군구 단위 지도를 최후수단으로 사용
+      const fb = huRegionFallback[id];
+      if(fb && !huMapState[id]) initMapForHouse(fb, id);
+      return;
+    }
     huUnitsCache[id] = units;
     huGroupsCache[id] = groupHousingUnits(units);
     const wrap = document.createElement('div');
@@ -1855,6 +1866,8 @@ function loadHousingUnits(annId, detailEl, id){
     renderHousingGroupRows(id, 5);
   }).catch(err => {
     console.error('ZipFit 세대정보 로드 실패:', err);
+    const fb = huRegionFallback[id];
+    if(fb && !huMapState[id]) initMapForHouse(fb, id);
   });
 }
 
@@ -1896,10 +1909,9 @@ function renderHousingGroupRows(id, visibleCount){
     const headEl = document.getElementById(`hu-group-head-${id}-${activeIdx}`);
     if(headEl) headEl.classList.add('hu-group-active');
   }
-  // 최초 로드 시 지도가 비어있지 않도록 첫 번째 건물을 자동으로 지도에 표시
-  // (호수 목록 본문은 접힌 채로 유지 — 지도만 미리 채움)
-  if(!huMapState[id] && !huAutoMapTried[id] && groups.length > 0){
-    huAutoMapTried[id] = true;
+  // 세대별 정보가 있는 공고는 시군구 지오코딩을 거치지 않고 첫 번째 건물 주소를 바로 사용
+  // (건물 주소가 항상 시군구 단위보다 정확함). huMapState[id]가 이미 있으면(=이미 초기화됐으면) 스킵.
+  if(!huMapState[id] && groups.length > 0){
     const first = groups[0];
     const addr = first.address || first.building_name;
     if(addr){
