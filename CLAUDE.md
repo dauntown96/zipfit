@@ -2,7 +2,7 @@
 
 > **이 파일이 유일한 세이브포인트입니다.**
 > Claude Code와 claude.ai 모두 이 파일을 기준으로 작업합니다.
-> **마지막 업데이트**: 2026-07-02 (initMapForHouse 지오코딩 폴백 로직 개선 — 시/도만→시/도+시군구 2단어로 정밀화, sw.js v25 배포 완료)
+> **마지막 업데이트**: 2026-07-02 (get_announcements_deduped() 대표행 비결정성 근본 수정 — 세대정보 아코디언 소실 버그 해결, DB만 변경 — 프론트 배포 없음)
 
 ## 🔜 다음 세션 작업 예정
 - **프론트엔드에 나머지 신규 데이터 노출**: scoring_criteria(가점표), eligibility_criteria(순위별 소득·자산기준), announcement_policies(정책 원문) — housing_units는 반영 완료. 자격진단 결과·가점 계산 등에 반영 필요
@@ -164,6 +164,7 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-07-02 | get_announcements_deduped() 대표행 비결정성 버그 근본 수정 — MYHOME 소스가 시군구별로 제목·공고일·소스·수집시각까지 완전 동일한 행을 여러 개 만드는데 ORDER BY에 최종 타이브레이커가 없어 pg_cron UPSERT마다 대표행이 바뀔 수 있었음(세대정보 아코디언 소실 원인). ORDER BY 소스우선순위를 MYHOME>LH에서 LH>MYHOME으로 역전하고 마지막에 `id ASC` 결정적 타이브레이커 추가(apply_migration: fix_dedup_rpc_deterministic_tiebreak_lh_priority). housing_units 17개 라벨 878건 전량 재매칭 확인, announcement_extras 355건 중 326건(9개 유효 id) 재매칭 성공·나머지 29건(5개 id)은 애초에 announcements에 존재하지 않는 orphaned 레거시 id로 이번 버그와 무관한 별개 이슈로 확인(미해결 상태 유지). announcement_policies 가짜 라벨 5건(2개 그룹, "3건"으로 알려졌던 것보다 많음) 확인 후 실제 announcement_id로 재매핑(extras 매칭 결과와 교차검증). 카드 총량 439건 불변 확인(그룹핑 안전). announcement_id=NULL인 policies 2건은 의도된 설계(불확실 시 NULL 유지 원칙)로 정상 |
 | 2026-07-02 | initMapForHouse() 지오코딩 폴백 로직 개선 — 1차 지오코딩 실패 시 fallback을 h.addr.split(' ')[0](시/도만)에서 slice(0,2)(시/도+시군구 2단어)로 변경. precise_address에 다양한 형태의 주소가 들어와도 폴백 검색 범위가 과도하게 넓어지지 않도록 정밀화. sw.js v24→v25 |
 | 2026-07-02 | announcements.precise_address 컬럼 프론트엔드 반영 — get_announcements_deduped() RPC에 precise_address 추가(DROP FUNCTION 후 재생성), 공고탭(loadNoticeData)·추천탭(matchHouses) 양쪽 카드에 data-precise-address 속성 추가. toggleDetail() 최초 지도 로딩 시 precise_address 유무만으로 분기(있으면 그 주소, 없으면 기존 sido+sigungu 방식) — 특정 공고 하드코딩 없이 앞으로 이 필드가 채워지는 모든 공고에 자동 적용되는 범용 로직. 세대별 정보 아코디언은 기존 housing_units 유무 판단 그대로 유지. sw.js v23→v24. Playwright kakao.maps 모의 객체로 precise_address 있음/없음 양쪽 지오코딩 호출 인자와 세대별 정보 섹션 미노출을 프로그래매틱 검증 |
 | 2026-07-02 | housing_units.building_name 데이터 정제 — building_name에 "매입다가구(지역명)" 카테고리성 자리표시자가 잘못 들어간 241건을 address 원문을 직접 읽고 판단해 실제 단지명(아파트·빌라·오피스텔명) 또는 단지명이 없는 순수 다가구/다세대는 법정동명으로 교체(정규식 일괄처리 아닌 케이스별 수동 판단). 예: "매입다가구(대전서구)" → "더 프라임 시티"(단지명 있는 경우), "매입다가구(대전서구)" → "도마동"(지번만 있는 순수 다가구). 검증: building_name LIKE '매입다가구(%' 0건 확인, 총 행수(881행) 불변 확인 |
