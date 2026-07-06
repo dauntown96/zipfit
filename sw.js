@@ -1,4 +1,4 @@
-const CACHE_NAME = 'zipfit-v34';
+const CACHE_NAME = 'zipfit-v35';
 const PRECACHE = ['/zipfit/', '/zipfit/index.html'];
 
 self.addEventListener('install', e => {

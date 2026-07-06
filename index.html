@@ -1023,7 +1023,7 @@ function renderNoticeList(filtered, totalCount){
   let html = '';
   shown.forEach((n, idx) => {
     const isClosed   = n['처리상태정규화']==='접수마감';
-    const isAmended  = (n['공고명']||'').includes('[정정공고]');
+    const isAmended  = (n['공고명']||'').includes('[정정공고]') || n['is_revised'];
     const demoTags   = classifyDemographics(n['공급유형'], n['공고명']);
     const isNew      = !isClosed && isNewNotice(n);
     const closingSoon = !isClosed && isClosingSoon(n);
