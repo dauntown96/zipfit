@@ -1253,7 +1253,7 @@ function renderPersonalizedRecommendations(){
   }
 
   let filtered=noticeData.filter(n=>{
-    const isClosed=n['처리상태']==='접수마감'||n['처리상태']==='마감';
+    const isClosed=n['처리상태정규화']==='접수마감';
     if(isClosed) return false;
     if(savedRegions.length && !savedRegions.includes(extractRegionTop(n['지역']))) return false;
     if(savedTypes.length && !savedTypes.some(t=>classifyNoticeType(n['공급유형'],n['공고명'])===t||n['공급유형']?.includes(t))) return false;
@@ -1262,7 +1262,7 @@ function renderPersonalizedRecommendations(){
 
   const desc=document.getElementById('personalizedDesc');
   if(!hasConditions){
-    filtered=noticeData.filter(n=>n['처리상태']!=='접수마감'&&n['처리상태']!=='마감').slice(0,5);
+    filtered=noticeData.filter(n=>n['처리상태정규화']!=='접수마감').slice(0,5);
     desc.textContent='저장된 조건이 없어 전체 공고를 표시해요. 설정 탭에서 조건을 저장하면 맞춤 추천을 받을 수 있어요.';
   } else {
     desc.textContent=`저장된 조건 기준 ${filtered.length}건 매칭됐어요.`;
@@ -1732,7 +1732,7 @@ async function diagnose(){
     // 가점 계산
     let gp=0;
     if(children>=3)gp+=4;else if(children===2)gp+=3;else if(children===1)gp+=2;
-    if(gp) html+=`<div class="rbox warn" style="margin-top:6px"><p class="rtitle">📊 예상 가점: ${gp}점 (자녀 항목)</p><p class="rdesc">지역본부마다 가점 평가항목이 달라요 (경남/광주전남=6항목, 부산울산=4항목). 청약저축 납입횟수·거주기간·장애인 항목도 확인하세요.</p></div>`;
+    if(gp) html+=`<div class="rbox warn" style="margin-top:6px"><p class="rtitle">📊 예상 가점: ${gp}점 (자녀 항목)</p><p class="rdesc">지역본부마다 가점 평가항목 구성이 다를 수 있어요. 청약저축 납입횟수·거주기간·장애인 항목 등을 공고문에서 확인하세요.</p></div>`;
 
     html+=`<button class="btn btn-primary" onclick="goStep(2);matchHouses()" style="margin-top:0.5rem">주택 매칭하러 가기 →</button>`;
   }
@@ -1880,12 +1880,12 @@ function toggleDetail(id, card){
   if(!open && !detailEl.dataset.policiesLoaded && cardEl){
     detailEl.dataset.policiesLoaded = '1';
     const annId = cardEl.dataset.announcementId || '';
-    loadAnnouncementPolicies(annId, detailEl, id);
+    loadAnnouncementPolicies(annId, detailEl, id, true);
   }
   if(!open && !detailEl.dataset.eligLoaded && cardEl){
     detailEl.dataset.eligLoaded = '1';
     const annId = cardEl.dataset.announcementId || '';
-    loadPreciseEligibility(annId, detailEl, id);
+    loadPreciseEligibility(annId, detailEl, id, true);
   }
 }
 
@@ -1900,11 +1900,34 @@ function driveFileIdFrom(url){
   return m ? m[1] : null;
 }
 
-function loadAnnouncementExtras(annId, detailEl, id){
+// 정정공고로 대표행(winner)이 바뀌면 옛 announcement_id에 붙어있던 사진/자격기준/정책 데이터가
+// 화면에서 안 보이게 되는 문제(orphan)를 막기 위해, 카드 최초 오픈(대표행 기준) 경로에서는
+// get_announcement_group_ids로 같은 공고의 모든 announcement_id를 구해 in.() 조회한다.
+// 단, 김포마송처럼 블록별로 분리 표시해야 하는 toggleBlockGroup() 경로는 useGroup을 넘기지 않아
+// 기존처럼 해당 블록의 announcement_id 단건(eq.)만 조회하도록 유지한다.
+function resolveAnnouncementIds(annId, useGroup){
+  if(!useGroup) return Promise.resolve([annId]);
+  return fetch(`${SUPABASE_URL}/rest/v1/rpc/get_announcement_group_ids`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_announcement_id: annId })
+  }).then(r => r.ok ? r.json() : null).then(rows => {
+    if(Array.isArray(rows) && rows.length > 0) return rows.map(r => r.announcement_id);
+    return [annId];
+  }).catch(() => [annId]);
+}
+
+function idFilterFor(ids){
+  return ids.length > 1
+    ? `announcement_id=in.(${ids.map(encodeURIComponent).join(',')})`
+    : `announcement_id=eq.${encodeURIComponent(ids[0])}`;
+}
+
+function loadAnnouncementExtras(annId, detailEl, id, useGroup){
   if(!annId) return;
-  fetch(`${SUPABASE_URL}/rest/v1/announcement_extras?announcement_id=eq.${encodeURIComponent(annId)}&order=extra_type,building_address`, {
+  resolveAnnouncementIds(annId, useGroup).then(ids => fetch(`${SUPABASE_URL}/rest/v1/announcement_extras?${idFilterFor(ids)}&order=extra_type,building_address`, {
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
-  }).then(r => r.ok ? r.json() : []).then(rows => {
+  })).then(r => r.ok ? r.json() : []).then(rows => {
     if(!Array.isArray(rows) || rows.length === 0) return;
     const photos = rows.filter(r => r.extra_type === 'photo');
     const floorplans = rows.filter(r => r.extra_type === 'floorplan');
@@ -1945,14 +1968,14 @@ const blockLoaded = {};
 // 보인다. 그래서 블록 개수가 확정된 뒤에만 카드 전체용 사진·평면도를 로드하도록 순서를 맞춘다 —
 // 블록이 2개 이상이면 카드 전체 섹션은 생략(블록별 섹션에서만 표시), 1개(일반적인 경우)면 그대로 표시.
 function loadAnnouncementBlocks(annId, id, detailEl){
-  if(!annId){ loadAnnouncementExtras(annId, detailEl, id); return; }
+  if(!annId){ loadAnnouncementExtras(annId, detailEl, id, true); return; }
   fetch(`${SUPABASE_URL}/rest/v1/rpc/get_announcement_blocks`, {
     method: 'POST',
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ p_announcement_id: annId })
   }).then(r => r.ok ? r.json() : []).then(blocks => {
     if(!Array.isArray(blocks) || blocks.length < 2){
-      loadAnnouncementExtras(annId, detailEl, id);
+      loadAnnouncementExtras(annId, detailEl, id, true);
       return;
     }
     blockAnnIds[id] = blocks.map(b => b.announcement_id);
@@ -1976,7 +1999,7 @@ function loadAnnouncementBlocks(annId, id, detailEl){
     }).join('');
   }).catch(err => {
     console.error('ZipFit 블록정보 로드 실패:', err);
-    loadAnnouncementExtras(annId, detailEl, id);
+    loadAnnouncementExtras(annId, detailEl, id, true);
   });
 }
 
@@ -1999,11 +2022,11 @@ function toggleBlockGroup(id, idx){
   loadAnnouncementExtras(annId, null, subId);
 }
 
-function loadAnnouncementPolicies(annId, detailEl, id){
+function loadAnnouncementPolicies(annId, detailEl, id, useGroup){
   if(!annId) return;
-  fetch(`${SUPABASE_URL}/rest/v1/announcement_policies?announcement_id=eq.${encodeURIComponent(annId)}&order=category`, {
+  resolveAnnouncementIds(annId, useGroup).then(ids => fetch(`${SUPABASE_URL}/rest/v1/announcement_policies?${idFilterFor(ids)}&order=category`, {
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
-  }).then(r => r.ok ? r.json() : []).then(policies => {
+  })).then(r => r.ok ? r.json() : []).then(policies => {
     if(!Array.isArray(policies) || policies.length === 0) return;
     const wrap = document.createElement('div');
     wrap.className = 'policy-wrap';
@@ -2021,11 +2044,11 @@ function loadAnnouncementPolicies(annId, detailEl, id){
   });
 }
 
-function loadPreciseEligibility(annId, detailEl, id){
+function loadPreciseEligibility(annId, detailEl, id, useGroup){
   if(!annId) return;
-  fetch(`${SUPABASE_URL}/rest/v1/eligibility_criteria?announcement_id=eq.${encodeURIComponent(annId)}&order=supply_form,rank`, {
+  resolveAnnouncementIds(annId, useGroup).then(ids => fetch(`${SUPABASE_URL}/rest/v1/eligibility_criteria?${idFilterFor(ids)}&order=supply_form,rank`, {
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
-  }).then(r => r.ok ? r.json() : []).then(rows => {
+  })).then(r => r.ok ? r.json() : []).then(rows => {
     if(!Array.isArray(rows) || rows.length === 0) return;
     const wrap = document.createElement('div');
     wrap.className = 'elig-wrap';
