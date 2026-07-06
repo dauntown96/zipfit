@@ -865,6 +865,8 @@ async function loadNoticeData(){
       'pair_announcement_key': r.pair_announcement_key||'',
       'housing_change_allowed': r.housing_change_allowed,
       'precise_address': r.precise_address||'',
+      'revised_at': r.revised_at||'',
+      'revision_note': r.revision_note||'',
     }));
 
     // 마감 숨기기 (status 칩 직접 선택 없을 때만, 정규화 상태 기준)
@@ -890,7 +892,7 @@ async function loadNoticeData(){
       return desc ? (vb > va ? 1 : vb < va ? -1 : 0) : (va > vb ? 1 : va < vb ? -1 : 0);
     };
     filtered = [...filtered].sort((a,b) => {
-      if(sortVal==='date-desc')     return nullLast(a,b,n=>n['announcement_date']||n['created_at'],true);
+      if(sortVal==='date-desc')     return nullLast(a,b,n=>n['revised_at']||n['announcement_date']||n['created_at'],true);
       if(sortVal==='end-asc')       return nullLast(a,b,n=>n['apply_end'],false);
       if(sortVal==='start-asc')     return nullLast(a,b,n=>n['apply_start'],false);
       if(sortVal==='units-desc')    return nullLast(a,b,n=>n['total_units']?Number(n['total_units']):null,true);
