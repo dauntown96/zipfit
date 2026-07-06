@@ -1875,12 +1875,7 @@ function toggleDetail(id, card){
   if(!open && !detailEl.dataset.blocksLoaded && cardEl){
     detailEl.dataset.blocksLoaded = '1';
     const annId = cardEl.dataset.announcementId || '';
-    loadAnnouncementBlocks(annId, id);
-  }
-  if(!open && !detailEl.dataset.extrasLoaded && cardEl){
-    detailEl.dataset.extrasLoaded = '1';
-    const annId = cardEl.dataset.announcementId || '';
-    loadAnnouncementExtras(annId, detailEl, id);
+    loadAnnouncementBlocks(annId, id, detailEl);
   }
   if(!open && !detailEl.dataset.policiesLoaded && cardEl){
     detailEl.dataset.policiesLoaded = '1';
@@ -1945,14 +1940,21 @@ function loadAnnouncementExtras(annId, detailEl, id){
 const blockAnnIds = {};
 const blockLoaded = {};
 
-function loadAnnouncementBlocks(annId, id){
-  if(!annId) return;
+// 카드 상세의 "사진·평면도" 섹션은 원래 카드 자체의 announcement_id(대표행) 것만 보여주는데,
+// 블록이 여러 개인 공고는 그 대표행이 사실 여러 블록 중 하나일 뿐이라 블록별 섹션과 중복/혼동되어
+// 보인다. 그래서 블록 개수가 확정된 뒤에만 카드 전체용 사진·평면도를 로드하도록 순서를 맞춘다 —
+// 블록이 2개 이상이면 카드 전체 섹션은 생략(블록별 섹션에서만 표시), 1개(일반적인 경우)면 그대로 표시.
+function loadAnnouncementBlocks(annId, id, detailEl){
+  if(!annId){ loadAnnouncementExtras(annId, detailEl, id); return; }
   fetch(`${SUPABASE_URL}/rest/v1/rpc/get_announcement_blocks`, {
     method: 'POST',
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ p_announcement_id: annId })
   }).then(r => r.ok ? r.json() : []).then(blocks => {
-    if(!Array.isArray(blocks) || blocks.length < 2) return;
+    if(!Array.isArray(blocks) || blocks.length < 2){
+      loadAnnouncementExtras(annId, detailEl, id);
+      return;
+    }
     blockAnnIds[id] = blocks.map(b => b.announcement_id);
     const wrap = document.createElement('div');
     wrap.className = 'hu-wrap';
@@ -1974,6 +1976,7 @@ function loadAnnouncementBlocks(annId, id){
     }).join('');
   }).catch(err => {
     console.error('ZipFit 블록정보 로드 실패:', err);
+    loadAnnouncementExtras(annId, detailEl, id);
   });
 }
 
