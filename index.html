@@ -1861,6 +1861,7 @@ function toggleDetail(id, card){
     const slots = document.createElement('div');
     slots.innerHTML =
       `<div id="elig-slot-${id}"></div>` +
+      `<div id="blocks-slot-${id}"></div>` +
       `<div id="hu-slot-${id}"></div>` +
       `<div id="extras-slot-${id}"></div>` +
       `<div id="policy-slot-${id}"></div>`;
@@ -1870,6 +1871,11 @@ function toggleDetail(id, card){
     detailEl.dataset.unitsLoaded = '1';
     const annId = cardEl.dataset.announcementId || '';
     loadHousingUnits(annId, detailEl, id);
+  }
+  if(!open && !detailEl.dataset.blocksLoaded && cardEl){
+    detailEl.dataset.blocksLoaded = '1';
+    const annId = cardEl.dataset.announcementId || '';
+    loadAnnouncementBlocks(annId, id);
   }
   if(!open && !detailEl.dataset.extrasLoaded && cardEl){
     detailEl.dataset.extrasLoaded = '1';
@@ -1929,6 +1935,65 @@ function loadAnnouncementExtras(annId, detailEl, id){
   }).catch(err => {
     console.error('ZipFit 사진/평면도 로드 실패:', err);
   });
+}
+
+// 한 공고문 안에 물리적으로 서로 다른 블록(주소/세대수가 다른 그룹)이 여러 개 섞여있는 경우
+// (예: 한 공고문에 B-3BL/B-5BL 두 단지가 같이 실린 케이스) 대표 카드 1개는 그대로 두고
+// 상세 아코디언 안에서만 블록별로 나눠 보여준다. get_announcement_blocks()가 1건만 반환하면
+// (대다수의 일반적인 단일 블록 공고) 이 섹션 자체를 표시하지 않는다 — 특정 공고를 하드코딩하지 않고
+// "같은 제목(dedup_key)을 공유하는 원본 행들의 주소/세대수가 서로 다르면 블록으로 취급"하는 범용 로직
+const blockAnnIds = {};
+const blockLoaded = {};
+
+function loadAnnouncementBlocks(annId, id){
+  if(!annId) return;
+  fetch(`${SUPABASE_URL}/rest/v1/rpc/get_announcement_blocks`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_announcement_id: annId })
+  }).then(r => r.ok ? r.json() : []).then(blocks => {
+    if(!Array.isArray(blocks) || blocks.length < 2) return;
+    blockAnnIds[id] = blocks.map(b => b.announcement_id);
+    const wrap = document.createElement('div');
+    wrap.className = 'hu-wrap';
+    wrap.innerHTML = `<div class="hu-title">🏘️ 이 공고에 포함된 블록 (${blocks.length}개)</div><div class="hu-list" id="blk-list-${id}"></div>`;
+    const slot = document.getElementById('blocks-slot-'+id);
+    if(!slot) return;
+    slot.appendChild(wrap);
+    const listEl = document.getElementById('blk-list-'+id);
+    listEl.innerHTML = blocks.map((b, idx) => {
+      const label = b.precise_address || `블록 ${idx+1}`;
+      const unitsStr = b.total_units ? `${b.total_units}세대` : '';
+      return `<div class="hu-group">
+        <div class="hu-group-head" id="blk-group-head-${id}-${idx}" onclick="event.stopPropagation();toggleBlockGroup('${id}',${idx})">
+          <span class="hu-group-name">${escapeHtml(label)}</span>
+          <span class="hu-group-count">${unitsStr} ▾</span>
+        </div>
+        <div class="hu-group-body" id="blk-group-body-${id}-${idx}" style="display:none"></div>
+      </div>`;
+    }).join('');
+  }).catch(err => {
+    console.error('ZipFit 블록정보 로드 실패:', err);
+  });
+}
+
+function toggleBlockGroup(id, idx){
+  const bodyEl = document.getElementById(`blk-group-body-${id}-${idx}`);
+  const headEl = document.getElementById(`blk-group-head-${id}-${idx}`);
+  if(!bodyEl) return;
+  const isOpen = bodyEl.style.display === 'block';
+  bodyEl.style.display = isOpen ? 'none' : 'block';
+  if(headEl) headEl.classList.toggle('hu-group-active', !isOpen);
+  if(isOpen) return;
+  const key = id+'-'+idx;
+  if(blockLoaded[key]) return;
+  blockLoaded[key] = true;
+  const annId = (blockAnnIds[id]||[])[idx];
+  if(!annId) return;
+  const subId = id+'-blk'+idx;
+  bodyEl.innerHTML = `<div id="hu-slot-${subId}"></div><div id="extras-slot-${subId}"></div>`;
+  loadHousingUnits(annId, null, subId);
+  loadAnnouncementExtras(annId, null, subId);
 }
 
 function loadAnnouncementPolicies(annId, detailEl, id){
