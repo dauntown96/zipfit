@@ -20,8 +20,9 @@ body.theme-dark .label,body.theme-dark .sub,body.theme-dark .haddr,body.theme-da
 body.theme-dark select,body.theme-dark input{background:#262932;border-color:#3a3e48;color:#e8e8e8}
 body.theme-dark .maintabs{background:#262932}
 body.theme-dark .maintab.active{background:#1f2229;color:#5DCAA5}
-body.theme-dark .logo,body.theme-dark .setting-label,body.theme-dark .panel-title,body.theme-dark .hname,body.theme-dark .mval,body.theme-dark .hu-title,body.theme-dark .hu-addr,body.theme-dark .hu-value,body.theme-dark .hu-group-name,body.theme-dark .policy-title,body.theme-dark .policy-content,body.theme-dark .elig-title,body.theme-dark .elig-row,body.theme-dark .extras-title,body.theme-dark .extras-group-label{color:#e8e8e8}
+body.theme-dark .logo,body.theme-dark .setting-label,body.theme-dark .panel-title,body.theme-dark .hname,body.theme-dark .mval,body.theme-dark .hu-title,body.theme-dark .hu-addr,body.theme-dark .hu-value,body.theme-dark .hu-group-name,body.theme-dark .policy-title,body.theme-dark .policy-content,body.theme-dark .elig-title,body.theme-dark .elig-row,body.theme-dark .extras-title,body.theme-dark .extras-group-label,body.theme-dark .hu-note-price{color:#e8e8e8}
 body.theme-dark .hu-group-head.hu-group-active{background:#1d3d33;border-color:#5DCAA5}
+body.theme-dark .hu-note-wrap{border-color:#2c2f38}
 body.theme-dark .hu-group-head:hover{background:#262932}
 body.fs-small{font-size:13px}
 body.fs-large{font-size:17px}
@@ -69,6 +70,9 @@ body.fs-large{font-size:17px}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 select,input[type=number],input[type=text]{width:100%;padding:9px 12px;font-size:14px;border:1px solid #ddd;border-radius:8px;background:#fff;color:#111;outline:none;transition:border 0.15s}
 select:focus,input:focus{border-color:#5DCAA5}
+/* 공고 검색창(flex 레이아웃)은 전역 width:100% 규칙과 충돌해 찌그러지므로 이 두 요소만 예외 처리 */
+#noticeSearchInput{width:auto;flex:1;min-width:0}
+#noticeSearchScopeSel{width:auto;flex:0 0 auto}
 .btn{width:100%;padding:11px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;border:none;margin-top:0.5rem;transition:all 0.15s}
 .btn-primary{background:#1D9E75;color:#fff}
 .btn-primary:hover{background:#0F6E56}
@@ -164,11 +168,12 @@ select:focus,input:focus{border-color:#5DCAA5}
 .extras-thumb{cursor:pointer;border:1px solid #e8e8e0}
 .extras-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px}
 .extras-modal-box{position:relative;width:100%;max-width:720px;max-height:90vh;display:flex;flex-direction:column;background:#111;border-radius:12px;overflow:hidden}
-.extras-modal-body{flex:1;min-height:200px;display:flex;align-items:center;justify-content:center;overflow:auto;background:#000}
+.extras-modal-body{flex:1;min-height:200px;position:relative;overflow:auto;background:#000}
+.extras-modal-content{width:100%;height:100%;display:flex;align-items:center;justify-content:center}
 .extras-modal-body img{max-width:100%;max-height:80vh;object-fit:contain}
 .extras-modal-body iframe{width:100%;height:80vh;border:0}
 .extras-modal-close{position:absolute;top:8px;right:8px;width:32px;height:32px;border-radius:50%;border:0;background:rgba(255,255,255,0.15);color:#fff;font-size:16px;cursor:pointer;z-index:2}
-.extras-modal-nav{position:absolute;top:50%;transform:translateY(-50%);width:40px;height:40px;border-radius:50%;border:0;background:rgba(255,255,255,0.15);color:#fff;font-size:22px;cursor:pointer;z-index:2}
+.extras-modal-nav{position:absolute;top:50%;transform:translateY(-50%);width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,0.3);background:rgba(0,0,0,0.45);color:#fff;font-size:22px;cursor:pointer;z-index:2;box-shadow:0 1px 4px rgba(0,0,0,0.4)}
 .extras-modal-prev{left:8px}
 .extras-modal-next{right:8px}
 .extras-modal-footer{display:flex;align-items:center;gap:10px;padding:10px 14px;background:#1a1a1a;color:#ddd;font-size:12px}
@@ -181,6 +186,10 @@ select:focus,input:focus{border-color:#5DCAA5}
 .hu-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:4px 8px}
 .hu-item{font-size:12px}
 .hu-label{color:#999;margin-right:4px}
+.hu-note-wrap{margin-top:8px;padding-top:8px;border-top:1px dashed #e0e0d8}
+.hu-note-item{margin:4px 0}
+.hu-note-badge{padding:2px 8px;font-size:11px;cursor:default;display:inline-block;margin:2px 4px 2px 0}
+.hu-note-price{font-size:12px;color:#555;margin-top:2px}
 .hu-value{color:#333;font-weight:500}
 .hu-more-btn{width:100%;padding:8px;border-radius:8px;border:1px dashed #ccc;background:#fafaf6;color:#666;font-size:12px;cursor:pointer;margin-top:4px}
 .hu-more-btn:hover{background:#f0f0e8}
@@ -356,6 +365,20 @@ select:focus,input:focus{border-color:#5DCAA5}
     </div>
 
     <button class="btn btn-primary" onclick="matchHouses()">맞춤 주택 찾기 →</button>
+    <div style="display:flex;align-items:center;justify-content:flex-end;margin-top:10px">
+      <select id="matchSortSel" onchange="applyMatchSortAndRender()" style="font-size:13px;padding:5px 8px;border:1px solid #e0e0e0;border-radius:8px;background:#fff;color:#333;cursor:pointer">
+        <option value="date-desc">최신 공고순</option>
+        <option value="end-asc">마감 임박순</option>
+        <option value="start-asc">접수 시작순</option>
+        <option value="units-desc">세대수 많은순</option>
+        <option value="deposit-asc">보증금 낮은순</option>
+        <option value="rent-asc">월임대료 낮은순</option>
+        <option value="area-desc">면적 넓은순</option>
+        <option value="region-asc">지역명순</option>
+        <option value="org-asc">공급기관순</option>
+        <option value="revised-first">정정공고 우선</option>
+      </select>
+    </div>
     <div id="match-result" class="result hidden"></div>
   </div>
   </div> <!-- /main1 -->
@@ -1839,11 +1862,46 @@ async function matchHouses(){
 
     lastFiltered = rows;
     visibleCount = 5;
-    renderMatchResults(rows);
+    applyMatchSortAndRender();
   } catch(err) {
     r.innerHTML = '<div class="rbox err"><p class="rtitle">⚠️ 매칭 중 오류가 발생했어요</p><p class="rdesc">잠시 후 다시 시도해주세요.</p><button class="btn btn-sec btn-sm" style="margin-top:8px" onclick="matchHouses()">다시 시도</button></div>';
     console.error('matchHouses 오류:', err);
   }
+}
+
+// 공고탭(noticeSortSel)과 동일한 정렬 옵션을 맞춤추천 탭에도 제공 — get_announcements_deduped()가
+// 반환하는 원본 필드명(raw RPC 컬럼명) 기준으로 정렬한다(noticeData의 한글 매핑과는 별개 데이터 형태).
+function sortMatchRows(rows, sortVal){
+  const nullLast = (a, b, fn, desc) => {
+    const va = fn(a), vb = fn(b);
+    if(va==null && vb==null) return 0;
+    if(va==null) return 1;
+    if(vb==null) return -1;
+    return desc ? (vb > va ? 1 : vb < va ? -1 : 0) : (va > vb ? 1 : va < vb ? -1 : 0);
+  };
+  return [...rows].sort((a,b) => {
+    if(sortVal==='date-desc')     return nullLast(a,b,n=>n.first_seen_at||n.announcement_date||n.created_at,true);
+    if(sortVal==='end-asc')       return nullLast(a,b,n=>n.apply_end,false);
+    if(sortVal==='start-asc')     return nullLast(a,b,n=>n.apply_start,false);
+    if(sortVal==='units-desc')    return nullLast(a,b,n=>n.total_units?Number(n.total_units):null,true);
+    if(sortVal==='deposit-asc')   return nullLast(a,b,n=>n.deposit_min?Number(n.deposit_min):null,false);
+    if(sortVal==='rent-asc')      return nullLast(a,b,n=>n.rent_min?Number(n.rent_min):null,false);
+    if(sortVal==='area-desc')     return nullLast(a,b,n=>n.area_max?Number(n.area_max):null,true);
+    if(sortVal==='region-asc'){
+      const regionA = (a.sido_nm||a.region||'') + ' ' + (a.sigungu_nm||'');
+      const regionB = (b.sido_nm||b.region||'') + ' ' + (b.sigungu_nm||'');
+      return regionA.localeCompare(regionB, 'ko');
+    }
+    if(sortVal==='org-asc')       return (a.supply_org||'').localeCompare(b.supply_org||'', 'ko');
+    if(sortVal==='revised-first') return (b.is_revised?1:0)-(a.is_revised?1:0);
+    return 0;
+  });
+}
+
+function applyMatchSortAndRender(){
+  const sortVal = document.getElementById('matchSortSel')?.value || 'date-desc';
+  lastFiltered = sortMatchRows(lastFiltered, sortVal);
+  renderMatchResults(lastFiltered);
 }
 
 let kakaoLoaded=false;
@@ -2051,11 +2109,13 @@ function renderExtrasModal(){
   document.getElementById('extrasModalCounter').textContent = multiple ? `${extrasModalIndex+1} / ${extrasModalItems.length}` : '';
   document.getElementById('extrasModalCaption').textContent = caption;
   document.getElementById('extrasModalDriveLink').href = it.file_url || '#';
-  document.getElementById('extrasModalBody').innerHTML = !fid
+  // 이미지는 원본 화질(uc?export=view)을 우선 시도하고, CORS/권한 등으로 로드 실패 시에만
+  // 기존 미리보기용 thumbnail URL로 자동 폴백한다(무한루프 방지를 위해 onerror는 1회만 동작).
+  document.getElementById('extrasModalContent').innerHTML = !fid
     ? '<p style="color:#999;font-size:13px">미리보기를 불러올 수 없어요</p>'
     : isPdf
       ? `<iframe src="https://drive.google.com/file/d/${fid}/preview" allow="autoplay"></iframe>`
-      : `<img src="https://drive.google.com/thumbnail?id=${fid}&sz=w1600" alt="${escapeHtml(caption)}">`;
+      : `<img src="https://drive.google.com/uc?export=view&id=${fid}" alt="${escapeHtml(caption)}" onerror="this.onerror=null;this.src='https://drive.google.com/thumbnail?id=${fid}&sz=w1600';">`;
 }
 
 document.addEventListener('keydown', e => {
@@ -2267,6 +2327,23 @@ function renderHousingGroupRows(id, visibleCount){
   }
 }
 
+// 콤마·슬래시로 이어붙은 특약성 비고("소득80%초과: 보증금47,224,000/월68,030" 등)를
+// 조건명 뱃지 + 금액 줄바꿈으로 분리해 가독성을 높인다. 세미콜론(;)으로 여러 조건이
+// 이어붙은 경우(예: "공동2인; 남성전용; 수급자:보증금1,000,000/월159,990") 조건별로 나눠 표시.
+function renderExtraNoteHtml(note){
+  if(!note) return '';
+  const segments = note.split(/;\s*/).map(s => s.trim()).filter(Boolean);
+  return segments.map(seg => {
+    const m = seg.match(/^([^:]+):\s*(.+)$/);
+    if(!m) return `<span class="chip hu-note-badge">${escapeHtml(seg)}</span>`;
+    const label = m[1].trim();
+    const detail = m[2].trim();
+    const priceMatch = detail.match(/보증금\s*([\d,]+)\s*원?\s*\/?\s*월(?:임대료)?\s*([\d,]+)\s*원?/);
+    const priceLine = priceMatch ? `보증금 ${priceMatch[1]}원 · 월 ${priceMatch[2]}원` : detail;
+    return `<div class="hu-note-item"><span class="chip hu-note-badge">${escapeHtml(label)}</span><div class="hu-note-price">${escapeHtml(priceLine)}</div></div>`;
+  }).join('');
+}
+
 function renderHousingUnitRow(u){
   const addr = u.address || '주소 정보 없음';
   const area = u.area_sqm != null ? parseFloat(u.area_sqm).toFixed(1)+'㎡' : '-';
@@ -2275,7 +2352,10 @@ function renderHousingUnitRow(u){
   const conv = u.conversion_date ? `<div class="hu-item"><span class="hu-label">분양전환</span><span class="hu-value">${u.conversion_date}</span></div>` : '';
   const floor = u.floor_info ? `<div class="hu-item"><span class="hu-label">동호수</span><span class="hu-value">${escapeHtml(u.floor_info)}</span></div>` : '';
   const unitType = u.unit_type ? `<div class="hu-item"><span class="hu-label">주택유형</span><span class="hu-value">${escapeHtml(u.unit_type)}</span></div>` : '';
-  const extraNote = u.extra_note ? `<div class="hu-item"><span class="hu-label">비고</span><span class="hu-value">${escapeHtml(u.extra_note)}</span></div>` : '';
+  // has_elevator는 원래 floor_info/extra_note에 섞여있던 걸 별도 컬럼으로 뽑아온 값이라
+  // 원본 유무와 무관하게 항상 같은 고정 위치(주택유형 옆)에 표시한다.
+  const elevator = u.has_elevator != null ? `<div class="hu-item"><span class="hu-label">승강기</span><span class="hu-value">${u.has_elevator ? '있음' : '없음'}</span></div>` : '';
+  const extraNote = u.extra_note ? `<div class="hu-note-wrap"><span class="hu-label">비고</span>${renderExtraNoteHtml(u.extra_note)}</div>` : '';
   return `<div class="hu-row">
     <div class="hu-addr">${addr}</div>
     <div class="hu-fields">
@@ -2285,8 +2365,9 @@ function renderHousingUnitRow(u){
       ${conv}
       ${floor}
       ${unitType}
-      ${extraNote}
+      ${elevator}
     </div>
+    ${extraNote}
   </div>`;
 }
 
@@ -2946,9 +3027,11 @@ function logoutUser(){
 <div id="extrasModalOverlay" class="extras-modal-overlay" onclick="if(event.target===this)closeExtrasViewer()" style="display:none">
   <div class="extras-modal-box">
     <button class="extras-modal-close" onclick="closeExtrasViewer()" aria-label="닫기">✕</button>
-    <button id="extrasModalPrev" class="extras-modal-nav extras-modal-prev" onclick="extrasViewerNav(-1)" aria-label="이전">‹</button>
-    <div id="extrasModalBody" class="extras-modal-body"></div>
-    <button id="extrasModalNext" class="extras-modal-nav extras-modal-next" onclick="extrasViewerNav(1)" aria-label="다음">›</button>
+    <div id="extrasModalBody" class="extras-modal-body">
+      <div id="extrasModalContent" class="extras-modal-content"></div>
+      <button id="extrasModalPrev" class="extras-modal-nav extras-modal-prev" onclick="extrasViewerNav(-1)" aria-label="이전">‹</button>
+      <button id="extrasModalNext" class="extras-modal-nav extras-modal-next" onclick="extrasViewerNav(1)" aria-label="다음">›</button>
+    </div>
     <div class="extras-modal-footer">
       <span id="extrasModalCaption" class="extras-modal-caption"></span>
       <span id="extrasModalCounter" class="extras-modal-counter"></span>
