@@ -2357,6 +2357,13 @@ function renderHousingUnitRow(u){
   const area = u.area_sqm != null ? parseFloat(u.area_sqm).toFixed(1)+'㎡' : '-';
   const deposit = u.deposit != null ? Number(u.deposit).toLocaleString()+'원' : '-';
   const rent = (u.monthly_rent == null || Number(u.monthly_rent) === 0) ? '월세없음' : Number(u.monthly_rent).toLocaleString()+'원';
+  // deposit_priority1/rent_priority1은 1순위(수급자 등)와 2·3순위(일반)가 서로 다른
+  // 임대조건을 갖는 공고(예: 청년매입임대)에서만 채워진다 — 있으면 두 조건을 함께 표시.
+  const hasPriority1 = u.deposit_priority1 != null || u.rent_priority1 != null;
+  const depositRent = hasPriority1
+    ? `<div class="hu-item"><span class="hu-label">임대조건</span><span class="hu-value">1순위: 보증금 ${u.deposit_priority1 != null ? Number(u.deposit_priority1).toLocaleString()+'원' : '-'}·월 ${(u.rent_priority1 == null || Number(u.rent_priority1) === 0) ? '월세없음' : Number(u.rent_priority1).toLocaleString()+'원'} / 2·3순위: 보증금 ${deposit}·월 ${rent}</span></div>`
+    : `<div class="hu-item"><span class="hu-label">보증금</span><span class="hu-value">${deposit}</span></div>
+      <div class="hu-item"><span class="hu-label">월임대료</span><span class="hu-value">${rent}</span></div>`;
   const conv = u.conversion_date ? `<div class="hu-item"><span class="hu-label">분양전환</span><span class="hu-value">${u.conversion_date}</span></div>` : '';
   const floor = u.floor_info ? `<div class="hu-item"><span class="hu-label">동호수</span><span class="hu-value">${escapeHtml(u.floor_info)}</span></div>` : '';
   const unitType = u.unit_type ? `<div class="hu-item"><span class="hu-label">주택유형</span><span class="hu-value">${escapeHtml(u.unit_type)}</span></div>` : '';
@@ -2368,8 +2375,7 @@ function renderHousingUnitRow(u){
     <div class="hu-addr">${addr}</div>
     <div class="hu-fields">
       <div class="hu-item"><span class="hu-label">전용면적</span><span class="hu-value">${area}</span></div>
-      <div class="hu-item"><span class="hu-label">보증금</span><span class="hu-value">${deposit}</span></div>
-      <div class="hu-item"><span class="hu-label">월임대료</span><span class="hu-value">${rent}</span></div>
+      ${depositRent}
       ${conv}
       ${floor}
       ${unitType}
