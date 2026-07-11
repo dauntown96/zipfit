@@ -145,21 +145,21 @@ select:focus,input:focus{border-color:#5DCAA5}
 .detail-note{font-size:11px;color:#999;line-height:1.6;padding:0 2px}
 .map-box{width:100%;height:220px;border-radius:10px;overflow:hidden;border:1px solid #e8e8e0;background:#f0f0e8}
 .hu-wrap{margin-top:12px;border-top:1px solid #e8e8e0;padding-top:12px}
-.hu-title{font-size:13px;font-weight:600;color:#333;margin-bottom:8px}
+.hu-title{font-size:13px;font-weight:600;color:#333;margin-bottom:8px;cursor:pointer}
 .policy-wrap{margin-top:12px;border-top:1px solid #e8e8e0;padding-top:12px}
-.policy-title{font-size:13px;font-weight:600;color:#333;margin-bottom:8px}
+.policy-title{font-size:13px;font-weight:600;color:#333;margin-bottom:8px;cursor:pointer}
 .policy-item{border:1px solid #e8e8e0;border-radius:10px;padding:10px 12px;margin-bottom:8px}
 .policy-item:last-child{margin-bottom:0}
 .policy-category{font-size:12px;font-weight:600;color:#1D9E75;margin-bottom:4px}
 .policy-content{font-size:12px;color:#555;line-height:1.5;white-space:pre-wrap}
 .elig-wrap{margin-top:12px;border-top:1px solid #e8e8e0;padding-top:12px}
-.elig-title{font-size:13px;font-weight:600;color:#333;margin-bottom:8px}
+.elig-title{font-size:13px;font-weight:600;color:#333;margin-bottom:8px;cursor:pointer}
 .elig-item{border:1px solid #e8e8e0;border-radius:10px;padding:10px 12px;margin-bottom:8px;font-size:12px}
 .elig-item:last-child{margin-bottom:0}
 .elig-head{font-weight:600;color:#1D9E75;margin-bottom:4px}
-.elig-row{display:flex;justify-content:space-between;color:#555;padding:2px 0}
+.elig-row{display:flex;justify-content:space-between;gap:8px;color:#555;padding:2px 0}
 .extras-wrap{margin-top:12px;border-top:1px solid #e8e8e0;padding-top:12px}
-.extras-title{font-size:13px;font-weight:600;color:#333;margin-bottom:8px}
+.extras-title{font-size:13px;font-weight:600;color:#333;margin-bottom:8px;cursor:pointer}
 .extras-group-label{font-size:12px;font-weight:600;color:#555;margin:8px 0 6px}
 .extras-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px}
 .extras-thumb{display:block;border-radius:8px;overflow:hidden;border:1px solid #e8e8e0;aspect-ratio:1/1;position:relative;background:#f8f8f8}
@@ -903,7 +903,9 @@ function applyNoticeFiltersAndRender(){
     return desc ? (vb > va ? 1 : vb < va ? -1 : 0) : (va > vb ? 1 : va < vb ? -1 : 0);
   };
   filtered = [...filtered].sort((a,b) => {
-    if(sortVal==='date-desc')     return nullLast(a,b,n=>n['first_seen_at']||n['announcement_date']||n['created_at'],true);
+    if(sortVal==='date-desc')     return nullLast(a,b,n=>n['first_seen_at'],true)
+      || nullLast(a,b,n=>n['announcement_date'],true)
+      || nullLast(a,b,n=>n['apply_start'],true);
     if(sortVal==='end-asc')       return nullLast(a,b,n=>n['apply_end'],false);
     if(sortVal==='start-asc')     return nullLast(a,b,n=>n['apply_start'],false);
     if(sortVal==='units-desc')    return nullLast(a,b,n=>n['total_units']?Number(n['total_units']):null,true);
@@ -1183,7 +1185,7 @@ function renderNoticeList(filtered, totalCount){
       <p class="haddr">${n['지역']||''} · ${classifyNoticeType(n['공급유형'],n['공고명'])} · ${n['공급유형']||''}</p>
       <div class="chip-row" style="margin:8px 0;gap:5px">
         ${isAmended?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#7B5EA7;border-color:#7B5EA7">🔄 정정</span>':''}
-        ${(isAmended && revisionNoteEsc)?`<span title="${revisionNoteEsc}" style="cursor:help;font-size:13px">ℹ️</span>`:''}
+        ${(isAmended && revisionNoteEsc)?`<span title="${revisionNoteEsc}" style="cursor:help;font-size:11px;color:#666;border:1px solid #ccc;border-radius:10px;padding:1px 6px">ℹ️ 정정사유</span>`:''}
         ${isNew?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
         ${closingSoon?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
         ${demoTags.map(t=>`<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:${t.color};border-color:${t.color}">${t.label}</span>`).join('')}
@@ -1902,7 +1904,9 @@ function sortMatchRows(rows, sortVal){
     return desc ? (vb > va ? 1 : vb < va ? -1 : 0) : (va > vb ? 1 : va < vb ? -1 : 0);
   };
   return [...rows].sort((a,b) => {
-    if(sortVal==='date-desc')     return nullLast(a,b,n=>n.first_seen_at||n.announcement_date||n.created_at,true);
+    if(sortVal==='date-desc')     return nullLast(a,b,n=>n.first_seen_at,true)
+      || nullLast(a,b,n=>n.announcement_date,true)
+      || nullLast(a,b,n=>n.apply_start,true);
     if(sortVal==='end-asc')       return nullLast(a,b,n=>n.apply_end,false);
     if(sortVal==='start-asc')     return nullLast(a,b,n=>n.apply_start,false);
     if(sortVal==='units-desc')    return nullLast(a,b,n=>n.total_units?Number(n.total_units):null,true);
@@ -2064,9 +2068,10 @@ function renderSpecialNotes(cardEl, id){
   if(revisionNote){
     items.push(`<div class="policy-item"><div class="policy-category">📝 정정 사유</div><div class="policy-content">${escapeHtml(revisionNote)}</div></div>`);
   }
-  const wrap = document.createElement('div');
+  const wrap = document.createElement('details');
   wrap.className = 'policy-wrap';
-  wrap.innerHTML = `<div class="policy-title">⚠️ 특이사항 안내</div>` + items.join('');
+  wrap.open = true; // 특이사항 안내는 원래 대부분 짧아 기본 펼침 유지
+  wrap.innerHTML = `<summary class="policy-title">⚠️ 특이사항 안내</summary>` + items.join('');
   const slot = document.getElementById('notes-slot-'+id);
   if(slot) slot.appendChild(wrap);
 }
@@ -2109,6 +2114,16 @@ function loadAnnouncementExtras(annId, detailEl, id, useGroup){
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
   })).then(r => r.ok ? r.json() : []).then(rows => {
     if(!Array.isArray(rows) || rows.length === 0) return;
+    // 같은 건물이 LH·MYHOME 두 파이프라인으로 각각 수집돼 서로 다른 announcement_id를 갖고,
+    // 그룹조회(resolveAnnouncementIds)로 양쪽이 함께 잡히면 동일 파일이 중복 노출될 수 있어
+    // file_hash(없으면 file_url의 drive fileId) 기준으로 먼저 중복을 제거한다.
+    const seen = new Set();
+    rows = rows.filter(r => {
+      const key = r.file_hash || driveFileIdFrom(r.file_url) || r.id;
+      if(seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
     const photos = rows.filter(r => r.extra_type === 'photo');
     const floorplans = rows.filter(r => r.extra_type === 'floorplan');
     const pamphlets = rows.filter(r => r.extra_type === 'pamphlet');
@@ -2127,9 +2142,10 @@ function loadAnnouncementExtras(annId, detailEl, id, useGroup){
           </a>`;
         }).join('') + `</div>`;
     };
-    const wrap = document.createElement('div');
+    const wrap = document.createElement('details');
     wrap.className = 'extras-wrap';
-    wrap.innerHTML = `<div class="extras-title">📷 사진·평면도·팸플릿 (${rows.length}건)</div>` +
+    if(rows.length <= 3) wrap.open = true;
+    wrap.innerHTML = `<summary class="extras-title">📷 사진·평면도·팸플릿 (${rows.length}건)</summary>` +
       renderGroup('사진', photos) + renderGroup('평면도', floorplans) + renderGroup('팸플릿', pamphlets);
     const slot = document.getElementById('extras-slot-'+id);
     if(slot) slot.appendChild(wrap);
@@ -2265,9 +2281,10 @@ function loadAnnouncementPolicies(annId, detailEl, id, useGroup){
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
   })).then(r => r.ok ? r.json() : []).then(policies => {
     if(!Array.isArray(policies) || policies.length === 0) return;
-    const wrap = document.createElement('div');
+    const wrap = document.createElement('details');
     wrap.className = 'policy-wrap';
-    wrap.innerHTML = `<div class="policy-title">📋 정책 안내 (${policies.length}건)</div>` +
+    wrap.open = true; // 정책안내는 원래 대부분 짧아 기본 펼침 유지
+    wrap.innerHTML = `<summary class="policy-title">📋 정책 안내 (${policies.length}건)</summary>` +
       policies.map(p => `
         <div class="policy-item">
           <div class="policy-category">${escapeHtml(p.category || '')}</div>
@@ -2287,21 +2304,32 @@ function loadPreciseEligibility(annId, detailEl, id, useGroup){
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
   })).then(r => r.ok ? r.json() : []).then(rows => {
     if(!Array.isArray(rows) || rows.length === 0) return;
-    const wrap = document.createElement('div');
+    const wrap = document.createElement('details');
     wrap.className = 'elig-wrap';
-    wrap.innerHTML = `<div class="elig-title">🎯 이 공고 정밀 자격기준 (${rows.length}건)</div>` +
+    if(rows.length <= 3) wrap.open = true;
+    wrap.innerHTML = `<summary class="elig-title">🎯 이 공고 정밀 자격기준 (${rows.length}건)</summary>` +
       rows.map(r => {
         const sf = r.supply_form ? escapeHtml(r.supply_form) : '일반';
         const rk = r.rank ? `${r.rank}순위` : '';
-        const income = r.income_pct ? `소득 ${r.income_pct}%` : '';
-        const dual = r.income_pct_dual_income ? ` (맞벌이 ${r.income_pct_dual_income}%)` : '';
-        const asset = r.asset_limit ? `자산 ${(r.asset_limit/10000).toLocaleString()}만원` : '';
+        const incomeExempt = r.income_limit_exempt === true;
+        const assetExempt = r.asset_limit_exempt === true;
+        const income = incomeExempt ? '소득기준 배제' : (r.income_pct ? `소득 ${r.income_pct}%` : '');
+        const dual = (!incomeExempt && r.income_pct_dual_income) ? ` (맞벌이 ${r.income_pct_dual_income}%)` : '';
+        const asset = assetExempt ? '자산기준 배제' : (r.asset_limit ? `자산 ${(r.asset_limit/10000).toLocaleString()}만원` : '');
         const car = r.car_limit ? `차량가액 ${(r.car_limit/10000).toLocaleString()}만원` : '';
+        // verification_requirements(jsonb, 키가 공고마다 다름) — 하드코딩 없이 Object.entries()로 범용 순회
+        let vr = '';
+        if(r.verification_requirements && typeof r.verification_requirements === 'object'){
+          vr = Object.entries(r.verification_requirements).map(([k,v]) =>
+            `<div class="elig-row"><span>${escapeHtml(k)}</span><span>${escapeHtml(typeof v==='string'?v:JSON.stringify(v))}</span></div>`
+          ).join('');
+        }
         return `<div class="elig-item">
           <div class="elig-head">${sf}${rk ? ' · '+rk : ''}</div>
           ${income ? `<div class="elig-row"><span>소득기준</span><span>${income}${dual}</span></div>` : ''}
           ${asset ? `<div class="elig-row"><span>자산기준</span><span>${asset}</span></div>` : ''}
           ${car ? `<div class="elig-row"><span>차량가액</span><span>${car}</span></div>` : ''}
+          ${vr}
         </div>`;
       }).join('');
     const slot = document.getElementById('elig-slot-'+id);
@@ -2330,9 +2358,10 @@ function loadHousingUnits(annId, detailEl, id){
     }
     huUnitsCache[id] = units;
     huGroupsCache[id] = groupHousingUnits(units);
-    const wrap = document.createElement('div');
+    const wrap = document.createElement('details');
     wrap.className = 'hu-wrap';
-    wrap.innerHTML = `<div class="hu-title">🏠 세대별 정보 (${units.length}건)</div><div class="hu-list" id="hu-list-${id}"></div>`;
+    if(units.length <= 3) wrap.open = true;
+    wrap.innerHTML = `<summary class="hu-title">🏠 세대별 정보 (${units.length}건)</summary><div class="hu-list" id="hu-list-${id}"></div>`;
     const slot = document.getElementById('hu-slot-'+id);
     if(slot) slot.appendChild(wrap);
     renderHousingGroupRows(id, 5);
@@ -2707,7 +2736,7 @@ function renderMatchResults(rows){
       <p class="haddr">${n.region||''} · ${classifyNoticeType(n.housing_type||'',n.title||'')} · ${n.housing_type||''}</p>
       <div class="chip-row" style="margin:8px 0;gap:5px">
         ${isAmended?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#7B5EA7;border-color:#7B5EA7">🔄 정정</span>':''}
-        ${(isAmended && revisionNoteEscM)?`<span title="${revisionNoteEscM}" style="cursor:help;font-size:13px">ℹ️</span>`:''}
+        ${(isAmended && revisionNoteEscM)?`<span title="${revisionNoteEscM}" style="cursor:help;font-size:11px;color:#666;border:1px solid #ccc;border-radius:10px;padding:1px 6px">ℹ️ 정정사유</span>`:''}
         ${isNew?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
         ${closingSoon?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
         ${demoTags.map(t=>`<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:${t.color};border-color:${t.color}">${t.label}</span>`).join('')}
