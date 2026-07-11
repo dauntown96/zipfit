@@ -672,11 +672,14 @@ function classifyDemographics(typeText, nameText){
   return tags;
 }
 
-// 신청 편의도 미니뱃지 생성 (mymy/supply_form/application_method/recruit_multiplier)
-function buildConvBadges(mymy, supplyForm, appMethod, recruitMult){
+// 신청 편의도 미니뱃지 생성 (mymy/supply_form/application_method/recruit_multiplier/완화모집/선정방식)
+function buildConvBadges(mymy, supplyForm, appMethod, recruitMult, isRelaxed, selectionMethod){
   const badges = [];
   if(mymy === true || mymy === 'true'){
     badges.push('<span class="chip sel" style="cursor:default;padding:3px 8px;font-size:10px;background:#0F6E56;border-color:#0F6E56">📱 MyMy가능</span>');
+  }
+  if(isRelaxed === true || isRelaxed === 'true'){
+    badges.push('<span class="chip sel" style="cursor:default;padding:3px 8px;font-size:10px;background:#1D9E75;border-color:#1D9E75">🔓 자격완화 추가모집</span>');
   }
   if(supplyForm && supplyForm !== '일반'){
     const sfMap = {'전세형':'🏠 전세형','기숙사형':'🏢 기숙사형','공동거주형':'👥 공동거주형','건설형':'🏗 건설형','분양전환형':'🔑 분양전환형'};
@@ -687,6 +690,13 @@ function buildConvBadges(mymy, supplyForm, appMethod, recruitMult){
     const amMap = {'email':'📧 이메일신청','online_offline':'🏢 현장접수가능','local_gov':'🏛 지자체신청'};
     const label = amMap[appMethod] || appMethod;
     badges.push(`<span class="chip sel" style="cursor:default;padding:3px 8px;font-size:10px;background:#7F77DD;border-color:#7F77DD">${label}</span>`);
+  }
+  if(selectionMethod === '선착순방문'){
+    badges.push('<span class="chip sel" style="cursor:default;padding:3px 8px;font-size:10px;background:#A32D2D;border-color:#A32D2D">🏃 선착순 방문접수</span>');
+  } else if(selectionMethod === '선계약후검증'){
+    badges.push('<span class="chip sel" style="cursor:default;padding:3px 8px;font-size:10px;background:#EF9F27;border-color:#EF9F27">⚠️ 선계약후검증</span>');
+  } else if(selectionMethod === '우선순위추첨'){
+    badges.push('<span class="chip sel" style="cursor:default;padding:3px 8px;font-size:10px;background:#7F77DD;border-color:#7F77DD">🎲 우선순위+추첨</span>');
   }
   if(recruitMult){
     badges.push(`<span class="chip sel" style="cursor:default;padding:3px 8px;font-size:10px;background:#888;border-color:#888">모집${recruitMult}배수</span>`);
@@ -987,6 +997,13 @@ async function loadNoticeData(){
       'revised_at': r.revised_at||'',
       'revision_note': r.revision_note||'',
       'first_seen_at': r.first_seen_at||'',
+      'is_relaxed_recruitment': r.is_relaxed_recruitment,
+      'relaxation_detail': r.relaxation_detail||'',
+      'selection_method': r.selection_method||'',
+      'contract_before_verification': r.contract_before_verification,
+      'rent_exemption_until': r.rent_exemption_until||'',
+      'rent_exemption_note': r.rent_exemption_note||'',
+      'special_notes': r.special_notes||null,
     }));
 
     applyNoticeFiltersAndRender();
@@ -1105,8 +1122,9 @@ function renderNoticeList(filtered, totalCount){
     const demoTags   = classifyDemographics(n['공급유형'], n['공고명']);
     const isNew      = !isClosed && isNewNotice(n);
     const closingSoon = !isClosed && isClosingSoon(n);
-    const convBadges = buildConvBadges(n['mymy_applicable'], n['supply_form'], n['application_method'], n['recruit_multiplier']);
+    const convBadges = buildConvBadges(n['mymy_applicable'], n['supply_form'], n['application_method'], n['recruit_multiplier'], n['is_relaxed_recruitment'], n['selection_method']);
     const pairKey    = n['pair_announcement_key']||'';
+    const revisionNoteEsc = (n['revision_note']||'').replace(/"/g,'&quot;');
     const applyStart = n['신청시작일']||n['apply_start']||'';
     const applyEnd   = n['신청마감일']||n['apply_end']||'';
     const annDate    = n['announcement_date']||'';
@@ -1157,7 +1175,7 @@ function renderNoticeList(filtered, totalCount){
         </div>`
       : `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px" onclick="event.stopPropagation()"><div style="display:flex;gap:8px;flex-wrap:wrap">${n['공고URL']?`<a class="detail-link" href="${n['공고URL']}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a>`:''} ${shareBtn} ${saveBtn}</div></div>`;
 
-    html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n['지역']||'').replace(/"/g,'&quot;')}" data-sido="${(n['sido_nm']||'').replace(/"/g,'&quot;')}" data-sigungu="${(n['sigungu_nm']||'').replace(/"/g,'&quot;')}" data-title="${(n['공고명']||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" data-precise-address="${(n['precise_address']||'').replace(/"/g,'&quot;')}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this)" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
+    html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n['지역']||'').replace(/"/g,'&quot;')}" data-sido="${(n['sido_nm']||'').replace(/"/g,'&quot;')}" data-sigungu="${(n['sigungu_nm']||'').replace(/"/g,'&quot;')}" data-title="${(n['공고명']||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" data-precise-address="${(n['precise_address']||'').replace(/"/g,'&quot;')}" data-relaxed="${n['is_relaxed_recruitment']===true?'1':''}" data-relaxation-detail="${(n['relaxation_detail']||'').replace(/"/g,'&quot;')}" data-contract-verify="${n['contract_before_verification']===true?'1':''}" data-rent-exempt-until="${(n['rent_exemption_until']||'').replace(/"/g,'&quot;')}" data-rent-exempt-note="${(n['rent_exemption_note']||'').replace(/"/g,'&quot;')}" data-revision-note-full="${revisionNoteEsc}" data-special-notes="${n['special_notes']?JSON.stringify(n['special_notes']).replace(/"/g,'&quot;'):''}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this)" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
       <div class="htop">
         <p class="hname">${n['공고명']||'(공고명 없음)'}</p>
         <span class="htag ${isClosed?'tag-mix':'tag-apt'}">${n['처리상태']||'-'}</span>
@@ -1165,6 +1183,7 @@ function renderNoticeList(filtered, totalCount){
       <p class="haddr">${n['지역']||''} · ${classifyNoticeType(n['공급유형'],n['공고명'])} · ${n['공급유형']||''}</p>
       <div class="chip-row" style="margin:8px 0;gap:5px">
         ${isAmended?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#7B5EA7;border-color:#7B5EA7">🔄 정정</span>':''}
+        ${(isAmended && revisionNoteEsc)?`<span title="${revisionNoteEsc}" style="cursor:help;font-size:13px">ℹ️</span>`:''}
         ${isNew?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
         ${closingSoon?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
         ${demoTags.map(t=>`<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:${t.color};border-color:${t.color}">${t.label}</span>`).join('')}
@@ -1967,18 +1986,20 @@ function toggleDetail(id, card){
       huRegionFallback[id] = { addr: [sido, sigungu].filter(Boolean).join(' ') || region, name };
     }
   }
-  // 자격기준/세대정보/정책안내가 로드 완료 순서와 무관하게 항상 같은 순서로 보이도록
-  // 고정 슬롯을 미리 만들어둔다 (자격기준 → 세대정보 → 정책안내)
+  // 특이사항 안내/자격기준/세대정보/정책안내가 로드 완료 순서와 무관하게 항상 같은 순서로 보이도록
+  // 고정 슬롯을 미리 만들어둔다 (특이사항 안내 → 자격기준 → 세대정보 → 정책안내)
   if(!open && !detailEl.dataset.slotsCreated && cardEl){
     detailEl.dataset.slotsCreated = '1';
     const slots = document.createElement('div');
     slots.innerHTML =
+      `<div id="notes-slot-${id}"></div>` +
       `<div id="elig-slot-${id}"></div>` +
       `<div id="blocks-slot-${id}"></div>` +
       `<div id="hu-slot-${id}"></div>` +
       `<div id="extras-slot-${id}"></div>` +
       `<div id="policy-slot-${id}"></div>`;
     detailEl.appendChild(slots);
+    renderSpecialNotes(cardEl, id);
   }
   if(!open && !detailEl.dataset.unitsLoaded && cardEl){
     detailEl.dataset.unitsLoaded = '1';
@@ -2006,6 +2027,48 @@ function escapeHtml(s){
   const d = document.createElement('div');
   d.textContent = s;
   return d.innerHTML;
+}
+
+// 카드 data-* 속성(완화모집/선계약후검증/임대료면제/특이사항/정정사유)을 읽어
+// 값이 있는 항목만 "특이사항 안내" 섹션으로 렌더링 (별도 fetch 없이 동기 렌더링)
+function renderSpecialNotes(cardEl, id){
+  const isRelaxed = cardEl.dataset.relaxed === '1';
+  const relaxationDetail = cardEl.dataset.relaxationDetail || '';
+  const contractVerify = cardEl.dataset.contractVerify === '1';
+  const rentExemptUntil = cardEl.dataset.rentExemptUntil || '';
+  const rentExemptNote = cardEl.dataset.rentExemptNote || '';
+  const revisionNote = cardEl.dataset.revisionNoteFull || '';
+  let specialNotes = null;
+  if(cardEl.dataset.specialNotes){
+    try{ specialNotes = JSON.parse(cardEl.dataset.specialNotes); }catch(e){ specialNotes = null; }
+  }
+  const hasSpecialNotes = specialNotes && typeof specialNotes === 'object' && Object.keys(specialNotes).length;
+  if(!isRelaxed && !contractVerify && !rentExemptUntil && !hasSpecialNotes && !revisionNote) return;
+
+  const items = [];
+  if(isRelaxed){
+    items.push(`<div class="policy-item"><div class="policy-category">🔓 자격완화 추가모집</div><div class="policy-content">이 공고는 입주자격을 완화한 추가모집입니다.${relaxationDetail?'<br>'+escapeHtml(relaxationDetail):''}</div></div>`);
+  }
+  if(contractVerify){
+    items.push(`<div style="font-size:12px;color:#A32D2D;background:#FFF3F3;border:1px solid #F5C2C2;border-radius:8px;padding:8px 10px;margin-bottom:8px">⚠️ 이 공고는 자격 검증 전에 먼저 계약을 체결합니다. 계약 후 부적격으로 판명되면 계약이 직권 해제될 수 있으니 신청 전 자격을 반드시 스스로 확인하세요.</div>`);
+  }
+  if(rentExemptUntil){
+    items.push(`<div class="policy-item"><div class="policy-category">🎁 월임대료 한시 면제</div><div class="policy-content">~${escapeHtml(rentExemptUntil)}까지 면제${rentExemptNote?'<br>'+escapeHtml(rentExemptNote):''}</div></div>`);
+  }
+  if(hasSpecialNotes){
+    Object.entries(specialNotes).forEach(([k,v])=>{
+      const val = (v===null||v===undefined) ? '' : (typeof v==='string' ? v : JSON.stringify(v));
+      items.push(`<div class="policy-item"><div class="policy-category">${escapeHtml(k)}</div><div class="policy-content">${escapeHtml(val)}</div></div>`);
+    });
+  }
+  if(revisionNote){
+    items.push(`<div class="policy-item"><div class="policy-category">📝 정정 사유</div><div class="policy-content">${escapeHtml(revisionNote)}</div></div>`);
+  }
+  const wrap = document.createElement('div');
+  wrap.className = 'policy-wrap';
+  wrap.innerHTML = `<div class="policy-title">⚠️ 특이사항 안내</div>` + items.join('');
+  const slot = document.getElementById('notes-slot-'+id);
+  if(slot) slot.appendChild(wrap);
 }
 
 function driveFileIdFrom(url){
@@ -2585,8 +2648,9 @@ function renderMatchResults(rows){
     const demoTags    = classifyDemographics(n.housing_type||'', n.title||'');
     const isNew       = !isClosed && isNewNotice({'created_at': n.created_at||'', 'apply_end': n.apply_end||''});
     const closingSoon = !isClosed && isClosingSoon({'apply_end': n.apply_end||''});
-    const convBadgesM = buildConvBadges(n.mymy_applicable, n.supply_form, n.application_method, n.recruit_multiplier);
+    const convBadgesM = buildConvBadges(n.mymy_applicable, n.supply_form, n.application_method, n.recruit_multiplier, n.is_relaxed_recruitment, n.selection_method);
     const pairKeyM    = n.pair_announcement_key||'';
+    const revisionNoteEscM = (n.revision_note||'').replace(/"/g,'&quot;');
     const applyStart  = n.apply_start||'';
     const applyEnd    = n.apply_end||'';
     const annDate     = n.announcement_date||'';
@@ -2635,7 +2699,7 @@ function renderMatchResults(rows){
         </div>`
       : `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px" onclick="event.stopPropagation()"><div style="display:flex;gap:8px;flex-wrap:wrap">${n.url?`<a class="detail-link" href="${n.url}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a>`:''} ${mShareBtn} ${mSaveBtn}</div></div>`;
 
-    html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n.region||'').replace(/"/g,'&quot;')}" data-sido="${(n.sido_nm||'').replace(/"/g,'&quot;')}" data-sigungu="${(n.sigungu_nm||'').replace(/"/g,'&quot;')}" data-title="${(n.title||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" data-precise-address="${(n.precise_address||'').replace(/"/g,'&quot;')}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this)" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
+    html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n.region||'').replace(/"/g,'&quot;')}" data-sido="${(n.sido_nm||'').replace(/"/g,'&quot;')}" data-sigungu="${(n.sigungu_nm||'').replace(/"/g,'&quot;')}" data-title="${(n.title||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" data-precise-address="${(n.precise_address||'').replace(/"/g,'&quot;')}" data-relaxed="${n.is_relaxed_recruitment===true?'1':''}" data-relaxation-detail="${(n.relaxation_detail||'').replace(/"/g,'&quot;')}" data-contract-verify="${n.contract_before_verification===true?'1':''}" data-rent-exempt-until="${(n.rent_exemption_until||'').replace(/"/g,'&quot;')}" data-rent-exempt-note="${(n.rent_exemption_note||'').replace(/"/g,'&quot;')}" data-revision-note-full="${revisionNoteEscM}" data-special-notes="${n.special_notes?JSON.stringify(n.special_notes).replace(/"/g,'&quot;'):''}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this)" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
       <div class="htop">
         <p class="hname">${n.title||'(공고명 없음)'}</p>
         <span class="htag ${isClosed?'tag-mix':'tag-apt'}">${n.status||'-'}</span>
@@ -2643,6 +2707,7 @@ function renderMatchResults(rows){
       <p class="haddr">${n.region||''} · ${classifyNoticeType(n.housing_type||'',n.title||'')} · ${n.housing_type||''}</p>
       <div class="chip-row" style="margin:8px 0;gap:5px">
         ${isAmended?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#7B5EA7;border-color:#7B5EA7">🔄 정정</span>':''}
+        ${(isAmended && revisionNoteEscM)?`<span title="${revisionNoteEscM}" style="cursor:help;font-size:13px">ℹ️</span>`:''}
         ${isNew?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
         ${closingSoon?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
         ${demoTags.map(t=>`<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:${t.color};border-color:${t.color}">${t.label}</span>`).join('')}
