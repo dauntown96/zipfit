@@ -882,7 +882,10 @@ function applyNoticeFiltersAndRender(){
   const hideClosed = document.getElementById('hideClosedChk')?.checked;
   let filtered = noticeData;
   if(hideClosed && !activeNoticeStatus){
-    filtered = noticeData.filter(n => n['처리상태정규화'] !== '접수마감');
+    // 처리상태정규화(RPC의 status_normalized)는 "접수상태"와 "정정여부"가 하나의 값에
+    // 섞여있어(정정공고면 접수마감이어도 '정정공고'로 덮어써짐), 접수마감 판정에는
+    // 정정여부와 섞이지 않은 원본 처리상태(status)를 직접 사용해야 한다.
+    filtered = noticeData.filter(n => n['처리상태'] !== '접수마감');
   }
   if(activeNoticeTarget){
     filtered = filtered.filter(n => {
@@ -905,7 +908,7 @@ function applyNoticeFiltersAndRender(){
   filtered = [...filtered].sort((a,b) => {
     // 접수마감 여부로 먼저 그룹을 나누고(접수 가능한 공고가 항상 위), 그룹 내부에서는
     // 선택된 정렬 기준을 그대로 적용 — 어떤 정렬을 골라도 마감 공고는 항상 하단에 위치
-    const closedDiff = ((a['처리상태정규화']==='접수마감')?1:0) - ((b['처리상태정규화']==='접수마감')?1:0);
+    const closedDiff = ((a['처리상태']==='접수마감')?1:0) - ((b['처리상태']==='접수마감')?1:0);
     if(closedDiff !== 0) return closedDiff;
     if(sortVal==='date-desc')     return nullLast(a,b,n=>n['announcement_date'],true)
       || nullLast(a,b,n=>n['apply_start'],true)
@@ -975,7 +978,6 @@ async function loadNoticeData(){
       '신청시작일': r.apply_start||'',
       '신청마감일': r.apply_end||'',
       '처리상태':  r.status||'',
-      '처리상태정규화': r.status_normalized||r.status||'',
       '공고URL':   r.url||'',
       '수집일시':  r.created_at||'',
       'created_at': r.created_at||'',
@@ -1123,7 +1125,7 @@ function renderNoticeList(filtered, totalCount){
   const shown = filtered.slice(0, noticeVisibleCount);
   let html = '';
   shown.forEach((n, idx) => {
-    const isClosed   = n['처리상태정규화']==='접수마감';
+    const isClosed   = n['처리상태']==='접수마감';
     const isAmended  = (n['공고명']||'').includes('[정정공고]') || n['is_revised'];
     const demoTags   = classifyDemographics(n['공급유형'], n['공고명']);
     const isNew      = !isClosed && isNewNotice(n);
@@ -1356,7 +1358,7 @@ function renderPersonalizedRecommendations(){
   }
 
   let filtered=noticeData.filter(n=>{
-    const isClosed=n['처리상태정규화']==='접수마감';
+    const isClosed=n['처리상태']==='접수마감';
     if(isClosed) return false;
     if(savedRegions.length && !savedRegions.includes(extractRegionTop(n['지역']))) return false;
     if(savedTypes.length && !savedTypes.some(t=>classifyNoticeType(n['공급유형'],n['공고명'])===t||n['공급유형']?.includes(t))) return false;
@@ -1365,7 +1367,7 @@ function renderPersonalizedRecommendations(){
 
   const desc=document.getElementById('personalizedDesc');
   if(!hasConditions){
-    filtered=noticeData.filter(n=>n['처리상태정규화']!=='접수마감').slice(0,5);
+    filtered=noticeData.filter(n=>n['처리상태']!=='접수마감').slice(0,5);
     desc.textContent='저장된 조건이 없어 전체 공고를 표시해요. 설정 탭에서 조건을 저장하면 맞춤 추천을 받을 수 있어요.';
   } else {
     desc.textContent=`저장된 조건 기준 ${filtered.length}건 매칭됐어요.`;
@@ -1459,7 +1461,7 @@ function renderInsight(rows, wrap, statsRows){
   const todayStr = today.toISOString().slice(0,10);
 
   // ① KPI
-  const kpiActive = rows.filter(r=>(r.status_normalized||r.status||'')==='접수중').length;
+  const kpiActive = rows.filter(r=>(r.status||'')==='접수중').length;
   const d7ago = new Date(today); d7ago.setDate(d7ago.getDate()-7);
   const kpiNew = rows.filter(r=>{
     if(!r.announcement_date) return false;
@@ -1627,7 +1629,7 @@ function renderInsight(rows, wrap, statsRows){
         const stock = Number(stat['총세대수'])||0;
         const noticeCnt = rows.filter(r=>{
           const ht = r.housing_type||'';
-          return ht.includes(keyword) && (r.status_normalized||r.status||'')==='접수중';
+          return ht.includes(keyword) && (r.status||'')==='접수중';
         }).length;
         return {label, stock, noticeCnt};
       });
@@ -1875,7 +1877,7 @@ async function matchHouses(){
       throw new Error('Supabase 오류: ' + msg);
     }
 
-    rows = rows.filter(r => r.status !== '접수마감' && r.status_normalized !== '접수마감');
+    rows = rows.filter(r => r.status !== '접수마감');
     if(regions.length > 0) {
       rows = rows.filter(r => regions.some(rg => (r.region||'').includes(rg)));
     }
@@ -1910,7 +1912,7 @@ function sortMatchRows(rows, sortVal){
   return [...rows].sort((a,b) => {
     // 접수마감 여부로 먼저 그룹을 나누고(접수 가능한 공고가 항상 위), 그룹 내부에서는
     // 선택된 정렬 기준을 그대로 적용 — 어떤 정렬을 골라도 마감 공고는 항상 하단에 위치
-    const closedDiff = (((a.status_normalized||a.status||'')==='접수마감')?1:0) - (((b.status_normalized||b.status||'')==='접수마감')?1:0);
+    const closedDiff = (((a.status||'')==='접수마감')?1:0) - (((b.status||'')==='접수마감')?1:0);
     if(closedDiff !== 0) return closedDiff;
     if(sortVal==='date-desc')     return nullLast(a,b,n=>n.announcement_date,true)
       || nullLast(a,b,n=>n.apply_start,true)
@@ -2682,7 +2684,7 @@ function renderMatchResults(rows){
   let html = `<div class="count-info"><span>총 ${rows.length}건 매칭</span></div>`;
 
   shown.forEach((n, idx) => {
-    const isClosed    = (n.status_normalized||n.status||'') === '접수마감';
+    const isClosed    = (n.status||'') === '접수마감';
     const isAmended   = (n.title||'').includes('[정정공고]') || n.is_revised;
     const demoTags    = classifyDemographics(n.housing_type||'', n.title||'');
     const isNew       = !isClosed && isNewNotice({'created_at': n.created_at||'', 'apply_end': n.apply_end||''});
