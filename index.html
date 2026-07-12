@@ -157,7 +157,15 @@ select:focus,input:focus{border-color:#5DCAA5}
 .elig-item{border:1px solid #e8e8e0;border-radius:10px;padding:10px 12px;margin-bottom:8px;font-size:12px}
 .elig-item:last-child{margin-bottom:0}
 .elig-head{font-weight:600;color:#1D9E75;margin-bottom:4px}
-.elig-row{display:flex;justify-content:space-between;gap:8px;color:#555;padding:2px 0}
+.elig-row{display:flex;justify-content:space-between;gap:8px;color:#555;padding:2px 0;margin-bottom:6px;align-items:flex-start}
+.elig-row:last-child{margin-bottom:0}
+.elig-key{font-weight:600;color:#333;flex-shrink:0}
+.elig-subrows{flex:1;min-width:0}
+.elig-subrow{display:flex;justify-content:space-between;gap:8px;padding:2px 0 2px 10px;border-left:2px solid #e8e8e0;font-size:11.5px}
+.elig-subrow span:first-child{color:#777}
+body.theme-dark .elig-key{color:#e8e8e8}
+body.theme-dark .elig-subrow{border-left-color:#3a3d47}
+body.theme-dark .elig-subrow span:first-child{color:#9aa0aa}
 .extras-wrap{margin-top:12px;border-top:1px solid #e8e8e0;padding-top:12px}
 .extras-title{font-size:13px;font-weight:600;color:#333;margin-bottom:8px;cursor:pointer}
 .extras-group-label{font-size:12px;font-weight:600;color:#555;margin:8px 0 6px}
@@ -192,6 +200,7 @@ select:focus,input:focus{border-color:#5DCAA5}
 .hu-note-wrap{margin-top:8px;padding-top:8px;border-top:1px dashed #e0e0d8}
 .hu-note-item{margin:4px 0}
 .hu-note-badge{padding:2px 8px;font-size:11px;cursor:default;display:inline-block;margin:2px 4px 2px 0}
+.hu-recruit-badge{padding:2px 9px;font-size:11px;cursor:default;display:inline-block;margin-left:6px;background:#1D9E75;color:#fff;border-color:#1D9E75;font-weight:600}
 .hu-note-price{font-size:12px;color:#555;margin-top:2px}
 .hu-value{color:#333;font-weight:500}
 .hu-more-btn{width:100%;padding:8px;border-radius:8px;border:1px dashed #ccc;background:#fafaf6;color:#666;font-size:12px;cursor:pointer;margin-top:4px}
@@ -1015,6 +1024,12 @@ async function loadNoticeData(){
       'rent_exemption_until': r.rent_exemption_until||'',
       'rent_exemption_note': r.rent_exemption_note||'',
       'special_notes': r.special_notes||null,
+      'doc_submit_announce_date': r.doc_submit_announce_date||'',
+      'doc_submit_start': r.doc_submit_start||'',
+      'doc_submit_end': r.doc_submit_end||'',
+      'winner_announce_date': r.winner_announce_date||'',
+      'contract_start': r.contract_start||'',
+      'contract_end': r.contract_end||'',
     }));
 
     applyNoticeFiltersAndRender();
@@ -1186,7 +1201,7 @@ function renderNoticeList(filtered, totalCount){
         </div>`
       : `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px" onclick="event.stopPropagation()"><div style="display:flex;gap:8px;flex-wrap:wrap">${n['공고URL']?`<a class="detail-link" href="${n['공고URL']}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a>`:''} ${shareBtn} ${saveBtn}</div></div>`;
 
-    html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n['지역']||'').replace(/"/g,'&quot;')}" data-sido="${(n['sido_nm']||'').replace(/"/g,'&quot;')}" data-sigungu="${(n['sigungu_nm']||'').replace(/"/g,'&quot;')}" data-title="${(n['공고명']||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" data-precise-address="${(n['precise_address']||'').replace(/"/g,'&quot;')}" data-relaxed="${n['is_relaxed_recruitment']===true?'1':''}" data-relaxation-detail="${(n['relaxation_detail']||'').replace(/"/g,'&quot;')}" data-contract-verify="${n['contract_before_verification']===true?'1':''}" data-rent-exempt-until="${(n['rent_exemption_until']||'').replace(/"/g,'&quot;')}" data-rent-exempt-note="${(n['rent_exemption_note']||'').replace(/"/g,'&quot;')}" data-revision-note-full="${revisionNoteEsc}" data-special-notes="${n['special_notes']?JSON.stringify(n['special_notes']).replace(/"/g,'&quot;'):''}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this)" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
+    html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n['지역']||'').replace(/"/g,'&quot;')}" data-sido="${(n['sido_nm']||'').replace(/"/g,'&quot;')}" data-sigungu="${(n['sigungu_nm']||'').replace(/"/g,'&quot;')}" data-title="${(n['공고명']||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" data-precise-address="${(n['precise_address']||'').replace(/"/g,'&quot;')}" data-relaxed="${n['is_relaxed_recruitment']===true?'1':''}" data-relaxation-detail="${(n['relaxation_detail']||'').replace(/"/g,'&quot;')}" data-contract-verify="${n['contract_before_verification']===true?'1':''}" data-rent-exempt-until="${(n['rent_exemption_until']||'').replace(/"/g,'&quot;')}" data-rent-exempt-note="${(n['rent_exemption_note']||'').replace(/"/g,'&quot;')}" data-revision-note-full="${revisionNoteEsc}" data-special-notes="${n['special_notes']?JSON.stringify(n['special_notes']).replace(/"/g,'&quot;'):''}" data-apply-start="${(n['apply_start']||'').replace(/"/g,'&quot;')}" data-apply-end="${(n['apply_end']||'').replace(/"/g,'&quot;')}" data-announcement-date="${(n['announcement_date']||'').replace(/"/g,'&quot;')}" data-doc-submit-announce="${(n['doc_submit_announce_date']||'').replace(/"/g,'&quot;')}" data-doc-submit-start="${(n['doc_submit_start']||'').replace(/"/g,'&quot;')}" data-doc-submit-end="${(n['doc_submit_end']||'').replace(/"/g,'&quot;')}" data-winner-announce="${(n['winner_announce_date']||'').replace(/"/g,'&quot;')}" data-contract-start="${(n['contract_start']||'').replace(/"/g,'&quot;')}" data-contract-end="${(n['contract_end']||'').replace(/"/g,'&quot;')}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this)" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
       <div class="htop">
         <p class="hname">${normalizeRevisedTitle(n['공고명'])||'(공고명 없음)'}</p>
         <span class="htag ${isClosed?'tag-mix':'tag-apt'}">${n['처리상태']||'-'}</span>
@@ -2010,6 +2025,7 @@ function toggleDetail(id, card){
     const slots = document.createElement('div');
     slots.innerHTML =
       `<div id="notes-slot-${id}"></div>` +
+      `<div id="schedule-slot-${id}"></div>` +
       `<div id="elig-slot-${id}"></div>` +
       `<div id="blocks-slot-${id}"></div>` +
       `<div id="hu-slot-${id}"></div>` +
@@ -2017,6 +2033,7 @@ function toggleDetail(id, card){
       `<div id="policy-slot-${id}"></div>`;
     detailEl.appendChild(slots);
     renderSpecialNotes(cardEl, id);
+    renderSupplySchedule(cardEl, id);
   }
   if(!open && !detailEl.dataset.unitsLoaded && cardEl){
     detailEl.dataset.unitsLoaded = '1';
@@ -2044,6 +2061,34 @@ function escapeHtml(s){
   const d = document.createElement('div');
   d.textContent = s;
   return d.innerHTML;
+}
+
+// verification_requirements의 스네이크/복합 key를 사람이 읽기 좋은 라벨로 변환.
+// 알려진 몇몇 key는 딕셔너리로 명시 매핑, 그 외 "A_B" 형태는 일반 규칙으로 "A(B)"로 변환.
+const ELIG_KEY_LABELS = {
+  '자산기준_자녀수별': '자산기준(자녀수별)',
+  '소득기준_자녀수별': '소득기준(자녀수별)',
+  '차량가액기준_자녀수별': '차량가액기준(자녀수별)',
+};
+function prettifyEligKey(k){
+  if(ELIG_KEY_LABELS[k]) return ELIG_KEY_LABELS[k];
+  const m = k.match(/^([^_]+)_(.+)$/);
+  return m ? `${m[1]}(${m[2]})` : k;
+}
+
+// verification_requirements의 값을 재귀 렌더링 — 숫자는 만원 단위, 중첩 객체는 들여쓴 하위 목록으로 변환해
+// raw JSON 문자열이 그대로 노출되지 않도록 한다.
+function renderEligValue(v){
+  if(v === null || v === undefined) return '<span></span>';
+  if(typeof v === 'number') return `<span>${(v/10000).toLocaleString()}만원</span>`;
+  if(typeof v === 'string') return `<span>${escapeHtml(v)}</span>`;
+  if(Array.isArray(v)) return `<span>${v.map(x => typeof x==='number' ? (x/10000).toLocaleString()+'만원' : escapeHtml(String(x))).join(', ')}</span>`;
+  if(typeof v === 'object'){
+    return `<div class="elig-subrows">` + Object.entries(v).map(([k,vv]) =>
+      `<div class="elig-subrow"><span>${escapeHtml(prettifyEligKey(k))}</span>${renderEligValue(vv)}</div>`
+    ).join('') + `</div>`;
+  }
+  return `<span>${escapeHtml(String(v))}</span>`;
 }
 
 // 방어적 안전장치: 수집 파이프라인이 원본 소스(LH/MYHOME)로부터 "[정정공고]" 접두어가
@@ -2092,6 +2137,44 @@ function renderSpecialNotes(cardEl, id){
   wrap.className = 'policy-wrap';
   wrap.innerHTML = `<summary class="policy-title">⚠️ 특이사항 안내</summary>` + items.join('');
   const slot = document.getElementById('notes-slot-'+id);
+  if(slot) slot.appendChild(wrap);
+}
+
+// 카드 data-* 속성(접수기간/서류제출대상자발표일/서류접수기간/당첨자발표일/계약기간)을 읽어
+// 값이 있는 항목만 순서대로 "공급일정" 섹션으로 렌더링 (별도 fetch 없이 동기 렌더링, renderSpecialNotes와 동일 패턴)
+function renderSupplySchedule(cardEl, id){
+  const applyStart = cardEl.dataset.applyStart || '';
+  const applyEnd = cardEl.dataset.applyEnd || '';
+  const docSubmitAnnounce = cardEl.dataset.docSubmitAnnounce || '';
+  const docSubmitStart = cardEl.dataset.docSubmitStart || '';
+  const docSubmitEnd = cardEl.dataset.docSubmitEnd || '';
+  const winnerAnnounce = cardEl.dataset.winnerAnnounce || '';
+  const contractStart = cardEl.dataset.contractStart || '';
+  const contractEnd = cardEl.dataset.contractEnd || '';
+
+  const items = [];
+  if(applyStart || applyEnd){
+    items.push(['📅 접수기간', `${applyStart||'-'} ~ ${applyEnd||'-'}`]);
+  }
+  if(docSubmitAnnounce){
+    items.push(['📋 서류제출대상자 발표일', docSubmitAnnounce]);
+  }
+  if(docSubmitStart || docSubmitEnd){
+    items.push(['📑 서류접수기간', `${docSubmitStart||'-'} ~ ${docSubmitEnd||'-'}`]);
+  }
+  if(winnerAnnounce){
+    items.push(['🏆 당첨자 발표일', winnerAnnounce]);
+  }
+  if(contractStart || contractEnd){
+    items.push(['✍️ 계약기간', `${contractStart||'-'} ~ ${contractEnd||'-'}`]);
+  }
+  if(!items.length) return;
+
+  const wrap = document.createElement('details');
+  wrap.className = 'policy-wrap';
+  wrap.innerHTML = `<summary class="policy-title">🗓️ 공급일정</summary>` +
+    items.map(([label,value]) => `<div class="policy-item"><div class="policy-category">${label}</div><div class="policy-content">${escapeHtml(value)}</div></div>`).join('');
+  const slot = document.getElementById('schedule-slot-'+id);
   if(slot) slot.appendChild(wrap);
 }
 
@@ -2355,11 +2438,12 @@ function loadPreciseEligibility(annId, detailEl, id, useGroup){
         const dual = (!incomeExempt && r.income_pct_dual_income) ? ` (맞벌이 ${r.income_pct_dual_income}%)` : '';
         const asset = assetExempt ? '자산기준 배제' : (r.asset_limit ? `자산 ${(r.asset_limit/10000).toLocaleString()}만원` : '');
         const car = r.car_limit ? `차량가액 ${(r.car_limit/10000).toLocaleString()}만원` : '';
-        // verification_requirements(jsonb, 키가 공고마다 다름) — 하드코딩 없이 Object.entries()로 범용 순회
+        // verification_requirements(jsonb, 키가 공고마다 다름) — 하드코딩 없이 Object.entries()로 범용 순회.
+        // 중첩 객체(예: 자녀수별 자산기준표)는 raw JSON 대신 들여쓴 하위 목록으로, 숫자는 만원 단위로 변환.
         let vr = '';
         if(r.verification_requirements && typeof r.verification_requirements === 'object'){
           vr = Object.entries(r.verification_requirements).map(([k,v]) =>
-            `<div class="elig-row"><span>${escapeHtml(k)}</span><span>${escapeHtml(typeof v==='string'?v:JSON.stringify(v))}</span></div>`
+            `<div class="elig-row"><span class="elig-key">${escapeHtml(prettifyEligKey(k))}</span>${renderEligValue(v)}</div>`
           ).join('');
         }
         return `<div class="elig-item">
@@ -2511,8 +2595,10 @@ function renderHousingUnitRow(u){
   // 원본 유무와 무관하게 항상 같은 고정 위치(주택유형 옆)에 표시한다.
   const elevator = u.has_elevator != null ? `<div class="hu-item"><span class="hu-label">승강기</span><span class="hu-value">${u.has_elevator ? '있음' : '없음'}</span></div>` : '';
   const extraNote = u.extra_note ? `<div class="hu-note-wrap"><span class="hu-label">비고</span>${renderExtraNoteHtml(u.extra_note)}</div>` : '';
+  // 금회 모집인원 — 경쟁률 가늠에 중요한 정보라 배지로 눈에 띄게 표시(기존 .chip 배지 스타일 재사용)
+  const recruitBadge = u.recruit_count != null ? `<span class="chip hu-recruit-badge">모집 ${u.recruit_count}세대</span>` : '';
   return `<div class="hu-row">
-    <div class="hu-addr">${addr}</div>
+    <div class="hu-addr">${addr}${recruitBadge}</div>
     <div class="hu-fields">
       <div class="hu-item"><span class="hu-label">전용면적</span><span class="hu-value">${area}</span></div>
       ${depositRent}
@@ -2776,7 +2862,7 @@ function renderMatchResults(rows){
         </div>`
       : `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px" onclick="event.stopPropagation()"><div style="display:flex;gap:8px;flex-wrap:wrap">${n.url?`<a class="detail-link" href="${n.url}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a>`:''} ${mShareBtn} ${mSaveBtn}</div></div>`;
 
-    html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n.region||'').replace(/"/g,'&quot;')}" data-sido="${(n.sido_nm||'').replace(/"/g,'&quot;')}" data-sigungu="${(n.sigungu_nm||'').replace(/"/g,'&quot;')}" data-title="${(n.title||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" data-precise-address="${(n.precise_address||'').replace(/"/g,'&quot;')}" data-relaxed="${n.is_relaxed_recruitment===true?'1':''}" data-relaxation-detail="${(n.relaxation_detail||'').replace(/"/g,'&quot;')}" data-contract-verify="${n.contract_before_verification===true?'1':''}" data-rent-exempt-until="${(n.rent_exemption_until||'').replace(/"/g,'&quot;')}" data-rent-exempt-note="${(n.rent_exemption_note||'').replace(/"/g,'&quot;')}" data-revision-note-full="${revisionNoteEscM}" data-special-notes="${n.special_notes?JSON.stringify(n.special_notes).replace(/"/g,'&quot;'):''}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this)" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
+    html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n.region||'').replace(/"/g,'&quot;')}" data-sido="${(n.sido_nm||'').replace(/"/g,'&quot;')}" data-sigungu="${(n.sigungu_nm||'').replace(/"/g,'&quot;')}" data-title="${(n.title||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" data-precise-address="${(n.precise_address||'').replace(/"/g,'&quot;')}" data-relaxed="${n.is_relaxed_recruitment===true?'1':''}" data-relaxation-detail="${(n.relaxation_detail||'').replace(/"/g,'&quot;')}" data-contract-verify="${n.contract_before_verification===true?'1':''}" data-rent-exempt-until="${(n.rent_exemption_until||'').replace(/"/g,'&quot;')}" data-rent-exempt-note="${(n.rent_exemption_note||'').replace(/"/g,'&quot;')}" data-revision-note-full="${revisionNoteEscM}" data-special-notes="${n.special_notes?JSON.stringify(n.special_notes).replace(/"/g,'&quot;'):''}" data-apply-start="${(n.apply_start||'').replace(/"/g,'&quot;')}" data-apply-end="${(n.apply_end||'').replace(/"/g,'&quot;')}" data-announcement-date="${(n.announcement_date||'').replace(/"/g,'&quot;')}" data-doc-submit-announce="${(n.doc_submit_announce_date||'').replace(/"/g,'&quot;')}" data-doc-submit-start="${(n.doc_submit_start||'').replace(/"/g,'&quot;')}" data-doc-submit-end="${(n.doc_submit_end||'').replace(/"/g,'&quot;')}" data-winner-announce="${(n.winner_announce_date||'').replace(/"/g,'&quot;')}" data-contract-start="${(n.contract_start||'').replace(/"/g,'&quot;')}" data-contract-end="${(n.contract_end||'').replace(/"/g,'&quot;')}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this)" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
       <div class="htop">
         <p class="hname">${normalizeRevisedTitle(n.title)||'(공고명 없음)'}</p>
         <span class="htag ${isClosed?'tag-mix':'tag-apt'}">${n.status||'-'}</span>
