@@ -2021,7 +2021,7 @@ function toggleDetail(id, card){
   if(!open && !detailEl.dataset.unitsLoaded && cardEl){
     detailEl.dataset.unitsLoaded = '1';
     const annId = cardEl.dataset.announcementId || '';
-    loadHousingUnits(annId, detailEl, id);
+    loadHousingUnits(annId, detailEl, id, true);
   }
   if(!open && !detailEl.dataset.blocksLoaded && cardEl){
     detailEl.dataset.blocksLoaded = '1';
@@ -2298,6 +2298,17 @@ function loadAnnouncementPolicies(annId, detailEl, id, useGroup){
   resolveAnnouncementIds(annId, useGroup).then(ids => fetch(`${SUPABASE_URL}/rest/v1/announcement_policies?${idFilterFor(ids)}&order=category`, {
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
   })).then(r => r.ok ? r.json() : []).then(policies => {
+    // 그룹조회로 형제 announcement_id 여러 곳에 동일 정책이 중복 백필된 경우를 대비해
+    // 카테고리+내용이 완전히 같은 행은 하나만 남긴다.
+    if(Array.isArray(policies) && policies.length > 0){
+      const seenPol = new Set();
+      policies = policies.filter(p => {
+        const key = (p.category||'') + '|' + (p.content_raw||'');
+        if(seenPol.has(key)) return false;
+        seenPol.add(key);
+        return true;
+      });
+    }
     if(!Array.isArray(policies) || policies.length === 0) return;
     const wrap = document.createElement('details');
     wrap.className = 'policy-wrap';
@@ -2320,6 +2331,17 @@ function loadPreciseEligibility(annId, detailEl, id, useGroup){
   resolveAnnouncementIds(annId, useGroup).then(ids => fetch(`${SUPABASE_URL}/rest/v1/eligibility_criteria?${idFilterFor(ids)}&order=supply_form,rank`, {
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
   })).then(r => r.ok ? r.json() : []).then(rows => {
+    // 그룹조회로 형제 announcement_id 여러 곳에 동일 자격기준이 중복 백필된 경우를 대비해
+    // 핵심 필드 조합이 완전히 같은 행은 하나만 남긴다.
+    if(Array.isArray(rows) && rows.length > 0){
+      const seenElig = new Set();
+      rows = rows.filter(r => {
+        const key = [r.supply_form, r.rank, r.income_pct, r.income_pct_dual_income, r.asset_limit, r.car_limit, JSON.stringify(r.verification_requirements||null)].join('|');
+        if(seenElig.has(key)) return false;
+        seenElig.add(key);
+        return true;
+      });
+    }
     if(!Array.isArray(rows) || rows.length === 0) return;
     const wrap = document.createElement('details');
     wrap.className = 'elig-wrap';
@@ -2361,11 +2383,22 @@ const huActiveGroup = {};
 const huMapState = {};
 const huRegionFallback = {};
 
-function loadHousingUnits(annId, detailEl, id){
+function loadHousingUnits(annId, detailEl, id, useGroup){
   if(!annId) return;
-  fetch(`${SUPABASE_URL}/rest/v1/housing_units?announcement_id=eq.${encodeURIComponent(annId)}&order=deposit.asc`, {
+  resolveAnnouncementIds(annId, useGroup).then(ids => fetch(`${SUPABASE_URL}/rest/v1/housing_units?${idFilterFor(ids)}&order=deposit.asc`, {
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
-  }).then(r => r.ok ? r.json() : []).then(units => {
+  })).then(r => r.ok ? r.json() : []).then(units => {
+    // 그룹조회로 형제 announcement_id 여러 곳에 동일 세대정보가 중복 백필된 경우를 대비해
+    // 핵심 필드 조합이 완전히 같은 행은 하나만 남긴다(announcement_extras의 file_hash dedup과 동일 취지).
+    if(Array.isArray(units) && units.length > 0){
+      const seenHu = new Set();
+      units = units.filter(u => {
+        const key = [u.building_name, u.address, u.floor_info, u.unit_type, u.deposit, u.monthly_rent, u.deposit_priority1, u.rent_priority1].join('|');
+        if(seenHu.has(key)) return false;
+        seenHu.add(key);
+        return true;
+      });
+    }
     if(!Array.isArray(units) || units.length === 0){
       // 세대별 정보가 없는 공고 — 시군구 단위 지도를 최후수단으로 사용
       const fb = huRegionFallback[id];
