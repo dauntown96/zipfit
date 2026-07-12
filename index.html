@@ -903,9 +903,13 @@ function applyNoticeFiltersAndRender(){
     return desc ? (vb > va ? 1 : vb < va ? -1 : 0) : (va > vb ? 1 : va < vb ? -1 : 0);
   };
   filtered = [...filtered].sort((a,b) => {
-    if(sortVal==='date-desc')     return nullLast(a,b,n=>n['first_seen_at'],true)
-      || nullLast(a,b,n=>n['announcement_date'],true)
-      || nullLast(a,b,n=>n['apply_start'],true);
+    // 접수마감 여부로 먼저 그룹을 나누고(접수 가능한 공고가 항상 위), 그룹 내부에서는
+    // 선택된 정렬 기준을 그대로 적용 — 어떤 정렬을 골라도 마감 공고는 항상 하단에 위치
+    const closedDiff = ((a['처리상태정규화']==='접수마감')?1:0) - ((b['처리상태정규화']==='접수마감')?1:0);
+    if(closedDiff !== 0) return closedDiff;
+    if(sortVal==='date-desc')     return nullLast(a,b,n=>n['announcement_date'],true)
+      || nullLast(a,b,n=>n['apply_start'],true)
+      || nullLast(a,b,n=>n['first_seen_at'],true);
     if(sortVal==='end-asc')       return nullLast(a,b,n=>n['apply_end'],false);
     if(sortVal==='start-asc')     return nullLast(a,b,n=>n['apply_start'],false);
     if(sortVal==='units-desc')    return nullLast(a,b,n=>n['total_units']?Number(n['total_units']):null,true);
@@ -1114,7 +1118,7 @@ function renderNoticeList(filtered, totalCount){
     ? '조건에 맞는 공고 '+filtered.length+'건 (전체 '+totalCount+'건 중)'
     : '전체 공고 '+filtered.length+'건';
   statusEl.className = 'rbox ok';
-  statusEl.innerHTML = '<p class="rtitle">✅ '+countText+'</p><p class="rdesc">매일 오전 9시 자동 업데이트</p>';
+  statusEl.innerHTML = '<p class="rtitle">✅ '+countText+'</p><p class="rdesc">매일 9·12·15·18시 자동 업데이트</p>';
 
   const shown = filtered.slice(0, noticeVisibleCount);
   let html = '';
@@ -1179,7 +1183,7 @@ function renderNoticeList(filtered, totalCount){
 
     html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n['지역']||'').replace(/"/g,'&quot;')}" data-sido="${(n['sido_nm']||'').replace(/"/g,'&quot;')}" data-sigungu="${(n['sigungu_nm']||'').replace(/"/g,'&quot;')}" data-title="${(n['공고명']||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" data-precise-address="${(n['precise_address']||'').replace(/"/g,'&quot;')}" data-relaxed="${n['is_relaxed_recruitment']===true?'1':''}" data-relaxation-detail="${(n['relaxation_detail']||'').replace(/"/g,'&quot;')}" data-contract-verify="${n['contract_before_verification']===true?'1':''}" data-rent-exempt-until="${(n['rent_exemption_until']||'').replace(/"/g,'&quot;')}" data-rent-exempt-note="${(n['rent_exemption_note']||'').replace(/"/g,'&quot;')}" data-revision-note-full="${revisionNoteEsc}" data-special-notes="${n['special_notes']?JSON.stringify(n['special_notes']).replace(/"/g,'&quot;'):''}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this)" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
       <div class="htop">
-        <p class="hname">${n['공고명']||'(공고명 없음)'}</p>
+        <p class="hname">${normalizeRevisedTitle(n['공고명'])||'(공고명 없음)'}</p>
         <span class="htag ${isClosed?'tag-mix':'tag-apt'}">${n['처리상태']||'-'}</span>
       </div>
       <p class="haddr">${n['지역']||''} · ${classifyNoticeType(n['공급유형'],n['공고명'])} · ${n['공급유형']||''}</p>
@@ -1513,7 +1517,7 @@ function renderInsight(rows, wrap, statsRows){
   wrap.innerHTML = `
     <div style="${S}">
       <p style="${T}">📊 공고 통계 인사이트</p>
-      <p style="font-size:13px;color:#888;margin:0">전국 <strong style="color:#5a7af7">${rows.length.toLocaleString()}개</strong> 공고 · 매일 오전 9시 자동 업데이트</p>
+      <p style="font-size:13px;color:#888;margin:0">전국 <strong style="color:#5a7af7">${rows.length.toLocaleString()}개</strong> 공고 · 매일 9·12·15·18시 자동 업데이트</p>
     </div>
 
     <div style="${S}">
@@ -1904,9 +1908,13 @@ function sortMatchRows(rows, sortVal){
     return desc ? (vb > va ? 1 : vb < va ? -1 : 0) : (va > vb ? 1 : va < vb ? -1 : 0);
   };
   return [...rows].sort((a,b) => {
-    if(sortVal==='date-desc')     return nullLast(a,b,n=>n.first_seen_at,true)
-      || nullLast(a,b,n=>n.announcement_date,true)
-      || nullLast(a,b,n=>n.apply_start,true);
+    // 접수마감 여부로 먼저 그룹을 나누고(접수 가능한 공고가 항상 위), 그룹 내부에서는
+    // 선택된 정렬 기준을 그대로 적용 — 어떤 정렬을 골라도 마감 공고는 항상 하단에 위치
+    const closedDiff = (((a.status_normalized||a.status||'')==='접수마감')?1:0) - (((b.status_normalized||b.status||'')==='접수마감')?1:0);
+    if(closedDiff !== 0) return closedDiff;
+    if(sortVal==='date-desc')     return nullLast(a,b,n=>n.announcement_date,true)
+      || nullLast(a,b,n=>n.apply_start,true)
+      || nullLast(a,b,n=>n.first_seen_at,true);
     if(sortVal==='end-asc')       return nullLast(a,b,n=>n.apply_end,false);
     if(sortVal==='start-asc')     return nullLast(a,b,n=>n.apply_start,false);
     if(sortVal==='units-desc')    return nullLast(a,b,n=>n.total_units?Number(n.total_units):null,true);
@@ -2033,6 +2041,13 @@ function escapeHtml(s){
   return d.innerHTML;
 }
 
+// 방어적 안전장치: 수집 파이프라인이 원본 소스(LH/MYHOME)로부터 "[정정공고]" 접두어가
+// 이미 2회 이상 중복된 제목을 받아오는 경우가 있어(파이프라인 쪽에서도 정규화하지만),
+// 화면에는 항상 접두어가 1번만 보이도록 렌더링 시점에도 한 번 더 정규화한다.
+function normalizeRevisedTitle(t){
+  return (t||'').replace(/^(\[정정공고\]\s*)+/, '[정정공고] ');
+}
+
 // 카드 data-* 속성(완화모집/선계약후검증/임대료면제/특이사항/정정사유)을 읽어
 // 값이 있는 항목만 "특이사항 안내" 섹션으로 렌더링 (별도 fetch 없이 동기 렌더링)
 function renderSpecialNotes(cardEl, id){
@@ -2070,7 +2085,6 @@ function renderSpecialNotes(cardEl, id){
   }
   const wrap = document.createElement('details');
   wrap.className = 'policy-wrap';
-  wrap.open = true; // 특이사항 안내는 원래 대부분 짧아 기본 펼침 유지
   wrap.innerHTML = `<summary class="policy-title">⚠️ 특이사항 안내</summary>` + items.join('');
   const slot = document.getElementById('notes-slot-'+id);
   if(slot) slot.appendChild(wrap);
@@ -2144,7 +2158,6 @@ function loadAnnouncementExtras(annId, detailEl, id, useGroup){
     };
     const wrap = document.createElement('details');
     wrap.className = 'extras-wrap';
-    if(rows.length <= 3) wrap.open = true;
     wrap.innerHTML = `<summary class="extras-title">📷 사진·평면도·팸플릿 (${rows.length}건)</summary>` +
       renderGroup('사진', photos) + renderGroup('평면도', floorplans) + renderGroup('팸플릿', pamphlets);
     const slot = document.getElementById('extras-slot-'+id);
@@ -2283,7 +2296,6 @@ function loadAnnouncementPolicies(annId, detailEl, id, useGroup){
     if(!Array.isArray(policies) || policies.length === 0) return;
     const wrap = document.createElement('details');
     wrap.className = 'policy-wrap';
-    wrap.open = true; // 정책안내는 원래 대부분 짧아 기본 펼침 유지
     wrap.innerHTML = `<summary class="policy-title">📋 정책 안내 (${policies.length}건)</summary>` +
       policies.map(p => `
         <div class="policy-item">
@@ -2306,7 +2318,6 @@ function loadPreciseEligibility(annId, detailEl, id, useGroup){
     if(!Array.isArray(rows) || rows.length === 0) return;
     const wrap = document.createElement('details');
     wrap.className = 'elig-wrap';
-    if(rows.length <= 3) wrap.open = true;
     wrap.innerHTML = `<summary class="elig-title">🎯 이 공고 정밀 자격기준 (${rows.length}건)</summary>` +
       rows.map(r => {
         const sf = r.supply_form ? escapeHtml(r.supply_form) : '일반';
@@ -2360,7 +2371,6 @@ function loadHousingUnits(annId, detailEl, id){
     huGroupsCache[id] = groupHousingUnits(units);
     const wrap = document.createElement('details');
     wrap.className = 'hu-wrap';
-    if(units.length <= 3) wrap.open = true;
     wrap.innerHTML = `<summary class="hu-title">🏠 세대별 정보 (${units.length}건)</summary><div class="hu-list" id="hu-list-${id}"></div>`;
     const slot = document.getElementById('hu-slot-'+id);
     if(slot) slot.appendChild(wrap);
@@ -2730,7 +2740,7 @@ function renderMatchResults(rows){
 
     html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n.region||'').replace(/"/g,'&quot;')}" data-sido="${(n.sido_nm||'').replace(/"/g,'&quot;')}" data-sigungu="${(n.sigungu_nm||'').replace(/"/g,'&quot;')}" data-title="${(n.title||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" data-precise-address="${(n.precise_address||'').replace(/"/g,'&quot;')}" data-relaxed="${n.is_relaxed_recruitment===true?'1':''}" data-relaxation-detail="${(n.relaxation_detail||'').replace(/"/g,'&quot;')}" data-contract-verify="${n.contract_before_verification===true?'1':''}" data-rent-exempt-until="${(n.rent_exemption_until||'').replace(/"/g,'&quot;')}" data-rent-exempt-note="${(n.rent_exemption_note||'').replace(/"/g,'&quot;')}" data-revision-note-full="${revisionNoteEscM}" data-special-notes="${n.special_notes?JSON.stringify(n.special_notes).replace(/"/g,'&quot;'):''}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this)" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
       <div class="htop">
-        <p class="hname">${n.title||'(공고명 없음)'}</p>
+        <p class="hname">${normalizeRevisedTitle(n.title)||'(공고명 없음)'}</p>
         <span class="htag ${isClosed?'tag-mix':'tag-apt'}">${n.status||'-'}</span>
       </div>
       <p class="haddr">${n.region||''} · ${classifyNoticeType(n.housing_type||'',n.title||'')} · ${n.housing_type||''}</p>
