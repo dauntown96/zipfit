@@ -2043,11 +2043,6 @@ function toggleDetail(id, card){
     renderSupplySchedule(cardEl, id);
     renderAttachments(cardEl, id);
   }
-  if(!open && !detailEl.dataset.unitsLoaded && cardEl){
-    detailEl.dataset.unitsLoaded = '1';
-    const annId = cardEl.dataset.announcementId || '';
-    loadHousingUnits(annId, detailEl, id, true);
-  }
   if(!open && !detailEl.dataset.blocksLoaded && cardEl){
     detailEl.dataset.blocksLoaded = '1';
     const annId = cardEl.dataset.announcementId || '';
@@ -2352,13 +2347,14 @@ const blockLoaded = {};
 // 보인다. 그래서 블록 개수가 확정된 뒤에만 카드 전체용 사진·평면도를 로드하도록 순서를 맞춘다 —
 // 블록이 2개 이상이면 카드 전체 섹션은 생략(블록별 섹션에서만 표시), 1개(일반적인 경우)면 그대로 표시.
 function loadAnnouncementBlocks(annId, id, detailEl){
-  if(!annId){ loadAnnouncementExtras(annId, detailEl, id, true); return; }
+  if(!annId){ loadHousingUnits(annId, detailEl, id, true); loadAnnouncementExtras(annId, detailEl, id, true); return; }
   fetch(`${SUPABASE_URL}/rest/v1/rpc/get_announcement_blocks`, {
     method: 'POST',
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ p_announcement_id: annId })
   }).then(r => r.ok ? r.json() : []).then(blocks => {
     if(!Array.isArray(blocks) || blocks.length < 2){
+      loadHousingUnits(annId, detailEl, id, true);
       loadAnnouncementExtras(annId, detailEl, id, true);
       return;
     }
@@ -2383,6 +2379,7 @@ function loadAnnouncementBlocks(annId, id, detailEl){
     }).join('');
   }).catch(err => {
     console.error('ZipFit 블록정보 로드 실패:', err);
+    loadHousingUnits(annId, detailEl, id, true);
     loadAnnouncementExtras(annId, detailEl, id, true);
   });
 }
