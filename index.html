@@ -2516,7 +2516,7 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
       // 세대별 정보가 없는 공고 — 시군구 단위 지도를 최후수단으로 사용
       const fb = huRegionFallback[id];
       const mid = huMapTargetId[id] || id;
-      if(fb && !huMapState[mid]) initMapForHouse(fb, mid);
+      if(fb) initMapForHouse(fb, mid);
       return;
     }
     huUnitsCache[id] = units;
@@ -2533,7 +2533,7 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
     console.error('ZipFit 세대정보 로드 실패:', err);
     const fb = huRegionFallback[id];
     const mid = huMapTargetId[id] || id;
-    if(fb && !huMapState[mid]) initMapForHouse(fb, mid);
+    if(fb) initMapForHouse(fb, mid);
   });
 }
 
@@ -2560,12 +2560,10 @@ function renderHousingGroupRows(id, visibleCount){
   if(groups.length === 1){
     const g = groups[0];
     listEl.innerHTML = g.units.map(renderHousingUnitRow).join('');
-    if(!huMapState[mapId]){
-      const addr = g.address || g.building_name;
-      if(addr){
-        setActiveHousingGroup(id, 0);
-        initMapForHouse({ addr, name: g.building_name || '' }, mapId);
-      }
+    const addr = g.address || g.building_name;
+    if(addr){
+      setActiveHousingGroup(id, 0);
+      initMapForHouse({ addr, name: g.building_name || '' }, mapId);
     }
     return;
   }
@@ -2592,8 +2590,9 @@ function renderHousingGroupRows(id, visibleCount){
     if(headEl) headEl.classList.add('hu-group-active');
   }
   // 세대별 정보가 있는 공고는 시군구 지오코딩을 거치지 않고 첫 번째 건물 주소를 바로 사용
-  // (건물 주소가 항상 시군구 단위보다 정확함). huMapState[mapId]가 이미 있으면(=이미 초기화됐으면) 스킵.
-  if(!huMapState[mapId] && groups.length > 0){
+  // (건물 주소가 항상 시군구 단위보다 정확함). initMapForHouse가 지도 존재 여부에 따라
+  // 새로 생성/이동을 알아서 처리하므로 huMapState 가드 없이 항상 호출.
+  if(groups.length > 0){
     const first = groups[0];
     const addr = first.address || first.building_name;
     if(addr){
