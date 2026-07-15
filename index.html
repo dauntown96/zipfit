@@ -2517,10 +2517,12 @@ function loadHousingUnits(annId, detailEl, id, useGroup){
       return;
     }
     huUnitsCache[id] = units;
-    huGroupsCache[id] = groupHousingUnits(units);
+    const groups = groupHousingUnits(units);
+    huGroupsCache[id] = groups;
     const wrap = document.createElement('details');
     wrap.className = 'hu-wrap';
     wrap.innerHTML = `<summary class="hu-title">🏠 세대별 정보 (${units.length}건)</summary><div class="hu-list" id="hu-list-${id}"></div>`;
+    if(groups.length === 1) wrap.open = true; // 건물이 1개뿐이면 처음부터 펼쳐서 보여줌
     const slot = document.getElementById('hu-slot-'+id);
     if(slot) slot.appendChild(wrap);
     renderHousingGroupRows(id, 5);
@@ -2548,6 +2550,21 @@ function renderHousingGroupRows(id, visibleCount){
   const groups = huGroupsCache[id];
   const listEl = document.getElementById('hu-list-'+id);
   if(!groups || !listEl) return;
+
+  // 건물이 1개뿐이면 "단지명 클릭" 단계를 생략하고 세대 행을 바로 표시
+  if(groups.length === 1){
+    const g = groups[0];
+    listEl.innerHTML = g.units.map(renderHousingUnitRow).join('');
+    if(!huMapState[id]){
+      const addr = g.address || g.building_name;
+      if(addr){
+        setActiveHousingGroup(id, 0);
+        initMapForHouse({ addr, name: g.building_name || '' }, id);
+      }
+    }
+    return;
+  }
+
   const shown = groups.slice(0, visibleCount);
   let html = shown.map((g, idx) => {
     const label = g.building_name || g.address;
