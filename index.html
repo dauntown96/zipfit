@@ -2393,11 +2393,21 @@ function toggleBlockGroup(id, idx){
   if(headEl) headEl.classList.toggle('hu-group-active', !isOpen);
   if(isOpen) return;
   const key = id+'-'+idx;
-  if(blockLoaded[key]) return;
+  const subId = id+'-blk'+idx;
+  if(blockLoaded[key]){
+    // 이미 데이터를 불러온 블록을 다시 여는 경우 — Supabase 재조회는 불필요하지만
+    // 지도는 이 블록의 위치로 다시 옮겨야 하므로, 캐시해둔 세대정보에서 주소를 꺼내 재이동시킨다.
+    const groups = huGroupsCache[subId];
+    if(groups && groups.length){
+      const g = groups[0];
+      const addr = g.address || g.building_name;
+      if(addr) initMapForHouse({ addr, name: g.building_name || '' }, id);
+    }
+    return;
+  }
   blockLoaded[key] = true;
   const annId = (blockAnnIds[id]||[])[idx];
   if(!annId) return;
-  const subId = id+'-blk'+idx;
   bodyEl.innerHTML = `<div id="hu-slot-${subId}"></div><div id="extras-slot-${subId}"></div>`;
   loadHousingUnits(annId, null, subId, false, id);
   loadAnnouncementExtras(annId, null, subId);
