@@ -426,6 +426,11 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 11. **정정/신규 공고를 실제보다 늦게 처음 발견한 것으로 의심되는 사례 발견 시** (예: PAN_ID/pblancId 번호대가 오래됐는데 오늘 처음 수집됨) — 추측으로 날짜를 채우거나 리셋하지 말고, 다운님께 보고 후 실제 게시일 확인을 요청할 것. 확인되면 `revised_at`/`revised_at_source='user_verified'`로 반영(서울대방 사례와 동일 절차)
 12. **공고 원문·QnA 등 첨부문서는 반드시 전체를 확인한 후 policies/eligibility에 반영할 것 — 미리보기(일부만 로드된 상태)만 보고 요약·반영 금지**: 2026-07-08 신혼신생아Ⅰ·Ⅱ "재계약 소득기준 및 할증" 항목이 QnA 문서를 미리보기로만 보고 뭉뚱그려 반영됐다가, 전체 텍스트 재확인 후 소득구간별 할증률 등 세부 수치가 크게 달랐던 것이 확인되어 정정한 사례 있음(아래 완료 이력 참고) — 앞으로 Google Drive 등에서 문서를 열람할 때는 미리보기 스니펫이 아닌 전체 내용(`read_file_content` 등)을 확인한 후에만 DB에 반영할 것
 13. **DB-only 작업(index.html/sw.js 등 코드 파일 변경이 전혀 없는 순수 SQL UPDATE/INSERT·마이그레이션 작업)은 별도 feature 브랜치 없이 CLAUDE.md 커밋을 main에 바로 push할 것** — 코드 변경이 있는 작업만 브랜치를 거쳐 병합. 단, 세션 환경(Claude Code on the web 등)이 지정 feature 브랜치 사용을 명시적으로 강제하는 경우엔 그 지침이 우선이며, 이 경우 작업 후 다운님께 main 병합 여부를 확인할 것
+14. 코드 변경 브랜치 자동 병합 원칙 (2026-07-20 신설)
+- 코드 변경(브랜치 작업) 완료 후 자체 테스트/검증을 통과했다고 판단되면, 별도 승인 요청 없이 바로 main에 병합(merge)하고 브랜치를 삭제한다.
+- 예외(다운님 확인 후 병합): ① 실험적이거나 되돌리기 어려운 대규모 변경(예: DB 스키마 마이그레이션, 여러 파일에 걸친 대규모 리팩토링), ② 자체 테스트로 검증이 애매하거나 불확실한 변경.
+- 병합 후에는 완료 보고에 "브랜치 {브랜치명}을 자체검증 통과 후 main에 자동 병합, 브랜치 삭제 완료"를 명시한다.
+- 이 원칙 신설 이전에 쌓여있던 미병합 브랜치(claude/insight-tab-review-wqqzgi, claude/notion-zipfit-page-o3aje1, claude/zealous-tesla-0gcppi, claude/zipfit-extras-db-load-2540yt, claude/zipfit-inspection-fixes-o4f9fu)는 diff 확인 후 고유 변경사항이 없으면(main에 이미 흡수됨) 삭제, 고유 변경사항이 있으면 병합 후 삭제한다.
 
 ---
 
