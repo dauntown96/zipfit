@@ -2340,6 +2340,7 @@ document.addEventListener('keydown', e => {
 // (대다수의 일반적인 단일 블록 공고) 이 섹션 자체를 표시하지 않는다 — 특정 공고를 하드코딩하지 않고
 // "같은 제목(dedup_key)을 공유하는 원본 행들의 주소/세대수가 서로 다르면 블록으로 취급"하는 범용 로직
 const blockAnnIds = {};
+const blockInfo = {};
 const blockLoaded = {};
 
 // 카드 상세의 "사진·평면도" 섹션은 원래 카드 자체의 announcement_id(대표행) 것만 보여주는데,
@@ -2359,6 +2360,7 @@ function loadAnnouncementBlocks(annId, id, detailEl){
       return;
     }
     blockAnnIds[id] = blocks.map(b => b.announcement_id);
+    blockInfo[id] = blocks;
     const wrap = document.createElement('div');
     wrap.className = 'hu-wrap';
     wrap.innerHTML = `<div class="hu-title">🏘️ 이 공고에 포함된 블록 (${blocks.length}개)</div><div class="hu-list" id="blk-list-${id}"></div>`;
@@ -2392,6 +2394,13 @@ function toggleBlockGroup(id, idx){
   bodyEl.style.display = isOpen ? 'none' : 'block';
   if(headEl) headEl.classList.toggle('hu-group-active', !isOpen);
   if(isOpen) return;
+  // 블록 자신의 precise_address를 1순위 지도 소스로 사용한다 — 세대정보(housing_units)의
+  // address가 비어 있어도 블록을 열면 항상 그 블록 위치로 지도가 이동하게 하는 방어선.
+  // 세대정보에 실제 주소가 있으면 뒤이어 loadHousingUnits가 더 정밀한 좌표로 갱신한다.
+  const blk = (blockInfo[id]||[])[idx];
+  if(blk && blk.precise_address){
+    initMapForHouse({ addr: blk.precise_address, name: blk.precise_address }, id);
+  }
   const key = id+'-'+idx;
   const subId = id+'-blk'+idx;
   if(blockLoaded[key]){
@@ -2553,7 +2562,10 @@ function groupHousingUnits(units){
   units.forEach(u => {
     const key = (u.building_name && u.building_name.trim()) || u.address || '주소 정보 없음';
     if(!map.has(key)){
-      map.set(key, { building_name: u.building_name || '', address: u.address || key, units: [] });
+      // 표시용 라벨(label)과 지오코딩용 주소(address)를 분리한다 —
+      // 주소가 실제로 없으면 address는 null로 두어 '주소 정보 없음' 같은 라벨이
+      // 카카오 지오코딩 쿼리로 그대로 나가지 않게 한다.
+      map.set(key, { building_name: u.building_name || '', address: u.address || null, label: key, units: [] });
     }
     map.get(key).units.push(u);
   });
@@ -2580,7 +2592,7 @@ function renderHousingGroupRows(id, visibleCount){
 
   const shown = groups.slice(0, visibleCount);
   let html = shown.map((g, idx) => {
-    const label = g.building_name || g.address;
+    const label = g.building_name || g.address || g.label;
     return `<div class="hu-group">
       <div class="hu-group-head" id="hu-group-head-${id}-${idx}" onclick="event.stopPropagation();toggleHousingGroup('${id}',${idx})">
         <span class="hu-group-name">${label}</span>
