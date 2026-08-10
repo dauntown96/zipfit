@@ -15,12 +15,12 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f0;color:#1a1a1a;min-height:100vh}
 body.theme-dark{background:#16181d;color:#e8e8e8}
-body.theme-dark .hero,body.theme-dark .panel,body.theme-dark .hcard,body.theme-dark .hu-row,body.theme-dark .hu-group-head,body.theme-dark .hu-group-body,body.theme-dark .policy-item,body.theme-dark .elig-item,body.theme-dark .extras-thumb{background:#1f2229;border-color:#2c2f38}
+body.theme-dark .hero,body.theme-dark .panel,body.theme-dark .hcard,body.theme-dark .hu-row,body.theme-dark .hu-group-head,body.theme-dark .hu-group-body,body.theme-dark .policy-item,body.theme-dark .docs-group,body.theme-dark .elig-item,body.theme-dark .extras-thumb{background:#1f2229;border-color:#2c2f38}
 body.theme-dark .label,body.theme-dark .sub,body.theme-dark .haddr,body.theme-dark .building-desc,body.theme-dark .hu-label,body.theme-dark .hu-group-count{color:#9aa0aa}
 body.theme-dark select,body.theme-dark input{background:#262932;border-color:#3a3e48;color:#e8e8e8}
 body.theme-dark .maintabs{background:#262932}
 body.theme-dark .maintab.active{background:#1f2229;color:#5DCAA5}
-body.theme-dark .logo,body.theme-dark .setting-label,body.theme-dark .panel-title,body.theme-dark .hname,body.theme-dark .mval,body.theme-dark .hu-title,body.theme-dark .hu-addr,body.theme-dark .hu-value,body.theme-dark .hu-group-name,body.theme-dark .policy-title,body.theme-dark .policy-content,body.theme-dark .elig-title,body.theme-dark .elig-row,body.theme-dark .extras-title,body.theme-dark .extras-group-label,body.theme-dark .hu-note-price{color:#e8e8e8}
+body.theme-dark .logo,body.theme-dark .setting-label,body.theme-dark .panel-title,body.theme-dark .hname,body.theme-dark .mval,body.theme-dark .hu-title,body.theme-dark .hu-addr,body.theme-dark .hu-value,body.theme-dark .hu-group-name,body.theme-dark .policy-title,body.theme-dark .policy-content,body.theme-dark .docs-title,body.theme-dark .docs-list li,body.theme-dark .elig-title,body.theme-dark .elig-row,body.theme-dark .extras-title,body.theme-dark .extras-group-label,body.theme-dark .hu-note-price{color:#e8e8e8}
 body.theme-dark .hu-group-head.hu-group-active{background:#1d3d33;border-color:#5DCAA5}
 body.theme-dark .hu-note-wrap{border-color:#2c2f38}
 body.theme-dark .hu-group-head:hover{background:#262932}
@@ -152,6 +152,14 @@ select:focus,input:focus{border-color:#5DCAA5}
 .policy-item:last-child{margin-bottom:0}
 .policy-category{font-size:12px;font-weight:600;color:#1D9E75;margin-bottom:4px}
 .policy-content{font-size:12px;color:#555;line-height:1.5;white-space:pre-wrap}
+.docs-wrap{margin-top:12px;border-top:1px solid #e8e8e0;padding-top:12px}
+.docs-title{font-size:13px;font-weight:600;color:#333;margin-bottom:8px;cursor:pointer}
+.docs-group{border:1px solid #e8e8e0;border-radius:10px;padding:10px 12px;margin-bottom:8px}
+.docs-group-required{border-color:#1D9E75}
+.docs-level{font-size:12px;font-weight:600;color:#1D9E75;margin-bottom:4px}
+.docs-list{margin:0;padding-left:18px}
+.docs-list li{font-size:12px;color:#555;line-height:1.6}
+.docs-note{font-size:11px;color:#888;line-height:1.5;margin-top:6px}
 .elig-wrap{margin-top:12px;border-top:1px solid #e8e8e0;padding-top:12px}
 .elig-title{font-size:13px;font-weight:600;color:#333;margin-bottom:8px;cursor:pointer}
 .elig-item{border:1px solid #e8e8e0;border-radius:10px;padding:10px 12px;margin-bottom:8px;font-size:12px}
@@ -1206,7 +1214,7 @@ function renderNoticeList(filtered, totalCount){
         </div>`
       : `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px" onclick="event.stopPropagation()"><div style="display:flex;gap:8px;flex-wrap:wrap">${n['공고URL']?`<a class="detail-link" href="${n['공고URL']}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a>`:''} ${shareBtn} ${saveBtn}</div></div>`;
 
-    html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n['지역']||'').replace(/"/g,'&quot;')}" data-sido="${(n['sido_nm']||'').replace(/"/g,'&quot;')}" data-sigungu="${(n['sigungu_nm']||'').replace(/"/g,'&quot;')}" data-title="${(n['공고명']||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" data-precise-address="${(n['precise_address']||'').replace(/"/g,'&quot;')}" data-relaxed="${n['is_relaxed_recruitment']===true?'1':''}" data-relaxation-detail="${(n['relaxation_detail']||'').replace(/"/g,'&quot;')}" data-contract-verify="${n['contract_before_verification']===true?'1':''}" data-rent-exempt-until="${(n['rent_exemption_until']||'').replace(/"/g,'&quot;')}" data-rent-exempt-note="${(n['rent_exemption_note']||'').replace(/"/g,'&quot;')}" data-revision-note-full="${revisionNoteEsc}" data-special-notes="${n['special_notes']?JSON.stringify(n['special_notes']).replace(/"/g,'&quot;'):''}" data-apply-start="${(n['apply_start']||'').replace(/"/g,'&quot;')}" data-apply-end="${(n['apply_end']||'').replace(/"/g,'&quot;')}" data-announcement-date="${(n['announcement_date']||'').replace(/"/g,'&quot;')}" data-doc-submit-announce="${(n['doc_submit_announce_date']||'').replace(/"/g,'&quot;')}" data-doc-submit-start="${(n['doc_submit_start']||'').replace(/"/g,'&quot;')}" data-doc-submit-end="${(n['doc_submit_end']||'').replace(/"/g,'&quot;')}" data-winner-announce="${(n['winner_announce_date']||'').replace(/"/g,'&quot;')}" data-contract-start="${(n['contract_start']||'').replace(/"/g,'&quot;')}" data-contract-end="${(n['contract_end']||'').replace(/"/g,'&quot;')}" data-attachment-urls="${n['attachment_urls']?JSON.stringify(n['attachment_urls']).replace(/"/g,'&quot;'):''}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this)" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
+    html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n['지역']||'').replace(/"/g,'&quot;')}" data-sido="${(n['sido_nm']||'').replace(/"/g,'&quot;')}" data-sigungu="${(n['sigungu_nm']||'').replace(/"/g,'&quot;')}" data-title="${(n['공고명']||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" data-housing-type="${(n['공급유형']||'').replace(/"/g,'&quot;')}" data-precise-address="${(n['precise_address']||'').replace(/"/g,'&quot;')}" data-relaxed="${n['is_relaxed_recruitment']===true?'1':''}" data-relaxation-detail="${(n['relaxation_detail']||'').replace(/"/g,'&quot;')}" data-contract-verify="${n['contract_before_verification']===true?'1':''}" data-rent-exempt-until="${(n['rent_exemption_until']||'').replace(/"/g,'&quot;')}" data-rent-exempt-note="${(n['rent_exemption_note']||'').replace(/"/g,'&quot;')}" data-revision-note-full="${revisionNoteEsc}" data-special-notes="${n['special_notes']?JSON.stringify(n['special_notes']).replace(/"/g,'&quot;'):''}" data-apply-start="${(n['apply_start']||'').replace(/"/g,'&quot;')}" data-apply-end="${(n['apply_end']||'').replace(/"/g,'&quot;')}" data-announcement-date="${(n['announcement_date']||'').replace(/"/g,'&quot;')}" data-doc-submit-announce="${(n['doc_submit_announce_date']||'').replace(/"/g,'&quot;')}" data-doc-submit-start="${(n['doc_submit_start']||'').replace(/"/g,'&quot;')}" data-doc-submit-end="${(n['doc_submit_end']||'').replace(/"/g,'&quot;')}" data-winner-announce="${(n['winner_announce_date']||'').replace(/"/g,'&quot;')}" data-contract-start="${(n['contract_start']||'').replace(/"/g,'&quot;')}" data-contract-end="${(n['contract_end']||'').replace(/"/g,'&quot;')}" data-attachment-urls="${n['attachment_urls']?JSON.stringify(n['attachment_urls']).replace(/"/g,'&quot;'):''}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this)" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
       <div class="htop">
         <p class="hname">${normalizeRevisedTitle(n['공고명'])||'(공고명 없음)'}</p>
         <span class="htag ${isClosed?'tag-mix':'tag-apt'}">${n['처리상태']||'-'}</span>
@@ -2037,7 +2045,8 @@ function toggleDetail(id, card){
       `<div id="hu-slot-${id}"></div>` +
       `<div id="attachments-slot-${id}"></div>` +
       `<div id="extras-slot-${id}"></div>` +
-      `<div id="policy-slot-${id}"></div>`;
+      `<div id="policy-slot-${id}"></div>` +
+      `<div id="docs-slot-${id}"></div>`;
     detailEl.appendChild(slots);
     renderSpecialNotes(cardEl, id);
     renderSupplySchedule(cardEl, id);
@@ -2052,6 +2061,10 @@ function toggleDetail(id, card){
     detailEl.dataset.policiesLoaded = '1';
     const annId = cardEl.dataset.announcementId || '';
     loadAnnouncementPolicies(annId, detailEl, id, true);
+  }
+  if(!open && !detailEl.dataset.docsLoaded && cardEl){
+    detailEl.dataset.docsLoaded = '1';
+    loadDocumentTemplates(cardEl.dataset.housingType || '', id);
   }
   if(!open && !detailEl.dataset.eligLoaded && cardEl){
     detailEl.dataset.eligLoaded = '1';
@@ -2452,6 +2465,45 @@ function loadAnnouncementPolicies(annId, detailEl, id, useGroup){
     if(slot) slot.appendChild(wrap);
   }).catch(err => {
     console.error('ZipFit 정책안내 로드 실패:', err);
+  });
+}
+
+// 제출서류 미리보기 — document_templates는 공고별 기록이 아니라 (주택유형 × 모집방식)으로
+// 분류된 서식 카탈로그라 announcement_id로 조인할 수 없다. 공고의 주택유형으로 매칭한다.
+// announcements에는 모집방식(recruitment_mode) 컬럼 자체가 없어 2번째 인자는 항상 null.
+function loadDocumentTemplates(housingType, id){
+  if(!housingType) return;
+  fetch(`${SUPABASE_URL}/rest/v1/rpc/get_document_templates_for`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_housing_type: housingType, p_recruitment_mode: null })
+  }).then(r => r.ok ? r.json() : []).then(rows => {
+    if(!Array.isArray(rows) || rows.length === 0) return;
+    // 유형 무관 공용 서식(위임장 2건)은 어떤 주택유형으로 조회해도 항상 걸린다.
+    // 그것만 남는 경우는 "이 유형의 서류 데이터가 아직 없음"이지 "제출서류가 위임장뿐"이
+    // 아니므로, 필수 서류가 하나도 없으면 섹션 자체를 띄우지 않는다.
+    if(!rows.some(r => r.requirement_level === '필수')) return;
+    const groups = [];
+    rows.forEach(r => {
+      const lv = r.requirement_level || '기타';
+      let g = groups.find(x => x.level === lv);
+      if(!g){ g = { level: lv, items: [] }; groups.push(g); }
+      g.items.push(r.doc_category || '');
+    });
+    const wrap = document.createElement('details');
+    wrap.className = 'docs-wrap';
+    wrap.innerHTML = `<summary class="docs-title">📄 제출서류 미리보기 (${rows.length}건)</summary>` +
+      groups.map(g => `
+        <div class="docs-group${g.level === '필수' ? ' docs-group-required' : ''}">
+          <div class="docs-level">${escapeHtml(g.level)}</div>
+          <ul class="docs-list">${g.items.map(t => `<li>${escapeHtml(t)}</li>`).join('')}</ul>
+        </div>
+      `).join('') +
+      `<div class="docs-note">ℹ️ 유사 공고에서 수집한 서류 목록입니다. 실제 제출서류는 공고 원문을 확인해 주세요.</div>`;
+    const slot = document.getElementById('docs-slot-'+id);
+    if(slot) slot.appendChild(wrap);
+  }).catch(err => {
+    console.error('ZipFit 제출서류 로드 실패:', err);
   });
 }
 
@@ -2948,7 +3000,7 @@ function renderMatchResults(rows){
         </div>`
       : `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px" onclick="event.stopPropagation()"><div style="display:flex;gap:8px;flex-wrap:wrap">${n.url?`<a class="detail-link" href="${n.url}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a>`:''} ${mShareBtn} ${mSaveBtn}</div></div>`;
 
-    html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n.region||'').replace(/"/g,'&quot;')}" data-sido="${(n.sido_nm||'').replace(/"/g,'&quot;')}" data-sigungu="${(n.sigungu_nm||'').replace(/"/g,'&quot;')}" data-title="${(n.title||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" data-precise-address="${(n.precise_address||'').replace(/"/g,'&quot;')}" data-relaxed="${n.is_relaxed_recruitment===true?'1':''}" data-relaxation-detail="${(n.relaxation_detail||'').replace(/"/g,'&quot;')}" data-contract-verify="${n.contract_before_verification===true?'1':''}" data-rent-exempt-until="${(n.rent_exemption_until||'').replace(/"/g,'&quot;')}" data-rent-exempt-note="${(n.rent_exemption_note||'').replace(/"/g,'&quot;')}" data-revision-note-full="${revisionNoteEscM}" data-special-notes="${n.special_notes?JSON.stringify(n.special_notes).replace(/"/g,'&quot;'):''}" data-apply-start="${(n.apply_start||'').replace(/"/g,'&quot;')}" data-apply-end="${(n.apply_end||'').replace(/"/g,'&quot;')}" data-announcement-date="${(n.announcement_date||'').replace(/"/g,'&quot;')}" data-doc-submit-announce="${(n.doc_submit_announce_date||'').replace(/"/g,'&quot;')}" data-doc-submit-start="${(n.doc_submit_start||'').replace(/"/g,'&quot;')}" data-doc-submit-end="${(n.doc_submit_end||'').replace(/"/g,'&quot;')}" data-winner-announce="${(n.winner_announce_date||'').replace(/"/g,'&quot;')}" data-contract-start="${(n.contract_start||'').replace(/"/g,'&quot;')}" data-contract-end="${(n.contract_end||'').replace(/"/g,'&quot;')}" data-attachment-urls="${n.attachment_urls?JSON.stringify(n.attachment_urls).replace(/"/g,'&quot;'):''}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this)" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
+    html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n.region||'').replace(/"/g,'&quot;')}" data-sido="${(n.sido_nm||'').replace(/"/g,'&quot;')}" data-sigungu="${(n.sigungu_nm||'').replace(/"/g,'&quot;')}" data-title="${(n.title||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" data-housing-type="${(n.housing_type||'').replace(/"/g,'&quot;')}" data-precise-address="${(n.precise_address||'').replace(/"/g,'&quot;')}" data-relaxed="${n.is_relaxed_recruitment===true?'1':''}" data-relaxation-detail="${(n.relaxation_detail||'').replace(/"/g,'&quot;')}" data-contract-verify="${n.contract_before_verification===true?'1':''}" data-rent-exempt-until="${(n.rent_exemption_until||'').replace(/"/g,'&quot;')}" data-rent-exempt-note="${(n.rent_exemption_note||'').replace(/"/g,'&quot;')}" data-revision-note-full="${revisionNoteEscM}" data-special-notes="${n.special_notes?JSON.stringify(n.special_notes).replace(/"/g,'&quot;'):''}" data-apply-start="${(n.apply_start||'').replace(/"/g,'&quot;')}" data-apply-end="${(n.apply_end||'').replace(/"/g,'&quot;')}" data-announcement-date="${(n.announcement_date||'').replace(/"/g,'&quot;')}" data-doc-submit-announce="${(n.doc_submit_announce_date||'').replace(/"/g,'&quot;')}" data-doc-submit-start="${(n.doc_submit_start||'').replace(/"/g,'&quot;')}" data-doc-submit-end="${(n.doc_submit_end||'').replace(/"/g,'&quot;')}" data-winner-announce="${(n.winner_announce_date||'').replace(/"/g,'&quot;')}" data-contract-start="${(n.contract_start||'').replace(/"/g,'&quot;')}" data-contract-end="${(n.contract_end||'').replace(/"/g,'&quot;')}" data-attachment-urls="${n.attachment_urls?JSON.stringify(n.attachment_urls).replace(/"/g,'&quot;'):''}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this)" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
       <div class="htop">
         <p class="hname">${normalizeRevisedTitle(n.title)||'(공고명 없음)'}</p>
         <span class="htag ${isClosed?'tag-mix':'tag-apt'}">${n.status||'-'}</span>
