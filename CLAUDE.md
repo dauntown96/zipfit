@@ -72,7 +72,6 @@
 
 ### 공유 채널
 - **CLAUDE.md** (이 파일) = 유일한 세이브포인트
-- Claude Code가 작업 완료 시 `/done` 커맨드로 CLAUDE.md 업데이트 + git push
 - claude.ai는 매 ZipFit 세션 시작 시 아래 URL로 최신 상태 확인:
   ```
   https://raw.githubusercontent.com/dauntown96/zipfit/main/CLAUDE.md
@@ -503,16 +502,6 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 - **Claude Code**: **쓰기 전담** — INSERT/UPDATE/DDL·마이그레이션, 코드 수정, git commit/push, CLAUDE.md 갱신.
 - **다운님**: 원문 업로드, 실제 브라우저 육안 확인, 사실관계 최종 판정.
 - 구 원칙 "Supabase 조회도 Claude Code를 경유한다"는 **폐기** — 읽기(SELECT)는 claude.ai가 직접 조회해도 되고, 쓰기만 Claude Code로 일원화한다.
-
----
-
-## 📋 작업 완료 후 — 반드시 `/done` 실행
-
-`/done` 커맨드가 아래를 자동 처리:
-1. 배포 URL 확인 안내
-2. CLAUDE.md 버그 목록 업데이트 (완료 ✅, 날짜 갱신)
-3. 작업 이력 추가
-4. git add CLAUDE.md + commit + push
 
 ---
 
