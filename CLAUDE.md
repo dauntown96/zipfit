@@ -100,7 +100,7 @@
 |---|---|
 | 프론트엔드 | HTML/CSS/JS 단일 파일 (index.html) |
 | 공고 데이터 | Supabase RPC `get_announcements_deduped()` |
-| 데이터 수집 | Edge Function `collect-announcements` v3 + pg_cron (매일 KST 09:00, 15:00 — 2회, timeout 120초) |
+| 데이터 수집 | Edge Function `collect-announcements` v3 + pg_cron (**20분 간격 상시 수집** — jobid 4, `*/20 * * * *`, active, timeout 120초). 공고 게시 시각이 불규칙하고(LH·SH·GH·지자체공사·마이홈 각각 상이), LH API 호출 한도 내라 20분 간격으로 확정 |
 | 사용자 프로필 | Edge Function `save-user-profile` v5 (GET/POST, CORS 완료) |
 | 알림·트리거 | Make.com Free 플랜 (알림·이메일 전용) |
 | 외부 API | LH 분양임대공고 API, 마이홈포털 API, 카카오맵 API |
