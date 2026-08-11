@@ -2,7 +2,7 @@
 
 > **이 파일이 유일한 세이브포인트입니다.**
 > Claude Code와 claude.ai 모두 이 파일을 기준으로 작업합니다.
-> **마지막 업데이트**: 2026-07-30 (보령시지역 보령명천1 국민임대 반영 — DB만, document_templates는 해시 실측 불가로 미반영 / 괴산동부 행복마을 국민임대 반영 id 90~94 / 스킬 개정 2건 — 임대조건 전환열 이율 검산 신설)
+> **마지막 업데이트**: 2026-08-11 (공고 유형 분류 '분양' 부분문자열 오매칭 수정 — 프론트+RPC 동일 적용, sw.js v59 / 문서 정정 6건 — cron 주기·Edge Function 버전·전역변수·함수 시그니처·LH 카테고리 표)
 
 ## 🔜 다음 세션 작업 예정
 - **🟡 announcements.attachment_urls 재분리 미완료(2026-07-28 영암학산1·영암용앙1 라우팅 버그 수정 시 발견) — 다음 자동수집 후 재확인 필요**: 작업지시서는 LH 대표ID(`2015122300020393`)의 `attachment_urls`에 영암학산1·영암용앙1·영암해남장흥 3개 단지 공고문 6건이 통째로 몰려있어 이를 단지별로 분리해야 한다는 전제였으나, 실측 결과 세 announcement_id(`2015122300020393`/`20830_15_전남광주통합특별시_영암군`/`20829_2_전남광주통합특별시_영암군`) 전부 `attachment_urls=null`로 확인됨(작업지시서 전제와 실제 DB 상태 불일치) — 분리할 대상 자체가 없어 이 단계는 스킵(작업지시서에 적힌 fileid들은 검증 불가능한 값이라 임의로 DB에 기입하지 않음). eligibility_criteria/announcement_policies 라우팅은 정상 수정 완료(아래 참고). 다음에 이 3개 공고 상세를 열었을 때 "공고문 원문" 섹션이 비어있다면, LH 상세조회 파이프라인이 이 3개 단지를 개별 attachment_urls로 채워줄 수 있는지(애초에 LH가 panId 하나에 3개 문서를 묶어 발행하는 케이스라 소스 자체에 단지별 구분이 없을 수 있음) 확인 필요.
@@ -100,8 +100,8 @@
 |---|---|
 | 프론트엔드 | HTML/CSS/JS 단일 파일 (index.html) |
 | 공고 데이터 | Supabase RPC `get_announcements_deduped()` |
-| 데이터 수집 | Edge Function `collect-announcements` v3 + pg_cron (**20분 간격 상시 수집** — jobid 4, `*/20 * * * *`, active, timeout 120초). 공고 게시 시각이 불규칙하고(LH·SH·GH·지자체공사·마이홈 각각 상이), LH API 호출 한도 내라 20분 간격으로 확정 |
-| 사용자 프로필 | Edge Function `save-user-profile` v5 (GET/POST, CORS 완료) |
+| 데이터 수집 | Edge Function `collect-announcements` v24 + pg_cron (**20분 간격 상시 수집** — jobid 4, `*/20 * * * *`, active, timeout 120초). 공고 게시 시각이 불규칙하고(LH·SH·GH·지자체공사·마이홈 각각 상이), LH API 호출 한도 내라 20분 간격으로 확정 |
+| 사용자 프로필 | Edge Function `save-user-profile` v6 (GET/POST, CORS 완료) |
 | 알림·트리거 | Make.com Free 플랜 (알림·이메일 전용) |
 | 외부 API | LH 분양임대공고 API, 마이홈포털 API, 카카오맵 API |
 | DB | Supabase PostgreSQL (프로젝트 ID: `khdpjjyspmlqtzperoqg`, 싱가포르) |
@@ -122,11 +122,11 @@
 | UPP_AIS_TP_CD | 내용 | 수집 여부 |
 |---|---|---|
 | `01` | 토지(부지 매각/임대) | ❌ 제외(주택 아님, 서비스 범위 밖) |
-| `05` | 분양주택(일반 매각·잔여세대 등, 2026-07-12 기준 154건) | ❌ **미수집 — 서비스명("공공임대·분양")상 범위 안일 가능성 높음, 다운님 확인 후 추가 여부 결정 필요(백로그 참고)** |
+| `05` | 분양주택(일반 매각·잔여세대 등, **2026-08-11 실측 30건** — 현행 수집 윈도우(오늘-90일)와 동일 조건 기준) | ❌ **보류 확정(분양 분석 확장 시점까지)** — 상세 근거는 Notion L1 참고 |
 | `06` | 임대주택(행복주택/국민임대/영구임대 등 일반임대) | ✅ 수집 중 |
 | `13` | 매입임대 | ✅ 수집 중 |
 | `22` | 분양·(구)임대상가(입찰) | ❌ 제외(상가, 주택 아님) |
-| `39` | 공공분양(신혼희망타운) | ✅ 수집 중(2026-07-12 추가) |
+| `39` | 공공분양(신혼희망타운) | ⚠️ **부분 수집** — `AIS_TP_CD_NM`에 '분양' 포함 시 `fetchNoticeList()`에서 필터 배제. 행복주택 계열만 유입(2026-07-12 추가) |
 | 나머지(02,03,04,07~12,14~21,25,30,35,40,45,50,99 등) | 전부 빈 목록 확인 | — |
 
 - 조회 방법: `net.http_get()`로 `UPP_AIS_TP_CD`를 하나씩 바꿔가며 `PG_SZ=1`로 호출 → `dsList` 비어있는지/`ALL_CNT` 확인. `collect-announcements`의 `fetchNoticeList()` 카테고리 루프(`for (const tp of [...])`)와 항상 대조.
@@ -157,7 +157,6 @@ noticeLoaded        // 필터 칩 초기 로드 여부
 activeNoticeRegion / activeNoticeType / activeNoticeStatus
 noticeFilterOptions // { regions, types, statuses }
 currentUser         // { email, marital, regions, types, ... }
-HOUSES[]            // 하드코딩 주택 29개 (추후 DB 연동)
 selectedRegions / selectedTypes   // 추천탭 필터 Set
 settingsRegions / settingsTypes   // 설정탭 칩 Set
 allRegions[]        // DB 동적 지역 목록
@@ -179,7 +178,7 @@ saveUserProfile(lvl)
 saveSettings() / applySettingsToUI(p)
 onSettingChange()                      // 토글 변경 시 자동 저장
 goMain(n) / goStep(n)
-toggleDetail(id) / initMapForHouse(h, id)
+toggleDetail(id, card) / initMapForHouse(h, id)
 diagnose() / matchHouses() / renderMatchResults(lvl)
 ```
 
