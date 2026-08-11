@@ -668,8 +668,8 @@ function classifyNoticeType(typeText, nameText){
   const t = (typeText||'') + ' ' + (nameText||'');
   if(t.includes('토지')) return '토지';
   if(t.includes('상가') || t.includes('점포')) return '상가';
-  if(t.includes('분양')) return '분양주택';
-  if(t.includes('매입임대') || t.includes('전세임대')) return '매입·전세임대';
+  if(t.includes('분양') && !t.includes('분양전환')) return '분양주택';
+  if(t.includes('매입임대') || t.includes('전세임대') || t.includes('전세주택')) return '매입·전세임대';
   if(t.includes('행복주택')) return '행복주택';
   if(t.includes('영구임대')) return '영구임대';
   if(t.includes('국민임대')) return '국민임대';
