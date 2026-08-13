@@ -547,13 +547,6 @@ body.theme-dark .elig-subrow span:first-child{color:#9aa0aa}
         <button class="btn btn-primary" onclick="zfVerifyOtp()">인증하고 로그인 →</button>
       </div>
       <p id="zfAuthMsg" style="font-size:12px;margin-top:8px;color:#888"></p>
-
-      <!-- 기존 경로(제거 금지 — 4단계 검증 후 정리) -->
-      <div style="margin-top:1.25rem;padding-top:1rem;border-top:1px solid #e5e3dd">
-        <p style="font-size:12px;color:#999;margin-bottom:8px">위 방법이 안 되면 아래를 이용해 주세요. (기존 방식)</p>
-        <button class="btn btn-sec" onclick="loginWithEmail()">이메일만 입력하고 시작하기 (기존 방식)</button>
-        <p id="loginMsg" style="font-size:12px;margin-top:8px;color:#888"></p>
-      </div>
     </div>
 
     <!-- 카카오 로그인 직후: 알림 받을 이메일 수집 (필수 경로 — 카카오는 이메일을 주지 않음) -->
@@ -3067,7 +3060,9 @@ function renderMatchResults(rows){
   html += `<div class="alert-signup-box" id="alertSignupBox">
     <p style="font-size:14px;font-weight:600;color:#111;margin-bottom:6px">💾 이 검색 조건을 저장할까요?</p>
     <p style="font-size:12px;color:#888;margin-bottom:12px">저장해두면 다음에 다시 입력하지 않아도 바로 검색할 수 있어요.</p>
-    ${currentUser?`<p style="font-size:12px;color:#0F6E56;margin-bottom:10px">✅ ${currentUser.email}로 저장됩니다</p>`:`<input type="email" id="alertEmail" placeholder="이메일 주소" style="width:100%;margin-bottom:10px">`}
+    ${currentUser
+      ? `<p style="font-size:12px;color:#0F6E56;margin-bottom:10px">✅ ${escapeHtml(currentUser.alert_email||currentUser.email||'로그인한 계정')}으로 저장됩니다</p>`
+      : `<p style="font-size:12px;color:#A32D2D;margin-bottom:10px">설정 탭에서 로그인하면 조건을 저장할 수 있어요.</p>`}
     <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#444;margin-bottom:12px;cursor:pointer">
       <input type="checkbox" id="newNoticeOptIn" checked style="width:16px;height:16px">
       저장한 조건으로 새 공고가 뜨면 알림 받기
@@ -3082,12 +3077,11 @@ function renderMatchResults(rows){
 }
 
 async function saveUserProfile(lvl){
-  const emailInput=document.getElementById('alertEmail');
-  const email=currentUser?currentUser.email:(emailInput?emailInput.value.trim():'');
   const msgEl=document.getElementById('alertSignupMsg');
-  if(!email || !email.includes('@')){
+  // 세션이 없으면 EF를 호출하지 않는다(401을 만들지 않는다).
+  if(!zfAuthAvailable() || !(await zfAccessToken())){
     msgEl.style.color='#A32D2D';
-    msgEl.textContent='올바른 이메일 주소를 입력해주세요.';
+    msgEl.textContent='조건을 저장하려면 설정 탭에서 먼저 로그인해주세요.';
     return;
   }
   msgEl.style.color='#888';
@@ -3096,8 +3090,6 @@ async function saveUserProfile(lvl){
   const newNoticeOn=document.getElementById('newNoticeOptIn')?.checked?'Y':'N';
 
   const payload={
-    userId: (currentUser&&currentUser['사용자ID'])||('u_'+Date.now()),
-    email: email,
     marital: diagMarital||'',
     children: document.getElementById('children').value||'',
     members: document.getElementById('members').value||'',
@@ -3114,22 +3106,20 @@ async function saveUserProfile(lvl){
     fontSize: (currentUser&&currentUser.font_size)||'normal'
   };
 
-  try{
-    const res=await fetch('https://khdpjjyspmlqtzperoqg.supabase.co/functions/v1/save-user-profile',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify(payload)
-    });
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    msgEl.style.color='#0F6E56';
-    msgEl.textContent = newNoticeOn==='Y' ? '✅ 조건 저장 완료! 새 공고가 뜨면 메일로 알려드릴게요.' : '✅ 조건이 저장됐어요.';
-    if(currentUser) currentUser.email=email; else { setCookie(ZF_COOKIE,email,365); currentUser={email}; }
-    if(emailInput) emailInput.value='';
-  }catch(err){
+  const res=await zfPostProfile(payload);
+  if(!res.ok){
     msgEl.style.color='#A32D2D';
-    msgEl.textContent='저장에 실패했어요. 잠시 후 다시 시도해주세요. ('+err.message+')';
-    console.error('ZipFit 사용자 프로필 저장 실패:',err);
+    msgEl.textContent = res.reason==='no-session'
+      ? '로그인이 만료됐어요. 설정 탭에서 다시 로그인해주세요.'
+      : '저장에 실패했어요. 잠시 후 다시 시도해주세요. ('+res.reason+')';
+    console.error('ZipFit 사용자 프로필 저장 실패:', res.reason);
+    return;
   }
+  msgEl.style.color='#0F6E56';
+  msgEl.textContent = newNoticeOn==='Y' ? '✅ 조건 저장 완료! 새 공고가 뜨면 메일로 알려드릴게요.' : '✅ 조건이 저장됐어요.';
+  currentUser={...(currentUser||{}), ...payload,
+    alert_on:true, new_notice_alert:newNoticeOn==='Y',
+    max_deposit:payload.maxDeposit, min_rooms:payload.minRooms};
 }
 
 const typeChecklist = {
@@ -3281,20 +3271,12 @@ loadRegionsFromSupabase(); // ② 전국 지역 동적 로드 후 buildChipOptio
 
 // ===== 환경설정 / 이메일 식별 시스템 =====
 const PROFILE_API_URL = "https://khdpjjyspmlqtzperoqg.supabase.co/functions/v1/save-user-profile";
-let currentUser = null; // { email, marital, children, ... }
-const ZF_COOKIE = 'zipfit_email';
+let currentUser = null; // { email, alert_email, marital, children, ... }
 
-function setCookie(name,value,days){
-  const d=new Date(); d.setTime(d.getTime()+days*24*60*60*1000);
-  document.cookie = name+'='+encodeURIComponent(value)+';expires='+d.toUTCString()+';path=/';
-}
-function getCookie(name){
-  const match=document.cookie.match(new RegExp('(^| )'+name+'=([^;]+)'));
-  return match?decodeURIComponent(match[2]):null;
-}
-
-// ===== Supabase Auth (신규 경로) =====
-// 기존 쿠키 경로와 병행 운영. 4단계 검증 전까지 구 경로 제거 금지.
+// ===== Supabase Auth =====
+// 2026-08-13 4단계 후반: 이메일+쿠키(zipfit_email) 경로를 완전히 제거했다.
+// 신원은 오직 Supabase 세션(JWT)이며, save-user-profile은 verify_jwt=true라
+// 토큰 없이 호출하면 401이다. 따라서 세션이 없으면 아예 호출하지 않는다.
 // 배포 루트는 하드코딩하지 않고 현재 경로에서 산출한다.
 //   /zipfit/           → /zipfit/
 //   /zipfit/index.html → /zipfit/
@@ -3302,7 +3284,6 @@ const ZF_REDIRECT_TO = location.origin + location.pathname.replace(/[^/]*$/, '')
 
 let zfAuth = null;          // Supabase 클라이언트 (SDK 로드 실패 시 null 유지)
 let zfSession = null;       // 현재 세션
-let zfPendingAlertEmail = null; // 4단계에서 서버로 보낼 alert_email (지금은 클라이언트 보관만)
 
 try{
   if(window.supabase && typeof window.supabase.createClient==='function'){
@@ -3397,41 +3378,123 @@ async function zfVerifyOtp(){
   }
 }
 
-// 세션 기반 진입. 카카오는 이메일을 주지 않으므로 두 갈래로 나뉜다.
+// ===== 프로필 API 공통 (전부 세션 토큰 필수) =====
+// save-user-profile은 verify_jwt=true다. 토큰 없이 부르면 401이므로 아예 부르지 않는다.
+async function zfAccessToken(){
+  if(!zfAuthAvailable()) return null;
+  try{
+    const { data } = await zfAuth.auth.getSession();
+    zfSession = (data && data.session) || null;
+    return zfSession ? zfSession.access_token : null;
+  }catch(err){
+    console.warn('ZipFit: 세션 조회 실패', err);
+    return null;
+  }
+}
+
+async function zfFetchProfile(){
+  const token=await zfAccessToken();
+  if(!token) return { ok:false, reason:'no-session', data:null };
+  try{
+    const res=await fetch(PROFILE_API_URL,{ headers:{ 'Authorization':'Bearer '+token } });
+    if(!res.ok) return { ok:false, reason:'http-'+res.status, data:null };
+    const json=await res.json().catch(()=>({}));
+    if(json.error) return { ok:false, reason:json.error, data:null };
+    return { ok:true, data:json.data||null };   // 행이 없으면 data=null(신규 사용자)
+  }catch(err){
+    return { ok:false, reason:(err&&err.message)||'network', data:null };
+  }
+}
+
+async function zfPostProfile(payload){
+  const token=await zfAccessToken();
+  if(!token) return { ok:false, reason:'no-session' };
+  try{
+    const res=await fetch(PROFILE_API_URL,{
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+token },
+      body: JSON.stringify(payload)
+    });
+    if(!res.ok) return { ok:false, reason:'http-'+res.status };
+    const json=await res.json().catch(()=>({}));
+    if(json.error) return { ok:false, reason:json.error };
+    return { ok:true };
+  }catch(err){
+    return { ok:false, reason:(err&&err.message)||'network' };
+  }
+}
+
+// currentUser 기준 payload. POST는 보낸 키로 행 전체를 갱신하므로
+// 일부만 보내면 나머지가 null로 지워진다 — 항상 전체를 실어 보낼 것.
+// (단 alertEmail 키는 EF가 "있을 때만" 반영하므로 생략하면 기존 값이 보존된다)
+function zfPayloadFromCurrentUser(extra){
+  const c=currentUser||{};
+  const asCsv=v=>Array.isArray(v)?v.join(','):(v||'');
+  return Object.assign({
+    marital: c.marital||'',
+    children: c.children!=null?c.children:'',
+    members: c.members!=null?c.members:'',
+    income: c.income||'',
+    assets: c.assets||'',
+    regions: asCsv(c.regions),
+    types: asCsv(c.types),
+    maxDeposit: c.max_deposit!=null?c.max_deposit:'',
+    minRooms: c.min_rooms!=null?c.min_rooms:'',
+    alertOn: c.alert_on===false?'N':'Y',
+    newNoticeAlert: c.new_notice_alert===false?'N':'Y',
+    marketingAlert: c.marketing_alert===true?'Y':'N',
+    theme: c.theme||'light',
+    fontSize: c.font_size||'normal'
+  }, extra||{});
+}
+
+function zfShowSettingsBody(){
+  document.getElementById('loginGate').classList.add('hidden');
+  const alertGate=document.getElementById('zfAlertEmailGate');
+  if(alertGate) alertGate.classList.add('hidden');
+  document.getElementById('settingsBody').classList.remove('hidden');
+  const c=currentUser||{};
+  const label=document.getElementById('currentUserEmail');
+  if(label){
+    const shown=(c.alert_email||c.email||'').trim();
+    label.textContent = shown ? (shown+'님 환영해요') : '로그인됨 (알림 이메일 미설정)';
+  }
+}
+
+// 세션 기반 진입.
 async function zfApplySession(session){
   zfSession = session||null;
   if(!zfSession) return false;
-  const email=(zfSession.user && zfSession.user.email) ? zfSession.user.email.trim() : '';
-  const gate=document.getElementById('loginGate');
-  const alertGate=document.getElementById('zfAlertEmailGate');
 
-  if(email){
-    // 이메일이 있으면 기존 프로필 로드 경로를 그대로 재사용(EF는 여전히 email 기반)
-    if(gate) gate.classList.add('hidden');
-    if(alertGate) alertGate.classList.add('hidden');
-    await loginWithEmail(email);
+  const gate=document.getElementById('loginGate');
+  if(gate) gate.classList.add('hidden');
+
+  const sessionEmail=(zfSession.user && zfSession.user.email) ? zfSession.user.email.trim() : '';
+  const result=await zfFetchProfile();
+  currentUser = result.data ? Object.assign({}, result.data) : { email: sessionEmail, alert_email: null };
+  if(!currentUser.email && sessionEmail) currentUser.email = sessionEmail;
+
+  applySettingsToUI(currentUser);
+  renderPersonalizedRecommendations();
+
+  // 알림 수신처가 아직 없는 신규 사용자(주로 카카오)만 수집 화면을 거친다.
+  const hasAlertEmail=!!(currentUser.alert_email||'').trim();
+  if(result.ok && !hasAlertEmail && !sessionEmail){
+    const alertGate=document.getElementById('zfAlertEmailGate');
+    if(alertGate) alertGate.classList.remove('hidden');
+    document.getElementById('settingsBody').classList.add('hidden');
     return true;
   }
 
-  // 카카오 등 이메일 미제공 → 알림 이메일 수집 화면(필수 경로)
-  if(gate) gate.classList.add('hidden');
-  if(alertGate) alertGate.classList.remove('hidden');
-  document.getElementById('settingsBody').classList.add('hidden');
+  zfShowSettingsBody();
+  if(!result.ok && result.reason!=='no-session'){
+    const msg=document.getElementById('settingsSaveMsg');
+    if(msg){ msg.style.color='#A32D2D'; msg.textContent='저장된 조건을 불러오지 못했어요. ('+result.reason+')'; }
+  }
   return true;
 }
 
-function zfEnterWithoutEmail(){
-  // 4단계에서 EF가 user_id/alert_email을 받기 전까지는 프로필 저장이 불가능하다.
-  // 조용히 실패시키지 않고 상태를 명시한다.
-  document.getElementById('zfAlertEmailGate').classList.add('hidden');
-  document.getElementById('settingsBody').classList.remove('hidden');
-  const label=document.getElementById('currentUserEmail');
-  if(label) label.textContent = zfPendingAlertEmail
-    ? ('카카오 로그인 · 알림 이메일 '+zfPendingAlertEmail+' (저장 연동은 준비 중)')
-    : '카카오 로그인 (알림 이메일 미설정 · 저장 연동은 준비 중)';
-}
-
-function zfSaveAlertEmail(){
+async function zfSaveAlertEmail(){
   const input=document.getElementById('zfAlertEmailInput');
   const msg=document.getElementById('zfAlertEmailMsg');
   const val=(input.value||'').trim();
@@ -3440,14 +3503,24 @@ function zfSaveAlertEmail(){
     msg.textContent='올바른 이메일 주소를 입력해주세요.';
     return;
   }
-  // 3단계에서는 서버 전송 없이 클라이언트 상태로만 보관한다(4단계에서 alert_email로 연결).
-  zfPendingAlertEmail = val;
-  zfEnterWithoutEmail();
+  msg.style.color='#888';
+  msg.textContent='저장 중...';
+  const res=await zfPostProfile(zfPayloadFromCurrentUser({ alertEmail: val }));
+  if(!res.ok){
+    msg.style.color='#A32D2D';
+    msg.textContent='저장에 실패했어요. 잠시 후 다시 시도해주세요. ('+res.reason+')';
+    return;
+  }
+  currentUser = Object.assign({}, currentUser||{}, { alert_email: val });
+  msg.textContent='';
+  input.value='';
+  zfShowSettingsBody();
 }
 
 function zfSkipAlertEmail(){
-  zfPendingAlertEmail = null;
-  zfEnterWithoutEmail();
+  const msg=document.getElementById('zfAlertEmailMsg');
+  if(msg) msg.textContent='';
+  zfShowSettingsBody();
 }
 
 if(zfAuthAvailable()){
@@ -3456,7 +3529,7 @@ if(zfAuthAvailable()){
       if(session) zfApplySession(session);
     } else if(event==='SIGNED_OUT'){
       zfSession=null;
-      zfPendingAlertEmail=null;
+      currentUser=null;
     }
   });
 }
@@ -3464,7 +3537,6 @@ if(zfAuthAvailable()){
 async function renderSettingsGate(){
   zfSyncAuthUiAvailability();
 
-  // ① Supabase 세션 우선
   if(zfAuthAvailable()){
     try{
       const { data } = await zfAuth.auth.getSession();
@@ -3473,51 +3545,16 @@ async function renderSettingsGate(){
         return;
       }
     }catch(err){
-      console.warn('ZipFit: 세션 조회 실패 — 쿠키 경로로 폴백합니다.', err);
+      console.warn('ZipFit: 세션 조회 실패', err);
     }
   }
 
-  // ② 기존 쿠키 경로(폴백, 제거 금지)
-  const saved=getCookie(ZF_COOKIE);
-  if(saved){
-    loginWithEmail(saved);
-  } else {
-    document.getElementById('loginGate').classList.remove('hidden');
-    document.getElementById('zfAlertEmailGate').classList.add('hidden');
-    document.getElementById('settingsBody').classList.add('hidden');
-  }
-}
-
-async function loginWithEmail(prefillEmail){
-  const email=(prefillEmail||document.getElementById('loginEmail').value||'').trim();
-  const msgEl=document.getElementById('loginMsg');
-  if(!email||!email.includes('@')){
-    if(msgEl){msgEl.style.color='#A32D2D';msgEl.textContent='올바른 이메일 주소를 입력해주세요.';}
-    return;
-  }
-  if(msgEl){msgEl.style.color='#888';msgEl.textContent='불러오는 중...';}
-
-  let profile={email};
-  try{
-    const res=await fetch(PROFILE_API_URL+'?email='+encodeURIComponent(email));
-    if(res.ok){
-      const json=await res.json();
-      if(json.data) profile={email,...json.data};
-    }
-  }catch(err){
-    console.warn('ZipFit 프로필 불러오기 실패(신규 사용자로 진행):', err);
-    if(msgEl){ msgEl.style.color='#A32D2D'; msgEl.textContent='설정을 불러오지 못했어요. 네트워크 연결을 확인해주세요.'; }
-  }
-
-  currentUser=profile;
-  setCookie(ZF_COOKIE,email,365);
-  applySettingsToUI(profile);
-  renderPersonalizedRecommendations();
-  document.getElementById('loginGate').classList.add('hidden');
-  const _alertGate=document.getElementById('zfAlertEmailGate');
-  if(_alertGate) _alertGate.classList.add('hidden');
-  document.getElementById('settingsBody').classList.remove('hidden');
-  document.getElementById('currentUserEmail').textContent=email+'님 환영해요';
+  // 세션 없음 → 로그인 화면
+  currentUser=null;
+  document.getElementById('loginGate').classList.remove('hidden');
+  const alertGate=document.getElementById('zfAlertEmailGate');
+  if(alertGate) alertGate.classList.add('hidden');
+  document.getElementById('settingsBody').classList.add('hidden');
 }
 
 function applySettingsToUI(p){
@@ -3552,8 +3589,29 @@ async function saveSettings(){
   const msgEl=document.getElementById('settingsSaveMsg');
   msgEl.style.color='#888';
   msgEl.textContent='저장 중...';
-  const payload={
-    email: currentUser.email,
+  // alertEmail 키는 넣지 않는다 — EF가 "키가 있을 때만" 반영하므로 기존 알림 주소가 보존된다.
+  const payload=zfSettingsFormPayload();
+  const res=await zfPostProfile(payload);
+  if(!res.ok){
+    msgEl.style.color='#A32D2D';
+    msgEl.textContent = res.reason==='no-session'
+      ? '로그인이 만료됐어요. 다시 로그인해주세요.'
+      : '설정 저장에 실패했어요. 네트워크 연결을 확인해주세요.';
+    if(res.reason==='no-session') renderSettingsGate();
+    return;
+  }
+  currentUser={...currentUser,...payload,
+    alert_on:payload.alertOn==='Y', new_notice_alert:payload.newNoticeAlert==='Y',
+    marketing_alert:payload.marketingAlert==='Y',
+    max_deposit:payload.maxDeposit, min_rooms:payload.minRooms,
+    theme:payload.theme, font_size:payload.fontSize};
+  msgEl.style.color='#0F6E56';
+  msgEl.textContent='✅ 조건이 저장됐어요.';
+}
+
+// 설정 폼의 현재 값을 EF payload 형태로 만든다(saveSettings·onSettingChange 공용).
+function zfSettingsFormPayload(){
+  return {
     marital: document.getElementById('set_marital').value||'',
     children: document.getElementById('set_children').value||'',
     members: document.getElementById('set_members').value||'',
@@ -3569,18 +3627,6 @@ async function saveSettings(){
     theme: document.querySelector('[data-theme].sel')?.dataset.theme||'light',
     fontSize: document.querySelector('[data-fontsize].sel')?.dataset.fontsize||'normal',
   };
-  try{
-    const res=await fetch(PROFILE_API_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    const json=await res.json().catch(()=>({}));
-    if(json.error || json.message?.toLowerCase().includes('error')) throw new Error(json.error||json.message||'서버 오류');
-    currentUser={...currentUser,...payload,alert_on:payload.alertOn,new_notice_alert:payload.newNoticeAlert,marketing_alert:payload.marketingAlert,max_deposit:payload.maxDeposit,min_rooms:payload.minRooms};
-    msgEl.style.color='#0F6E56';
-    msgEl.textContent='✅ 조건이 저장됐어요.';
-  }catch(err){
-    msgEl.style.color='#A32D2D';
-    msgEl.textContent='설정 저장에 실패했어요. 네트워크 연결을 확인해주세요.';
-  }
 }
 
 function setTheme(theme,silent){
@@ -3598,34 +3644,25 @@ function setFontSize(size,silent){
 
 async function onSettingChange(){
   if(!currentUser) return;
-  const theme=document.querySelector('[data-theme].sel')?.dataset.theme||'light';
-  const fontSize=document.querySelector('[data-fontsize].sel')?.dataset.fontsize||'normal';
-  const payload={
-    email: currentUser.email,
-    marital: currentUser.marital||'',
-    children: currentUser.children||'',
-    members: currentUser.members||'',
-    income: currentUser.income||'',
-    assets: currentUser.assets||'',
-    regions: Array.isArray(currentUser.regions)?currentUser.regions.join(','):(currentUser.regions||''),
-    maxDeposit: currentUser.max_deposit||'',
-    minRooms: currentUser.min_rooms||'',
-    types: Array.isArray(currentUser.types)?currentUser.types.join(','):(currentUser.types||''),
+  // 토글만 바뀌는 자동 저장. 나머지 값은 currentUser 기준으로 전체를 함께 실어 보낸다
+  // (일부만 보내면 서버에서 나머지 컬럼이 null로 지워진다).
+  const payload=zfPayloadFromCurrentUser({
     alertOn: document.getElementById('toggleAlertOn').checked?'Y':'N',
     newNoticeAlert: document.getElementById('toggleNewNotice').checked?'Y':'N',
     marketingAlert: document.getElementById('toggleMarketing').checked?'Y':'N',
-    theme, fontSize
-  };
-  try{
-    await fetch(PROFILE_API_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-  }catch(err){console.error('ZipFit 설정 저장 실패:',err);}
+    theme: document.querySelector('[data-theme].sel')?.dataset.theme||'light',
+    fontSize: document.querySelector('[data-fontsize].sel')?.dataset.fontsize||'normal'
+  });
+  const res=await zfPostProfile(payload);
+  if(!res.ok){ console.error('ZipFit 설정 저장 실패:', res.reason); return; }
+  currentUser={...currentUser,
+    alert_on:payload.alertOn==='Y', new_notice_alert:payload.newNoticeAlert==='Y',
+    marketing_alert:payload.marketingAlert==='Y',
+    theme:payload.theme, font_size:payload.fontSize};
 }
 
 async function logoutUser(){
-  // 기존 쿠키 경로 정리(유지) + 신규 세션이 있으면 함께 종료
-  document.cookie = ZF_COOKIE+'=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;';
   currentUser=null;
-  zfPendingAlertEmail=null;
   if(zfAuthAvailable()){
     try{ await zfAuth.auth.signOut(); }catch(err){ console.warn('ZipFit: signOut 실패', err); }
   }
