@@ -3343,7 +3343,12 @@ async function zfSignInKakao(){
   try{
     const { error } = await zfAuth.auth.signInWithOAuth({
       provider:'kakao',
-      options:{ redirectTo: ZF_REDIRECT_TO }
+      // scope를 명시하지 않으면 supabase-js가 account_email·profile_image를 함께 요청해
+      // KOE205("설정하지 않은 동의 항목")로 거부된다. 이 앱은 두 항목 모두 미설정 상태:
+      //   account_email  — 비즈니스 앱 미전환이라 설정 자체가 불가(구조적 제약)
+      //   profile_image  — 의도적으로 동의받지 않기로 결정
+      // 대시보드 Kakao Provider에는 scope 입력란이 없어 호출부에서 지정한다.
+      options:{ redirectTo: ZF_REDIRECT_TO, scopes: 'profile_nickname' }
     });
     if(error) throw error;
   }catch(err){
