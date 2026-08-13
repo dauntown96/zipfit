@@ -11,6 +11,10 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="ZipFit">
 <script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=58c490c9bded159ee35575e80345d783&amp;libraries=services&amp;autoload=false"></script>
+<!-- Supabase Auth SDK — 코딩원칙 17번 3조건 준수(버전 완전고정 + SRI + sw.js PRECACHE) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/dist/umd/supabase.js"
+        integrity="sha384-qafw21c/iciq0VXsi9FzkfoQv5I/V0iqE4lSNcKXPnW9/UTJLnv5CcN4FHxVLnKg"
+        crossorigin="anonymous"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f0;color:#1a1a1a;min-height:100vh}
@@ -520,14 +524,49 @@ body.theme-dark .elig-subrow span:first-child{color:#9aa0aa}
 
     <!-- 로그인 전: 이메일로 시작하기 -->
     <div id="loginGate" class="panel">
-      <p class="panel-title">이메일로 시작하기</p>
-      <p class="sub" style="margin-bottom:1rem">이메일을 입력하면 저장하신 조건과 알림 설정을 불러올 수 있어요. (별도 비밀번호는 필요 없어요)</p>
+      <p class="panel-title">로그인</p>
+      <p class="sub" style="margin-bottom:1rem">로그인하면 저장하신 조건과 알림 설정을 불러올 수 있어요.</p>
+
+      <!-- 신규 경로 ① 카카오 -->
+      <button class="btn" id="zfKakaoBtn" onclick="zfSignInKakao()"
+              style="background:#FEE500;color:#191600;border:none;margin-bottom:0.75rem">카카오로 시작하기</button>
+
+      <!-- 신규 경로 ② 이메일 인증코드(OTP) -->
       <div class="field">
-        <label class="label">이메일 주소</label>
+        <label class="label" for="loginEmail">이메일 주소</label>
         <input type="email" id="loginEmail" placeholder="example@email.com">
       </div>
-      <button class="btn btn-primary" onclick="loginWithEmail()">시작하기 →</button>
-      <p id="loginMsg" style="font-size:12px;margin-top:8px;color:#888"></p>
+      <button class="btn btn-primary" onclick="zfSendOtp()">인증코드 받기 →</button>
+
+      <!-- OTP 코드 입력 (코드 발송 후 노출) -->
+      <div id="zfOtpBox" class="hidden" style="margin-top:0.75rem">
+        <div class="field">
+          <label class="label" for="zfOtpCode">메일로 받은 6자리 인증코드</label>
+          <input type="text" id="zfOtpCode" inputmode="numeric" autocomplete="one-time-code" placeholder="000000">
+        </div>
+        <button class="btn btn-primary" onclick="zfVerifyOtp()">인증하고 로그인 →</button>
+      </div>
+      <p id="zfAuthMsg" style="font-size:12px;margin-top:8px;color:#888"></p>
+
+      <!-- 기존 경로(제거 금지 — 4단계 검증 후 정리) -->
+      <div style="margin-top:1.25rem;padding-top:1rem;border-top:1px solid #e5e3dd">
+        <p style="font-size:12px;color:#999;margin-bottom:8px">위 방법이 안 되면 아래를 이용해 주세요. (기존 방식)</p>
+        <button class="btn btn-sec" onclick="loginWithEmail()">이메일만 입력하고 시작하기 (기존 방식)</button>
+        <p id="loginMsg" style="font-size:12px;margin-top:8px;color:#888"></p>
+      </div>
+    </div>
+
+    <!-- 카카오 로그인 직후: 알림 받을 이메일 수집 (필수 경로 — 카카오는 이메일을 주지 않음) -->
+    <div id="zfAlertEmailGate" class="panel hidden">
+      <p class="panel-title">알림 받을 이메일</p>
+      <p class="sub" style="margin-bottom:1rem">카카오 로그인은 이메일을 제공하지 않아요. 새 공고 알림을 메일로 받으시려면 주소를 입력해 주세요. 나중에 설정에서 바꿀 수 있어요.</p>
+      <div class="field">
+        <label class="label" for="zfAlertEmailInput">이메일 주소</label>
+        <input type="email" id="zfAlertEmailInput" placeholder="example@email.com">
+      </div>
+      <button class="btn btn-primary" onclick="zfSaveAlertEmail()">저장하고 계속 →</button>
+      <button class="btn btn-sec" onclick="zfSkipAlertEmail()">건너뛰기</button>
+      <p id="zfAlertEmailMsg" style="font-size:12px;margin-top:8px;color:#888"></p>
     </div>
 
     <!-- 로그인 후: 환경설정 본체 -->
@@ -3254,12 +3293,188 @@ function getCookie(name){
   return match?decodeURIComponent(match[2]):null;
 }
 
-function renderSettingsGate(){
+// ===== Supabase Auth (신규 경로) =====
+// 기존 쿠키 경로와 병행 운영. 4단계 검증 전까지 구 경로 제거 금지.
+// 배포 루트는 하드코딩하지 않고 현재 경로에서 산출한다.
+//   /zipfit/           → /zipfit/
+//   /zipfit/index.html → /zipfit/
+const ZF_REDIRECT_TO = location.origin + location.pathname.replace(/[^/]*$/, '');
+
+let zfAuth = null;          // Supabase 클라이언트 (SDK 로드 실패 시 null 유지)
+let zfSession = null;       // 현재 세션
+let zfPendingAlertEmail = null; // 4단계에서 서버로 보낼 alert_email (지금은 클라이언트 보관만)
+
+try{
+  if(window.supabase && typeof window.supabase.createClient==='function'){
+    zfAuth = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth:{
+        detectSessionInUrl: true,   // 리다이렉트 복귀 시 URL 해시를 소비하고 정리
+        persistSession: true,
+        autoRefreshToken: true,
+        flowType: 'implicit'        // GitHub Pages 정적 호스팅 → 해시 기반 왕복
+      }
+    });
+  }
+}catch(err){
+  console.warn('ZipFit: Supabase Auth 초기화 실패 — 기존 이메일 경로로만 동작합니다.', err);
+  zfAuth = null;
+}
+
+function zfAuthAvailable(){ return !!zfAuth; }
+
+function zfAuthMsg(text, isError){
+  const el=document.getElementById('zfAuthMsg');
+  if(!el) return;
+  el.style.color = isError ? '#A32D2D' : '#888';
+  el.textContent = text||'';
+}
+
+// SDK가 SRI 실패·네트워크 오류로 안 뜬 경우 신규 버튼을 숨겨 기존 경로만 노출
+function zfSyncAuthUiAvailability(){
+  if(zfAuthAvailable()) return;
+  const kakao=document.getElementById('zfKakaoBtn');
+  if(kakao) kakao.style.display='none';
+  zfAuthMsg('간편 로그인을 사용할 수 없어요. 아래 기존 방식을 이용해 주세요.', true);
+}
+
+async function zfSignInKakao(){
+  if(!zfAuthAvailable()){ zfSyncAuthUiAvailability(); return; }
+  zfAuthMsg('카카오로 이동 중...');
+  try{
+    const { error } = await zfAuth.auth.signInWithOAuth({
+      provider:'kakao',
+      options:{ redirectTo: ZF_REDIRECT_TO }
+    });
+    if(error) throw error;
+  }catch(err){
+    zfAuthMsg('카카오 로그인을 시작하지 못했어요. ('+(err.message||err)+')', true);
+  }
+}
+
+async function zfSendOtp(){
+  if(!zfAuthAvailable()){ zfSyncAuthUiAvailability(); return; }
+  const email=(document.getElementById('loginEmail').value||'').trim();
+  if(!email || !email.includes('@')){
+    zfAuthMsg('올바른 이메일 주소를 입력해주세요.', true);
+    return;
+  }
+  zfAuthMsg('인증코드를 보내는 중...');
+  try{
+    const { error } = await zfAuth.auth.signInWithOtp({
+      email,
+      options:{ emailRedirectTo: ZF_REDIRECT_TO }
+    });
+    if(error) throw error;
+    document.getElementById('zfOtpBox').classList.remove('hidden');
+    zfAuthMsg('메일로 인증코드를 보냈어요. 코드를 입력해 주세요.');
+  }catch(err){
+    zfAuthMsg('인증코드 발송에 실패했어요. ('+(err.message||err)+')', true);
+  }
+}
+
+async function zfVerifyOtp(){
+  if(!zfAuthAvailable()) return;
+  const email=(document.getElementById('loginEmail').value||'').trim();
+  const token=(document.getElementById('zfOtpCode').value||'').trim();
+  if(!token){ zfAuthMsg('인증코드를 입력해주세요.', true); return; }
+  zfAuthMsg('확인 중...');
+  try{
+    const { error } = await zfAuth.auth.verifyOtp({ email, token, type:'email' });
+    if(error) throw error;
+    zfAuthMsg('');
+    // 이후 처리는 onAuthStateChange(SIGNED_IN)가 담당
+  }catch(err){
+    zfAuthMsg('인증코드가 올바르지 않아요. ('+(err.message||err)+')', true);
+  }
+}
+
+// 세션 기반 진입. 카카오는 이메일을 주지 않으므로 두 갈래로 나뉜다.
+async function zfApplySession(session){
+  zfSession = session||null;
+  if(!zfSession) return false;
+  const email=(zfSession.user && zfSession.user.email) ? zfSession.user.email.trim() : '';
+  const gate=document.getElementById('loginGate');
+  const alertGate=document.getElementById('zfAlertEmailGate');
+
+  if(email){
+    // 이메일이 있으면 기존 프로필 로드 경로를 그대로 재사용(EF는 여전히 email 기반)
+    if(gate) gate.classList.add('hidden');
+    if(alertGate) alertGate.classList.add('hidden');
+    await loginWithEmail(email);
+    return true;
+  }
+
+  // 카카오 등 이메일 미제공 → 알림 이메일 수집 화면(필수 경로)
+  if(gate) gate.classList.add('hidden');
+  if(alertGate) alertGate.classList.remove('hidden');
+  document.getElementById('settingsBody').classList.add('hidden');
+  return true;
+}
+
+function zfEnterWithoutEmail(){
+  // 4단계에서 EF가 user_id/alert_email을 받기 전까지는 프로필 저장이 불가능하다.
+  // 조용히 실패시키지 않고 상태를 명시한다.
+  document.getElementById('zfAlertEmailGate').classList.add('hidden');
+  document.getElementById('settingsBody').classList.remove('hidden');
+  const label=document.getElementById('currentUserEmail');
+  if(label) label.textContent = zfPendingAlertEmail
+    ? ('카카오 로그인 · 알림 이메일 '+zfPendingAlertEmail+' (저장 연동은 준비 중)')
+    : '카카오 로그인 (알림 이메일 미설정 · 저장 연동은 준비 중)';
+}
+
+function zfSaveAlertEmail(){
+  const input=document.getElementById('zfAlertEmailInput');
+  const msg=document.getElementById('zfAlertEmailMsg');
+  const val=(input.value||'').trim();
+  if(!val || !val.includes('@')){
+    msg.style.color='#A32D2D';
+    msg.textContent='올바른 이메일 주소를 입력해주세요.';
+    return;
+  }
+  // 3단계에서는 서버 전송 없이 클라이언트 상태로만 보관한다(4단계에서 alert_email로 연결).
+  zfPendingAlertEmail = val;
+  zfEnterWithoutEmail();
+}
+
+function zfSkipAlertEmail(){
+  zfPendingAlertEmail = null;
+  zfEnterWithoutEmail();
+}
+
+if(zfAuthAvailable()){
+  zfAuth.auth.onAuthStateChange((event, session)=>{
+    if(event==='SIGNED_IN' || event==='TOKEN_REFRESHED' || event==='INITIAL_SESSION'){
+      if(session) zfApplySession(session);
+    } else if(event==='SIGNED_OUT'){
+      zfSession=null;
+      zfPendingAlertEmail=null;
+    }
+  });
+}
+
+async function renderSettingsGate(){
+  zfSyncAuthUiAvailability();
+
+  // ① Supabase 세션 우선
+  if(zfAuthAvailable()){
+    try{
+      const { data } = await zfAuth.auth.getSession();
+      if(data && data.session){
+        await zfApplySession(data.session);
+        return;
+      }
+    }catch(err){
+      console.warn('ZipFit: 세션 조회 실패 — 쿠키 경로로 폴백합니다.', err);
+    }
+  }
+
+  // ② 기존 쿠키 경로(폴백, 제거 금지)
   const saved=getCookie(ZF_COOKIE);
   if(saved){
     loginWithEmail(saved);
   } else {
     document.getElementById('loginGate').classList.remove('hidden');
+    document.getElementById('zfAlertEmailGate').classList.add('hidden');
     document.getElementById('settingsBody').classList.add('hidden');
   }
 }
@@ -3290,6 +3505,8 @@ async function loginWithEmail(prefillEmail){
   applySettingsToUI(profile);
   renderPersonalizedRecommendations();
   document.getElementById('loginGate').classList.add('hidden');
+  const _alertGate=document.getElementById('zfAlertEmailGate');
+  if(_alertGate) _alertGate.classList.add('hidden');
   document.getElementById('settingsBody').classList.remove('hidden');
   document.getElementById('currentUserEmail').textContent=email+'님 환영해요';
 }
@@ -3395,12 +3612,23 @@ async function onSettingChange(){
   }catch(err){console.error('ZipFit 설정 저장 실패:',err);}
 }
 
-function logoutUser(){
+async function logoutUser(){
+  // 기존 쿠키 경로 정리(유지) + 신규 세션이 있으면 함께 종료
   document.cookie = ZF_COOKIE+'=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;';
   currentUser=null;
+  zfPendingAlertEmail=null;
+  if(zfAuthAvailable()){
+    try{ await zfAuth.auth.signOut(); }catch(err){ console.warn('ZipFit: signOut 실패', err); }
+  }
+  zfSession=null;
   document.getElementById('settingsBody').classList.add('hidden');
+  const _alertGate=document.getElementById('zfAlertEmailGate');
+  if(_alertGate) _alertGate.classList.add('hidden');
   document.getElementById('loginGate').classList.remove('hidden');
   document.getElementById('loginEmail').value='';
+  const _otp=document.getElementById('zfOtpBox');
+  if(_otp) _otp.classList.add('hidden');
+  zfAuthMsg('');
 }
 </script>
 
