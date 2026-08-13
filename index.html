@@ -531,21 +531,12 @@ body.theme-dark .elig-subrow span:first-child{color:#9aa0aa}
       <button class="btn" id="zfKakaoBtn" onclick="zfSignInKakao()"
               style="background:#FEE500;color:#191600;border:none;margin-bottom:0.75rem">카카오로 시작하기</button>
 
-      <!-- 신규 경로 ② 이메일 인증코드(OTP) -->
+      <!-- 신규 경로 ② 이메일 로그인 링크(매직링크) -->
       <div class="field">
         <label class="label" for="loginEmail">이메일 주소</label>
         <input type="email" id="loginEmail" placeholder="example@email.com">
       </div>
-      <button class="btn btn-primary" onclick="zfSendOtp()">인증코드 받기 →</button>
-
-      <!-- OTP 코드 입력 (코드 발송 후 노출) -->
-      <div id="zfOtpBox" class="hidden" style="margin-top:0.75rem">
-        <div class="field">
-          <label class="label" for="zfOtpCode">메일로 받은 6자리 인증코드</label>
-          <input type="text" id="zfOtpCode" inputmode="numeric" autocomplete="one-time-code" placeholder="000000">
-        </div>
-        <button class="btn btn-primary" onclick="zfVerifyOtp()">인증하고 로그인 →</button>
-      </div>
+      <button class="btn btn-primary" onclick="zfSendLoginLink()">로그인 링크 받기 →</button>
       <p id="zfAuthMsg" style="font-size:12px;margin-top:8px;color:#888"></p>
     </div>
 
@@ -3346,42 +3337,32 @@ async function zfSignInKakao(){
   }
 }
 
-async function zfSendOtp(){
+// 이메일 로그인 = 매직링크 방식.
+// Supabase 기본 이메일 템플릿은 링크만 보낸다. 6자리 코드({{ .Token }})를 쓰려면
+// 커스텀 SMTP가 필요한데 현재 미설정이라 템플릿 수정 자체가 막혀 있다.
+// 커스텀 SMTP를 도입하면 코드 입력 방식을 재검토할 것.
+async function zfSendLoginLink(){
   if(!zfAuthAvailable()){ zfSyncAuthUiAvailability(); return; }
   const email=(document.getElementById('loginEmail').value||'').trim();
   if(!email || !email.includes('@')){
     zfAuthMsg('올바른 이메일 주소를 입력해주세요.', true);
     return;
   }
-  zfAuthMsg('인증코드를 보내는 중...');
+  zfAuthMsg('로그인 링크를 보내는 중...');
   try{
+    // 같은 signInWithOtp API가 링크를 보낸다. 복귀 주소는 카카오와 동일한 배포 루트.
     const { error } = await zfAuth.auth.signInWithOtp({
       email,
       options:{ emailRedirectTo: ZF_REDIRECT_TO }
     });
     if(error) throw error;
-    document.getElementById('zfOtpBox').classList.remove('hidden');
-    zfAuthMsg('메일로 인증코드를 보냈어요. 코드를 입력해 주세요.');
+    zfAuthMsg('메일로 로그인 링크를 보냈어요. 메일함을 확인해 주세요.');
   }catch(err){
-    zfAuthMsg('인증코드 발송에 실패했어요. ('+(err.message||err)+')', true);
+    zfAuthMsg('로그인 링크 발송에 실패했어요. ('+(err.message||err)+')', true);
   }
 }
-
-async function zfVerifyOtp(){
-  if(!zfAuthAvailable()) return;
-  const email=(document.getElementById('loginEmail').value||'').trim();
-  const token=(document.getElementById('zfOtpCode').value||'').trim();
-  if(!token){ zfAuthMsg('인증코드를 입력해주세요.', true); return; }
-  zfAuthMsg('확인 중...');
-  try{
-    const { error } = await zfAuth.auth.verifyOtp({ email, token, type:'email' });
-    if(error) throw error;
-    zfAuthMsg('');
-    // 이후 처리는 onAuthStateChange(SIGNED_IN)가 담당
-  }catch(err){
-    zfAuthMsg('인증코드가 올바르지 않아요. ('+(err.message||err)+')', true);
-  }
-}
+// 링크 클릭 후 복귀하면 detectSessionInUrl이 해시를 소비하고
+// onAuthStateChange(SIGNED_IN)가 이후 처리를 담당한다.
 
 // ===== 프로필 API 공통 (전부 세션 토큰 필수) =====
 // save-user-profile은 verify_jwt=true다. 토큰 없이 부르면 401이므로 아예 부르지 않는다.
@@ -3671,8 +3652,6 @@ async function logoutUser(){
   if(_alertGate) _alertGate.classList.add('hidden');
   document.getElementById('loginGate').classList.remove('hidden');
   document.getElementById('loginEmail').value='';
-  const _otp=document.getElementById('zfOtpBox');
-  if(_otp) _otp.classList.add('hidden');
   zfAuthMsg('');
 }
 </script>
