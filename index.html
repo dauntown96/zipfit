@@ -3272,6 +3272,10 @@ loadRegionsFromSupabase(); // ② 전국 지역 동적 로드 후 buildChipOptio
 // ===== 환경설정 / 이메일 식별 시스템 =====
 const PROFILE_API_URL = "https://khdpjjyspmlqtzperoqg.supabase.co/functions/v1/save-user-profile";
 let currentUser = null; // { email, alert_email, marital, children, ... }
+// 프로필 GET 성공 여부. currentUser의 truthy 여부와 별개로 관리한다 —
+// 조회 실패 시 currentUser에 최소 객체를 채우는데, 그 상태로 POST하면
+// regions·income·assets 등이 전부 null로 덮어써지기 때문이다.
+let zfProfileLoaded = false;
 
 // ===== Supabase Auth =====
 // 2026-08-13 4단계 후반: 이메일+쿠키(zipfit_email) 경로를 완전히 제거했다.
@@ -3427,6 +3431,18 @@ async function zfPostProfile(payload){
 // currentUser 기준 payload. POST는 보낸 키로 행 전체를 갱신하므로
 // 일부만 보내면 나머지가 null로 지워진다 — 항상 전체를 실어 보낼 것.
 // (단 alertEmail 키는 EF가 "있을 때만" 반영하므로 생략하면 기존 값이 보존된다)
+const ZF_PROFILE_LOAD_FAIL_MSG='조건을 불러오지 못해 저장할 수 없어요. 새로고침해 주세요.';
+
+// 저장 가능 여부. 프로필 조회에 성공한 세션에서만 POST를 허용한다.
+function zfCanSaveProfile(msgElId){
+  if(currentUser && zfProfileLoaded) return true;
+  if(currentUser && msgElId){
+    const el=document.getElementById(msgElId);
+    if(el){ el.style.color='#A32D2D'; el.textContent=ZF_PROFILE_LOAD_FAIL_MSG; }
+  }
+  return false;
+}
+
 function zfPayloadFromCurrentUser(extra){
   const c=currentUser||{};
   const asCsv=v=>Array.isArray(v)?v.join(','):(v||'');
@@ -3471,6 +3487,7 @@ async function zfApplySession(session){
 
   const sessionEmail=(zfSession.user && zfSession.user.email) ? zfSession.user.email.trim() : '';
   const result=await zfFetchProfile();
+  zfProfileLoaded = !!result.ok;   // 실패 시 저장 경로를 전부 막는다(부분 payload로 덮어쓰기 방지)
   currentUser = result.data ? Object.assign({}, result.data) : { email: sessionEmail, alert_email: null };
   if(!currentUser.email && sessionEmail) currentUser.email = sessionEmail;
 
@@ -3489,7 +3506,7 @@ async function zfApplySession(session){
   zfShowSettingsBody();
   if(!result.ok && result.reason!=='no-session'){
     const msg=document.getElementById('settingsSaveMsg');
-    if(msg){ msg.style.color='#A32D2D'; msg.textContent='저장된 조건을 불러오지 못했어요. ('+result.reason+')'; }
+    if(msg){ msg.style.color='#A32D2D'; msg.textContent=ZF_PROFILE_LOAD_FAIL_MSG+' ('+result.reason+')'; }
   }
   return true;
 }
@@ -3503,6 +3520,7 @@ async function zfSaveAlertEmail(){
     msg.textContent='올바른 이메일 주소를 입력해주세요.';
     return;
   }
+  if(!zfCanSaveProfile('zfAlertEmailMsg')) return;
   msg.style.color='#888';
   msg.textContent='저장 중...';
   const res=await zfPostProfile(zfPayloadFromCurrentUser({ alertEmail: val }));
@@ -3529,7 +3547,7 @@ if(zfAuthAvailable()){
       if(session) zfApplySession(session);
     } else if(event==='SIGNED_OUT'){
       zfSession=null;
-      currentUser=null;
+      currentUser=null; zfProfileLoaded=false;
     }
   });
 }
@@ -3550,7 +3568,7 @@ async function renderSettingsGate(){
   }
 
   // 세션 없음 → 로그인 화면
-  currentUser=null;
+  currentUser=null; zfProfileLoaded=false;
   document.getElementById('loginGate').classList.remove('hidden');
   const alertGate=document.getElementById('zfAlertEmailGate');
   if(alertGate) alertGate.classList.add('hidden');
@@ -3586,6 +3604,7 @@ function applySettingsToUI(p){
 
 async function saveSettings(){
   if(!currentUser) return;
+  if(!zfCanSaveProfile('settingsSaveMsg')) return;
   const msgEl=document.getElementById('settingsSaveMsg');
   msgEl.style.color='#888';
   msgEl.textContent='저장 중...';
@@ -3644,6 +3663,7 @@ function setFontSize(size,silent){
 
 async function onSettingChange(){
   if(!currentUser) return;
+  if(!zfCanSaveProfile('settingsSaveMsg')) return;
   // 토글만 바뀌는 자동 저장. 나머지 값은 currentUser 기준으로 전체를 함께 실어 보낸다
   // (일부만 보내면 서버에서 나머지 컬럼이 null로 지워진다).
   const payload=zfPayloadFromCurrentUser({
@@ -3662,7 +3682,7 @@ async function onSettingChange(){
 }
 
 async function logoutUser(){
-  currentUser=null;
+  currentUser=null; zfProfileLoaded=false;
   if(zfAuthAvailable()){
     try{ await zfAuth.auth.signOut(); }catch(err){ console.warn('ZipFit: signOut 실패', err); }
   }
