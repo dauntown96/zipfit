@@ -635,15 +635,15 @@ body.theme-dark .elig-subrow span:first-child{color:#9aa0aa}
         <p class="slabel" style="margin:0 0 0.75rem">🔔 알림 설정</p>
         <div class="setting-row">
           <div><div class="setting-label">전체 알림</div><div class="setting-sub">모든 알림을 받을지 결정해요</div></div>
-          <label class="toggle"><input type="checkbox" id="toggleAlertOn" checked onchange="onSettingChange()"><span class="toggle-slider"></span></label>
+          <label class="toggle"><input type="checkbox" id="toggleAlertOn" checked onchange="onSettingChange({alertOn:this.checked?'Y':'N'})"><span class="toggle-slider"></span></label>
         </div>
         <div class="setting-row">
           <div><div class="setting-label">저장 조건 신규공고 알림</div><div class="setting-sub">내가 저장한 조건에 맞는 공고가 뜨면 알려드려요</div></div>
-          <label class="toggle"><input type="checkbox" id="toggleNewNotice" checked onchange="onSettingChange()"><span class="toggle-slider"></span></label>
+          <label class="toggle"><input type="checkbox" id="toggleNewNotice" checked onchange="onSettingChange({newNoticeAlert:this.checked?'Y':'N'})"><span class="toggle-slider"></span></label>
         </div>
         <div class="setting-row">
           <div><div class="setting-label">마케팅 소식 알림</div><div class="setting-sub">ZipFit 이벤트, 새 기능 소식 등을 받아요</div></div>
-          <label class="toggle"><input type="checkbox" id="toggleMarketing" onchange="onSettingChange()"><span class="toggle-slider"></span></label>
+          <label class="toggle"><input type="checkbox" id="toggleMarketing" onchange="onSettingChange({marketingAlert:this.checked?'Y':'N'})"><span class="toggle-slider"></span></label>
         </div>
       </div>
 
@@ -3099,12 +3099,12 @@ async function saveUserProfile(lvl){
     maxDeposit: document.getElementById('maxDeposit').value||'',
     minRooms: document.getElementById('minRooms').value||'',
     types: [...selectedTypes].join(','),
-    alertOn: 'Y',
-    newNoticeAlert: newNoticeOn,
-    marketingAlert: (currentUser&&currentUser.marketing_alert===true)?'Y':'N',
-    theme: (currentUser&&currentUser.theme)||'light',
-    fontSize: (currentUser&&currentUser.font_size)||'normal'
+    newNoticeAlert: newNoticeOn
   };
+  // 알림 받기를 선택했을 때만 마스터 스위치를 켠다.
+  // marketingAlert/theme/fontSize는 자격진단 입력값이 아니므로 아예 보내지 않는다
+  // — 기본값으로 채워 보내면 사용자의 다크모드·마케팅수신 설정이 조용히 초기화된다.
+  if(newNoticeOn==='Y') payload.alertOn='Y';
 
   const res=await zfPostProfile(payload);
   if(!res.ok){
@@ -3118,8 +3118,9 @@ async function saveUserProfile(lvl){
   msgEl.style.color='#0F6E56';
   msgEl.textContent = newNoticeOn==='Y' ? '✅ 조건 저장 완료! 새 공고가 뜨면 메일로 알려드릴게요.' : '✅ 조건이 저장됐어요.';
   currentUser={...(currentUser||{}), ...payload,
-    alert_on:true, new_notice_alert:newNoticeOn==='Y',
+    new_notice_alert:newNoticeOn==='Y',
     max_deposit:payload.maxDeposit, min_rooms:payload.minRooms};
+  if(newNoticeOn==='Y') currentUser.alert_on=true;
 }
 
 const typeChecklist = {
@@ -3428,9 +3429,8 @@ async function zfPostProfile(payload){
   }
 }
 
-// currentUser 기준 payload. POST는 보낸 키로 행 전체를 갱신하므로
-// 일부만 보내면 나머지가 null로 지워진다 — 항상 전체를 실어 보낼 것.
-// (단 alertEmail 키는 EF가 "있을 때만" 반영하므로 생략하면 기존 값이 보존된다)
+// EF v12부터 POST는 부분 갱신이다 — body에 담긴 키만 UPDATE된다.
+// 따라서 각 저장 경로는 자기가 실제로 바꾼 값만 보낸다(전체 payload 동봉 금지).
 const ZF_PROFILE_LOAD_FAIL_MSG='조건을 불러오지 못해 저장할 수 없어요. 새로고침해 주세요.';
 
 // 저장 가능 여부. 프로필 조회에 성공한 세션에서만 POST를 허용한다.
@@ -3441,27 +3441,6 @@ function zfCanSaveProfile(msgElId){
     if(el){ el.style.color='#A32D2D'; el.textContent=ZF_PROFILE_LOAD_FAIL_MSG; }
   }
   return false;
-}
-
-function zfPayloadFromCurrentUser(extra){
-  const c=currentUser||{};
-  const asCsv=v=>Array.isArray(v)?v.join(','):(v||'');
-  return Object.assign({
-    marital: c.marital||'',
-    children: c.children!=null?c.children:'',
-    members: c.members!=null?c.members:'',
-    income: c.income||'',
-    assets: c.assets||'',
-    regions: asCsv(c.regions),
-    types: asCsv(c.types),
-    maxDeposit: c.max_deposit!=null?c.max_deposit:'',
-    minRooms: c.min_rooms!=null?c.min_rooms:'',
-    alertOn: c.alert_on===false?'N':'Y',
-    newNoticeAlert: c.new_notice_alert===false?'N':'Y',
-    marketingAlert: c.marketing_alert===true?'Y':'N',
-    theme: c.theme||'light',
-    fontSize: c.font_size||'normal'
-  }, extra||{});
 }
 
 function zfShowSettingsBody(){
@@ -3523,7 +3502,7 @@ async function zfSaveAlertEmail(){
   if(!zfCanSaveProfile('zfAlertEmailMsg')) return;
   msg.style.color='#888';
   msg.textContent='저장 중...';
-  const res=await zfPostProfile(zfPayloadFromCurrentUser({ alertEmail: val }));
+  const res=await zfPostProfile({ alertEmail: val });   // 바꾼 값 하나만
   if(!res.ok){
     msg.style.color='#A32D2D';
     msg.textContent='저장에 실패했어요. 잠시 후 다시 시도해주세요. ('+res.reason+')';
@@ -3651,34 +3630,34 @@ function zfSettingsFormPayload(){
 function setTheme(theme,silent){
   document.body.classList.toggle('theme-dark',theme==='dark');
   document.querySelectorAll('[data-theme]').forEach(c=>c.classList.toggle('sel',c.dataset.theme===theme));
-  if(!silent) onSettingChange();
+  if(!silent) onSettingChange({ theme });
 }
 function setFontSize(size,silent){
   document.body.classList.remove('fs-small','fs-large');
   if(size==='small') document.body.classList.add('fs-small');
   if(size==='large') document.body.classList.add('fs-large');
   document.querySelectorAll('[data-fontsize]').forEach(c=>c.classList.toggle('sel',c.dataset.fontsize===size));
-  if(!silent) onSettingChange();
+  if(!silent) onSettingChange({ fontSize: size });
 }
 
-async function onSettingChange(){
+// 토글·테마·글자크기 자동 저장. 호출자가 "자기가 바꾼 값 하나"만 넘긴다.
+// EF v12는 부분 갱신이므로 나머지 컬럼은 서버에서 그대로 보존된다.
+const ZF_SETTING_TO_COLUMN={
+  alertOn:'alert_on', newNoticeAlert:'new_notice_alert', marketingAlert:'marketing_alert',
+  theme:'theme', fontSize:'font_size'
+};
+async function onSettingChange(patch){
   if(!currentUser) return;
   if(!zfCanSaveProfile('settingsSaveMsg')) return;
-  // 토글만 바뀌는 자동 저장. 나머지 값은 currentUser 기준으로 전체를 함께 실어 보낸다
-  // (일부만 보내면 서버에서 나머지 컬럼이 null로 지워진다).
-  const payload=zfPayloadFromCurrentUser({
-    alertOn: document.getElementById('toggleAlertOn').checked?'Y':'N',
-    newNoticeAlert: document.getElementById('toggleNewNotice').checked?'Y':'N',
-    marketingAlert: document.getElementById('toggleMarketing').checked?'Y':'N',
-    theme: document.querySelector('[data-theme].sel')?.dataset.theme||'light',
-    fontSize: document.querySelector('[data-fontsize].sel')?.dataset.fontsize||'normal'
-  });
-  const res=await zfPostProfile(payload);
+  if(!patch || !Object.keys(patch).length) return;
+  const res=await zfPostProfile(patch);
   if(!res.ok){ console.error('ZipFit 설정 저장 실패:', res.reason); return; }
-  currentUser={...currentUser,
-    alert_on:payload.alertOn==='Y', new_notice_alert:payload.newNoticeAlert==='Y',
-    marketing_alert:payload.marketingAlert==='Y',
-    theme:payload.theme, font_size:payload.fontSize};
+  const merged={...currentUser};
+  for(const [k,v] of Object.entries(patch)){
+    const col=ZF_SETTING_TO_COLUMN[k];
+    if(col) merged[col] = (v==='Y'||v==='N') ? (v==='Y') : v;
+  }
+  currentUser=merged;
 }
 
 async function logoutUser(){
