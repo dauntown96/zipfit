@@ -145,7 +145,7 @@ function mapStatus(shStatus: string): string {
 // 버리지 않고 hidden_from_listing=true로 적재한다 — 수집을 좁히면 되돌릴 수 없고,
 // 향후 발표일 알림 기능에 과거분이 필요하다. RPC의 base CTE가 이 플래그를 걸러낸다.
 const HIDDEN_TYPES = ['상가임대', '용지분양']
-const HIDDEN_TITLE_KEYWORDS = ['당첨자', '예비자 발표', '서류심사', '서류제출', '발표', '연기', '운영기관', '모집 일정']
+const HIDDEN_TITLE_KEYWORDS = ['당첨자', '예비자 발표', '서류심사', '서류제출', '발표', '연기', '운영기관', '모집 일정', '경쟁률']
 
 function isHidden(row: ShRow): boolean {
   if (row.housingType && HIDDEN_TYPES.some(t => row.housingType!.includes(t))) return true
