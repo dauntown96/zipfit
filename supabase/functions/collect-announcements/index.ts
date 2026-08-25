@@ -71,13 +71,100 @@ type EtcInfoItem = { ETC_CTS?: string; CRC_RSN?: string }
 type AhflInfoItem = { AHFL_URL?: string; SL_PAN_AHFL_DS_CD_NM?: string; CMN_AHFL_NM?: string }
 type MyHomeItem = Record<string, string | number | null>
 
-async function fetchNoticeList(): Promise<NoticeItem[]> {
+// 업스트림(apis.data.go.kr)이 간헐적으로 JSON이 아닌 응답을 준다(2026-08-25 조사).
+// 실측된 두 오류는 뿌리가 같다 — 응답이 기대 형식이 아닌데 검증 없이 파싱한 것.
+//   · SyntaxError: Unexpected token '<', "<!DOCTYPE "...  → HTML 페이지가 옴
+//   · TypeError: raw.find is not a function              → JSON이지만 배열이 아님
+// 타입 단언(as)은 런타임에 아무것도 검사하지 않는다. 아래에서 실제로 확인한다.
+type FetchFail = { kind: string; status: number | null; contentType: string | null; snippet: string }
+
+class UpstreamError extends Error {
+  constructor(public readonly info: FetchFail) { super(info.kind) }
+}
+
+// 응답 본문 선두만 남긴다(전문 아님). URL은 절대 남기지 않는다 — ServiceKey가 섞여 들어간다.
+// 다만 일부 오류 페이지는 요청 URL을 본문에 그대로 되비추므로, 본문 쪽에도 방어를 한 겹 둔다.
+const SNIPPET_LEN = 200
+const redactKey = (text: string): string =>
+  text.replace(/(serviceKey|ServiceKey)=[^&\s"'<]*/g, '$1=***')
+const snippetOf = (text: string): string =>
+  redactKey(text).slice(0, SNIPPET_LEN).replace(/\s+/g, ' ').trim()
+
+// JSON 배열을 기대하는 엔드포인트용 공통 페치.
+// 순서: res.ok → Content-Type → text()+JSON.parse → Array.isArray
+async function fetchJsonStrict(url: string, timeoutMs: number): Promise<{ value: unknown; status: number; contentType: string | null }> {
+  let res: Response
+  try {
+    res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) })
+  } catch (e) {
+    // 네트워크 실패·타임아웃. 여기엔 응답 자체가 없다.
+    throw new UpstreamError({ kind: `network:${e instanceof Error ? e.name : 'Error'}`, status: null, contentType: null, snippet: String(e).slice(0, SNIPPET_LEN) })
+  }
+
+  const contentType = res.headers.get('content-type')
+  const text = await res.text().catch(() => '')
+
+  if (!res.ok) {
+    throw new UpstreamError({ kind: 'http_error', status: res.status, contentType, snippet: snippetOf(text) })
+  }
+  if (!/(application|text)\/(json|.*\+json)/i.test(contentType ?? '')) {
+    // HTML 점검·차단 페이지가 여기서 걸린다. JSON.parse를 아예 부르지 않는다.
+    throw new UpstreamError({ kind: 'not_json_content_type', status: res.status, contentType, snippet: snippetOf(text) })
+  }
+
+  try {
+    return { value: JSON.parse(text), status: res.status, contentType }
+  } catch {
+    throw new UpstreamError({ kind: 'json_parse_failed', status: res.status, contentType, snippet: snippetOf(text) })
+  }
+}
+
+// 배열이 아니면 .find를 부르지 않는다. `raw.find is not a function`의 직접 방어.
+function requireArray(parsed: unknown, status: number | null, contentType: string | null): Record<string, unknown>[] {
+  if (!Array.isArray(parsed)) {
+    throw new UpstreamError({
+      kind: 'not_an_array',
+      status,
+      contentType,
+      // 배열이 아닌 응답의 정체(대개 공공데이터포털 오류 봉투)를 남겨야 다음 진단이 추측이 되지 않는다.
+      snippet: snippetOf(JSON.stringify(parsed)),
+    })
+  }
+  return parsed as Record<string, unknown>[]
+}
+
+const describeFail = (where: string, info: FetchFail): string =>
+  `${where}: ${info.kind}` +
+  ` status=${info.status ?? '-'}` +
+  ` ct=${info.contentType ?? '-'}` +
+  ` body="${info.snippet}"`
+
+// 목록 한 페이지를 가져와 dsList까지 뽑아내는 단위.
+// requireArray를 이 안에 두는 것이 중요하다 — 밖에 두면 '배열이 아님'(현재 진행 중인
+// TypeError의 정체)이 재시도 대상에서 빠져 간헐 장애를 한 번도 못 건진다.
+async function fetchListPage(url: string, timeoutMs: number): Promise<NoticeItem[]> {
+  const { value, status, contentType } = await fetchJsonStrict(url, timeoutMs)
+  const raw  = requireArray(value, status, contentType)
+  const body = raw.find(c => Array.isArray(c['dsList']))
+  return (body?.['dsList'] as NoticeItem[]) ?? []
+}
+
+// 목록 fetch 타임아웃. 상세조회 기본값(5초)보다 넉넉하되 20분 cron 주기를 위협하지 않는 값.
+// 근거: 목록은 카테고리 3종 × 페이지 루프라 최악의 경우 호출 수가 누적된다. 실측상 정상
+// 실행 전체가 37.8초(평균)~55.8초(최대)이고 목록 구간은 그중 일부다. 12초 × 재시도 1회는
+// 한 페이지 최대 24초로, 전 페이지가 동시에 최악이 되는 경우가 아니면 기존 실행시간 범위를
+// 크게 벗어나지 않는다. 무제한(현행)이 유일하게 위험한 선택이었다.
+const LIST_TIMEOUT_MS = 12000
+const LIST_RETRY_DELAY_MS = 1500
+
+async function fetchNoticeList(): Promise<{ items: NoticeItem[]; failures: string[] }> {
   const today  = new Date()
   const past   = new Date(today); past.setDate(today.getDate() - 90)
   const future = new Date(today); future.setDate(today.getDate() + 365)
   const fmt    = (d: Date) =>
     `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`
   const all: NoticeItem[] = []
+  const failures: string[] = []
   // 2026-07-13 추가 실측 확인(다운님 제보): 카테고리 39는 "공공분양(매매)"과 "행복주택(임대)"이
   // 뒤섞여 있음 — AIS_TP_CD_NM에 "분양"이 포함되면 매매 확정, 아니면(행복주택 등) 임대로 정상 수집.
   for (const tp of ['06','13','39']) {
@@ -87,9 +174,31 @@ async function fetchNoticeList(): Promise<NoticeItem[]> {
         `?ServiceKey=${LH_API_KEY}&PG_SZ=100&PAGE=${page}&UPP_AIS_TP_CD=${tp}` +
         `&PAN_ST_DT=${fmt(past)}&PAN_ED_DT=${fmt(today)}` +
         `&CLSG_ST_DT=${fmt(past)}&CLSG_ED_DT=${fmt(future)}`
-      const raw  = await (await fetch(url)).json() as Record<string,unknown>[]
-      const body = raw.find(c => Array.isArray(c['dsList']))
-      const rawItems = (body?.['dsList'] as NoticeItem[]) ?? []
+
+      // 페이지 단위로 실패를 가둔다. 예외가 이 루프 밖으로 나가면 카테고리 3종이 통째로
+      // 죽어 lh_fetched가 항상 0이 됐다(2026-08-25 조사). 이제 실패는 그 카테고리만 중단한다.
+      let rawItems: NoticeItem[]
+      try {
+        // 간헐 장애이므로 짧은 대기 후 1회만 재시도한다. 과한 재시도는 20분 주기를
+        // 위협하고 게이트웨이 부담만 키운다.
+        let lastInfo: FetchFail | null = null
+        try {
+          rawItems = await fetchListPage(url, LIST_TIMEOUT_MS)
+        } catch (e1) {
+          if (!(e1 instanceof UpstreamError)) throw e1
+          lastInfo = e1.info
+          await new Promise((r: (v: unknown) => void) => setTimeout(r, LIST_RETRY_DELAY_MS))
+          rawItems = await fetchListPage(url, LIST_TIMEOUT_MS)
+        }
+        if (lastInfo) console.log(`[LH] tp=${tp} p=${page} 재시도로 복구 (1차: ${lastInfo.kind})`)
+      } catch (e) {
+        const info: FetchFail = e instanceof UpstreamError
+          ? e.info
+          : { kind: `unexpected:${e instanceof Error ? e.name : 'Error'}`, status: null, contentType: null, snippet: String(e).slice(0, SNIPPET_LEN) }
+        failures.push(describeFail(`LH 목록 tp=${tp} page=${page}`, info))
+        break   // 이 카테고리만 중단. 다음 카테고리는 그대로 시도하고, 이미 모은 all은 유지한다.
+      }
+
       const items = tp === '39' ? rawItems.filter(i => !(i.AIS_TP_CD_NM ?? '').includes('분양')) : rawItems
       all.push(...items)
       if (rawItems.length < 100) break
@@ -97,7 +206,8 @@ async function fetchNoticeList(): Promise<NoticeItem[]> {
     }
   }
   const seen = new Set<string>()
-  return all.filter(i => { if (!i.PAN_ID || seen.has(i.PAN_ID)) return false; seen.add(i.PAN_ID); return true })
+  const deduped = all.filter(i => { if (!i.PAN_ID || seen.has(i.PAN_ID)) return false; seen.add(i.PAN_ID); return true })
+  return { items: deduped, failures }
 }
 
 async function fetchDetailWithTimeout(item: NoticeItem, timeoutMs: number): Promise<{ sbd: SbdItem | null; scdl: SplScdlItem | null; etcInfo: EtcInfoItem | null; ahflInfo: AhflInfoItem[] | null }> {
@@ -174,29 +284,40 @@ function mapLHRow(item: NoticeItem, sbd: SbdItem | null, scdl: SplScdlItem | nul
   }
 }
 
-async function fetchMyHome(): Promise<MyHomeItem[]> {
+// 2026-08-25: 여기서 실패해도 errors에 아무것도 남지 않아(console.error + break),
+// LH·MYHOME이 동시에 죽은 장애를 "LH 단독 문제"로 오진했다. 이제 errors에 남긴다.
+const MYHOME_TIMEOUT_MS = 15000
+
+async function fetchMyHome(): Promise<{ items: MyHomeItem[]; failures: string[] }> {
   const all: MyHomeItem[] = []
+  const failures: string[] = []
   let totalCount = 0
   let page = 1
   while (true) {
     const url = `https://apis.data.go.kr/1613000/HWSPR02/rsdtRcritNtcList` +
       `?serviceKey=${LH_API_KEY}&numOfRows=100&pageNo=${page}&type=json`
     try {
-      const res  = await fetch(url, { signal: AbortSignal.timeout(15000) })
-      const raw  = await res.json()
+      // LH 목록과 같은 검증 경로를 쓴다(상태코드·Content-Type·본문 선두).
+      // 단 이 엔드포인트는 배열이 아니라 객체를 주므로 requireArray는 부르지 않는다.
+      const { value } = await fetchJsonStrict(url, MYHOME_TIMEOUT_MS)
+      const raw = value as { response?: { body?: { totalCount?: unknown; item?: unknown } } }
       if (page === 1) totalCount = parseInt(String(raw?.response?.body?.totalCount ?? 0))
       const itemsRaw = raw?.response?.body?.item
-      const items: MyHomeItem[] = Array.isArray(itemsRaw) ? itemsRaw : itemsRaw ? [itemsRaw] : []
+      const items: MyHomeItem[] = Array.isArray(itemsRaw) ? itemsRaw : itemsRaw ? [itemsRaw as MyHomeItem] : []
       all.push(...items)
       if (items.length < 100) break
       page++; if (page > 20) break
     } catch(e) {
-      console.error(`MYHOME page${page} 오류:`, e)
+      const info: FetchFail = e instanceof UpstreamError
+        ? e.info
+        : { kind: `unexpected:${e instanceof Error ? e.name : 'Error'}`, status: null, contentType: null, snippet: String(e).slice(0, SNIPPET_LEN) }
+      failures.push(describeFail(`MYHOME 목록 page=${page}`, info))
+      console.error(`MYHOME page${page} 오류: ${info.kind}`)
       break
     }
   }
   console.log(`[MYHOME] totalCount=${totalCount} collected=${all.length}`)
-  return all
+  return { items: all, failures }
 }
 
 function mapMyHomeRow(it: MyHomeItem) {
@@ -263,10 +384,14 @@ async function collect() {
 
   let lhNotices: NoticeItem[] = []
   try {
-    lhNotices = await fetchNoticeList()
-    console.log(`[LH] 목록 ${lhNotices.length}건`)
+    // 부분 실패를 견딘다. 카테고리 3종 중 하나만 성공해도 그만큼은 수집되고,
+    // 전부 실패했을 때만 빈 배열이 된다.
+    const listed = await fetchNoticeList()
+    lhNotices = listed.items
+    errors.push(...listed.failures)
+    console.log(`[LH] 목록 ${lhNotices.length}건 (실패 ${listed.failures.length}건)`)
   } catch(e) {
-    errors.push(`LH 목록: ${e}`)
+    errors.push(`LH 목록(예상치 못한 오류): ${e}`)
   }
 
   const lhBaseRows = lhNotices.map(n => mapLHRow(n, null, null, null)).filter(r => r.announcement_id && r.title)
@@ -406,7 +531,9 @@ async function collect() {
   let mhFetched  = 0
   let mhDedupMerged = 0
   try {
-    const mhItems = await fetchMyHome()
+    const fetchedMh = await fetchMyHome()
+    const mhItems = fetchedMh.items
+    errors.push(...fetchedMh.failures)
     mhFetched = mhItems.length
     const mhRowsRaw = mhItems.map(mapMyHomeRow).filter(r => r.announcement_id && r.title)
 
