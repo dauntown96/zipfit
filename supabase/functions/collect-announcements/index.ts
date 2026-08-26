@@ -149,15 +149,19 @@ async function fetchListPage(url: string, timeoutMs: number): Promise<NoticeItem
   return (body?.['dsList'] as NoticeItem[]) ?? []
 }
 
-// 목록 fetch 타임아웃. 상세조회 기본값(5초)보다 넉넉하되 20분 cron 주기를 위협하지 않는 값.
-// 근거: 목록은 카테고리 3종 × 페이지 루프라 최악의 경우 호출 수가 누적된다. 실측상 정상
-// 실행 전체가 37.8초(평균)~55.8초(최대)이고 목록 구간은 그중 일부다. 12초 × 재시도 1회는
-// 한 페이지 최대 24초로, 전 페이지가 동시에 최악이 되는 경우가 아니면 기존 실행시간 범위를
-// 크게 벗어나지 않는다. 무제한(현행)이 유일하게 위험한 선택이었다.
+// 목록 fetch 타임아웃 — 12초 유지(줄이지도 늘리지도 않는다).
+// 근거(2026-08-26 실측): 실패 시 포털이 돌려주는 504 SERVICETIMEOUT_ERROR는 콜당
+// 5.9~6.8초에 도착한다(실패 실행 6회 duration에서 역산). 즉 타임아웃이 발동하기 전에
+// 응답이 오므로 12초를 8초로 줄여도 이 장애에서는 1초도 아끼지 못한다. 반대로 6초 밑으로
+// 내리면 504가 도착하기 직전에 우리가 먼저 끊어 `http_error status=504 body=...`라는
+// 진단 정보를 `network:TimeoutError`로 잃는다. 정상 응답은 훨씬 빨리 오지만(정상 실행
+// 전체가 33~35초), 업스트림이 건강한데도 느린 경우가 실재하므로(상세조회 43초 사례)
+// 상한 자체는 여유를 남긴다.
 const LIST_TIMEOUT_MS = 12000
-const LIST_RETRY_DELAY_MS = 1500
 
-async function fetchNoticeList(): Promise<{ items: NoticeItem[]; failures: string[] }> {
+// 카테고리를 인자로 받는다 — 후반 재시도에서 실패한 카테고리만 다시 부르기 위해서다.
+// 반환의 failedTps가 그 대상이 된다.
+async function fetchNoticeList(tps: string[]): Promise<{ items: NoticeItem[]; failures: string[]; failedTps: string[] }> {
   const today  = new Date()
   const past   = new Date(today); past.setDate(today.getDate() - 90)
   const future = new Date(today); future.setDate(today.getDate() + 365)
@@ -165,9 +169,10 @@ async function fetchNoticeList(): Promise<{ items: NoticeItem[]; failures: strin
     `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`
   const all: NoticeItem[] = []
   const failures: string[] = []
+  const failedTps: string[] = []
   // 2026-07-13 추가 실측 확인(다운님 제보): 카테고리 39는 "공공분양(매매)"과 "행복주택(임대)"이
   // 뒤섞여 있음 — AIS_TP_CD_NM에 "분양"이 포함되면 매매 확정, 아니면(행복주택 등) 임대로 정상 수집.
-  for (const tp of ['06','13','39']) {
+  for (const tp of tps) {
     let page = 1
     while (true) {
       const url = `https://apis.data.go.kr/B552555/lhLeaseNoticeInfo1/lhLeaseNoticeInfo1` +
@@ -177,25 +182,20 @@ async function fetchNoticeList(): Promise<{ items: NoticeItem[]; failures: strin
 
       // 페이지 단위로 실패를 가둔다. 예외가 이 루프 밖으로 나가면 카테고리 3종이 통째로
       // 죽어 lh_fetched가 항상 0이 됐다(2026-08-25 조사). 이제 실패는 그 카테고리만 중단한다.
+      //
+      // 2026-08-26: 여기 있던 "1.5초 대기 후 즉시 1회 재시도"를 제거했다. 실측상 성공 0건이고
+      // (실패 6회 전부 카테고리당 오류 1건 = page=1에서 재시도까지 실패), 실패 실행 시간만
+      // 늘렸다. 같은 게이트웨이가 몇 초 안에 회복될 확률이 낮기 때문이다. 재시도는 실행
+      // 후반으로 옮겼다(collect()의 후반 재시도 블록).
       let rawItems: NoticeItem[]
       try {
-        // 간헐 장애이므로 짧은 대기 후 1회만 재시도한다. 과한 재시도는 20분 주기를
-        // 위협하고 게이트웨이 부담만 키운다.
-        let lastInfo: FetchFail | null = null
-        try {
-          rawItems = await fetchListPage(url, LIST_TIMEOUT_MS)
-        } catch (e1) {
-          if (!(e1 instanceof UpstreamError)) throw e1
-          lastInfo = e1.info
-          await new Promise((r: (v: unknown) => void) => setTimeout(r, LIST_RETRY_DELAY_MS))
-          rawItems = await fetchListPage(url, LIST_TIMEOUT_MS)
-        }
-        if (lastInfo) console.log(`[LH] tp=${tp} p=${page} 재시도로 복구 (1차: ${lastInfo.kind})`)
+        rawItems = await fetchListPage(url, LIST_TIMEOUT_MS)
       } catch (e) {
         const info: FetchFail = e instanceof UpstreamError
           ? e.info
           : { kind: `unexpected:${e instanceof Error ? e.name : 'Error'}`, status: null, contentType: null, snippet: String(e).slice(0, SNIPPET_LEN) }
         failures.push(describeFail(`LH 목록 tp=${tp} page=${page}`, info))
+        failedTps.push(tp)
         break   // 이 카테고리만 중단. 다음 카테고리는 그대로 시도하고, 이미 모은 all은 유지한다.
       }
 
@@ -207,7 +207,7 @@ async function fetchNoticeList(): Promise<{ items: NoticeItem[]; failures: strin
   }
   const seen = new Set<string>()
   const deduped = all.filter(i => { if (!i.PAN_ID || seen.has(i.PAN_ID)) return false; seen.add(i.PAN_ID); return true })
-  return { items: deduped, failures }
+  return { items: deduped, failures, failedTps }
 }
 
 async function fetchDetailWithTimeout(item: NoticeItem, timeoutMs: number): Promise<{ sbd: SbdItem | null; scdl: SplScdlItem | null; etcInfo: EtcInfoItem | null; ahflInfo: AhflInfoItem[] | null }> {
@@ -288,9 +288,10 @@ function mapLHRow(item: NoticeItem, sbd: SbdItem | null, scdl: SplScdlItem | nul
 // LH·MYHOME이 동시에 죽은 장애를 "LH 단독 문제"로 오진했다. 이제 errors에 남긴다.
 const MYHOME_TIMEOUT_MS = 15000
 
-async function fetchMyHome(): Promise<{ items: MyHomeItem[]; failures: string[] }> {
+async function fetchMyHome(): Promise<{ items: MyHomeItem[]; failures: string[]; failed: boolean }> {
   const all: MyHomeItem[] = []
   const failures: string[] = []
+  let failed = false
   let totalCount = 0
   let page = 1
   while (true) {
@@ -313,11 +314,12 @@ async function fetchMyHome(): Promise<{ items: MyHomeItem[]; failures: string[] 
         : { kind: `unexpected:${e instanceof Error ? e.name : 'Error'}`, status: null, contentType: null, snippet: String(e).slice(0, SNIPPET_LEN) }
       failures.push(describeFail(`MYHOME 목록 page=${page}`, info))
       console.error(`MYHOME page${page} 오류: ${info.kind}`)
+      failed = true
       break
     }
   }
   console.log(`[MYHOME] totalCount=${totalCount} collected=${all.length}`)
-  return { items: all, failures }
+  return { items: all, failures, failed }
 }
 
 function mapMyHomeRow(it: MyHomeItem) {
@@ -382,12 +384,15 @@ async function collect() {
   const startedAt = Date.now()
   const errors: string[] = []
 
+  const LH_CATEGORIES = ['06','13','39']
   let lhNotices: NoticeItem[] = []
+  let failedTps: string[] = []
   try {
     // 부분 실패를 견딘다. 카테고리 3종 중 하나만 성공해도 그만큼은 수집되고,
     // 전부 실패했을 때만 빈 배열이 된다.
-    const listed = await fetchNoticeList()
+    const listed = await fetchNoticeList(LH_CATEGORIES)
     lhNotices = listed.items
+    failedTps = listed.failedTps
     errors.push(...listed.failures)
     console.log(`[LH] 목록 ${lhNotices.length}건 (실패 ${listed.failures.length}건)`)
   } catch(e) {
@@ -530,10 +535,12 @@ async function collect() {
   let mhUpserted = 0
   let mhFetched  = 0
   let mhDedupMerged = 0
+  let mhFailed = false
   try {
     const fetchedMh = await fetchMyHome()
     const mhItems = fetchedMh.items
     errors.push(...fetchedMh.failures)
+    mhFailed = fetchedMh.failed
     mhFetched = mhItems.length
     const mhRowsRaw = mhItems.map(mapMyHomeRow).filter(r => r.announcement_id && r.title)
 
@@ -553,6 +560,79 @@ async function collect() {
     console.log(`[MYHOME] upsert ${mhUpserted}건`)
   } catch(e) {
     errors.push(`MYHOME: ${e}`)
+  }
+
+  // ── 실행 후반 재시도 (2026-08-26 신설) ─────────────────────────────
+  // 종전엔 실패한 자리에서 1.5초 뒤 즉시 재시도했다. 실측 성공 0건이었고, 같은
+  // 게이트웨이가 몇 초 만에 회복될 확률이 낮기 때문이다. 그래서 재시도를 여기로 옮긴다 —
+  // MYHOME 수집·상세조회 등 다른 작업을 먼저 끝낸 뒤, 실패한 경로만 한 번 더 부른다.
+  //
+  // 🔴 재시도는 1회뿐이다. 여기서 또 실패하면 포기하고 20분 뒤 정기 실행에 맡긴다
+  // (7일 실측상 실패 72회 중 40회(56%)가 다음 회차에 바로 복구된 고립 실패였다).
+  //
+  // ⚠️ LH를 건져도 상세조회(dsSbd/dsSplScdl)는 여기서 하지 않는다. 90건 상세조회는
+  // 실행 시간을 크게 늘려 20분 주기를 위협한다. 목록만 upsert해두면 apply_start가 NULL로
+  // 남고, 기존 nullApplyStartIds 우선순위 로직이 다음 회차에 그것들을 먼저 상세조회한다.
+  const LATE_RETRY_BUDGET_MS = 70000
+  let lateRetryLhOk = 0
+  let lateRetryMhOk = 0
+  const needLateRetry = failedTps.length > 0 || mhFailed
+
+  if (needLateRetry && (Date.now() - startedAt) >= LATE_RETRY_BUDGET_MS) {
+    errors.push(`late_retry: 시간 예산(${LATE_RETRY_BUDGET_MS}ms) 초과로 건너뜀`)
+  } else if (needLateRetry) {
+    const notes: string[] = []
+
+    if (failedTps.length > 0) {
+      try {
+        const again = await fetchNoticeList(failedTps)
+        const rows = again.items.map(n => mapLHRow(n, null, null, null)).filter(r => r.announcement_id && r.title)
+        for (let i = 0; i < rows.length; i += 50) {
+          const { data, error } = await supabase.from('announcements')
+            .upsert(rows.slice(i, i+50), { onConflict: 'source,announcement_id', ignoreDuplicates: false })
+            .select('id')
+          if (error) errors.push(`late_retry LH upsert[${i}]: ${error.message}`)
+          else lhUpserted += data?.length ?? 0
+        }
+        lateRetryLhOk = again.items.length
+        lhNotices = lhNotices.concat(again.items)
+        const recovered = failedTps.filter(tp => !again.failedTps.includes(tp))
+        notes.push(`LH ${recovered.length}/${failedTps.length}개 카테고리 복구(${lateRetryLhOk}건)`)
+      } catch(e) {
+        notes.push(`LH 재시도 예외: ${e}`)
+      }
+    }
+
+    if (mhFailed) {
+      try {
+        const againMh = await fetchMyHome()
+        if (!againMh.failed) {
+          const rowsRaw = againMh.items.map(mapMyHomeRow).filter(r => r.announcement_id && r.title)
+          const m = new Map<string, ReturnType<typeof mapMyHomeRow>>()
+          for (const row of rowsRaw) m.set(row.announcement_id, row)
+          const rows = Array.from(m.values())
+          for (let i = 0; i < rows.length; i += 50) {
+            const { data, error } = await supabase.from('announcements')
+              .upsert(rows.slice(i, i+50), { onConflict: 'source,announcement_id', ignoreDuplicates: false })
+              .select('id')
+            if (error) errors.push(`late_retry MYHOME upsert[${i}]: ${error.message}`)
+            else mhUpserted += data?.length ?? 0
+          }
+          lateRetryMhOk = againMh.items.length
+          mhFetched += againMh.items.length
+          notes.push(`MYHOME 복구(${lateRetryMhOk}건)`)
+        } else {
+          notes.push('MYHOME 재시도 실패')
+        }
+      } catch(e) {
+        notes.push(`MYHOME 재시도 예외: ${e}`)
+      }
+    }
+
+    // 전용 컬럼이 없으므로 errors에 남긴다(스키마 변경은 이번 범위 밖).
+    // 이 방식이 효과가 있는지 판정할 유일한 근거이므로, 성공/실패 양쪽 다 남긴다.
+    errors.push(`late_retry: ${notes.join(' / ')}`)
+    console.log(`[LATE_RETRY] ${notes.join(' / ')}`)
   }
 
   const expired = await markExpired()
@@ -577,8 +657,8 @@ async function collect() {
   }
 
   return {
-    lh:     { fetched: lhNotices.length, detail_ok: lhDetailOk, upserted: lhUpserted, slow_retry_ok: slowRetryOk },
-    myhome: { fetched: mhFetched, upserted: mhUpserted, dedup_merged: mhDedupMerged },
+    lh:     { fetched: lhNotices.length, detail_ok: lhDetailOk, upserted: lhUpserted, slow_retry_ok: slowRetryOk, late_retry_ok: lateRetryLhOk },
+    myhome: { fetched: mhFetched, upserted: mhUpserted, dedup_merged: mhDedupMerged, late_retry_ok: lateRetryMhOk },
     expired,
     errors,
   }
