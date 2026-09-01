@@ -904,6 +904,44 @@ function refreshChipSel(wrapId, activeVal){
 
 // 공고 검색 — 클라이언트사이드 필터링(현재 로드된 noticeData 대상).
 // 서버사이드 검색으로 전환 시 이 함수만 API 호출로 교체하면 되도록 입출력을 순수 함수로 분리.
+// ── 행정구역 개편 신·구 명칭 대조표 ──────────────────────────────
+// 2026-07-01 개편으로 DB에 신·구 명칭이 공존한다(수집 시점에 따라 원본 API가 다르게 준다).
+// 어느 쪽으로 검색해도 나오도록, "행의 검색 텍스트에 옛/새 이름을 덧붙이는" 방식으로 푼다.
+// 🔴 쿼리를 넓히지 않고 행을 넓히는 이유: 「서구」는 5개 시·도, 「중구」는 6개 시·도에
+//    실재한다(실측). 전역 치환을 하면 서울 중구를 찾는 사람에게 인천 제물포구가 뜬다.
+//    그래서 자치구 대조표는 반드시 해당 시·도의 행에만 적용한다.
+// ⚠️ 확인된 것만 넣는다. 추측 매핑은 없는 것보다 나쁘다.
+const ZF_SIGUNGU_ALIASES = {
+  // 인천 2026-07-01 개편: 중구·동구 → 제물포구·영종구 / 서구 → 서해구·검단구
+  '인천광역시': {
+    '서구':     ['서해구','검단구'],
+    '서해구':   ['서구'],
+    '검단구':   ['서구'],
+    '중구':     ['제물포구','영종구'],
+    '동구':     ['제물포구'],
+    '제물포구': ['중구','동구'],
+    '영종구':   ['중구']
+  }
+};
+// 시·도 통합 명칭. 수집 EF의 MERGED_SIDO_MAP과 같은 근거다.
+// (대전·충남은 통합 미법제화라 대상이 아니다.)
+const ZF_SIDO_ALIASES = {
+  '전남광주통합특별시': ['광주광역시','전라남도'],
+  '강원특별자치도':     ['강원도']
+};
+
+// 이 행이 검색으로 잡혀야 하는 추가 지역 표기들.
+function zfRegionAliases(sido, sigungu){
+  const out=[];
+  const sd=(sido||'').trim(), sg=(sigungu||'').trim();
+  if(sd && ZF_SIDO_ALIASES[sd]) out.push(...ZF_SIDO_ALIASES[sd]);
+  if(sd && sg){
+    const table=ZF_SIGUNGU_ALIASES[sd];
+    if(table && table[sg]) out.push(...table[sg]);
+  }
+  return out;
+}
+
 function searchFilterNotices(list, query, scope){
   const q = (query || '').trim().toLowerCase();
   if(!q) return list;
@@ -914,6 +952,7 @@ function searchFilterNotices(list, query, scope){
     const titleMatch = title.includes(q) || buildingName.includes(q);
     if(scope === 'title') return titleMatch;
     const regionText = [n['지역'], n['sido_nm'], n['sigungu_nm'], n['precise_address']]
+      .concat(zfRegionAliases(n['sido_nm'], n['sigungu_nm']))
       .filter(Boolean).join(' ').toLowerCase();
     if(scope === 'title-region') return titleMatch || regionText.includes(q);
     // scope === 'all': 제목+지역+공급기관+주택유형+공급형태
