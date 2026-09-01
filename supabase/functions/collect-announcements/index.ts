@@ -432,13 +432,42 @@ async function collect() {
     errors.push(`상세조회 우선순위 조회: ${e}`)
   }
 
-  const needDetail = [...activeNotices]
+  // 정정사유(CRC_RSN)는 목록이 아니라 상세조회(dsEtcInfo) 산물이라, 처음 수집될 때 이미 마감이던
+  // 정정공고는 위 활성 게이트에 걸려 상세조회를 단 한 번도 시도하지 않는다(2026-08-31 조사: 142건).
+  // 그래서 "정정 + 사유 없음 + 시도 이력 없음"인 건에 한해 마감이어도 대상에 넣는다.
+  // detail_fetch_last_attempt 조건이 핵심 — 성공이든 실패든 시도하면 기록되므로(성공: 상세 upsert,
+  // 실패: bump_detail_fetch_fail) 매 회차 같은 건을 무한 재시도하지 않는다.
+  const revisionBackfillIds = new Set<string>()
+  try {
+    const { data: pending } = await supabase.from('announcements')
+      .select('announcement_id')
+      .eq('source', 'LH')
+      .eq('is_revised', true)
+      .is('revision_note', null)
+      .is('detail_fetch_last_attempt', null)
+    for (const r of (pending ?? [])) revisionBackfillIds.add(r.announcement_id as string)
+  } catch(e) {
+    errors.push(`정정사유 보강 대상 조회: ${e}`)
+  }
+
+  const activeIdSet = new Set(activeNotices.map(n => n.PAN_ID))
+  const revisionBackfillNotices = lhNotices.filter(
+    n => !activeIdSet.has(n.PAN_ID) && revisionBackfillIds.has(n.PAN_ID)
+  )
+
+  // 캡은 종전대로 90건 하나이며, 활성 공고가 항상 앞에 온다 — 보강분은 남는 자리만 쓰므로
+  // 활성 공고의 상세조회가 보강분에 밀리지 않는다(실측 활성 80건 < 90).
+  const needDetail = [...activeNotices, ...revisionBackfillNotices]
     .sort((a, b) => {
+      const aBackfill = activeIdSet.has(a.PAN_ID) ? 0 : 1
+      const bBackfill = activeIdSet.has(b.PAN_ID) ? 0 : 1
+      if (aBackfill !== bBackfill) return aBackfill - bBackfill
       const aNull = nullApplyStartIds.has(a.PAN_ID) ? 0 : 1
       const bNull = nullApplyStartIds.has(b.PAN_ID) ? 0 : 1
       return aNull - bNull
     })
     .slice(0, 90)
+  console.log(`[LH] 상세대상 ${needDetail.length}건 (활성 ${activeNotices.length}, 정정보강 후보 ${revisionBackfillNotices.length})`)
 
   let lhDetailOk = 0
   const detailRows: ReturnType<typeof mapLHRow>[] = []

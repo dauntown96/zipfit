@@ -1237,7 +1237,7 @@ function renderNoticeList(filtered, totalCount){
         </div>`
       : `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px" onclick="event.stopPropagation()"><div style="display:flex;gap:8px;flex-wrap:wrap">${n['공고URL']?`<a class="detail-link" href="${n['공고URL']}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a>`:''} ${shareBtn} ${saveBtn}</div></div>`;
 
-    html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n['지역']||'').replace(/"/g,'&quot;')}" data-sido="${(n['sido_nm']||'').replace(/"/g,'&quot;')}" data-sigungu="${(n['sigungu_nm']||'').replace(/"/g,'&quot;')}" data-title="${(n['공고명']||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" data-housing-type="${(n['공급유형']||'').replace(/"/g,'&quot;')}" data-precise-address="${(n['precise_address']||'').replace(/"/g,'&quot;')}" data-relaxed="${n['is_relaxed_recruitment']===true?'1':''}" data-relaxation-detail="${(n['relaxation_detail']||'').replace(/"/g,'&quot;')}" data-contract-verify="${n['contract_before_verification']===true?'1':''}" data-rent-exempt-until="${(n['rent_exemption_until']||'').replace(/"/g,'&quot;')}" data-rent-exempt-note="${(n['rent_exemption_note']||'').replace(/"/g,'&quot;')}" data-revision-note-full="${revisionNoteEsc}" data-special-notes="${n['special_notes']?JSON.stringify(n['special_notes']).replace(/"/g,'&quot;'):''}" data-apply-start="${(n['apply_start']||'').replace(/"/g,'&quot;')}" data-apply-end="${(n['apply_end']||'').replace(/"/g,'&quot;')}" data-announcement-date="${(n['announcement_date']||'').replace(/"/g,'&quot;')}" data-doc-submit-announce="${(n['doc_submit_announce_date']||'').replace(/"/g,'&quot;')}" data-doc-submit-start="${(n['doc_submit_start']||'').replace(/"/g,'&quot;')}" data-doc-submit-end="${(n['doc_submit_end']||'').replace(/"/g,'&quot;')}" data-winner-announce="${(n['winner_announce_date']||'').replace(/"/g,'&quot;')}" data-contract-start="${(n['contract_start']||'').replace(/"/g,'&quot;')}" data-contract-end="${(n['contract_end']||'').replace(/"/g,'&quot;')}" data-attachment-urls="${n['attachment_urls']?JSON.stringify(n['attachment_urls']).replace(/"/g,'&quot;'):''}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this)" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
+    html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n['지역']||'').replace(/"/g,'&quot;')}" data-sido="${(n['sido_nm']||'').replace(/"/g,'&quot;')}" data-sigungu="${(n['sigungu_nm']||'').replace(/"/g,'&quot;')}" data-title="${(n['공고명']||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" data-housing-type="${(n['공급유형']||'').replace(/"/g,'&quot;')}" data-precise-address="${(n['precise_address']||'').replace(/"/g,'&quot;')}" data-relaxed="${n['is_relaxed_recruitment']===true?'1':''}" data-relaxation-detail="${(n['relaxation_detail']||'').replace(/"/g,'&quot;')}" data-contract-verify="${n['contract_before_verification']===true?'1':''}" data-rent-exempt-until="${(n['rent_exemption_until']||'').replace(/"/g,'&quot;')}" data-rent-exempt-note="${(n['rent_exemption_note']||'').replace(/"/g,'&quot;')}" data-revised="${isAmended?'1':''}" data-revision-note-full="${revisionNoteEsc}" data-special-notes="${n['special_notes']?JSON.stringify(n['special_notes']).replace(/"/g,'&quot;'):''}" data-apply-start="${(n['apply_start']||'').replace(/"/g,'&quot;')}" data-apply-end="${(n['apply_end']||'').replace(/"/g,'&quot;')}" data-announcement-date="${(n['announcement_date']||'').replace(/"/g,'&quot;')}" data-doc-submit-announce="${(n['doc_submit_announce_date']||'').replace(/"/g,'&quot;')}" data-doc-submit-start="${(n['doc_submit_start']||'').replace(/"/g,'&quot;')}" data-doc-submit-end="${(n['doc_submit_end']||'').replace(/"/g,'&quot;')}" data-winner-announce="${(n['winner_announce_date']||'').replace(/"/g,'&quot;')}" data-contract-start="${(n['contract_start']||'').replace(/"/g,'&quot;')}" data-contract-end="${(n['contract_end']||'').replace(/"/g,'&quot;')}" data-attachment-urls="${n['attachment_urls']?JSON.stringify(n['attachment_urls']).replace(/"/g,'&quot;'):''}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this)" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
       <div class="htop">
         <p class="hname">${normalizeRevisedTitle(n['공고명'])||'(공고명 없음)'}</p>
         <span class="htag ${isClosed?'tag-mix':'tag-apt'}">${n['처리상태']||'-'}</span>
@@ -2094,6 +2094,10 @@ function toggleDetail(id, card){
     const annId = cardEl.dataset.announcementId || '';
     loadPreciseEligibility(annId, detailEl, id, true);
   }
+  if(!open && !detailEl.dataset.revisionNoteLoaded && cardEl){
+    detailEl.dataset.revisionNoteLoaded = '1';
+    loadGroupRevisionNote(cardEl, id);
+  }
 }
 
 function escapeHtml(s){
@@ -2177,6 +2181,84 @@ function renderSpecialNotes(cardEl, id){
   wrap.innerHTML = `<summary class="policy-title">⚠️ 특이사항 안내</summary>` + items.join('');
   const slot = document.getElementById('notes-slot-'+id);
   if(slot) slot.appendChild(wrap);
+}
+
+// 사유가 그룹 어디에도 없을 때의 안내(배지는 유지한다 — 정정된 사실 자체는 유효한 정보다).
+const REVISION_NOTE_ABSENT_MSG = '정정된 공고이지만 정정 사유가 제공되지 않았어요. 공고문 원문을 확인해 주세요.';
+
+// 「특이사항 안내」 섹션에 항목을 나중에 덧붙인다. 섹션이 아직 없으면(=동기 렌더링 시점에
+// 표시할 특이사항이 하나도 없었던 경우) 이 시점에 만들어 슬롯에 붙인다.
+function appendSpecialNoteItem(id, itemHtml){
+  const slot = document.getElementById('notes-slot-'+id);
+  if(!slot) return;
+  let wrap = slot.querySelector('details.policy-wrap');
+  if(!wrap){
+    wrap = document.createElement('details');
+    wrap.className = 'policy-wrap';
+    wrap.innerHTML = `<summary class="policy-title">⚠️ 특이사항 안내</summary>`;
+    slot.appendChild(wrap);
+  }
+  wrap.insertAdjacentHTML('beforeend', itemHtml);
+}
+
+// get_announcement_group_ids()는 제목의 [정정공고] 접두어를 떼고 그룹키를 만들어 같은 공고의
+// LH·MYHOME 행을 함께 반환하는데, 화면은 winner 행의 revision_note만 읽는다. winner가 MYHOME이면
+// (MYHOME엔 사유 저장 경로 자체가 없어) 비어 있고, 정작 형제인 LH 행에는 사유가 있다.
+// 그래서 카드 상세를 열 때 그룹 전체에서 사유가 있는 행을 찾아 표시한다(데이터는 만들지 않는다).
+// 우선순위: user_verified(다운님 수기 검증분) > LH > revised_at 최신.
+function pickGroupRevisionNote(rows){
+  const withNote = (rows||[]).filter(r => r && typeof r.revision_note === 'string' && r.revision_note.trim());
+  if(withNote.length === 0) return null;
+  withNote.sort((a,b) => {
+    const uv = (r => r.revised_at_source === 'user_verified' ? 0 : 1);
+    if(uv(a) !== uv(b)) return uv(a) - uv(b);
+    const lh = (r => r.source === 'LH' ? 0 : 1);
+    if(lh(a) !== lh(b)) return lh(a) - lh(b);
+    return String(b.revised_at||'').localeCompare(String(a.revised_at||''));
+  });
+  return withNote[0].revision_note.trim();
+}
+
+function loadGroupRevisionNote(cardEl, id){
+  if(cardEl.dataset.revised !== '1') return;
+  // winner 행에 이미 사유가 있으면 renderSpecialNotes가 동기 렌더링을 마쳤다 — 중복 표시 금지.
+  if(cardEl.dataset.revisionNoteFull) return;
+  const annId = cardEl.dataset.announcementId || '';
+  if(!annId){ appendSpecialNoteItem(id, revisionNoteItemHtml(null)); return; }
+  resolveAnnouncementIds(annId, true).then(ids => fetch(
+    `${SUPABASE_URL}/rest/v1/announcements?select=announcement_id,source,revision_note,revised_at,revised_at_source&${idFilterFor(ids)}`,
+    { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
+  )).then(r => r.ok ? r.json() : []).then(rows => {
+    const note = pickGroupRevisionNote(rows);
+    if(note){
+      cardEl.dataset.revisionNoteFull = note;
+      injectRevisionNoteChip(cardEl, note);
+    }
+    appendSpecialNoteItem(id, revisionNoteItemHtml(note));
+  }).catch(err => {
+    console.error('ZipFit 정정사유 로드 실패:', err);
+  });
+}
+
+function revisionNoteItemHtml(note){
+  return note
+    ? `<div class="policy-item"><div class="policy-category">📝 정정 사유</div><div class="policy-content">${escapeHtml(note)}</div></div>`
+    : `<div class="policy-item"><div class="policy-category">📝 정정 사유</div><div class="policy-content">${escapeHtml(REVISION_NOTE_ABSENT_MSG)}</div></div>`;
+}
+
+// 카드의 "🔄 정정" 배지 옆 ℹ️ 툴팁 칩은 목록 렌더링 시점에 사유가 있어야만 만들어진다.
+// 그룹에서 뒤늦게 사유를 찾았으면 같은 자리에 칩을 끼워 넣어 배지·툴팁·아코디언을 일치시킨다.
+function injectRevisionNoteChip(cardEl, note){
+  const row = cardEl.querySelector('.chip-row');
+  if(!row || row.querySelector('[data-revision-chip]')) return;
+  const badge = Array.from(row.children).find(el => (el.textContent||'').includes('정정'));
+  if(!badge) return;
+  const chip = document.createElement('span');
+  chip.setAttribute('data-revision-chip', '1');
+  chip.title = note;
+  chip.style.cssText = 'cursor:help;font-size:11px;color:#666;border:1px solid #ccc;border-radius:10px;padding:1px 6px';
+  chip.textContent = 'ℹ️ 정정사유';
+  badge.insertAdjacentElement('afterend', chip);
 }
 
 // 카드 data-* 속성(접수기간/서류제출대상자발표일/서류접수기간/당첨자발표일/계약기간)을 읽어
@@ -3023,7 +3105,7 @@ function renderMatchResults(rows){
         </div>`
       : `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px" onclick="event.stopPropagation()"><div style="display:flex;gap:8px;flex-wrap:wrap">${n.url?`<a class="detail-link" href="${n.url}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a>`:''} ${mShareBtn} ${mSaveBtn}</div></div>`;
 
-    html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n.region||'').replace(/"/g,'&quot;')}" data-sido="${(n.sido_nm||'').replace(/"/g,'&quot;')}" data-sigungu="${(n.sigungu_nm||'').replace(/"/g,'&quot;')}" data-title="${(n.title||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" data-housing-type="${(n.housing_type||'').replace(/"/g,'&quot;')}" data-precise-address="${(n.precise_address||'').replace(/"/g,'&quot;')}" data-relaxed="${n.is_relaxed_recruitment===true?'1':''}" data-relaxation-detail="${(n.relaxation_detail||'').replace(/"/g,'&quot;')}" data-contract-verify="${n.contract_before_verification===true?'1':''}" data-rent-exempt-until="${(n.rent_exemption_until||'').replace(/"/g,'&quot;')}" data-rent-exempt-note="${(n.rent_exemption_note||'').replace(/"/g,'&quot;')}" data-revision-note-full="${revisionNoteEscM}" data-special-notes="${n.special_notes?JSON.stringify(n.special_notes).replace(/"/g,'&quot;'):''}" data-apply-start="${(n.apply_start||'').replace(/"/g,'&quot;')}" data-apply-end="${(n.apply_end||'').replace(/"/g,'&quot;')}" data-announcement-date="${(n.announcement_date||'').replace(/"/g,'&quot;')}" data-doc-submit-announce="${(n.doc_submit_announce_date||'').replace(/"/g,'&quot;')}" data-doc-submit-start="${(n.doc_submit_start||'').replace(/"/g,'&quot;')}" data-doc-submit-end="${(n.doc_submit_end||'').replace(/"/g,'&quot;')}" data-winner-announce="${(n.winner_announce_date||'').replace(/"/g,'&quot;')}" data-contract-start="${(n.contract_start||'').replace(/"/g,'&quot;')}" data-contract-end="${(n.contract_end||'').replace(/"/g,'&quot;')}" data-attachment-urls="${n.attachment_urls?JSON.stringify(n.attachment_urls).replace(/"/g,'&quot;'):''}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this)" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
+    html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n.region||'').replace(/"/g,'&quot;')}" data-sido="${(n.sido_nm||'').replace(/"/g,'&quot;')}" data-sigungu="${(n.sigungu_nm||'').replace(/"/g,'&quot;')}" data-title="${(n.title||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" data-housing-type="${(n.housing_type||'').replace(/"/g,'&quot;')}" data-precise-address="${(n.precise_address||'').replace(/"/g,'&quot;')}" data-relaxed="${n.is_relaxed_recruitment===true?'1':''}" data-relaxation-detail="${(n.relaxation_detail||'').replace(/"/g,'&quot;')}" data-contract-verify="${n.contract_before_verification===true?'1':''}" data-rent-exempt-until="${(n.rent_exemption_until||'').replace(/"/g,'&quot;')}" data-rent-exempt-note="${(n.rent_exemption_note||'').replace(/"/g,'&quot;')}" data-revised="${isAmended?'1':''}" data-revision-note-full="${revisionNoteEscM}" data-special-notes="${n.special_notes?JSON.stringify(n.special_notes).replace(/"/g,'&quot;'):''}" data-apply-start="${(n.apply_start||'').replace(/"/g,'&quot;')}" data-apply-end="${(n.apply_end||'').replace(/"/g,'&quot;')}" data-announcement-date="${(n.announcement_date||'').replace(/"/g,'&quot;')}" data-doc-submit-announce="${(n.doc_submit_announce_date||'').replace(/"/g,'&quot;')}" data-doc-submit-start="${(n.doc_submit_start||'').replace(/"/g,'&quot;')}" data-doc-submit-end="${(n.doc_submit_end||'').replace(/"/g,'&quot;')}" data-winner-announce="${(n.winner_announce_date||'').replace(/"/g,'&quot;')}" data-contract-start="${(n.contract_start||'').replace(/"/g,'&quot;')}" data-contract-end="${(n.contract_end||'').replace(/"/g,'&quot;')}" data-attachment-urls="${n.attachment_urls?JSON.stringify(n.attachment_urls).replace(/"/g,'&quot;'):''}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this)" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
       <div class="htop">
         <p class="hname">${normalizeRevisedTitle(n.title)||'(공고명 없음)'}</p>
         <span class="htag ${isClosed?'tag-mix':'tag-apt'}">${n.status||'-'}</span>
