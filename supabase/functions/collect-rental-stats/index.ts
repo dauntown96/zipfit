@@ -1,8 +1,15 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+const requireEnv = (key: string): string => {
+  const v = Deno.env.get(key)
+  if (!v) throw new Error(`필수 환경변수 누락: ${key}`)
+  return v
+}
+
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const API_KEY = Deno.env.get('ODCLOUD_API_KEY')!
+const CRON_SECRET = requireEnv('CRON_SECRET')
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
@@ -76,6 +83,16 @@ async function detectAndRecordChanges(
 }
 
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response(null, { headers: {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST,OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type,x-cron-secret',
+  }})
+  if (req.method !== 'POST') return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 })
+  if (req.headers.get('x-cron-secret') !== CRON_SECRET) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+  }
+
   try {
     // body에서 target 읽기 (없으면 전체)
     let target: string | null = null
