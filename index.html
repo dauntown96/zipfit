@@ -904,6 +904,44 @@ function refreshChipSel(wrapId, activeVal){
 
 // 공고 검색 — 클라이언트사이드 필터링(현재 로드된 noticeData 대상).
 // 서버사이드 검색으로 전환 시 이 함수만 API 호출로 교체하면 되도록 입출력을 순수 함수로 분리.
+// ── 행정구역 개편 신·구 명칭 대조표 ──────────────────────────────
+// 2026-07-01 개편으로 DB에 신·구 명칭이 공존한다(수집 시점에 따라 원본 API가 다르게 준다).
+// 어느 쪽으로 검색해도 나오도록, "행의 검색 텍스트에 옛/새 이름을 덧붙이는" 방식으로 푼다.
+// 🔴 쿼리를 넓히지 않고 행을 넓히는 이유: 「서구」는 5개 시·도, 「중구」는 6개 시·도에
+//    실재한다(실측). 전역 치환을 하면 서울 중구를 찾는 사람에게 인천 제물포구가 뜬다.
+//    그래서 자치구 대조표는 반드시 해당 시·도의 행에만 적용한다.
+// ⚠️ 확인된 것만 넣는다. 추측 매핑은 없는 것보다 나쁘다.
+const ZF_SIGUNGU_ALIASES = {
+  // 인천 2026-07-01 개편: 중구·동구 → 제물포구·영종구 / 서구 → 서해구·검단구
+  '인천광역시': {
+    '서구':     ['서해구','검단구'],
+    '서해구':   ['서구'],
+    '검단구':   ['서구'],
+    '중구':     ['제물포구','영종구'],
+    '동구':     ['제물포구'],
+    '제물포구': ['중구','동구'],
+    '영종구':   ['중구']
+  }
+};
+// 시·도 통합 명칭. 수집 EF의 MERGED_SIDO_MAP과 같은 근거다.
+// (대전·충남은 통합 미법제화라 대상이 아니다.)
+const ZF_SIDO_ALIASES = {
+  '전남광주통합특별시': ['광주광역시','전라남도'],
+  '강원특별자치도':     ['강원도']
+};
+
+// 이 행이 검색으로 잡혀야 하는 추가 지역 표기들.
+function zfRegionAliases(sido, sigungu){
+  const out=[];
+  const sd=(sido||'').trim(), sg=(sigungu||'').trim();
+  if(sd && ZF_SIDO_ALIASES[sd]) out.push(...ZF_SIDO_ALIASES[sd]);
+  if(sd && sg){
+    const table=ZF_SIGUNGU_ALIASES[sd];
+    if(table && table[sg]) out.push(...table[sg]);
+  }
+  return out;
+}
+
 function searchFilterNotices(list, query, scope){
   const q = (query || '').trim().toLowerCase();
   if(!q) return list;
@@ -914,6 +952,7 @@ function searchFilterNotices(list, query, scope){
     const titleMatch = title.includes(q) || buildingName.includes(q);
     if(scope === 'title') return titleMatch;
     const regionText = [n['지역'], n['sido_nm'], n['sigungu_nm'], n['precise_address']]
+      .concat(zfRegionAliases(n['sido_nm'], n['sigungu_nm']))
       .filter(Boolean).join(' ').toLowerCase();
     if(scope === 'title-region') return titleMatch || regionText.includes(q);
     // scope === 'all': 제목+지역+공급기관+주택유형+공급형태
@@ -1079,27 +1118,211 @@ async function loadNoticeData(){
   }
 }
 
-// ===== 저장한 공고 =====
-const SAVED_KEY = 'zipfit_saved_notices';
-function getSavedNotices(){ try{ return JSON.parse(localStorage.getItem(SAVED_KEY)||'[]'); }catch(e){ return []; } }
-function setSavedNotices(arr){ localStorage.setItem(SAVED_KEY, JSON.stringify(arr)); }
+// ===== 저장한 공고 (서버 정본 + 메모리 캐시) =====
+// 서버(saved_announcements)가 정본이다. announcement_id만 저장하고 카드 표시 정보는
+// 조회 시점에 원본 공고와 다시 결합한다 — 공고가 정정되거나 마감돼도 찜이 따라간다.
+const SAVED_KEY = 'zipfit_saved_notices';   // 레거시 로컬 키(1회 마이그레이션 후 삭제)
 
-function toggleSaveNotice(id, title, region, type, url, apply_end, source){
-  let saved = getSavedNotices();
-  const idx = saved.findIndex(s=>s.id===id);
-  if(idx>=0){
-    saved.splice(idx,1);
-  } else {
-    saved.unshift({ id, title, region, type, url, apply_end:apply_end||'', source:source||'', savedAt: new Date().toISOString() });
+// 로그아웃 시 지워야 하는 "사용자 귀속" 로컬 키 목록.
+// 앞으로 저장 항목이 늘어나면 반드시 여기에만 추가한다(삭제 누락 방지).
+// 다크모드·글자크기 같은 기기 설정은 사용자 귀속이 아니므로 넣지 않는다.
+const ZF_USER_LOCAL_KEYS = [SAVED_KEY];
+function zfClearUserLocalData(){
+  ZF_USER_LOCAL_KEYS.forEach(k=>{ try{ localStorage.removeItem(k); }catch(e){} });
+}
+
+// SUPABASE_URL은 이 스크립트 블록보다 뒤에서 선언되므로 상수로 두면 TDZ 오류가 난다.
+// 반드시 호출 시점에 평가되도록 함수로 둔다.
+function zfSavedApiUrl(){ return `${SUPABASE_URL}/rest/v1/saved_announcements`; }
+
+// renderNoticeList/renderMatchResults의 카드 루프가 동기 함수라 메모리 캐시를 둔다.
+// localStorage가 아니라 메모리다 — 정본은 언제나 서버이고, 새로고침하면 서버에서 다시 읽는다.
+let savedIds   = new Set();  // 서버에 저장된 announcement_id
+let savedRows  = [];         // [{announcement_id, created_at}] 최신순
+let savedCards = [];         // 원본 공고와 재결합한 화면 표시용 목록
+
+function isSavedId(id){ return savedIds.has(id); }
+function getSavedNotices(){ return savedCards; }
+
+function zfAnonHeaders(){
+  return {'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY,'Content-Type':'application/json'};
+}
+function zfSavedHeaders(token){
+  return {'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json'};
+}
+
+// 서버에서 찜 목록을 읽어 savedIds/savedRows를 갱신한다.
+async function zfLoadSavedFromServer(){
+  const token = await zfAccessToken();
+  if(!token){ savedIds=new Set(); savedRows=[]; savedCards=[]; return false; }
+  try{
+    const res = await fetch(`${zfSavedApiUrl()}?select=announcement_id,created_at&order=created_at.desc`,
+      { headers: zfSavedHeaders(token) });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const rows = await res.json();
+    if(!Array.isArray(rows)) throw new Error('예상치 못한 응답');
+    savedRows = rows;
+    savedIds  = new Set(rows.map(r=>r.announcement_id));
+    return true;
+  }catch(err){
+    console.warn('ZipFit: 저장한 공고 조회 실패', err);
+    return false;
   }
-  setSavedNotices(saved);
-  updateSaveBtn(id);
+}
+
+function zfSavedCardFrom(sr, r){
+  return {
+    id:        sr.announcement_id,
+    savedAt:   sr.created_at||'',
+    title:     r ? (r.title||'')        : '',
+    region:    r ? (r.region||'')       : '',
+    type:      r ? (r.housing_type||'') : '',
+    url:       r ? (r.url||'')          : '',
+    apply_end: r ? (r.apply_end||'')    : '',
+    source:    r ? (r.source||'')       : ''
+  };
+}
+
+// 저장된 announcement_id를 현재 dedup 대표행과 다시 결합한다.
+async function zfResolveSavedCards(){
+  if(!savedRows.length){ savedCards=[]; return; }
+  let rows=[];
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_announcements_deduped`,
+      {method:'POST', headers: zfAnonHeaders(), body:'{}'});
+    if(res.ok) rows = await res.json();
+  }catch(err){ console.warn('ZipFit: 저장 공고 원본 조회 실패', err); }
+  if(!Array.isArray(rows)) rows=[];
+
+  const byId = new Map(rows.map(r=>[r.announcement_id, r]));
+  const cards=[], drifted=[];
+  savedRows.forEach(sr=>{
+    const hit = byId.get(sr.announcement_id);
+    if(hit) cards.push(zfSavedCardFrom(sr, hit));
+    else drifted.push(sr);
+  });
+
+  // 저장 당시의 대표행이 정정공고 등으로 바뀐 경우에만 그룹을 펼쳐 재매칭한다(보통 0건).
+  for(const sr of drifted){
+    let hit=null;
+    try{
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_announcement_group_ids`,
+        {method:'POST', headers: zfAnonHeaders(), body: JSON.stringify({p_announcement_id: sr.announcement_id})});
+      if(res.ok){
+        const gids = await res.json();
+        if(Array.isArray(gids)){
+          hit = gids.map(g=>byId.get(typeof g==='string'?g:(g&&g.announcement_id))).find(Boolean)||null;
+        }
+      }
+    }catch(err){ console.warn('ZipFit: 저장 공고 그룹 조회 실패', err); }
+    cards.push(zfSavedCardFrom(sr, hit));
+  }
+
+  cards.sort((a,b)=>String(b.savedAt||'').localeCompare(String(a.savedAt||'')));
+  savedCards = cards;
+}
+
+// 서버 → 메모리 캐시 → 화면 순으로 갱신한다.
+async function zfRefreshSaved(){
+  const ok = await zfLoadSavedFromServer();
+  await zfResolveSavedCards();
   updateSaveBadge();
+  refreshAllSaveBtns();
+  return ok;
+}
+
+// 레거시 localStorage 찜을 1회 서버로 올린 뒤 로컬을 정리한다.
+async function zfMigrateLocalSaved(){
+  let legacy=[];
+  try{ legacy = JSON.parse(localStorage.getItem(SAVED_KEY)||'[]'); }catch(e){ legacy=[]; }
+  if(!Array.isArray(legacy) || !legacy.length){ zfClearUserLocalData(); return; }
+  const token = await zfAccessToken();
+  if(!token) return;   // 로그인 전에는 로컬 데이터를 건드리지 않는다
+
+  // 스냅샷의 id는 announcement_id지만, 과거 코드에 인덱스 폴백("0"/"m3")이 있어
+  // 실제 공고로 확인되는 것만 올린다. 나머지 7개 필드는 버린다.
+  const ids=[...new Set(legacy.map(s=>s&&s.id).filter(v=>typeof v==='string'&&v))];
+  let valid=[];
+  try{ valid = await zfFilterExistingAnnouncementIds(ids); }
+  catch(err){ console.warn('ZipFit: 찜 마이그레이션 확인 실패', err); return; }
+  if(!valid.length){ zfClearUserLocalData(); return; }
+
+  try{
+    const res = await fetch(zfSavedApiUrl(), {
+      method:'POST',
+      headers: Object.assign(zfSavedHeaders(token), {'Prefer':'resolution=ignore-duplicates,return=minimal'}),
+      body: JSON.stringify(valid.map(id=>({ announcement_id:id })))   // user_id는 DB default auth.uid()
+    });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+  }catch(err){
+    console.warn('ZipFit: 찜 마이그레이션 실패(로컬 보존)', err);
+    return;   // 실패 시 로컬을 지우지 않는다 — 다음 로그인에 재시도한다
+  }
+  zfClearUserLocalData();
+}
+
+// 주어진 id 중 announcements에 실재하는 것만 돌려준다.
+async function zfFilterExistingAnnouncementIds(ids){
+  if(!ids.length) return [];
+  const list = ids.map(v=>'"'+String(v).replace(/"/g,'\\"')+'"').join(',');
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/announcements?select=announcement_id&announcement_id=in.(${encodeURIComponent(list)})`,
+    { headers: zfAnonHeaders() });
+  if(!res.ok) throw new Error('HTTP '+res.status);
+  const rows = await res.json();
+  if(!Array.isArray(rows)) return [];
+  return [...new Set(rows.map(r=>r.announcement_id))];
+}
+
+async function toggleSaveNotice(id){
+  const token = await zfAccessToken();
+  if(!token){ zfPromptLoginForSave(); return; }
+
+  const wasSaved = savedIds.has(id);
+  // 낙관적 갱신 — 실패하면 되돌린다.
+  if(wasSaved) savedIds.delete(id); else savedIds.add(id);
+  updateSaveBtn(id); updateSaveBadge();
+
+  try{
+    let res;
+    if(wasSaved){
+      // RLS가 본인 행으로 한정하므로 announcement_id만으로 안전하게 지워진다.
+      res = await fetch(`${zfSavedApiUrl()}?announcement_id=eq.${encodeURIComponent(id)}`,
+        { method:'DELETE', headers: zfSavedHeaders(token) });
+    } else {
+      res = await fetch(zfSavedApiUrl(), {
+        method:'POST',
+        headers: Object.assign(zfSavedHeaders(token), {'Prefer':'resolution=ignore-duplicates,return=minimal'}),
+        body: JSON.stringify({ announcement_id:id })   // user_id는 DB default auth.uid()
+      });
+    }
+    if(!res.ok) throw new Error('HTTP '+res.status);
+  }catch(err){
+    if(wasSaved) savedIds.add(id); else savedIds.delete(id);
+    updateSaveBtn(id); updateSaveBadge();
+    zfFlashSaveError(id);
+    console.warn('ZipFit: 찜 저장 실패', err);
+    return;
+  }
+  await zfRefreshSaved();
+}
+
+// 비로그인 상태에서 저장을 누르면 설정 탭 로그인으로 안내한다.
+function zfPromptLoginForSave(){
+  goMain(5);
+  if(typeof zfAuthMsg==='function') zfAuthMsg('로그인하면 공고를 저장할 수 있어요.');
+}
+
+// 저장 실패를 버튼 라벨로 잠깐 알린다(shareNotice와 같은 방식, 새 UI 없음).
+function zfFlashSaveError(id){
+  document.querySelectorAll(`[data-save-id="${id}"]`).forEach(btn=>{
+    btn.textContent = '⚠️ 저장 실패';
+  });
+  setTimeout(()=>updateSaveBtn(id), 1500);
 }
 
 function updateSaveBtn(id){
-  const saved = getSavedNotices();
-  const isSaved = saved.some(s=>s.id===id);
+  const isSaved = isSavedId(id);
   document.querySelectorAll(`[data-save-id="${id}"]`).forEach(btn=>{
     btn.textContent = isSaved ? '🔖 저장됨' : '🔖 저장';
     btn.style.color = isSaved ? '#1D9E75' : '#888';
@@ -1107,10 +1330,35 @@ function updateSaveBtn(id){
   });
 }
 
+// 로그아웃/세션 종료 시 이 기기에 남은 사용자 귀속 데이터를 전부 지운다.
+// 공용 기기에 이전 사용자의 찜이 남지 않게 하는 지점 — 서버에는 그대로 있으므로
+// 다시 로그인하면 복원된다.
+function zfForgetLocalUser(){
+  zfClearUserLocalData();
+  savedIds=new Set(); savedRows=[]; savedCards=[];
+  updateSaveBadge();
+  refreshAllSaveBtns();
+  if(document.getElementById('savedNoticeList')) renderSavedNotices();
+  if(document.getElementById('checklistSelector')) buildChecklist();
+}
+
+function refreshAllSaveBtns(){
+  document.querySelectorAll('[data-save-id]').forEach(btn=>{
+    updateSaveBtn(btn.getAttribute('data-save-id'));
+  });
+}
+
 function updateSaveBadge(){
-  const count = getSavedNotices().length;
+  const count = savedIds.size;
   const badge = document.getElementById('savedBadge');
   if(badge){ badge.textContent = count>0 ? count : ''; badge.style.display = count>0?'inline':'none'; }
+}
+
+// 관리 탭 진입 시 서버에서 다시 읽고 그린다.
+async function zfRenderSavedTab(){
+  await zfRefreshSaved();
+  renderSavedNotices();
+  buildChecklist();
 }
 
 function renderSavedNotices(){
@@ -1130,10 +1378,10 @@ function renderSavedNotices(){
     const dateStr = s.savedAt ? new Date(s.savedAt).toLocaleDateString('ko-KR') : '';
     html += `<div class="hcard">
       <div class="htop">
-        <p class="hname">${s.title||'(공고명 없음)'}</p>
-        <button style="background:none;border:none;font-size:18px;cursor:pointer;padding:2px 4px;color:#ccc" title="저장 삭제" onclick="toggleSaveNotice('${s.id.replace(/'/g,"\\'")}','${(s.title||'').replace(/'/g,"\\'")}','${(s.region||'').replace(/'/g,"\\'")}','${(s.type||'').replace(/'/g,"\\'")}','${(s.url||'').replace(/'/g,"\\'")}','${(s.apply_end||'').replace(/'/g,"\\'")}','${(s.source||'').replace(/'/g,"\\'")}');renderSavedNotices()">✕</button>
+        <p class="hname">${escapeHtml(s.title||'(공고명 없음)')}</p>
+        <button style="background:none;border:none;font-size:18px;cursor:pointer;padding:2px 4px;color:#ccc" title="저장 삭제" onclick="toggleSaveNotice('${String(s.id).replace(/'/g,"\\'")}').then(renderSavedNotices)">✕</button>
       </div>
-      <p class="haddr">${s.region||''} · ${s.type||''}</p>
+      <p class="haddr">${escapeHtml(s.region||'')} · ${escapeHtml(s.type||'')}</p>
       ${dateStr?`<p style="font-size:11px;color:#bbb;margin-top:4px">저장일: ${dateStr}</p>`:''}
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
         ${s.url?`<a class="detail-link" href="${s.url}" target="_blank">📄 공고 원문 보기</a>`:''}
@@ -1219,11 +1467,9 @@ function renderNoticeList(filtered, totalCount){
     const nType = (n['공급유형']||'').replace(/'/g,"\\'");
     const nUrl = (n['공고URL']||'').replace(/'/g,"\\'");
     const nId = (n['announcement_id']||String(idx)).replace(/'/g,"\\'");
-    const nApplyEnd = (n['신청마감일']||n['apply_end']||'').replace(/'/g,"\\'");
-    const nSource = (n['source']||'').replace(/'/g,"\\'");
-    const nSaved = getSavedNotices().some(s=>s.id===(n['announcement_id']||String(idx)));
+    const nSaved = isSavedId(n['announcement_id']||String(idx));
     const shareBtn = `<button class="detail-link" style="border:1px solid #1D9E75;color:#1D9E75;background:#fff;cursor:pointer;margin-top:10px" onclick="event.stopPropagation();shareNotice(this,'${nTitle}','${nRegion}','${nType}','${nUrl}')">🔗 이 공고 공유하기</button>`;
-    const saveBtn = `<button data-save-id="${n['announcement_id']||idx}" class="detail-link" style="border:1px solid ${nSaved?'#1D9E75':'#ccc'};color:${nSaved?'#1D9E75':'#888'};background:#fff;cursor:pointer;margin-top:10px" onclick="event.stopPropagation();toggleSaveNotice('${nId}','${nTitle}','${nRegion}','${nType}','${nUrl}','${nApplyEnd}','${nSource}')">${nSaved?'🔖 저장됨':'🔖 저장'}</button>`;
+    const saveBtn = `<button data-save-id="${n['announcement_id']||idx}" class="detail-link" style="border:1px solid ${nSaved?'#1D9E75':'#ccc'};color:${nSaved?'#1D9E75':'#888'};background:#fff;cursor:pointer;margin-top:10px" onclick="event.stopPropagation();toggleSaveNotice('${nId}')">${nSaved?'🔖 저장됨':'🔖 저장'}</button>`;
     const detailHTML = detailRows.length
       ? `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px;transition:all 0.2s" onclick="event.stopPropagation()">
           <div class="detail-grid">
@@ -1470,7 +1716,7 @@ function goMain(n){
   if(n===2 && !noticeLoaded) initNoticeFilters();
   else if(n===2) loadNoticeData();
   if(n===3) loadInsightData();
-  if(n===4){ renderSavedNotices(); buildChecklist(); }
+  if(n===4) zfRenderSavedTab();
   if(n===5) renderSettingsGate();
 }
 
@@ -3087,11 +3333,9 @@ function renderMatchResults(rows){
     const mType = (n.housing_type||'').replace(/'/g,"\\'");
     const mUrl = (n.url||'').replace(/'/g,"\\'");
     const mId = (n.announcement_id||'m'+idx).replace(/'/g,"\\'");
-    const mApplyEnd = (n.apply_end||'').replace(/'/g,"\\'");
-    const mSource = (n.source||'').replace(/'/g,"\\'");
-    const mSaved = getSavedNotices().some(s=>s.id===(n.announcement_id||'m'+idx));
+    const mSaved = isSavedId(n.announcement_id||'m'+idx);
     const mShareBtn = `<button class="detail-link" style="border:1px solid #1D9E75;color:#1D9E75;background:#fff;cursor:pointer" onclick="event.stopPropagation();shareNotice(this,'${mTitle}','${mRegion}','${mType}','${mUrl}')">🔗 이 공고 공유하기</button>`;
-    const mSaveBtn = `<button data-save-id="${n.announcement_id||'m'+idx}" class="detail-link" style="border:1px solid ${mSaved?'#1D9E75':'#ccc'};color:${mSaved?'#1D9E75':'#888'};background:#fff;cursor:pointer" onclick="event.stopPropagation();toggleSaveNotice('${mId}','${mTitle}','${mRegion}','${mType}','${mUrl}','${mApplyEnd}','${mSource}')">${mSaved?'🔖 저장됨':'🔖 저장'}</button>`;
+    const mSaveBtn = `<button data-save-id="${n.announcement_id||'m'+idx}" class="detail-link" style="border:1px solid ${mSaved?'#1D9E75':'#ccc'};color:${mSaved?'#1D9E75':'#888'};background:#fff;cursor:pointer" onclick="event.stopPropagation();toggleSaveNotice('${mId}')">${mSaved?'🔖 저장됨':'🔖 저장'}</button>`;
     const detailHTML = detailRows.length
       ? `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px" onclick="event.stopPropagation()">
           <div class="detail-grid">
@@ -3536,6 +3780,13 @@ async function zfApplySession(session){
   applySettingsToUI(currentUser);
   renderPersonalizedRecommendations();
 
+  // 레거시 로컬 찜을 1회 서버로 올린 뒤, 서버 목록으로 화면을 맞춘다.
+  await zfMigrateLocalSaved();
+  await zfRefreshSaved();
+  if(!document.getElementById('main4').classList.contains('hidden')){
+    renderSavedNotices(); buildChecklist();
+  }
+
   // 알림 수신처가 아직 없는 신규 사용자(주로 카카오)만 수집 화면을 거친다.
   const hasAlertEmail=!!(currentUser.alert_email||'').trim();
   if(result.ok && !hasAlertEmail && !sessionEmail){
@@ -3590,6 +3841,7 @@ if(zfAuthAvailable()){
     } else if(event==='SIGNED_OUT'){
       zfSession=null;
       currentUser=null; zfProfileLoaded=false;
+      zfForgetLocalUser();
     }
   });
 }
@@ -3611,6 +3863,7 @@ async function renderSettingsGate(){
 
   // 세션 없음 → 로그인 화면
   currentUser=null; zfProfileLoaded=false;
+  zfForgetLocalUser();
   document.getElementById('loginGate').classList.remove('hidden');
   const alertGate=document.getElementById('zfAlertEmailGate');
   if(alertGate) alertGate.classList.add('hidden');
@@ -3729,6 +3982,7 @@ async function logoutUser(){
     try{ await zfAuth.auth.signOut(); }catch(err){ console.warn('ZipFit: signOut 실패', err); }
   }
   zfSession=null;
+  zfForgetLocalUser();
   document.getElementById('settingsBody').classList.add('hidden');
   const _alertGate=document.getElementById('zfAlertEmailGate');
   if(_alertGate) _alertGate.classList.add('hidden');
