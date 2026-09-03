@@ -203,4 +203,4 @@ const requireEnv = (key: string): string => {
 | 배포 | https://dauntown96.github.io/zipfit |
 | GitHub | https://github.com/dauntown96/zipfit |
 | Supabase | https://supabase.com/dashboard/project/khdpjjyspmlqtzperoqg |
-| Notion (참고용) | https://www.notion.so/3878aaa7e1558102ae9bf39dbb9a2efe |
+| 노션 시작점 | 🏠 L0 — https://www.notion.so/3b48aaa7e15581f88981d0c636de780c |
