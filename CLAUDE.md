@@ -2,7 +2,7 @@
 
 > **이 파일은 규약과 좌표를 담는다.** Claude Code 세션마다 전문이 자동 주입되므로, 매번 읽혀야 하는 것만 둔다.
 > Claude Code와 claude.ai 모두 이 파일을 기준으로 작업한다.
-> **마지막 갱신**: 2026-09-02 (완료 이력을 `docs/history.md`로 분리)
+> **마지막 갱신**: 2026-09-03 (완료 이력을 `docs/history.md`로 분리)
 
 ## 📌 이 파일의 소관 — 무엇을 담고 무엇을 안 담는가
 
@@ -13,17 +13,18 @@
 | 수집 API 카테고리 실측표 | 구현 사실(판정 조건·게이트) → Notion ⑩ |
 | 정본 라우팅(아래) | 수치·현황 → **조회로 확인한다** |
 
-🔴 **완료한 작업은 여기가 아니라 `docs/history.md` 맨 위에 쓴다.** 이 파일의 「최근 작업 이력」에는 최신 2건만 두고, 새 이력이 들어오면 밀려난 것을 `docs/history.md` 맨 위로 옮긴다.
+🔴 **완료한 작업은 여기가 아니라 `docs/history.md` 맨 위에 쓴다.** 이 파일의 「최근 작업 이력」에는 최신 3건만 두고, 새 이력이 들어오면 밀려난 것을 `docs/history.md` 맨 위로 옮긴다.
 
 ## 🧭 이 문서에 없는 것 — 어디로 가는가
 
 | 찾는 것 | 정본 |
 |---|---|
-| 구현 사실 — 판정 조건·게이트·데이터 흐름·캡 | Notion **⑩ 시스템 구조** — (URL: claude.ai 보완) |
-| 할 일·미결·보류 | Notion **📋 백로그 DB** (유일한 정본) — (URL: claude.ai 보완) |
-| 판단이 뒤집힌 경위 | Notion **⑧ 판례집** — (URL: claude.ai 보완) |
-| 3자 분장·git·지시서·병합 규약 | Notion **⑦ 협업 규약** — (URL: claude.ai 보완) |
-| 어디를 봐야 할지 모를 때 | Notion **⑨ 5장 검색 키워드 사전** — (URL: claude.ai 보완) |
+| 세션 시작 — 지금 상황·절대원칙 | [🏠 L0 시작](https://www.notion.so/3b48aaa7e15581f88981d0c636de780c) |
+| 구현 사실 — 판정 조건·게이트·데이터 흐름·캡 | [⑩ 시스템 구조](https://www.notion.so/3ce8aaa7e155813ca69ff94e71a82277) |
+| 할 일·미결·보류 (**유일한 정본**) | [📋 백로그 DB](https://www.notion.so/7786386dbb054269bdff55033aafe19e) |
+| 판단이 뒤집힌 경위 | [⑧ 판례집](https://www.notion.so/3b48aaa7e15581c0bcd7d3c8868df713) |
+| 3자 분장·git·지시서·병합 규약 | [⑦ 협업 규약](https://www.notion.so/3b48aaa7e155816ea873d4c3f006510a) |
+| 어디를 봐야 할지 모를 때 | [⑨ 라우팅 규약](https://www.notion.so/3b98aaa7e155812686b6ff3d11ea43fa) — 5장 검색 키워드 사전 |
 
 ⚠️ 아래 코딩 원칙 13·14번은 ⑦의 **요약 사본**이다. 어긋나면 **⑦이 정본**이다.
 
@@ -47,7 +48,7 @@
 | 공고 데이터 | Supabase RPC `get_announcements_deduped()` |
 | 데이터 수집 | **LH·MYHOME**: Edge Function `collect-announcements` + pg_cron (**20분 간격 상시 수집** — jobid 4, `*/20 * * * *`, active, timeout 120초). 공고 게시 시각이 불규칙하고(LH·SH·GH·지자체공사·마이홈 각각 상이), LH API 호출 한도 내라 20분 간격으로 확정 | / **SH**: Edge Function `collect-sh-announcements` + pg_cron(jobid 8, `0 0,3,6,9 * * *` UTC = 09/12/15/18시 KST 4회)
 | 사용자 프로필 | Edge Function `save-user-profile` (GET/POST, **`verify_jwt=true`**, 식별자는 JWT의 `auth.uid()` — 이메일 기반 식별은 2026-08-13 폐기, CORS는 `https://dauntown96.github.io` 고정) |
-| 알림·트리거 | Make.com Free 플랜 (알림·이메일 전용) |
+| 알림·트리거 | 🔴 **없음 — Make.com은 2026-08-27 미사용 확정**. 검토했고 안 쓰기로 한 것이지 미검토가 아니다(재검토 트리거는 📦 아카이브 「MCP 생태계 보류」에). 알림 경로는 미구현 상태이며 후보는 백로그 「카카오 알림톡」 |
 | 외부 API | LH 분양임대공고 API, 마이홈포털 API, 카카오맵 API |
 | DB | Supabase PostgreSQL (프로젝트 ID: `khdpjjyspmlqtzperoqg`, 싱가포르) |
 | 인증 | **Supabase Auth** (카카오 OAuth + 이메일 매직링크 — 코드 입력 방식 아님, 아래 제약 참고). 신원은 JWT(`auth.uid()`), 프로필 API는 `verify_jwt=true`. 이메일+쿠키(`zipfit_email`) 경로는 2026-08-13 **완전 제거**. `user_profiles`에 RLS 정책 3종(본인 행 select/update/insert) 적용 |
@@ -126,15 +127,16 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 
 ---
 
-## 🕘 최근 작업 이력 (최신 2건)
+## 🕘 최근 작업 이력 (최신 3건)
 
-🔴 **전체 이력은 [`docs/history.md`](docs/history.md)에 있다.** 아래는 직전 맥락 전달용 발췌가 아니라 **이 2건이 여기 있는 것 자체가 정본**이며, `docs/history.md`와 중복되지 않는다.
+🔴 **전체 이력은 [`docs/history.md`](docs/history.md)에 있다.** 아래는 직전 맥락 전달용 발췌가 아니라 **이 3건이 여기 있는 것 자체가 정본**이며, `docs/history.md`와 중복되지 않는다.
 🔴 **새 이력은 `docs/history.md` 맨 위에 쓴다.** 여기에 쌓지 않는다 — 그러면 다시 518KB가 된다.
 
 | 날짜 | 내용 |
 |---|---|
-| 2026-08-28 | **document_templates 해시 정규화 규칙 A~D 적용 + 2-up 원문 10행 복구 (DB만)**. 4단계에 걸친 조사→규칙설계→검증→반영. **게이트**: `pdfplumber 0.11.10` 파이프라인이 2026-08-21 baseline 해시를 행별로 정확히 재현함을 먼저 확인(행별 자체검증 = 정확성 오라클). **규칙**: A(작성예시 페이지 절단, 앵커 2종 `<작성 예시>`·`[이 페이지는 제출 ×]`) / B(지역본부·지사명 → `<OFFICE>`·`<BRANCH>`) / C(별지·붙임 번호와 쪽표시 제거) / D(연도 자리표시자 → `<DATE>`) 순서 적용 후 NUL 제거 + 전체 공백 제거 + SHA-256. **규칙 E(정규화하지 않음)**: `LH`↔`공사`, `(확정일자가 표시되어야 함)` 유무, `계약자는 영구` 유무, `자격심사 및 선정순위 결정`↔`자격심사` — 실제 판(版) 차이라 분리 유지. **🔴 3단계의 「원문 부재」 판정은 틀렸다**: 괴산동부·전북남부권 공고문은 **2-up 레이아웃**(PDF 1쪽에 문서 2쪽)이라 PDF 23쪽인데 문서 쪽번호는 46까지 간다. 쪽번호를 1쪽부터 순서대로 읽어 **문서 쪽 N ⇒ PDF page ⌈N/2⌉, 홀수=좌·짝수=우** 대응을 확정한 뒤 좌우 크롭으로 **10행 전부 baseline 재현 성공**(id 90~93, 95~100). 한 서식이 두 쪽에 걸치는 경우(예: p19R+p20L)도 정상 처리. **최종 범위**: 98행 중 **79행 재계산**(`[NORM:ABCD-v1]`), **19행 baseline 유지**(`[NORM:baseline]` + 사유코드 — hwpx 7행·영암 extract_tables 재분리 5행은 `(EXTRACT_UNREPRODUCIBLE)`, 표 설명 기반 7행은 `(TABLE_SUMMARY)`). ⚠️ hwpx 21·22는 재현에 성공했으나 배치 일관성 원칙에 따라 나머지 5행과 함께 제외. **규칙 발동 수**: A 2 / B 49 / C 62 / D 60 — 🔴 A 발동 0이면 실패라는 기준 충족. **병합 결과**: distinct 해시 79→57(재계산분 기준), 전체 98행 기준 75종. 새 병합군 8개는 **전부 같은 doc_category**이며, 표본 3쌍(id7↔94 / 8↔83 / 64↔81)을 정규화 전 원문으로 직접 diff한 결과 차이가 **지역본부명과 쪽표시뿐**임을 확인(다른 서식이 잘못 합쳐진 사례 0건). 기존 중복쌍 `fa7d5828`(64·88)은 함께 `cc81bc9a`로 이동했고 81이 합류. **반영 방식**: 🔴 UPDATE를 CTE로 묶지 않고 **행 단위 개별 문장**으로 25/25/25/23 4배치 실행(2026-08-10 판례 — CTE로 묶으면 조용히 건너뛴다). `sample_source`는 **덮어쓰지 않고 태그만 덧붙였다** — `[HASH_SRC:]`/`[EXTRACT:]` 98/98 온전. **검증**: 총 98행 불변, `[NORM:]` 태그 누락 0건(79+19=98). **미조치(백로그)**: id 32 태그 모순(`sample_source`는 표 설명 기반이라는데 `[HASH_SRC:ORIGINAL_DOC]`), 강원 위임장 `doc_category` 오배정 의심, id 55 결번(미채번/삭제 구분 불가), id 71·72 병합이 2026-08-25에 이력 없이 이뤄져 99→98행이 된 것 — 이번 범위 밖이라 관측만 기록. 코드 변경 없음(DB만) |
-| 2026-08-31 | **`upsert-announcement` 배포 철회 게이트 확인 — 🔴 철회 미완(대시보드 수동 삭제 필요), 코드·시크릿 전부 보존**. 이 함수는 `verify_jwt:false` + `service_role` 쓰기(RLS 우회)라 `WEBHOOK_SECRET` 하나가 유일한 관문인 **무인증 쓰기 엔드포인트**인데, 원래 호출자로 보이던 Make를 다운님이 쓰지 않기로 확정(2026-08-27)해 배포를 내리기로 했다. **게이트 4종 전부 통과**: ①cron 잡 3개(4 `*/20`·8 `0 0,3,6,9`·11 `0 18 * * 0`)의 `command`를 실조회 — 셋 다 각각 `collect-announcements`/`collect-sh-announcements`/`collect-rental-stats`를 부르며 이 함수를 부르는 잡은 **없음** ②`index.html`·`sw.js`에 `upsert-announcement` 문자열 **0건** ③다른 EF 소스에서 이 함수를 호출하는 코드 **0건**(`supabase/` 전체 grep, 자기 디렉터리 제외) ④Edge 함수 호출 로그에서 이 함수 **0건**. ⚠️ **④의 한계(정직 보고)**: `query_logs`는 **최대 24시간 창**이라 지시서가 요구한 30일치를 볼 수 없었다 — 확인한 것은 **최근 24시간 0건**이다. 다만 같은 쿼리로 다른 함수는 잡히므로(collect-announcements 72건·collect-sh 4건·collect-rental-stats 1건) 쿼리 자체가 무효라서 0이 나온 것은 아님을 대조로 확인했다. **🔴 철회는 실행하지 못했다**: 이 세션의 Supabase MCP에는 **Edge Function 삭제 도구가 없다**(`list`/`get`/`deploy`뿐). 지시서가 "방법이 확실하지 않으면 추측으로 실행하지 말라"고 했고, Management API를 임의 호출할 인증 수단도 없어 **다운님이 대시보드에서 직접 삭제**해야 한다(2026-08-12 `test-lh-detail`·`test-myhome-api` 삭제 때와 동일 경로). 현재 배포 상태는 **v15 ACTIVE·`verify_jwt:false`** 그대로다. **보존한 것(의도적)**: `supabase/functions/upsert-announcement/`(`index.ts`+`deno.jsonc`)를 git에서 **지우지 않았고**, `WEBHOOK_SECRET` 환경변수도 **지우지 않았다** — 되살릴 때 필요하다. `WEBHOOK_SECRET`을 참조하는 곳은 이 함수의 `index.ts` 하나뿐임을 저장소 전체 grep으로 확인했으므로(그 외엔 CLAUDE.md 서술뿐), 배포만 내리면 이 시크릿을 읽는 코드는 **한 곳도 남지 않는다**. **되살리는 법**: git의 `supabase/functions/upsert-announcement/`를 `verify_jwt:false`로 재배포하면 되고, `WEBHOOK_SECRET`은 유지돼 있다. **수집 회귀 확인**: 철회를 못 했으니 "철회 후 첫 수집"은 대상이 없으나 현재 상태를 확인 — `collection_run_log` id 3499(08-31 00:20 UTC) `lh_fetched=485`/`myhome 291/287`/`errors=null`로 평소값(470~480대) 정상. 직전 id 3498은 전 경로 504(업스트림 `SERVICETIMEOUT_ERROR`)로 0건이나 이는 2026-08-25·26에 이미 규명된 LH 게이트웨이 간헐 장애이며 이번 작업과 무관하다(바로 다음 회차에 자동 회복). **DB·코드 변경 없음**(CLAUDE.md만) — 이 세션이 지정 브랜치 외 push를 막아 `claude/upsert-announcement-rollback-207ilk`에만 push |
+| 2026-09-03 | **`CLAUDE.md` 이력 분리 + 낡은 규약 갱신**(`bfbedba`, PR #13 `bd8f1c8`). `CLAUDE.md`는 Claude Code 세션마다 전문이 자동 주입되는 유일한 문서인데, 실측 결과 **541,799 bytes 중 완료 이력이 517,838(95.6%)** 이었다 — 규약을 읽히려고 매번 이력을 함께 읽고 있었고 정작 그 규약이 노션 ⑦보다 낡아 있었다. **이력 259행 중 257행을 `docs/history.md`로 이동**하고 최신분만 잔류. 🔴 **한 행도 삭제·변형하지 않았다**(정렬 후 바이트 완전 일치로 확인). 541,799→25,121 B(−95.4%). **노션으로 옮기지 않은 이유**: 「무엇을 왜 바꿨나」의 정본이 노션에 없다 — ⑩은 「지금 어떻게 동작하나」, ⑧은 「판단이 갈린 것」만 담아 평범한 변경 경위는 소관 자체가 없었다. git 안에 두면 `grep`도 된다. **갱신**: 코딩원칙 13(⑦ 「병합은 누가 하는가」 반영, 「병합 여부를 언급하지 않는다」 삭제) · 14(⑦ 2026-08-27 재배정 반영 — 조사는 Claude Code, 재검증만 claude.ai. 한 달 낡아 있었다). **신설**: 「이 파일의 소관」 + 정본 라우팅 블록 — `CLAUDE.md`에 노션 매뉴얼 링크가 **하나도 없어** 읽고도 라우팅에 도달하지 못했다. **삭제**(전부 노션에 정본 있음): 「다음 세션 작업 예정」·「현재 버그 목록」(12건 중 11건 완료)·「탭 구조」·「공유 방식」. 기술 스택의 EF 버전 수치도 제거(적혀 있던 v24·v11 둘 다 이미 낡은 값). 코드 변경 없음 |
+| 2026-09-02 | **미병합 브랜치 3개 회수 — `CLAUDE.md` 이력 3행 복구**(PR #10 `7335f66` / #11 `94f4945` / #12 `cc3206d`). ⑦에 「지정 브랜치 세션에서도 Claude Code가 PR 생성까지 한다」가 2026-08-26부터 있었는데 이틀간 병합이 다운님께 넘어갔고, 그 사이 브랜치에 묶인 `CLAUDE.md` 이력행이 유실돼 있었다. 🔴 **규칙이 없어서가 아니라 라우팅을 안 열어서 생긴 사고다** — 규칙 부재와 규칙 미도달은 처방이 정반대이며, 후자에 조항을 더하면 오히려 나빠진다. 대가도 있었다: 08-18 `requirement_level` 정규화 이력행이 유실된 탓에 08-28 기록이 「id 71·72 병합이 이력 없이 이뤄졌다」고 **오판**했다 — 기록 유실이 다른 판단을 오염시킨 실례. ⚠️ `gh` CLI는 이 환경에 **없다**(실측). 병합은 GitHub MCP(`create_pull_request`→`merge_pull_request`)로 한다 |
+| 2026-09-01 | **사용자 데이터 서버화 + 정정사유 표시 + 행정구역 신·구 명칭**. ① **정정사유 표시 정상화**(`dc7ff4a`, PR #8 `50edeb1`) — 배지·툴팁·「특이사항 안내」가 winner 행의 `revision_note` 하나만 읽어 winner가 MYHOME이면 사유가 비었다. `loadGroupRevisionNote`/`pickGroupRevisionNote`/`injectRevisionNoteChip`로 **그룹 전체에서 사유를 찾아 표시**(우선순위 `revised_at_source='user_verified'` → `source='LH'` → `revised_at` 최신). 그룹 어디에도 없으면 **배지는 유지**하고 미제공 안내만 — 정정됐다는 사실 자체가 유효한 정보다. 파이프라인은 `collect-announcements`에 상세조회 게이트 예외 추가(`is_revised=true` + `revision_note IS NULL` + `detail_fetch_last_attempt IS NULL` 3조건). 🔴 **캡 90건을 늘리지 않고 정렬 1순위를 「활성 우선」으로만 바꿔** 유휴 슬롯만 회수했다 — 캡을 늘리면 그 캡이 지키던 실행시간·호출량이 함께 풀린다. 사유 있는 LH 공고 47→88. ② **찜 서버화 + 로그아웃 캐시 삭제**(`8dd5425`) — `saved_announcements` 신설(RLS 3정책, `user_id`에 `default auth.uid()`, `UNIQUE(user_id, announcement_id)`). `announcement_id`만 저장하고 카드 표시용 필드는 스냅샷하지 않는다(공고가 정정·마감돼도 찜이 따라가게). `announcements` 유니크가 `(source, announcement_id)`라 FK 불가 — soft reference다. 🔴 `getSavedNotices()` 소비처 7곳 중 2곳이 **동기 렌더 루프**라 비동기 조회를 직접 못 넣어 메모리 Set 캐시를 뒀다(localStorage 아님 — 「로컬은 캐시일 뿐」 원칙 유지). POLICY 17→20. ③ **행정구역 신·구 명칭**(`042c1f5`) — 🔴 **전역 치환 금지**. 「서구」는 5개 시·도, 「중구」는 6개 시·도에 있어 전역으로 걸면 서울 중구 검색에 인천 제물포구가 뜬다. **행 단위·시·도 스코프** 별칭으로 좁혔고 `sigungu_nm` NULL 행은 건드리지 않았다(정규화가 NULL 처리를 바꾸면 그 공고들이 통째로 사라진다). 시·도 레벨 gap 포함(「광주광역시」·「전라남도」·「강원도」가 DB에 0건이고 전부 통합 명칭). 셋 다 `sw.js` CACHE_NAME +1 동반. ①은 PR #8, ②③은 PR #9 `2a742b0`으로 병합 |
 
 ---
 
