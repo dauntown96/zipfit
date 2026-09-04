@@ -9,7 +9,26 @@ const requireEnv = (key: string): string => {
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const API_KEY = Deno.env.get('ODCLOUD_API_KEY')!
-const CRON_SECRET = requireEnv('CRON_SECRET')
+// 🔴 CRON_SECRET 교체 구간(2026-09-04) — 구 값과 신 값을 모두 수용한다.
+// 값 교체는 원자적이지 않다: 대시보드 시크릿 변경과 cron 잡 재작성 사이에 발화한 잡이
+// 401로 조용히 실패하고 collection_run_log에 흔적조차 남지 않는다. 그 구간을 없애려고
+// 이중 수용을 둔다. 교체가 끝나면 구 값 수용을 걷어낸 뒤에 대시보드에서 구 값을 삭제한다
+// (순서 역전 금지 — requireEnv('CRON_SECRET')이 필수라 먼저 삭제하면 EF가 부팅 즉시 throw).
+const CRON_SECRET    = requireEnv('CRON_SECRET')
+const CRON_SECRET_V2 = Deno.env.get('CRON_SECRET_V2') ?? null
+
+const matchCronSecret = (req: Request): 'v1' | 'v2' | null => {
+  const got = req.headers.get('x-cron-secret')
+  if (!got) return null
+  if (CRON_SECRET_V2 !== null && got === CRON_SECRET_V2) return 'v2'
+  if (got === CRON_SECRET) return 'v1'
+  return null
+}
+
+// 인증만 확인하고 즉시 반환한다(수집·외부 호출 없음). 시크릿 값은 담지 않는다.
+const authcheckResponse = (matched: 'v1' | 'v2') => new Response(JSON.stringify({
+  mode: 'authcheck', ok: true, matched, v2_configured: CRON_SECRET_V2 !== null,
+}), { headers: { 'Content-Type': 'application/json' } })
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
@@ -89,9 +108,11 @@ Deno.serve(async (req) => {
     'Access-Control-Allow-Headers': 'Content-Type,x-cron-secret',
   }})
   if (req.method !== 'POST') return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 })
-  if (req.headers.get('x-cron-secret') !== CRON_SECRET) {
+  const matched = matchCronSecret(req)
+  if (!matched) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
   }
+  if (new URL(req.url).searchParams.get('mode') === 'authcheck') return authcheckResponse(matched)
 
   try {
     // body에서 target 읽기 (없으면 전체)
