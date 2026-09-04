@@ -9,7 +9,21 @@ const requireEnv = (key: string): string => {
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const API_KEY = Deno.env.get('ODCLOUD_API_KEY')!
-const CRON_SECRET = requireEnv('CRON_SECRET')
+// 🔴 시크릿 게이트 — 값은 CRON_SECRET_V2 하나만 받는다.
+// 2026-09-04 교체 완료. 이중 수용(구 CRON_SECRET 병행)은 cron 잡 3개가 신 값으로
+// 도는 것을 확인한 뒤 걷어냈다 — 대시보드에서 구 값을 지우기 *전에* 걷어내야 한다.
+// requireEnv가 필수 참조라 순서를 뒤집으면 EF가 부팅 즉시 throw하기 때문이다.
+// 다음 교체 때도 같은 순서로 한다: 이중 수용 배포 → cron 전환·확인 → 단일 수용 배포 → 구 값 삭제.
+const CRON_SECRET = requireEnv('CRON_SECRET_V2')
+
+const matchCronSecret = (req: Request): boolean =>
+  req.headers.get('x-cron-secret') === CRON_SECRET
+
+// 인증만 확인하고 즉시 반환한다(수집·외부 호출 없음). 시크릿에 관한 어떤 값도 담지 않는다.
+// 미인증 요청은 이 지점에 도달하지 못하므로(401) 외부에 드러나는 정보가 없고,
+// 주기가 긴 EF를 부작용 없이 검증할 유일한 수단이라 교체 후에도 남긴다.
+const authcheckResponse = () => new Response(JSON.stringify({ mode: 'authcheck', ok: true }),
+  { headers: { 'Content-Type': 'application/json' } })
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
@@ -89,9 +103,10 @@ Deno.serve(async (req) => {
     'Access-Control-Allow-Headers': 'Content-Type,x-cron-secret',
   }})
   if (req.method !== 'POST') return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 })
-  if (req.headers.get('x-cron-secret') !== CRON_SECRET) {
+  if (!matchCronSecret(req)) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
   }
+  if (new URL(req.url).searchParams.get('mode') === 'authcheck') return authcheckResponse()
 
   try {
     // body에서 target 읽기 (없으면 전체)
