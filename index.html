@@ -2053,6 +2053,17 @@ async function loadEligibilityCriteria(){
   return _eligibilityCriteria;
 }
 
+// 자녀 가점 적용 여부 — scoring_criteria상 「자녀의 수」는 신혼신생아매입임대에만 있다.
+// 자격진단의 유형 목록(eligibility_criteria.housing_type)에는 「신혼신생아매입임대」 값이 없고
+// 「매입임대」가 그 상위 구간이므로, 유형(매입임대 포함)과 대상(신혼·신생아 계열) 두 축으로 좁힌다.
+const CHILD_SCORE_HOUSING_TYPES = ['매입임대'];
+const CHILD_SCORE_MARITALS = ['newborn','pre','married_7','married_child6'];
+function isChildScoreApplicable(eligibleTypes, marital){
+  const types = eligibleTypes || [];
+  const typeOk = types.some(t => CHILD_SCORE_HOUSING_TYPES.some(h => (t||'').includes(h)));
+  return typeOk && CHILD_SCORE_MARITALS.includes(marital);
+}
+
 async function diagnose(){
   const marital=document.getElementById('marital').value;
   const children=parseInt(document.getElementById('children').value)||0;
@@ -2135,10 +2146,13 @@ async function diagnose(){
       html+=`<div class="rbox warn" style="margin-top:6px"><p class="rtitle">♿ 최하층 우선배정</p><p class="rdesc">일부 공고(광명도시공사 등)에서 장애인·노약자 대상 최하층 우선배정을 지원해요. 공고 상세에서 <b>별첨 확인서</b>를 준비하세요.</p></div>`;
     }
 
-    // 가점 계산
-    let gp=0;
-    if(children>=3)gp+=4;else if(children===2)gp+=3;else if(children===1)gp+=2;
-    if(gp) html+=`<div class="rbox warn" style="margin-top:6px"><p class="rtitle">📊 예상 가점: ${gp}점 (자녀 항목)</p><p class="rdesc">지역본부마다 가점 평가항목 구성이 다를 수 있어요. 청약저축 납입횟수·거주기간·장애인 항목 등을 공고문에서 확인하세요.</p></div>`;
+    // 가점 계산 — 자녀 가점은 신혼신생아매입임대 계열에만 존재하므로 그 조건에서만 표시
+    // (scoring_criteria 실측: 「자녀의 수」 항목은 housing_type='신혼신생아매입임대'에만 있음)
+    if(isChildScoreApplicable(window.eligibleTypes, marital)){
+      let gp=0;
+      if(children>=3)gp+=4;else if(children===2)gp+=3;else if(children===1)gp+=2;
+      if(gp) html+=`<div class="rbox warn" style="margin-top:6px"><p class="rtitle">📊 예상 가점: ${gp}점 (자녀 항목 · 신혼신생아매입임대 기준)</p><p class="rdesc">지역본부마다 가점 평가항목 구성이 다를 수 있어요. 청약저축 납입횟수·거주기간·장애인 항목 등을 공고문에서 확인하세요.</p></div>`;
+    }
 
     html+=`<button class="btn btn-primary" onclick="goStep(2);matchHouses()" style="margin-top:0.5rem">주택 매칭하러 가기 →</button>`;
   }
