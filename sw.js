@@ -1,4 +1,4 @@
-const CACHE_NAME = 'zipfit-v70';
+const CACHE_NAME = 'zipfit-v71';
 // 코딩원칙 17번 ③: 외부 CDN 스크립트는 PRECACHE에 포함(오프라인/캐시 일관성)
 const PRECACHE = ['/zipfit/', '/zipfit/index.html'];
 // 외부 CDN은 별도로 캐싱한다. addAll에 함께 넣으면 CDN 일시 장애 시
