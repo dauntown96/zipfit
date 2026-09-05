@@ -151,6 +151,10 @@ select:focus,input:focus{border-color:#5DCAA5}
 .hu-wrap{margin-top:12px;border-top:1px solid #e8e8e0;padding-top:12px}
 .hu-title{font-size:13px;font-weight:600;color:#333;margin-bottom:8px;cursor:pointer}
 .policy-wrap{margin-top:12px;border-top:1px solid #e8e8e0;padding-top:12px}
+.stale-src{display:block;background:#fff8e6;border:1px solid #f0d9a0;border-radius:6px;padding:8px 10px;margin:0 0 10px;font-size:12px;line-height:1.5;color:#6b5320}
+.stale-src-msg{display:block}
+.stale-src-note{display:block;margin-top:4px;color:#7a6533;white-space:pre-wrap}
+.stale-src-note:empty{display:none}
 .policy-title{font-size:13px;font-weight:600;color:#333;margin-bottom:8px;cursor:pointer}
 .policy-item{border:1px solid #e8e8e0;border-radius:10px;padding:10px 12px;margin-bottom:8px}
 .policy-item:last-child{margin-bottom:0}
@@ -2466,6 +2470,47 @@ function appendSpecialNoteItem(id, itemHtml){
 // (MYHOME엔 사유 저장 경로 자체가 없어) 비어 있고, 정작 형제인 LH 행에는 사유가 있다.
 // 그래서 카드 상세를 열 때 그룹 전체에서 사유가 있는 행을 찾아 표시한다(데이터는 만들지 않는다).
 // 우선순위: user_verified(다운님 수기 검증분) > LH > revised_at 최신.
+// ── (d) 출처 표시 ────────────────────────────────────────────────────────────
+// 대표행(winner)이 자식 데이터를 하나도 안 들고 있는데 그룹조회 폴백이 형제 행의 것을 대신
+// 채워주는 경우가 있다. 이때 화면에는 아무 신호가 없어서 「정정이 이 항목을 안 건드렸다」
+// (형제 데이터 = 정답)와 「정정된 내용이 아직 분석되지 않았다」(형제 데이터 = 오답)가
+// 똑같이 보인다. 그래서 그 블록에 출처를 밝힌다. 🔴 데이터는 고치지 않는다 — 표시만이다.
+//
+// 판정은 is_revised가 아니라 "상태"로 한다: winner 자신의 행이 결과에 하나도 없으면 켠다.
+// 정정은 이 상태를 가장 자주 일으키는 계기일 뿐 원인이 아니며, 비정정 winner도 같은 모양이다.
+const STALE_SRC_MSG_REVISED = '정정 전 공고 기준입니다. 정정된 내용이 아직 반영되지 않았을 수 있으니 공고 원문을 함께 확인하세요.';
+const STALE_SRC_MSG_PLAIN   = '대표 공고와 다른 회차의 분석 데이터입니다. 대표 공고의 내용과 다를 수 있으니 공고 원문을 함께 확인하세요.';
+
+function cardElFor(id){ return document.querySelector(`[data-card-id="${id}"]`); }
+
+// 🔴 중복 제거(dedup) 이전의 원본 rows로 판정해야 한다. dedup은 먼저 나온 행을 남기는데
+// PostgREST의 정렬 기준상 winner 행이 아니라 형제 행이 남을 수 있어, dedup 후에 보면
+// 자식을 들고 있는 winner를 폴백으로 오판한다.
+function staleSourceBannerHtml(rawRows, annId, useGroup, id){
+  if(!useGroup || !annId) return '';
+  if(!Array.isArray(rawRows) || rawRows.length === 0) return '';
+  if(rawRows.some(r => r && r.announcement_id === annId)) return '';
+  const cardEl = cardElFor(id);
+  const revised = cardEl && cardEl.dataset.revised === '1';
+  const msg = revised ? STALE_SRC_MSG_REVISED : STALE_SRC_MSG_PLAIN;
+  const note = (cardEl && cardEl.dataset.revisionNoteFull) || '';
+  return `<div class="stale-src" data-stale-src>`
+    + `<span class="stale-src-msg">⚠️ ${escapeHtml(msg)}</span>`
+    + `<span class="stale-src-note" data-stale-note>${note ? '📝 정정 사유: ' + escapeHtml(note) : ''}</span>`
+    + `</div>`;
+}
+
+// 정정 사유는 그룹 조회로 뒤늦게 도착할 수 있다. 그때 이미 그려진 배너의 빈 사유 칸을 채운다.
+// 🔴 원문에 없는 사유를 지어내지 않는다 — 사유가 없으면 칸은 빈 채로 둔다.
+function fillStaleSourceNotes(id, note){
+  if(!note) return;
+  const detailEl = document.getElementById(id);
+  if(!detailEl) return;
+  detailEl.querySelectorAll('[data-stale-note]').forEach(el => {
+    if(!el.textContent.trim()) el.textContent = '📝 정정 사유: ' + note;
+  });
+}
+
 function pickGroupRevisionNote(rows){
   const withNote = (rows||[]).filter(r => r && typeof r.revision_note === 'string' && r.revision_note.trim());
   if(withNote.length === 0) return null;
@@ -2493,6 +2538,7 @@ function loadGroupRevisionNote(cardEl, id){
     if(note){
       cardEl.dataset.revisionNoteFull = note;
       injectRevisionNoteChip(cardEl, note);
+      fillStaleSourceNotes(id, note);
     }
     appendSpecialNoteItem(id, revisionNoteItemHtml(note));
   }).catch(err => {
@@ -2619,6 +2665,7 @@ function loadAnnouncementExtras(annId, detailEl, id, useGroup){
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
   })).then(r => r.ok ? r.json() : []).then(rows => {
     if(!Array.isArray(rows) || rows.length === 0) return;
+    const staleHtml = staleSourceBannerHtml(rows, annId, useGroup, id);
     // 같은 건물이 LH·MYHOME 두 파이프라인으로 각각 수집돼 서로 다른 announcement_id를 갖고,
     // 그룹조회(resolveAnnouncementIds)로 양쪽이 함께 잡히면 동일 파일이 중복 노출될 수 있어
     // file_hash(없으면 file_url의 drive fileId) 기준으로 먼저 중복을 제거한다.
@@ -2649,7 +2696,7 @@ function loadAnnouncementExtras(annId, detailEl, id, useGroup){
     };
     const wrap = document.createElement('details');
     wrap.className = 'extras-wrap';
-    wrap.innerHTML = `<summary class="extras-title">📷 사진·평면도·팸플릿 (${rows.length}건)</summary>` +
+    wrap.innerHTML = `<summary class="extras-title">📷 사진·평면도·팸플릿 (${rows.length}건)</summary>` + staleHtml +
       renderGroup('사진', photos) + renderGroup('평면도', floorplans) + renderGroup('팸플릿', pamphlets);
     const slot = document.getElementById('extras-slot-'+id);
     if(slot) slot.appendChild(wrap);
@@ -2805,6 +2852,7 @@ function loadAnnouncementPolicies(annId, detailEl, id, useGroup){
   resolveAnnouncementIds(annId, useGroup).then(ids => fetch(`${SUPABASE_URL}/rest/v1/announcement_policies?${idFilterFor(ids)}&order=category`, {
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
   })).then(r => r.ok ? r.json() : []).then(policies => {
+    const staleHtml = staleSourceBannerHtml(policies, annId, useGroup, id);
     // 그룹조회로 형제 announcement_id 여러 곳에 동일 정책이 중복 백필된 경우를 대비해
     // 카테고리+내용이 완전히 같은 행은 하나만 남긴다.
     if(Array.isArray(policies) && policies.length > 0){
@@ -2819,7 +2867,7 @@ function loadAnnouncementPolicies(annId, detailEl, id, useGroup){
     if(!Array.isArray(policies) || policies.length === 0) return;
     const wrap = document.createElement('details');
     wrap.className = 'policy-wrap';
-    wrap.innerHTML = `<summary class="policy-title">📋 정책 안내 (${policies.length}건)</summary>` +
+    wrap.innerHTML = `<summary class="policy-title">📋 정책 안내 (${policies.length}건)</summary>` + staleHtml +
       policies.map(p => `
         <div class="policy-item">
           <div class="policy-category">${escapeHtml(p.category || '')}</div>
@@ -2877,6 +2925,7 @@ function loadPreciseEligibility(annId, detailEl, id, useGroup){
   resolveAnnouncementIds(annId, useGroup).then(ids => fetch(`${SUPABASE_URL}/rest/v1/eligibility_criteria?${idFilterFor(ids)}&order=supply_form,rank`, {
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
   })).then(r => r.ok ? r.json() : []).then(rows => {
+    const staleHtml = staleSourceBannerHtml(rows, annId, useGroup, id);
     // 그룹조회로 형제 announcement_id 여러 곳에 동일 자격기준이 중복 백필된 경우를 대비해
     // 핵심 필드 조합이 완전히 같은 행은 하나만 남긴다.
     if(Array.isArray(rows) && rows.length > 0){
@@ -2891,7 +2940,7 @@ function loadPreciseEligibility(annId, detailEl, id, useGroup){
     if(!Array.isArray(rows) || rows.length === 0) return;
     const wrap = document.createElement('details');
     wrap.className = 'elig-wrap';
-    wrap.innerHTML = `<summary class="elig-title">🎯 이 공고 정밀 자격기준 (${rows.length}건)</summary>` +
+    wrap.innerHTML = `<summary class="elig-title">🎯 이 공고 정밀 자격기준 (${rows.length}건)</summary>` + staleHtml +
       rows.map(r => {
         const sf = r.supply_form ? escapeHtml(r.supply_form) : '일반';
         const rk = r.rank ? `${r.rank}순위` : '';
@@ -2937,6 +2986,7 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
   resolveAnnouncementIds(annId, useGroup).then(ids => fetch(`${SUPABASE_URL}/rest/v1/housing_units?${idFilterFor(ids)}&order=deposit.asc`, {
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
   })).then(r => r.ok ? r.json() : []).then(units => {
+    const staleHtml = staleSourceBannerHtml(units, annId, useGroup, id);
     // 그룹조회로 형제 announcement_id 여러 곳에 동일 세대정보가 중복 백필된 경우를 대비해
     // 핵심 필드 조합이 완전히 같은 행은 하나만 남긴다(announcement_extras의 file_hash dedup과 동일 취지).
     if(Array.isArray(units) && units.length > 0){
@@ -2960,7 +3010,7 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
     huGroupsCache[id] = groups;
     const wrap = document.createElement('details');
     wrap.className = 'hu-wrap';
-    wrap.innerHTML = `<summary class="hu-title">🏠 세대별 정보 (${units.length}건)</summary><div class="hu-list" id="hu-list-${id}"></div>`;
+    wrap.innerHTML = `<summary class="hu-title">🏠 세대별 정보 (${units.length}건)</summary>` + staleHtml + `<div class="hu-list" id="hu-list-${id}"></div>`;
     if(groups.length === 1) wrap.open = true; // 건물이 1개뿐이면 처음부터 펼쳐서 보여줌
     const slot = document.getElementById('hu-slot-'+id);
     if(slot) slot.appendChild(wrap);
