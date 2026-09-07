@@ -12,5 +12,6 @@ WITH target AS (
 SELECT a.announcement_id
 FROM announcements a, target t
 WHERE a.title IS NOT NULL
+  AND a.hidden_from_listing IS NOT TRUE
   AND announcement_dedup_key(a.title) = t.dedup_key;
 $function$

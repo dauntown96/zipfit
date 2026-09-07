@@ -15,6 +15,7 @@ base AS (
     trim(regexp_replace(a.precise_address, '\s*\([^)]*\)\s*$', '')) AS addr_core
   FROM announcements a
   WHERE a.title IS NOT NULL
+    AND a.hidden_from_listing IS NOT TRUE
 ),
 group_rows AS (
   SELECT b.*
