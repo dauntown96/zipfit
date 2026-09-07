@@ -756,8 +756,28 @@ function parseNoticeDate(s){
     const d = new Date(str);
     return isNaN(d.getTime()) ? null : d;
   }
+  // 날짜만 있는 문자열은 「로컬 자정」으로 만든다.
+  // new Date('2026-09-10')은 UTC 자정으로 해석되어 KST에서는 09:00이 되고,
+  // 그 상태로 toISOString()을 쓰면 시간대에 따라 날짜가 하루 밀린다.
+  const m = str.match(/^(\d{4})[-.\/](\d{1,2})[-.\/](\d{1,2})\.?$/);
+  if(m){
+    const d = new Date(+m[1], +m[2]-1, +m[3]);
+    return isNaN(d.getTime()) ? null : d;
+  }
   const d = new Date(str.replace(/\./g, '-'));
   return isNaN(d.getTime()) ? null : d;
+}
+// 날짜 키는 항상 「로컬(한국 사용자 기준 KST) 날짜」로 만든다 — toISOString()은 UTC라 쓰지 않는다.
+function dateKey(d){
+  if(!d) return '';
+  const p2 = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;
+}
+// 로컬 자정(00:00:00.000). 날짜 비교에서 시각을 제거하는 데 쓴다.
+function startOfLocalDay(d){
+  const x = new Date(d);
+  x.setHours(0,0,0,0);
+  return x;
 }
 function isNewNotice(row){
   // 기준: announcement_date(모집공고일) → apply_start → created_at 순 fallback
@@ -771,11 +791,11 @@ function isNewNotice(row){
 function isClosingSoon(row){
   const d = parseNoticeDate(row['신청마감일']||row['apply_end']||'');
   if(!d) return false;
-  const endOfDay = new Date(d);
-  if(!row['신청마감일']?.includes('T') && !row['apply_end']?.includes('T')){
-    endOfDay.setHours(23, 59, 59, 999);
-  }
-  const diff = (endOfDay - new Date()) / (1000*60*60*24);
+  // 🔴 시각을 비교에서 제거한다 — 양쪽 다 「로컬 날짜의 00:00」으로 맞춘 뒤 일수 차를 센다.
+  // 예전에는 마감일 23:59(UTC 자정 파싱분이라 KST 09:00 기준)와 「지금 시각」을 뺐다.
+  // 그래서 3일째 날의 diff가 3을 넘어(KST에서는 하루 종일 3.4~4.0) 통째로 잘렸다
+  // — 2026-09-05 실측 화면 18 vs SQL 27, 차이 9건이 정확히 3일째 날 전부였다.
+  const diff = Math.round((startOfLocalDay(d) - startOfLocalDay(new Date())) / (1000*60*60*24));
   return diff >= 0 && diff <= 3;
 }
 function extractRegionTop(regionText){
@@ -1763,7 +1783,7 @@ async function loadInsightData(){
 
 function renderInsight(rows, wrap, statsRows){
   const today = new Date();
-  const todayStr = today.toISOString().slice(0,10);
+  const todayStr = dateKey(today);
 
   // ① KPI
   const kpiActive = rows.filter(r=>(r.status||'')==='접수중').length;
@@ -1779,19 +1799,19 @@ function renderInsight(rows, wrap, statsRows){
   const timelineMap = {};
   for(let i=0;i<14;i++){
     const d = new Date(today); d.setDate(d.getDate()+i);
-    timelineMap[d.toISOString().slice(0,10)] = 0;
+    timelineMap[dateKey(d)] = 0;
   }
   rows.forEach(r=>{
     const raw = r.apply_end||'';
     if(!raw) return;
     const d = parseNoticeDate(raw);
     if(!d) return;
-    const key = d.toISOString().slice(0,10);
+    const key = dateKey(d);
     if(key in timelineMap) timelineMap[key]++;
   });
   const timelineEntries = Object.entries(timelineMap).sort((a,b)=>a[0]<b[0]?-1:1);
   const timelineMax = Math.max(1,...timelineEntries.map(e=>e[1]));
-  const tomorrowStr = new Date(new Date(today).setDate(today.getDate()+1)).toISOString().slice(0,10);
+  const tomorrowStr = dateKey(new Date(new Date(today).setDate(today.getDate()+1)));
 
   // ③ 지역별 (sido_nm||region) — 공고수 + 세대수 합계
   const regionMap = {};
@@ -1812,7 +1832,7 @@ function renderInsight(rows, wrap, statsRows){
     if(!r.announcement_date) return;
     const d = parseNoticeDate(r.announcement_date);
     if(!d||d<d30ago) return;
-    const key = d.toISOString().slice(0,10);
+    const key = dateKey(d);
     trendMap[key]=(trendMap[key]||0)+1;
   });
   const trendEntries = Object.entries(trendMap).sort((a,b)=>a[0]<b[0]?-1:1);
