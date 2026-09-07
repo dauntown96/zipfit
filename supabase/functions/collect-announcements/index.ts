@@ -451,6 +451,10 @@ async function collect() {
   // 그래서 "정정 + 사유 없음 + 시도 이력 없음"인 건에 한해 마감이어도 대상에 넣는다.
   // detail_fetch_last_attempt 조건이 핵심 — 성공이든 실패든 시도하면 기록되므로(성공: 상세 upsert,
   // 실패: bump_detail_fetch_fail) 매 회차 같은 건을 무한 재시도하지 않는다.
+  // 🔴 다만 이 게이트는 아래에서 lhNotices(= 이번 회차 LH 목록)를 filter하므로, 목록 윈도우
+  // (fetchNoticeList의 PAN_ST_DT = 오늘-90일) 안에 있는 공고에만 닿는다. 윈도우 밖 공고는
+  // 여기서 아무리 대상으로 뽑혀도 목록에 없어 상세조회로 이어지지 않는다 — 이 경로로는
+  // 영원히 채워지지 않는다(2026-09-05 실측: 미시도 101건 중 95건이 윈도우 밖).
   const revisionBackfillIds = new Set<string>()
   try {
     const { data: pending } = await supabase.from('announcements')
