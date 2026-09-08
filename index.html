@@ -17,6 +17,7 @@
         crossorigin="anonymous"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
+html{scroll-padding-top:88px}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f0;color:#1a1a1a;min-height:100vh}
 body.theme-dark{background:#16181d;color:#e8e8e8}
 body.theme-dark .hero,body.theme-dark .panel,body.theme-dark .hcard,body.theme-dark .hu-row,body.theme-dark .hu-group-head,body.theme-dark .hu-group-body,body.theme-dark .policy-item,body.theme-dark .docs-group,body.theme-dark .elig-item,body.theme-dark .extras-thumb{background:#1f2229;border-color:#2c2f38}
@@ -35,7 +36,7 @@ body.fs-large{font-size:17px}
 .logo{font-size:24px;font-weight:600;color:#111;margin-bottom:0.5rem}
 .logo span{color:#1D9E75}
 .sub{font-size:14px;color:#666;line-height:1.7}
-.badge{display:inline-block;font-size:11px;padding:4px 12px;border-radius:20px;background:#E1F5EE;color:#085041;margin-top:0.75rem;font-weight:500}
+.badge{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom;font-size:11px;padding:4px 12px;border-radius:20px;background:#E1F5EE;color:#085041;margin-top:0.75rem;font-weight:500}
 .steps{display:flex;gap:8px;margin-bottom:1.5rem}
 /* 대탭 (메인 카테고리) */
 .maintabs{display:flex;gap:6px;margin-bottom:1rem;background:#ece9e0;padding:5px;border-radius:14px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,0.08)}
@@ -72,7 +73,7 @@ body.fs-large{font-size:17px}
 .field{margin-bottom:1rem}
 .label{font-size:13px;color:#555;margin-bottom:6px;display:block;font-weight:500}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-select,input[type=number],input[type=text]{width:100%;padding:9px 12px;font-size:14px;border:1px solid #ddd;border-radius:8px;background:#fff;color:#111;outline:none;transition:border 0.15s}
+select,input[type=number],input[type=text],input[type=email]{width:100%;padding:9px 12px;font-size:14px;border:1px solid #ddd;border-radius:8px;background:#fff;color:#111;outline:none;transition:border 0.15s}
 select:focus,input:focus{border-color:#5DCAA5}
 /* 공고 검색창(flex 레이아웃)은 전역 width:100% 규칙과 충돌해 찌그러지므로 이 두 요소만 예외 처리 */
 #noticeSearchInput{width:auto;flex:1;min-width:0}
@@ -243,7 +244,7 @@ body.theme-dark .elig-subrow span:first-child{color:#9aa0aa}
 <div class="wrap">
   <div class="hero">
     <div class="logo">🏠 <span>Zip</span>Fit</div>
-    <p class="sub">전국 공공임대·분양 공고 맞춤 매칭 서비스<br>LH·SH·GH 등 공공기관 공고를 한 곳에서. 내 조건에 맞는 집을 빠르게 찾아드립니다.</p>
+    <p class="sub">전국 공공임대·분양 공고 맞춤 매칭 서비스<br>전국 공공기관 공고를 한 곳에서. 내 조건에 맞는 집을 빠르게 찾아드립니다.</p>
     <span class="badge">📢 2026년 경기북부 2차 공고 · 신청기간 6.30~7.2</span>
   </div>
 
@@ -1005,23 +1006,43 @@ function searchFilterNotices(list, query, scope){
 
 // 이미 로드된 noticeData에 클라이언트 사이드 필터(마감숨기기/대상계층/검색어)와 정렬을 적용해 다시 그린다.
 // 검색어 입력처럼 서버 재호출이 필요 없는 변경은 loadNoticeData() 대신 이 함수만 호출한다.
-function applyNoticeFiltersAndRender(){
-  const hideClosed = document.getElementById('hideClosedChk')?.checked;
-  let filtered = noticeData;
-  if(hideClosed && !activeNoticeStatus){
-    // status_normalized는 이제 원본 처리상태(status)를 그대로 반환하지만(정정여부와 더 이상
-    // 섞이지 않음), 접수마감 판정은 명시적으로 원본 처리상태 필드를 직접 사용한다.
-    filtered = noticeData.filter(n => n['처리상태'] !== '접수마감');
-  }
+// 마감 숨기기를 뺀 나머지 클라이언트 필터(대상계층·검색어)만 적용한다.
+// 0건일 때 「정말 없는 것」과 「마감 필터에 가려진 것」을 가르려면 같은 조건으로 마감까지
+// 포함해 한 번 더 세야 하는데, loadNoticeData()가 서버에 넘기는 p_status는 status 칩만
+// 반영하므로(마감 숨기기는 서버로 안 나간다) noticeData에는 마감 공고가 이미 들어 있다.
+// 따라서 재질의 없이 클라이언트에서 셀 수 있다.
+function applyNoticeSubFilters(rows){
+  let out = rows;
   if(activeNoticeTarget){
-    filtered = filtered.filter(n => {
+    out = out.filter(n => {
       const tags = classifyDemographics(n['공급유형'], n['공고명']);
       return tags.some(t => t.label === activeNoticeTarget);
     });
   }
   const searchQuery = document.getElementById('noticeSearchInput')?.value || '';
   const searchScope = document.getElementById('noticeSearchScopeSel')?.value || 'title-region';
-  filtered = searchFilterNotices(filtered, searchQuery, searchScope);
+  return searchFilterNotices(out, searchQuery, searchScope);
+}
+
+// 안내에서 「마감 공고까지 보기」를 눌렀을 때. 체크박스를 코드로 바꾸면 onchange가 안 뜨므로
+// 직접 다시 그린다 — noticeData에 마감이 이미 있어 서버 재질의는 필요 없다.
+function showClosedNotices(){
+  const chk = document.getElementById('hideClosedChk');
+  if(!chk) return;
+  chk.checked = false;
+  updateFilterToggleBtn();
+  applyNoticeFiltersAndRender();
+}
+
+function applyNoticeFiltersAndRender(){
+  const hideClosed = document.getElementById('hideClosedChk')?.checked;
+  // status 칩을 직접 고른 경우엔 칩이 우선이라 마감 숨기기가 개입하지 않는다.
+  const closedHidden = !!hideClosed && !activeNoticeStatus;
+  // status_normalized는 이제 원본 처리상태(status)를 그대로 반환하지만(정정여부와 더 이상
+  // 섞이지 않음), 접수마감 판정은 명시적으로 원본 처리상태 필드를 직접 사용한다.
+  let filtered = applyNoticeSubFilters(
+    closedHidden ? noticeData.filter(n => n['처리상태'] !== '접수마감') : noticeData
+  );
 
   const sortVal = document.getElementById('noticeSortSel')?.value || 'date-desc';
   const nullLast = (a, b, fn, desc) => {
@@ -1057,7 +1078,9 @@ function applyNoticeFiltersAndRender(){
 
   noticeFiltered = filtered;
   noticeVisibleCount = 20;
-  renderNoticeList(filtered, noticeData.length);
+  const hiddenClosedCount = (!filtered.length && closedHidden)
+    ? applyNoticeSubFilters(noticeData).length : 0;
+  renderNoticeList(filtered, noticeData.length, hiddenClosedCount);
 }
 
 // ── 핵심: 필터 변경 시 RPC 재호출 ──
@@ -1447,14 +1470,29 @@ async function shareNotice(btn, title, region, type, url){
   }
 }
 
-function renderNoticeList(filtered, totalCount){
+// move_in_date는 LH가 준 수집 필드로 값 자체는 정확하다. 다만 국민·영구임대는 기존 단지의
+// 예비입주자 재공고가 많아 과거 입주월이 정상이다 — 2026-09-08 실측으로 값이 있는 47건 중
+// 40건(85%)이 과거였다. 「입주예정」 하나로 고정하면 다수가 미래를 주장하는 틀린 라벨이 된다.
+function moveInLabel(v){
+  const m = String(v||'').match(/^(\d{4})\D+(\d{1,2})/);
+  if(!m) return '입주시기';
+  const now = new Date();
+  return (Number(m[1])*100 + Number(m[2])) <= (now.getFullYear()*100 + now.getMonth() + 1)
+    ? '입주' : '입주예정';
+}
+
+function renderNoticeList(filtered, totalCount, hiddenClosedCount){
   const statusEl = document.getElementById('notice-status');
   const listEl   = document.getElementById('notice-list');
   listEl.innerHTML = '';
 
   if(!filtered.length){
     statusEl.className = 'rbox warn';
-    statusEl.innerHTML = '<p class="rtitle">⚠ 조건에 맞는 공고가 없어요</p>';
+    statusEl.innerHTML = hiddenClosedCount > 0
+      ? `<p class="rtitle">⚠ 접수 중인 공고가 없어요</p>`
+        + `<p class="rdesc">마감된 공고까지 포함하면 ${hiddenClosedCount}건이 있어요.</p>`
+        + `<button class="btn btn-sec btn-sm" style="margin-top:8px" onclick="showClosedNotices()">마감 공고까지 보기 (${hiddenClosedCount}건) →</button>`
+      : '<p class="rtitle">⚠ 조건에 맞는 공고가 없어요</p>';
     return;
   }
 
@@ -1463,7 +1501,7 @@ function renderNoticeList(filtered, totalCount){
     ? '조건에 맞는 공고 '+filtered.length+'건 (전체 '+totalCount+'건 중)'
     : '전체 공고 '+filtered.length+'건';
   statusEl.className = 'rbox ok';
-  statusEl.innerHTML = '<p class="rtitle">✅ '+countText+'</p><p class="rdesc">매일 9·12·15·18시 자동 업데이트</p>';
+  statusEl.innerHTML = '<p class="rtitle">✅ '+countText+'</p><p class="rdesc">수시로 자동 업데이트</p>';
 
   const shown = filtered.slice(0, noticeVisibleCount);
   let html = '';
@@ -1497,7 +1535,7 @@ function renderNoticeList(filtered, totalCount){
       detailRows.push(['전용면적', areaStr]);
     }
     if(n['total_units']) detailRows.push(['총 세대수', n['total_units']+'세대']);
-    if(n['move_in_date']) detailRows.push(['입주예정', n['move_in_date']]);
+    if(n['move_in_date']) detailRows.push([moveInLabel(n['move_in_date']), n['move_in_date']]);
     if(n['deposit_min']) detailRows.push(['보증금', Number(n['deposit_min']).toLocaleString()+'원']);
     if(n['rent_min']) detailRows.push(['월임대료', Number(n['rent_min']).toLocaleString()+'원']);
     if(annDate) detailRows.push(['공고일', annDate]);
@@ -1802,6 +1840,16 @@ async function loadInsightData(){
   }
 }
 
+// 지역 행 하나. 접힌 부분과 펼친 부분이 같은 모양이어야 해 함수로 뺐다.
+// regionMaxCnt·regionMaxUnits는 renderInsight의 지역 스코프에서 읽는다.
+function toggleRegionRest(btn){
+  const el = document.getElementById('regionRest');
+  if(!el) return;
+  const willOpen = el.style.display === 'none';
+  el.style.display = willOpen ? 'flex' : 'none';
+  btn.textContent = willOpen ? btn.dataset.less : btn.dataset.more;
+}
+
 function renderInsight(rows, wrap, statsRows){
   const today = new Date();
   const todayStr = dateKey(today);
@@ -1838,13 +1886,32 @@ function renderInsight(rows, wrap, statsRows){
   const regionMap = {};
   rows.forEach(r=>{
     const k = r.sido_nm||r.region||'기타';
-    if(!regionMap[k]) regionMap[k]={cnt:0,units:0};
+    if(!regionMap[k]) regionMap[k]={cnt:0,units:0,hasUnits:false};
     regionMap[k].cnt++;
-    if(r.total_units) regionMap[k].units += Number(r.total_units)||0;
+    if(r.total_units){ regionMap[k].units += Number(r.total_units)||0; regionMap[k].hasUnits=true; }
   });
-  const regionTop = Object.entries(regionMap).sort((a,b)=>b[1].cnt-a[1].cnt).slice(0,10);
-  const regionMaxCnt = Math.max(1,...regionTop.map(e=>e[1].cnt));
-  const regionMaxUnits = Math.max(1,...regionTop.map(e=>e[1].units));
+  const REGION_HEAD = 10;
+  const regionAll = Object.entries(regionMap).sort((a,b)=>b[1].cnt-a[1].cnt);
+  const regionTop = regionAll.slice(0, REGION_HEAD);
+  const regionRest = regionAll.slice(REGION_HEAD);
+  // 막대 기준은 접힘·펼침 상태와 무관하게 같아야 하므로 전 지역 기준으로 잡는다
+  const regionMaxCnt = Math.max(1,...regionAll.map(e=>e[1].cnt));
+  const regionMaxUnits = Math.max(1,...regionAll.map(e=>e[1].units));
+  const regionRowHTML = ([region,v])=>`
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;color:#555;margin-bottom:4px">
+              <span style="font-weight:600">${region}</span>
+              <span style="color:#888">${v.cnt}건${v.hasUnits?' · '+v.units.toLocaleString()+'세대':' · <span style="color:#bbb">세대수 정보 없음</span>'}</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:3px">
+              <div style="background:#eee;border-radius:4px;height:8px;overflow:hidden">
+                <div style="background:#5a7af7;height:100%;width:${Math.round(v.cnt/regionMaxCnt*100)}%;border-radius:4px;transition:width 0.4s"></div>
+              </div>
+              ${(v.hasUnits&&v.units>0)?`<div style="background:#eee;border-radius:4px;height:8px;overflow:hidden">
+                <div style="background:#1D9E75;height:100%;width:${Math.round(v.units/regionMaxUnits*100)}%;border-radius:4px;transition:width 0.4s"></div>
+              </div>`:''}
+            </div>
+          </div>`;
 
   // ④ 최근 30일 추이
   const d30ago = new Date(today); d30ago.setDate(d30ago.getDate()-30);
@@ -1865,7 +1932,7 @@ function renderInsight(rows, wrap, statsRows){
   wrap.innerHTML = `
     <div style="${S}">
       <p style="${T}">📊 공고 통계 인사이트</p>
-      <p style="font-size:13px;color:#888;margin:0">전국 <strong style="color:#5a7af7">${rows.length.toLocaleString()}개</strong> 공고 · 매일 9·12·15·18시 자동 업데이트</p>
+      <p style="font-size:13px;color:#888;margin:0">전국 <strong style="color:#5a7af7">${rows.length.toLocaleString()}개</strong> 공고 · 수시로 자동 업데이트</p>
     </div>
 
     <div style="${S}">
@@ -1906,24 +1973,17 @@ function renderInsight(rows, wrap, statsRows){
     </div>
 
     <div style="${S}">
-      <p style="${T}">📍 지역별 공고 현황 (상위 10)</p>
+      <p style="${T}">📍 지역별 공고 현황 (전국 ${regionAll.length}개 지역)</p>
       <div style="display:flex;flex-direction:column;gap:10px">
-        ${regionTop.map(([region,v])=>`
-          <div>
-            <div style="display:flex;justify-content:space-between;font-size:12px;color:#555;margin-bottom:4px">
-              <span style="font-weight:600">${region}</span>
-              <span style="color:#888">${v.cnt}건${v.units>0?' · '+v.units.toLocaleString()+'세대':''}</span>
-            </div>
-            <div style="display:flex;flex-direction:column;gap:3px">
-              <div style="background:#eee;border-radius:4px;height:8px;overflow:hidden">
-                <div style="background:#5a7af7;height:100%;width:${Math.round(v.cnt/regionMaxCnt*100)}%;border-radius:4px;transition:width 0.4s"></div>
-              </div>
-              ${v.units>0?`<div style="background:#eee;border-radius:4px;height:8px;overflow:hidden">
-                <div style="background:#1D9E75;height:100%;width:${Math.round(v.units/regionMaxUnits*100)}%;border-radius:4px;transition:width 0.4s"></div>
-              </div>`:''}
-            </div>
-          </div>`).join('')}
+        ${regionTop.map(regionRowHTML).join('')}
       </div>
+      ${regionRest.length ? `
+        <div id="regionRest" style="display:none;flex-direction:column;gap:10px;margin-top:10px">
+          ${regionRest.map(regionRowHTML).join('')}
+        </div>
+        <button class="btn btn-sec btn-sm" id="regionMoreBtn" style="margin-top:10px"
+                data-more="나머지 ${regionRest.length}개 지역 더 보기 ↓" data-less="접기 ↑"
+                onclick="toggleRegionRest(this)">나머지 ${regionRest.length}개 지역 더 보기 ↓</button>` : ''}
       <div style="display:flex;gap:12px;margin-top:10px">
         <span style="font-size:11px;color:#888;display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#5a7af7"></span>공고수</span>
         <span style="font-size:11px;color:#888;display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#1D9E75"></span>세대수</span>
@@ -1973,17 +2033,17 @@ function renderInsight(rows, wrap, statsRows){
       const gapRows = TYPES.map(({label, keyword})=>{
         const stat = statsByType[label]||{};
         const stock = Number(stat['총세대수'])||0;
-        const noticeCnt = rows.filter(r=>{
-          const ht = r.housing_type||'';
-          return ht.includes(keyword) && (r.status||'')==='접수중';
-        }).length;
-        return {label, stock, noticeCnt};
+        const ofType = rows.filter(r=>(r.housing_type||'').includes(keyword));
+        const noticeCnt = ofType.filter(r=>(r.status||'')==='접수중').length;
+        // 「공고중」·「정정공고중」 = 게시됐으나 접수 시작 전. 접수중과 합산하지 않고 따로 센다.
+        const upcomingCnt = ofType.filter(r=>['공고중','정정공고중'].includes(r.status||'')).length;
+        return {label, stock, noticeCnt, upcomingCnt};
       });
 
       const secA = `<div style="${SB}">
-        <p style="${TB}">🏘️ 재고 세대 vs 현재 공고 (접수중)</p>
+        <p style="${TB}">🏘️ 재고 세대 vs 현재 공고</p>
         <div style="display:flex;flex-direction:column;gap:14px">
-          ${gapRows.map(({label, stock, noticeCnt})=>`
+          ${gapRows.map(({label, stock, noticeCnt, upcomingCnt})=>`
             <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:#f8f9ff;border-radius:10px">
               <div>
                 <p style="font-size:13px;font-weight:700;color:#333;margin:0 0 4px">${label}</p>
@@ -1992,8 +2052,12 @@ function renderInsight(rows, wrap, statsRows){
               <div style="text-align:right">
                 ${noticeCnt>0
                   ? `<p style="font-size:14px;font-weight:700;color:#1D9E75;margin:0">${noticeCnt}건</p>
-                     <p style="font-size:10px;color:#888;margin:2px 0 0">접수중 공고</p>`
-                  : `<p style="font-size:12px;color:#bbb;margin:0">현재 공고 없음</p>`}
+                     <p style="font-size:10px;color:#888;margin:2px 0 0">접수중 공고</p>
+                     ${upcomingCnt>0?`<p style="font-size:10px;color:#EF9F27;margin:2px 0 0">공고중 ${upcomingCnt}건</p>`:''}`
+                  : upcomingCnt>0
+                    ? `<p style="font-size:14px;font-weight:700;color:#EF9F27;margin:0">${upcomingCnt}건</p>
+                       <p style="font-size:10px;color:#888;margin:2px 0 0">공고중 (접수 시작 전)</p>`
+                    : `<p style="font-size:12px;color:#bbb;margin:0">접수중·공고중 모두 없음</p>`}
               </div>
             </div>`).join('')}
         </div>
@@ -2045,12 +2109,11 @@ async function updateBannerFromDB(){
     const rows=await res.json();
     if(!rows||!rows.length) return;
     const active=rows.find(r=>r.status==='접수중')||rows[0];
-    const titleShort=(active.title||'').slice(0,20);
     const start=active.apply_start||'';
     const end=active.apply_end||'';
     const datePart=(start||end)?` · ${start||'-'}~${end||'-'}`:'';
     const el=document.querySelector('.badge');
-    if(el) el.textContent=`📢 ${titleShort}${datePart}`;
+    if(el) el.textContent=`📢 ${active.title||''}${datePart}`;
   }catch(e){console.warn('배너 업데이트 실패:',e);}
 }
 document.addEventListener('DOMContentLoaded', updateBannerFromDB);
@@ -3488,7 +3551,7 @@ function renderMatchResults(rows){
       detailRows.push(['전용면적', areaStr]);
     }
     if(n.total_units) detailRows.push(['총 세대수', n.total_units+'세대']);
-    if(n.move_in_date) detailRows.push(['입주예정', n.move_in_date]);
+    if(n.move_in_date) detailRows.push([moveInLabel(n.move_in_date), n.move_in_date]);
     if(n.deposit_min) detailRows.push(['보증금', Number(n.deposit_min).toLocaleString()+'원']);
     if(n.rent_min) detailRows.push(['월임대료', Number(n.rent_min).toLocaleString()+'원']);
     if(annDate) detailRows.push(['공고일', annDate]);
@@ -3674,8 +3737,7 @@ function buildChecklist(){
       <p style="font-size:12px;color:#888;margin-bottom:12px">공고 탭에서 공고를 저장해주세요.</p>
       <button class="btn btn-sec btn-sm" onclick="goMain(2)">공고 탭으로 이동 →</button>
     </div>`;
-    bodyEl.style.opacity='0.35';
-    bodyEl.style.pointerEvents='none';
+    bodyEl.style.display='none';
     document.getElementById('dday-num').textContent='D-?';
     document.getElementById('dday-sub').textContent='';
     document.getElementById('checklist-common').innerHTML='';
@@ -3685,13 +3747,14 @@ function buildChecklist(){
     return;
   }
 
-  bodyEl.style.opacity='1';
-  bodyEl.style.pointerEvents='';
+  bodyEl.style.display='';
 
   const prevId = document.getElementById('noticeSelect')?.value;
   const options = saved.map(s=>{
     const endDate = s.apply_end ? s.apply_end.slice(5,10).replace('-','.') : '미정';
-    const shortTitle = (s.title||'').slice(0,25);
+    // <option>에는 text-overflow가 먹지 않아 여기서만 글자 수로 자르되, 잘린 사실을 표시한다
+    const rawTitle = s.title||'';
+    const shortTitle = rawTitle.length > 25 ? rawTitle.slice(0,25)+'…' : rawTitle;
     return `<option value="${s.id}"${s.id===prevId?' selected':''}>${shortTitle} (마감: ${endDate})</option>`;
   }).join('');
 
