@@ -1539,14 +1539,11 @@ function noticeShowMore(){
 }
 </script>
 <script>
-const HOUSING_CRITERIA = {
-  '매입임대':     { incomePct: 100, assetLimit: 36200, targets: ['신혼부부','신생아가구','한부모가족','유자녀혼인가구','청년'] },
-  '행복주택':     { incomePct: 120, assetLimit: 36200, targets: ['신혼부부','청년','대학생','고령자','장애인','주거급여수급자'] },
-  '국민임대':     { incomePct: 70,  assetLimit: 36200, targets: ['전체','청년','장애인','고령자'] },
-  '영구임대':     { incomePct: 50,  assetLimit: 24100, targets: ['전체'] },
-  '통합공공임대': { incomePct: 150, assetLimit: 36200, targets: ['전체'] },
-  '분양':         { incomePct: 160, assetLimit: 50000, targets: ['전체'] },
-};
+// 🔴 자격기준 수치(소득%·자산한도)는 여기 두지 않는다. 정본은 DB `eligibility_criteria`의 `기본기준` 행이다.
+// 2026-09-08까지 이 상수가 소득%·자산한도를 함께 들고 있었고, DB와 따로 낡아 3.62억(2025년 값)이
+// 화면에 그대로 노출됐다. 같은 값을 두 곳에서 들고 있으면 반드시 한쪽이 낡는다.
+// 여기 남은 것은 「칩에 어떤 유형을 띄울까」뿐이다.
+const HOUSING_TYPES = ['매입임대','행복주택','국민임대','영구임대','통합공공임대','분양'];
 // 가구원수별 중위소득 100% 기준 (2026년, 만원)
 const MEDIAN_INCOME = { 1:228, 2:381, 3:492, 4:602, 5:708, 6:814 };
 
@@ -1560,6 +1557,13 @@ let visibleCount=3;
 let lastFiltered=[];
 
 function fmt(n){return Math.round(n/10000).toLocaleString()+'만원';}
+// 「3억 4,500만원」 꼴. 자산 한도처럼 억 단위가 넘어가는 금액에 쓴다.
+function fmtEok(n){
+  const man = Math.round(n/10000);
+  const eok = Math.floor(man/10000), rest = man%10000;
+  if(eok<=0) return man.toLocaleString()+'만원';
+  return rest ? `${eok}억 ${rest.toLocaleString()}만원` : `${eok}억원`;
+}
 function fmtR(n){return (Math.round(n/1000)/10).toLocaleString()+'만원';}
 
 // ── 지역/유형 칩을 데이터에서 동적으로 생성 (행정구역이 바뀌어도 자동 대응) ──
@@ -1589,7 +1593,7 @@ async function loadRegionsFromSupabase(){
 
 function buildChipOptions(){
   const regions=allRegions.length?allRegions:[];
-  const types=Object.keys(HOUSING_CRITERIA);
+  const types=HOUSING_TYPES;
 
   // 추천 탭 칩
   buildChipGroup('regionChips',regions,selectedRegions,
@@ -2068,13 +2072,11 @@ async function loadEligibilityCriteria(){
       const rows = await res.json();
       if(Array.isArray(rows) && rows.length > 0){ _eligibilityCriteria = rows; return rows; }
     }
-  } catch(e){ console.warn('eligibility_criteria 로드 실패, fallback 사용:', e); }
-  // fallback: HOUSING_CRITERIA 상수 → 동일 구조로 변환
-  _eligibilityCriteria = Object.entries(HOUSING_CRITERIA).map(([ht, c]) => ({
-    housing_type: ht, supply_form: '일반',
-    income_pct: c.incomePct, income_pct_dual_income: c.incomePct, asset_limit: c.assetLimit * 10000
-  }));
-  return _eligibilityCriteria;
+  } catch(e){ console.warn('eligibility_criteria 로드 실패:', e); }
+  // 🔴 상수 폴백을 두지 않는다. 예전에는 여기서 낡은 상수로 조용히 떨어져,
+  // 기준이 어긋나도 화면에 아무 신호가 없었다. 자격 판정은 사용자가 지원 여부를 정하는 근거이므로
+  // 「틀린 판정」보다 「판정 보류」가 낫다. 호출부(diagnose)가 null을 받아 보류 문구를 띄운다.
+  return null;
 }
 
 // 자녀 가점 적용 여부 — scoring_criteria상 「자녀의 수」는 신혼신생아매입임대에만 있다.
@@ -2110,25 +2112,42 @@ async function diagnose(){
     else if(income>lim130) incomeMsg=`맞벌이 기준(${fmt(lim200)}) 충족 · 단독소득 기준(${fmt(lim130)}) 초과`;
     else incomeMsg=`소득 기준 충족 (기준: ${fmt(lim130)})`;
   }
-  const assetLim=362000000;
-  let assetMsg='';
-  if(assets>0){ assetMsg=(assets<=assetLim)?`자산 기준 충족 (기준: 3억 6,200만원)`:`자산 기준 초과 (기준: 3억 6,200만원)`; }
-
   const rankMap={newborn:'1순위 (신생아 가구)',single_parent:'1순위 (지원대상 한부모가족)',married_7:children>0?'2순위 (미성년 자녀 있는 신혼부부)':'3순위 (미성년 자녀 없는 신혼부부)',pre:children>0?'2순위':'3순위',married_child6:'4순위 (6세 이하 자녀 혼인가구)',married:'5순위 (혼인가구)'};
   diagMarital=marital;
 
   // DB에서 자격기준 로드 (유형×공급형태 매트릭스)
   const criteria = await loadEligibilityCriteria();
+  // 🔴 기준을 못 불러오면 판정하지 않는다 — 낡은 값으로 조용히 떨어지지 않는다.
+  if(!criteria){
+    r.innerHTML=`<div class="rbox warn"><p class="rtitle">⚠ 기준을 불러오지 못했어요</p><p class="rdesc">자격 기준 정보를 가져오지 못해 진단을 진행할 수 없어요.<br>잘못된 결과를 보여드리지 않으려고 판정을 멈췄습니다. 네트워크를 확인하고 다시 시도해주세요.</p><button class="btn btn-sec btn-sm" style="margin-top:8px" onclick="diagnose()">다시 시도</button></div>`;
+    return;
+  }
   const medianBase = (MEDIAN_INCOME[members]||MEDIAN_INCOME[6]) * 10000;
+
+  // 🔴 자산 문구는 판정에 쓰는 것과 같은 DB 값에서 만든다(하드코딩 금지).
+  // 「기준: 3억 6,200만원」처럼 단일 숫자를 박으면 안 된다 — 한도가 유형마다 다르고(2.45억~5억),
+  // 하나를 골라 적는 순간 나머지 유형에 대해 문구가 거짓이 된다.
+  // 그래서 실제로 자산요건을 통과한 유형 수를 세어 보여준다. 문구가 판정 결과 그 자체다.
+  const assetOkTypes = assets>0 ? criteria.filter(c => {
+    const lim = Number(c.asset_limit) || 0;
+    return lim > 0 && assets <= lim;
+  }) : [];
+  let assetMsg='';
+  if(assets>0){
+    const limMax = Math.max(0, ...criteria.map(c => Number(c.asset_limit) || 0));
+    assetMsg = assetOkTypes.length
+      ? `자산 ${fmtEok(assets)} — 자산요건 통과 유형 ${assetOkTypes.length}개 (한도 최대 ${fmtEok(limMax)})`
+      : `자산 기준 초과 — 모든 유형의 자산 한도(최대 ${fmtEok(limMax)})를 넘어요`;
+  }
 
   // 공급형태별 신청가능 여부: 맞벌이 소득은 income_pct_dual_income 기준
   const eligibleEntries = criteria.filter(c => {
     const isDualIncome = incomeMsg.includes('맞벌이 기준') && !incomeMsg.includes('초과');
     const pct = (isDualIncome && c.income_pct_dual_income) ? c.income_pct_dual_income : c.income_pct;
     const incLim = medianBase * pct / 100;
-    const assetLimC = c.asset_limit || 362000000;
+    const assetLimC = Number(c.asset_limit) || 0;
     const incOk = income === 0 || income <= incLim;
-    const assetOk = assets === 0 || assets <= assetLimC;
+    const assetOk = assets === 0 || (assetLimC > 0 && assets <= assetLimC);
     return incOk && assetOk;
   });
 
