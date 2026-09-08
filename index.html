@@ -2169,7 +2169,7 @@ let _eligibilityCriteria = null;
 async function loadEligibilityCriteria(){
   if(_eligibilityCriteria) return _eligibilityCriteria;
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/eligibility_criteria?source_announcement_id=eq.기본기준&select=housing_type,supply_form,income_pct,income_pct_dual_income,income_pct_birth1,income_pct_birth2,asset_limit,asset_limit_birth1,asset_limit_birth2,car_limit,car_limit_birth1,car_limit_birth2,age_min,age_max,manual_check_note&order=housing_type`,
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/eligibility_criteria?source_announcement_id=eq.기본기준&select=housing_type,supply_form,income_pct,income_pct_dual_income,income_pct_birth1,income_pct_birth2,asset_limit,asset_limit_birth1,asset_limit_birth2,car_limit,car_limit_birth1,car_limit_birth2,age_min,age_max,manual_check_note,age_exception_note&order=housing_type`,
       {headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY}});
     if(res.ok){
       const rows = await res.json();
@@ -2240,7 +2240,11 @@ async function diagnose(){
     else if(income>lim130) incomeMsg=`맞벌이 기준(${fmt(lim200)}) 충족 · 단독소득 기준(${fmt(lim130)}) 초과`;
     else incomeMsg=`소득 기준 충족 (기준: ${fmt(lim130)})`;
   }
-  const rankMap={newborn:'1순위 (신생아 가구)',single_parent:'1순위 (지원대상 한부모가족)',married_7:children>0?'2순위 (미성년 자녀 있는 신혼부부)':'3순위 (미성년 자녀 없는 신혼부부)',pre:children>0?'2순위':'3순위',married_child6:'4순위 (6세 이하 자녀 혼인가구)',married:'5순위 (혼인가구)'};
+  // 🔴 여기 있던 rankMap을 지웠다(2026-09-08). 도입 커밋(8d9b821) 이래 한 번도 참조된 적이 없다 —
+  // 그 이름을 대괄호로 인덱싱한 코드가 git 이력 전체에 없다. 들어가려다 만 흔적이고, 쓰이는 줄 알고 그 값을 근거로
+  // 판단하는 오해를 만든다(직전 hideClosed와 같은 종류다).
+  // 순위 축 자체는 살아 있고 정본은 DB다 — eligibility_criteria.rank를 공고 상세가 그대로 보여준다.
+  // 혼인상태에서 순위를 프론트가 되짚어 만드는 것은 그 정본을 코드에 복제하는 일이라 되살리지 않는다.
   diagMarital=marital;
 
   // DB에서 자격기준 로드 (유형×공급형태 매트릭스)
@@ -2322,8 +2326,23 @@ async function diagnose(){
     carMsg = `자동차 가액은 판정에서 뺐어요 — 유형별 한도 ${range}은 별도 확인이 필요해요 (보험개발원 차량기준가액).`;
   }
 
+  // 🔴 manual_check_note가 붙은 행은 애초에 판정 대상이 아니다. 그런 행에서 한도가 비어 있는 축은
+  // 「요건이 없다」가 아니라 「우리가 모른다」이므로, 그 축으로 행을 지우지 않는다.
+  // 지우면 화면에서 유형이 통째로 사라져 통과도 탈락도 아닌 무안내가 된다 — 기숙사형이 그랬다
+  // (실측: 기숙사형 공고 4건 12행의 asset_limit이 전부 NULL이라, 자산을 입력하는 순간 사라졌다).
+  // 🔴 이 완화는 manual_check_note 행에만 준다. 자산 축의 일반 규칙(한도가 없으면 탈락)은 그대로 둔다 —
+  // asset_limit_exempt 구조와 함께 봐야 하는 별건이다.
+  function shownForCheck(c){
+    const L = limitsFor(c, 0);
+    const incOk   = income===0   || L.incLim==null   || income   <= L.incLim;
+    const assetOk = assets===0   || L.assetLim==null || L.assetLim<=0 || assets <= L.assetLim;
+    const carOk   = carValue===0 || L.carLim==null   || carValue <= L.carLim;
+    return incOk && assetOk && carOk;
+  }
+  const judgeRows = criteria.filter(c => !c.manual_check_note);
+
   // 공급형태별 신청가능 여부 — 기본 판정은 가산을 쓰지 않는다(아래 이유).
-  const moneyOkEntries = criteria.filter(c => moneyOk(c, 0));
+  const moneyOkEntries = judgeRows.filter(c => moneyOk(c, 0));
 
   // 🔴 화면이 묻는 것은 「자녀 수(미성년)」이고 공고가 말하는 것은 「출산자녀」다. DB에 두 표기가
   // 공존하고(출산·출생 50행 / 미성년 8행) 입양·재혼 가정에서 갈린다. 같은 것으로 단정하고 가산을
@@ -2333,19 +2352,27 @@ async function diagnose(){
   const birthTier = Math.min(children, 2);
   const baseSet = new Set(moneyOkEntries);
   const bonusOnlyEntries = birthTier>0
-    ? criteria.filter(c => !baseSet.has(c) && moneyOk(c, birthTier)
-        && !c.manual_check_note && ageStateFor(c, birthYear) !== 'no')
+    ? judgeRows.filter(c => !baseSet.has(c) && moneyOk(c, birthTier)
+        && ageStateFor(c, birthYear) !== 'no')
     : [];
 
   // 🔴 우리가 묻지 않는 요건이 있는 행은 통과 판정을 내리지 않는다(정본은 DB manual_check_note).
   // 행을 아예 빼면 상위 유형의 느슨한 한도로 판정돼 과다 통과가 남고, 통과로 내보내면 근거 없는 통과다.
-  const checkNoteEntries = moneyOkEntries.filter(c => c.manual_check_note);
-  const judgeableEntries = moneyOkEntries.filter(c => !c.manual_check_note);
+  const checkNoteEntries = criteria.filter(c => c.manual_check_note && shownForCheck(c));
 
   // 🔴 나이 축은 소득·자산과 같은 filter에 넣지 않는다. 세 갈래로 갈리기 때문이다.
   // 'no'는 빠지고, 'check'는 「신청 가능」에 넣지 않되 버리지도 않고 따로 보여준다.
-  const eligibleEntries = judgeableEntries.filter(c => ageStateFor(c, birthYear) === 'ok');
-  const ageCheckEntries = judgeableEntries.filter(c => ageStateFor(c, birthYear) === 'check');
+  const eligibleEntries = moneyOkEntries.filter(c => ageStateFor(c, birthYear) === 'ok');
+  const ageCheckEntries = moneyOkEntries.filter(c => ageStateFor(c, birthYear) === 'check');
+
+  // 🔴 나이가 단독 요건이 아닌 유형이 있다 — 원문이 「만19~39세 청년 또는 사회초년생」·
+  // 「대학생·대학원생 또는 19~39세 청년」이다. 구간 밖이라고 행을 지우면 자격 있는 사람에게
+  // 유형이 통째로 사라지고, 탈락 문구조차 없어 왜 없는지도 알 수 없다.
+  // 사유 문구를 코드에 두지 않는다 — 정본은 DB age_exception_note이고 행마다 사유가 다르다
+  // (행복주택/청년은 사회초년생, 매입임대/청년은 학적. 실측으로 갈렸다).
+  // 구간 안이면 이 축은 아무 일도 하지 않는다 — 판정은 예전 그대로다.
+  const ageExceptionEntries = moneyOkEntries.filter(c =>
+    c.age_exception_note && ageStateFor(c, birthYear) === 'no');
 
   // 유형 목록 (중복 제거, housing_type 기준)
   const eligibleTypeSet = new Set(eligibleEntries.map(c => c.housing_type));
@@ -2382,6 +2409,17 @@ async function diagnose(){
     commonMsgs+=`<div class="rbox warn" style="margin-top:6px"><p class="rtitle">🍼 출산자녀 수에 따라 기준이 완화될 수 있어요</p><p class="rdesc">${bonusLabels}<br><span style="font-size:11px;color:#999">위 판정은 완화 전 기준이에요. 공고가 말하는 「출산자녀」와 입력하신 「자녀 수(미성년)」가 같은 개념이 아닐 수 있어(입양·재혼) 자동으로 적용하지 않았어요. 공고문에서 확인해주세요.</span></p></div>`;
   }
 
+  // 🔴 나이 구간 밖이지만 사라지지 않는 유형 — 사유는 DB가 들고 있다.
+  if(ageExceptionEntries.length){
+    const excLabels = ageExceptionEntries.map(c => {
+      const sf = (c.supply_form && c.supply_form !== '일반') ? `(${c.supply_form})` : '';
+      const lo = c.age_min, hi = c.age_max;
+      const range = (lo != null && hi != null) ? `만 ${lo}~${hi}세` : (lo != null ? `만 ${lo}세 이상` : `만 ${hi}세 이하`);
+      return `· ${c.housing_type}${sf} — 나이 요건 ${range} · ${c.age_exception_note}`;
+    }).join('<br>');
+    commonMsgs+=`<div class="rbox warn" style="margin-top:6px"><p class="rtitle">🎂 나이 요건에 예외가 있어요</p><p class="rdesc">${excLabels}</p></div>`;
+  }
+
   // 🔴 우리가 묻지 않는 요건이 있는 유형 — 통과도 탈락도 아니다.
   if(checkNoteEntries.length){
     const noteLabels = checkNoteEntries.map(c => {
@@ -2400,9 +2438,11 @@ async function diagnose(){
     const axisLabel = carValue>0 ? '소득·자산·자동차' : '소득·자산';
     html = ageCheckEntries.length
       ? `<div class="rbox warn"><p class="rtitle">🎂 나이 확인이 필요해요</p><p class="rdesc">ZipFit이 판정하는 요건은 통과했지만, 남은 유형이 모두 나이 요건에 걸려 있어요.<br>출생연도를 입력하거나 공고문의 기준일로 확인해주세요.</p></div>`
-      : (checkNoteEntries.length
-        ? `<div class="rbox warn"><p class="rtitle">📄 요건 확인이 필요해요</p><p class="rdesc">ZipFit이 판정하는 요건은 통과한 유형이 남아 있지만, 묻지 않는 요건이 있어 통과로 안내하지 않아요.<br>아래 항목을 공고문에서 직접 확인해주세요.</p></div>`
-        : `<div class="rbox err"><p class="rtitle">❌ 신청 가능한 유형 없음</p><p class="rdesc">입력하신 ${axisLabel} 조건으로는 신청 가능한 유형이 없어요.<br>${axisLabel} 기준을 다시 확인해보세요.</p></div>`);
+      : (ageExceptionEntries.length
+        ? `<div class="rbox warn"><p class="rtitle">🎂 나이 요건 확인이 필요해요</p><p class="rdesc">나이 구간을 벗어났지만, 그 유형은 나이가 단독 요건이 아니에요.<br>아래 예외에 해당하는지 공고문에서 확인해주세요.</p></div>`
+        : (checkNoteEntries.length
+          ? `<div class="rbox warn"><p class="rtitle">📄 요건 확인이 필요해요</p><p class="rdesc">ZipFit이 판정하는 요건은 통과한 유형이 남아 있지만, 묻지 않는 요건이 있어 통과로 안내하지 않아요.<br>아래 항목을 공고문에서 직접 확인해주세요.</p></div>`
+          : `<div class="rbox err"><p class="rtitle">❌ 신청 가능한 유형 없음</p><p class="rdesc">입력하신 ${axisLabel} 조건으로는 신청 가능한 유형이 없어요.<br>${axisLabel} 기준을 다시 확인해보세요.</p></div>`));
     html+=commonMsgs;
   } else {
     // 공급형태별 세분화 목록
