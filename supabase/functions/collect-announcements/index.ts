@@ -254,6 +254,12 @@ function parseArea(s: string | null | undefined): [number|null, number|null] {
   return [min, max]
 }
 
+// 🔴 이 함수는 상세(sbd·scdl·ahflInfo)가 없으면 상세 파생 컬럼을 생략하지 않고 null로 채워 반환한다.
+// 그 null은 DB의 protect_detail_columns_trigger가 coalesce(NEW.x, OLD.x)로 무시하므로 기존 값이
+// 지워지지 않는다. 즉 「값을 지우지 않는다」는 불변식은 이 파일이 아니라 DB 쪽에 있다.
+// 🔴 그 트리거를 지우면 이 함수가 매 런 값을 지운다 — 트리거를 되돌릴 때 여기도 함께 본다.
+// (2026-09-09: 이 사실을 모르고 EF만 읽으면 「null이 덮어쓴다」로 읽혀서 남긴다. 트리거가 보호하는
+//  15컬럼과 보호하지 않는 것(region·deposit_min·rent_min 등)의 목록은 트리거 함수 주석에 있다.)
 function mapLHRow(item: NoticeItem, sbd: SbdItem | null, scdl: SplScdlItem | null, ahflInfo: AhflInfoItem[] | null) {
   const areaStr = san(sbd?.MIN_MAX_RSDN_DDO_AR ?? sbd?.DDO_AR)
   const [areaMin, areaMax] = parseArea(areaStr)
@@ -491,7 +497,41 @@ async function collect() {
   const detailRows: ReturnType<typeof mapLHRow>[] = []
   const failedIds: string[] = []
   const revisionCandidates: { id: string; note: string }[] = []
+
+  // ── 상세조회 마감 (2026-09-09 신설) ──────────────────────────────
+  // 문제: 앞단에 마감이 없어서, 업스트림이 열화되면 이 루프가 예산을 통째로 먹고
+  // 아래 late_retry 게이트가 열리지 않는다. 2026-09-09 실측 두 런이 그랬다 —
+  // 상세대상 80건 중 50건이 5초 타임아웃에 걸려 이 루프만 66.2초를 썼고(전체 88.0초의 75%),
+  // 게이트 판정 시점 누계가 88.0초라 late_retry가 통째로 건너뛰어졌다.
+  // 배치 하나는 Promise.all이라 5건 중 하나만 느려도 5초를 다 쓴다(배치당 정상 1.9초 대 열화 4.0초).
+  //
+  // 🔴 한도 산출(절대수를 임의로 정하지 않는다):
+  //   게이트가 열리려면  앞단 누계 < LATE_RETRY_BUDGET_MS(70,000)
+  //   앞단 = 목록 5,000 + 기본 upsert 1,600 + 우선순위 조회 140
+  //          + [이 루프] + 상세 upsert·bump·정정사유 300 + MYHOME 최악 15,000
+  //   ∴ 이 루프의 몫 상한 = 70,000 − 22,040 ≈ 47,960
+  //   배치 경계에서만 검사하므로 마지막 배치가 최대 5,000을 더 쓴다 → 한도 ≤ 42,960
+  //   정상 런 실측(60런, 2026-09-08~09) 24.78~31.11초, 배치당 최악 1.928초.
+  //   캡 90건(18배치)으로 외삽하면 37.25초 → 한도 ≥ 37,250
+  //   [37,250 , 42,960] 구간의 가운데를 배치 단위로 올림해 40,000을 쓴다.
+  //   정상 실측 최대(31.11초) 대비 +8.9초, 90건 외삽 대비 +2.75초, 상한 대비 −2.96초.
+  //
+  // 🔴 중단해도 안전한 이유: 시도하지 않은 건은 fetchDetail을 아예 부르지 않으므로
+  // detail_fetch_last_attempt도 detail_fetch_fail_count도 찍히지 않는다. 다음 런에서
+  // nullApplyStartIds 우선순위(apply_start가 NULL인 활성 공고가 1순위)로 그대로 앞자리에 돌아온다.
+  // 새 상태를 만들지 않는다 — 이것이 이 처방을 고른 이유다.
+  //
+  // ⚠️ LATE_RETRY_BUDGET_MS·TIME_BUDGET_MS·타임아웃 값은 건드리지 않았다. Free 플랜 wall-clock
+  // 150초 한도가 그대로라, 예산을 올리는 방향은 EF 자체를 죽여 회차 전체를 잃는다.
+  const DETAIL_BUDGET_MS = 40000
+  const detailStartedAt = Date.now()
+  let detailSkipped = 0
+
   for (let i = 0; i < needDetail.length; i += 5) {
+    if (Date.now() - detailStartedAt >= DETAIL_BUDGET_MS) {
+      detailSkipped = needDetail.length - i
+      break
+    }
     const batch   = needDetail.slice(i, i+5)
     const results = await Promise.all(batch.map(n => fetchDetail(n)))
     batch.forEach((n, j) => {
@@ -564,7 +604,13 @@ async function collect() {
       .upsert(detailRows.slice(i, i+50), { onConflict: 'source,announcement_id', ignoreDuplicates: false })
     if (error) errors.push(`LH detail_upsert[${i}]: ${error.message}`)
   }
-  console.log(`[LH] 상세 ${lhDetailOk}/${needDetail.length}건`)
+  // 전용 컬럼이 없으므로 errors에 남긴다(스키마 변경은 범위 밖). late_retry와 같은 방식이며,
+  // 마감이 실제로 발동했는지를 collection_run_log만 보고 판정할 유일한 근거다.
+  if (detailSkipped > 0) {
+    errors.push(`상세조회 마감(${DETAIL_BUDGET_MS}ms) 초과로 ${detailSkipped}건 미시도`)
+  }
+  console.log(`[LH] 상세 ${lhDetailOk}/${needDetail.length}건` +
+    (detailSkipped > 0 ? ` (마감 초과로 ${detailSkipped}건 미시도)` : ''))
 
   if (failedIds.length > 0) {
     const { error } = await supabase.rpc('bump_detail_fetch_fail', { p_ids: failedIds })
