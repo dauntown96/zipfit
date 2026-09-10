@@ -3,6 +3,9 @@
 // 두 가지 일을 한다.
 //   ① 허용된 공고 사이트의 첨부 URL 하나를 받아 그 바이트를 base64로 돌려준다.
 //   ② (mode=upload) 그 바이트를 Google Drive에 직접 올린다.
+//   ②의 준비로 mode=ensure_folder가 있다 — 공고 폴더만 확보하고 ID를 돌려준다.
+//   🔴 여러 건을 쏘기 전에 한 번 불러 folder_id를 받아 두는 것이 정해진 순서다.
+//     그러지 않으면 폴더 생성이 요청마다 일어나 갈린다(2026-09-10 실측).
 //
 // 🔴 ②가 필요한 이유 — 놓는 쪽이 막혀 있었다(2026-09-10 실측):
 //   ①로 받은 base64가 Drive에 닿으려면 모델 출력(도구 파라미터)을 거쳐야 하는데
@@ -267,12 +270,24 @@ const getAccessToken = async (s: DriveSecrets): Promise<string> => {
 // Drive 검색 질의의 문자열 리터럴 이스케이프.
 const q = (v: string) => v.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
 
+// 🔴 Drive 파일·폴더 ID는 URL-safe 문자만 쓴다.
+//   호출자가 준 ID는 질의문과 URL에 그대로 들어가므로 형식부터 본다 —
+//   통과하지 못하면 Drive를 아예 부르지 않는다.
+const DRIVE_ID_RE = /^[A-Za-z0-9_-]{10,200}$/
+
+// 폴더도 createdTime을 함께 받는다.
+// 🔴 폴더가 갈렸을 때 어느 쪽이 먼저인지를 **서버 시각으로** 알 수 있어야 한다.
+//   추측으로 순서를 말하지 않기 위해서다.
+const FOLDER_FIELDS = 'id,name,createdTime'
+
+type Folder = { id: string; createdTime: string | null }
+
 const findFolder = async (
   name: string,
   parent: string | null,
   token: string,
   s: DriveSecrets,
-): Promise<string | null> => {
+): Promise<Folder | null> => {
   const parts = [
     `name='${q(name)}'`,
     "mimeType='application/vnd.google-apps.folder'",
@@ -281,12 +296,13 @@ const findFolder = async (
   if (parent) parts.push(`'${q(parent)}' in parents`)
   const url = 'https://www.googleapis.com/drive/v3/files?' + new URLSearchParams({
     q: parts.join(' and '),
-    fields: 'files(id,name)',
+    fields: `files(${FOLDER_FIELDS})`,
     pageSize: '10',
   })
   const body = await driveFetch(url, { method: 'GET' }, token, s)
-  const files = (body.files as Array<{ id: string }> | undefined) ?? []
-  return files.length ? files[0].id : null
+  const files = (body.files as Array<Record<string, unknown>> | undefined) ?? []
+  if (!files.length) return null
+  return { id: files[0].id as string, createdTime: (files[0].createdTime as string) ?? null }
 }
 
 const createFolder = async (
@@ -294,30 +310,36 @@ const createFolder = async (
   parent: string | null,
   token: string,
   s: DriveSecrets,
-): Promise<string> => {
+): Promise<Folder> => {
   const metadata: Record<string, unknown> = {
     name,
     mimeType: 'application/vnd.google-apps.folder',
   }
   if (parent) metadata.parents = [parent]
   const body = await driveFetch(
-    'https://www.googleapis.com/drive/v3/files?fields=id,name',
+    `https://www.googleapis.com/drive/v3/files?fields=${FOLDER_FIELDS}`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(metadata) },
     token,
     s,
   )
-  return body.id as string
+  return { id: body.id as string, createdTime: (body.createdTime as string) ?? null }
 }
 
+// ⚠️ 찾기와 만들기 사이에 창이 있다(check-then-act). Drive에는 폴더 이름
+//   유일성 제약이 없어서 같은 이름을 동시에 확보하려 하면 **둘 다 만들어진다.**
+//   2026-09-10 김제하동 첫 수집에서 실제로 갈렸다(211ms 차, 둘 다 created=true).
+// 🔴 그래서 업로드 경로는 folder_id를 받아 이 함수를 지나가지 않는다.
+//   이 함수는 mode=ensure_folder에서 **한 번만** 부르는 것을 전제로 남는다.
 const ensureFolder = async (
   name: string,
   parent: string | null,
   token: string,
   s: DriveSecrets,
-): Promise<{ id: string; created: boolean }> => {
+): Promise<{ id: string; created: boolean; createdTime: string | null }> => {
   const found = await findFolder(name, parent, token, s)
-  if (found) return { id: found, created: false }
-  return { id: await createFolder(name, parent, token, s), created: true }
+  if (found) return { ...found, created: false }
+  const made = await createFolder(name, parent, token, s)
+  return { ...made, created: true }
 }
 
 const FILE_FIELDS = 'id,name,size,mimeType,md5Checksum,sha256Checksum,webViewLink,parents,createdTime'
@@ -491,6 +513,8 @@ Deno.serve(async (req: Request) => {
   const nameOverride = reqUrl.searchParams.get('filename')
   // 같은 이름이 이미 있고 내용이 다를 때만 의미가 있다. 기본은 건드리지 않는 것.
   const onDupe = reqUrl.searchParams.get('on_dupe') ?? 'skip'
+  // 🔴 미리 확보해 둔 공고 폴더의 ID. 오면 폴더를 찾지도 만들지도 않는다.
+  const folderIdParam = reqUrl.searchParams.get('folder_id')
 
   // 시크릿이 어디에 있는지만 확인한다. 값은 돌려주지 않는다.
   if (mode === 'selftest') {
@@ -511,12 +535,60 @@ Deno.serve(async (req: Request) => {
     return json({ ok: !secretError, env_present: envPresent, secret_source: secretSource, error: secretError })
   }
 
+  // 🔴 공고 폴더만 확보하고 끝낸다 — 첨부를 받지 않는다.
+  //   업로드를 여러 건 쏘기 **전에 한 번** 부르는 것이 이 모드의 용도다.
+  //   폴더 생성이 한 곳에서만 일어나야 갈리지 않는다.
+  if (mode === 'ensure_folder') {
+    if (!announcementId) {
+      return json({ ok: false, error: 'mode=ensure_folder에는 announcement_id가 필요하다' }, 400)
+    }
+    const startedAt = Date.now()
+    let secrets: DriveSecrets | null = null
+    try {
+      secrets = await getDriveSecrets()
+      const token = await getAccessToken(secrets)
+      // 루트는 환경변수로 고정돼 있으면 그것을 쓴다.
+      // root_folder_name이 null인 것이 곧 「이름찾기 분기를 타지 않았다」는 증거다.
+      const rootEnv = Deno.env.get('GDRIVE_ROOT_FOLDER_ID')
+      const root = rootEnv
+        ? { id: rootEnv, created: false, createdTime: null }
+        : await ensureFolder(DRIVE_ROOT_NAME, null, token, secrets)
+      const noticeName = `[임시] ${announcementId}`
+      const notice = await ensureFolder(noticeName, root.id, token, secrets)
+      return json({
+        ok: true,
+        mode: 'ensure_folder',
+        secret_source: secrets.source,
+        root_folder_id: root.id,
+        root_folder_created: root.created,
+        root_folder_name: rootEnv ? null : DRIVE_ROOT_NAME,
+        notice_folder_id: notice.id,
+        notice_folder_name: noticeName,
+        notice_folder_created: notice.created,
+        // 🔴 Drive 서버 시각. 폴더가 갈렸는지 판정할 때 이것으로 순서를 본다.
+        notice_folder_created_time: notice.createdTime,
+        elapsed_ms: Date.now() - startedAt,
+      })
+    } catch (e) {
+      return json({
+        ok: false,
+        mode: 'ensure_folder',
+        error: redact(String(e instanceof Error ? e.message : e), secrets),
+        elapsed_ms: Date.now() - startedAt,
+      }, 502)
+    }
+  }
+
   const wantUpload = mode === 'upload'
   if (wantUpload && !announcementId) {
     return json({ ok: false, error: 'mode=upload에는 announcement_id가 필요하다' }, 400)
   }
   if (wantUpload && !['skip', 'replace'].includes(onDupe)) {
     return json({ ok: false, error: `on_dupe는 skip 또는 replace다: ${onDupe}` }, 400)
+  }
+  // 형식 검사는 Drive를 부르기 전에 한다. 이상한 값을 질의문에 넣지 않는다.
+  if (wantUpload && folderIdParam !== null && !DRIVE_ID_RE.test(folderIdParam)) {
+    return json({ ok: false, error: 'folder_id가 Drive ID 형식이 아니다' }, 400)
   }
 
   if (!target) return json({ ok: false, error: 'url 파라미터가 없다' }, 400)
@@ -645,17 +717,33 @@ Deno.serve(async (req: Request) => {
         secrets = await getDriveSecrets()
         const token = await getAccessToken(secrets)
 
-        // 루트: 환경변수로 고정돼 있으면 그것을 쓰고, 없으면 이름으로 찾아 재사용한다.
-        // 🔴 매번 새로 만들면 폴더가 쌓인다. 찾기를 먼저 한다.
-        const rootEnv = Deno.env.get('GDRIVE_ROOT_FOLDER_ID')
-        const root = rootEnv
-          ? { id: rootEnv, created: false }
-          : await ensureFolder(DRIVE_ROOT_NAME, null, token, secrets)
+        // 🔴 폴더를 어떻게 정하는가 — 이번 수리의 핵심이 여기다.
+        let root: { id: string; created: boolean } | null = null
+        let rootEnv: string | undefined
+        let noticeName: string | null = null
+        let notice: { id: string; created: boolean | null }
+        let folderSource: 'param' | 'ensured'
 
-        // 공고별 폴더는 임시명이다 — 분석 후 표준명으로 정정하는 것이 기존 규약이다.
-        // 🔴 유일해야 하므로 announcement_id를 포함한다.
-        const noticeName = `[임시] ${announcementId}`
-        const notice = await ensureFolder(noticeName, root.id, token, secrets)
+        if (folderIdParam) {
+          // 🔴 미리 확보된 폴더다. 찾지도 만들지도 않으므로 check-then-act가 없다.
+          //   폴더 이름은 우리가 정한 것이 아니라 알 수 없다 — null로 둔다.
+          notice = { id: folderIdParam, created: null }
+          folderSource = 'param'
+        } else {
+          // ⚠️ 하위 호환 경로다. 종전대로 동작하지만 **동시 호출에 갈린다.**
+          //   그래서 아래에서 응답에 경고를 남긴다 — 조용히 넘어가지 않게.
+          folderSource = 'ensured'
+          // 루트: 환경변수로 고정돼 있으면 그것을 쓰고, 없으면 이름으로 찾아 재사용한다.
+          rootEnv = Deno.env.get('GDRIVE_ROOT_FOLDER_ID')
+          root = rootEnv
+            ? { id: rootEnv, created: false }
+            : await ensureFolder(DRIVE_ROOT_NAME, null, token, secrets)
+
+          // 공고별 폴더는 임시명이다 — 분석 후 표준명으로 정정하는 것이 기존 규약이다.
+          // 🔴 유일해야 하므로 announcement_id를 포함한다.
+          noticeName = `[임시] ${announcementId}`
+          notice = await ensureFolder(noticeName, root.id, token, secrets)
+        }
 
         // 중복 처리. 기본은 skip이고, 같은 이름이라도 내용이 다르면 조용히 넘어가지 않는다.
         const existing = await findFileInFolder(filename, notice.id, token, secrets)
@@ -702,9 +790,11 @@ Deno.serve(async (req: Request) => {
         payload.drive = {
           action,
           secret_source: secrets.source,
-          root_folder_id: root.id,
-          root_folder_created: root.created,
-          root_folder_name: rootEnv ? null : DRIVE_ROOT_NAME,
+          // 폴더를 누가 정했는가. param이면 이 요청은 폴더를 만들 수 없었다.
+          folder_source: folderSource,
+          root_folder_id: root ? root.id : null,
+          root_folder_created: root ? root.created : null,
+          root_folder_name: root && !rootEnv ? DRIVE_ROOT_NAME : null,
           notice_folder_id: notice.id,
           notice_folder_name: noticeName,
           notice_folder_created: notice.created,
@@ -725,6 +815,12 @@ Deno.serve(async (req: Request) => {
           converted_to_google_format: typeof file.mimeType === 'string' &&
             (file.mimeType as string).startsWith('application/vnd.google-apps'),
           duplicate_compared_by: comparedBy,
+        }
+        if (folderSource === 'ensured') {
+          // 🔴 종전 경로로 동작했다는 사실 자체를 알린다.
+          payload.warning = 'folder_id 없이 불렀다 — 이 요청이 폴더를 직접 확보했다. ' +
+            '같은 공고를 동시에 여러 건 쏘면 폴더가 갈린다. ' +
+            'mode=ensure_folder로 먼저 확보하고 folder_id를 넘길 것.'
         }
       } catch (e) {
         payload.uploaded = false
