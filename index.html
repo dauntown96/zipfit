@@ -1933,15 +1933,24 @@ function renderInsight(rows, wrap, statsRows){
   // ③ 지역별 (sido_nm||region) — 공고수 + 세대수 합계
   // 🔴 모수는 rows 전량이 아니라 「마감되지 않은 것」이다.
   // rows 자체는 건드리지 않는다 — ①②④가 각자 필터를 갖고 있어 rows를 좁히면 함께 흔들린다.
-  // 축은 status 문자열이 아니라 접수기간 날짜(applyWindowState)다. ①이 이미 그 축이다.
-  // 🔴 'closed'만 뺀다 — 'before'(접수 예정)를 빼면 곧 열릴 공고가 지역 분포에서 사라지고,
-  // 'unknown'(접수기간 결측)을 빼면 결측이 몰린 지역이 통째로 사라진다.
-  // 2026-09-10 실측: 828그룹 중 closed 466 · unknown 282 · before 42 · open 38이고,
-  // 'unknown'을 빼면 서울이 80건에서 0건이 되어 지역 목록에서 통째로 없어진다.
-  // ⚠️ 다만 unknown 282건 중 267건은 DB status가 '접수마감'이다(LH 209 · SH 58).
-  // 날짜 축만으로는 이 둘을 못 가른다 — 지시서가 status 축을 금지해 이 회차는 남긴다.
-  // 갈림은 이 한 줄뿐이다. 나중에 누적 토글을 붙이면 REGION_SCOPE만 바꾼다.
-  const REGION_SCOPE = r => applyWindowState(r) !== 'closed';
+  // 🔴 날짜 축(applyWindowState)이 주(主), status는 날짜가 없을 때만 보조다. ①이 그 축이다.
+  // 'closed'는 뺀다. 'open'·'before'는 남긴다 — 'before'(접수 예정)를 빼면 곧 열릴 공고가
+  // 지역 분포에서 사라진다. 갈리는 것은 'unknown'(시작·마감 중 하나라도 결측)뿐이다.
+  // 🔴 'unknown'이면서 status가 마감이면 뺀다 — 「날짜를 모른다」와 「기관이 마감이라고
+  // 말했다」가 함께 있으면 후자를 무시할 이유가 없다. 날짜 결측이 「진행 중일 수도 있다」는
+  // 뜻은 아니다. 2026-09-10 실측으로 267건이 여기 걸린다(LH 209 · SH 58).
+  // 🔴 예외 — apply_end가 오늘 이후면 status보다 날짜를 믿고 남긴다(실측 1건).
+  // status 마감 판정은 접미사로 본다. '접수마감'·'모집마감'은 걸리고 '마감임박'은 안 걸린다.
+  // ⚠️ status를 보는 것은 이 술어 한 곳뿐이다. 정렬·카드·필터로 넓히지 않는다.
+  // 갈림은 이 술어뿐이다. 나중에 누적 토글을 붙이면 REGION_SCOPE만 바꾼다.
+  const REGION_SCOPE = r => {
+    const st = applyWindowState(r);
+    if(st === 'closed') return false;
+    if(st !== 'unknown') return true;
+    const e = parseNoticeDate(r['신청마감일']||r['apply_end']||'');
+    if(e && startOfLocalDay(e) >= startOfLocalDay(new Date())) return true;
+    return !/마감$/.test(String(r.status||'').trim());
+  };
   const regionRows = rows.filter(REGION_SCOPE);
   const regionMap = {};
   regionRows.forEach(r=>{
@@ -2034,8 +2043,8 @@ function renderInsight(rows, wrap, statsRows){
 
     <div style="${S}">
       <p style="${T};margin-bottom:4px">📍 지역별 공고 현황 (${regionAll.length}개 지역)</p>
-      <p style="font-size:12px;color:#888;margin:0 0 14px;line-height:1.5">접수 마감일이 지난 공고는 빼고 <strong style="color:#5a7af7">${regionRows.length.toLocaleString()}건</strong>을 세었어요 · 목록에 없는 지역은 남은 공고가 없는 곳이에요</p>
-      ${regionAll.length===0 ? '<p style="font-size:13px;color:#aaa;text-align:center;padding:20px 0">접수 마감일이 지나지 않은 공고가 없어요</p>' : `
+      <p style="font-size:12px;color:#888;margin:0 0 14px;line-height:1.5">마감된 공고는 빼고 <strong style="color:#5a7af7">${regionRows.length.toLocaleString()}건</strong>을 세었어요 · 목록에 없는 지역은 아직 마감되지 않은 공고가 없는 곳이에요</p>
+      ${regionAll.length===0 ? '<p style="font-size:13px;color:#aaa;text-align:center;padding:20px 0">아직 마감되지 않은 공고가 없어요</p>' : `
       <div style="display:flex;flex-direction:column;gap:10px">
         ${regionTop.map(regionRowHTML).join('')}
       </div>
