@@ -287,6 +287,7 @@ body.theme-dark .zf-footer a{color:#9aa0aa}
         <label class="label">혼인 상태</label>
         <select id="marital">
           <option value="">선택하세요</option>
+          <option value="single">해당 없음 (혼인 중이 아님)</option>
           <option value="newborn">신생아 가구 (2년 내 출산)</option>
           <option value="married_7">신혼부부 (혼인 7년 이내)</option>
           <option value="pre">예비 신혼부부</option>
@@ -613,6 +614,7 @@ body.theme-dark .zf-footer a{color:#9aa0aa}
             <label class="label" for="set_marital">혼인 상태</label>
             <select id="set_marital">
               <option value="">선택하세요</option>
+              <option value="single">해당 없음 (혼인 중이 아님)</option>
               <option value="newborn">신생아 가구 (2년 내 출산)</option>
               <option value="married_7">신혼부부 (혼인 7년 이내)</option>
               <option value="pre">예비 신혼부부</option>
@@ -874,11 +876,6 @@ function applyWindowState(row){
 }
 function isAcceptingNow(row){ return applyWindowState(row) === 'open'; }
 function isUpcomingApply(row){ return applyWindowState(row) === 'before'; }
-function extractRegionTop(regionText){
-  if(!regionText) return '기타';
-  const m = regionText.trim().match(/^(\S+?[시도])/);
-  return m ? m[1] : regionText.trim().split(' ')[0] || '기타';
-}
 
 // ── 필터 토글 ──
 function toggleNoticeFilter(){
@@ -2416,49 +2413,54 @@ async function diagnose(){
     return incOk && assetOk && carOk;
   }
 
-  // 🔴 자산 문구는 판정에 쓰는 것과 같은 DB 값에서 만든다(하드코딩 금지).
+  // 🔴 manual_check_note가 붙은 행은 판정 대상이 아니다 — 축별 문구도 같은 모집단에서 만든다.
+  // 정의를 여기로 올렸다(2026-09-11). 종전에는 아래 판정부에서 처음 만들고, 축별 문구는
+  // criteria 전체를 세고 있었다.
+  const judgeRows = criteria.filter(c => !c.manual_check_note);
+
+  // 🔴 축별 문구는 판정에 쓰는 것과 같은 DB 값에서 만든다(하드코딩 금지).
   // 「기준: 3억 6,200만원」처럼 단일 숫자를 박으면 안 된다 — 한도가 유형마다 다르고(2.45억~5억),
   // 하나를 골라 적는 순간 나머지 유형에 대해 문구가 거짓이 된다.
-  // 그래서 실제로 자산요건을 통과한 유형 수를 세어 보여준다. 문구가 판정 결과 그 자체다.
-  const assetOkTypes = assets>0 ? criteria.filter(c => {
+  //
+  // 🔴 개수를 말하지 않는다(2026-09-11). 종전에는 세어서 적었는데, 한 화면에서 「유형」이 세 가지를
+  // 가리켜 숫자가 갈렸다 — 축별 문구는 기준 행을, 아래 목록은 판정을 통과한 기준 행을,
+  // 유형 칩은 고유 housing_type을 센다. 실측 한 입력에서 10·9·8·5가 동시에 떴다.
+  // 실제 개수는 아래 「신청 가능한 주택 유형」 목록이 보여준다. 여기서는 충족 여부와 한도만 말한다.
+  const assetOk1 = assets>0 && judgeRows.some(c => {
     const lim = Number(c.asset_limit) || 0;
     return lim > 0 && assets <= lim;
-  }) : [];
-
-  // 🔴 소득 문구도 같은 원칙이다(2026-09-11). 종전에는 「기준: 572만원」처럼 단일 숫자를 박았는데,
-  // 그 값은 매입임대 전세형(130%)의 것이라 나머지 유형에 대해 거짓이었다. 한도는 유형마다 다르다.
-  // 계산 대상 집합은 자산 문구와 같게 criteria 전체로 둔다.
-  const incomeOkTypes = income>0 ? criteria.filter(c => {
+  });
+  const incomeOk1 = income>0 && judgeRows.some(c => {
     const lim = limitsFor(c, 0, dualApplied).incLim;
     return lim != null && income <= lim;
-  }) : [];
+  });
+
   let incomeMsg='';
   if(income>0){
-    const incMax = Math.max(0, ...criteria.map(c => limitsFor(c, 0, dualApplied).incLim || 0));
+    const incMax = Math.max(0, ...judgeRows.map(c => limitsFor(c, 0, dualApplied).incLim || 0));
     const basis = `가구원수 ${members}인${dualApplied ? '·맞벌이' : ''} 기준`;
-    incomeMsg = incomeOkTypes.length
-      ? `소득 ${fmt(income)} — 소득요건 통과 유형 ${incomeOkTypes.length}개 (${basis}, 한도 최대 ${fmt(incMax)})`
+    incomeMsg = incomeOk1
+      ? `소득 ${fmt(income)} — 소득 기준을 충족하는 유형이 있어요 (${basis}, 유형별 한도 최대 ${fmt(incMax)})`
       : `소득 기준 초과 — 모든 유형의 소득 한도(${basis}, 최대 ${fmt(incMax)})를 넘어요`;
   }
 
   let assetMsg='';
   if(assets>0){
-    const limMax = Math.max(0, ...criteria.map(c => Number(c.asset_limit) || 0));
-    assetMsg = assetOkTypes.length
-      ? `자산 ${fmtEok(assets)} — 자산요건 통과 유형 ${assetOkTypes.length}개 (한도 최대 ${fmtEok(limMax)})`
+    const limMax = Math.max(0, ...judgeRows.map(c => Number(c.asset_limit) || 0));
+    assetMsg = assetOk1
+      ? `자산 ${fmtEok(assets)} — 자산 기준을 충족하는 유형이 있어요 (유형별 한도 최대 ${fmtEok(limMax)})`
       : `자산 기준 초과 — 모든 유형의 자산 한도(최대 ${fmtEok(limMax)})를 넘어요`;
   }
 
   // 🔴 자동차 가액은 소득·자산이 전부 배제되는 완화모집에서도 그대로 남는 요건이다.
   // 안 보여주면 사용자가 통과로 착각한다 — 그래서 「모름」일 때도 문구는 반드시 낸다.
-  // 자산 문구와 같은 원칙: 숫자를 박지 않고 판정에 쓰는 DB 값에서 만든다.
-  const carLimits = [...new Set(criteria.map(c => Number(c.car_limit)).filter(v => v > 0))].sort((a,b)=>a-b);
+  const carLimits = [...new Set(judgeRows.map(c => Number(c.car_limit)).filter(v => v > 0))].sort((a,b)=>a-b);
   let carMsg='';
   if(carValue>0){
-    const carOkTypes = criteria.filter(c => { const L = limitsFor(c,0,dualApplied); return L.carLim!=null && L.carLim>0 && carValue <= L.carLim; });
+    const carOk1 = judgeRows.some(c => { const L = limitsFor(c,0,dualApplied); return L.carLim!=null && L.carLim>0 && carValue <= L.carLim; });
     const carMax = carLimits.length ? carLimits[carLimits.length-1] : 0;
-    carMsg = carOkTypes.length
-      ? `자동차 ${fmt(carValue)} — 자동차요건 통과 유형 ${carOkTypes.length}개 (한도 최대 ${fmt(carMax)})`
+    carMsg = carOk1
+      ? `자동차 ${fmt(carValue)} — 자동차 기준을 충족하는 유형이 있어요 (유형별 한도 최대 ${fmt(carMax)})`
       : `자동차 기준 초과 — 모든 유형의 자동차 가액 한도(최대 ${fmt(carMax)})를 넘어요`;
   } else if(carLimits.length){
     const range = carLimits.length>1 ? `${fmt(carLimits[0])}~${fmt(carLimits[carLimits.length-1])}` : fmt(carLimits[0]);
@@ -2478,7 +2480,6 @@ async function diagnose(){
     const carOk   = carValue===0 || L.carLim==null   || carValue <= L.carLim;
     return incOk && assetOk && carOk;
   }
-  const judgeRows = criteria.filter(c => !c.manual_check_note);
 
   // 공급형태별 신청가능 여부 — 기본 판정은 가산을 쓰지 않는다(아래 이유).
   const moneyOkEntries = judgeRows.filter(c => moneyOk(c, 0));
@@ -2645,10 +2646,13 @@ async function diagnose(){
 
     // 가점 계산 — 자녀 가점은 신혼신생아매입임대 계열에만 존재하므로 그 조건에서만 표시
     // (scoring_criteria 실측: 「자녀의 수」 항목은 housing_type='신혼신생아매입임대'에만 있음)
+    // 🔴 안내 문구에 「가점 항목 구성이 지역본부별로 갈린다」를 적지 않는다(2026-09-11) —
+    // ⑧ 판례집 「기각된 가설 3건」②가 2026-07-02 원본 PDF 재대조로 기각한 전제다.
+    // 대신 코드가 계산하지 않는다는 사실만 말한다. 새 제도 주장으로 바꾸지 않는다.
     if(isChildScoreApplicable(window.eligibleTypes, marital)){
       let gp=0;
       if(children>=3)gp+=4;else if(children===2)gp+=3;else if(children===1)gp+=2;
-      if(gp) html+=`<div class="rbox warn" style="margin-top:6px"><p class="rtitle">📊 예상 가점: ${gp}점 (자녀 항목 · 신혼신생아매입임대 기준)</p><p class="rdesc">지역본부마다 가점 평가항목 구성이 다를 수 있어요. 청약저축 납입횟수·거주기간·장애인 항목 등을 공고문에서 확인하세요.</p></div>`;
+      if(gp) html+=`<div class="rbox warn" style="margin-top:6px"><p class="rtitle">📊 예상 가점: ${gp}점 (자녀 항목 · 신혼신생아매입임대 기준)</p><p class="rdesc">청약저축 납입횟수·거주기간·장애인 항목 등은 ZipFit이 계산하지 않아요. 공고문에서 확인하세요.</p></div>`;
     }
 
     html+=`<button class="btn btn-primary" onclick="goStep(2);matchHouses()" style="margin-top:0.5rem">주택 매칭하러 가기 →</button>`;
@@ -3627,11 +3631,17 @@ function renderHousingUnitRow(u){
   const area = u.area_sqm != null ? parseFloat(u.area_sqm).toFixed(1)+'㎡' : '-';
   const deposit = u.deposit != null ? Number(u.deposit).toLocaleString()+'원' : '-';
   const rent = (u.monthly_rent == null || Number(u.monthly_rent) === 0) ? '월세없음' : Number(u.monthly_rent).toLocaleString()+'원';
-  // deposit_priority1/rent_priority1은 1순위(수급자 등)와 2·3순위(일반)가 서로 다른
-  // 임대조건을 갖는 공고(예: 청년매입임대)에서만 채워진다 — 있으면 두 조건을 함께 표시.
+  // deposit_priority1/rent_priority1은 한 세대에 임대조건이 둘인 공고에서 채워진다
+  // (실측 2026-09-11: 30공고 1,127행). 🔴 두 조건이 갈리는 원인은 유형마다 다르고 최소 5개 축이며,
+  // 350행은 DB에 단서 자체가 없다. 🔴 그래서 코드가 계층·순위 이름을 붙이지 않는다 —
+  // 종전 하드코딩 라벨이 맞는 행은 502행뿐이고 625행에서 거짓이었다. 특히 260행은 priority1 쪽이
+  // 오히려 비싼 조건이라 이름이 값과 반대였다. 경위는 docs/history.md 2026-09-11 항목에 있다.
+  // 원인 라벨은 원문 확인 뒤 별도 컬럼으로 붙인다(2차 소탕 2단계).
   const hasPriority1 = u.deposit_priority1 != null || u.rent_priority1 != null;
+  const depositP1 = u.deposit_priority1 != null ? Number(u.deposit_priority1).toLocaleString()+'원' : '-';
+  const rentP1 = (u.rent_priority1 == null || Number(u.rent_priority1) === 0) ? '월세없음' : Number(u.rent_priority1).toLocaleString()+'원';
   const depositRent = hasPriority1
-    ? `<div class="hu-item"><span class="hu-label">임대조건</span><span class="hu-value">1순위: 보증금 ${u.deposit_priority1 != null ? Number(u.deposit_priority1).toLocaleString()+'원' : '-'}·월 ${(u.rent_priority1 == null || Number(u.rent_priority1) === 0) ? '월세없음' : Number(u.rent_priority1).toLocaleString()+'원'} / 2·3순위: 보증금 ${deposit}·월 ${rent}</span></div>`
+    ? `<div class="hu-item"><span class="hu-label">임대조건</span><span class="hu-value">보증금 ${deposit}·월 ${rent} 또는 보증금 ${depositP1}·월 ${rentP1}<br><span style="font-size:11px;color:#888">어느 조건이 적용되는지는 비고·공고문에서 확인하세요</span></span></div>`
     : `<div class="hu-item"><span class="hu-label">보증금</span><span class="hu-value">${deposit}</span></div>
       <div class="hu-item"><span class="hu-label">월임대료</span><span class="hu-value">${rent}</span></div>`;
   const conv = u.conversion_date ? `<div class="hu-item"><span class="hu-label">분양전환</span><span class="hu-value">${u.conversion_date}</span></div>` : '';
@@ -4141,7 +4151,9 @@ function buildChecklist(){
     single_parent:['지원대상 한부모가족 증명서 (행정복지센터)'],
     married_child6:['6세 이하 자녀 출생 관련 서류 (가족관계증명서로 확인)'],
     pre:['예비배우자 주민등록표등본','세대구성 확인서 (신청자·예비배우자 날인) — 공고문 첨부 양식 사용'],
-    married_7:[],married:[]
+    // single은 빈 배열이라 아래 `||[]` 폴백과 동작이 같다. 그래도 키를 적는다 —
+    // 목록에 없는 값이 흘러든 것과 「추가 서류가 없는 것이 맞다」를 구분하기 위해서다.
+    married_7:[],married:[],single:[]
   };
   const conds = condMap[diagMarital]||[];
   document.getElementById('checklist-cond').innerHTML = conds.length
