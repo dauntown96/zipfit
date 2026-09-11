@@ -1707,7 +1707,10 @@ async function loadRegionsFromSupabase(){
     );
     if(res.ok){
       const rows=await res.json();
-      const seen=new Set(rows.map(r=>extractRegionTop(r.region)).filter(Boolean));
+      // 🔴 RPC가 이미 정규화한 region_top을 그대로 쓴다(2026-09-11). 종전에는 같은 rows에서
+      // region을 다시 파싱해 칩을 만들었고, 그 결과가 메인 필터 칩(region_top 기준)과 838행 중
+      // 83행에서 어긋났다 — 「서울」과 「서울특별시」가 따로 뜨고 「전라남도」가 통합 전 이름으로 남았다.
+      const seen=new Set(rows.map(r=>r.region_top).filter(Boolean));
       allRegions=[...seen].sort();
     }
   }catch(e){
@@ -1814,7 +1817,9 @@ function renderPersonalizedRecommendations(){
   let filtered=noticeData.filter(n=>{
     const isClosed=n['처리상태']==='접수마감';
     if(isClosed) return false;
-    if(savedRegions.length && !savedRegions.includes(extractRegionTop(n['지역']))) return false;
+    // 🔴 칩이 region_top이 됐으므로 여기도 같은 값을 본다 — noticeData가 이미 담고 있다(1181행).
+    // 다시 파싱하면 저장된 「서울특별시」가 region='서울'인 73행을 조용히 걸러낸다.
+    if(savedRegions.length && !savedRegions.includes(n['지역대분류'])) return false;
     if(savedTypes.length && !savedTypes.some(t=>classifyNoticeType(n['공급유형'],n['공고명'])===t||n['공급유형']?.includes(t))) return false;
     return true;
   });
@@ -3415,11 +3420,27 @@ function loadPreciseEligibility(annId, detailEl, id, useGroup){
   })).then(r => r.ok ? r.json() : []).then(rows => {
     const staleHtml = staleSourceBannerHtml(rows, annId, useGroup, id);
     // 그룹조회로 형제 announcement_id 여러 곳에 동일 자격기준이 중복 백필된 경우를 대비해
-    // 핵심 필드 조합이 완전히 같은 행은 하나만 남긴다.
+    // 중복 행을 하나만 남긴다.
+    // 🔴 키 = 「이 아코디언이 화면에 그리는 필드 전부」다(2026-09-11). 화면에서 달라 보이는 두 행은
+    // 둘 다 남고, 화면에서 똑같이 보이는 두 행만 접힌다. 이 규칙이 아니면 둘 중 하나가 반드시 틀린다 —
+    // 그리는데 키에 없으면 다른 행이 사라지고(2026-09-11 이전 *_exempt 2개가 그랬다),
+    // 키에 있는데 안 그리면 화면상 똑같은 행이 둘로 보인다.
+    // ⚠️ 그래서 이 조회가 받는 31개 컬럼 중 안 그리는 것은 키에 넣지 않는다 — *_birth1/2 · age_min·age_max ·
+    // manual_check_note · age_exception_note · income_pct_household1/2_bonus는 자격진단 전용이고
+    // 이 아코디언은 표시하지 않는다(⑤ 역참조표의 경로 A/B 구분).
+    // 🔴 아래 배열과 바로 밑 렌더는 같은 목록이어야 한다. 렌더가 필드마다 서식이 달라(배제 표기가 금액을
+    // 대신하고, 맞벌이가 소득과 한 줄로 묶인다) 한 배열에서 둘 다 만들지는 못했다. 붙여 두고 검증으로 본다.
+    const ELIG_RENDER_FIELDS = [
+      'supply_form', 'rank',
+      'income_limit_exempt', 'income_pct', 'income_pct_dual_income',
+      'asset_limit_exempt', 'asset_limit',
+      'car_limit',
+      'verification_requirements'
+    ];
     if(Array.isArray(rows) && rows.length > 0){
       const seenElig = new Set();
       rows = rows.filter(r => {
-        const key = [r.supply_form, r.rank, r.income_pct, r.income_pct_dual_income, r.asset_limit, r.car_limit, JSON.stringify(r.verification_requirements||null)].join('|');
+        const key = ELIG_RENDER_FIELDS.map(f => JSON.stringify(r[f] ?? null)).join('|');
         if(seenElig.has(key)) return false;
         seenElig.add(key);
         return true;
