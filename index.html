@@ -313,12 +313,28 @@ body.theme-dark .zf-footer a{color:#9aa0aa}
           <option value="2" selected>2인</option>
           <option value="3">3인</option>
           <option value="4">4인</option>
-          <option value="5">5인 이상</option>
+          <option value="5">5인</option>
+          <option value="6">6인</option>
+          <option value="7">7인</option>
+          <option value="8">8인 이상</option>
         </select>
       </div>
       <div class="field">
         <label class="label">세대 월평균 소득 (만원)</label>
         <input type="number" id="income" placeholder="예: 450" min="0">
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <!-- 🔴 맞벌이 여부는 진단에서만 쓰고 프로필에 저장하지 않는다(2026-09-11).
+             공고가 말하는 맞벌이는 「본인 및 배우자 모두 소득이 있는 경우」라 라벨을 그 정의대로 적는다.
+             기본값은 「모름」이고, 모름·아니오는 단독 기준으로 판정한 뒤 갈리는 유형만 안내한다. -->
+        <label class="label" for="dualIncome">본인과 배우자 모두 소득이 있나요?</label>
+        <select id="dualIncome">
+          <option value="unknown" selected>모름</option>
+          <option value="no">아니오</option>
+          <option value="yes">예</option>
+        </select>
       </div>
     </div>
     <div class="row">
@@ -1652,13 +1668,12 @@ function noticeShowMore(){
 // 🔴 자격기준 수치(소득%·자산한도)는 여기 두지 않는다. 정본은 DB `eligibility_criteria`의 `기본기준` 행이다.
 // 2026-09-08까지 이 상수가 소득%·자산한도를 함께 들고 있었고, DB와 따로 낡아 3.62억(2025년 값)이
 // 화면에 그대로 노출됐다. 같은 값을 두 곳에서 들고 있으면 반드시 한쪽이 낡는다.
+// 🔴 소득 기준액도 DB(`urban_worker_monthly_income`)가 정본이다 — 2026-09-11에 여기 있던
+// 소득 상수 세 개를 지웠다. 중위소득이라 적힌 것은 출처가 없었고(공식 기준액 대비 59.8~82.2%로
+// 비율이 제각각이었다), 나머지 둘은 매입임대 전세형 공고 한 건의 게시표라 그 유형 밖에서는 거짓이었다
+// (1·2인 가산이 이미 녹아 있어 가산 축을 따로 만들 수도 없었다). 경위는 docs/history.md 2026-09-11.
 // 여기 남은 것은 「칩에 어떤 유형을 띄울까」뿐이다.
 const HOUSING_TYPES = ['매입임대','행복주택','국민임대','영구임대','통합공공임대','분양'];
-// 가구원수별 중위소득 100% 기준 (2026년, 만원)
-const MEDIAN_INCOME = { 1:228, 2:381, 3:492, 4:602, 5:708, 6:814 };
-
-const LIMIT130={1:5720045,2:8212778,3:10618958,4:11442863,5:12125081};
-const LIMIT200={1:8389399,2:12319167,3:16336858,4:17604404,5:18653970};
 let diagMarital='';
 let selectedRegions=new Set();
 let selectedTypes=new Set();
@@ -2223,12 +2238,39 @@ function goStep(n){
   }
 }
 
+// 도시근로자 가구원수별 가구당 월평균소득 기준액 캐시 (페이지 로드 1회 조회)
+// 🔴 이 표가 소득 한도의 밑값이다. eligibility_criteria의 income_pct 계열은 이 값에 곱하는 비율일 뿐이다.
+// 표는 해마다 바뀐다 — 새 연도 행을 넣으면 아래 로직이 가장 큰 standard_year를 자동으로 고른다.
+let _urbanIncome = null;
+async function loadUrbanIncome(){
+  if(_urbanIncome) return _urbanIncome;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/urban_worker_monthly_income?select=standard_year,household_size,income_100&order=standard_year.desc,household_size.asc`,
+      {headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY}});
+    if(res.ok){
+      const rows = await res.json();
+      if(Array.isArray(rows) && rows.length > 0){
+        // 가장 큰 standard_year의 행만 쓴다. 옛 연도 행이 남아 있어도 섞이지 않는다.
+        const year = Math.max(...rows.map(r => Number(r.standard_year)));
+        const table = {};
+        rows.filter(r => Number(r.standard_year) === year)
+            .forEach(r => { table[Number(r.household_size)] = Number(r.income_100); });
+        // 🔴 1~8인이 다 있을 때만 쓴다. 한 칸이라도 비면 그 가구원수에서 조용히 판정이 사라진다.
+        const complete = [1,2,3,4,5,6,7,8].every(n => Number.isFinite(table[n]) && table[n] > 0);
+        if(complete){ _urbanIncome = { year, table }; return _urbanIncome; }
+      }
+    }
+  } catch(e){ console.warn('urban_worker_monthly_income 로드 실패:', e); }
+  // 🔴 폴백 상수를 두지 않는다. 호출부(diagnose)가 null을 받아 보류 문구를 띄운다.
+  return null;
+}
+
 // eligibility_criteria 테이블 캐시 (페이지 로드 1회 조회)
 let _eligibilityCriteria = null;
 async function loadEligibilityCriteria(){
   if(_eligibilityCriteria) return _eligibilityCriteria;
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/eligibility_criteria?source_announcement_id=eq.기본기준&select=housing_type,supply_form,income_pct,income_pct_dual_income,income_pct_birth1,income_pct_birth2,asset_limit,asset_limit_birth1,asset_limit_birth2,car_limit,car_limit_birth1,car_limit_birth2,age_min,age_max,manual_check_note,age_exception_note&order=housing_type`,
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/eligibility_criteria?source_announcement_id=eq.기본기준&select=housing_type,supply_form,income_pct,income_pct_dual_income,income_pct_birth1,income_pct_birth2,income_pct_household1_bonus,income_pct_household2_bonus,asset_limit,asset_limit_birth1,asset_limit_birth2,car_limit,car_limit_birth1,car_limit_birth2,age_min,age_max,manual_check_note,age_exception_note&order=housing_type`,
       {headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY}});
     if(res.ok){
       const rows = await res.json();
@@ -2273,7 +2315,11 @@ function ageStateFor(row, birthYear){
 async function diagnose(){
   const marital=document.getElementById('marital').value;
   const children=parseInt(document.getElementById('children').value)||0;
-  const members=Math.min(parseInt(document.getElementById('members').value)||2,5);
+  const members=Math.min(parseInt(document.getElementById('members').value)||2,8);
+  // 🔴 사용자 입력이다 — 2026-09-11 이전에는 문구 문자열에서 되짚어 추정했다.
+  // 'yes'일 때만 맞벌이 기준을 쓴다. 'unknown'·'no'는 단독 기준이고, 'unknown'이면 갈리는 유형만 안내한다.
+  const dualInput=document.getElementById('dualIncome')?.value||'unknown';
+  const dualApplied = dualInput === 'yes';
   const income=(parseFloat(document.getElementById('income').value)||0)*10000;
   const assets=(parseFloat(document.getElementById('assets').value)||0)*10000;
   const owned=document.getElementById('owned').value;
@@ -2292,13 +2338,9 @@ async function diagnose(){
   if(!marital){r.innerHTML='<div class="rbox warn"><p class="rtitle">⚠ 혼인 상태를 선택해주세요</p></div>';return;}
   if(owned==='yes'){r.innerHTML='<div class="rbox err"><p class="rtitle">❌ 신청 불가 — 주택 소유자</p><p class="rdesc">세대구성원 전원이 무주택이어야 신청 가능합니다. 주택 처분 후 무주택 기간을 확인해주세요.</p></div>';return;}
 
-  const lim130=LIMIT130[members], lim200=LIMIT200[members];
-  let incomeMsg='';
-  if(income>0){
-    if(income>lim200){ incomeMsg=`소득 기준 초과 (맞벌이 기준 ${fmt(lim200)})`; }
-    else if(income>lim130) incomeMsg=`맞벌이 기준(${fmt(lim200)}) 충족 · 단독소득 기준(${fmt(lim130)}) 초과`;
-    else incomeMsg=`소득 기준 충족 (기준: ${fmt(lim130)})`;
-  }
+  // 🔴 소득 문구는 판정이 끝난 뒤 자산·자동차 문구와 같은 방식으로 만든다(아래 incomeMsg).
+  // 2026-09-11 이전에는 여기서 상수 두 개로 문구를 먼저 만들고, 그 문구 문자열에서 맞벌이 여부를
+  // 되짚어 판정에 썼다. 문구가 판정의 입력이 되는 구조라 유형별 한도와 무관한 숫자가 화면에 박혔다.
   // 🔴 여기 있던 rankMap을 지웠다(2026-09-08). 도입 커밋(8d9b821) 이래 한 번도 참조된 적이 없다 —
   // 그 이름을 대괄호로 인덱싱한 코드가 git 이력 전체에 없다. 들어가려다 만 흔적이고, 쓰이는 줄 알고 그 값을 근거로
   // 판단하는 오해를 만든다(직전 hideClosed와 같은 종류다).
@@ -2306,25 +2348,31 @@ async function diagnose(){
   // 혼인상태에서 순위를 프론트가 되짚어 만드는 것은 그 정본을 코드에 복제하는 일이라 되살리지 않는다.
   diagMarital=marital;
 
-  // DB에서 자격기준 로드 (유형×공급형태 매트릭스)
-  const criteria = await loadEligibilityCriteria();
+  // DB에서 자격기준 로드 (유형×공급형태 매트릭스 + 가구원수별 기준액)
+  const [criteria, urban] = await Promise.all([loadEligibilityCriteria(), loadUrbanIncome()]);
   // 🔴 기준을 못 불러오면 판정하지 않는다 — 낡은 값으로 조용히 떨어지지 않는다.
-  if(!criteria){
+  // 기준액 표가 없거나 1~8인이 다 차지 않은 경우도 같다(loadUrbanIncome이 null을 준다).
+  if(!criteria || !urban){
     r.innerHTML=`<div class="rbox warn"><p class="rtitle">⚠ 기준을 불러오지 못했어요</p><p class="rdesc">자격 기준 정보를 가져오지 못해 진단을 진행할 수 없어요.<br>잘못된 결과를 보여드리지 않으려고 판정을 멈췄습니다. 네트워크를 확인하고 다시 시도해주세요.</p><button class="btn btn-sec btn-sm" style="margin-top:8px" onclick="diagnose()">다시 시도</button></div>`;
     return;
   }
-  const medianBase = (MEDIAN_INCOME[members]||MEDIAN_INCOME[6]) * 10000;
-  const isDualIncome = incomeMsg.includes('맞벌이 기준') && !incomeMsg.includes('초과');
+  const incomeBase = urban.table[members];
 
-  // 🔴 출산자녀 가산 — 가산된 한도를 여기서 계산하지 않는다. 정본은 DB의 *_birth1/*_birth2 컬럼이다.
+  // 🔴 자산·자동차 가산 — 가산된 한도를 여기서 계산하지 않는다. 정본은 DB의 *_birth1/*_birth2 컬럼이다.
   // 산식(×1.1/×1.2)으로 만들면 실측과 어긋난다: 345,000,000×1.2=414,000,000인데 실제 고시값은
   // 413,000,000이고, 245,000,000×1.1=269,500,000인데 실제는 270,000,000이다. 비율이 아니라 고시표 값이다.
   // 가산 폭도 유형마다 다르다(2026-09-08 실측: 자산 일반계열 +34/+68백만, 영구임대 +25/+49백만,
-  // 행복주택 청년 +50백만(2인 tier만 확인됨)). 소득은 행복주택·영구임대만 +10%p/+20%p이고
-  // 국민임대·매입임대는 tier와 무관하게 동일하다 — 「가산율은 전부 같다」가 성립하지 않는다.
+  // 행복주택 청년 +50백만(2인 tier만 확인됨)).
   // NULL은 「가산 근거 없음」이며 기본값으로 떨어진다. 없는 완화를 지어내지 않는다.
-  // 가산 판정이 기본 판정보다 엄격해질 수는 없으므로 축마다 느슨한 쪽을 쓴다.
-  function limitsFor(c, tier){
+  // 가산 판정이 기본 판정보다 엄격해질 수는 없으므로 이 두 축은 느슨한 쪽을 쓴다.
+  //
+  // 🔴 소득 축만 규칙이 다르다 — 합산이다(2026-09-11 원문 대조). 공고문이 그렇게 적는다:
+  // 「소득·자산 기준은 가산항목에 따라 일정 비율로 가산되며, 가산항목이 중복시 합산 적용됩니다.」
+  // 게시표가 그것을 값으로 보여준다 — 서울대방 행복주택 맞벌이 2인가구 130%(= 100 + 20 맞벌이 + 10 가구원수),
+  // 한부모 2인가구 1자녀 120%(= 100 + 10 + 10), 영구임대 일반입주자 2인가구 1자녀 70%(= 50 + 10 + 10).
+  // 종전에는 축마다 Math.max로 「느슨한 쪽 하나만」 썼는데, 그것은 코드의 안전측 설계였지 제도 규칙이 아니었다.
+  // DB의 *_dual_income·*_birth1/2는 절대 비율(기본 + 가산)이므로 기본값을 빼서 가산분(%p)으로 되돌려 더한다.
+  function limitsFor(c, tier, dual){
     const num = v => (v==null || v==='') ? null : Number(v);
     const pick = (base, b1, b2) => {
       const b = num(base), v = num(tier===2 ? b2 : (tier===1 ? b1 : null));
@@ -2332,11 +2380,21 @@ async function diagnose(){
       if(b==null) return v;
       return Math.max(b, v);
     };
-    // 맞벌이 쪽 가산은 실측값이 없다. 맞벌이 기준이 잡히면 그 값을 그대로 두고 가산을 얹지 않는다.
-    const basePct = (isDualIncome && c.income_pct_dual_income) ? c.income_pct_dual_income : c.income_pct;
-    const pct = pick(basePct, c.income_pct_birth1, c.income_pct_birth2);
+    const basePct = num(c.income_pct);
+    let pct = basePct;
+    if(pct != null){
+      const hhBonus = members===1 ? num(c.income_pct_household1_bonus)
+                    : members===2 ? num(c.income_pct_household2_bonus) : null;
+      pct += (hhBonus ?? 0);
+      const dualPct = num(c.income_pct_dual_income);
+      if(dual && dualPct != null) pct += dualPct - basePct;
+      const birthPct = tier===1 ? num(c.income_pct_birth1) : tier===2 ? num(c.income_pct_birth2) : null;
+      if(birthPct != null) pct += birthPct - basePct;
+    }
     return {
-      incLim:   pct==null ? null : medianBase * pct / 100,
+      // 🔴 정수 pct를 먼저 곱하고 100으로 나눈다. base*(pct/100)로 쓰면 부동소수 오차로 반올림이
+      // 한 원씩 어긋난다 — 9,326,985 × 70%가 정확히 6,528,889.5라 경계에 걸린다(공고 게시값 6,528,890).
+      incLim:   pct==null ? null : Math.round(incomeBase * pct / 100),
       assetLim: pick(c.asset_limit,  c.asset_limit_birth1,  c.asset_limit_birth2),
       carLim:   pick(c.car_limit,    c.car_limit_birth1,    c.car_limit_birth2)
     };
@@ -2345,8 +2403,8 @@ async function diagnose(){
   // 자동차만 규칙이 다르다: 한도 정보가 없는 행(carLim==null)은 탈락시키지 않는다 —
   // 자산과 달리 이 축은 값이 비어 있는 행이 실제로 있고(행복주택/대학생), 없는 요건으로 떨어뜨리면
   // 지금까지 통과하던 유형이 조용히 사라진다.
-  function moneyOk(c, tier){
-    const L = limitsFor(c, tier);
+  function moneyOk(c, tier, dual = dualApplied){
+    const L = limitsFor(c, tier, dual);
     const incOk   = income===0    || (L.incLim!=null && income <= L.incLim);
     const assetOk = assets===0    || (L.assetLim!=null && L.assetLim>0 && assets <= L.assetLim);
     const carOk   = carValue===0  || L.carLim==null || carValue <= L.carLim;
@@ -2361,6 +2419,23 @@ async function diagnose(){
     const lim = Number(c.asset_limit) || 0;
     return lim > 0 && assets <= lim;
   }) : [];
+
+  // 🔴 소득 문구도 같은 원칙이다(2026-09-11). 종전에는 「기준: 572만원」처럼 단일 숫자를 박았는데,
+  // 그 값은 매입임대 전세형(130%)의 것이라 나머지 유형에 대해 거짓이었다. 한도는 유형마다 다르다.
+  // 계산 대상 집합은 자산 문구와 같게 criteria 전체로 둔다.
+  const incomeOkTypes = income>0 ? criteria.filter(c => {
+    const lim = limitsFor(c, 0, dualApplied).incLim;
+    return lim != null && income <= lim;
+  }) : [];
+  let incomeMsg='';
+  if(income>0){
+    const incMax = Math.max(0, ...criteria.map(c => limitsFor(c, 0, dualApplied).incLim || 0));
+    const basis = `가구원수 ${members}인${dualApplied ? '·맞벌이' : ''} 기준`;
+    incomeMsg = incomeOkTypes.length
+      ? `소득 ${fmt(income)} — 소득요건 통과 유형 ${incomeOkTypes.length}개 (${basis}, 한도 최대 ${fmt(incMax)})`
+      : `소득 기준 초과 — 모든 유형의 소득 한도(${basis}, 최대 ${fmt(incMax)})를 넘어요`;
+  }
+
   let assetMsg='';
   if(assets>0){
     const limMax = Math.max(0, ...criteria.map(c => Number(c.asset_limit) || 0));
@@ -2375,7 +2450,7 @@ async function diagnose(){
   const carLimits = [...new Set(criteria.map(c => Number(c.car_limit)).filter(v => v > 0))].sort((a,b)=>a-b);
   let carMsg='';
   if(carValue>0){
-    const carOkTypes = criteria.filter(c => { const L = limitsFor(c,0); return L.carLim!=null && L.carLim>0 && carValue <= L.carLim; });
+    const carOkTypes = criteria.filter(c => { const L = limitsFor(c,0,dualApplied); return L.carLim!=null && L.carLim>0 && carValue <= L.carLim; });
     const carMax = carLimits.length ? carLimits[carLimits.length-1] : 0;
     carMsg = carOkTypes.length
       ? `자동차 ${fmt(carValue)} — 자동차요건 통과 유형 ${carOkTypes.length}개 (한도 최대 ${fmt(carMax)})`
@@ -2392,7 +2467,7 @@ async function diagnose(){
   // 🔴 이 완화는 manual_check_note 행에만 준다. 자산 축의 일반 규칙(한도가 없으면 탈락)은 그대로 둔다 —
   // asset_limit_exempt 구조와 함께 봐야 하는 별건이다.
   function shownForCheck(c){
-    const L = limitsFor(c, 0);
+    const L = limitsFor(c, 0, dualApplied);
     const incOk   = income===0   || L.incLim==null   || income   <= L.incLim;
     const assetOk = assets===0   || L.assetLim==null || L.assetLim<=0 || assets <= L.assetLim;
     const carOk   = carValue===0 || L.carLim==null   || carValue <= L.carLim;
@@ -2412,6 +2487,14 @@ async function diagnose(){
   const baseSet = new Set(moneyOkEntries);
   const bonusOnlyEntries = birthTier>0
     ? judgeRows.filter(c => !baseSet.has(c) && moneyOk(c, birthTier)
+        && ageStateFor(c, birthYear) !== 'no')
+    : [];
+
+  // 🔴 맞벌이 안내 — 「모름」일 때만 띄운다(2026-09-11 신설).
+  // 「예」면 이미 맞벌이 기준으로 판정했고, 「아니오」면 물어본 결과가 단독이므로 둘 다 안내할 것이 없다.
+  // 🍼 안내와 같은 구조다: 판정은 안전측(단독)으로 두고, 결과가 갈리는 유형만 양쪽을 보여준다.
+  const dualOnlyEntries = dualInput==='unknown'
+    ? judgeRows.filter(c => !baseSet.has(c) && moneyOk(c, 0, true)
         && ageStateFor(c, birthYear) !== 'no')
     : [];
 
@@ -2458,7 +2541,7 @@ async function diagnose(){
   if(bonusOnlyEntries.length){
     const bonusLabels = bonusOnlyEntries.map(c => {
       const sf = (c.supply_form && c.supply_form !== '일반') ? `(${c.supply_form})` : '';
-      const b = limitsFor(c, 0), a = limitsFor(c, birthTier);
+      const b = limitsFor(c, 0, dualApplied), a = limitsFor(c, birthTier, dualApplied);
       const parts=[];
       if(a.assetLim!=null && b.assetLim!=null && a.assetLim>b.assetLim) parts.push(`자산 ${fmtEok(b.assetLim)} → ${fmtEok(a.assetLim)}`);
       if(a.incLim  !=null && b.incLim  !=null && a.incLim  >b.incLim  ) parts.push(`소득 ${fmt(b.incLim)} → ${fmt(a.incLim)}`);
@@ -2466,6 +2549,19 @@ async function diagnose(){
       return `· ${c.housing_type}${sf}${parts.length ? ' — '+parts.join(' · ') : ''}`;
     }).join('<br>');
     commonMsgs+=`<div class="rbox warn" style="margin-top:6px"><p class="rtitle">🍼 출산자녀 수에 따라 기준이 완화될 수 있어요</p><p class="rdesc">${bonusLabels}<br><span style="font-size:11px;color:#999">위 판정은 완화 전 기준이에요. 공고가 말하는 「출산자녀」와 입력하신 「자녀 수(미성년)」가 같은 개념이 아닐 수 있어(입양·재혼) 자동으로 적용하지 않았어요. 공고문에서 확인해주세요.</span></p></div>`;
+  }
+
+  // 🔴 맞벌이로 갈리는 유형만 띄운다. 갈리지 않으면 아무것도 띄우지 않는다.
+  // 완화 폭은 DB 값과 산식에서 만든다 — 화면에 숫자를 박지 않는다.
+  if(dualOnlyEntries.length){
+    const dualLabels = dualOnlyEntries.map(c => {
+      const sf = (c.supply_form && c.supply_form !== '일반') ? `(${c.supply_form})` : '';
+      const b = limitsFor(c, 0, false), a = limitsFor(c, 0, true);
+      const gap = (a.incLim!=null && b.incLim!=null && a.incLim>b.incLim)
+        ? ` — 소득 ${fmt(b.incLim)} → ${fmt(a.incLim)}` : '';
+      return `· ${c.housing_type}${sf}${gap}`;
+    }).join('<br>');
+    commonMsgs+=`<div class="rbox warn" style="margin-top:6px"><p class="rtitle">👫 본인과 배우자 모두 소득이 있으면 기준이 완화돼요</p><p class="rdesc">${dualLabels}<br><span style="font-size:11px;color:#999">위 판정은 단독소득 기준이에요. 맞벌이 여부를 「모름」으로 두셔서 완화를 적용하지 않았어요. 해당되면 위에서 「예」를 선택하고 다시 진단해주세요.</span></p></div>`;
   }
 
   // 🔴 나이 구간 밖이지만 사라지지 않는 유형 — 사유는 DB가 들고 있다.
@@ -2511,7 +2607,7 @@ async function diagnose(){
     }).join(' ');
     // 자동차를 축에 적는 조건: 실제로 입력했고, 목록의 모든 행에 한도가 있어 정말로 판정된 경우.
     // 한도가 없는 행이 섞이면 「자동차 요건을 충족했다」가 그 행에 대해 거짓이 된다.
-    const carJudged = carValue>0 && eligibleEntries.every(c => limitsFor(c,0).carLim!=null);
+    const carJudged = carValue>0 && eligibleEntries.every(c => limitsFor(c,0,dualApplied).carLim!=null);
     const okAxes = carJudged ? '소득·자산·자동차·나이' : '소득·자산·나이';
     html=`<div class="rbox ok"><p class="rtitle">✅ 신청 가능한 주택 유형</p><p class="rdesc">${entryLabels}<br><span style="font-size:11px;color:#999">${okAxes} 기준을 충족한 유형이에요. 공급형태(전세형 등)별로 기준이 다를 수 있어요.</span></p></div>`;
     html+=commonMsgs;
