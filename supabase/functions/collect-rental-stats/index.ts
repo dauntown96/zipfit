@@ -6,9 +6,15 @@ const requireEnv = (key: string): string => {
   return v
 }
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
-const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-const API_KEY = Deno.env.get('ODCLOUD_API_KEY')!
+// 🔴 셋 다 requireEnv로 읽는다(코딩원칙 16). 2026-09-12까지 `!` 단언이었고, 그중
+// ODCLOUD_API_KEY 하나가 **조용히 통과**했다 — 미설정이면 URL에 리터럴 `serviceKey=undefined`가
+// 실려 나가고, 비-2xx를 받은 fetchAllPages가 console.error 후 break해서 0건을 수집한 뒤
+// 응답이 `success: true, upserted: 0`이 된다. 성공으로 보고되는 실패라 아무도 모른다.
+// 앞의 두 개는 createClient가 `supabaseUrl is required.` / `supabaseKey is required.`로
+// 부팅에 throw하긴 했으나, 로그에 「필수 환경변수 누락: X」가 남지 않아 원인이 즉시 안 보였다.
+const SUPABASE_URL = requireEnv('SUPABASE_URL')
+const SUPABASE_SERVICE_KEY = requireEnv('SUPABASE_SERVICE_ROLE_KEY')
+const API_KEY = requireEnv('ODCLOUD_API_KEY')
 // 🔴 시크릿 게이트 — 값은 CRON_SECRET_V2 하나만 받는다.
 // 2026-09-04 교체 완료. 이중 수용(구 CRON_SECRET 병행)은 cron 잡 3개가 신 값으로
 // 도는 것을 확인한 뒤 걷어냈다 — 대시보드에서 구 값을 지우기 *전에* 걷어내야 한다.
