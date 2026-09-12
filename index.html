@@ -3173,10 +3173,16 @@ function loadAnnouncementExtras(annId, detailEl, id, useGroup){
     const staleHtml = staleSourceBannerHtml(rows, annId, useGroup, id);
     // 같은 건물이 LH·MYHOME 두 파이프라인으로 각각 수집돼 서로 다른 announcement_id를 갖고,
     // 그룹조회(resolveAnnouncementIds)로 양쪽이 함께 잡히면 동일 파일이 중복 노출될 수 있어
-    // file_hash(없으면 file_url의 drive fileId) 기준으로 먼저 중복을 제거한다.
+    // Drive fileId(못 뽑으면 행 id) 기준으로 먼저 중복을 제거한다.
+    // 🔴 2026-09-12: 키에서 file_hash를 뺐다. 그 컬럼에 든 값은 해시가 아니라 Drive의
+    // 파일 크기다(메타데이터와 대조 확인) — 크기가 같은 다른 파일이 조용히 사라졌다.
+    // 실측: 2개 그룹에서 파일 5개가 빠지고 있었다(대전 청년매입 예찬빌A·B 사진 4,
+    // 광주전남 신혼신생아Ⅱ 부영애시앙 평면도 1). 컬럼 값 자체는 그대로 두었다.
+    // ⚠️ 키의 뜻이 바뀐다 — 「내용이 같으면 하나」가 아니라 「같은 Drive 파일이면 하나」다.
+    // Drive ID 추출 실패율은 1,152행에서 0%였다(전부 drive.google.com/file/d/<ID>/… 형태).
     const seen = new Set();
     rows = rows.filter(r => {
-      const key = r.file_hash || driveFileIdFrom(r.file_url) || r.id;
+      const key = driveFileIdFrom(r.file_url) || r.id;
       if(seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -3509,7 +3515,7 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
   })).then(r => r.ok ? r.json() : []).then(units => {
     const staleHtml = staleSourceBannerHtml(units, annId, useGroup, id);
     // 그룹조회로 형제 announcement_id 여러 곳에 동일 세대정보가 중복 백필된 경우를 대비해
-    // 핵심 필드 조합이 완전히 같은 행은 하나만 남긴다(announcement_extras의 file_hash dedup과 동일 취지).
+    // 핵심 필드 조합이 완전히 같은 행은 하나만 남긴다(announcement_extras 첨부 dedup과 동일 취지).
     if(Array.isArray(units) && units.length > 0){
       const seenHu = new Set();
       units = units.filter(u => {
