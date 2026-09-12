@@ -156,3 +156,78 @@ anon·authenticated EXECUTE가 **여전히 true**다. `=X`가 **PUBLIC** 항목�
 
 🔵 **그래서 새 RPC는 그 자리에서 손으로 닫는다** — `revoke execute ... from public, anon, authenticated` 뒤 필요한 역할에만 grant.
 `CLAUDE.md` 원칙 15에 같은 내용을 적었다.
+
+---
+
+## 스키마 변경 이력 (DDL)
+
+기록만 한다 — 위 「권한 변경 이력」과 같다. 여기를 고쳐도 DB는 바뀌지 않는다.
+
+### 2026-09-12 — `eligibility_criteria_bak_20260908` DROP
+
+2026-09-08 기준값 갱신 전으로 되돌릴 수단으로 만든 스냅샷이다. 그 존재 이유였던
+「되돌릴 수단이 없다」는 전제가 같은 날 오판으로 드러났다 — `zipfit-backup`의 자동 덤프가
+매일 돌고 09-08자 덤프도 확보돼 있다.
+
+🔴 **이름 대조 체계의 첫 삭제 사례다.** 백업 쪽 `schema_guard`가 이것을 「사라진 이름」으로 읽고
+한 회차 실패하며, 승인은 `zipfit-backup` 쪽 짝 문서가 처리한다.
+
+**실행 전 확인** (셋 다 0행이어야 실행한다 — 하나라도 나오면 멈춘다)
+
+```sql
+-- (1) 이 테이블을 참조하는 제약
+select conrelid::regclass, conname from pg_constraint
+where confrelid = 'public.eligibility_criteria_bak_20260908'::regclass;
+
+-- (2) 뷰·머티리얼라이즈드뷰·함수 본문·룰·cron 명령문에 이름이 등장하는지
+select 'view' k, viewname from pg_views where schemaname='public' and definition ilike '%eligibility_criteria_bak_20260908%'
+union all select 'matview', matviewname from pg_matviews where schemaname='public' and definition ilike '%eligibility_criteria_bak_20260908%'
+union all select 'func', p.proname from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+  where n.nspname='public' and p.prokind in ('f','p') and pg_get_functiondef(p.oid) ilike '%eligibility_criteria_bak_20260908%'
+union all select 'cron', jobname from cron.job where command ilike '%eligibility_criteria_bak_20260908%';
+
+-- (3) 원본과 스냅샷의 현재 행 수
+select (select count(*) from public.eligibility_criteria) as live,
+       (select count(*) from public.eligibility_criteria_bak_20260908) as bak;
+```
+
+⚠️ **(2)에서 `pg_get_functiondef(p.oid)`는 `prokind in ('f','p')`로 걸러야 한다** —
+집계 함수(`prokind='a'`)에 부르면 `"array_agg" is an aggregate function`으로 쿼리 전체가 죽는다.
+
+**실행** (2026-09-12 01:15 UTC = 10:15 KST)
+
+```sql
+DROP TABLE public.eligibility_criteria_bak_20260908;
+```
+
+🔴 **`CASCADE`를 붙이지 않는다.** 참조가 있으면 실패해야 한다 — 실행 전 확인과 같은 방어다.
+
+**실행 시점 상태**: 304행 · 컬럼 18 · 트리거 0 · 정책 0 · RLS 켜짐 · ACL은 `postgres`·`service_role`뿐.
+`public` 테이블 16 → 15. `eligibility_criteria` 307행 불변.
+
+### 되돌리기
+
+🔴 **`DROP TABLE`에 대응하는 한 줄짜리 SQL은 없다.** 복구 수단이 셋 있고, 셋 다 DB 밖에 있다.
+
+1. 🔴 **`zipfit-backup`의 일일 덤프** — 2026-09-08(스냅샷 생성) 이후 ~ 2026-09-12(삭제) 사이의
+   어느 회차든 이 테이블을 담고 있다. 그 덤프에서 `eligibility_criteria_bak_20260908` 블록만 꺼내
+   `psql`로 되먹인다. **이것이 정규 경로다.**
+2. **현행 `eligibility_criteria`와의 차이로 재구성** — 스냅샷은 기준값 갱신 **전** 상태이므로,
+   09-08 갱신분을 되짚으면 근사할 수 있다. ⚠️ 근사일 뿐 동일 복원이 아니다.
+3. **빈 껍데기가 필요할 뿐이면** 아래로 만든다(데이터는 들어오지 않는다).
+
+```sql
+create table public.eligibility_criteria_bak_20260908 (
+  id uuid, region text, housing_type text, supply_form text, rank integer,
+  income_pct numeric, income_pct_dual_income numeric, asset_limit bigint, car_limit bigint,
+  source_announcement_id text, created_at timestamp with time zone, announcement_id text,
+  subscription_months_required integer, subscription_payments_required integer,
+  income_limit_exempt boolean, asset_limit_exempt boolean,
+  verification_requirements jsonb, eligibility_schema_type text
+);
+alter table public.eligibility_criteria_bak_20260908 enable row level security;
+revoke all on table public.eligibility_criteria_bak_20260908 from anon, authenticated;
+```
+
+⚠️ **행 수가 원본과 다르다** — 삭제 시점에 원본 307 · 스냅샷 304였다. 09-08 이후 원본에 3행이
+늘었다는 뜻이며, **이 삭제는 그 3행과 무관하다.** 복구할 때 307행을 기대하지 않는다.
