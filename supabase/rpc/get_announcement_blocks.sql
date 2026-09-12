@@ -3,11 +3,15 @@ CREATE OR REPLACE FUNCTION public.get_announcement_blocks(p_announcement_id text
  LANGUAGE sql
  STABLE
 AS $function$
+-- 🔴 target에서 LIMIT 1을 걷어냈다(2026-09-12) — get_announcement_group_ids와 같은 처리다.
+-- announcement_id 단독에는 유니크 제약이 없다(제약은 UNIQUE (source, announcement_id)).
+-- 중복이 생기면 LIMIT 1이 둘 중 하나를 조용히 골라 다른 공고의 블록을 돌려준다.
+-- 고르는 대신 일치하는 행들의 키를 전부 모아 받는다 — 중복 0건인 지금은 결과가 종전과 같고,
+-- 중복이 생기면 그룹이 합집합이 된다. ⚠️ 유니크 제약 신설은 영향이 넓어 여기서 하지 않는다.
 WITH target AS (
-  SELECT announcement_dedup_key(title) AS dedup_key
+  SELECT DISTINCT announcement_dedup_key(title) AS dedup_key
   FROM announcements
   WHERE announcement_id = p_announcement_id
-  LIMIT 1
 ),
 base AS (
   SELECT a.*,
@@ -19,8 +23,8 @@ base AS (
 ),
 group_rows AS (
   SELECT b.*
-  FROM base b, target t
-  WHERE b.dedup_key = t.dedup_key
+  FROM base b
+  WHERE b.dedup_key IN (SELECT dedup_key FROM target)
 ),
 -- ⭐ 2026-07-17 수정: distinct 주소 카운트를 MYHOME 소스 기준으로만 계산.
 -- LH의 precise_address는 종종 서술형("OO동·OO동 일원")이라 같은 물리적 단지를

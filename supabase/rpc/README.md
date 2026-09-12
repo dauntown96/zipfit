@@ -273,3 +273,46 @@ git show 54ca066:supabase/rpc/protect_detail_columns.sql
 그 출력을 그대로 실행한 뒤 `md5(pg_get_functiondef(...))`가
 `d1745de8f7153d888fde4450d088290e`인지 대조한다(변경 후는 `4181561ceaa9e0a26acb5b307f480de6`).
 🔴 **`DROP TRIGGER`로 되돌리지 말 것** — 그러면 보호 대상 15개까지 함께 풀린다.
+
+---
+
+### 2026-09-12 — 취소공고 플래그 · 두 `target` CTE의 `LIMIT 1` 제거
+
+한 회차에서 함수 **3개**를 손봤다. 같은 회차에 묶은 이유는 `get_announcement_group_ids`와
+`get_announcement_blocks`가 **같은 결함을 각자 갖고 있어서** 한쪽만 고치면 조용히 어긋나기
+때문이다.
+
+| 함수 | 무엇을 | 변경 전 md5 | 변경 후 md5 |
+|---|---|---|---|
+| `get_announcements_deduped` | `cancel_keys` CTE + `has_cancel_notice` 컬럼 | `fa999d94a484a548ec50b294b5ab1e48` | `15457abee9717e4104f669d98b2ed7fa` |
+| `get_announcement_group_ids` | VOLATILE → STABLE, `target`의 `LIMIT 1` 제거 | `24ddfd7e2a1958e822f1e7842dfaf087` | `32765df988b515646752bbf641bff368` |
+| `get_announcement_blocks` | `target`의 `LIMIT 1` 제거 | `9b20f1f693a0a06a1242b87eacdd2008` | `2c4b8ccb19daa37f354c1cf355c15f3d` |
+
+🔴 **`get_announcements_deduped`는 `CREATE OR REPLACE`로 안 됐다.** 반환 컬럼을 더하면
+`cannot change return type of existing function`이 난다. `DROP` 뒤 재생성해야 하며, 이번엔
+**하나의 `DO` 블록 안에서** 처리했다(단일 문이라 실패하면 통째로 롤백된다).
+
+🔴 **`DROP`은 그 함수의 ACL도 함께 지운다.** 재생성 뒤 아래를 다시 실행해 원래 상태로
+되돌렸다 — 재생성 전 `proacl`에 **PUBLIC EXECUTE가 있었고**, 권한을 좁히는 것은 이번
+범위가 아니라 그대로 복원했다.
+
+```sql
+GRANT EXECUTE ON FUNCTION public.get_announcements_deduped(text, text, text)
+  TO postgres, anon, authenticated, service_role;
+```
+
+⚠️ **본문을 손으로 옮겨 적지 않았다.** `pg_get_functiondef()`로 읽은 현재 정의를 DB 안에서
+`replace()`로 고쳐 `EXECUTE`했고, 앵커가 정확히 1건이 아니면 `RAISE EXCEPTION`으로 멈추게
+했다. 그래서 바뀌지 않은 부분은 바이트 단위로 종전과 같다.
+
+**되돌리기.** 세 파일 모두 직전 정의가 커밋 `b1b3f74`에 있다.
+
+```
+git show b1b3f74:supabase/rpc/get_announcements_deduped.sql
+git show b1b3f74:supabase/rpc/get_announcement_group_ids.sql
+git show b1b3f74:supabase/rpc/get_announcement_blocks.sql
+```
+
+`get_announcements_deduped`만 되돌릴 때도 **`DROP` 뒤 재생성 + 위 `GRANT`**가 필요하다
+(컬럼이 줄어드는 것도 반환 타입 변경이다). 나머지 둘은 그 출력을 그대로 실행하면 된다.
+실행 뒤 `md5(pg_get_functiondef(...))`가 위 표의 「변경 전」과 같은지 대조한다.
