@@ -860,8 +860,9 @@ function isClosingSoon(row){
 // 보이던 것을 빼지 않고 안 보이던 것만 더한다.
 // 날짜 비교는 isClosingSoon과 같은 방식이다 — 양쪽을 로컬 자정으로 맞춘 뒤 일수로 센다.
 // 반환: 'open'(접수중) | 'before'(접수 시작 전) | 'closed'(마감) | 'unknown'(판정 불가)
-// 🔴 'unknown'은 false가 아니라 별도 상태다. 접수기간이 없는 행(SH 14건 실측 — 목록에
-// 접수기간이 없는 것이 의도된 설계다)을 접수중으로도 시작전으로도 만들지 않는다.
+// 🔴 'unknown'은 false가 아니라 별도 상태다. 접수기간이 없는 행(SH 전량 — SH 목록에
+// 접수기간 컬럼이 없어 수집이 null로 둔다. 🔴 원본에 없는 것이 아니라 상세 본문에 있고
+// 우리가 안 읽는 것이다, 2026-09-12 실측)을 접수중으로도 시작전으로도 만들지 않는다.
 // 없는 정보로 「오늘 넣을 수 있다」를 만들면 사용자에게 거짓 신호가 된다.
 function applyWindowState(row){
   const s = parseNoticeDate(row['신청시작일']||row['apply_start']||'');
