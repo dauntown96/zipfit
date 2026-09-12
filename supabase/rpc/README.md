@@ -231,3 +231,45 @@ revoke all on table public.eligibility_criteria_bak_20260908 from anon, authenti
 
 ⚠️ **행 수가 원본과 다르다** — 삭제 시점에 원본 307 · 스냅샷 304였다. 09-08 이후 원본에 3행이
 늘었다는 뜻이며, **이 삭제는 그 3행과 무관하다.** 복구할 때 307행을 기대하지 않는다.
+
+## 함수 본문 변경 이력
+
+권한·DDL과 달리 이쪽은 **파일 diff가 곧 기록**이다. 아래는 그 diff를 어디서 찾는지와
+되돌리는 방법만 적는다.
+
+### 2026-09-12 — `protect_detail_columns()`에 `region` 가드 추가
+
+**무엇을.** 기존 15개 컬럼의 `coalesce(NEW.x, OLD.x)` 뒤에 블록 하나를 더했다.
+
+```sql
+IF NEW.region IS NOT NULL AND OLD.region IS NOT NULL
+   AND NOT (NEW.region ~ '[0-9]' OR NEW.region ~ '(읍|면|동|리|로|길)')
+   AND     (OLD.region ~ '[0-9]' OR OLD.region ~ '(읍|면|동|리|로|길)')
+THEN
+  NEW.region := OLD.region;
+END IF;
+```
+
+🔴 **왜 축이 다른가.** 나머지 15개는 NULL로 덮이므로 `coalesce`가 걸린다. `region`은
+`mapLHRow`가 `addr ?? (regionRaw || null)`로 만들어 **NULL이 되지 않고 「덜 정확한 값」
+(`CNP_CD_NM` 지역본부명)으로 덮인다.** 그래서 「주소형인가」를 묻는 별도 술어가 필요했다.
+
+**막는 방향은 하나뿐이다** — 주소형 → 지역본부명. 아래 셋은 그대로 통과한다.
+INSERT(이 트리거는 `BEFORE UPDATE` 전용) · 지역본부명 → 지역본부명 · 주소형 → 주소형.
+
+⚠️ **탈출구 `zipfit.allow_null_clear`가 이 가드도 함께 푼다.** 함수 맨 위에서 통째로
+빠져나가는 구조이기 때문이며, 이름과 달리 NULL 소거 전용이 아니다.
+
+**판정식의 근거.** LH가 실제로 보내는 `CNP_CD_NM` 25종(`전국`·`인천광역시 외` 포함)을
+전수 대조해 **하나도 주소형으로 갈리지 않는 것**을 확인한 뒤 골랐다(2026-09-12).
+
+**되돌리기.** 한 줄짜리 SQL은 없고, **직전 정의를 그대로 다시 실행하면 된다.**
+직전 정의는 커밋 `54ca066` 시점의 `supabase/rpc/protect_detail_columns.sql`이다.
+
+```
+git show 54ca066:supabase/rpc/protect_detail_columns.sql
+```
+
+그 출력을 그대로 실행한 뒤 `md5(pg_get_functiondef(...))`가
+`d1745de8f7153d888fde4450d088290e`인지 대조한다(변경 후는 `4181561ceaa9e0a26acb5b307f480de6`).
+🔴 **`DROP TRIGGER`로 되돌리지 말 것** — 그러면 보호 대상 15개까지 함께 풀린다.

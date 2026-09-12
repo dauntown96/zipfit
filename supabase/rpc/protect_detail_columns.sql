@@ -30,6 +30,8 @@ AS $function$
 --     COMMIT;
 --
 -- SET LOCAL은 트랜잭션이 끝나면 사라지므로 다음 트랜잭션은 다시 보호 상태다. 밖으로 새지 않는다.
+-- ⚠️ 이 스위치는 이름이 allow_null_clear지만 **아래 region 가드도 함께 푼다**(맨 위에서 통째로
+-- 빠져나가기 때문이다). region을 일부러 지역본부명으로 되돌려야 할 때도 같은 스위치를 쓴다.
 -- 🔴 대안(DROP → 정정 → 재생성)을 쓰지 말 것 — 수집이 KST 09:00~18:50에 10분 간격으로 돌아서
 -- 그 사이에 런이 끼면 정확히 막으려던 소거가 그 창에서 일어난다.
 --
@@ -39,8 +41,10 @@ AS $function$
 --   EF 매핑을 고칠 문제다(백로그).
 -- sido_nm·sigungu_nm — get_announcements_deduped의 best_location이 그룹 단위로 coalesce한다.
 -- apply_end·announcement_date·status·title·url — 목록에서 매 런 오므로 NULL이 될 일이 없다.
--- region — `addr ?? (regionRaw || null)`이라 NULL이 되지 않고 덜 정확한 값으로 덮인다.
---   NULL이 아니므로 이 트리거로는 못 막는다. 별건이다.
+-- region — 🔴 2026-09-12부터 보호한다(본문 맨 아래). 다른 컬럼과 축이 다르다 —
+--   NULL이 되는 것이 아니라 「덜 정확한 값」으로 덮이므로 coalesce로는 못 막고,
+--   「NEW가 주소형이 아니고 OLD가 주소형이면 OLD 유지」라는 별도 술어를 쓴다.
+--   NULL 쓰기는 여전히 막지 않는다 — mapLHRow가 region에 NULL을 싣는 경로가 없다.
 BEGIN
   IF coalesce(current_setting('zipfit.allow_null_clear', true), '') = 'on' THEN
     RETURN NEW;
@@ -64,6 +68,24 @@ BEGIN
   -- 첨부·주소
   NEW.attachment_urls          := coalesce(NEW.attachment_urls,          OLD.attachment_urls);
   NEW.precise_address          := coalesce(NEW.precise_address,          OLD.precise_address);
+
+  -- region — 🔴 여기만 축이 다르다. NULL이 아니라 「덜 정확한 값」으로 덮여서 coalesce가 안 걸린다.
+  -- 무엇을 막나: 기본 목록 upsert(collect-announcements 422행)가 매 런 목록 전량 500여 건의
+  -- region에 CNP_CD_NM(지역본부명)을 실어 보내고, 상세가 성공한 <=90건만 542·589행에서 실제
+  -- 주소를 싣는다. 그래서 한 런이 복구한 주소를 다음 런이 지웠다 — 2026-09-12 실측으로
+  -- 직전 런에 상세를 받은 55행에서만 주소형이 35건이고, 그 이전에 받은 361행은 0건이었다.
+  -- 판정식은 ⑩ 「열화의 판정 기준」과 같다: 숫자가 있거나 읍·면·동·리·로·길 토큰이 있으면 주소형.
+  --   실측(2026-09-12): LH가 실제로 보내는 지역본부명 25종이 전부 비주소형으로 갈린다(오분류 0).
+  -- 🔴 아래 셋은 그대로 통과한다 — 막는 방향은 「주소형 -> 지역본부명」 하나뿐이다.
+  --   · INSERT — 이 트리거는 BEFORE UPDATE 전용이라 새 공고는 region을 갖고 태어난다
+  --   · 지역본부명 -> 지역본부명 — 본부 표기가 실제로 바뀌면 갱신된다
+  --   · 주소형 -> 주소형 — 상세조회가 주소를 갱신하는 경로는 막히지 않는다
+  IF NEW.region IS NOT NULL AND OLD.region IS NOT NULL
+     AND NOT (NEW.region ~ '[0-9]' OR NEW.region ~ '(읍|면|동|리|로|길)')
+     AND     (OLD.region ~ '[0-9]' OR OLD.region ~ '(읍|면|동|리|로|길)')
+  THEN
+    NEW.region := OLD.region;
+  END IF;
 
   RETURN NEW;
 END;

@@ -259,7 +259,11 @@ function parseArea(s: string | null | undefined): [number|null, number|null] {
 // 지워지지 않는다. 즉 「값을 지우지 않는다」는 불변식은 이 파일이 아니라 DB 쪽에 있다.
 // 🔴 그 트리거를 지우면 이 함수가 매 런 값을 지운다 — 트리거를 되돌릴 때 여기도 함께 본다.
 // (2026-09-09: 이 사실을 모르고 EF만 읽으면 「null이 덮어쓴다」로 읽혀서 남긴다. 트리거가 보호하는
-//  15컬럼과 보호하지 않는 것(region·deposit_min·rent_min 등)의 목록은 트리거 함수 주석에 있다.)
+//  15컬럼과 보호하지 않는 것(deposit_min·rent_min 등)의 목록은 트리거 함수 주석에 있다.)
+// 🔴 region도 2026-09-12부터 같은 트리거가 지킨다 — 다만 축이 다르다. 아래 `addr ?? regionRaw`는
+// 상세가 없으면 CNP_CD_NM(지역본부명)을 싣는데, 그것이 NULL이 아니라 「덜 정확한 값」이라
+// coalesce로는 안 걸린다. 트리거가 「NEW가 주소형이 아니고 OLD가 주소형이면 OLD 유지」로 막는다.
+// 그전까지는 422행 기본 upsert가 매 런 목록 전량의 주소를 지역본부명으로 되돌리고 있었다.
 function mapLHRow(item: NoticeItem, sbd: SbdItem | null, scdl: SplScdlItem | null, ahflInfo: AhflInfoItem[] | null) {
   const areaStr = san(sbd?.MIN_MAX_RSDN_DDO_AR ?? sbd?.DDO_AR)
   const [areaMin, areaMax] = parseArea(areaStr)
@@ -267,7 +271,12 @@ function mapLHRow(item: NoticeItem, sbd: SbdItem | null, scdl: SplScdlItem | nul
   const regionRaw = san(item.CNP_CD_NM) ?? ''
   const parts   = regionRaw.split(' ')
   const sido    = applySidoMerge(normSido(parts[0]) || null)
-  const sigungu = parts.length > 1 ? parts.slice(1).join(' ') : null
+  // 🔴 CNP_CD_NM은 지역본부명이라 둘째 토큰이 시군구가 아니다. 실제로 오는 값은 「인천광역시 외」
+  // 처럼 「<시도> 외」 하나뿐이고, 그 「외」가 그대로 sigungu_nm에 들어가 있었다(2026-09-12 실측 70행,
+  // LH의 sigungu_nm은 NULL 840 + '외' 70이 전부라 진짜 시군구가 들어온 적은 없다).
+  // 「외」는 「그 밖에도 있다」는 뜻이지 지명이 아니므로 시군구 없음(null)으로 둔다.
+  const rest    = parts.slice(1).join(' ').trim()
+  const sigungu = (rest && rest !== '외') ? rest : null
   const addr    = san(sbd?.LCT_ARA_ADR ?? sbd?.LGDN_ADR)
   const title   = normalizeTitle(san(item.PAN_NM))
   return {
