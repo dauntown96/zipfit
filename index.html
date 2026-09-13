@@ -233,6 +233,19 @@ body.theme-dark .extras-missing-note{color:#d8c48a;background:#2a2721;border-col
    모집 배지(초록 채움)와 겹치지 않도록 이번 회차는 흰 바탕 + 초록 테두리로 둔다. */
 .hu-round-badge{padding:2px 9px;font-size:11px;cursor:default;display:inline-block;margin-left:6px;background:#fff;color:#1D9E75;border-color:#1D9E75;font-weight:600}
 .hu-round-badge.hu-round-old{background:#fff3d6;color:#8a6a1c;border-color:#e0b96a}
+/* 회차 변화 요약 — 지난 회차의 같은 세대와 짝지어 금액 차이만 적는다.
+   오른 것은 붉게, 내린 것은 푸르게. 초록은 모집 배지가 쓰고 있어 여기서는 쓰지 않는다. */
+.hu-diff{margin-top:6px;display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:11px}
+.hu-diff-head{color:#888}
+.hu-diff-item{padding:2px 8px;border-radius:12px;border:1px solid #e6d2d0;background:#fff4f3;color:#a3423a;font-weight:600}
+.hu-diff-item.hu-diff-down{border-color:#cfdcea;background:#f2f7fc;color:#2f5f8f}
+/* 지난 회차 — 접어서 둔다. 🔴 거르는 것이 아니라 계층을 나누는 것이라 언제든 펼쳐 볼 수 있다. */
+.hu-past{margin-top:10px;border-top:1px dashed #e0e0d8;padding-top:10px}
+.hu-past-title{font-size:12px;font-weight:600;color:#777;cursor:pointer}
+.hu-past-list{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.hu-past-list .hu-row{background:#fafaf6}
+.hu-past-only{padding:2px 9px;font-size:11px;cursor:default;display:inline-block;margin-left:6px;background:#f0efe9;color:#777;border-color:#ddd}
+body.theme-dark .hu-past-title{color:#cfcfcf}
 .hu-note-price{font-size:12px;color:#555;margin-top:2px}
 .hu-value{color:#333;font-weight:500}
 .hu-more-btn{width:100%;padding:8px;border-radius:8px;border:1px dashed #ccc;background:#fafaf6;color:#666;font-size:12px;cursor:pointer;margin-top:4px}
@@ -3004,6 +3017,10 @@ const STALE_SRC_MSG_PLAIN   = '대표 공고와 다른 회차의 분석 데이�
 // 아래 MIXED는 상태가 다르다 — 대표 회차와 지난 회차가 "같은 블록 안에 섞여" 있다.
 // PLAIN을 그대로 쓰면 대표 회차 행까지 낡은 것처럼 읽히므로 문구를 새로 둔다(기존 문구는 건드리지 않는다).
 const STALE_SRC_MSG_MIXED   = '여러 회차의 정보가 함께 표시되고 있습니다. 행마다 회차를 적었으니 「이번 회차」 표시가 없는 값은 공고 원문과 함께 확인하세요.';
+// 🔴 MIXED는 「섞여 있다」는 경고인데, 지난 회차를 접어 아래로 내리면 더 이상 섞여 있지 않다.
+// 그래서 실제로 나뉜 경우에만 이 문구를 쓴다 — 화면 상태와 문구가 어긋나지 않게.
+// MIXED는 나누지 못한 경우(이번 회차 행이 하나도 없는 블록)에 그대로 남는다.
+const STALE_SRC_MSG_SPLIT   = '이 공고에는 지난 회차의 세대 정보도 함께 저장돼 있습니다. 위에 보이는 값은 이번 회차 기준이고, 지난 회차는 아래 「지난 회차 보기」를 펼쳐 확인할 수 있어요.';
 
 function cardElFor(id){ return document.querySelector(`[data-card-id="${id}"]`); }
 
@@ -3012,7 +3029,7 @@ function cardElFor(id){ return document.querySelector(`[data-card-id="${id}"]`);
 // 자식을 들고 있는 winner를 폴백으로 오판한다.
 // rounds는 회차 혼입 판정 결과(roundInfoFor). 넘기지 않으면 종전과 똑같이 orphan만 본다 —
 // policies·extras·eligibility 세 로더는 넘기지 않으므로 동작이 바뀌지 않는다.
-function staleSourceBannerHtml(rawRows, annId, useGroup, id, rounds){
+function staleSourceBannerHtml(rawRows, annId, useGroup, id, rounds, split){
   if(!useGroup || !annId) return '';
   if(!Array.isArray(rawRows) || rawRows.length === 0) return '';
   const orphan = !rawRows.some(r => r && r.announcement_id === annId);
@@ -3022,10 +3039,13 @@ function staleSourceBannerHtml(rawRows, annId, useGroup, id, rounds){
   if(!orphan && !mixed) return '';
   const cardEl = cardElFor(id);
   const revised = cardEl && cardEl.dataset.revised === '1';
-  const msg = mixed ? STALE_SRC_MSG_MIXED : (revised ? STALE_SRC_MSG_REVISED : STALE_SRC_MSG_PLAIN);
+  const msg = split ? STALE_SRC_MSG_SPLIT
+            : (mixed ? STALE_SRC_MSG_MIXED : (revised ? STALE_SRC_MSG_REVISED : STALE_SRC_MSG_PLAIN));
+  // 나뉜 뒤에는 경고할 상태가 아니다 — 낡은 값이 섞여 있지 않고 따로 접혀 있을 뿐이라 안내로 낮춘다.
+  const icon = split ? 'ℹ️' : '⚠️';
   const note = (cardEl && cardEl.dataset.revisionNoteFull) || '';
   return `<div class="stale-src" data-stale-src>`
-    + `<span class="stale-src-msg">⚠️ ${escapeHtml(msg)}</span>`
+    + `<span class="stale-src-msg">${icon} ${escapeHtml(msg)}</span>`
     + `<span class="stale-src-note" data-stale-note>${note ? '📝 정정 사유: ' + escapeHtml(note) : ''}</span>`
     + `</div>`;
 }
@@ -3695,6 +3715,62 @@ const huMapState = {};
 const huRegionFallback = {};
 const huMapTargetId = {};   // "세대정보 리스트 id" → "실제 지도를 그려야 할 카드 id" 매핑
 
+// 🔴 「같은 세대」의 정의를 여기서 새로 만들지 않는다 — 바로 아래 중복제거가 쓰는 키에서
+// 금액 네 개만 뺀 것이다. 중복제거는 이미 「키가 같고 금액까지 같으면 한 세대」로 판정하고 있으므로,
+// 금액만 빼면 그대로 「키가 같고 금액이 달라진 세대」, 즉 비교해야 할 짝이 된다.
+// 두 규칙이 갈리면 한쪽이 합친 행을 다른 쪽이 못 찾는 사각지대가 생긴다.
+function huCompareKey(u){
+  return [u.building_name, u.address, u.floor_info, u.unit_type, u.area_sqm].join('|');
+}
+// 값이 양쪽에 다 있는 필드만 비교한다. 한쪽이 NULL이면 「0이 됐다」가 아니라 「모른다」이므로 건너뛴다.
+const HU_DIFF_FIELDS = [
+  ['deposit', '보증금'],
+  ['monthly_rent', '월임대료'],
+  ['deposit_priority1', '보증금(다른 조건)'],
+  ['rent_priority1', '월임대료(다른 조건)']
+];
+// 이번 회차 행에 zfDiff를, 짝이 없는 지난 회차 행에 zfPastOnly를 붙인다.
+// 🔴 키가 양쪽에서 각각 하나뿐일 때만 비교한다 — 같은 키가 여럿이면 어느 행과 짝인지 정할 수 없고,
+// 아무 행이나 고르면 틀린 증감을 사실처럼 보여주게 된다.
+// 🔴 비교 상대는 「직전 회차」다 — 지난 회차가 여럿이면 이번 회차 바로 앞의 것 하나만 본다.
+// 가장 오래된 회차와 비교하면 그 사이의 변화가 한 덩어리로 뭉개진다.
+function attachRoundDiffs(current, past){
+  const curCount = new Map();
+  current.forEach(u => { const k = huCompareKey(u); curCount.set(k, (curCount.get(k) || 0) + 1); });
+  const pastByKey = new Map();
+  past.forEach(u => {
+    const k = huCompareKey(u);
+    if(!pastByKey.has(k)) pastByKey.set(k, []);
+    pastByKey.get(k).push(u);
+  });
+  current.forEach(u => {
+    const k = huCompareKey(u);
+    const rows = pastByKey.get(k);
+    if(!rows || curCount.get(k) !== 1) return;
+    let prevDate = '';
+    rows.forEach(p => { if((p.zfRoundDate || '') > prevDate) prevDate = p.zfRoundDate || ''; });
+    const sameRound = rows.filter(p => (p.zfRoundDate || '') === prevDate);
+    if(sameRound.length !== 1) return;
+    const prev = sameRound[0];
+    const parts = [];
+    HU_DIFF_FIELDS.forEach(([f, label]) => {
+      if(prev[f] == null || u[f] == null) return;
+      const d = Number(u[f]) - Number(prev[f]);
+      if(!isFinite(d) || d === 0) return;
+      parts.push({ label: label, up: d > 0, abs: Math.abs(d) });
+    });
+    if(parts.length) u.zfDiff = { date: prevDate, parts: parts };
+  });
+  past.forEach(p => { if(!curCount.has(huCompareKey(p))) p.zfPastOnly = true; });
+}
+function renderHuDiffHtml(diff){
+  if(!diff || !diff.parts.length) return '';
+  const items = diff.parts.map(p =>
+    `<span class="chip hu-diff-item${p.up ? '' : ' hu-diff-down'}">${escapeHtml(p.label)} ${p.up ? '+' : '−'}${p.abs.toLocaleString()}원</span>`
+  ).join('');
+  return `<div class="hu-diff"><span class="hu-diff-head">지난 회차(${escapeHtml(diff.date)}) 대비</span>${items}</div>`;
+}
+
 function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
   if(!annId) return;
   huMapTargetId[id] = mapId || id;   // 지도용 id 등록 (없으면 자기 자신)
@@ -3707,7 +3783,8 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
     fetchGroupRounds(ids, useGroup)
   ])).then(([units, roundMap]) => {
     const rounds = roundInfoFor(units, annId, roundMap);
-    const staleHtml = staleSourceBannerHtml(units, annId, useGroup, id, rounds);
+    // 🔴 배너 판정은 중복제거 이전 원본으로 한다(종전 동작 유지) — 아래에서 쓴다.
+    const rawUnits = units;
     const roundDateOf = u => (rounds && u && rounds.map[u.announcement_id] && rounds.map[u.announcement_id].announcement_date) || '';
     // 그룹조회로 형제 announcement_id 여러 곳에 동일 세대정보가 중복 백필된 경우를 대비해
     // 핵심 필드 조합이 완전히 같은 행은 하나만 남긴다(announcement_extras 첨부 dedup과 동일 취지).
@@ -3737,6 +3814,22 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
         u.zfRoundLabel = (u.zfRoundCurrent ? '이번 회차 · ' : '지난 회차 · ') + u.zfRoundDate;
       });
     }
+    // 🔴 지난 회차를 거르지 않고 계층을 나눈다 — 바깥에는 이번 회차만, 지난 회차는 접어서 그대로 둔다.
+    // 양쪽이 다 있을 때만 나눈다. 이번 회차 행이 하나도 없는 블록(orphan)을 나누면 바깥이 비어버려
+    // 정보가 사라진 것처럼 보이므로, 그때는 종전대로 통째로 보이고 배너도 종전 문구를 쓴다.
+    let pastUnits = [];
+    if(rounds && Array.isArray(units)){
+      const past = units.filter(u => u.zfRoundLabel && !u.zfRoundCurrent);
+      const cur  = units.filter(u => !(u.zfRoundLabel && !u.zfRoundCurrent));
+      if(past.length > 0 && cur.length > 0){
+        attachRoundDiffs(cur, past);
+        // 지난 회차가 여럿이면 최근 것이 위로 온다 — 직전 회차를 먼저 보게 한다.
+        past.sort((a, b) => (b.zfRoundDate || '').localeCompare(a.zfRoundDate || ''));
+        units = cur;
+        pastUnits = past;
+      }
+    }
+    const staleHtml = staleSourceBannerHtml(rawUnits, annId, useGroup, id, rounds, pastUnits.length > 0);
     if(!Array.isArray(units) || units.length === 0){
       // 세대별 정보가 없는 공고 — 시군구 단위 지도를 최후수단으로 사용
       const fb = huRegionFallback[id];
@@ -3749,7 +3842,12 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
     huGroupsCache[id] = groups;
     const wrap = document.createElement('details');
     wrap.className = 'hu-wrap';
-    wrap.innerHTML = `<summary class="hu-title">🏠 세대별 정보 (${units.length}건)</summary>` + staleHtml + `<div class="hu-list" id="hu-list-${id}"></div>`;
+    // 접힌 안에서도 회차 배지를 그대로 단다 — 지난 회차가 여럿이면 그 안에서 또 갈려야 한다.
+    const pastHtml = pastUnits.length
+      ? `<details class="hu-past"><summary class="hu-past-title">🕘 지난 회차 보기 (${pastUnits.length}건)</summary>`
+        + `<div class="hu-past-list">${pastUnits.map(renderHousingUnitRow).join('')}</div></details>`
+      : '';
+    wrap.innerHTML = `<summary class="hu-title">🏠 세대별 정보 (${units.length}건)</summary>` + staleHtml + `<div class="hu-list" id="hu-list-${id}"></div>` + pastHtml;
     if(groups.length === 1) wrap.open = true; // 건물이 1개뿐이면 처음부터 펼쳐서 보여줌
     const slot = document.getElementById('hu-slot-'+id);
     if(slot) slot.appendChild(wrap);
@@ -3884,8 +3982,12 @@ function renderHousingUnitRow(u){
   const roundBadge = u.zfRoundLabel
     ? `<span class="chip hu-round-badge${u.zfRoundCurrent ? '' : ' hu-round-old'}">${escapeHtml(u.zfRoundLabel)}</span>`
     : '';
+  // 지난 회차에만 있는 세대 — 이번 회차에서 빠진 것인지 값이 바뀐 것인지 사용자가 갈릴 수 있어 표로 밝힌다.
+  const pastOnlyBadge = u.zfPastOnly ? `<span class="chip hu-past-only">이번 회차에 같은 세대 없음</span>` : '';
+  // 변화 요약 — 이번 회차 행에만 붙는다(attachRoundDiffs가 채운다). 접지 않아도 보이도록 행 안에 둔다.
+  const diffHtml = renderHuDiffHtml(u.zfDiff);
   return `<div class="hu-row">
-    <div class="hu-addr">${addr}${recruitBadge}${roundBadge}</div>
+    <div class="hu-addr">${addr}${recruitBadge}${roundBadge}${pastOnlyBadge}</div>
     <div class="hu-fields">
       <div class="hu-item"><span class="hu-label">전용면적</span><span class="hu-value">${area}</span></div>
       ${depositRent}
@@ -3894,6 +3996,7 @@ function renderHousingUnitRow(u){
       ${unitType}
       ${elevator}
     </div>
+    ${diffHtml}
     ${extraNote}
   </div>`;
 }
