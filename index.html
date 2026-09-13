@@ -191,6 +191,15 @@ body.theme-dark .elig-subrow span:first-child{color:#9aa0aa}
 .extras-thumb img{width:100%;height:100%;object-fit:cover;display:block}
 .extras-thumb-label{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.55);color:#fff;font-size:9px;padding:3px 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .extras-thumb{cursor:pointer;border:1px solid #e8e8e0}
+.extras-thumb-missing{background:#f2f2ee;border-style:dashed;border-color:#d3d3ca}
+.extras-thumb-nopreview{background:#f4f6f8}
+.extras-thumb-missing-mark{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:4px;font-size:10px;line-height:1.3;color:#8a8a80}
+.extras-missing-note{font-size:11px;line-height:1.5;color:#8a6d3b;background:#fdf6e3;border:1px solid #f0e2c0;border-radius:6px;padding:6px 8px;margin:6px 0}
+.extras-modal-unavailable{color:#bbb;font-size:13px;line-height:1.6;text-align:center;padding:24px 16px}
+body.theme-dark .extras-thumb-missing{background:#24262d;border-color:#3a3d47}
+body.theme-dark .extras-thumb-nopreview{background:#23262c}
+body.theme-dark .extras-thumb-missing-mark{color:#8b9099}
+body.theme-dark .extras-missing-note{color:#d8c48a;background:#2a2721;border-color:#3f3a2c}
 .extras-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px}
 .extras-modal-box{position:relative;width:100%;max-width:720px;max-height:90vh;display:flex;flex-direction:column;background:#111;border-radius:12px;overflow:hidden}
 .extras-modal-body{flex:1;min-height:200px;position:relative;overflow:auto;background:#000}
@@ -3194,13 +3203,18 @@ function loadAnnouncementExtras(annId, detailEl, id, useGroup){
       if(items.length === 0) return '';
       const gid = 'eg' + (extrasGroupSeq++);
       extrasGroupsRegistry[gid] = items;
-      return `<div class="extras-group-label">${label} (${items.length}건)</div><div class="extras-grid">` +
+      return `<div class="extras-group-label" data-label="${label}">${label} (${items.length}건)</div><div class="extras-grid">` +
         items.map((it, idx) => {
           const fid = driveFileIdFrom(it.file_url);
           const thumbSrc = fid ? `https://drive.google.com/thumbnail?id=${fid}&sz=w300` : '';
           const caption = [it.building_address, it.dong_ho].filter(Boolean).join(' ');
-          return `<a class="extras-thumb" href="${escapeHtml(it.file_url||'#')}" target="_blank" rel="noopener" onclick="event.preventDefault();openExtrasViewer('${gid}',${idx})">
-            ${thumbSrc ? `<img src="${thumbSrc}" loading="lazy" alt="${escapeHtml(caption)}">` : ''}
+          // 🔴 2026-09-13: 썸네일이 안 떠도 깨진 <img>로 남기지 않는다. onerror에서 타일을
+          // 자리표시자로 바꾸고 (N건)을 다시 센다 — 자세한 근거는 extrasThumbFailed() 주석.
+          // fid를 못 뽑은 행은 애초에 띄울 URL이 없으므로 그 자리에서 바로 자리표시자로 만든다.
+          return `<a class="extras-thumb${thumbSrc ? '' : ' extras-thumb-missing'}" data-fid="${escapeHtml(fid||'')}" data-kind="${escapeHtml(it.extra_type||'')}" href="${escapeHtml(it.file_url||'#')}" target="_blank" rel="noopener" onclick="event.preventDefault();openExtrasViewer('${gid}',${idx})">
+            ${thumbSrc
+              ? `<img src="${thumbSrc}" loading="lazy" alt="${escapeHtml(caption)}" onerror="extrasThumbFailed(this)">`
+              : `<span class="extras-thumb-missing-mark">불러올 수 없음</span>`}
             ${caption ? `<span class="extras-thumb-label">${escapeHtml(caption)}</span>` : ''}
           </a>`;
         }).join('') + `</div>`;
@@ -3208,12 +3222,108 @@ function loadAnnouncementExtras(annId, detailEl, id, useGroup){
     const wrap = document.createElement('details');
     wrap.className = 'extras-wrap';
     wrap.innerHTML = `<summary class="extras-title">📷 사진·평면도·팸플릿 (${rows.length}건)</summary>` + staleHtml +
+      `<div class="extras-missing-note" style="display:none"></div>` +
       renderGroup('사진', photos) + renderGroup('평면도', floorplans) + renderGroup('팸플릿', pamphlets);
     const slot = document.getElementById('extras-slot-'+id);
-    if(slot) slot.appendChild(wrap);
+    if(slot){
+      slot.appendChild(wrap);
+      // fid를 못 뽑아 렌더 시점에 이미 자리표시자가 된 타일을 (N건)에 반영한다.
+      refreshExtrasCounts(wrap);
+    }
   }).catch(err => {
     console.error('ZipFit 사진/평면도 로드 실패:', err);
   });
+}
+
+// ── 불러오지 못한 첨부 다루기 (2026-09-13 신설) ────────────────────────────
+// 화면이 Drive 썸네일 로드 실패를 아예 거르지 않아, 못 뜬 파일은 깨진 <img>로 남고
+// 묶음 제목의 (N건)에도 계속 잡혔다. 그 자리를 메운다.
+//
+// ⚠️ 「207개가 없다」는 브라우저가 보는 것과 다르다. 2026-09-12 회차의 207/919는 Drive
+//   커넥터(계정 인증) 기준이고, 2026-09-13에 같은 1,126개를 익명 공개 경로
+//   (drive.google.com/thumbnail)로 전수 조회하니 1,124개가 200 image/*였다. 404는 2개인데
+//   둘 다 62MB·87MB 팸플릿 PDF이고 파일 자체는 멀쩡하다(아래 extrasThumbFailed 주석).
+//   즉 이 코드는 「지금 몇 개가 없다」를 전제로 하지 않는다 — 무엇이 실패하든 그 자리에서
+//   정직하게 다루는 장치이고, 그래서 공개 설정이 바뀌어도 그대로 맞는다.
+//
+// 🔴 왜 onerror인가 — 미리 확인하는 길이 브라우저에는 없다.
+//   drive.google.com은 Access-Control-Allow-Origin을 주지 않아 fetch/XHR HEAD가 CORS로
+//   막히고, mode:'no-cors'로 보내면 opaque 응답이라 status를 읽을 수 없다. 읽을 수 있는
+//   사전 확인은 OAuth를 붙인 Drive API뿐인데 그건 클라이언트에 토큰과 스코프를 새로
+//   들이는 일이다. 게다가 사전 확인은 타일마다 요청을 한 번 더 늘린다 — onerror는 이미
+//   일어나는 이미지 로드에 얹히므로 추가 요청이 0이다.
+//
+// ⚠️ 두 실패를 화면은 구분하지 못한다.
+//   ① 파일이 없다(404) ② 파일은 있는데 볼 권한이 없다(로그인 안 한 방문자 → 로그인
+//   페이지로 리다이렉트). HTTP 층에서는 서로 다르지만 그 차이가 페이지까지 오지 않는다 —
+//   <img>의 onerror는 상태코드를 주지 않고, CORS 때문에 우리가 직접 읽어볼 수도 없다.
+//   그래서 문구는 원인을 단정하지 않고 「지금 불러올 수 없다」까지만 말한다.
+//
+// ⚠️ 조용히 감추지 않는다. 타일 자리와 주소·동호 라벨은 그대로 두고 그림만 자리표시자로
+//   바꾼다 — 「그 공고에 사진이 있었는데 지금 없다」가 화면에 남아야 한다.
+//
+// 🔴 DB는 건드리지 않는다. 없어진 210행은 그대로 있다 — 이건 증상을 정직하게 보이게
+//   한 것이지 데이터를 고친 것이 아니다.
+const extrasFailedIds = new Set();
+
+// 🔴 팸플릿(PDF)은 썸네일이 안 떠도 「없다」고 말하지 않는다 — 실측으로 갈렸다.
+//   2026-09-13 전수 조회에서 썸네일이 404로 떨어진 것은 1,126개 중 2개였고 둘 다 팸플릿이며
+//   둘 다 파일은 멀쩡하다 — 부천원종 C1블록 62,192,176B · 당진우강송산 86,584,736B(Drive
+//   메타데이터로 확인, 앞의 것은 uc?export=view가 PDF 본문까지 돌려줬다). 용량이 커서
+//   Drive가 썸네일을 만들어 주지 않는 것뿐이다.
+//   사진·평면도는 썸네일이 곧 표시 경로라 실패가 곧 「못 본다」지만, 팸플릿의 표시 경로는
+//   모달의 /preview라 썸네일 실패가 파일에 대한 근거가 되지 못한다. 그래서 팸플릿은
+//   중립 문구(미리보기 없음)로 두고 (N건)에서도 빼지 않으며 모달도 그대로 열어 준다.
+function extrasThumbFailed(img){
+  img.onerror = null;
+  const a = img.closest ? img.closest('.extras-thumb') : null;
+  if(!a) return;
+  const fid = a.getAttribute('data-fid');
+  const isPdf = a.getAttribute('data-kind') === 'pamphlet';
+  const mark = document.createElement('span');
+  mark.className = 'extras-thumb-missing-mark';
+  if(isPdf){
+    a.classList.add('extras-thumb-nopreview');
+    mark.textContent = '📄 미리보기 없음';
+  }else{
+    if(fid) extrasFailedIds.add(fid);
+    a.classList.add('extras-thumb-missing');
+    mark.textContent = '불러올 수 없음';
+  }
+  a.replaceChild(mark, img);
+  refreshExtrasCounts(a.closest('.extras-wrap'));
+}
+
+// 묶음 제목·그룹 라벨의 (N건)을 "지금 실제로 보이는 타일 수"로 다시 쓴다.
+// 못 띄운 수는 감추지 않고 라벨 뒤에 따로 적는다 — 세는 수와 보이는 수는 맞추되
+// 사라진 사실 자체는 남긴다.
+function refreshExtrasCounts(wrap){
+  if(!wrap) return;
+  let shown = 0, missing = 0;
+  wrap.querySelectorAll('.extras-grid').forEach(grid => {
+    const all = grid.querySelectorAll('.extras-thumb').length;
+    const gone = grid.querySelectorAll('.extras-thumb-missing').length;
+    shown += all - gone;
+    missing += gone;
+    const label = grid.previousElementSibling;
+    if(label && label.classList.contains('extras-group-label')){
+      const base = label.getAttribute('data-label') || '';
+      label.textContent = `${base} (${all - gone}건)` + (gone ? ` · ${gone}건은 지금 불러올 수 없어요` : '');
+    }
+  });
+  const title = wrap.querySelector('.extras-title');
+  if(title) title.textContent = `📷 사진·평면도·팸플릿 (${shown}건)` + (missing ? ` · ${missing}건 불러오기 실패` : '');
+  const note = wrap.querySelector('.extras-missing-note');
+  if(note){
+    note.textContent = missing
+      ? `${missing}건은 지금 불러올 수 없어요. 원본 파일이 지워졌거나 자리를 옮겼을 수 있고, 열람 권한이 없어서일 수도 있어요.`
+      : '';
+    note.style.display = missing ? '' : 'none';
+  }
+}
+
+function extrasUnavailableHtml(){
+  return '<p class="extras-modal-unavailable">이 파일은 지금 불러올 수 없어요.<br>원본이 지워졌거나 자리를 옮겼을 수 있고,<br>열람 권한이 없어서일 수도 있어요.</p>';
 }
 
 // 사진·평면도·팸플릿 인앱 뷰어 — 클릭 시 Drive 외부 페이지로 나가지 않고 모달로 바로 보여준다.
@@ -3254,12 +3364,31 @@ function renderExtrasModal(){
   document.getElementById('extrasModalCaption').textContent = caption;
   document.getElementById('extrasModalDriveLink').href = it.file_url || '#';
   // 이미지는 원본 화질(uc?export=view)을 우선 시도하고, CORS/권한 등으로 로드 실패 시에만
-  // 기존 미리보기용 thumbnail URL로 자동 폴백한다(무한루프 방지를 위해 onerror는 1회만 동작).
-  document.getElementById('extrasModalContent').innerHTML = !fid
-    ? '<p style="color:#999;font-size:13px">미리보기를 불러올 수 없어요</p>'
+  // 기존 미리보기용 thumbnail URL로 자동 폴백한다. 그 폴백마저 실패하면 깨진 <img>로 두지 않고
+  // 안내 문구로 바꾼다(extrasModalImgFailed가 단계를 세므로 무한루프가 없다).
+  // ⚠️ 팸플릿 iframe은 onerror가 안 먹고 안쪽 문서가 교차출처라 읽을 수도 없다. 그리고 썸네일
+  // 실패를 근거로 삼을 수도 없다(위 extrasThumbFailed 주석 — 62MB PDF가 그 반례다). 그래서
+  // 팸플릿은 종전처럼 /preview를 띄우고, 원본이 없으면 Drive가 자기 문구를 보여준다.
+  // 지워진 팸플릿을 우리 문구로 바꿔 주지는 못한다 — 교차출처라 판정 근거가 없다.
+  document.getElementById('extrasModalContent').innerHTML = !fid || (!isPdf && extrasFailedIds.has(fid))
+    ? extrasUnavailableHtml()
     : isPdf
       ? `<iframe src="https://drive.google.com/file/d/${fid}/preview" allow="autoplay"></iframe>`
-      : `<img src="https://drive.google.com/uc?export=view&id=${fid}" alt="${escapeHtml(caption)}" onerror="this.onerror=null;this.src='https://drive.google.com/thumbnail?id=${fid}&sz=w1600';">`;
+      : `<img src="https://drive.google.com/uc?export=view&id=${fid}" alt="${escapeHtml(caption)}" data-fid="${escapeHtml(fid)}" onerror="extrasModalImgFailed(this)">`;
+}
+
+function extrasModalImgFailed(img){
+  const fid = img.getAttribute('data-fid');
+  if(img.getAttribute('data-stage') !== 'thumb'){
+    // 1단계 실패 → 미리보기 해상도로 한 번 더 시도한다.
+    img.setAttribute('data-stage', 'thumb');
+    img.src = `https://drive.google.com/thumbnail?id=${fid}&sz=w1600`;
+    return;
+  }
+  img.onerror = null;
+  if(fid) extrasFailedIds.add(fid);
+  const box = document.getElementById('extrasModalContent');
+  if(box) box.innerHTML = extrasUnavailableHtml();
 }
 
 document.addEventListener('keydown', e => {
