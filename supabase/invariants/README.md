@@ -13,7 +13,8 @@
 
 | 파일 | 무엇 |
 |---|---|
-| `v3.sql` | 현행. 2026-09-14 claude.ai 작성분 **전문 그대로**(한 글자도 고치지 않았다) |
+| **`v3.1.sql`** | **현행.** v3 + `allow_exec_funcs`에 `get_announcement_price_summary` 한 줄 |
+| `v3.sql` | 2026-09-14 claude.ai 작성분 **전문 그대로**(한 글자도 고치지 않았다) |
 
 🔴 **고칠 때는 새 번호로 파일을 추가한다.** `v3.sql`을 덮어쓰면 「그때 무엇을 쟀는가」가 사라져
 과거 회신의 위반 수와 대조할 수 없게 된다.
@@ -28,12 +29,23 @@
 | 버전 | 바뀐 것 |
 |---|---|
 | v2 | V1이 **컬럼 단위 GRANT**를 못 보던 구멍을 메움(`has_table_privilege` → `has_any_column_privilege`) · `usage_events` 허용목록 추가 |
-| **v3** | **V8 보관 기간 감시** 신설 — `usage_events` 최고령 행이 1년+7일보다 오래되면 위반. 삭제 잡(jobid 14)이 조용히 죽는 것을 잡는다 |
+| v3 | **V8 보관 기간 감시** 신설 — `usage_events` 최고령 행이 1년+7일보다 오래되면 위반. 삭제 잡(jobid 14)이 조용히 죽는 것을 잡는다 |
+| **v3.1** | `allow_exec_funcs`에 `get_announcement_price_summary` 추가 — **그 한 줄뿐이다.** 실제 문제가 아니라 허용목록이 낡았던 것이다 |
 
 ⚠️ **`DELETE`·`TRUNCATE`에 `has_any_column_privilege`를 쓰면 `22023`으로 쿼리가 죽는다.**
 그래서 V1이 권한 종류로 갈라져 있다. 합치지 말 것.
 
-## 2026-09-14 실측 — 위반 2건
+## 2026-09-14 실측 — v3.1 기준 위반 1건
+
+| 검사 | 대상 | 내용 |
+|---|---|---|
+| V6 RLS 정책 0 | `collection_run_log` | policies=0 + anon SELECT — `allow_empty_policy`에 넣을지 정해지지 않았다 |
+
+🔵 **V1·V2·V3·V4·V5·V7·V8 전부 0건.** 같은 회차에 신설한 `sh_collection_run_log`는 `anon`에
+아무 권한도 주지 않아 V1·V6 어디에도 걸리지 않고, 트리거 함수 `sh_run_log_fill_started_at()`도
+만든 자리에서 EXECUTE를 닫아 V2에 걸리지 않는다.
+
+## 2026-09-14 실측 — v3 기준 위반 2건 (v3.1 이전)
 
 | 검사 | 대상 | 내용 | 판단 |
 |---|---|---|---|

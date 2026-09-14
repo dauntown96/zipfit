@@ -528,3 +528,76 @@ DROP FUNCTION public.get_announcement_price_summary(text[]);
 
 🔵 **화면은 이 함수가 없어도 깨지지 않는다** — 호출이 실패하면 요약 줄 자리가 비고(캐시를
 도로 비워 다음 렌더에서 다시 시도한다) 카드의 나머지는 그대로다.
+
+---
+
+### 2026-09-14 (3차) — `sh_collection_run_log` 신설 (SH 수집 런 로그)
+
+SH 수집 1회 = 1행. 🔴 **지금까지 SH 런의 흔적이 어디에도 남지 않았다** — `collection_run_log`는
+컬럼이 `lh_*`·`myhome_*`뿐이고, `cron.job_run_details`는 HTTP 요청이 큐에 들어간 것만 기록하며
+(`succeeded` ≠ EF 성공), `net._http_response`는 약 6시간치만 남고, `collect()`의 `errors` 배열은
+응답에만 담겨 사라졌다.
+
+| | |
+|---|---|
+| 컬럼 | `id` · `run_at`(로그를 쓴 시각 = 런의 끝) · `started_at` · `total_pages` · `pages_failed` · `parsed` · `dedup_merged` · `upserted` · `hidden` · `visible` · `duration_ms` · `errors`(jsonb) |
+| 인덱스 | `sh_collection_run_log_run_at_idx (run_at desc)` |
+| 권한 | 🔴 `postgres` · `service_role`뿐. **`anon`·`authenticated`에 아무 것도 주지 않았다** |
+| RLS | 켬 · 정책 0 |
+| 보관 | **90일** — pg_cron jobid 16 `zipfit-purge-sh-run-log` `10 15 * * *`(UTC) |
+
+🔵 **`anon` SELECT가 없어서 불변식 V6에 걸리지 않는다.** V6의 조건이 「정책 0 **그리고** anon
+SELECT」라 권한을 안 주면 예외 목록에 넣을 필요 자체가 없다(`collection_run_log`가 V6에 걸려 있는
+이유는 거기엔 anon SELECT가 있기 때문이다).
+
+#### 🔴 미검출 횟수는 카운터 컬럼 없이 센다
+
+「최근 N런에 안 보인 행」을 구하는 방법으로 셋을 놓고 골랐다.
+
+| 안 | 왜 안 골랐나 / 골랐나 |
+|---|---|
+| 런마다 **본 ID 목록**을 담는다 | 정확하지만 표가 81×4/일로 커진다 |
+| `announcements`에 **행별 카운터** | 🔴 수집이 매 런 건드리는 테이블이라 `region` 열화와 같은 구조가 된다. 보호 장치가 또 필요하다 |
+| ✅ **런의 시작 시각과 `updated_at` 비교** | 🔵 **새 컬럼도 ID 목록도 필요 없다.** SH upsert는 목록에서 본 행을 전부 다시 쓰므로 `announcements.updated_at`이 곧 「마지막으로 목록에 보인 시각」이다 |
+
+```sql
+with ok_runs as (
+  select started_at from public.sh_collection_run_log
+  where pages_failed = 0 and errors = '[]'::jsonb and coalesce(upserted,0) > 0
+)
+select a.announcement_id,
+       (select count(*) from ok_runs r where r.started_at > a.updated_at) as 미검출_횟수
+from public.announcements a
+where a.source = 'SH' and a.status <> '접수마감';
+```
+
+🔴 **`run_at`이 아니라 `started_at`으로 비교한다.** `run_at`은 로그를 쓴 시각(런의 끝)이고 그
+런에서 본 행들의 `updated_at`은 그보다 **앞선다** — `run_at`으로 비교하면 방금 본 행까지
+미검출로 센다. 2026-09-14 첫 런에서 실제로 그렇게 나왔다(81행을 막 upsert한 직후인데 전부 1).
+고친 뒤: 떨어져 나간 6행 **2**, 지금 목록에 있는 12행 **0**.
+
+⚠️ **`pages_failed > 0`이거나 `errors`가 비지 않은 런은 제외한다** — 「안 보였다」와 「못 봤다」를
+가르기 위해서다. 이게 없으면 수집 장애가 마감으로 둔갑한다.
+
+#### `started_at`은 트리거가 채운다 — EF를 다시 배포하지 않으려고
+
+| 함수 | md5 | 파일 |
+|---|---|---|
+| `sh_run_log_fill_started_at()` | `d549aa462c2b336691e3b67ca3cc3a59` | `sh_run_log_fill_started_at.sql` |
+
+⚠️ **생성 컬럼(`generated always as`)으로는 못 만든다** — `timestamptz - interval`이 STABLE이지
+IMMUTABLE이 아니라 `42P17: generation expression is not immutable`로 거부된다. 그래서
+BEFORE INSERT 트리거로 둔다. 🔵 `duration_ms`가 `startedAt`부터의 경과 시간 그대로라 런 시작이
+정확히 복원되고, DEFAULT는 BEFORE ROW 트리거보다 먼저 적용되므로 `new.run_at`은 이미 채워져 있다.
+🔵 호출자가 `started_at`을 직접 실으면 그 값을 존중한다(나중에 EF가 보내도 덮어쓰지 않는다).
+
+**되돌리기.**
+
+```sql
+DROP TABLE public.sh_collection_run_log;              -- 트리거도 함께 사라진다
+DROP FUNCTION public.sh_run_log_fill_started_at();
+SELECT cron.unschedule('zipfit-purge-sh-run-log');
+```
+
+🔵 **EF는 되돌리지 않아도 된다** — `logRun()`이 실패를 삼키므로 표가 없으면 콘솔 에러만 남고
+수집은 그대로 돈다.
