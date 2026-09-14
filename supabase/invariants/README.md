@@ -35,11 +35,20 @@
 ⚠️ **`DELETE`·`TRUNCATE`에 `has_any_column_privilege`를 쓰면 `22023`으로 쿼리가 죽는다.**
 그래서 V1이 권한 종류로 갈라져 있다. 합치지 말 것.
 
-## 2026-09-14 실측 — v3.1 기준 위반 1건
+## 2026-09-14 실측 (2) — v3.1 기준 위반 **0건**
+
+🔵 **전부 통과다.** 남아 있던 V6 `collection_run_log`를 **예외 목록에 넣지 않고 `anon`·`authenticated`
+SELECT를 걷어서** 없앴다 — 예외로 덮으면 다음에 진짜 문제가 생겨도 조용하다. 읽는 곳이 저장소·DB
+어디에도 없음을 확인한 뒤 걷었다(상세는 `supabase/rpc/README.md` 2026-09-14 4차).
+
+🔵 같은 회차에 만든 `sh_auto_close_log`·`sh_close_missing()`도 `anon` 권한을 아예 안 줘서 어느 검사에도
+안 걸린다.
+
+## 2026-09-14 실측 (1) — v3.1 기준 위반 1건 (권한 회수 이전)
 
 | 검사 | 대상 | 내용 |
 |---|---|---|
-| V6 RLS 정책 0 | `collection_run_log` | policies=0 + anon SELECT — `allow_empty_policy`에 넣을지 정해지지 않았다 |
+| V6 RLS 정책 0 | `collection_run_log` | policies=0 + anon SELECT |
 
 🔵 **V1·V2·V3·V4·V5·V7·V8 전부 0건.** 같은 회차에 신설한 `sh_collection_run_log`는 `anon`에
 아무 권한도 주지 않아 V1·V6 어디에도 걸리지 않고, 트리거 함수 `sh_run_log_fill_started_at()`도
