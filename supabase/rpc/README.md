@@ -601,3 +601,77 @@ SELECT cron.unschedule('zipfit-purge-sh-run-log');
 
 🔵 **EF는 되돌리지 않아도 된다** — `logRun()`이 실패를 삼키므로 표가 없으면 콘솔 에러만 남고
 수집은 그대로 돈다.
+
+---
+
+### 2026-09-14 (4차) — SH 자동 마감 규칙 · `collection_run_log` anon SELECT 회수
+
+#### `sh_auto_close_log` 신설 — 왜 표를 만들었나
+
+되돌리기 어려운 UPDATE라 근거가 남아야 한다. 🔴 **「안 만들고 되는 길」을 먼저 봤고, 없었다.**
+
+| 담을 것 | 유도 가능한가 |
+|---|---|
+| 이전 `status` | 지금은 전부 `'공고중'`이라 유도되지만(SH `mapStatus`가 두 값뿐), **`mapStatus`가 바뀌면 조용히 틀린다.** 유도 가능 ≠ 기록됨 |
+| 닫은 시각 | 닫는 UPDATE가 `updated_at`을 밀어 남지만, 그 행이 목록에 다시 나타나면 **덮어써진다** |
+| 미검출 횟수 | 🔴 **유도가 불가능하다** — 횟수를 `updated_at`(마지막으로 본 시각)에서 세는데 **닫는 UPDATE 자체가 그 `updated_at`을 파괴한다** |
+
+마지막 하나가 결정적이라 표를 만들었다. 권한은 `postgres`·`service_role`뿐, RLS 켬 · 정책 0 → V6에 안 걸린다.
+
+🔵 **「닫았다 열렸다」가 반복되면 같은 `announcement_id`로 행이 여러 개 쌓인다.** 다시 열린 사실은 따로 쓰지 않는다 — SH 스크랩이 `status`를 되돌리므로 **「close 행이 있는데 `announcements.status`가 다시 `'공고중'`이고 `updated_at > closed_at`」**이면 그 사이에 목록에 다시 나타난 것이다. **쓰기 경로를 늘리지 않고 유도된다.**
+
+#### `sh_close_missing(p_threshold, p_dry_run)` 신설
+
+| | |
+|---|---|
+| md5 | `e9117ae81a5bb4f2ebd36b2e127043d5` |
+| 파일 | `sh_close_missing.sql` |
+| EXECUTE | `postgres` · `service_role`뿐 (PUBLIC·anon·authenticated 없음) |
+| 🔴 문턱 | **`p_threshold`의 기본값 8이 유일한 자리다.** SH가 하루 4회(00/03/06/09 UTC)라 8회 = 만 2일 |
+
+🔵 **cron 잡은 인자 없이 부르고, 시험은 인자를 넘겨서 한다** — 그래서 시험하려고 문턱을 「임시로 낮췄다 되돌리는」 일이 없다. `p_dry_run=true`면 무엇이 닫힐지만 돌려주고 쓰지 않는다.
+
+#### 🔴 왜 수집 EF가 아니라 pg_cron인가
+
+직전 회차에 **삭제 잡을 수집에 얹지 않은 이유**는 「수집이 멈추면 그것도 멈춘다」였다. 여기는 **반대로 보일 수 있지만 결론은 같다**:
+
+- 미검출 횟수가 **「성공한 런의 수」로 정의**되므로, 수집이 멈추면 `ok_runs`가 안 늘고 **아무것도 안 닫힌다**
+- 즉 **안전성을 스케줄러가 아니라 판정식이 준다.** 언제 돌든 결과가 같다
+- 그래서 되돌리기가 싼 쪽을 고른다 — `cron.unschedule` 한 줄이면 끝이고, **EF 재배포(2026-08-26 사고 구조)를 한 번 더 타지 않는다**
+
+**pg_cron jobid 17 `zipfit-sh-close-missing` `20 0,3,6,9 * * *`(UTC)** — SH 수집 20분 뒤라 그 회차 런 로그가 이미 쓰여 있다.
+
+#### 2026-09-14 시험 — 닫고 되돌렸다
+
+| 단계 | 결과 |
+|---|---|
+| 기본 문턱 8로 실제 실행 | **0행** — 아무도 8회에 안 닿았다 |
+| 문턱 2 · `p_dry_run=true` | **6행** 표시 · 쓰기 0 |
+| 문턱 2 실제 UPDATE(트랜잭션 안) | SH 안마감 **18 → 12** · 마감기록 **6행**(전부 `threshold=2`) |
+| `rollback` 뒤 | SH 안마감 **18** · 마감기록 **0행** · 마감 74 — **원상** |
+| cron 프로브(1분 주기, 같은 명령) | `succeeded` · `return_message='0 rows'` · 0.004초 → 확인 뒤 `unschedule` |
+
+⚠️ 여기서는 `return_message='0 rows'`가 **뜻이 있다** — 명령이 함수를 직접 `SELECT`하기 때문이다. `net.http_post`를 부르는 수집 잡들의 `'1 row'`와 다르다.
+
+#### `collection_run_log` — anon SELECT 회수
+
+```sql
+revoke select on public.collection_run_log from anon, authenticated;
+```
+
+🔴 **예외 목록에 넣지 않고 권한을 걷었다.** 예외로 덮으면 다음에 진짜 문제가 생겨도 조용하다.
+읽는 곳 확인(2026-09-14): 저장소 전체에서 이 표를 **읽는** 코드 0건, DB 안의 함수·뷰도 0건. 쓰는 곳은
+`collect-announcements`의 insert 하나뿐이고 service_role로 돈다. ⚠️ RLS·정책은 안 건드렸다 — 어차피
+RLS 켬 + 정책 0이라 anon은 **이미 0행을 보고 있었다**(권한만 남아 있던 것이다).
+
+**되돌리기.**
+
+```sql
+SELECT cron.unschedule('zipfit-sh-close-missing');
+DROP FUNCTION public.sh_close_missing(integer, boolean);
+DROP TABLE public.sh_auto_close_log;
+GRANT SELECT ON public.collection_run_log TO anon, authenticated;   -- 되돌릴 이유는 없다
+```
+
+⚠️ **이미 닫힌 행은 자동으로 안 열린다.** `sh_auto_close_log`의 `prev_status`로 되돌린다.
+🔵 단, 그 공고가 SH 목록에 다시 나타나면 **다음 스크랩이 스스로 연다.**
