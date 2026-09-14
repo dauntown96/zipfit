@@ -491,7 +491,7 @@ body.theme-dark .zf-footer a{color:#9aa0aa}
 
     <!-- 공고 검색 -->
     <div style="display:flex;gap:8px;margin-bottom:0.75rem">
-      <input type="text" id="noticeSearchInput" placeholder="공고명, 지역 등으로 검색" oninput="applyNoticeFiltersAndRender()"
+      <input type="text" id="noticeSearchInput" placeholder="공고명, 지역 등으로 검색" oninput="applyNoticeFiltersAndRender();zfLogSearchSoon(this.value)"
         style="flex:1;min-width:0;padding:9px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px">
       <select id="noticeSearchScopeSel" onchange="applyNoticeFiltersAndRender()"
         style="font-size:13px;padding:5px 8px;border:1px solid #e0e0e0;border-radius:8px;background:#fff;color:#333;cursor:pointer">
@@ -1309,6 +1309,77 @@ function zfSavedHeaders(token){
   return {'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json'};
 }
 
+// ===== 사용 로그 송신 =====
+// 🔴 측정은 부수적인 일이다. 실패해도 삼키고, 화면을 절대 붙들지 않는다.
+//    호출자는 await 하지 않는다(전부 fire-and-forget).
+const ZF_LOG_EVENTS = new Set(['page_view','notice_open','search','recommend_click']);
+let zfLogFailures = 0;      // 삼킨 실패 수. 화면에 띄우지 않고 콘솔에서만 본다.
+let zfLogSent     = 0;      // 보낸 수. 둘을 견주면 삼킨 비율이 나온다.
+let zfSidMem      = null;   // sessionStorage 가 막혔을 때의 폴백
+
+function zfNewSid(){
+  try{ if(self.crypto && self.crypto.randomUUID) return self.crypto.randomUUID(); }catch(e){}
+  return 'zf-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10);
+}
+// 🔴 sessionStorage 다 — 탭을 닫으면 사라져 방문과 방문을 잇지 않는다.
+//    잇는 순간 개인 식별에 가까워진다(localStorage 를 쓰지 않는 이유).
+function zfSessionId(){
+  if(zfSidMem) return zfSidMem;
+  let id=null;
+  try{
+    id = sessionStorage.getItem('zf_sid');
+    if(!id){ id = zfNewSid(); sessionStorage.setItem('zf_sid', id); }
+  }catch(e){ id = zfNewSid(); }   // 사생활 보호 모드 등. 막혀도 서비스는 그대로 돈다.
+  zfSidMem = id;
+  return id;
+}
+
+const zfLogRecent = new Map();   // 중복 전송 방지(같은 사건이 1초 안에 두 번 = 렌더 중복)
+function zfLog(event, props, announcementId){
+  try{
+    if(!ZF_LOG_EVENTS.has(event)) return;   // 목록 밖은 보내지 않는다(DB CHECK 가 거부한다)
+    const key = event+'|'+(announcementId||'')+'|'+JSON.stringify(props||{});
+    const now = Date.now();
+    if(zfLogRecent.has(key) && now - zfLogRecent.get(key) < 1000) return;
+    zfLogRecent.set(key, now);
+    if(zfLogRecent.size > 200) zfLogRecent.clear();   // 무한히 커지지 않게
+
+    const body = { event: event, session_id: zfSessionId() };
+    if(announcementId) body.announcement_id = String(announcementId).slice(0,64);
+    if(props && Object.keys(props).length) body.props = props;
+
+    // 🔴 동의 갈래는 "어느 키로 보내느냐"로 갈린다.
+    //    user_id 는 DB 기본값 auth.uid() 가 채우고 화면에는 그 컬럼 INSERT 권한이 없다.
+    //    그래서 비동의면 anon 키로 보내 auth.uid() 를 NULL 로 만든다 — 비로그인과 같아진다.
+    const consented = !!(currentUser && (currentUser.usage_log_consent===true || currentUser.usage_log_consent==='Y'));
+    const send = (headers) => {
+      // 🔴 Prefer: return=minimal — SELECT 권한이 없어 응답 본문을 요구하면 조용히 실패한다.
+      const h = Object.assign({}, headers, {'Prefer':'return=minimal'});
+      fetch(SUPABASE_URL+'/rest/v1/usage_events',
+        {method:'POST', headers:h, body:JSON.stringify(body), keepalive:true})
+        .then(r=>{ if(r.ok) zfLogSent++; else zfLogFailures++; })
+        .catch(()=>{ zfLogFailures++; });
+    };
+    if(consented){
+      zfAccessToken().then(t=>send(t?zfSavedHeaders(t):zfAnonHeaders())).catch(()=>send(zfAnonHeaders()));
+    } else {
+      send(zfAnonHeaders());
+    }
+  }catch(e){ zfLogFailures++; }   // 🔴 삼킨다. 측정 때문에 화면이 멈추면 본말이 뒤집힌다.
+}
+
+// 검색은 한 글자마다 oninput 이 돈다 — 눌러 담았다가 멈춘 뒤 한 번만 보낸다.
+let zfSearchTimer=null, zfLastSearch='';
+function zfLogSearchSoon(q){
+  clearTimeout(zfSearchTimer);
+  zfSearchTimer = setTimeout(function(){
+    const t=(q||'').trim();
+    if(!t || t===zfLastSearch) return;      // 빈 값·직전과 같은 값은 보내지 않는다
+    zfLastSearch = t;
+    zfLog('search', {q: t.slice(0,50)});    // 길이를 잘라 둔다
+  }, 800);
+}
+
 // 서버에서 찜 목록을 읽어 savedIds/savedRows를 갱신한다.
 async function zfLoadSavedFromServer(){
   const token = await zfAccessToken();
@@ -1671,7 +1742,7 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
         </div>`
       : `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px" onclick="event.stopPropagation()"><div style="display:flex;gap:8px;flex-wrap:wrap">${n['공고URL']?`<a class="detail-link" href="${n['공고URL']}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a>`:''} ${shareBtn} ${saveBtn}</div></div>`;
 
-    html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n['지역']||'').replace(/"/g,'&quot;')}" data-sido="${(n['sido_nm']||'').replace(/"/g,'&quot;')}" data-sigungu="${(n['sigungu_nm']||'').replace(/"/g,'&quot;')}" data-title="${(n['공고명']||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" data-housing-type="${(n['공급유형']||'').replace(/"/g,'&quot;')}" data-precise-address="${(n['precise_address']||'').replace(/"/g,'&quot;')}" data-relaxed="${n['is_relaxed_recruitment']===true?'1':''}" data-relaxation-detail="${(n['relaxation_detail']||'').replace(/"/g,'&quot;')}" data-contract-verify="${n['contract_before_verification']===true?'1':''}" data-rent-exempt-until="${(n['rent_exemption_until']||'').replace(/"/g,'&quot;')}" data-rent-exempt-note="${(n['rent_exemption_note']||'').replace(/"/g,'&quot;')}" data-revised="${isAmended?'1':''}" data-revision-note-full="${revisionNoteEsc}" data-special-notes="${n['special_notes']?JSON.stringify(n['special_notes']).replace(/"/g,'&quot;'):''}" data-apply-start="${(n['apply_start']||'').replace(/"/g,'&quot;')}" data-apply-end="${(n['apply_end']||'').replace(/"/g,'&quot;')}" data-announcement-date="${(n['announcement_date']||'').replace(/"/g,'&quot;')}" data-doc-submit-announce="${(n['doc_submit_announce_date']||'').replace(/"/g,'&quot;')}" data-doc-submit-start="${(n['doc_submit_start']||'').replace(/"/g,'&quot;')}" data-doc-submit-end="${(n['doc_submit_end']||'').replace(/"/g,'&quot;')}" data-winner-announce="${(n['winner_announce_date']||'').replace(/"/g,'&quot;')}" data-contract-start="${(n['contract_start']||'').replace(/"/g,'&quot;')}" data-contract-end="${(n['contract_end']||'').replace(/"/g,'&quot;')}" data-attachment-urls="${n['attachment_urls']?JSON.stringify(n['attachment_urls']).replace(/"/g,'&quot;'):''}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this)" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
+    html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n['지역']||'').replace(/"/g,'&quot;')}" data-sido="${(n['sido_nm']||'').replace(/"/g,'&quot;')}" data-sigungu="${(n['sigungu_nm']||'').replace(/"/g,'&quot;')}" data-title="${(n['공고명']||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" data-housing-type="${(n['공급유형']||'').replace(/"/g,'&quot;')}" data-precise-address="${(n['precise_address']||'').replace(/"/g,'&quot;')}" data-relaxed="${n['is_relaxed_recruitment']===true?'1':''}" data-relaxation-detail="${(n['relaxation_detail']||'').replace(/"/g,'&quot;')}" data-contract-verify="${n['contract_before_verification']===true?'1':''}" data-rent-exempt-until="${(n['rent_exemption_until']||'').replace(/"/g,'&quot;')}" data-rent-exempt-note="${(n['rent_exemption_note']||'').replace(/"/g,'&quot;')}" data-revised="${isAmended?'1':''}" data-revision-note-full="${revisionNoteEsc}" data-special-notes="${n['special_notes']?JSON.stringify(n['special_notes']).replace(/"/g,'&quot;'):''}" data-apply-start="${(n['apply_start']||'').replace(/"/g,'&quot;')}" data-apply-end="${(n['apply_end']||'').replace(/"/g,'&quot;')}" data-announcement-date="${(n['announcement_date']||'').replace(/"/g,'&quot;')}" data-doc-submit-announce="${(n['doc_submit_announce_date']||'').replace(/"/g,'&quot;')}" data-doc-submit-start="${(n['doc_submit_start']||'').replace(/"/g,'&quot;')}" data-doc-submit-end="${(n['doc_submit_end']||'').replace(/"/g,'&quot;')}" data-winner-announce="${(n['winner_announce_date']||'').replace(/"/g,'&quot;')}" data-contract-start="${(n['contract_start']||'').replace(/"/g,'&quot;')}" data-contract-end="${(n['contract_end']||'').replace(/"/g,'&quot;')}" data-attachment-urls="${n['attachment_urls']?JSON.stringify(n['attachment_urls']).replace(/"/g,'&quot;'):''}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this,'notice')" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
       <div class="htop">
         <p class="hname">${normalizeRevisedTitle(n['공고명'])||'(공고명 없음)'}</p>
         <span class="htag ${isClosed?'tag-mix':'tag-apt'}">${n['처리상태']||'-'}</span>
@@ -1878,7 +1949,7 @@ function renderPersonalizedRecommendations(){
   }
 
   let html='';
-  shown.forEach(n=>{
+  shown.forEach((n,idx)=>{
     const announcementDate=n['모집공고일']||n['announcement_date']||'';
     const applyStart=n['신청시작일']||n['apply_start']||'';
     const applyEnd=n['신청마감일']||n['apply_end']||'';
@@ -1897,13 +1968,15 @@ function renderPersonalizedRecommendations(){
         ${closingSoon?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
       </div>
       <p style="font-size:12px;color:#888;margin-bottom:8px">${dateLine}</p>
-      ${(n['공고URL']||n['url'])?`<a class="detail-link" href="${n['공고URL']||n['url']}" target="_blank" style="display:block">📄 공고 원문 보기</a>`:''}
+      ${(n['공고URL']||n['url'])?`<a class="detail-link" href="${n['공고URL']||n['url']}" target="_blank" rel="noopener" style="display:block" onclick="zfLog('recommend_click',{rank:${idx+1}},'${(n['announcement_id']||'').toString().replace(/'/g,'')}')">📄 공고 원문 보기</a>`:''}
     </div>`;
   });
   if(filtered.length>5) html+=`<p style="font-size:12px;color:#888;text-align:center;margin-top:8px">외 ${filtered.length-5}건 더 — 공고 탭에서 전체 확인</p>`;
   document.getElementById('personalizedList').innerHTML=html;
 }
 
+let zfLastTab = null;
+const ZF_TAB_NAME = {1:'추천',2:'공고',3:'인사이트',4:'관리',5:'설정'};
 function goMain(n){
   [1,2,3,4,5].forEach(i=>{
     document.getElementById('main'+i).classList.toggle('hidden',i!==n);
@@ -1911,6 +1984,8 @@ function goMain(n){
     tab.classList.toggle('active',i===n);
     tab.setAttribute('aria-selected', i===n ? 'true' : 'false');
   });
+  // 사용 로그: 탭 전환. 같은 탭을 다시 그릴 때(프로그램 호출)는 보내지 않는다.
+  if(n!==zfLastTab){ zfLastTab=n; zfLog('page_view', {tab: ZF_TAB_NAME[n]||String(n)}); }
   if(n===1) renderPersonalizedRecommendations();
   if(n===2 && !noticeLoaded) initNoticeFilters();
   else if(n===2) loadNoticeData();
@@ -2823,12 +2898,14 @@ function loadKakao(){
 
 const POI_CATS={subway:{code:'SW8',label:'🚇 지하철'},park:{code:'AT4',label:'🌳 공원'},hospital:{code:'HP8',label:'🏥 병원'},childcare:{code:'PS3',label:'👶 어린이집'},school:{code:'SC4',label:'🏫 학교'},store:{code:'CS2',label:'🏪 편의점'},mart:{code:'MT1',label:'🛒 마트'}};
 
-function toggleDetail(id, card){
+function toggleDetail(id, card, from){
   const detailEl = document.getElementById(id);
   if(!detailEl) return;
   const open = detailEl.style.display === 'block';
   detailEl.style.display = open ? 'none' : 'block';
   const cardEl = card || document.querySelector(`[data-card-id="${id}"]`);
+  // 사용 로그: 펼칠 때만 보낸다(접는 것은 열람이 아니다).
+  if(!open) zfLog('notice_open', from?{from:from}:null, cardEl && cardEl.dataset ? cardEl.dataset.announcementId : '');
   if(cardEl){
     cardEl.style.borderColor = open ? '' : '#1D9E75';
     cardEl.setAttribute('aria-expanded', open ? 'false' : 'true');
@@ -4278,7 +4355,7 @@ function renderMatchResults(rows){
         </div>`
       : `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px" onclick="event.stopPropagation()"><div style="display:flex;gap:8px;flex-wrap:wrap">${n.url?`<a class="detail-link" href="${n.url}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a>`:''} ${mShareBtn} ${mSaveBtn}</div></div>`;
 
-    html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n.region||'').replace(/"/g,'&quot;')}" data-sido="${(n.sido_nm||'').replace(/"/g,'&quot;')}" data-sigungu="${(n.sigungu_nm||'').replace(/"/g,'&quot;')}" data-title="${(n.title||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" data-housing-type="${(n.housing_type||'').replace(/"/g,'&quot;')}" data-precise-address="${(n.precise_address||'').replace(/"/g,'&quot;')}" data-relaxed="${n.is_relaxed_recruitment===true?'1':''}" data-relaxation-detail="${(n.relaxation_detail||'').replace(/"/g,'&quot;')}" data-contract-verify="${n.contract_before_verification===true?'1':''}" data-rent-exempt-until="${(n.rent_exemption_until||'').replace(/"/g,'&quot;')}" data-rent-exempt-note="${(n.rent_exemption_note||'').replace(/"/g,'&quot;')}" data-revised="${isAmended?'1':''}" data-revision-note-full="${revisionNoteEscM}" data-special-notes="${n.special_notes?JSON.stringify(n.special_notes).replace(/"/g,'&quot;'):''}" data-apply-start="${(n.apply_start||'').replace(/"/g,'&quot;')}" data-apply-end="${(n.apply_end||'').replace(/"/g,'&quot;')}" data-announcement-date="${(n.announcement_date||'').replace(/"/g,'&quot;')}" data-doc-submit-announce="${(n.doc_submit_announce_date||'').replace(/"/g,'&quot;')}" data-doc-submit-start="${(n.doc_submit_start||'').replace(/"/g,'&quot;')}" data-doc-submit-end="${(n.doc_submit_end||'').replace(/"/g,'&quot;')}" data-winner-announce="${(n.winner_announce_date||'').replace(/"/g,'&quot;')}" data-contract-start="${(n.contract_start||'').replace(/"/g,'&quot;')}" data-contract-end="${(n.contract_end||'').replace(/"/g,'&quot;')}" data-attachment-urls="${n.attachment_urls?JSON.stringify(n.attachment_urls).replace(/"/g,'&quot;'):''}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this)" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
+    html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n.region||'').replace(/"/g,'&quot;')}" data-sido="${(n.sido_nm||'').replace(/"/g,'&quot;')}" data-sigungu="${(n.sigungu_nm||'').replace(/"/g,'&quot;')}" data-title="${(n.title||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" data-housing-type="${(n.housing_type||'').replace(/"/g,'&quot;')}" data-precise-address="${(n.precise_address||'').replace(/"/g,'&quot;')}" data-relaxed="${n.is_relaxed_recruitment===true?'1':''}" data-relaxation-detail="${(n.relaxation_detail||'').replace(/"/g,'&quot;')}" data-contract-verify="${n.contract_before_verification===true?'1':''}" data-rent-exempt-until="${(n.rent_exemption_until||'').replace(/"/g,'&quot;')}" data-rent-exempt-note="${(n.rent_exemption_note||'').replace(/"/g,'&quot;')}" data-revised="${isAmended?'1':''}" data-revision-note-full="${revisionNoteEscM}" data-special-notes="${n.special_notes?JSON.stringify(n.special_notes).replace(/"/g,'&quot;'):''}" data-apply-start="${(n.apply_start||'').replace(/"/g,'&quot;')}" data-apply-end="${(n.apply_end||'').replace(/"/g,'&quot;')}" data-announcement-date="${(n.announcement_date||'').replace(/"/g,'&quot;')}" data-doc-submit-announce="${(n.doc_submit_announce_date||'').replace(/"/g,'&quot;')}" data-doc-submit-start="${(n.doc_submit_start||'').replace(/"/g,'&quot;')}" data-doc-submit-end="${(n.doc_submit_end||'').replace(/"/g,'&quot;')}" data-winner-announce="${(n.winner_announce_date||'').replace(/"/g,'&quot;')}" data-contract-start="${(n.contract_start||'').replace(/"/g,'&quot;')}" data-contract-end="${(n.contract_end||'').replace(/"/g,'&quot;')}" data-attachment-urls="${n.attachment_urls?JSON.stringify(n.attachment_urls).replace(/"/g,'&quot;'):''}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this,'match')" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
       <div class="htop">
         <p class="hname">${normalizeRevisedTitle(n.title)||'(공고명 없음)'}</p>
         <span class="htag ${isClosed?'tag-mix':'tag-apt'}">${n.status||'-'}</span>
