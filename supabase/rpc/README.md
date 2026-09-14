@@ -479,3 +479,52 @@ git show b1b3f74:supabase/rpc/get_announcement_blocks.sql
 `get_announcements_deduped`만 되돌릴 때도 **`DROP` 뒤 재생성 + 위 `GRANT`**가 필요하다
 (컬럼이 줄어드는 것도 반환 타입 변경이다). 나머지 둘은 그 출력을 그대로 실행하면 된다.
 실행 뒤 `md5(pg_get_functiondef(...))`가 위 표의 「변경 전」과 같은지 대조한다.
+
+---
+
+### 2026-09-14 — `get_announcement_price_summary(text[])` 신설 (1층 요약 한 줄)
+
+**새 함수다.** 카드 1층에 보증금·월세·전용면적 한 줄을 붙이려고 만들었다. 재료는
+`housing_units`다 — `announcements.deposit_min` 등은 분석분이 전부 NULL이라 쓸 수 없다.
+
+| | |
+|---|---|
+| 변경 전 md5 | (없음 — 이번에 신설) |
+| 변경 후 md5 | `5bc539e6ebab50fd43a1f61f40da9203` |
+| 파일 | `get_announcement_price_summary.sql` |
+| EXECUTE | `postgres` · `anon` · `authenticated` · `service_role` (PUBLIC 없음 — 만든 자리에서 `revoke … from public, anon, authenticated` 뒤 필요한 역할에만 `grant`) |
+
+🔴 **회차를 가르는 규칙이 프론트와 같아야 한다.** 한 그룹에 07·08·09월 세 회차가 섞여 있는
+공고(김제하동)가 있고, 1층에 나가는 값이 지난 회차면 첫 화면부터 틀린다. 그래서 판정을
+`index.html`의 두 곳과 **한 글자씩 맞췄다**:
+
+- `roundInfoFor()` — `anyRevised || dates.size < 2`면 회차를 가르지 않고, 아니면 자기 행의
+  `announcement_date`가 이번 회차다 → CTE `cur`
+- `loadHousingUnits()` — `past.length > 0 && cur.length > 0`일 때만 갈라 보여주고, 이번 회차에
+  세대정보가 하나도 없으면 그룹 전체를 쓴다 → CTE `cur_has` · `pick`
+
+⚠️ **이 두 곳을 고치면 이 함수도 같이 고쳐야 한다.** 정본은 화면이고, 어긋나면 카드를 열었을
+때의 수치와 1층 요약이 달라진다.
+
+#### 🔴 한 회차 안에서 본문을 두 번 고쳤다 — 두 번째는 성능이다
+
+1. **초판** — 이번 회차만 집계. 김제하동 6행이 세 회차로 갈리는 것을 못 보고 있었다.
+2. **2판** — 이번 회차에 `housing_units`가 0행인 공고 2건이 요약에서 통째로 빠졌다(분석분
+   10건 중 8건만 나왔다). 카드는 그럴 때 그룹 전체를 보여주므로 같은 폴백(`cur_has`)을 넣었다.
+3. **3판(현재)** — 그룹을 `get_announcement_group_ids()`로 id마다 부르던 것을 집합 연산으로
+   바꿨다. 🔴 **목록 1회분(842건)에 17.3초가 걸렸다**(EXPLAIN ANALYZE 실측). 그 함수는 호출마다
+   `announcements`를 두 번 훑고 `announcement_dedup_key()`를 2,635행 전부에 건다. 집합으로 펴서
+   **247.9ms**가 됐고(70배), **결과는 842건 전부 바이트 단위로 같다**(digest
+   `3ed8dff6553c4a4a71587ecc66718bd3` 일치, 123행).
+
+⚠️ **원칙 20의 「고치기 전에 덤프」를 이 함수에는 적용할 수 없었다** — 세 판 모두 같은 회차에서
+태어났고 `main`에 있던 「변경 전」이 애초에 없다. 대신 위에 세 판의 경위를 남긴다.
+
+**되돌리기.** 이 함수는 이번 회차에 생겼으므로 되돌림은 삭제다.
+
+```sql
+DROP FUNCTION public.get_announcement_price_summary(text[]);
+```
+
+🔵 **화면은 이 함수가 없어도 깨지지 않는다** — 호출이 실패하면 요약 줄 자리가 비고(캐시를
+도로 비워 다음 렌더에서 다시 시도한다) 카드의 나머지는 그대로다.
