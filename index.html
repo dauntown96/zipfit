@@ -1334,15 +1334,21 @@ function zfSessionId(){
   return id;
 }
 
-const zfLogRecent = new Map();   // 중복 전송 방지(같은 사건이 1초 안에 두 번 = 렌더 중복)
+const zfLogRecent = new Map();   // 중복 전송 방지(같은 사건이 짧게 두 번 = 렌더 중복)
+// 🔴 page_view 는 시간 창을 쓰지 않는다 — goMain 의 zfLastTab 비교가 이미 정확한 가드이고,
+//    시간 창을 겹치면 진짜 탭 이동(A→B→A)까지 먹는다(2026-09-14 실측: 3행이 2행이 됐다).
+const ZF_LOG_DEDUPE_MS = { page_view: 0 };
 function zfLog(event, props, announcementId){
   try{
     if(!ZF_LOG_EVENTS.has(event)) return;   // 목록 밖은 보내지 않는다(DB CHECK 가 거부한다)
-    const key = event+'|'+(announcementId||'')+'|'+JSON.stringify(props||{});
-    const now = Date.now();
-    if(zfLogRecent.has(key) && now - zfLogRecent.get(key) < 1000) return;
-    zfLogRecent.set(key, now);
-    if(zfLogRecent.size > 200) zfLogRecent.clear();   // 무한히 커지지 않게
+    const win = (event in ZF_LOG_DEDUPE_MS) ? ZF_LOG_DEDUPE_MS[event] : 1000;
+    if(win > 0){
+      const key = event+'|'+(announcementId||'')+'|'+JSON.stringify(props||{});
+      const now = Date.now();
+      if(zfLogRecent.has(key) && now - zfLogRecent.get(key) < win) return;
+      zfLogRecent.set(key, now);
+      if(zfLogRecent.size > 200) zfLogRecent.clear();   // 무한히 커지지 않게
+    }
 
     const body = { event: event, session_id: zfSessionId() };
     if(announcementId) body.announcement_id = String(announcementId).slice(0,64);
@@ -1368,6 +1374,16 @@ function zfLog(event, props, announcementId){
   }catch(e){ zfLogFailures++; }   // 🔴 삼킨다. 측정 때문에 화면이 멈추면 본말이 뒤집힌다.
 }
 
+// 🔴 검색어에는 이름·전화번호·주소가 들어갈 수 있다. props 는 「개인정보가 아닌 것」으로 설계했으므로
+//    명백한 것부터 거른다. ⚠️ 완벽히는 못 막는다 — 두세 글자 한글 이름은 지역명과 구분할 방법이 없다.
+//    그래서 거르는 축은 「사람이 실수로 붙여넣는 것」이지 「작정하고 넣는 것」이 아니다.
+const ZF_PII_PATTERNS = [
+  /\d{6,}/,                        // 연속 숫자 6자리 이상 — 전화·주민·계좌(지역·단지명에는 거의 없다)
+  /\d{2,4}-\d{3,4}-\d{4}/,         // 하이픈 낀 전화번호(위 규칙이 하이픈 때문에 못 잡는다)
+  /[^\s@]+@[^\s@]+\.[^\s@]+/       // 이메일
+];
+function zfLooksPersonal(t){ return ZF_PII_PATTERNS.some(function(re){ return re.test(t); }); }
+
 // 검색은 한 글자마다 oninput 이 돈다 — 눌러 담았다가 멈춘 뒤 한 번만 보낸다.
 let zfSearchTimer=null, zfLastSearch='';
 function zfLogSearchSoon(q){
@@ -1376,7 +1392,9 @@ function zfLogSearchSoon(q){
     const t=(q||'').trim();
     if(!t || t===zfLastSearch) return;      // 빈 값·직전과 같은 값은 보내지 않는다
     zfLastSearch = t;
-    zfLog('search', {q: t.slice(0,50)});    // 길이를 잘라 둔다
+    // 🔵 걸리면 검색어만 빼고 사건은 남긴다 — 「검색이 몇 번 일어났나」는 잃지 않는다.
+    if(zfLooksPersonal(t)) zfLog('search', {q_omitted:true, len:t.length});
+    else                   zfLog('search', {q: t.slice(0,50)});
   }, 800);
 }
 
@@ -1985,7 +2003,13 @@ function goMain(n){
     tab.setAttribute('aria-selected', i===n ? 'true' : 'false');
   });
   // 사용 로그: 탭 전환. 같은 탭을 다시 그릴 때(프로그램 호출)는 보내지 않는다.
-  if(n!==zfLastTab){ zfLastTab=n; zfLog('page_view', {tab: ZF_TAB_NAME[n]||String(n)}); }
+  // 🔵 nav='load' 는 페이지 로드(새로고침 포함) 뒤 첫 이동, 'tab' 은 같은 페이지 안의 탭 전환.
+  //    새로고침은 진짜 페이지 로드라 지우지 않고, 대신 집계에서 가를 수 있게 남긴다.
+  if(n!==zfLastTab){
+    const nav = (zfLastTab===null) ? 'load' : 'tab';
+    zfLastTab=n;
+    zfLog('page_view', {tab: ZF_TAB_NAME[n]||String(n), nav: nav});
+  }
   if(n===1) renderPersonalizedRecommendations();
   if(n===2 && !noticeLoaded) initNoticeFilters();
   else if(n===2) loadNoticeData();
