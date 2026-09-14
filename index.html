@@ -721,6 +721,14 @@ body.theme-dark .zf-footer a{color:#9aa0aa}
       </div>
 
       <div class="panel" style="margin-bottom:1rem">
+        <p class="slabel" style="margin:0 0 0.75rem">🔒 개인정보</p>
+        <div class="setting-row">
+          <div><div class="setting-label">이용 기록에 계정 연결 (선택)</div><div class="setting-sub">서비스 개선을 위해 남는 이용 기록에 내 계정을 함께 표시할지 정해요. 꺼도 모든 기능은 그대로 쓸 수 있고, 계정과 연결되지 않는 익명 기록은 남아요. <a href="./privacy.html" target="_blank" rel="noopener">자세히</a></div></div>
+          <label class="toggle"><input type="checkbox" id="toggleUsageLog" onchange="onSettingChange({usageLogConsent:this.checked?'Y':'N'})"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom:1rem">
         <p class="slabel" style="margin:0 0 0.75rem">🎨 화면 설정</p>
         <div class="field">
           <label class="label">테마</label>
@@ -4801,6 +4809,7 @@ function applySettingsToUI(p){
   document.getElementById('toggleAlertOn').checked = p.alert_on!==false && p.alert_on!=='N';
   document.getElementById('toggleNewNotice').checked = p.new_notice_alert!==false && p.new_notice_alert!=='N';
   document.getElementById('toggleMarketing').checked = p.marketing_alert===true || p.marketing_alert==='Y';
+  document.getElementById('toggleUsageLog').checked = p.usage_log_consent===true || p.usage_log_consent==='Y';
   setTheme(p.theme==='dark'?'dark':'light',true);
   setFontSize(p.font_size||'normal',true);
 
@@ -4844,6 +4853,7 @@ async function saveSettings(){
   currentUser={...currentUser,...payload,
     alert_on:payload.alertOn==='Y', new_notice_alert:payload.newNoticeAlert==='Y',
     marketing_alert:payload.marketingAlert==='Y',
+    usage_log_consent:payload.usageLogConsent==='Y',
     max_deposit:payload.maxDeposit, min_rooms:payload.minRooms,
     birth_year:payload.birthYear,
     theme:payload.theme, font_size:payload.fontSize};
@@ -4867,6 +4877,7 @@ function zfSettingsFormPayload(){
     alertOn: document.getElementById('toggleAlertOn').checked?'Y':'N',
     newNoticeAlert: document.getElementById('toggleNewNotice').checked?'Y':'N',
     marketingAlert: document.getElementById('toggleMarketing').checked?'Y':'N',
+    usageLogConsent: document.getElementById('toggleUsageLog').checked?'Y':'N',
     theme: document.querySelector('[data-theme].sel')?.dataset.theme||'light',
     fontSize: document.querySelector('[data-fontsize].sel')?.dataset.fontsize||'normal',
   };
@@ -4889,6 +4900,7 @@ function setFontSize(size,silent){
 // EF v12는 부분 갱신이므로 나머지 컬럼은 서버에서 그대로 보존된다.
 const ZF_SETTING_TO_COLUMN={
   alertOn:'alert_on', newNoticeAlert:'new_notice_alert', marketingAlert:'marketing_alert',
+  usageLogConsent:'usage_log_consent',
   theme:'theme', fontSize:'font_size'
 };
 async function onSettingChange(patch){

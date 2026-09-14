@@ -40,6 +40,7 @@ const PROFILE_COLUMNS = [
   'marketing_alert',
   'theme',
   'font_size',
+  'usage_log_consent',
 ].join(', ')
 
 const json = (body: unknown, status = 200) =>
@@ -93,6 +94,7 @@ const FIELD_MAP: Record<string, { col: string; conv: (v: unknown) => unknown }> 
   marketingAlert: { col: 'marketing_alert', conv: toBool },
   theme: { col: 'theme', conv: toTextOrNull },
   fontSize: { col: 'font_size', conv: toTextOrNull },
+  usageLogConsent: { col: 'usage_log_consent', conv: toBool },
   alertEmail: { col: 'alert_email', conv: toLowerTextOrNull },
 }
 
