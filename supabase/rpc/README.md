@@ -232,6 +232,112 @@ revoke all on table public.eligibility_criteria_bak_20260908 from anon, authenti
 ⚠️ **행 수가 원본과 다르다** — 삭제 시점에 원본 307 · 스냅샷 304였다. 09-08 이후 원본에 3행이
 늘었다는 뜻이며, **이 삭제는 그 3행과 무관하다.** 복구할 때 307행을 기대하지 않는다.
 
+### 2026-09-14 — `usage_events` 신설 (사용 로그)
+
+측정 장치가 하나도 없어 「아무도 안 쓴다」와 「쓰는지 모른다」가 구분되지 않던 것을 메운다.
+🔴 **이 회차는 그릇만 만든다 — 화면에서 보내는 코드는 0이다.**
+
+🔴 **다른 테이블과 정반대다: 화면(`anon`)이 직접 INSERT한다.** 그래서 이 표만 규칙이 다르고,
+다른 데서 이 모양을 흉내 내면 안 된다.
+
+**실행**
+
+```sql
+create table public.usage_events (
+  id              bigint generated always as identity primary key,
+  event           text        not null,
+  occurred_at     timestamptz not null default now(),
+  session_id      text        not null,
+  user_id         uuid                 default auth.uid(),
+  announcement_id text,
+  props           jsonb       not null default '{}'::jsonb,
+  constraint usage_events_event_check check (event in (
+    'page_view','notice_open','notice_save','notice_unsave','search',
+    'filter_apply','diagnosis_start','diagnosis_complete','recommend_click','attachment_open')),
+  constraint usage_events_session_id_check      check (char_length(session_id) between 8 and 64),
+  constraint usage_events_announcement_id_check check (announcement_id is null or char_length(announcement_id) <= 64),
+  constraint usage_events_props_size_check      check (char_length(props::text) <= 2048)
+);
+
+revoke all on table public.usage_events from anon, authenticated, public;
+grant insert (event, session_id, announcement_id, props)
+  on table public.usage_events to anon, authenticated;
+
+alter table public.usage_events enable row level security;
+create policy "anon can insert usage_events" on public.usage_events
+  for insert to anon, authenticated
+  with check (user_id is not distinct from auth.uid());
+
+create index idx_usage_events_occurred_at       on public.usage_events (occurred_at);
+create index idx_usage_events_event_occurred_at on public.usage_events (event, occurred_at);
+```
+
+(`COMMENT` 5건은 생략했다 — Supabase 마이그레이션 `create_usage_events`에 전문이 있다.)
+
+#### 🔴 권한을 컬럼 단위로 열었다 — 이 표의 핵심이다
+
+`grant insert`에 **컬럼 목록이 붙어 있다.** 그래서 화면은 `event`·`session_id`·`announcement_id`·`props`
+네 개만 값을 정할 수 있고, 나머지 셋은 **손댈 수 없다.**
+
+| 컬럼 | 화면이 정하나 | 누가 정하나 |
+|---|---|---|
+| `id` | ❌ | identity(시퀀스 권한 없이도 채워진다 — 찜하기 선례와 같다) |
+| `occurred_at` | ❌ | 서버 `now()`. 클라이언트 시계가 끼어들지 못한다 |
+| `user_id` | ❌ | `auth.uid()` 기본값. **위조가 구조적으로 불가능하다** |
+| `event`·`session_id`·`announcement_id`·`props` | ✅ | 화면 |
+
+⚠️ **그래서 `relacl`에는 `anon`이 아예 없다.** 권한은 `pg_attribute.attacl`에 있다
+(`anon=a/postgres`). 테이블 ACL만 보면 「anon 권한 0」으로 보이니 **컬럼 ACL을 함께 조회한다.**
+
+```sql
+select a.attname, coalesce(array_to_string(a.attacl,' | '),'(없음)')
+from pg_attribute a where a.attrelid='public.usage_events'::regclass and a.attnum>0
+order by a.attnum;
+```
+
+#### 🔴 이 신설은 불변식 V1에 **안 잡힌다** — 불변식 쪽이 낡았다
+
+V1이 `has_table_privilege(…,'INSERT')`를 쓰는데 **이 함수는 컬럼 단위 GRANT를 보지 못한다.**
+2026-09-14 실측: `has_table_privilege('anon','public.usage_events','INSERT')` = **false**,
+`has_any_column_privilege(…)` = **true**.
+
+🔴 **즉 누구든 컬럼 단위로 쓰기를 열면 V1은 조용하다.** 이 표만의 문제가 아니라 검사 자체의 구멍이다.
+고치는 법 — 컬럼 단위로 줄 수 있는 권한만 함수를 바꾼다(`DELETE`·`TRUNCATE`는 컬럼 권한이 없어
+`has_any_column_privilege`가 `unrecognized privilege type`으로 죽는다):
+
+```sql
+case when priv in ('INSERT','UPDATE','REFERENCES')
+     then has_any_column_privilege(role, tbl, priv)
+     else has_table_privilege(role, tbl, priv) end
+```
+
+원본 SQL은 claude.ai가 갖고 있어 여기서 고치지 않았다. 허용목록에 더할 문구는 두 줄이다.
+
+```
+usage_events / anon          INSERT  (컬럼 단위: event, session_id, announcement_id, props)
+usage_events / authenticated INSERT  (컬럼 단위: event, session_id, announcement_id, props)
+```
+
+#### 사건 종류를 늘릴 때
+
+```sql
+alter table public.usage_events
+  drop constraint usage_events_event_check,
+  add  constraint usage_events_event_check check (event in ( …기존 + 신규… )) not valid;
+```
+
+🔴 **`NOT VALID`를 붙인다** — 기존 행을 다시 훑지 않아 표가 커진 뒤에도 즉시 끝난다(새 행은 그대로 검사된다).
+🔴 **화면보다 DB를 먼저 고친다.** 제약이 송신보다 앞서야 새 사건이 버려지지 않는다.
+
+#### 되돌리기
+
+```sql
+drop table public.usage_events;
+```
+
+정책·인덱스·시퀀스가 함께 사라진다. 🔴 **`CASCADE`를 붙이지 않는다** — 참조가 생겼으면 실패해야 한다.
+⚠️ 되돌리면 그때까지 쌓인 로그도 함께 사라진다(백업 덤프 말고는 복구 수단이 없다).
+
 ## 함수 본문 변경 이력
 
 권한·DDL과 달리 이쪽은 **파일 diff가 곧 기록**이다. 아래는 그 diff를 어디서 찾는지와
