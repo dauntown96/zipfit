@@ -1678,6 +1678,125 @@ function moveInRow(v){
   return moveInUnreal(v) ? ['입주시기', '확인 필요'] : [moveInLabel(v), v];
 }
 
+// ===== 1층 요약 한 줄 (보증금 · 월세 · 전용면적) =====
+// 🔴 재료는 housing_units다. announcements.deposit_min 등은 분석분이 전부 NULL이라 쓰지 않는다.
+// 집계는 RPC get_announcement_price_summary(text[])가 그룹 단위로 한 번에 돌려준다 —
+// 카드가 여는 범위(get_announcement_group_ids)와 같은 범위라 카드 안 수치와 어긋나지 않는다.
+// 🔴 「값이 없다」와 「아직 안 물어봤다」를 가른다. 캐시 값이
+//    없음(has=false)=미조회 · undefined=조회 중 · null=조회했으나 세대정보 없음 · 객체=요약.
+// 이걸 안 가르면 응답이 오기 전에 「원문 정리 전」을 잘못 띄운다.
+const zfPriceCache = new Map();
+
+function zfPriceUnit(v, div, digits, mode){
+  const p = Math.pow(10, digits);
+  const x = (Number(v) / div) * p;
+  const y = mode === 'floor' ? Math.floor(x) : mode === 'ceil' ? Math.ceil(x) : Math.round(x);
+  return y / p;
+}
+function zfPriceNum(v, digits){
+  // 소수 자리가 0뿐이면 떼어낸다 — 「월 25.0만」보다 「월 25만」이 읽기 쉽다.
+  return digits > 0 ? v.toFixed(digits).replace(/\.0+$/, '') : Math.round(v).toLocaleString();
+}
+// 🔴 반올림 규칙 — 표시 범위가 실제 값을 반드시 품도록 min은 내림 · max는 올림한다.
+// 값이 하나뿐이면(min===max) 범위가 아니므로 그때만 반올림한다. 한 값을 내리거나 올리면
+// 실제와 다른 수가 되지만, 범위는 바깥으로 넓히는 쪽이 안전하다.
+// renderEligValue가 원 단위 끝자리를 반올림해 실제보다 좁게 보였던 문제를 되풀이하지 않기 위함.
+function zfPriceRange(min, max, div, digits, unit, unitEach){
+  if(min === null || min === undefined) return '';
+  if(max === null || max === undefined) max = min;
+  if(Number(min) === Number(max)){
+    return zfPriceNum(zfPriceUnit(min, div, digits, 'round'), digits) + unit;
+  }
+  const lo = zfPriceNum(zfPriceUnit(min, div, digits, 'floor'), digits);
+  const hi = zfPriceNum(zfPriceUnit(max, div, digits, 'ceil'),  digits);
+  return unitEach ? (lo + unit + '~' + hi + unit) : (lo + '~' + hi + unit);
+}
+function zfSummaryLine(s){
+  const parts = [];
+  if(s.deposit_min !== null && s.deposit_min !== undefined){
+    parts.push('보증금 ' + zfPriceRange(s.deposit_min, s.deposit_max, 10000, 0, '만', true));
+  }
+  if(s.rent_min !== null && s.rent_min !== undefined){
+    parts.push((Number(s.rent_min) === 0 && Number(s.rent_max) === 0)
+      ? '월세 없음'
+      : '월 ' + zfPriceRange(s.rent_min, s.rent_max, 10000, 1, '만', true));
+  }
+  if(s.area_min !== null && s.area_min !== undefined){
+    parts.push('전용 ' + zfPriceRange(s.area_min, s.area_max, 1, 0, '㎡', false));
+  }
+  return parts.join(' · ');
+}
+
+// 🔴 「준비 중」처럼 곧 될 것 같은 인상을 주지 않는다 — 언제 정리될지 정해져 있지 않다.
+// 대신 우리가 하는 일이 「공고 원문을 정리하는 것」임과, 지금 당장 어디를 보면 되는지를 적는다.
+function zfNotAnalyzedHtml(url){
+  const link = url
+    ? ` <a href="${url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:#0F6E56;font-weight:600;text-decoration:underline">📄 공고 원문 보기</a>`
+    : '';
+  return `<div style="font-size:12px;color:#6B6B63;background:#F6F6F2;border:1px solid #E8E8E0;border-radius:8px;padding:6px 10px;margin-bottom:6px">아직 공고 원문을 정리하지 못했어요 · 보증금·면적은 원문에서 확인해 주세요${link}</div>`;
+}
+
+function zfFillSummarySlots(){
+  document.querySelectorAll('[data-sum-for]').forEach(el => {
+    const id = el.getAttribute('data-sum-for');
+    if(!id || !zfPriceCache.has(id)) return;
+    const s = zfPriceCache.get(id);
+    if(s === undefined) return;                    // 조회 중 — 아직 아무것도 적지 않는다
+    const url = el.getAttribute('data-sum-url') || '';
+    const line = s ? zfSummaryLine(s) : '';
+    el.innerHTML = line
+      ? `<div style="font-size:12.5px;font-weight:600;color:#1F5E4A;background:#F2F9F6;border:1px solid #DCEDE6;border-radius:8px;padding:6px 10px;margin-bottom:6px">${line}</div>`
+      : zfNotAnalyzedHtml(url);
+  });
+}
+
+// 아직 모르는 id만 골라 한 번에 묻는다. 카드마다 부르면 목록 1회에 87번이 된다.
+async function zfEnsurePriceSummaries(ids){
+  const need = [];
+  (ids || []).forEach(id => { if(id && !zfPriceCache.has(id)) need.push(String(id)); });
+  if(!need.length) return false;
+  need.forEach(id => zfPriceCache.set(id, undefined));   // 같은 id로 두 번 나가지 않게 자리를 잡는다
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_announcement_price_summary`,
+      {method:'POST', headers: zfAnonHeaders(), body: JSON.stringify({p_ids: need})});
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const rows = await res.json();
+    if(!Array.isArray(rows)) throw new Error('예상치 못한 응답');
+    need.forEach(id => zfPriceCache.set(id, null));      // 응답에 없으면 세대정보가 없는 것이다
+    rows.forEach(r => { if(r && r.announcement_id) zfPriceCache.set(String(r.announcement_id), r); });
+    return true;
+  }catch(err){
+    // 🔴 실패하면 자리를 도로 비운다 — 안 물어본 것과 같게 두어야 다음 렌더가 다시 시도한다.
+    // 여기서 null로 두면 통신 실패가 「원문 정리 전」으로 둔갑한다.
+    need.forEach(id => zfPriceCache.delete(id));
+    console.error('ZipFit 요약 로드 실패:', err);
+    return false;
+  }
+}
+
+// ⚠️ 특이사항을 1층 배지로 — 경고는 접히면 안 된다.
+// 🔴 「특이사항 안내」 아코디언은 그대로 둔다(설명 전문이 거기 있다). 배지는 더하기만 한다.
+// 🔴 자격완화는 여기서 만들지 않는다 — buildConvBadges()가 이미 「🔓 자격완화 추가모집」을
+// 1층에 붙이고 있었다(2026-09-14 로컬 렌더로 확인, 배지가 두 개로 겹쳤다).
+// 같은 이유로 선계약후검증도 selection_method 쪽에서 이미 배지가 나왔으면 붙이지 않는다.
+function zfWarnBadges(o){
+  const b = [];
+  const at = s => escapeHtml(String(s || ''));
+  if(o.contractVerify && o.selectionMethod !== '선계약후검증'){
+    b.push('<span class="chip sel" title="자격 검증 전에 먼저 계약을 체결합니다. 계약 후 부적격으로 판명되면 계약이 직권 해제될 수 있어요." style="cursor:help;padding:4px 10px;font-size:11px;background:#A32D2D;border-color:#A32D2D">⚠️ 선계약 후검증</span>');
+  }
+  if(o.rentExemptUntil){
+    b.push(`<span class="chip sel" title="${at('~' + o.rentExemptUntil + '까지 월임대료 면제' + (o.rentExemptNote ? ' / ' + o.rentExemptNote : ''))}" style="cursor:help;padding:4px 10px;font-size:11px;background:#1D9E75;border-color:#1D9E75">🎁 임대료 면제</span>`);
+  }
+  if(o.specialNotes && typeof o.specialNotes === 'object'){
+    Object.entries(o.specialNotes).forEach(([k, v]) => {
+      const val = (v === null || v === undefined) ? '' : (typeof v === 'string' ? v : JSON.stringify(v));
+      b.push(`<span class="chip sel" title="${at(val)}" style="cursor:help;padding:4px 10px;font-size:11px;background:#EF9F27;border-color:#EF9F27">⚠️ ${at(k)}</span>`);
+    });
+  }
+  return b.join('');
+}
+
 function renderNoticeList(filtered, totalCount, hiddenClosedCount){
   const statusEl = document.getElementById('notice-status');
   const listEl   = document.getElementById('notice-list');
@@ -1775,8 +1894,10 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
         ${closingSoon?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
         ${demoTags.map(t=>`<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:${t.color};border-color:${t.color}">${t.label}</span>`).join('')}
         ${convBadges}
+        ${zfWarnBadges({contractVerify:n['contract_before_verification']===true, selectionMethod:n['selection_method'], rentExemptUntil:n['rent_exemption_until'], rentExemptNote:n['rent_exemption_note'], specialNotes:n['special_notes']})}
       </div>
       ${pairKey?`<div style="font-size:11px;color:#A32D2D;background:#FFF3F3;border:1px solid #F5C2C2;border-radius:8px;padding:5px 10px;margin-bottom:6px">⚠️ 동일 회차 짝공고와 <b>중복 신청 시 자동 탈락</b>될 수 있어요. 공고문을 반드시 확인하세요.</div>`:''}
+      <div data-sum-for="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" data-sum-url="${(n['공고URL']||'').replace(/"/g,'&quot;')}"></div>
       <p style="font-size:12px;color:#888;margin-bottom:8px">${dateLine}</p>
       ${detailHTML}
     </div>`;
@@ -1785,6 +1906,9 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
     html += `<button class="more-btn" onclick="noticeShowMore()">더 보기 (${filtered.length - noticeVisibleCount}건 더) ↓</button>`;
   }
   listEl.innerHTML = html;
+  // 캐시에 이미 있는 것은 즉시(깜빡임 없음), 없는 것만 물어보고 도착하면 채운다.
+  zfFillSummarySlots();
+  zfEnsurePriceSummaries(shown.map(n => n['announcement_id'])).then(ok => { if(ok) zfFillSummarySlots(); });
 }
 
 function noticeShowMore(){
@@ -4394,8 +4518,10 @@ function renderMatchResults(rows){
         ${closingSoon?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
         ${demoTags.map(t=>`<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:${t.color};border-color:${t.color}">${t.label}</span>`).join('')}
         ${convBadgesM}
+        ${zfWarnBadges({contractVerify:n.contract_before_verification===true, selectionMethod:n.selection_method, rentExemptUntil:n.rent_exemption_until, rentExemptNote:n.rent_exemption_note, specialNotes:n.special_notes})}
       </div>
       ${pairKeyM?`<div style="font-size:11px;color:#A32D2D;background:#FFF3F3;border:1px solid #F5C2C2;border-radius:8px;padding:5px 10px;margin-bottom:6px">⚠️ 동일 회차 짝공고와 <b>중복 신청 시 자동 탈락</b>될 수 있어요. 공고문을 반드시 확인하세요.</div>`:''}
+      <div data-sum-for="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" data-sum-url="${(n.url||'').replace(/"/g,'&quot;')}"></div>
       <p style="font-size:12px;color:#888;margin-bottom:8px">${dateLine}</p>
       ${detailHTML}
     </div>`;
@@ -4422,6 +4548,8 @@ function renderMatchResults(rows){
   html += `<button class="btn btn-primary" onclick="goMain(4);goStep(3)" style="margin-top:0.5rem">서류 체크리스트 보기 →</button>`;
 
   r.innerHTML = html;
+  zfFillSummarySlots();
+  zfEnsurePriceSummaries(shown.map(n => n.announcement_id)).then(ok => { if(ok) zfFillSummarySlots(); });
 }
 
 async function saveUserProfile(lvl){
