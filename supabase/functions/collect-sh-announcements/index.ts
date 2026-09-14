@@ -101,7 +101,7 @@ type ShRow = {
 
 /** 목록 테이블 한 페이지를 파싱한다.
  *
- *  ⚠️ announcement_id는 반드시 i-sh.co.kr 링크의 seq를 쓴다(아래 상세 주석 참조).
+ *  ⚠️ announcement_id는 반드시 i-sh.co.kr 링크의 seq를 쓴다.
  *  같은 페이지에 있는 `/site/main/sh/publicLease/view?seq=N`의 N은 **그 페이지 안에서의
  *  행 번호(1..10)**일 뿐이라 새 공고가 올라올 때마다 가리키는 공고가 바뀐다. 그걸 식별자로
  *  쓰면 매 수집마다 기존 행의 내용이 다른 공고로 덮어써진다. 게다가 그 링크는 HTML에서
@@ -155,7 +155,7 @@ function mapStatus(shStatus: string): string {
   return '공고중'
 }
 
-// 비모집 공고(당첨자·서류심사·연기·운영기관 안내)와 비주택(상가임대·용지분양)을 가리는 규칙.
+// 비모집 공고(당첨자·서류심사·연기·운영기관 안내·경쟁률 게시)와 비주택(상가임대·용지분양)을 가리는 규칙.
 // 버리지 않고 hidden_from_listing=true로 적재한다 — 수집을 좁히면 되돌릴 수 없고,
 // 향후 발표일 알림 기능에 과거분이 필요하다. RPC의 base CTE가 이 플래그를 걸러낸다.
 const HIDDEN_TYPES = ['상가임대', '용지분양']
@@ -192,10 +192,24 @@ function mapRow(row: ShRow) {
   }
 }
 
+// 🔴 로그 쓰기가 실패해도 수집을 멈추지 않는다 — 부수적인 일이다.
+// supabase-js 는 던지지 않고 { error } 로 돌려주므로 두 축을 모두 삼킨다.
+async function logRun(row: Record<string, unknown>): Promise<void> {
+  try {
+    const { error } = await supabase.from('sh_collection_run_log').insert(row)
+    if (error) console.error(`SH 런 로그 기록 실패: ${error.message}`)
+  } catch (e) {
+    console.error(`SH 런 로그 기록 실패: ${e}`)
+  }
+}
+
 async function collect() {
   const startedAt = Date.now()
   const errors: string[] = []
+  // 목록 페이지 중 200이 아니었거나 예외가 난 수. 0이 아니면 그 런은 「전량을 봤다」고 말할 수 없다.
+  let pagesFailed = 0
 
+  try {
   const first = await fetchText(listUrl(1))
   if (first.status !== 200) throw new Error(`SH 목록 1페이지 status=${first.status}`)
   const firstHtml = pickDecoded(first.utf8, first.euckr).text
@@ -208,9 +222,9 @@ async function collect() {
     await sleep(PAGE_DELAY_MS)
     try {
       const r = await fetchText(listUrl(cp))
-      if (r.status !== 200) { errors.push(`목록 cp=${cp}: status=${r.status}`); continue }
+      if (r.status !== 200) { errors.push(`목록 cp=${cp}: status=${r.status}`); pagesFailed++; continue }
       allRows.push(...parseListPage(pickDecoded(r.utf8, r.euckr).text))
-    } catch (e) { errors.push(`목록 cp=${cp}: ${e}`) }
+    } catch (e) { errors.push(`목록 cp=${cp}: ${e}`); pagesFailed++ }
   }
 
   // 같은 seq가 여러 페이지에 걸쳐 나오면(목록 갱신 중 밀림) 배치 upsert가 통째로 거부되므로
@@ -229,8 +243,9 @@ async function collect() {
     else upserted += data?.length ?? 0
   }
 
-  return {
+  const result = {
     total_pages: totalPages,
+    pages_failed: pagesFailed,
     parsed: allRows.length,
     dedup_merged: dedupMerged,
     upserted,
@@ -238,6 +253,21 @@ async function collect() {
     visible: rows.filter(r => !r.hidden_from_listing).length,
     duration_ms: Date.now() - startedAt,
     errors,
+  }
+  await logRun(result)
+  return result
+
+  } catch (e) {
+    // 🔴 1페이지부터 죽은 런도 남긴다 — 「무엇이 실패했는지 사후에 볼 방법이 없다」가 이 표의 이유다.
+    // ⚠️ 미검출 횟수를 셀 때는 pages_failed > 0 이거나 errors 가 비지 않은 런을 제외한다
+    //    (「안 보였다」와 「못 봤다」를 가르기 위해서다).
+    await logRun({
+      total_pages: null, pages_failed: pagesFailed, parsed: null, dedup_merged: null,
+      upserted: null, hidden: null, visible: null,
+      duration_ms: Date.now() - startedAt,
+      errors: [...errors, String(e)],
+    })
+    throw e
   }
 }
 
