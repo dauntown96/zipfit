@@ -338,6 +338,63 @@ drop table public.usage_events;
 정책·인덱스·시퀀스가 함께 사라진다. 🔴 **`CASCADE`를 붙이지 않는다** — 참조가 생겼으면 실패해야 한다.
 ⚠️ 되돌리면 그때까지 쌓인 로그도 함께 사라진다(백업 덤프 말고는 복구 수단이 없다).
 
+### 2026-09-14 (2차) — `user_profiles.usage_log_consent` 추가 (이용 기록 선택 동의)
+
+이용 기록에 **회원 식별자를 붙여도 되는지**에 대한 선택 동의. 처리방침 「서비스 이용 기록」 절과 짝이다.
+
+**실행**
+
+```sql
+alter table public.user_profiles
+  add column usage_log_consent boolean not null default false;
+```
+
+(`COMMENT` 1건은 생략했다 — Supabase 마이그레이션 `add_usage_log_consent_to_user_profiles`에 전문이 있다.)
+
+#### 🔴 기본값이 `false`인 이유 — 그리고 NULL을 안 쓴 이유
+
+「동의함」을 기본으로 두면 **선택 동의의 뜻이 사라진다.** 선례도 같다 — `marketing_alert`가 `default false`다.
+
+`NULL`을 허용해 「아직 묻지 않았다 / 거절했다 / 동의했다」 셋으로 가르는 방법도 있었고 **쓰지 않았다.**
+동작이 갈리지 않기 때문이다 — 「묻지 않았다」와 「거절했다」는 둘 다 *`user_id`를 붙이지 않는다*로 똑같이 끝난다.
+반면 3상태는 송신 코드에 `NULL`이 참으로 평가되는지를 매번 따지게 만든다.
+🔴 **동의 플래그에서는 애매함을 없애는 쪽이 「물어봤는지」를 기록하는 것보다 값지다.**
+
+`NOT NULL`이라 기존 행도 즉시 `false`로 채워진다(PG11+라 테이블 재작성 없음). 그 값은 실제와도 맞는다 —
+2026-09-14 현재 **아무도 동의한 적이 없고 송신 코드도 없다.**
+
+⚠️ 나중에 「묻지 않았다」를 따로 세야 하면 그때 `NULL`을 허용하면 된다(되돌림이 `ALTER COLUMN DROP NOT NULL` 한 줄).
+
+#### 권한
+
+컬럼 ACL을 따로 만들지 않았다 — `user_profiles`의 테이블 SELECT 권한(`anon=r`·`authenticated=r`)이 그대로 덮고,
+쓰기는 종전대로 `save-user-profile` EF(service_role)만 한다. **불변식 위반은 늘지 않는다**(실측).
+
+#### 🔴 아직 이 컬럼을 바꿀 화면이 없다 — EF가 막고 있다
+
+`save-user-profile`이 **하드코딩 허용목록**(`FIELD_MAP`)으로만 쓰고, `SELECT` 컬럼 목록도 하드코딩이다.
+목록에 없는 키는 `if (key in body)` 루프에서 **조용히 버려지고 EF는 `success: true`를 돌려준다.**
+
+🔴 **그래서 체크박스만 먼저 붙이면 「켜짐 → 저장됐다고 표시 → 새로고침하면 꺼짐」이 된다.**
+동의 기록이 거짓이 되는 형태라 **이 회차에서는 화면을 붙이지 않았다.** 붙이려면 EF에 두 줄이 먼저 들어가야 한다.
+
+```ts
+// ① FIELD_MAP 에
+usageLogConsent: { col: 'usage_log_consent', conv: toBool },
+// ② GET 이 돌려주는 SELECT 컬럼 목록에
+'usage_log_consent',
+```
+
+⚠️ EF 배포는 `CLAUDE.md` 원칙 23의 「되돌리기 어려운 것」이라 확인을 받고 한다.
+
+#### 되돌리기
+
+```sql
+alter table public.user_profiles drop column usage_log_consent;
+```
+
+⚠️ 그때까지 기록된 동의 여부가 함께 사라진다.
+
 ## 함수 본문 변경 이력
 
 권한·DDL과 달리 이쪽은 **파일 diff가 곧 기록**이다. 아래는 그 diff를 어디서 찾는지와
