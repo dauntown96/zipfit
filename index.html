@@ -3190,6 +3190,25 @@ function loadKakao(){
 
 const POI_CATS={subway:{code:'SW8',label:'🚇 지하철'},park:{code:'AT4',label:'🌳 공원'},hospital:{code:'HP8',label:'🏥 병원'},childcare:{code:'PS3',label:'👶 어린이집'},school:{code:'SC4',label:'🏫 학교'},store:{code:'CS2',label:'🏪 편의점'},mart:{code:'MT1',label:'🛒 마트'}};
 
+// 🔴 가진 것 중 가장 정밀한 주소를 고른다.
+//    종전 식은 `[sido, sigungu].filter(Boolean).join(' ') || region` 이었는데,
+//    `||` 는 sido 가 비었을 때만 발화한다 — sigungu_nm 이 NULL 이면 **시·도 한 어절**이
+//    지오코더로 가고, 같은 행의 region 에 들어 있는 상세주소가 통째로 버려졌다.
+//    level 은 핀의 실제 정확도다 — 문구가 이보다 정확한 척하지 않게 하는 데 쓴다.
+//      'detail'  상세주소(읍·면·동 이상)   'sigungu' 시·군·구   'sido' 시·도뿐   '' 아무것도 없음
+function pickRegionAddr(sido, sigungu, region){
+  const t = v => String(v || '').trim();
+  const nWords = v => t(v) ? t(v).split(/\s+/).length : 0;
+  const rg = t(region);
+  if(nWords(rg) >= 3) return { addr: rg, level: 'detail' };     // region 이 전체주소를 담고 있다
+  const sg = [t(sido), t(sigungu)].filter(Boolean).join(' ');
+  if(t(sido) && t(sigungu)) return { addr: sg, level: 'sigungu' };
+  if(nWords(rg) === 2)      return { addr: rg, level: 'sigungu' };
+  if(sg)                    return { addr: sg, level: 'sido' };
+  if(rg)                    return { addr: rg, level: 'sido' };
+  return { addr: '', level: '' };
+}
+
 function toggleDetail(id, card, from){
   const detailEl = document.getElementById(id);
   if(!detailEl) return;
@@ -3219,16 +3238,21 @@ function toggleDetail(id, card, from){
       </div>`;
     detailEl.appendChild(mapWrap);
 
+    // 세대별 정보(housing_units)가 있으면 그 안의 실제 건물 주소가 시/군/구 단위보다 훨씬
+    // 정확하므로, 시군구 지오코딩은 바로 시도하지 않고 세대별 정보 로드를 기다린다.
+    // 세대별 정보가 아예 없는 공고에 한해서만 huRegionFallback을 최후수단으로 쓴다.
+    // 🔴 이 카드의 폴백은 카드를 열 때마다 **반드시 다시 정한다** — 정밀주소가 있어 쓰지
+    //    않는 경우에도 비운다. 안 그러면 같은 인덱스를 재방문할 때 이전 카드의 폴백이 남아,
+    //    자기 주소로 그린 뒤 그것이 뒤늦게 도착해 핀을 딴 지역으로 옮기고 그 위에
+    //    「세부 주소가 없어요」까지 붙는다(2026-09-15 실물 실측: 상학로 36이 있는 공고에
+    //    「전남광주통합특별시」가 한 번 더 나갔다).
+    const fbPick = preciseAddr ? null : pickRegionAddr(sido, sigungu, region);
+    huRegionFallback[id] = (fbPick && fbPick.addr)
+      ? { addr: fbPick.addr, name, approx: fbPick.level !== 'detail', level: fbPick.level }
+      : null;
     if(preciseAddr){
       // precise_address(단지 확정 주소, 건설형 등)는 이미 가장 정확한 정보라 바로 사용
       initMapForHouse({ addr: preciseAddr, name }, id);
-    } else {
-      // 세대별 정보(housing_units)가 있으면 그 안의 실제 건물 주소가 시/군/구 단위보다 훨씬
-      // 정확하므로, 시군구 지오코딩은 바로 시도하지 않고 세대별 정보 로드를 기다린다.
-      // 세대별 정보가 아예 없는 공고에 한해서만 아래 huRegionFallback을 최후수단으로 사용.
-      // 🔴 approx: 이 주소는 시·군·구까지뿐이다 — 핀이 그 중심을 가리킨다.
-      //    ⑤ 역참조표의 「region / sido_nm / sigungu_nm → 지도 Lv3」이 이 경로다.
-      huRegionFallback[id] = { addr: [sido, sigungu].filter(Boolean).join(' ') || region, name, approx: true };
     }
   }
   // 특이사항 안내/자격기준/세대정보/정책안내가 로드 완료 순서와 무관하게 항상 같은 순서로 보이도록
