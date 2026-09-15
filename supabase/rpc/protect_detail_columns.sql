@@ -40,7 +40,13 @@ AS $function$
 --   「0원」과 「모름」이 DB에서 갈리지 않는다. 보호하면 전세형 전환 공고에 낡은 월세가 영구히 남는다.
 --   EF 매핑을 고칠 문제다(백로그).
 -- sido_nm·sigungu_nm — get_announcements_deduped의 best_location이 그룹 단위로 coalesce한다.
--- apply_end·announcement_date·status·title·url — 목록에서 매 런 오므로 NULL이 될 일이 없다.
+-- announcement_date·status·title·url — 목록에서 매 런 오므로 NULL이 될 일이 없다.
+-- apply_end — 🔴 2026-09-15부터 보호한다(위 scdl 블록). 종전 제외 근거(「목록에서 매 런 온다」)는
+--   LH·MYHOME에만 성립하고 SH에는 성립하지 않는다 — collect-sh-announcements의 mapRow가
+--   apply_start과 **같은 줄에서** 리터럴 null을 싣는다(하루 4회, 위 ■ 왜 이것이 필요한가 참조).
+--   apply_start은 그래서 보호에 들어갔는데 apply_end만 빠져 있었다. 지금은 SH의 apply_end가
+--   항상 null이라 지워질 값이 없어 피해가 0이나, SH 접수기간 상세 파싱이 들어오면 새로 채운
+--   마감일이 하루 4회 지워진다. 그래서 파싱보다 먼저 넣는다.
 -- region — 🔴 2026-09-12부터 보호한다(본문 맨 아래). 다른 컬럼과 축이 다르다 —
 --   NULL이 되는 것이 아니라 「덜 정확한 값」으로 덮이므로 coalesce로는 못 막고,
 --   「NEW가 주소형이 아니고 OLD가 주소형이면 OLD 유지」라는 별도 술어를 쓴다.
@@ -59,6 +65,7 @@ BEGIN
   NEW.building_name            := coalesce(NEW.building_name,            OLD.building_name);
   -- scdl(일정) 파생
   NEW.apply_start              := coalesce(NEW.apply_start,              OLD.apply_start);
+  NEW.apply_end                := coalesce(NEW.apply_end,                OLD.apply_end);
   NEW.doc_submit_announce_date := coalesce(NEW.doc_submit_announce_date, OLD.doc_submit_announce_date);
   NEW.doc_submit_start         := coalesce(NEW.doc_submit_start,         OLD.doc_submit_start);
   NEW.doc_submit_end           := coalesce(NEW.doc_submit_end,           OLD.doc_submit_end);
