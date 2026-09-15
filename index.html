@@ -298,8 +298,8 @@ body.theme-dark .zf-footer a{color:#9aa0aa}
     <div id="personalizedList"></div>
   </div>
   <div id="personalizedPrompt" class="rbox warn" style="margin-bottom:1rem;display:none">
-    <p class="rtitle">💡 맞춤 추천을 받으려면?</p>
-    <p class="rdesc">설정 탭에서 이메일로 로그인하고 조건을 저장하면 내 조건에 맞는 공고를 바로 추천해드려요.</p>
+    <p class="rtitle" id="personalizedPromptTitle">💡 맞춤 추천을 받으려면?</p>
+    <p class="rdesc" id="personalizedPromptDesc">설정 탭에서 로그인하고 관심 지역·공급유형을 저장하면 내 조건에 맞는 공고를 바로 추천해드려요.</p>
   </div>
 
   <div class="subtabs">
@@ -768,6 +768,12 @@ body.theme-dark .zf-footer a{color:#9aa0aa}
 let noticeData = [];
 let noticeLoaded = false;   // 필터 칩 초기 로드 여부
 let noticeLoading = false;
+// 🔴 공고 데이터의 확보 상태는 네 갈래다 — 안 불렀다 / 부르는 중 / 불러왔다 / 실패했다.
+//    종전에는 앞의 셋이 전부 noticeLoaded===false 하나로 뭉쳐 있었고, 추천 탭이 그것을
+//    「불러오는 중」으로 그렸다. 첫 화면에서는 부르는 주체가 아예 없어 그 문구가 거짓이었다
+//    (2026-09-15 실측: 20초 뒤에도 noticeLoaded=false, 카드 0장).
+let noticeInit  = false;    // initNoticeFilters()가 도는 중
+let noticeError = false;    // 마지막 확보 시도가 실패했다
 let noticeVisibleCount = 20;
 let noticeFiltered = [];
 
@@ -1023,6 +1029,12 @@ function resetNoticeFilters(){
 
 // ── 필터 칩 목록: 첫 로드 시 region_top·status_normalized 사용 (중복 없음) ──
 async function initNoticeFilters(){
+  // 🔴 중복 가드 — 추천 탭(첫 화면)과 공고 탭이 둘 다 이 입구를 쓴다.
+  //    noticeLoaded 만으로는 모자라다: 로드가 도는 동안에는 아직 false라 탭을 오가면
+  //    같은 질의가 두 번 나간다. 「끝났나」와 「도는 중인가」를 따로 본다.
+  if(noticeLoaded || noticeInit) return;
+  noticeInit  = true;
+  noticeError = false;
   try{
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/rpc/get_announcements_deduped`,
@@ -1043,13 +1055,35 @@ async function initNoticeFilters(){
     noticeLoaded = true;
     loadNoticeData();
   }catch(e){
+    noticeError = true;
     console.error('ZipFit 필터 초기화 실패:', e);
     const statusEl = document.getElementById('notice-status');
     if(statusEl){
       statusEl.className = 'rbox err';
-      statusEl.innerHTML = '<p class="rtitle">⚠️ 공고 데이터를 불러오지 못했어요</p><p class="rdesc">네트워크 연결을 확인하고 다시 시도해주세요.</p><button class="btn btn-sec btn-sm" style="margin-top:8px" onclick="initNoticeFilters()">새로고침</button>';
+      statusEl.innerHTML = '<p class="rtitle">⚠️ 공고 데이터를 불러오지 못했어요</p><p class="rdesc">네트워크 연결을 확인하고 다시 시도해주세요.</p><button class="btn btn-sec btn-sm" style="margin-top:8px" onclick="zfRetryNoticeData()">새로고침</button>';
     }
+  }finally{
+    noticeInit = false;
+    // 여기서 loadNoticeData()까지 간 경우는 그쪽 finally가 추천을 다시 그린다.
+    // 못 간 경우(위 catch)만 여기서 그린다 — 안 그리면 추천 탭이 로딩 문구에 갇힌다.
+    if(noticeError) zfRerenderRecIfVisible();
   }
+}
+
+// 🔴 로드가 끝난 뒤 추천 탭을 다시 그린다 — 성공·실패 양쪽 다.
+//    로드는 비동기라 시작만 걸어두면 문구만 남고 카드가 영영 안 나온다.
+//    zfApplySession()이 main4를 다루는 방식과 같은 관용이다.
+function zfRerenderRecIfVisible(){
+  const rec = document.getElementById('main1');
+  if(rec && !rec.classList.contains('hidden')) renderPersonalizedRecommendations();
+}
+
+// 실패 뒤 다시 시도. 어느 단계에서 깨졌는지에 따라 부를 곳이 다르다 —
+// 필터 칩조차 못 만들었으면 initNoticeFilters(), 목록만 실패했으면 loadNoticeData().
+function zfRetryNoticeData(){
+  noticeError = false;
+  if(noticeLoaded) loadNoticeData(); else initNoticeFilters();
+  zfRerenderRecIfVisible();
 }
 
 function buildNoticeFilterChips(){
@@ -1332,14 +1366,17 @@ async function loadNoticeData(){
       'has_cancel_notice': r.has_cancel_notice===true,
     }));
 
+    noticeError = false;
     applyNoticeFiltersAndRender();
     updateFilterToggleBtn();
   }catch(err){
+    noticeError = true;
     statusEl.className = 'rbox err';
-    statusEl.innerHTML = '<p class="rtitle">⚠️ 공고 데이터를 불러오지 못했어요</p><p class="rdesc">잠시 후 다시 시도해주세요.</p><button class="btn btn-sec btn-sm" style="margin-top:8px" onclick="loadNoticeData()">새로고침</button>';
+    statusEl.innerHTML = '<p class="rtitle">⚠️ 공고 데이터를 불러오지 못했어요</p><p class="rdesc">잠시 후 다시 시도해주세요.</p><button class="btn btn-sec btn-sm" style="margin-top:8px" onclick="zfRetryNoticeData()">새로고침</button>';
     console.error('ZipFit 공고 로드 실패:', err);
   }finally{
     noticeLoading = false;
+    zfRerenderRecIfVisible();
   }
 }
 
@@ -2105,6 +2142,26 @@ function renderChipState(wrapId,selSet){
   });
 }
 
+// 추천 탭 안내 박스의 세 상태 중 둘. 셋째(로그인 + 조건 저장)는 안내를 감춘다.
+// 🔴 문구에 「이메일로」를 박지 않는다 — 카카오가 실제 기본 경로이고, 카카오는 이메일을
+//    주지 않아(hasEmail=false) 그 사용자에게 없는 수단을 안내하게 된다(2026-09-15 실측).
+const ZF_REC_PROMPT = {
+  guest:  {title:'💡 맞춤 추천을 받으려면?',
+           desc :'설정 탭에서 로그인하고 관심 지역·공급유형을 저장하면 내 조건에 맞는 공고를 바로 추천해드려요.'},
+  noCond: {title:'💡 조건을 저장하면 더 정확해져요',
+           desc :'설정 탭에서 관심 지역·공급유형을 저장하면 그 조건에 맞는 공고만 골라 보여드려요.'}
+};
+// kind 가 null 이면 감춘다(= 로그인 + 조건 저장).
+function zfSetRecPrompt(kind){
+  const box=document.getElementById('personalizedPrompt');
+  if(!box) return;
+  if(!kind){ box.style.display='none'; return; }
+  const t=ZF_REC_PROMPT[kind];
+  document.getElementById('personalizedPromptTitle').textContent=t.title;
+  document.getElementById('personalizedPromptDesc').textContent =t.desc;
+  box.style.display='block';
+}
+
 function renderPersonalizedRecommendations(){
   const panel=document.getElementById('personalizedPanel');
   const prompt=document.getElementById('personalizedPrompt');
@@ -2112,7 +2169,7 @@ function renderPersonalizedRecommendations(){
 
   if(!currentUser){
     panel.style.display='none';
-    prompt.style.display='block';
+    zfSetRecPrompt('guest');
     return;
   }
 
@@ -2120,11 +2177,30 @@ function renderPersonalizedRecommendations(){
   const savedTypes=Array.isArray(currentUser.types)?currentUser.types:(typeof currentUser.types==='string'?currentUser.types.split(',').filter(Boolean):[]);
   const hasConditions=savedRegions.length||savedTypes.length;
 
-  prompt.style.display='none';
+  zfSetRecPrompt(hasConditions ? null : 'noCond');
   panel.style.display='block';
 
   if(!noticeLoaded || !noticeData.length){
-    document.getElementById('personalizedList').innerHTML='<div class="rbox warn"><p class="rtitle">⏳ 공고 데이터를 불러오는 중이에요</p></div>';
+    // 🔴 「불러오는 중」은 실제로 부르고 있을 때만 쓴다. 종전에는 이 한 문구가
+    //    「안 불렀다」·「0건」·「실패」를 전부 덮었고, 첫 화면에서는 부르는 주체조차
+    //    없어 거짓 상태였다. 네 갈래를 가르되 화면에는 셋만 보인다.
+    let box;
+    if(noticeLoading || noticeInit){
+      box='<div class="rbox warn"><p class="rtitle">⏳ 공고 데이터를 불러오는 중이에요</p></div>';
+    }else if(noticeError){
+      box='<div class="rbox err"><p class="rtitle">⚠️ 공고 데이터를 불러오지 못했어요</p>'
+         +'<p class="rdesc">네트워크 연결을 확인하고 다시 시도해주세요.</p>'
+         +'<button class="btn btn-sec btn-sm" style="margin-top:8px" onclick="zfRetryNoticeData()">다시 시도</button></div>';
+    }else if(noticeLoaded){
+      box='<div class="rbox warn"><p class="rtitle">표시할 공고가 없어요</p>'
+         +'<p class="rdesc">지금 올라온 공고가 없어요. 잠시 뒤 다시 확인해주세요.</p></div>';
+    }else{
+      // 🔴 아무도 안 불렀다 — 여기가 첫 화면 영구 로딩의 자리였다.
+      //    중복 가드는 initNoticeFilters() 안에 있으므로 여기서 또 재지 않는다.
+      initNoticeFilters();
+      box='<div class="rbox warn"><p class="rtitle">⏳ 공고 데이터를 불러오는 중이에요</p></div>';
+    }
+    document.getElementById('personalizedList').innerHTML=box;
     document.getElementById('personalizedDesc').textContent='';
     return;
   }
@@ -2142,7 +2218,8 @@ function renderPersonalizedRecommendations(){
   const desc=document.getElementById('personalizedDesc');
   if(!hasConditions){
     filtered=noticeData.filter(n=>!isHiddenAsClosed(n)).slice(0,5);
-    desc.textContent='저장된 조건이 없어 전체 공고를 표시해요. 설정 탭에서 조건을 저장하면 맞춤 추천을 받을 수 있어요.';
+    // 조건 저장 안내는 위 안내 박스(noCond)가 맡는다 — 여기서 되풀이하지 않는다.
+    desc.textContent='저장된 조건이 없어 전체 공고를 표시해요.';
   } else {
     desc.textContent=`저장된 조건 기준 ${filtered.length}건 매칭됐어요.`;
   }
@@ -5216,6 +5293,15 @@ async function logoutUser(){
   document.getElementById('loginEmail').value='';
   zfAuthMsg('');
 }
+
+// ===== 첫 화면 부트스트랩 =====
+// 🔴 앱은 추천 탭에서 시작하는데 goMain()은 탭을 눌러야 돈다 — 즉 첫 화면에서는
+//    공고 데이터를 부르는 주체가 아무도 없었다. 그래서 추천 탭이 영구 로딩이었고
+//    (2026-09-15 실측: 20초 뒤에도 카드 0장), 공고 탭을 한 번 들렀다 와야 나왔다.
+//    여기서 확보를 시작한다. 끝나면 loadNoticeData()의 finally 가 추천을 다시 그리고,
+//    그 한 번이 비로그인 안내 박스까지 함께 띄운다(종전에는 그것도 안 그려졌다).
+// 🔵 중복 가드는 initNoticeFilters() 안에 있으므로 공고 탭이 또 부르지 않는다.
+initNoticeFilters();
 </script>
 
 <!-- 사진·평면도·팸플릿 인앱 뷰어 (모든 카드가 공유하는 단일 모달) -->
