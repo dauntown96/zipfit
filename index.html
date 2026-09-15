@@ -266,6 +266,8 @@ body.theme-dark .hu-past-title{color:#cfcfcf}
 .poi-item{display:flex;justify-content:space-between;font-size:12px;color:#444;padding:6px 8px;background:#f8f8f4;border-radius:6px}
 .poi-dist{color:#999;font-size:11px}
 .poi-loading{font-size:12px;color:#999;padding:8px;text-align:center}
+/* 추정 핀 안내. 색은 기존 .warn 토큰(#FAEEDA/#FAC775/#854F0B) 그대로 — 새 색을 만들지 않는다 */
+.map-approx{font-size:12px;line-height:1.55;color:#854F0B;background:#FAEEDA;border:1px solid #FAC775;border-radius:8px;padding:7px 10px;margin-top:6px}
 .zf-footer{margin-top:1.5rem;padding-top:1rem;border-top:1px solid #e8e8e0;text-align:center}
 .zf-footer a{font-size:12px;color:#888;text-decoration:none}
 body.theme-dark .zf-footer{border-top-color:#2c2f38}
@@ -2383,10 +2385,16 @@ function renderInsight(rows, wrap, statsRows){
   const regionMap = {};
   regionRows.forEach(r=>{
     const k = r.sido_nm||r.region||'기타';
-    if(!regionMap[k]) regionMap[k]={cnt:0,units:0,hasUnits:false};
+    if(!regionMap[k]) regionMap[k]={cnt:0,units:0,hasUnits:false,withUnits:0};
     regionMap[k].cnt++;
-    if(r.total_units){ regionMap[k].units += Number(r.total_units)||0; regionMap[k].hasUnits=true; }
+    // 🔵 withUnits = 세대수가 실제로 집계에 들어간 공고 수. 분모는 cnt 와 같은 regionRows 다.
+    if(r.total_units){ regionMap[k].units += Number(r.total_units)||0; regionMap[k].hasUnits=true; regionMap[k].withUnits++; }
   });
+  // 🔴 세대수 합이 「그 지역 전부」인 척하지 않는다 — 일부만 집계된 지역에는 몇 건인지 적는다.
+  //    집계율 0%는 이미 「세대수 정보 없음」으로 뜨고(PR #28), 100%는 안 붙인다 —
+  //    전부에 붙이면 소음이 되어 정작 부분집계인 지역이 묻힌다.
+  const regionUnitsNote = v => (v.withUnits > 0 && v.withUnits < v.cnt)
+    ? ` <span style="color:#bbb">(${v.withUnits}건 집계)</span>` : '';
   const REGION_HEAD = 10;
   const regionAll = Object.entries(regionMap).sort((a,b)=>b[1].cnt-a[1].cnt);
   const regionTop = regionAll.slice(0, REGION_HEAD);
@@ -2398,7 +2406,7 @@ function renderInsight(rows, wrap, statsRows){
           <div>
             <div style="display:flex;justify-content:space-between;font-size:12px;color:#555;margin-bottom:4px">
               <span style="font-weight:600">${region}</span>
-              <span style="color:#888">${v.cnt}건${v.hasUnits?' · '+v.units.toLocaleString()+'세대':' · <span style="color:#bbb">세대수 정보 없음</span>'}</span>
+              <span style="color:#888">${v.cnt}건${v.hasUnits?' · '+v.units.toLocaleString()+'세대'+regionUnitsNote(v):' · <span style="color:#bbb">세대수 정보 없음</span>'}</span>
             </div>
             <div style="display:flex;flex-direction:column;gap:3px">
               <div style="background:#eee;border-radius:4px;height:8px;overflow:hidden">
@@ -3218,7 +3226,9 @@ function toggleDetail(id, card, from){
       // 세대별 정보(housing_units)가 있으면 그 안의 실제 건물 주소가 시/군/구 단위보다 훨씬
       // 정확하므로, 시군구 지오코딩은 바로 시도하지 않고 세대별 정보 로드를 기다린다.
       // 세대별 정보가 아예 없는 공고에 한해서만 아래 huRegionFallback을 최후수단으로 사용.
-      huRegionFallback[id] = { addr: [sido, sigungu].filter(Boolean).join(' ') || region, name };
+      // 🔴 approx: 이 주소는 시·군·구까지뿐이다 — 핀이 그 중심을 가리킨다.
+      //    ⑤ 역참조표의 「region / sido_nm / sigungu_nm → 지도 Lv3」이 이 경로다.
+      huRegionFallback[id] = { addr: [sido, sigungu].filter(Boolean).join(' ') || region, name, approx: true };
     }
   }
   // 특이사항 안내/자격기준/세대정보/정책안내가 로드 완료 순서와 무관하게 항상 같은 순서로 보이도록
@@ -3287,11 +3297,31 @@ function prettifyEligKey(k){
 
 // verification_requirements의 값을 재귀 렌더링 — 숫자는 만원 단위, 중첩 객체는 들여쓴 하위 목록으로 변환해
 // raw JSON 문자열이 그대로 노출되지 않도록 한다.
+// 🔴 `(v/10000).toLocaleString()`은 조용히 반올림한다 — toLocaleString의 기본
+//    maximumFractionDigits가 3이라 넷째 자리부터 사라진다(4,576,036 → 「457.604만원」 →
+//    역산하면 4,576,040). 반올림하도록 짠 것이 아니라 기본값을 그대로 쓴 결과였다.
+//    ⓐ 만원으로 떨어지면 종전 표기를 그대로 둔다(39,600만원).
+//    ⓑ 끝자리가 있을 때만 「N만 M원」으로 쪼갠다 — 원 단위로 통째 적으면
+//       1,035,000,000원처럼 읽기 어렵고, 「억 N만원」 합성은 이미 fmtEok가 쓰는 관용이다.
+//    어느 쪽이든 화면 값을 원 단위로 역산하면 원문 값과 정확히 같다.
+function manwonText(v){
+  const n = Number(v);
+  if(!isFinite(n)) return String(v);
+  if(!Number.isInteger(n)) return n.toLocaleString(undefined, {maximumFractionDigits: 20}) + '원';
+  const sign = n < 0 ? '-' : '';
+  const abs  = Math.abs(n);
+  const rest = abs % 10000;
+  if(rest === 0) return sign + (abs / 10000).toLocaleString() + '만원';
+  const man = Math.floor(abs / 10000);
+  return man ? `${sign}${man.toLocaleString()}만 ${rest.toLocaleString()}원`
+             : `${sign}${rest.toLocaleString()}원`;
+}
+
 function renderEligValue(v){
   if(v === null || v === undefined) return '<span></span>';
-  if(typeof v === 'number') return `<span>${(v/10000).toLocaleString()}만원</span>`;
+  if(typeof v === 'number') return `<span>${manwonText(v)}</span>`;
   if(typeof v === 'string') return `<span>${escapeHtml(v)}</span>`;
-  if(Array.isArray(v)) return `<span>${v.map(x => typeof x==='number' ? (x/10000).toLocaleString()+'만원' : escapeHtml(String(x))).join(', ')}</span>`;
+  if(Array.isArray(v)) return `<span>${v.map(x => typeof x==='number' ? manwonText(x) : escapeHtml(String(x))).join(', ')}</span>`;
   if(typeof v === 'object'){
     return `<div class="elig-subrows">` + Object.entries(v).map(([k,vv]) =>
       `<div class="elig-subrow"><span>${escapeHtml(prettifyEligKey(k))}</span>${renderEligValue(vv)}</div>`
@@ -4433,7 +4463,10 @@ function toGeocodeAddress(addr){
 }
 
 function initMapForHouse(h,id){
-  const renderMap = (result) => {
+  // 🔵 approx = 「이 핀은 시·군·구 중심이다」. 두 갈래에서 참이 된다 —
+  //    ① 호출자가 넘긴 주소 자체가 시도+시군구뿐일 때(huRegionFallback)
+  //    ② 전체주소·도로명 지오코딩이 다 실패해 tryLevel3로 떨어졌을 때
+  const renderMap = (result, approx) => {
     const mapEl = document.getElementById('map-'+id);
     if(!mapEl) return;
     const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
@@ -4444,10 +4477,16 @@ function initMapForHouse(h,id){
       state.map.setCenter(coords);
       state.marker.setPosition(coords);
     } else {
+      // 🔴 카카오 지도는 컨테이너에 타일을 **덧붙인다** — 기존 자식을 지우지 않는다.
+      //    그래서 「📍 지도를 불러오는 중...」 자리표시자가 타일 뒤에 그대로 남아,
+      //    지도가 다 그려진 뒤에도 보이는 채였다(2026-09-15 실측: 타일 7장 + 자리표시자 33px).
+      //    지우는 책임이 어디에도 없었다 — 실패 경로만 innerHTML로 덮어쓰고 있었다.
+      mapEl.innerHTML = '';
       const map = new kakao.maps.Map(mapEl, {center:coords, level:5});
       const marker = new kakao.maps.Marker({position:coords, map});
       huMapState[id] = { map, marker };
     }
+    setMapApproxNote(mapEl, approx);
     buildPoiTabs(id, coords);
   };
   loadKakao().then(()=>{
@@ -4469,7 +4508,7 @@ function initMapForHouse(h,id){
       geocoder.addressSearch(fallback, (r3, s3) => {
         console.warn('[ZipFit geocode] Lv3(시군구) 시도:', fallback, '결과:', s3);
         if(s3 === kakao.maps.services.Status.OK && r3.length){
-          renderMap(r3);
+          renderMap(r3, true);   // Lv3 = 시군구 중심. 추정이다.
         } else if(!huMapState[id]){
           const mapEl = document.getElementById('map-'+id);
           if(mapEl) mapEl.innerHTML = '<p style="text-align:center;padding:80px 0;color:#999;font-size:13px">📍 주소 위치를 찾을 수 없어요</p>';
@@ -4486,7 +4525,7 @@ function initMapForHouse(h,id){
       geocoder.addressSearch(roadAddr, (r2, s2) => {
         console.warn('[ZipFit geocode] Lv2(도로명 정제) 시도:', roadAddr, '결과:', s2);
         if(s2 === kakao.maps.services.Status.OK && r2.length){
-          renderMap(r2);
+          renderMap(r2, !!h.approx);
         } else {
           tryLevel3();
         }
@@ -4496,7 +4535,7 @@ function initMapForHouse(h,id){
     geocoder.addressSearch(lv1Addr, (result, status) => {
       console.warn('[ZipFit geocode] Lv1(전체주소) 시도:', lv1Addr, '결과:', status);
       if(status === kakao.maps.services.Status.OK && result.length){
-        renderMap(result);
+        renderMap(result, !!h.approx);
       } else {
         tryLevel2();
       }
@@ -4506,6 +4545,24 @@ function initMapForHouse(h,id){
     if(mapEl) mapEl.innerHTML = '<p style="text-align:center;padding:80px 0;color:#999;font-size:13px">📍 지도를 불러올 수 없어요</p>';
     console.error('ZipFit 지도 로드 실패:', err);
   });
+}
+
+// 🔴 핀이 시·군·구 중심일 때만 그 사실을 적는다. 정확한 주소로 찍힌 핀에는 붙이지 않는다
+//    — 전부에 붙이면 소음이 되고, 「대략」이라는 말이 아무 뜻도 없게 된다.
+//    고치는 일이 아니라 적는 일이다: 지오코딩·좌표 계산은 건드리지 않았다.
+function setMapApproxNote(mapEl, approx){
+  if(!mapEl) return;
+  let note = mapEl.nextElementSibling;
+  const has = note && note.classList && note.classList.contains('map-approx');
+  if(!has){
+    if(!approx) return;              // 지울 것이 없으면 만들지 않는다
+    note = document.createElement('p');
+    note.className = 'map-approx';
+    note.textContent = '📍 대략의 위치예요 — 공고에 세부 주소가 없어 시·군·구 중심을 표시했어요. 정확한 위치는 공고 원문에서 확인하세요.';
+    mapEl.insertAdjacentElement('afterend', note);
+    return;
+  }
+  note.hidden = !approx;             // 같은 지도를 다시 쓸 때(건물 클릭) 되돌아간다
 }
 
 function buildPoiTabs(id,coords){
