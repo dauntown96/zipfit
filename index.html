@@ -4472,8 +4472,15 @@ function initMapForHouse(h,id){
     const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
     const state = huMapState[id];
     // 지도는 처음 한 번만 생성하고, 이후 건물 클릭 시에는 기존 지도/마커를 그 위치로 옮겨서
-    // 항상 마커가 1개만 유지되도록 함
-    if(state && state.map && state.marker){
+    // 항상 마커가 1개만 유지되도록 함.
+    // 🔴 단, 「그 지도가 지금 이 상자에 들어 있을 때」만 그렇다.
+    //    huMapState 의 키는 카드 id(`ncard-detail-{인덱스}`)인데 그 인덱스는 renderNoticeList()가
+    //    목록을 다시 그릴 때마다 **다른 공고에 재배정**된다. 그러면 캐시에는 이전 공고의 지도가
+    //    남아 있고 상자만 새 것이라, 이미 DOM에서 떨어진 지도에 setCenter 만 하고 끝났다.
+    //    → 새 상자에는 「📍 지도를 불러오는 중...」만 남는다(2026-09-15 실측: 기준값 7 / 비교값 0).
+    //    원소 동일성으로 가른다 — 같은 카드 안의 건물·블록 클릭은 상자가 그대로라 재사용이 살아 있고,
+    //    목록이 다시 그려진 뒤에는 상자가 다른 노드라 새로 만든다.
+    if(state && state.map && state.marker && state.el === mapEl){
       state.map.setCenter(coords);
       state.marker.setPosition(coords);
     } else {
@@ -4484,7 +4491,7 @@ function initMapForHouse(h,id){
       mapEl.innerHTML = '';
       const map = new kakao.maps.Map(mapEl, {center:coords, level:5});
       const marker = new kakao.maps.Marker({position:coords, map});
-      huMapState[id] = { map, marker };
+      huMapState[id] = { map, marker, el: mapEl };   // 🔵 어느 상자에 들어 있는지까지 기억한다
     }
     setMapApproxNote(mapEl, approx);
     buildPoiTabs(id, coords);
