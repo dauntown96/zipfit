@@ -4,7 +4,15 @@
 <meta charset="UTF-8">
 <link rel="icon" href="data:,">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ZipFit — LH 신혼·신생아 매입임대 맞춤 매칭</title>
+<title>ZipFit — 집 공고, 핏하게 골라보기</title>
+<meta name="description" content="전국 공공임대주택 공고를 한곳에서 보고, 내 조건으로 자격진단까지. LH·마이홈·SH 공고를 모아 보여줍니다.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="ZipFit">
+<meta property="og:title" content="ZipFit — 집 공고, 핏하게 골라보기">
+<meta property="og:description" content="전국 공공임대주택 공고를 한곳에서 보고, 내 조건으로 자격진단까지. LH·마이홈·SH 공고를 모아 보여줍니다.">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="ZipFit — 집 공고, 핏하게 골라보기">
+<meta name="twitter:description" content="전국 공공임대주택 공고를 한곳에서 보고, 내 조건으로 자격진단까지. LH·마이홈·SH 공고를 모아 보여줍니다.">
 <link rel="manifest" href="/zipfit/manifest.json">
 <meta name="theme-color" content="#1D9E75">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -487,10 +495,10 @@ body.theme-dark .zf-footer a{color:#9aa0aa}
         <option value="date-desc">최신 공고순</option>
         <option value="end-asc">마감 임박순</option>
         <option value="start-asc">접수 시작순</option>
-        <option value="units-desc">세대수 많은순</option>
+        <option value="units-desc">단지 규모 큰순</option>
         <option value="deposit-asc">보증금 낮은순</option>
         <option value="rent-asc">월임대료 낮은순</option>
-        <option value="area-desc">면적 넓은순</option>
+        <option value="area-desc">단지 면적 넓은순</option>
         <option value="region-asc">지역명순</option>
         <option value="org-asc">공급기관순</option>
         <option value="revised-first">정정공고 우선</option>
@@ -563,10 +571,10 @@ body.theme-dark .zf-footer a{color:#9aa0aa}
         <option value="date-desc">최신 공고순</option>
         <option value="end-asc">마감 임박순</option>
         <option value="start-asc">접수 시작순</option>
-        <option value="units-desc">세대수 많은순</option>
+        <option value="units-desc">단지 규모 큰순</option>
         <option value="deposit-asc">보증금 낮은순</option>
         <option value="rent-asc">월임대료 낮은순</option>
-        <option value="area-desc">면적 넓은순</option>
+        <option value="area-desc">단지 면적 넓은순</option>
         <option value="region-asc">지역명순</option>
         <option value="org-asc">공급기관순</option>
         <option value="revised-first">정정공고 우선</option>
@@ -1003,6 +1011,19 @@ function applyWindowRank(row){
 //    `noticeData` 매핑이 빈 날짜를 null 이 아니라 **빈 문자열**로 채우기 때문에 `va == null` 만으로는
 //    발화하지 않는다. 빈 문자열은 오름차순에서 가장 작은 값이라 그냥 두면 맨 앞에 선다.
 //    🔵 공고 탭과 추천 탭이 **같은 함수**를 부른다 — 정렬 방식은 양쪽 다 바꾸지 않았고 빈 값 자리만 고쳤다.
+// 🔴 수치 정렬 키 — `v ? Number(v) : null` 을 쓰지 않는다(2026-09-16).
+//    그 꼴은 **진짜 0을 모름으로 바꾼다**: 월세 0원(월세 없는 전세형)이 「모름」과 한 덩어리가 되어
+//    「월임대료 낮은순」 맨 뒤로 밀린다. 가장 싼 것이 맨 뒤에 서는 것이다.
+//    🔵 2026-09-16 실측으로는 네 축(deposit_min·rent_min·area_max·total_units) 전부 0이 **0건**이라
+//       지금 화면은 달라지지 않는다. 그래도 고친다 — 값이 들어오는 날 조용히 틀리는 자리다.
+//    구분하는 것은 셋뿐이다: null·undefined·빈 문자열만 모름이고, 0 은 값이다.
+//    숫자로 읽히지 않는 값(NaN)도 모름으로 둔다 — 정렬에 넣으면 비교가 전부 거짓이 된다.
+function zfNumOrNull(v){
+  if(v === null || v === undefined || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 function zfNullLast(a, b, fn, desc){
   const norm = v => (v === null || v === undefined || v === '') ? null : v;
   const va = norm(fn(a)), vb = norm(fn(b));
@@ -1456,7 +1477,8 @@ function showClosedNotices(){
   applyNoticeFiltersAndRender();
 }
 
-function applyNoticeFiltersAndRender(){
+// keepPage — 재질의 경로만 넘긴다. 그 밖에는 언제나 1쪽이다(위 관문 주석 참조).
+function applyNoticeFiltersAndRender(keepPage){
   const hideClosed = document.getElementById('hideClosedChk')?.checked;
   // status 칩을 직접 고른 경우엔 칩이 우선이라 마감 숨기기가 개입하지 않는다.
   const closedHidden = !!hideClosed && !activeNoticeStatus;
@@ -1490,10 +1512,11 @@ function applyNoticeFiltersAndRender(){
       if(ga !== gb) return ga - gb;
       return nullLast(a,b,n=>n['apply_start'],false);
     }
-    if(sortVal==='units-desc')    return nullLast(a,b,n=>n['total_units']?Number(n['total_units']):null,true);
-    if(sortVal==='deposit-asc')   return nullLast(a,b,n=>n['deposit_min']?Number(n['deposit_min']):null,false);
-    if(sortVal==='rent-asc')      return nullLast(a,b,n=>n['rent_min']?Number(n['rent_min']):null,false);
-    if(sortVal==='area-desc')     return nullLast(a,b,n=>n['area_max']?Number(n['area_max']):null,true);
+    // 🔴 네 수치 정렬은 zfNumOrNull 한 벌을 쓴다 — 0 은 값이고 빈 값만 모름이다(2026-09-16).
+    if(sortVal==='units-desc')    return nullLast(a,b,n=>zfNumOrNull(n['total_units']),true);
+    if(sortVal==='deposit-asc')   return nullLast(a,b,n=>zfNumOrNull(n['deposit_min']),false);
+    if(sortVal==='rent-asc')      return nullLast(a,b,n=>zfNumOrNull(n['rent_min']),false);
+    if(sortVal==='area-desc')     return nullLast(a,b,n=>zfNumOrNull(n['area_max']),true);
     if(sortVal==='region-asc'){
       const regionA = (a['sido_nm']||a['지역']||'') + ' ' + (a['sigungu_nm']||'');
       const regionB = (b['sido_nm']||b['지역']||'') + ' ' + (b['sigungu_nm']||'');
@@ -1507,6 +1530,12 @@ function applyNoticeFiltersAndRender(){
   noticeFiltered = filtered;
   // 🔴 필터·칩·정렬·검색이 바뀌면 언제나 1쪽으로 간다 — 이 함수가 그 넷의 공통 관문이다.
   noticePage = 1;
+  // 🔴 재질의(10분 경과 후 탭 재진입)만은 예외다(2026-09-16). 그것은 **사용자가 무언가를 바꾼 것이
+  //    아니라** 우리가 데이터를 새로 받아온 것이라, 보던 쪽을 빼앗을 이유가 없다.
+  //    ⚠️ 관문을 우회하지 않는다 — 위 한 줄은 그대로 돌고, 여기서 넘겨받은 쪽으로 되돌릴 뿐이다.
+  //    그래서 필터·칩·정렬·검색 경로는 keepPage 를 넘기지 않아 종전과 똑같이 1쪽으로 간다.
+  //    그 쪽이 없어졌으면(데이터가 줄었으면) renderNoticeList 의 pageCount 클램프가 마지막 쪽으로 민다.
+  if(keepPage && keepPage > 1) noticePage = keepPage;
   const hiddenClosedCount = (!filtered.length && closedHidden)
     ? applyNoticeSubFilters(noticeData).length : 0;
   renderNoticeList(filtered, noticeData.length, hiddenClosedCount);
@@ -1589,7 +1618,8 @@ function zfMapNoticeRows(rows){
 }
 
 // ── 핵심: 필터 변경 시 RPC 재호출 ──
-async function loadNoticeData(){
+// keepPage — 재질의 뒤 되돌릴 쪽 번호. 안 넘기면 종전대로 1쪽이다.
+async function loadNoticeData(keepPage){
   noticeLoading = true;
   const statusEl = document.getElementById('notice-status');
   const listEl   = document.getElementById('notice-list');
@@ -1626,7 +1656,7 @@ async function loadNoticeData(){
     noticeData = zfMapNoticeRows(rows);
 
     noticeError = false;
-    applyNoticeFiltersAndRender();
+    applyNoticeFiltersAndRender(keepPage);
     updateFilterToggleBtn();
   }catch(err){
     noticeError = true;
@@ -2239,9 +2269,9 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
     if(n['area_min']){
       const areaStr = parseFloat(n['area_min']).toFixed(1) + '㎡' +
         (n['area_max']&&n['area_max']!==n['area_min'] ? ' ~ '+parseFloat(n['area_max']).toFixed(1)+'㎡' : '');
-      detailRows.push(['전용면적', areaStr]);
+      detailRows.push(['단지 전용면적', areaStr]);
     }
-    if(n['total_units']) detailRows.push(['총 세대수', n['total_units']+'세대']);
+    if(n['total_units']) detailRows.push(['단지 규모', n['total_units']+'세대']);
     if(n['move_in_date']) detailRows.push(moveInRow(n['move_in_date']));
     if(n['deposit_min']) detailRows.push(['보증금', Number(n['deposit_min']).toLocaleString()+'원']);
     if(n['rent_min']) detailRows.push(['월임대료', Number(n['rent_min']).toLocaleString()+'원']);
@@ -2277,7 +2307,13 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
         <p class="hname">${normalizeRevisedTitle(n['공고명'])||'(공고명 없음)'}</p>
         <span class="htag ${isClosed?'tag-mix':'tag-apt'}">${n['처리상태']||'-'}</span>
       </div>
-      <p class="haddr">${zfCoverPlace(n['region_names'], n['block_count'], n['sido_nm'], n['sigungu_nm'], n['지역'])} · ${classifyNoticeType(n['공급유형'],n['공고명'])} · ${n['공급유형']||''}</p>
+      <!-- 🔴 유형은 **한 번만** 적는다(2026-09-16). 종전에는 classifyNoticeType() 결과와 housing_type
+           원문이 나란히 붙어 「국민임대 · 임대주택 - 국민임대」처럼 같은 말이 두 번 나왔다.
+           남긴 쪽은 **원문(housing_type)** 이다 — 분류값은 878건 중 324건에서 다른 말이 되고,
+           그중 49건은 「기타」로 뭉개져 「도시형생활주택」 같은 실재하는 이름을 잃는다.
+           🔵 추천 탭·저장 목록이 이미 원문 한 벌만 쓰고 있어, 여섯 자리가 한 어휘로 모인다.
+           🔴 classifyNoticeType 은 유형 칩·설정 매칭에서 그대로 쓴다 — 바꾼 것은 표시 문자열뿐이다. -->
+      <p class="haddr">${zfCoverPlace(n['region_names'], n['block_count'], n['sido_nm'], n['sigungu_nm'], n['지역'])} · ${n['공급유형']||''}</p>
       <div class="chip-row" style="margin:8px 0;gap:5px">
         ${hasCancel?cancelNoticeBadge(n['공고명']||''):''}
         ${n['building_name']?`<span class="chip" style="cursor:default;padding:4px 10px;font-size:11px">🏢 ${zfBuildingLabel(n['building_name'], n['block_count'])}</span>`:''}
@@ -2604,7 +2640,8 @@ function goMain(n){
   }
   if(n===1) renderPersonalizedRecommendations();
   if(n===2 && !noticeLoaded) initNoticeFilters();
-  else if(n===2 && (Date.now() - noticeLoadedAt) >= NOTICE_REFETCH_MS) loadNoticeData();
+  // 🔵 보던 쪽을 들려 보낸다 — 재질의가 3쪽을 1쪽으로 되돌리던 것을 막는다(2026-09-16).
+  else if(n===2 && (Date.now() - noticeLoadedAt) >= NOTICE_REFETCH_MS) loadNoticeData(noticePage);
   if(n===3) loadInsightData();
   if(n===4) zfRenderSavedTab();
   if(n===5) renderSettingsGate();
@@ -2648,7 +2685,7 @@ async function loadInsightData(){
 }
 
 // 지역 행 하나. 접힌 부분과 펼친 부분이 같은 모양이어야 해 함수로 뺐다.
-// regionMaxCnt·regionMaxUnits는 renderInsight의 지역 스코프에서 읽는다.
+// regionMaxCnt는 renderInsight의 지역 스코프에서 읽는다(regionMaxUnits는 2026-09-16에 걷었다).
 function toggleRegionRest(btn){
   const el = document.getElementById('regionRest');
   if(!el) return;
@@ -2710,36 +2747,29 @@ function renderInsight(rows, wrap, statsRows){
   const regionMap = {};
   regionRows.forEach(r=>{
     const k = r.sido_nm||r.region||'기타';
-    if(!regionMap[k]) regionMap[k]={cnt:0,units:0,hasUnits:false,withUnits:0};
+    if(!regionMap[k]) regionMap[k]={cnt:0};
     regionMap[k].cnt++;
-    // 🔵 withUnits = 세대수가 실제로 집계에 들어간 공고 수. 분모는 cnt 와 같은 regionRows 다.
-    if(r.total_units){ regionMap[k].units += Number(r.total_units)||0; regionMap[k].hasUnits=true; regionMap[k].withUnits++; }
   });
-  // 🔴 세대수 합이 「그 지역 전부」인 척하지 않는다 — 일부만 집계된 지역에는 몇 건인지 적는다.
-  //    집계율 0%는 이미 「세대수 정보 없음」으로 뜨고(PR #28), 100%는 안 붙인다 —
-  //    전부에 붙이면 소음이 되어 정작 부분집계인 지역이 묻힌다.
-  const regionUnitsNote = v => (v.withUnits > 0 && v.withUnits < v.cnt)
-    ? ` <span style="color:#bbb">(${v.withUnits}건 집계)</span>` : '';
+  // 🔴 total_units 합계를 뺐다(2026-09-16). 그 컬럼은 **모집 세대수가 아니라 단지가 가진
+  //    총세대수**이고(LH `SUM_TOT_HSH_CNT ?? HSH_CNT`), 다단지 공고에서는 **첫 단지 값**이다.
+  //    그래서 지역별로 더한 수는 모집 규모도 재고도 아닌 — 무엇의 합도 아닌 수였다.
+  //    ⚠️ 여기서 뺀 것은 **표시와 합산**뿐이다. 컬럼도 수집도 건드리지 않았다.
   const REGION_HEAD = 10;
   const regionAll = Object.entries(regionMap).sort((a,b)=>b[1].cnt-a[1].cnt);
   const regionTop = regionAll.slice(0, REGION_HEAD);
   const regionRest = regionAll.slice(REGION_HEAD);
   // 막대 기준은 접힘·펼침 상태와 무관하게 같아야 하므로 전 지역 기준으로 잡는다
   const regionMaxCnt = Math.max(1,...regionAll.map(e=>e[1].cnt));
-  const regionMaxUnits = Math.max(1,...regionAll.map(e=>e[1].units));
   const regionRowHTML = ([region,v])=>`
           <div>
             <div style="display:flex;justify-content:space-between;font-size:12px;color:#555;margin-bottom:4px">
               <span style="font-weight:600">${region}</span>
-              <span style="color:#888">${v.cnt}건${v.hasUnits?' · '+v.units.toLocaleString()+'세대'+regionUnitsNote(v):' · <span style="color:#bbb">세대수 정보 없음</span>'}</span>
+              <span style="color:#888">${v.cnt}건</span>
             </div>
             <div style="display:flex;flex-direction:column;gap:3px">
               <div style="background:#eee;border-radius:4px;height:8px;overflow:hidden">
                 <div style="background:#5a7af7;height:100%;width:${Math.round(v.cnt/regionMaxCnt*100)}%;border-radius:4px;transition:width 0.4s"></div>
               </div>
-              ${(v.hasUnits&&v.units>0)?`<div style="background:#eee;border-radius:4px;height:8px;overflow:hidden">
-                <div style="background:#1D9E75;height:100%;width:${Math.round(v.units/regionMaxUnits*100)}%;border-radius:4px;transition:width 0.4s"></div>
-              </div>`:''}
             </div>
           </div>`;
 
@@ -2816,10 +2846,7 @@ function renderInsight(rows, wrap, statsRows){
         <button class="btn btn-sec btn-sm" id="regionMoreBtn" style="margin-top:10px"
                 data-more="나머지 ${regionRest.length}개 지역 더 보기 ↓" data-less="접기 ↑"
                 onclick="toggleRegionRest(this)">나머지 ${regionRest.length}개 지역 더 보기 ↓</button>` : ''}
-      <div style="display:flex;gap:12px;margin-top:10px">
-        <span style="font-size:11px;color:#888;display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#5a7af7"></span>공고수</span>
-        <span style="font-size:11px;color:#888;display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#1D9E75"></span>세대수</span>
-      </div>`}
+      `}
     </div>
 
     <div style="${S}">
@@ -3469,10 +3496,11 @@ function sortMatchRows(rows, sortVal){
       || nullLast(a,b,n=>n.first_seen_at,true);
     if(sortVal==='end-asc')       return nullLast(a,b,n=>n.apply_end,false);
     if(sortVal==='start-asc')     return nullLast(a,b,n=>n.apply_start,false);
-    if(sortVal==='units-desc')    return nullLast(a,b,n=>n.total_units?Number(n.total_units):null,true);
-    if(sortVal==='deposit-asc')   return nullLast(a,b,n=>n.deposit_min?Number(n.deposit_min):null,false);
-    if(sortVal==='rent-asc')      return nullLast(a,b,n=>n.rent_min?Number(n.rent_min):null,false);
-    if(sortVal==='area-desc')     return nullLast(a,b,n=>n.area_max?Number(n.area_max):null,true);
+    // 🔵 공고 탭과 **같은 zfNumOrNull** 을 부른다 — 사본을 두지 않는다.
+    if(sortVal==='units-desc')    return nullLast(a,b,n=>zfNumOrNull(n.total_units),true);
+    if(sortVal==='deposit-asc')   return nullLast(a,b,n=>zfNumOrNull(n.deposit_min),false);
+    if(sortVal==='rent-asc')      return nullLast(a,b,n=>zfNumOrNull(n.rent_min),false);
+    if(sortVal==='area-desc')     return nullLast(a,b,n=>zfNumOrNull(n.area_max),true);
     if(sortVal==='region-asc'){
       const regionA = (a.sido_nm||a.region||'') + ' ' + (a.sigungu_nm||'');
       const regionB = (b.sido_nm||b.region||'') + ' ' + (b.sigungu_nm||'');
@@ -4311,7 +4339,9 @@ function loadAnnouncementBlocks(annId, id, detailEl){
     const listEl = document.getElementById('blk-list-'+id);
     listEl.innerHTML = blocks.map((b, idx) => {
       const label = b.precise_address || `블록 ${idx+1}`;
-      const unitsStr = b.total_units ? `${b.total_units}세대` : '';
+      // 🔴 상세 정보표의 「단지 규모」와 **같은 값**이다(announcements.total_units).
+      //    여기는 라벨이 없는 자리라 값 앞에 「단지」를 붙인다 — 모집 세대수로 읽히면 안 된다.
+      const unitsStr = b.total_units ? `단지 ${b.total_units}세대` : '';
       return `<div class="hu-group">
         <div class="hu-group-head" id="blk-group-head-${id}-${idx}" onclick="event.stopPropagation();toggleBlockGroup('${id}',${idx})">
           <span class="hu-group-name">${escapeHtml(label)}</span>
@@ -5249,9 +5279,9 @@ function renderMatchResults(rows){
     if(n.area_min){
       const areaStr = parseFloat(n.area_min).toFixed(1)+'㎡' +
         (n.area_max&&n.area_max!==n.area_min ? ' ~ '+parseFloat(n.area_max).toFixed(1)+'㎡' : '');
-      detailRows.push(['전용면적', areaStr]);
+      detailRows.push(['단지 전용면적', areaStr]);
     }
-    if(n.total_units) detailRows.push(['총 세대수', n.total_units+'세대']);
+    if(n.total_units) detailRows.push(['단지 규모', n.total_units+'세대']);
     if(n.move_in_date) detailRows.push(moveInRow(n.move_in_date));
     if(n.deposit_min) detailRows.push(['보증금', Number(n.deposit_min).toLocaleString()+'원']);
     if(n.rent_min) detailRows.push(['월임대료', Number(n.rent_min).toLocaleString()+'원']);
@@ -5284,7 +5314,8 @@ function renderMatchResults(rows){
         <p class="hname">${normalizeRevisedTitle(n.title)||'(공고명 없음)'}</p>
         <span class="htag ${isClosed?'tag-mix':'tag-apt'}">${n.status||'-'}</span>
       </div>
-      <p class="haddr">${zfCoverPlace(n.region_names, n.block_count, n.sido_nm, n.sigungu_nm, n.region)} · ${classifyNoticeType(n.housing_type||'',n.title||'')} · ${n.housing_type||''}</p>
+      <!-- 🔴 공고 탭과 같은 규칙 — 유형은 원문 한 번만(2026-09-16). -->
+      <p class="haddr">${zfCoverPlace(n.region_names, n.block_count, n.sido_nm, n.sigungu_nm, n.region)} · ${n.housing_type||''}</p>
       <div class="chip-row" style="margin:8px 0;gap:5px">
         ${hasCancel?cancelNoticeBadge(n.title||''):''}
         ${n.building_name?`<span class="chip" style="cursor:default;padding:4px 10px;font-size:11px">🏢 ${escapeHtml(n.building_name)}</span>`:''}
@@ -5577,6 +5608,55 @@ function zfPurgeLegacyAuthStorage(){
   }catch(e){ return 0; }
 }
 
+// ===== 복귀 주소에 실려 온 로그인 오류 =====
+// 🔴 **createClient 보다 먼저** 읽는다 — detectSessionInUrl 이 해시를 소비하고 지우기 때문에
+//    그 뒤에 읽으면 이미 없다. 종전에는 아무도 읽지 않아 오류가 **조용히 사라졌고**,
+//    사용자에게는 「눌렀는데 그냥 로그인 화면」으로만 보였다(2026-09-16).
+// ⚠️ implicit 흐름이라 성공·실패 둘 다 **해시**로 온다. 쿼리스트링도 함께 본다 —
+//    Supabase 가 경로에 따라 `?error=` 로 주는 경우가 있어 둘 다 받아 둔다.
+let ZF_AUTH_URL_ERROR = null;   // { code, desc } — 로그인 화면에 한 번 보여주고 비운다
+
+function zfAuthErrorKo(code, desc){
+  const c = (code||'').toLowerCase();
+  // 🔴 otp_expired 는 「시간이 지났다」만 뜻하지 않는다 — **이미 쓰였거나** 새 링크를 받아
+  //    앞 링크가 무효가 된 경우도 같은 코드로 온다. 그래서 문구가 셋을 다 품어야 한다.
+  if(c === 'otp_expired')     return '로그인 링크가 만료됐거나 이미 사용됐어요. 새 링크를 받아 주세요.';
+  if(c === 'access_denied')   return '로그인이 취소됐거나 링크가 더 이상 유효하지 않아요. 새 링크를 받아 주세요.';
+  if(c === 'server_error')    return '로그인 처리 중 문제가 생겼어요. 잠시 뒤 다시 시도해 주세요.';
+  // 🔴 모르는 코드의 원문을 버리지 않는다 — 화면은 한국어로, 원문은 콘솔로.
+  return '로그인에 실패했어요. 새 링크를 받아 다시 시도해 주세요.';
+}
+
+function zfCaptureAuthUrlError(){
+  try{
+    const hash  = new URLSearchParams((location.hash||'').replace(/^#/, ''));
+    const query = new URLSearchParams(location.search||'');
+    const pick = k => hash.get(k) || query.get(k);
+    const err  = pick('error') || pick('error_code');
+    if(!err) return;
+    const code = pick('error_code') || pick('error') || '';
+    const desc = pick('error_description') || '';
+    ZF_AUTH_URL_ERROR = { code, desc };
+    // 🔴 원문을 콘솔에 남긴다. 화면 문구는 한국어라 영문 단서가 여기 말고는 남지 않는다.
+    console.warn('[ZipFit auth] 복귀 주소 오류:', { error: pick('error'), error_code: code, error_description: desc });
+    // 🔵 주소창을 정리한다 — 새로고침해도 같은 오류가 되살아나지 않게.
+    //    replaceState 라 뒤로가기 이력이 늘지 않는다.
+    history.replaceState(null, '', location.pathname + location.search.replace(/[?&](error|error_code|error_description)=[^&]*/g, '').replace(/^&/, '?'));
+  }catch(e){
+    console.warn('[ZipFit auth] 복귀 주소 오류 파싱 실패', e);
+  }
+}
+zfCaptureAuthUrlError();
+
+// 🔵 로그인 화면이 떠 있으면 그 자리에 바로 적고, 아니면 renderSettingsGate 가 나중에 적는다.
+function zfShowAuthUrlErrorIfAny(){
+  if(!ZF_AUTH_URL_ERROR) return false;
+  const { code, desc } = ZF_AUTH_URL_ERROR;
+  ZF_AUTH_URL_ERROR = null;                      // 한 번만 보여준다
+  zfAuthMsg(zfAuthErrorKo(code, desc), true);
+  return true;
+}
+
 try{
   zfPurgeLegacyAuthStorage();   // 🔴 createClient 보다 먼저 — 새 클라이언트가 그것을 볼 일이 없게
   if(window.supabase && typeof window.supabase.createClient==='function'){
@@ -5634,7 +5714,8 @@ async function zfSignInKakao(){
     });
     if(error) throw error;
   }catch(err){
-    zfAuthMsg('카카오 로그인을 시작하지 못했어요. ('+(err.message||err)+')', true);
+    // 🔵 매직링크와 **같은 함수**를 쓴다 — 여기도 영문 원문이 그대로 노출되던 자리였다(2026-09-16).
+    zfAuthMsg('카카오 로그인을 시작하지 못했어요. ' + zfAuthApiErrorKo(err), true);
   }
 }
 
@@ -5642,6 +5723,37 @@ async function zfSignInKakao(){
 // Supabase 기본 이메일 템플릿은 링크만 보낸다. 6자리 코드({{ .Token }})를 쓰려면
 // 커스텀 SMTP가 필요한데 현재 미설정이라 템플릿 수정 자체가 막혀 있다.
 // 커스텀 SMTP를 도입하면 코드 입력 방식을 재검토할 것.
+// ===== Supabase Auth 오류를 한국어로 =====
+// 🔴 영문 원문을 그대로 화면에 띄우지 않는다. 종전에는
+//    「로그인 링크 발송에 실패했어요. (For security purposes, you can only request this after 7 seconds.)」
+//    처럼 Supabase 영문이 사용자에게 그대로 노출됐다(2026-09-16 다운님 관측).
+// 🔴 **모르는 오류는 원문을 버리지 않는다** — 화면은 일반 문구로, 원문은 console.error 로 남긴다.
+//    그러지 않으면 진단 단서가 통째로 사라진다.
+// 🔵 초는 원문 메시지에서 뽑고, 못 뽑으면 「잠시 뒤」로 떨어진다(수를 지어내지 않는다).
+function zfAuthApiErrorKo(err){
+  const raw = (err && (err.message || err.error_description)) ? String(err.message || err.error_description) : String(err || '');
+  console.error('ZipFit 로그인 오류(원문):', raw, err);
+  const low = raw.toLowerCase();
+
+  // 재요청 제한 — 「... after N seconds.」 / 「... after N second.」
+  if(low.includes('for security purposes') || low.includes('rate limit') || low.includes('too many requests')){
+    const m = raw.match(/after\s+(\d+)\s*second/i);
+    return m ? `보안을 위해 ${m[1]}초 뒤에 다시 요청할 수 있어요.`
+             : '보안을 위해 잠시 뒤에 다시 요청할 수 있어요.';
+  }
+  if(low.includes('email rate limit exceeded')) return '메일 발송 한도를 넘었어요. 잠시 뒤에 다시 시도해 주세요.';
+  if(low.includes('invalid email') || low.includes('unable to validate email')) return '이메일 주소 형식을 확인해 주세요.';
+  if(low.includes('signups not allowed') || low.includes('signup is disabled')) return '지금은 신규 가입이 막혀 있어요.';
+  if(low.includes('otp_expired') || low.includes('token has expired') || low.includes('expired')){
+    return '로그인 링크가 만료됐거나 이미 사용됐어요. 새 링크를 받아 주세요.';
+  }
+  if(low.includes('failed to fetch') || low.includes('networkerror') || low.includes('network')){
+    return '네트워크 연결을 확인하고 다시 시도해 주세요.';
+  }
+  // 🔴 여기까지 오면 우리가 모르는 오류다. 원문은 위에서 콘솔에 남겼다.
+  return '지금은 처리할 수 없어요. 잠시 뒤에 다시 시도해 주세요.';
+}
+
 async function zfSendLoginLink(){
   if(!zfAuthAvailable()){ zfSyncAuthUiAvailability(); return; }
   const email=(document.getElementById('loginEmail').value||'').trim();
@@ -5657,9 +5769,11 @@ async function zfSendLoginLink(){
       options:{ emailRedirectTo: ZF_REDIRECT_TO }
     });
     if(error) throw error;
-    zfAuthMsg('메일로 로그인 링크를 보냈어요. 메일함을 확인해 주세요.');
+    // 🔵 새 링크를 받으면 **앞 링크는 무효가 된다** — 그 사실을 미리 말해 둔다.
+    //    이것을 모르면 옛 메일을 눌렀다가 otp_expired 를 보고 원인을 알 수 없다.
+    zfAuthMsg('메일로 로그인 링크를 보냈어요. 메일함을 확인해 주세요. (새 링크를 받으면 이전 링크는 더 이상 쓸 수 없어요)');
   }catch(err){
-    zfAuthMsg('로그인 링크 발송에 실패했어요. ('+(err.message||err)+')', true);
+    zfAuthMsg('로그인 링크를 보내지 못했어요. ' + zfAuthApiErrorKo(err), true);
   }
 }
 // 링크 클릭 후 복귀하면 detectSessionInUrl이 해시를 소비하고
@@ -5679,11 +5793,40 @@ async function zfAccessToken(){
   }
 }
 
-async function zfFetchProfile(){
-  const token=await zfAccessToken();
-  if(!token) return { ok:false, reason:'no-session', data:null };
+// ===== 401 재시도 — 딱 한 번 =====
+// 🔴 401 은 「토큰이 방금 만료됐다」인 경우가 많다. 그때 refreshSession() 한 번이면 살아난다.
+//    ⚠️ **무한 재시도를 만들지 않는다** — 재시도는 정확히 1회이고, 두 번째 401 은 그대로 실패다.
+//    (권한이 아예 없는 경우·EF 가 계속 401 을 주는 경우에 서로를 계속 두드리게 되기 때문이다.)
+// 🔵 규칙을 한 벌만 둔다 — zfFetchProfile·zfPostProfile 이 **같은 이 함수**를 부른다.
+// 🔴 EF(save-user-profile) 쪽은 건드리지 않았다. 이것은 전적으로 호출자 쪽 처리다.
+async function zfRefreshAccessToken(){
+  if(!zfAuthAvailable()) return null;
   try{
-    const res=await fetch(PROFILE_API_URL,{ headers:{ 'Authorization':'Bearer '+token } });
+    const { data, error } = await zfAuth.auth.refreshSession();
+    if(error) { console.warn('ZipFit: 세션 갱신 실패', error); return null; }
+    zfSession = (data && data.session) || null;
+    return zfSession ? zfSession.access_token : null;
+  }catch(err){
+    console.warn('ZipFit: 세션 갱신 예외', err);
+    return null;
+  }
+}
+
+// build(token) 이 Response 를 돌려주는 fetch 를 만든다. 401 이면 갱신 후 **1회만** 다시 부른다.
+async function zfCallWithRetry(build){
+  const token = await zfAccessToken();
+  if(!token) return null;                       // 세션 없음 — EF 를 아예 부르지 않는다
+  let res = await build(token);
+  if(res.status !== 401) return res;
+  const fresh = await zfRefreshAccessToken();
+  if(!fresh) return res;                        // 갱신 실패 — 첫 401 을 그대로 돌려준다
+  return await build(fresh);                    // 🔴 여기까지다. 세 번째 호출은 없다.
+}
+
+async function zfFetchProfile(){
+  try{
+    const res=await zfCallWithRetry(t => fetch(PROFILE_API_URL,{ headers:{ 'Authorization':'Bearer '+t } }));
+    if(!res) return { ok:false, reason:'no-session', data:null };
     if(!res.ok) return { ok:false, reason:'http-'+res.status, data:null };
     const json=await res.json().catch(()=>({}));
     if(json.error) return { ok:false, reason:json.error, data:null };
@@ -5694,14 +5837,13 @@ async function zfFetchProfile(){
 }
 
 async function zfPostProfile(payload){
-  const token=await zfAccessToken();
-  if(!token) return { ok:false, reason:'no-session' };
   try{
-    const res=await fetch(PROFILE_API_URL,{
+    const res=await zfCallWithRetry(t => fetch(PROFILE_API_URL,{
       method:'POST',
-      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+token },
+      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+t },
       body: JSON.stringify(payload)
-    });
+    }));
+    if(!res) return { ok:false, reason:'no-session' };
     if(!res.ok) return { ok:false, reason:'http-'+res.status };
     const json=await res.json().catch(()=>({}));
     if(json.error) return { ok:false, reason:json.error };
@@ -5843,6 +5985,8 @@ async function renderSettingsGate(){
   const alertGate=document.getElementById('zfAlertEmailGate');
   if(alertGate) alertGate.classList.add('hidden');
   document.getElementById('settingsBody').classList.add('hidden');
+  // 🔴 링크를 눌렀다가 되돌아온 사람에게 **왜** 로그인이 안 됐는지 말한다.
+  zfShowAuthUrlErrorIfAny();
 }
 
 function applySettingsToUI(p){
