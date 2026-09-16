@@ -559,7 +559,7 @@ body.theme-dark .zf-footer a{color:#9aa0aa}
         <option value="30">30개씩</option>
         <option value="50">50개씩</option>
       </select>
-      <select id="noticeSortSel" style="font-size:13px;padding:5px 8px;border:1px solid #e0e0e0;border-radius:8px;background:#fff;color:#333;cursor:pointer" onchange="loadNoticeData()">
+      <select id="noticeSortSel" style="font-size:13px;padding:5px 8px;border:1px solid #e0e0e0;border-radius:8px;background:#fff;color:#333;cursor:pointer" onchange="applyNoticeFiltersAndRender()">
         <option value="date-desc">최신 공고순</option>
         <option value="end-asc">마감 임박순</option>
         <option value="start-asc">접수 시작순</option>
@@ -775,7 +775,8 @@ body.theme-dark .zf-footer a{color:#9aa0aa}
 
       <div class="panel">
         <p class="slabel" style="margin:0 0 0.75rem">🚪 계정</p>
-        <button class="btn btn-sec" onclick="logoutUser()">다른 이메일로 전환</button>
+        <button class="btn btn-sec" onclick="logoutUser()">로그아웃하고 다른 계정으로 전환</button>
+        <p style="font-size:12px;color:#888;margin:6px 0 0;line-height:1.5">지금 계정에서 로그아웃한 뒤 다른 계정으로 로그인합니다. 저장한 공고와 설정은 계정마다 따로 보관돼요.</p>
       </div>
     </div>
   </div> <!-- /main5 -->
@@ -993,13 +994,17 @@ function applyWindowRank(row){
   return isHiddenAsClosed(row) ? 3 : 2;
 }
 
-// 「마감 임박순」 3분기 — 0: 마감일이 오늘 이후 · 1: 이미 지남 · 2: 마감일 없음.
+// 날짜 정렬 3분기 — 0: 그 날짜가 오늘 이후 · 1: 이미 지남 · 2: 날짜가 없음.
 // 🔴 이것은 접수 가능 여부가 아니라 **그 정렬 기준 안에서의 자리**다. 그래서 applyWindowRank 와
-//    달리 status 도 접수 시작일도 보지 않는다 — 보는 것은 apply_end 하나뿐이다.
-function applyEndGroup(row){
-  const e = parseNoticeDate(row['신청마감일']||row['apply_end']||'');
-  if(!e) return 2;
-  return startOfLocalDay(e) < startOfLocalDay(new Date()) ? 1 : 0;
+//    달리 status 도 다른 날짜도 보지 않는다 — 보는 것은 넘겨받은 그 필드 하나뿐이다.
+// 🔴 「마감 임박순」과 「접수 시작순」이 **같은 함수**를 쓴다(2026-09-16 일반화). 사본을 만들지 않는다.
+// 🔴 nullLast 로는 이 자리를 막을 수 없다 — noticeData 매핑이 `r.apply_start||''` 로 채워
+//    빈 값이 null 이 아니라 **빈 문자열**이라, 오름차순에서 가장 작은 값으로 맨 앞에 선다.
+//    그래서 「없음」을 뒤로 보내는 일은 이 3분기가 맡는다.
+function applyDateGroup(row, koKey, enKey){
+  const v = parseNoticeDate(row[koKey]||row[enKey]||'');
+  if(!v) return 2;
+  return startOfLocalDay(v) < startOfLocalDay(new Date()) ? 1 : 0;
 }
 
 // 🔴 공고 탭 상태 칩은 업스트림 `status` 문자열이 아니라 **날짜 판정**으로 간다(2026-09-16).
@@ -1118,7 +1123,13 @@ async function initNoticeFilters(){
     noticeFilterOptions = { regions, types, statuses };
     buildNoticeFilterChips();
     noticeLoaded = true;
-    loadNoticeData();
+    // 🔴 여기서 받은 rows 가 loadNoticeData() 가 받을 것과 **같은 것**이다(양쪽 다 인자 없이 전량).
+    //    그래서 다시 묻지 않고 그대로 쓴다 — 부팅 RPC 가 2회에서 1회로 준다(2026-09-16).
+    //    ⚠️ 지역·유형 칩은 RPC 인자로 나가므로 그 칩이 바뀌면 종전대로 loadNoticeData() 가 다시 묻는다.
+    noticeData = zfMapNoticeRows(rows);
+    noticeError = false;
+    applyNoticeFiltersAndRender();
+    updateFilterToggleBtn();
   }catch(e){
     noticeError = true;
     console.error('ZipFit 필터 초기화 실패:', e);
@@ -1157,8 +1168,10 @@ function buildNoticeFilterChips(){
   // 🔴 상태 칩만 서버로 안 나간다 — 날짜 판정이 클라이언트에 있어서다(RPC는 그대로 둔다).
   buildSingleSelectChips('noticeStatusChips',  noticeFilterOptions.statuses, ()=>activeNoticeStatus,  v=>{ activeNoticeStatus=v;  applyNoticeFiltersAndRender(); });
   const targetOptions = ['청년','신혼·신생아','대학생','고령자','한부모가족','장애인'];
-  buildSingleSelectChips('noticeTargetChips',  targetOptions,                ()=>activeNoticeTarget,  v=>{ activeNoticeTarget=v;  loadNoticeData(); });
-  document.getElementById('hideClosedChk').onchange = () => loadNoticeData();
+  // 🔴 대상 계층 칩은 RPC 인자가 아니라 클라이언트 필터다(applyNoticeSubFilters) — 재질의하지 않는다(2026-09-16).
+  buildSingleSelectChips('noticeTargetChips',  targetOptions,                ()=>activeNoticeTarget,  v=>{ activeNoticeTarget=v;  applyNoticeFiltersAndRender(); });
+  // 🔴 마감 숨기기도 클라이언트 필터다 — noticeData 에 마감이 이미 들어 있어 서버에 다시 묻지 않는다.
+  document.getElementById('hideClosedChk').onchange = () => applyNoticeFiltersAndRender();
 }
 
 // 단일 선택 칩 빌더 (전체 = null)
@@ -1285,6 +1298,52 @@ function zfCoverPlaceText(regionNames, blockCount, sido, sigungu, fallback){
 function zfCoverPlace(regionNames, blockCount, sido, sigungu, fallback){
   return escapeHtml(zfCoverPlaceText(regionNames, blockCount, sido, sigungu, fallback));
 }
+// ===== [취소공고] 짝 판정 =====
+// 🔴 이것은 DB `announcement_dedup_key(title)` 의 **거울**이다. RPC·DB 를 바꾸지 않고 화면에서
+//    풀라는 지시라 여기 한 벌을 둔다. 🔴 **정본은 DB다** — 그쪽 정의가 바뀌면 이것도 함께 바꿔야 한다.
+//    [VERIFY] 2026-09-16 활성 876건에서, 이 거울로 찾은 짝 원공고 집합이 RPC 가 스스로 표시한
+//    `has_cancel_notice=true` 집합과 **완전히 같았다**(양쪽 2건 · 짝 없는 취소공고 0건).
+const ZF_CANCEL_PREFIX = '[취소공고]';
+function zfDedupKey(title){
+  return String(title || '')
+    .replace(/^(\s*(\[정정공고\]|[[(]\s*(재)?(수정|정정)[^\])]*[\])])\s*)+/, '')
+    .replace(/['‘’`"“”″]/g, '')
+    .replace(/\s+/g, '')
+    .replace(/\.{2,}/g, '.');
+}
+// 원공고 dedup 키 → 그 짝 취소공고. 🔵 카드 id 가 아니라 **제목에서 나온 키**라 재렌더로 낡지 않는다.
+const zfCancelByOrigKey = {};
+// 목록에서 뺄 [취소공고] 행의 announcement_id 집합을 돌려준다.
+// 🔴 **짝이 없는 취소공고는 남긴다** — 원공고를 못 찾은 채 숨기면 취소 사실이 화면에서 사라진다.
+function zfPairedCancelIds(rows, pick){
+  const origKeys = new Set();
+  rows.forEach(r => { const k = zfDedupKey(pick(r).title);
+    if(!k.startsWith(ZF_CANCEL_PREFIX)) origKeys.add(k); });
+  const drop = new Set();
+  rows.forEach(r => {
+    const p = pick(r);
+    const k = zfDedupKey(p.title);
+    if(!k.startsWith(ZF_CANCEL_PREFIX)) return;
+    const orig = k.slice(ZF_CANCEL_PREFIX.length);
+    if(!origKeys.has(orig)) return;
+    drop.add(p.id);
+    zfCancelByOrigKey[orig] = { url: p.url || '', title: p.title, id: p.id };
+  });
+  return drop;
+}
+// 「취소공고 있음」 배지 — 취소공고 원문 URL 을 알면 링크로, 모르면 종전 칩 그대로.
+function cancelNoticeBadge(title){
+  const st  = 'cursor:help;padding:4px 10px;font-size:11px;background:#A32D2D;border-color:#A32D2D';
+  const tip = '같은 이름의 [취소공고]가 따로 게시됐어요. 공고 원문을 반드시 확인하세요.';
+  const info = zfCancelByOrigKey[zfDedupKey(title)];
+  if(info && info.url){
+    return `<a class="chip sel" href="${escapeHtml(info.url)}" target="_blank" rel="noopener"`
+      + ` title="${tip} 눌러 취소공고 원문을 엽니다." onclick="event.stopPropagation()"`
+      + ` style="${st};color:#fff;text-decoration:none">🚫 취소공고 보기 ↗</a>`;
+  }
+  return `<span class="chip sel" title="${tip}" style="${st}">🚫 취소공고 있음</span>`;
+}
+
 // 상세의 전체 시군구 목록 — 표지가 「외 N곳」으로 줄이므로 여기서 전부 펼쳐 보여준다.
 //    한 곳뿐이면 표지가 이미 그 이름을 적었으므로 아무것도 그리지 않는다.
 function zfPlacesLine(regionNames){
@@ -1380,11 +1439,17 @@ function applyNoticeFiltersAndRender(){
     // 🔴 이미 지난 마감일은 뒤로 보낸다 — 「마감 임박순」인데 맨 위가 지난 공고면 이름이 거짓말이다.
     //    앞: 마감일 ≥ 오늘 오름차순 / 뒤: 지난 마감일(역시 오름차순) / 맨 뒤: 마감일 없음.
     if(sortVal==='end-asc'){
-      const ga = applyEndGroup(a), gb = applyEndGroup(b);
+      const ga = applyDateGroup(a,'신청마감일','apply_end'), gb = applyDateGroup(b,'신청마감일','apply_end');
       if(ga !== gb) return ga - gb;
       return nullLast(a,b,n=>n['apply_end'],false);
     }
-    if(sortVal==='start-asc')     return nullLast(a,b,n=>n['apply_start'],false);
+    // 🔴 접수 시작순도 같은 3분기를 탄다(2026-09-16) — 종전에는 맨 위가 작년 시작일 공고였다
+    //    (apply_start 가 있는 594건 중 518건이 이미 지난 날짜, 최솟값 2025-07-28).
+    if(sortVal==='start-asc'){
+      const ga = applyDateGroup(a,'신청시작일','apply_start'), gb = applyDateGroup(b,'신청시작일','apply_start');
+      if(ga !== gb) return ga - gb;
+      return nullLast(a,b,n=>n['apply_start'],false);
+    }
     if(sortVal==='units-desc')    return nullLast(a,b,n=>n['total_units']?Number(n['total_units']):null,true);
     if(sortVal==='deposit-asc')   return nullLast(a,b,n=>n['deposit_min']?Number(n['deposit_min']):null,false);
     if(sortVal==='rent-asc')      return nullLast(a,b,n=>n['rent_min']?Number(n['rent_min']):null,false);
@@ -1405,6 +1470,77 @@ function applyNoticeFiltersAndRender(){
   const hiddenClosedCount = (!filtered.length && closedHidden)
     ? applyNoticeSubFilters(noticeData).length : 0;
   renderNoticeList(filtered, noticeData.length, hiddenClosedCount);
+}
+
+// 🔴 RPC 행 → noticeData 형태로 옮기는 자리를 하나로 모았다(2026-09-16).
+//    부팅에서 initNoticeFilters() 가 받은 전량과 loadNoticeData() 가 받는 전량이 **같은 것**이라,
+//    같은 변환을 두 벌 두지 않고 이 함수를 양쪽이 부른다.
+function zfMapNoticeRows(rows){
+  let out = rows.map(r => ({
+    '공고명':    r.title||'',
+    '지역':      r.region||'',
+    '지역대분류': r.region_top||'',
+    '공급유형':  r.housing_type||'',
+    '공급기관':  r.supply_org||'',
+    '신청시작일': r.apply_start||'',
+    '신청마감일': r.apply_end||'',
+    '처리상태':  r.status||'',
+    '공고URL':   r.url||'',
+    '수집일시':  r.created_at||'',
+    'created_at': r.created_at||'',
+    'apply_start': r.apply_start||'',
+    'apply_end':   r.apply_end||'',
+    'announcement_date': r.announcement_date||'',
+    'area_min': r.area_min,
+    'area_max': r.area_max,
+    'total_units': r.total_units,
+    'move_in_date': r.move_in_date,
+    'deposit_min': r.deposit_min,
+    'rent_min': r.rent_min,
+    'is_revised': r.is_revised||false,
+    'sido_nm': r.sido_nm||'',
+    'sigungu_nm': r.sigungu_nm||'',
+    'source': r.source||'',
+    'announcement_id': r.announcement_id||'',
+    'mymy_applicable': r.mymy_applicable,
+    'supply_form': r.supply_form||'',
+    'application_method': r.application_method||'',
+    'recruit_multiplier': r.recruit_multiplier||'',
+    'pair_announcement_key': r.pair_announcement_key||'',
+    'housing_change_allowed': r.housing_change_allowed,
+    'precise_address': r.precise_address||'',
+    'revised_at': r.revised_at||'',
+    'revision_note': r.revision_note||'',
+    'first_seen_at': r.first_seen_at||'',
+    'is_relaxed_recruitment': r.is_relaxed_recruitment,
+    'relaxation_detail': r.relaxation_detail||'',
+    'selection_method': r.selection_method||'',
+    'contract_before_verification': r.contract_before_verification,
+    'rent_exemption_until': r.rent_exemption_until||'',
+    'rent_exemption_note': r.rent_exemption_note||'',
+    'special_notes': r.special_notes||null,
+    'doc_submit_announce_date': r.doc_submit_announce_date||'',
+    'doc_submit_start': r.doc_submit_start||'',
+    'doc_submit_end': r.doc_submit_end||'',
+    'winner_announce_date': r.winner_announce_date||'',
+    // 🔴 2026-09-16 신설 — 그룹이 걸친 시군구 전부와 단지(블록) 수. RPC 가 조회 시점에 계산한다.
+    'region_names': r.region_names||null,
+    'block_count': r.block_count||1,
+    'contract_start': r.contract_start||'',
+    'contract_end': r.contract_end||'',
+    'building_name': r.building_name||'',
+    'attachment_urls': r.attachment_urls||null,
+    // 🔴 같은 이름의 [취소공고]가 따로 있는 그룹이다(RPC가 dedup 키로 판정한다).
+    // 취소행은 접수마감이라 기본 목록에서 빠지므로 프론트가 목록만 보고는 알 수 없다.
+    'has_cancel_notice': r.has_cancel_notice===true,
+  }));
+  // 🔴 짝 원공고가 있는 [취소공고] 행을 목록에서 뺀다(2026-09-16). noticeData 에서 빼므로
+  //    목록·상태 칩 건수·검색·「전체 N건」이 **한 자리에서 함께** 줄어든다(사본 없음).
+  //    🔵 빼기 전에 그 행의 원문 URL 을 원공고 쪽 배지가 쓰도록 담아 둔다.
+  const dropCancel = zfPairedCancelIds(out,
+    n => ({ id: n['announcement_id'], title: n['공고명'] || '', url: n['공고URL'] || '' }));
+  if(dropCancel.size) out = out.filter(n => !dropCancel.has(n['announcement_id']));
+  return out;
 }
 
 // ── 핵심: 필터 변경 시 RPC 재호출 ──
@@ -1442,64 +1578,7 @@ async function loadNoticeData(){
     }
 
     // 마감 숨기기는 status 칩 미선택 시 클라이언트에서 최종 처리
-    noticeData = rows.map(r => ({
-      '공고명':    r.title||'',
-      '지역':      r.region||'',
-      '지역대분류': r.region_top||'',
-      '공급유형':  r.housing_type||'',
-      '공급기관':  r.supply_org||'',
-      '신청시작일': r.apply_start||'',
-      '신청마감일': r.apply_end||'',
-      '처리상태':  r.status||'',
-      '공고URL':   r.url||'',
-      '수집일시':  r.created_at||'',
-      'created_at': r.created_at||'',
-      'apply_start': r.apply_start||'',
-      'apply_end':   r.apply_end||'',
-      'announcement_date': r.announcement_date||'',
-      'area_min': r.area_min,
-      'area_max': r.area_max,
-      'total_units': r.total_units,
-      'move_in_date': r.move_in_date,
-      'deposit_min': r.deposit_min,
-      'rent_min': r.rent_min,
-      'is_revised': r.is_revised||false,
-      'sido_nm': r.sido_nm||'',
-      'sigungu_nm': r.sigungu_nm||'',
-      'source': r.source||'',
-      'announcement_id': r.announcement_id||'',
-      'mymy_applicable': r.mymy_applicable,
-      'supply_form': r.supply_form||'',
-      'application_method': r.application_method||'',
-      'recruit_multiplier': r.recruit_multiplier||'',
-      'pair_announcement_key': r.pair_announcement_key||'',
-      'housing_change_allowed': r.housing_change_allowed,
-      'precise_address': r.precise_address||'',
-      'revised_at': r.revised_at||'',
-      'revision_note': r.revision_note||'',
-      'first_seen_at': r.first_seen_at||'',
-      'is_relaxed_recruitment': r.is_relaxed_recruitment,
-      'relaxation_detail': r.relaxation_detail||'',
-      'selection_method': r.selection_method||'',
-      'contract_before_verification': r.contract_before_verification,
-      'rent_exemption_until': r.rent_exemption_until||'',
-      'rent_exemption_note': r.rent_exemption_note||'',
-      'special_notes': r.special_notes||null,
-      'doc_submit_announce_date': r.doc_submit_announce_date||'',
-      'doc_submit_start': r.doc_submit_start||'',
-      'doc_submit_end': r.doc_submit_end||'',
-      'winner_announce_date': r.winner_announce_date||'',
-      // 🔴 2026-09-16 신설 — 그룹이 걸친 시군구 전부와 단지(블록) 수. RPC 가 조회 시점에 계산한다.
-      'region_names': r.region_names||null,
-      'block_count': r.block_count||1,
-      'contract_start': r.contract_start||'',
-      'contract_end': r.contract_end||'',
-      'building_name': r.building_name||'',
-      'attachment_urls': r.attachment_urls||null,
-      // 🔴 같은 이름의 [취소공고]가 따로 있는 그룹이다(RPC가 dedup 키로 판정한다).
-      // 취소행은 접수마감이라 기본 목록에서 빠지므로 프론트가 목록만 보고는 알 수 없다.
-      'has_cancel_notice': r.has_cancel_notice===true,
-    }));
+    noticeData = zfMapNoticeRows(rows);
 
     noticeError = false;
     applyNoticeFiltersAndRender();
@@ -1707,8 +1786,13 @@ async function zfResolveSavedCards(){
     cards.push(zfSavedCardFrom(sr, hit));
   }
 
-  cards.sort((a,b)=>String(b.savedAt||'').localeCompare(String(a.savedAt||'')));
-  savedCards = cards;
+  // 🔴 저장 목록에도 같은 판정 함수를 건다(2026-09-16 지시). 짝 원공고가 있는 [취소공고] 카드는
+  //    목록에서 빠지고, 취소 사실은 원공고 카드의 「취소공고 보기」 배지가 말한다.
+  //    ⚠️ 사용자가 직접 저장한 항목이 말없이 사라지는 자리라 회신에 적었다.
+  const dropCancelS = zfPairedCancelIds(cards, c => ({ id: c.id, title: c.title || '', url: c.url || '' }));
+  const kept = dropCancelS.size ? cards.filter(c => !dropCancelS.has(c.id)) : cards;
+  kept.sort((a,b)=>String(b.savedAt||'').localeCompare(String(a.savedAt||'')));
+  savedCards = kept;
 }
 
 // 서버 → 메모리 캐시 → 화면 순으로 갱신한다.
@@ -2135,7 +2219,7 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
       </div>
       <p class="haddr">${zfCoverPlace(n['region_names'], n['block_count'], n['sido_nm'], n['sigungu_nm'], n['지역'])} · ${classifyNoticeType(n['공급유형'],n['공고명'])} · ${n['공급유형']||''}</p>
       <div class="chip-row" style="margin:8px 0;gap:5px">
-        ${hasCancel?'<span class="chip sel" title="같은 이름의 [취소공고]가 따로 게시됐어요. 공고 원문을 반드시 확인하세요." style="cursor:help;padding:4px 10px;font-size:11px;background:#A32D2D;border-color:#A32D2D">🚫 취소공고 있음</span>':''}
+        ${hasCancel?cancelNoticeBadge(n['공고명']||''):''}
         ${n['building_name']?`<span class="chip" style="cursor:default;padding:4px 10px;font-size:11px">🏢 ${zfBuildingLabel(n['building_name'], n['block_count'])}</span>`:''}
         ${isAmended?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#7B5EA7;border-color:#7B5EA7">🔄 정정</span>':''}
         ${(isAmended && revisionNoteEsc)?`<span title="${revisionNoteEsc}" style="cursor:help;font-size:11px;color:#666;border:1px solid #ccc;border-radius:10px;padding:1px 6px">ℹ️ 정정사유</span>`:''}
@@ -2427,7 +2511,7 @@ function renderPersonalizedRecommendations(){
       </div>
       <p class="haddr">${zfCoverPlace(n['region_names'], n['block_count'], n['sido_nm'], n['sigungu_nm'], n['지역'])} · ${n['공급유형']||''}</p>
       <div class="chip-row" style="margin:6px 0;gap:5px">
-        ${hasCancel?'<span class="chip sel" title="같은 이름의 [취소공고]가 따로 게시됐어요. 공고 원문을 반드시 확인하세요." style="cursor:help;padding:4px 10px;font-size:11px;background:#A32D2D;border-color:#A32D2D">🚫 취소공고 있음</span>':''}
+        ${hasCancel?cancelNoticeBadge(n['공고명']||''):''}
         ${isNewNotice(n)?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
         ${closingSoon?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
         ${applyUnknownChip(n)}
@@ -3285,6 +3369,10 @@ async function matchHouses(){
     }
 
     rows = rows.filter(r => !isHiddenAsClosed(r));
+    // 🔴 공고 탭과 같은 판정 함수를 쓴다(2026-09-16) — 짝 있는 [취소공고] 행은 여기서도 뺀다.
+    const dropCancelM = zfPairedCancelIds(rows,
+      r => ({ id: r.announcement_id, title: r.title || '', url: r.url || '' }));
+    if(dropCancelM.size) rows = rows.filter(r => !dropCancelM.has(r.announcement_id));
     if(regions.length > 0) {
       rows = rows.filter(r => regions.some(rg => (r.region||'').includes(rg)));
     }
@@ -4506,6 +4594,7 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
       const fb = huRegionFallback[id];
       const mid = huMapTargetId[id] || id;
       if(fb) initMapForHouse(fb, mid);
+      else mapFail(mid, '위치 정보가 없어요', '세대정보도 폴백 주소도 없다(정밀주소·시군구 모두 비어 있음)');
       return;
     }
     // 🔴 캐시는 접힌 행까지 그대로 담는다 — 지도 소스가 여기서 나오므로(첫 건물 주소),
@@ -4539,6 +4628,7 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
     const fb = huRegionFallback[id];
     const mid = huMapTargetId[id] || id;
     if(fb) initMapForHouse(fb, mid);
+    else mapFail(mid, '위치 정보를 불러오지 못했어요', '세대정보 조회 실패 + 폴백 주소 없음: ' + err);
   });
 }
 
@@ -4571,6 +4661,7 @@ function renderHousingGroupRows(id, visibleCount, mapOnly){
     const g0 = groups[0];
     const a0 = g0 && (g0.address || g0.building_name);
     if(a0) initMapForHouse({ addr: a0, name: g0.building_name || '' }, mapId);
+    else mapFail(mapId, '위치 정보가 없어요', '지난 회차 블록의 첫 건물에 주소·단지명이 없다');
     return;
   }
 
@@ -4582,6 +4673,8 @@ function renderHousingGroupRows(id, visibleCount, mapOnly){
     if(addr){
       setActiveHousingGroup(id, 0);
       initMapForHouse({ addr, name: g.building_name || '' }, mapId);
+    } else {
+      mapFail(mapId, '위치 정보가 없어요', '단일 건물에 주소·단지명이 없다');
     }
     return;
   }
@@ -4616,6 +4709,8 @@ function renderHousingGroupRows(id, visibleCount, mapOnly){
     if(addr){
       setActiveHousingGroup(id, 0);
       initMapForHouse({ addr, name: first.building_name || '' }, mapId);
+    } else {
+      mapFail(mapId, '위치 정보가 없어요', '첫 건물에 주소·단지명이 없다');
     }
   }
 }
@@ -4759,12 +4854,39 @@ function toGeocodeAddress(addr){
 //    🔵 빈 상자로 두지 않고 문구를 넣는다(「세대수 정보 없음」과 같은 형태).
 function closeMapBox(id, html){
   const mapEl = document.getElementById('map-'+id);
-  if(!mapEl) return false;
+  if(!mapEl){ zfMapWarn(id, '지도 상자(map-'+id+')가 DOM 에 없다'); return false; }
   mapEl.innerHTML = html;
   setMapApproxNote(mapEl, false);                 // 「대략의 위치예요」는 붙이지 않는다
   const sec = mapEl.parentElement && mapEl.parentElement.querySelector('.poi-section');
   if(sec) sec.style.display = 'none';             // 🔴 주변시설을 함께 닫는다 — 이 작업의 목적이다
   return true;
+}
+
+// 🔴 지도가 안 뜨는 경로는 **말없이 끝나지 않는다**(2026-09-16).
+//    화면에는 최종 상태 문구를, 콘솔에는 왜 못 그렸는지를 한 줄 남긴다 — 둘의 역할이 다르다.
+//    (백로그 「initMapForHouse 의 실패가 전부 조용하다」·「자리표시자 잔존」이 같은 자리다.)
+function zfMapWarn(id, why){
+  const el = (typeof cardElFor === 'function') ? cardElFor(id) : null;
+  console.warn('[ZipFit map] 지도를 그리지 못했습니다 —', why,
+               '| card:', id, '| announcement:', (el && el.dataset && el.dataset.announcementId) || '(미상)');
+}
+// 🔴 「지금 이 상자에 우리가 그린 지도가 들어 있는가」 — 원소 동일성으로 본다(PR #130 과 같은 축).
+//    카드 id 는 재렌더마다 다른 공고에 재배정되므로 `huMapState[id]` 가 있다는 것만으로는
+//    **이 상자**에 지도가 있다는 뜻이 아니다.
+function zfMapDrawnHere(id){
+  const st = huMapState[id];
+  return !!(st && st.el && st.el === document.getElementById('map-'+id));
+}
+// 🔴 자리표시자(「📍 지도를 불러오는 중...」)를 남기지 않는다 — 끝난 상태를 글로 적는다.
+//    문구 체계는 전세임대(PR #133)·세대정보 없는 블록(PR #135)과 같은 `.map-closed` 다.
+// 🔴 **이미 그려진 지도는 절대 덮지 않는다.** 한 카드에서 지도 경로가 여러 번 불리기 때문이다 —
+//    정밀주소로 지도를 그린 뒤 세대정보가 비어 도착하면, 그 「없음」이 멀쩡한 지도를 지울 뻔했다
+//    (2026-09-16 대역에서 실제로 재현했다: 화성동탄2 리츠 카드의 지도가 문구로 바뀌었다).
+//    같은 가드가 주변시설 탭에서 던진 예외가 지도를 덮던 자리도 함께 막는다.
+function mapFail(id, msg, why){
+  if(zfMapDrawnHere(id)){ zfMapWarn(id, why + ' (지도는 이미 그려져 있어 그대로 둔다)'); return false; }
+  zfMapWarn(id, why);
+  return closeMapBox(id, '<p class="map-closed"><strong>📍 ' + msg + '</strong></p>');
 }
 
 // 🔴 시·도까지만 아는 공고는 지도도 주변시설도 그리지 않는다.
@@ -4817,7 +4939,7 @@ function initMapForHouse(h,id){
   //    ② 전체주소·도로명 지오코딩이 다 실패해 tryLevel3로 떨어졌을 때
   const renderMap = (result, approx) => {
     const mapEl = document.getElementById('map-'+id);
-    if(!mapEl) return;
+    if(!mapEl){ zfMapWarn(id, '좌표는 받았으나 지도 상자가 사라졌다(카드가 다시 그려짐)'); return; }
     const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
     const state = huMapState[id];
     // 지도는 처음 한 번만 생성하고, 이후 건물 클릭 시에는 기존 지도/마커를 그 위치로 옮겨서
@@ -4854,20 +4976,19 @@ function initMapForHouse(h,id){
     const tryLevel3 = () => {
       // 최후수단: 시/도 + 시군구
       const fallback = lv1Addr.split(' ').slice(0,2).join(' ');
+      // 🔴 「이미 지도가 있으니 그냥 두자」를 **원소 동일성**으로 판정한다(2026-09-16).
+      //    종전 `if(!huMapState[id])` 는 이전 카드가 남긴 상태에도 참이 되어, 이 상자에는 지도가
+      //    없는데 문구를 덮지 않고 **자리표시자를 그대로 남겼다**(실측: 지오코딩 전패 시 재현).
       if(!fallback){
-        if(!huMapState[id]){
-          const mapEl = document.getElementById('map-'+id);
-          if(mapEl) mapEl.innerHTML = '<p style="text-align:center;padding:80px 0;color:#999;font-size:13px">📍 주소 위치를 찾을 수 없어요</p>';
-        }
+        mapFail(id, '주소 위치를 찾을 수 없어요', '지오코딩할 주소가 비어 있다');
         return;
       }
       geocoder.addressSearch(fallback, (r3, s3) => {
         console.warn('[ZipFit geocode] Lv3(시군구) 시도:', fallback, '결과:', s3);
         if(s3 === kakao.maps.services.Status.OK && r3.length){
           renderMap(r3, true);   // Lv3 = 시군구 중심. 추정이다.
-        } else if(!huMapState[id]){
-          const mapEl = document.getElementById('map-'+id);
-          if(mapEl) mapEl.innerHTML = '<p style="text-align:center;padding:80px 0;color:#999;font-size:13px">📍 주소 위치를 찾을 수 없어요</p>';
+        } else {
+          mapFail(id, '주소 위치를 찾을 수 없어요', 'Lv3(시군구) 지오코딩 실패: ' + fallback + ' → ' + s3);
         }
       });
     };
@@ -4897,8 +5018,9 @@ function initMapForHouse(h,id){
       }
     });
   }).catch(err=>{
-    const mapEl = document.getElementById('map-'+id);
-    if(mapEl) mapEl.innerHTML = '<p style="text-align:center;padding:80px 0;color:#999;font-size:13px">📍 지도를 불러올 수 없어요</p>';
+    // ⚠️ 여기는 SDK 로드 실패만이 아니라 **위 then 본문에서 던진 것**도 잡는다(주변시설 탭 포함).
+    //    그래서 지도가 이미 그려진 뒤에 걸리면 멀쩡한 지도를 문구로 덮는다 — 회신에 적었다.
+    mapFail(id, '지도를 불러올 수 없어요', '지도 경로에서 예외: ' + err);
     console.error('ZipFit 지도 로드 실패:', err);
   });
 }
@@ -5055,7 +5177,7 @@ function renderMatchResults(rows){
       </div>
       <p class="haddr">${zfCoverPlace(n.region_names, n.block_count, n.sido_nm, n.sigungu_nm, n.region)} · ${classifyNoticeType(n.housing_type||'',n.title||'')} · ${n.housing_type||''}</p>
       <div class="chip-row" style="margin:8px 0;gap:5px">
-        ${hasCancel?'<span class="chip sel" title="같은 이름의 [취소공고]가 따로 게시됐어요. 공고 원문을 반드시 확인하세요." style="cursor:help;padding:4px 10px;font-size:11px;background:#A32D2D;border-color:#A32D2D">🚫 취소공고 있음</span>':''}
+        ${hasCancel?cancelNoticeBadge(n.title||''):''}
         ${n.building_name?`<span class="chip" style="cursor:default;padding:4px 10px;font-size:11px">🏢 ${escapeHtml(n.building_name)}</span>`:''}
         ${isAmended?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#7B5EA7;border-color:#7B5EA7">🔄 정정</span>':''}
         ${(isAmended && revisionNoteEscM)?`<span title="${revisionNoteEscM}" style="cursor:help;font-size:11px;color:#666;border:1px solid #ccc;border-radius:10px;padding:1px 6px">ℹ️ 정정사유</span>`:''}
