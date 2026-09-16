@@ -804,6 +804,10 @@ let noticeInit  = false;    // initNoticeFilters()가 도는 중
 let noticeError = false;    // 마지막 확보 시도가 실패했다
 // 🔴 「더 보기」(누적 노출 수)를 페이지로 바꿨다(2026-09-16) — 공고 탭은 「전체를 나열하고
 //    필터·정렬로 찾는 곳」이라 몇 쪽인지·지금 어디인지가 보여야 한다.
+// 🔴 공고 탭을 누를 때마다 전량을 다시 받지 않는다(2026-09-16). 다만 수집이 10분마다 도므로
+//    **마지막으로 받은 지 10분이 지났을 때만** 다시 받는다. 지역·유형 칩은 RPC 인자라 종전대로 즉시 재질의한다.
+let noticeLoadedAt = 0;
+const NOTICE_REFETCH_MS = 10 * 60 * 1000;
 let noticePage = 1;                 // 1부터
 let noticePageSize = 20;            // 10 · 20 · 30 · 50
 const NOTICE_PAGE_SIZES = [10, 20, 30, 50];
@@ -993,6 +997,19 @@ function applyWindowRank(row){
   if(st === 'before') return 1;
   if(st === 'closed') return 3;
   return isHiddenAsClosed(row) ? 3 : 2;
+}
+
+// 🔴 정렬 비교자 한 벌 — 빈 값을 뒤로 보낸다(2026-09-16에 하나로 모았다).
+//    `noticeData` 매핑이 빈 날짜를 null 이 아니라 **빈 문자열**로 채우기 때문에 `va == null` 만으로는
+//    발화하지 않는다. 빈 문자열은 오름차순에서 가장 작은 값이라 그냥 두면 맨 앞에 선다.
+//    🔵 공고 탭과 추천 탭이 **같은 함수**를 부른다 — 정렬 방식은 양쪽 다 바꾸지 않았고 빈 값 자리만 고쳤다.
+function zfNullLast(a, b, fn, desc){
+  const norm = v => (v === null || v === undefined || v === '') ? null : v;
+  const va = norm(fn(a)), vb = norm(fn(b));
+  if(va == null && vb == null) return 0;
+  if(va == null) return 1;
+  if(vb == null) return -1;
+  return desc ? (vb > va ? 1 : vb < va ? -1 : 0) : (va > vb ? 1 : va < vb ? -1 : 0);
 }
 
 // 날짜 정렬 3분기 — 0: 그 날짜가 오늘 이후 · 1: 이미 지남 · 2: 날짜가 없음.
@@ -1332,6 +1349,34 @@ function zfPairedCancelIds(rows, pick){
   });
   return drop;
 }
+// 🔴 거울이 DB 와 어긋나면 콘솔에 한 번 남긴다 — 사람이 매 회차 손으로 대조하지 않게.
+//    비교 축: 「거울로 찾은 짝 원공고 집합」 vs 「RPC 가 준 has_cancel_notice 참 집합」.
+let zfDedupMirrorWarned = false;
+function zfCheckDedupMirror(rows){
+  if(zfDedupMirrorWarned) return;
+  try{
+    const keys = new Set();
+    rows.forEach(n => { const k = zfDedupKey(n['공고명'] || '');
+      if(!k.startsWith(ZF_CANCEL_PREFIX)) keys.add(k); });
+    const byMirror = new Set();
+    rows.forEach(n => {
+      const k = zfDedupKey(n['공고명'] || '');
+      if(!k.startsWith(ZF_CANCEL_PREFIX)) return;
+      const orig = k.slice(ZF_CANCEL_PREFIX.length);
+      rows.forEach(m => { if(zfDedupKey(m['공고명'] || '') === orig) byMirror.add(m['announcement_id']); });
+    });
+    const byRpc = new Set(rows.filter(n => n['has_cancel_notice'] === true).map(n => n['announcement_id']));
+    const onlyMirror = [...byMirror].filter(x => !byRpc.has(x));
+    const onlyRpc = [...byRpc].filter(x => !byMirror.has(x));
+    if(onlyMirror.length || onlyRpc.length){
+      zfDedupMirrorWarned = true;
+      console.warn('[ZipFit dedup mirror] zfDedupKey 가 DB announcement_dedup_key 와 어긋납니다.',
+        '거울만:', onlyMirror, '| RPC만:', onlyRpc,
+        '— index.html 의 zfDedupKey 를 DB 정의에 맞춰 고쳐야 합니다.');
+    }
+  }catch(e){ /* 점검이 화면을 막지 않는다 */ }
+}
+
 // 「취소공고 있음」 배지 — 취소공고 원문 URL 을 알면 링크로, 모르면 종전 칩 그대로.
 function cancelNoticeBadge(title){
   const st  = 'cursor:help;padding:4px 10px;font-size:11px;background:#A32D2D;border-color:#A32D2D';
@@ -1422,13 +1467,7 @@ function applyNoticeFiltersAndRender(){
   let filtered = applyNoticeSubFilters(base);
 
   const sortVal = document.getElementById('noticeSortSel')?.value || 'date-desc';
-  const nullLast = (a, b, fn, desc) => {
-    const va = fn(a), vb = fn(b);
-    if(va==null && vb==null) return 0;
-    if(va==null) return 1;
-    if(vb==null) return -1;
-    return desc ? (vb > va ? 1 : vb < va ? -1 : 0) : (va > vb ? 1 : va < vb ? -1 : 0);
-  };
+  const nullLast = zfNullLast;   // 🔵 사본을 두지 않는다 — 빈 값 처리가 한 곳이다
   filtered = [...filtered].sort((a,b) => {
     // 🔴 접수 단계 그룹 선비교(applyWindowRank)를 **공고 탭에서 걷었다**(2026-09-16).
     //    「최신 공고순」을 골랐는데 최신 공고가 위에 안 오던 것이 이것이었다 — 정렬 위에
@@ -1477,6 +1516,7 @@ function applyNoticeFiltersAndRender(){
 //    부팅에서 initNoticeFilters() 가 받은 전량과 loadNoticeData() 가 받는 전량이 **같은 것**이라,
 //    같은 변환을 두 벌 두지 않고 이 함수를 양쪽이 부른다.
 function zfMapNoticeRows(rows){
+  noticeLoadedAt = Date.now();
   let out = rows.map(r => ({
     '공고명':    r.title||'',
     '지역':      r.region||'',
@@ -1540,6 +1580,10 @@ function zfMapNoticeRows(rows){
   //    🔵 빼기 전에 그 행의 원문 URL 을 원공고 쪽 배지가 쓰도록 담아 둔다.
   const dropCancel = zfPairedCancelIds(out,
     n => ({ id: n['announcement_id'], title: n['공고명'] || '', url: n['공고URL'] || '' }));
+  // 🔴 거울 자기점검(2026-09-16) — `zfDedupKey` 는 DB `announcement_dedup_key` 의 사본이라
+  //    DB 쪽이 바뀌면 조용히 어긋난다. 목록을 받을 때마다 **RPC 가 스스로 표시한 값**과 대조한다.
+  //    사용자 화면에는 영향이 없다. 한 번만 경고한다(목록을 다시 받을 때마다 도배하지 않게).
+  zfCheckDedupMirror(out);
   if(dropCancel.size) out = out.filter(n => !dropCancel.has(n['announcement_id']));
   return out;
 }
@@ -1787,13 +1831,22 @@ async function zfResolveSavedCards(){
     cards.push(zfSavedCardFrom(sr, hit));
   }
 
-  // 🔴 저장 목록에도 같은 판정 함수를 건다(2026-09-16 지시). 짝 원공고가 있는 [취소공고] 카드는
-  //    목록에서 빠지고, 취소 사실은 원공고 카드의 「취소공고 보기」 배지가 말한다.
-  //    ⚠️ 사용자가 직접 저장한 항목이 말없이 사라지는 자리라 회신에 적었다.
-  const dropCancelS = zfPairedCancelIds(cards, c => ({ id: c.id, title: c.title || '', url: c.url || '' }));
-  const kept = dropCancelS.size ? cards.filter(c => !dropCancelS.has(c.id)) : cards;
-  kept.sort((a,b)=>String(b.savedAt||'').localeCompare(String(a.savedAt||'')));
-  savedCards = kept;
+  // 🔴 저장 목록에서는 **빼지 않고 표시로 바꾼다**(2026-09-16 판정). 저장 목록은 사용자가 직접 고른
+  //    것이라 말없이 사라지면 안 된다 — 공고 탭·추천·매칭의 「목록에서 뺀다」는 그대로 둔다.
+  //    ① 저장한 것이 [취소공고] 행이면 **원공고 카드로 바꿔** 보여주고 취소 표시를 붙인다.
+  //    ② 원공고를 못 찾으면 취소공고 카드를 그대로 두고 같은 표시를 붙인다.
+  //    ③ 원공고를 저장한 경우에는 기존 배지 그대로다(여기서 아무것도 하지 않는다).
+  const byKey = new Map();
+  rows.forEach(r => { const k = zfDedupKey(r.title || ''); if(!byKey.has(k)) byKey.set(k, r); });
+  const resolved = cards.map(c => {
+    const k = zfDedupKey(c.title || '');
+    if(!k.startsWith(ZF_CANCEL_PREFIX)) return c;
+    const orig = byKey.get(k.slice(ZF_CANCEL_PREFIX.length));
+    const base = orig ? zfSavedCardFrom({ announcement_id: c.id, created_at: c.savedAt }, orig) : c;
+    return Object.assign({}, base, { cancelled: true });
+  });
+  resolved.sort((a,b)=>String(b.savedAt||'').localeCompare(String(a.savedAt||'')));
+  savedCards = resolved;
 }
 
 // 서버 → 메모리 캐시 → 화면 순으로 갱신한다.
@@ -1956,6 +2009,8 @@ function renderSavedNotices(){
         <button style="background:none;border:none;font-size:18px;cursor:pointer;padding:2px 4px;color:#ccc" title="저장 삭제" onclick="toggleSaveNotice('${String(s.id).replace(/'/g,"\\'")}').then(renderSavedNotices)">✕</button>
       </div>
       <p class="haddr">${escapeHtml(s.cover||s.region||'')} · ${escapeHtml(s.type||'')}</p>
+      ${(s.cancelled || zfCancelByOrigKey[zfDedupKey(s.title||'')])
+        ? `<div style="margin-top:6px">${cancelNoticeBadge(s.title||'')}</div>` : ''}
       ${dateStr?`<p style="font-size:11px;color:#bbb;margin-top:4px">저장일: ${dateStr}</p>`:''}
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
         ${s.url?`<a class="detail-link" href="${s.url}" target="_blank">📄 공고 원문 보기</a>`:''}
@@ -2078,6 +2133,8 @@ function zfFillSummarySlots(){
 }
 
 // 아직 모르는 id만 골라 한 번에 묻는다. 카드마다 부르면 목록 1회에 87번이 된다.
+// 🔵 이 함수는 **카드 id 를 쓰지 않는다** — 캐시 키도 채우는 자리(`[data-sum-for]`)도 announcement_id 다.
+//    그래서 같은 자리에 다른 공고가 와도 값이 섞이지 않는다(가드를 걸 대상이 아니다, 2026-09-16 확인).
 async function zfEnsurePriceSummaries(ids){
   const need = [];
   (ids || []).forEach(id => { if(id && !zfPriceCache.has(id)) need.push(String(id)); });
@@ -2172,7 +2229,9 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
     const annDate    = n['announcement_date']||'';
     // 모집공고일 = 접수시작일이면 중복 제거. unknown이면 '미상'+원문 링크(applyDateLine).
     const dateLine   = applyDateLine(n, annDate, applyStart, applyEnd, n['공고URL']||'');
-    const cardId = 'ncard-detail-'+idx;
+    // 🔴 목록 안 인덱스가 아니라 announcement_id 에서 만든다(2026-09-16) — 목록을 다시 그려도·쪽을
+    //    넘겨도 같은 공고는 같은 id 다. 접두(`ncard-`/`mcard-`)는 유지해 두 탭이 동시에 DOM 에 있어도 안 겹친다.
+    const cardId = 'ncard-' + zfCardKey(n['announcement_id'] || idx);
 
     // 상세 영역 항목 구성
     const detailRows = [];
@@ -2200,7 +2259,7 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
     const shareBtn = `<button class="detail-link" style="border:1px solid #1D9E75;color:#1D9E75;background:#fff;cursor:pointer;margin-top:10px" onclick="event.stopPropagation();shareNotice(this,'${nTitle}','${nRegion}','${nType}','${nUrl}')">🔗 이 공고 공유하기</button>`;
     const saveBtn = `<button data-save-id="${n['announcement_id']||idx}" class="detail-link" style="border:1px solid ${nSaved?'#1D9E75':'#ccc'};color:${nSaved?'#1D9E75':'#888'};background:#fff;cursor:pointer;margin-top:10px" onclick="event.stopPropagation();toggleSaveNotice('${nId}')">${nSaved?'🔖 저장됨':'🔖 저장'}</button>`;
     const detailHTML = detailRows.length
-      ? `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px;transition:all 0.2s" onclick="event.stopPropagation()">
+      ? `<div id="${cardId}" data-ann-id="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px;transition:all 0.2s" onclick="event.stopPropagation()">
           <div class="detail-grid">
             ${detailRows.map(([k,v])=>`<div style="font-size:12px"><span style="color:#999">${k}</span><br><span style="color:#333;font-weight:500">${v}</span></div>`).join('')}
           </div>
@@ -2211,7 +2270,7 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
             ${saveBtn}
           </div>
         </div>`
-      : `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px" onclick="event.stopPropagation()"><div style="display:flex;gap:8px;flex-wrap:wrap">${n['공고URL']?`<a class="detail-link" href="${n['공고URL']}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a>`:''} ${shareBtn} ${saveBtn}</div></div>`;
+      : `<div id="${cardId}" data-ann-id="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px" onclick="event.stopPropagation()"><div style="display:flex;gap:8px;flex-wrap:wrap">${n['공고URL']?`<a class="detail-link" href="${n['공고URL']}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a>`:''} ${shareBtn} ${saveBtn}</div></div>`;
 
     html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n['지역']||'').replace(/"/g,'&quot;')}" data-sido="${(n['sido_nm']||'').replace(/"/g,'&quot;')}" data-sigungu="${(n['sigungu_nm']||'').replace(/"/g,'&quot;')}" data-title="${(n['공고명']||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" data-housing-type="${(n['공급유형']||'').replace(/"/g,'&quot;')}" data-precise-address="${(n['precise_address']||'').replace(/"/g,'&quot;')}" data-relaxed="${n['is_relaxed_recruitment']===true?'1':''}" data-relaxation-detail="${(n['relaxation_detail']||'').replace(/"/g,'&quot;')}" data-contract-verify="${n['contract_before_verification']===true?'1':''}" data-rent-exempt-until="${(n['rent_exemption_until']||'').replace(/"/g,'&quot;')}" data-rent-exempt-note="${(n['rent_exemption_note']||'').replace(/"/g,'&quot;')}" data-revised="${isAmended?'1':''}" data-revision-note-full="${revisionNoteEsc}" data-special-notes="${n['special_notes']?JSON.stringify(n['special_notes']).replace(/"/g,'&quot;'):''}" data-apply-start="${(n['apply_start']||'').replace(/"/g,'&quot;')}" data-apply-end="${(n['apply_end']||'').replace(/"/g,'&quot;')}" data-announcement-date="${(n['announcement_date']||'').replace(/"/g,'&quot;')}" data-doc-submit-announce="${(n['doc_submit_announce_date']||'').replace(/"/g,'&quot;')}" data-doc-submit-start="${(n['doc_submit_start']||'').replace(/"/g,'&quot;')}" data-doc-submit-end="${(n['doc_submit_end']||'').replace(/"/g,'&quot;')}" data-winner-announce="${(n['winner_announce_date']||'').replace(/"/g,'&quot;')}" data-contract-start="${(n['contract_start']||'').replace(/"/g,'&quot;')}" data-contract-end="${(n['contract_end']||'').replace(/"/g,'&quot;')}" data-attachment-urls="${n['attachment_urls']?JSON.stringify(n['attachment_urls']).replace(/"/g,'&quot;'):''}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this,'notice')" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
       <div class="htop">
@@ -2239,6 +2298,7 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
   });
   html += noticePagerHtml(pageCount, noticePage);
   listEl.innerHTML = html;
+  zfPruneCardCaches();   // 🔴 안정 키는 낡지 않는 대신 쌓인다 — 화면에 없는 키를 비운다
   // 캐시에 이미 있는 것은 즉시(깜빡임 없음), 없는 것만 물어보고 도착하면 채운다.
   zfFillSummarySlots();
   zfEnsurePriceSummaries(shown.map(n => n['announcement_id'])).then(ok => { if(ok) zfFillSummarySlots(); });
@@ -2544,7 +2604,7 @@ function goMain(n){
   }
   if(n===1) renderPersonalizedRecommendations();
   if(n===2 && !noticeLoaded) initNoticeFilters();
-  else if(n===2) loadNoticeData();
+  else if(n===2 && (Date.now() - noticeLoadedAt) >= NOTICE_REFETCH_MS) loadNoticeData();
   if(n===3) loadInsightData();
   if(n===4) zfRenderSavedTab();
   if(n===5) renderSettingsGate();
@@ -3398,13 +3458,7 @@ async function matchHouses(){
 // 공고탭(noticeSortSel)과 동일한 정렬 옵션을 맞춤추천 탭에도 제공 — get_announcements_deduped()가
 // 반환하는 원본 필드명(raw RPC 컬럼명) 기준으로 정렬한다(noticeData의 한글 매핑과는 별개 데이터 형태).
 function sortMatchRows(rows, sortVal){
-  const nullLast = (a, b, fn, desc) => {
-    const va = fn(a), vb = fn(b);
-    if(va==null && vb==null) return 0;
-    if(va==null) return 1;
-    if(vb==null) return -1;
-    return desc ? (vb > va ? 1 : vb < va ? -1 : 0) : (va > vb ? 1 : va < vb ? -1 : 0);
-  };
+  const nullLast = zfNullLast;   // 🔵 사본을 두지 않는다 — 빈 값 처리가 한 곳이다
   return [...rows].sort((a,b) => {
     // 접수 단계로 먼저 그룹을 나누고, 그룹 내부에서는 선택된 정렬 기준을 그대로 적용.
     // 🔴 open → before → unknown → closed. 접수기간 미상은 마감보다 위다.
@@ -3986,9 +4040,11 @@ let extrasGroupSeq = 0;
 
 function loadAnnouncementExtras(annId, detailEl, id, useGroup){
   if(!annId) return;
+  const ownerAnn = zfCardAnn(id);
   resolveAnnouncementIds(annId, useGroup).then(ids => fetch(`${SUPABASE_URL}/rest/v1/announcement_extras?${idFilterFor(ids)}&order=extra_type,building_address`, {
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
   })).then(r => r.ok ? r.json() : []).then(rows => {
+    if(!zfStillOurs(id, ownerAnn)) return;   // 그 사이 이 자리에 다른 공고가 왔다
     if(!Array.isArray(rows) || rows.length === 0) return;
     const staleHtml = staleSourceBannerHtml(rows, annId, useGroup, id);
     // 같은 건물이 LH·MYHOME 두 파이프라인으로 각각 수집돼 서로 다른 announcement_id를 갖고,
@@ -4217,6 +4273,9 @@ document.addEventListener('keydown', e => {
 // "같은 제목(dedup_key)을 공유하는 원본 행들의 주소/세대수가 서로 다르면 블록으로 취급"하는 범용 로직
 const blockAnnIds = {};
 const blockInfo = {};
+// ⚠️ 아래 설명의 「`ncard-detail-{인덱스}`」는 2026-09-16 에 `ncard-<announcement_id 인코딩>` 으로
+//    바뀌었다(zfCardKey). 재배정은 더 이상 일어나지 않지만, **가드는 그대로 둔다** — 같은 공고를
+//    다시 그릴 때도 원소는 새로 생기고, 가드가 그것까지 덮는다.
 // 🔴 `blockLoaded` 를 걷어냈다(2026-09-16). 카드 id(`ncard-detail-{인덱스}`)를 키로 쓰는 모듈 수준
 //    캐시였는데 그 인덱스는 목록을 다시 그릴 때마다 **다른 공고에 재배정**된다. 한 번 펼친 자리에
 //    다른 공고가 오면 `blockLoaded[key]` 가 아직 참이라 `toggleBlockGroup` 이 조회를 건너뛰고,
@@ -4309,9 +4368,11 @@ function toggleBlockGroup(id, idx){
 
 function loadAnnouncementPolicies(annId, detailEl, id, useGroup){
   if(!annId) return;
+  const ownerAnn = zfCardAnn(id);
   resolveAnnouncementIds(annId, useGroup).then(ids => fetch(`${SUPABASE_URL}/rest/v1/announcement_policies?${idFilterFor(ids)}&order=category`, {
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
   })).then(r => r.ok ? r.json() : []).then(policies => {
+    if(!zfStillOurs(id, ownerAnn)) return;
     const staleHtml = staleSourceBannerHtml(policies, annId, useGroup, id);
     // 그룹조회로 형제 announcement_id 여러 곳에 동일 정책이 중복 백필된 경우를 대비해
     // 카테고리+내용이 완전히 같은 행은 하나만 남긴다.
@@ -4382,9 +4443,11 @@ function loadDocumentTemplates(housingType, id){
 
 function loadPreciseEligibility(annId, detailEl, id, useGroup){
   if(!annId) return;
+  const ownerAnn = zfCardAnn(id);
   resolveAnnouncementIds(annId, useGroup).then(ids => fetch(`${SUPABASE_URL}/rest/v1/eligibility_criteria?${idFilterFor(ids)}&order=supply_form,rank`, {
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
   })).then(r => r.ok ? r.json() : []).then(rows => {
+    if(!zfStillOurs(id, ownerAnn)) return;
     const staleHtml = staleSourceBannerHtml(rows, annId, useGroup, id);
     // 그룹조회로 형제 announcement_id 여러 곳에 동일 자격기준이 중복 백필된 경우를 대비해
     // 중복 행을 하나만 남긴다.
@@ -4457,6 +4520,45 @@ const huMapState = {};
 const huRegionFallback = {};
 const huMapTargetId = {};   // "세대정보 리스트 id" → "실제 지도를 그려야 할 카드 id" 매핑
 
+// ===== 카드 id 안정 키 + 공통 가드 (2026-09-16 · G-4 2단계) =====
+// 🔴 **1단계 — 공통 가드.** 비동기 응답이 돌아왔을 때 「이 자리가 아직 그 공고의 것인가」를
+//    한 함수로 묻는다. 기존 원소 동일성 가드(`huMapState.el`·`dataset.blkLoadedFor`)는 그대로 둔다 —
+//    이것은 그 위에 얹는 그물이지 대체가 아니다.
+// 🔴 블록 경로는 `id` 가 `카드id-blk{n}` 이라 그 id 로는 상세 div 를 못 찾는다. 지도 대상 id 가
+//    곧 진짜 카드이므로 그것으로 찾는다(한 칸 경로에서는 둘이 같다).
+function zfOwnerCardId(id){ return huMapTargetId[id] || id; }
+function zfCardAnn(id){
+  const el = document.getElementById(zfOwnerCardId(id));
+  return el ? (el.dataset.annId || '') : null;
+}
+// 🔵 호출 시점에 상세 div 를 못 읽었으면(null) 막지 않는다 — 없는 근거로 화면을 비우지 않는다.
+function zfStillOurs(id, annId){
+  if(annId === null || annId === undefined) return true;
+  const el = document.getElementById(zfOwnerCardId(id));
+  return !!(el && el.dataset.annId === annId);
+}
+
+// 🔴 **2단계 — 안정 키.** 카드 id 를 목록 안 인덱스가 아니라 `announcement_id` 에서 만든다.
+//    단사 인코딩이고 `-`·`_` 도 인코딩한다 — 파생 id 가 `-` 를, 블록 하위가 `-blk` 를 구분자로 쓰기 때문이다.
+//    [VERIFY] 2026-09-16 활성 876건 중 **8건의 announcement_id 에 공백이 있다**(MYHOME 식별자의
+//    시군구가 「천안시 서북구」처럼 두 마디인 경우). HTML5 id 는 공백을 담을 수 없어 원문 그대로는 쓸 수 없다.
+//    영숫자만 그대로 두고 나머지를 `_<코드포인트16진수>_` 로 바꾸면 출력에 `-` 가 없어 구분자와 겹치지 않는다.
+function zfCardKey(aid){
+  return String(aid || '').replace(/[^A-Za-z0-9]/g, c => '_' + c.codePointAt(0).toString(16) + '_');
+}
+
+// 🔴 키가 안정되면 캐시는 낡지 않는 대신 **쌓이기만 한다.** 목록을 다시 그릴 때 화면에 없는 키를 비운다.
+//    🔵 `huGroupsCache`(지도 소스)도 함께 비운다 — 목록을 다시 그린 직후에는 상세 div 가 통째로
+//    새로 생겨 **펼쳐진 카드가 하나도 없다.** 그래서 지금 지도를 쓰고 있는 카드가 없다.
+function zfPruneCardCaches(){
+  const live = new Set();
+  document.querySelectorAll('[data-card-id]').forEach(el => live.add(el.dataset.cardId));
+  [huUnitsCache, huGroupsCache, huActiveGroup, huRegionFallback, huMapTargetId, huMapState,
+   blockAnnIds, blockInfo].forEach(cache => {
+    Object.keys(cache).forEach(k => { if(!live.has(k.split('-blk')[0])) delete cache[k]; });
+  });
+}
+
 // 🔴 「같은 세대」의 정의를 여기서 새로 만들지 않는다 — 바로 아래 중복제거가 쓰는 키에서
 // 금액 네 개만 뺀 것이다. 중복제거는 이미 「키가 같고 금액까지 같으면 한 세대」로 판정하고 있으므로,
 // 금액만 빼면 그대로 「키가 같고 금액이 달라진 세대」, 즉 비교해야 할 짝이 된다.
@@ -4520,6 +4622,7 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
   //    곧 진짜 카드이므로 그것으로 찾는다. 한 칸 경로에서는 둘이 같은 값이라 동작이 안 바뀐다.
   const huCardId = huMapTargetId[id];
   const huIsBlock = huCardId !== id;   // 블록 하위 렌더인가
+  const ownerAnn = zfCardAnn(id);      // 응답이 돌아왔을 때 이 자리가 아직 그 공고인지 볼 기준
   // 🔴 회차는 announcements를 한 번 더 조회해 얻는다(그룹함수 미접촉). 세대정보 조회와 나란히
   // 보내므로 왕복이 늘지 않고, 그룹이 아니거나 형제가 하나면 요청 자체를 보내지 않는다.
   resolveAnnouncementIds(annId, useGroup).then(ids => Promise.all([
@@ -4589,6 +4692,7 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
         pastOnly = true;
       }
     }
+    if(!zfStillOurs(id, ownerAnn)) return;   // 그 사이 이 자리에 다른 공고가 왔다
     const staleHtml = staleSourceBannerHtml(rawUnits, annId, useGroup, id, rounds, pastUnits.length > 0);
     if(!pastOnly && (!Array.isArray(units) || units.length === 0)){
       // 세대별 정보가 없는 공고 — 시군구 단위 지도를 최후수단으로 사용
@@ -4938,7 +5042,9 @@ function initMapForHouse(h,id){
   // 🔵 approx = 「이 핀은 시·군·구 중심이다」. 두 갈래에서 참이 된다 —
   //    ① 호출자가 넘긴 주소 자체가 시도+시군구뿐일 때(huRegionFallback)
   //    ② 전체주소·도로명 지오코딩이 다 실패해 tryLevel3로 떨어졌을 때
+  const mapOwnerAnn = zfCardAnn(id);
   const renderMap = (result, approx) => {
+    if(!zfStillOurs(id, mapOwnerAnn)){ zfMapWarn(id, '좌표가 돌아왔을 때 이 자리는 다른 공고였다'); return; }
     const mapEl = document.getElementById('map-'+id);
     if(!mapEl){ zfMapWarn(id, '좌표는 받았으나 지도 상자가 사라졌다(카드가 다시 그려짐)'); return; }
     const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
@@ -4946,6 +5052,8 @@ function initMapForHouse(h,id){
     // 지도는 처음 한 번만 생성하고, 이후 건물 클릭 시에는 기존 지도/마커를 그 위치로 옮겨서
     // 항상 마커가 1개만 유지되도록 함.
     // 🔴 단, 「그 지도가 지금 이 상자에 들어 있을 때」만 그렇다.
+    //    ⚠️ 아래는 2026-09-16 안정 키 전환 **이전**의 설명이다. 지금은 카드 id 가 announcement_id
+    //    에서 나와 재배정되지 않지만, 같은 공고를 다시 그려도 **상자는 새 노드**라 이 가드가 여전히 필요하다.
     //    huMapState 의 키는 카드 id(`ncard-detail-{인덱스}`)인데 그 인덱스는 renderNoticeList()가
     //    목록을 다시 그릴 때마다 **다른 공고에 재배정**된다. 그러면 캐시에는 이전 공고의 지도가
     //    남아 있고 상자만 새 것이라, 이미 DOM에서 떨어진 지도에 setCenter 만 하고 끝났다.
@@ -5134,7 +5242,7 @@ function renderMatchResults(rows){
     const applyEnd    = n.apply_end||'';
     const annDate     = n.announcement_date||'';
     const dateLine    = applyDateLine(n, annDate, applyStart, applyEnd, n.url||'');
-    const cardId = 'mcard-detail-'+idx;
+    const cardId = 'mcard-' + zfCardKey(n.announcement_id || idx);
 
     const detailRows = [];
     if(n.supply_org) detailRows.push(['공급기관', n.supply_org]);
@@ -5159,7 +5267,7 @@ function renderMatchResults(rows){
     const mShareBtn = `<button class="detail-link" style="border:1px solid #1D9E75;color:#1D9E75;background:#fff;cursor:pointer" onclick="event.stopPropagation();shareNotice(this,'${mTitle}','${mRegion}','${mType}','${mUrl}')">🔗 이 공고 공유하기</button>`;
     const mSaveBtn = `<button data-save-id="${n.announcement_id||'m'+idx}" class="detail-link" style="border:1px solid ${mSaved?'#1D9E75':'#ccc'};color:${mSaved?'#1D9E75':'#888'};background:#fff;cursor:pointer" onclick="event.stopPropagation();toggleSaveNotice('${mId}')">${mSaved?'🔖 저장됨':'🔖 저장'}</button>`;
     const detailHTML = detailRows.length
-      ? `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px" onclick="event.stopPropagation()">
+      ? `<div id="${cardId}" data-ann-id="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px" onclick="event.stopPropagation()">
           <div class="detail-grid">
             ${detailRows.map(([k,v])=>`<div style="font-size:12px"><span style="color:#999">${k}</span><br><span style="color:#333;font-weight:500">${v}</span></div>`).join('')}
           </div>
@@ -5169,7 +5277,7 @@ function renderMatchResults(rows){
             ${mSaveBtn}
           </div>
         </div>`
-      : `<div id="${cardId}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px" onclick="event.stopPropagation()"><div style="display:flex;gap:8px;flex-wrap:wrap">${n.url?`<a class="detail-link" href="${n.url}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a>`:''} ${mShareBtn} ${mSaveBtn}</div></div>`;
+      : `<div id="${cardId}" data-ann-id="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px" onclick="event.stopPropagation()"><div style="display:flex;gap:8px;flex-wrap:wrap">${n.url?`<a class="detail-link" href="${n.url}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a>`:''} ${mShareBtn} ${mSaveBtn}</div></div>`;
 
     html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n.region||'').replace(/"/g,'&quot;')}" data-sido="${(n.sido_nm||'').replace(/"/g,'&quot;')}" data-sigungu="${(n.sigungu_nm||'').replace(/"/g,'&quot;')}" data-title="${(n.title||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" data-housing-type="${(n.housing_type||'').replace(/"/g,'&quot;')}" data-precise-address="${(n.precise_address||'').replace(/"/g,'&quot;')}" data-relaxed="${n.is_relaxed_recruitment===true?'1':''}" data-relaxation-detail="${(n.relaxation_detail||'').replace(/"/g,'&quot;')}" data-contract-verify="${n.contract_before_verification===true?'1':''}" data-rent-exempt-until="${(n.rent_exemption_until||'').replace(/"/g,'&quot;')}" data-rent-exempt-note="${(n.rent_exemption_note||'').replace(/"/g,'&quot;')}" data-revised="${isAmended?'1':''}" data-revision-note-full="${revisionNoteEscM}" data-special-notes="${n.special_notes?JSON.stringify(n.special_notes).replace(/"/g,'&quot;'):''}" data-apply-start="${(n.apply_start||'').replace(/"/g,'&quot;')}" data-apply-end="${(n.apply_end||'').replace(/"/g,'&quot;')}" data-announcement-date="${(n.announcement_date||'').replace(/"/g,'&quot;')}" data-doc-submit-announce="${(n.doc_submit_announce_date||'').replace(/"/g,'&quot;')}" data-doc-submit-start="${(n.doc_submit_start||'').replace(/"/g,'&quot;')}" data-doc-submit-end="${(n.doc_submit_end||'').replace(/"/g,'&quot;')}" data-winner-announce="${(n.winner_announce_date||'').replace(/"/g,'&quot;')}" data-contract-start="${(n.contract_start||'').replace(/"/g,'&quot;')}" data-contract-end="${(n.contract_end||'').replace(/"/g,'&quot;')}" data-attachment-urls="${n.attachment_urls?JSON.stringify(n.attachment_urls).replace(/"/g,'&quot;'):''}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this,'match')" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
       <div class="htop">
@@ -5217,6 +5325,7 @@ function renderMatchResults(rows){
   html += `<button class="btn btn-primary" onclick="goMain(4);goStep(3)" style="margin-top:0.5rem">서류 체크리스트 보기 →</button>`;
 
   r.innerHTML = html;
+  zfPruneCardCaches();   // 🔴 안정 키는 낡지 않는 대신 쌓인다 — 화면에 없는 키를 비운다
   zfFillSummarySlots();
   zfEnsurePriceSummaries(shown.map(n => n.announcement_id)).then(ok => { if(ok) zfFillSummarySlots(); });
 }
