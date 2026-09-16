@@ -11,7 +11,7 @@
 //
 // robots.txt 실측(2026-08-19): `User-agent: * / Allow: /` — 전면 허용, Disallow 없음.
 
-import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { createClient } from 'jsr:@supabase/supabase-js@2.116.0'
 
 // 코딩원칙 16번: `Deno.env.get()!`는 타입 단언일 뿐 런타임 검사가 아니라서
 // 미설정 시 undefined로 조용히 잘못 동작한다. 없으면 명시적으로 throw 한다.
