@@ -230,6 +230,13 @@ body.theme-dark .extras-missing-note{color:#d8c48a;background:#2a2721;border-col
 .hu-item-wide{white-space:normal;flex:1 1 100%;min-width:0;overflow-wrap:anywhere}
 /* 세대 정보가 아직 없는 블록 — 빈 상자를 남기지 않는다(「세대수 정보 없음」과 같은 형태). */
 .blk-empty{font-size:12px;color:#999;margin:6px 0;padding:8px 10px;background:#f4f4f2;border-radius:8px}
+/* 페이저 — 360px 한 줄에 들어가야 하므로 버튼을 최소로 줄인다. 새 색을 만들지 않고 기존 회색 토큰만 쓴다. */
+.pg-range{font-size:12px;color:#888;margin:0 0 8px;text-align:right}
+.pg-bar{display:flex;align-items:center;justify-content:center;gap:3px;flex-wrap:nowrap;margin:14px 0 4px}
+.pg-btn{min-width:28px;height:30px;padding:0 6px;font-size:12px;border:1px solid #e0e0e0;border-radius:7px;background:#fff;color:#555;cursor:pointer;flex:0 0 auto}
+.pg-btn[aria-current="page"]{background:#0F6E56;border-color:#0F6E56;color:#fff;font-weight:700}
+.pg-btn:disabled{color:#ccc;cursor:default}
+.pg-gap{min-width:14px;text-align:center;font-size:12px;color:#bbb;flex:0 0 auto}
 .hu-label{color:#999;margin-right:4px}
 .hu-note-wrap{margin-top:8px;padding-top:8px;border-top:1px dashed #e0e0d8}
 .hu-note-item{margin:4px 0}
@@ -544,7 +551,14 @@ body.theme-dark .zf-footer a{color:#9aa0aa}
       </div>
     </div>
 
-    <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:8px">
+    <div style="display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-bottom:8px">
+      <select id="noticePageSizeSel" aria-label="한 쪽에 보여줄 공고 수" onchange="noticeSetPageSize(this.value)"
+        style="font-size:13px;padding:5px 8px;border:1px solid #e0e0e0;border-radius:8px;background:#fff;color:#333;cursor:pointer">
+        <option value="10">10개씩</option>
+        <option value="20" selected>20개씩</option>
+        <option value="30">30개씩</option>
+        <option value="50">50개씩</option>
+      </select>
       <select id="noticeSortSel" style="font-size:13px;padding:5px 8px;border:1px solid #e0e0e0;border-radius:8px;background:#fff;color:#333;cursor:pointer" onchange="loadNoticeData()">
         <option value="date-desc">최신 공고순</option>
         <option value="end-asc">마감 임박순</option>
@@ -786,7 +800,11 @@ let noticeLoading = false;
 //    (2026-09-15 실측: 20초 뒤에도 noticeLoaded=false, 카드 0장).
 let noticeInit  = false;    // initNoticeFilters()가 도는 중
 let noticeError = false;    // 마지막 확보 시도가 실패했다
-let noticeVisibleCount = 20;
+// 🔴 「더 보기」(누적 노출 수)를 페이지로 바꿨다(2026-09-16) — 공고 탭은 「전체를 나열하고
+//    필터·정렬로 찾는 곳」이라 몇 쪽인지·지금 어디인지가 보여야 한다.
+let noticePage = 1;                 // 1부터
+let noticePageSize = 20;            // 10 · 20 · 30 · 50
+const NOTICE_PAGE_SIZES = [10, 20, 30, 50];
 let noticeFiltered = [];
 
 // 현재 선택된 필터값 (단일 선택, null = 전체)
@@ -975,6 +993,31 @@ function applyWindowRank(row){
   return isHiddenAsClosed(row) ? 3 : 2;
 }
 
+// 「마감 임박순」 3분기 — 0: 마감일이 오늘 이후 · 1: 이미 지남 · 2: 마감일 없음.
+// 🔴 이것은 접수 가능 여부가 아니라 **그 정렬 기준 안에서의 자리**다. 그래서 applyWindowRank 와
+//    달리 status 도 접수 시작일도 보지 않는다 — 보는 것은 apply_end 하나뿐이다.
+function applyEndGroup(row){
+  const e = parseNoticeDate(row['신청마감일']||row['apply_end']||'');
+  if(!e) return 2;
+  return startOfLocalDay(e) < startOfLocalDay(new Date()) ? 1 : 0;
+}
+
+// 🔴 공고 탭 상태 칩은 업스트림 `status` 문자열이 아니라 **날짜 판정**으로 간다(2026-09-16).
+//    계기: `status`='접수중'인 행은 8건뿐인데 날짜로 접수 중인 공고는 30건이었다 — 칩이
+//    네 건 중 세 건을 감추고 있었다(`status`='공고중'인데 날짜상 접수 중인 것이 21건).
+// 🔴 사본을 만들지 않는다 — 「신청할 수 없는 공고 숨기기」와 **같은 두 술어**를 부른다.
+//    순서가 전부다: `isHiddenAsClosed`를 먼저 봐야 「미상인데 기관이 마감이라 한 것」이
+//    「마감」으로 간다. 그래서 「마감」 칩 집합 = `isHiddenAsClosed` 집합이고, 네 칩은
+//    서로 겹치지 않으면서 합이 전체다.
+const NOTICE_STATE_CHIPS = ['접수 중', '접수 예정', '접수기간 미상', '마감'];
+function noticeStateLabel(row){
+  if(isHiddenAsClosed(row)) return '마감';
+  const st = applyWindowState(row);
+  if(st === 'open')   return '접수 중';
+  if(st === 'before') return '접수 예정';
+  return '접수기간 미상';
+}
+
 // 🔴 문구는 「없음」이 아니라 「미상」이다 — 「접수기간 없음」은 상시모집으로 읽힌다.
 const APPLY_UNKNOWN_LABEL = '접수기간 미상';
 // 기존 칩 체계(.chip)에 회색 변종을 얹는다. 새 디자인 언어를 만들지 않는다 —
@@ -1067,11 +1110,11 @@ async function initNoticeFilters(){
     // region_top, status_normalized는 RPC에서 이미 정규화된 값
     const regions  = [...new Set(rows.map(r => r.region_top).filter(Boolean))].sort();
     const types    = [...new Set(rows.map(r => classifyNoticeType(r.housing_type||'', r.title||'')))].sort();
-    const statuses = [...new Set(rows.map(r => r.status_normalized).filter(Boolean))].sort();
-    // status_normalized가 이제 원본 status를 그대로 반환하므로(is_revised로 덮어쓰지 않음),
-    // "정정공고" 값은 자동으로 안 나옴 — is_revised=true인 행이 있으면 별도 옵션으로 추가.
-    // 선택 시 p_status='정정공고'로 전달되면 RPC가 is_revised 기준으로 걸러줌.
-    if(rows.some(r => r.is_revised) && !statuses.includes('정정공고')) statuses.push('정정공고');
+    // 🔴 상태 칩은 데이터에서 뽑지 않는다(2026-09-16) — 날짜 판정 네 상태로 고정이다.
+    //    종전에는 `status_normalized`의 distinct(업스트림 문자열)였고 `p_status`로 서버가 걸렀다.
+    //    `is_revised` 기반 '정정공고' 옵션도 같은 이유로 걷었다 — 정정 여부는 접수 가능 여부가 아니고
+    //    카드 배지·「정정공고 우선」 정렬이 그 정보를 그대로 갖고 있다.
+    const statuses = [...NOTICE_STATE_CHIPS];
     noticeFilterOptions = { regions, types, statuses };
     buildNoticeFilterChips();
     noticeLoaded = true;
@@ -1111,7 +1154,8 @@ function zfRetryNoticeData(){
 function buildNoticeFilterChips(){
   buildSingleSelectChips('noticeRegionChips',  noticeFilterOptions.regions,  ()=>activeNoticeRegion,  v=>{ activeNoticeRegion=v;  loadNoticeData(); });
   buildSingleSelectChips('noticeTypeChips',    noticeFilterOptions.types,    ()=>activeNoticeType,    v=>{ activeNoticeType=v;    loadNoticeData(); });
-  buildSingleSelectChips('noticeStatusChips',  noticeFilterOptions.statuses, ()=>activeNoticeStatus,  v=>{ activeNoticeStatus=v;  loadNoticeData(); });
+  // 🔴 상태 칩만 서버로 안 나간다 — 날짜 판정이 클라이언트에 있어서다(RPC는 그대로 둔다).
+  buildSingleSelectChips('noticeStatusChips',  noticeFilterOptions.statuses, ()=>activeNoticeStatus,  v=>{ activeNoticeStatus=v;  applyNoticeFiltersAndRender(); });
   const targetOptions = ['청년','신혼·신생아','대학생','고령자','한부모가족','장애인'];
   buildSingleSelectChips('noticeTargetChips',  targetOptions,                ()=>activeNoticeTarget,  v=>{ activeNoticeTarget=v;  loadNoticeData(); });
   document.getElementById('hideClosedChk').onchange = () => loadNoticeData();
@@ -1225,16 +1269,21 @@ function zfPickLeadPlace(places, sido, sigungu, cover){
   return (own && places.indexOf(own) >= 0) ? own : places[0];
 }
 // 표지 지역 문구 — 세 갈래다. 🔴 대표 한 곳만 적는 종전 문구는 남기지 않는다(「우리 동네가 아니네」로 읽힌다).
-function zfCoverPlace(regionNames, blockCount, sido, sigungu, fallback){
+// 🔴 판정은 여기 하나다(2026-09-16). 글자가 필요한 곳(공유 문구 등)은 이 함수를,
+//    HTML 이 필요한 곳은 아래 zfCoverPlace 를 부른다 — 사본을 만들지 않는다.
+function zfCoverPlaceText(regionNames, blockCount, sido, sigungu, fallback){
   const places = zfPlaceNames(regionNames);
   const blocks = Number(blockCount) || 1;
   if(places.length >= 2){
-    return escapeHtml(zfShortPlace(zfPickLeadPlace(places, sido, sigungu, fallback))) + ' 외 ' + (places.length - 1) + '곳';
+    return zfShortPlace(zfPickLeadPlace(places, sido, sigungu, fallback)) + ' 외 ' + (places.length - 1) + '곳';
   }
   if(places.length === 1 && blocks >= 2){
-    return escapeHtml(zfShortPlace(places[0])) + ' · ' + blocks + '개 단지';
+    return zfShortPlace(places[0]) + ' · ' + blocks + '개 단지';
   }
-  return escapeHtml(fallback || '');   // 한 곳·한 단지는 종전 그대로
+  return String(fallback || '');       // 한 곳·한 단지는 종전 그대로
+}
+function zfCoverPlace(regionNames, blockCount, sido, sigungu, fallback){
+  return escapeHtml(zfCoverPlaceText(regionNames, blockCount, sido, sigungu, fallback));
 }
 // 상세의 전체 시군구 목록 — 표지가 「외 N곳」으로 줄이므로 여기서 전부 펼쳐 보여준다.
 //    한 곳뿐이면 표지가 이미 그 이름을 적었으므로 아무것도 그리지 않는다.
@@ -1306,11 +1355,11 @@ function applyNoticeFiltersAndRender(){
   const hideClosed = document.getElementById('hideClosedChk')?.checked;
   // status 칩을 직접 고른 경우엔 칩이 우선이라 마감 숨기기가 개입하지 않는다.
   const closedHidden = !!hideClosed && !activeNoticeStatus;
-  // status_normalized는 이제 원본 처리상태(status)를 그대로 반환하지만(정정여부와 더 이상
-  // 섞이지 않음), 접수마감 판정은 명시적으로 원본 처리상태 필드를 직접 사용한다.
-  let filtered = applyNoticeSubFilters(
-    closedHidden ? noticeData.filter(n => !isHiddenAsClosed(n)) : noticeData
-  );
+  // 🔴 상태 칩을 여기서 건다(2026-09-16) — 서버 p_status 가 아니라 클라이언트다.
+  //    칩과 숨기기가 같은 술어(isHiddenAsClosed·applyWindowState)를 쓰므로 둘이 어긋나지 않는다.
+  let base = closedHidden ? noticeData.filter(n => !isHiddenAsClosed(n)) : noticeData;
+  if(activeNoticeStatus) base = base.filter(n => noticeStateLabel(n) === activeNoticeStatus);
+  let filtered = applyNoticeSubFilters(base);
 
   const sortVal = document.getElementById('noticeSortSel')?.value || 'date-desc';
   const nullLast = (a, b, fn, desc) => {
@@ -1321,14 +1370,20 @@ function applyNoticeFiltersAndRender(){
     return desc ? (vb > va ? 1 : vb < va ? -1 : 0) : (va > vb ? 1 : va < vb ? -1 : 0);
   };
   filtered = [...filtered].sort((a,b) => {
-    // 접수 단계로 먼저 그룹을 나누고, 그룹 내부에서는 선택된 정렬 기준을 그대로 적용.
-    // 🔴 open → before → unknown → closed. 접수기간 미상은 마감보다 위다.
-    const closedDiff = applyWindowRank(a) - applyWindowRank(b);
-    if(closedDiff !== 0) return closedDiff;
+    // 🔴 접수 단계 그룹 선비교(applyWindowRank)를 **공고 탭에서 걷었다**(2026-09-16).
+    //    「최신 공고순」을 골랐는데 최신 공고가 위에 안 오던 것이 이것이었다 — 정렬 위에
+    //    또 하나의 정렬이 얹혀 있었다. 공고 탭은 「전체를 나열하고 필터·정렬로 찾는 곳」이고
+    //    고르는 일은 추천 탭이 한다. 🔵 함수는 남는다 — 추천 탭(sortMatchRows)이 계속 쓴다.
     if(sortVal==='date-desc')     return nullLast(a,b,n=>n['announcement_date'],true)
       || nullLast(a,b,n=>n['apply_start'],true)
       || nullLast(a,b,n=>n['first_seen_at'],true);
-    if(sortVal==='end-asc')       return nullLast(a,b,n=>n['apply_end'],false);
+    // 🔴 이미 지난 마감일은 뒤로 보낸다 — 「마감 임박순」인데 맨 위가 지난 공고면 이름이 거짓말이다.
+    //    앞: 마감일 ≥ 오늘 오름차순 / 뒤: 지난 마감일(역시 오름차순) / 맨 뒤: 마감일 없음.
+    if(sortVal==='end-asc'){
+      const ga = applyEndGroup(a), gb = applyEndGroup(b);
+      if(ga !== gb) return ga - gb;
+      return nullLast(a,b,n=>n['apply_end'],false);
+    }
     if(sortVal==='start-asc')     return nullLast(a,b,n=>n['apply_start'],false);
     if(sortVal==='units-desc')    return nullLast(a,b,n=>n['total_units']?Number(n['total_units']):null,true);
     if(sortVal==='deposit-asc')   return nullLast(a,b,n=>n['deposit_min']?Number(n['deposit_min']):null,false);
@@ -1345,7 +1400,8 @@ function applyNoticeFiltersAndRender(){
   });
 
   noticeFiltered = filtered;
-  noticeVisibleCount = 20;
+  // 🔴 필터·칩·정렬·검색이 바뀌면 언제나 1쪽으로 간다 — 이 함수가 그 넷의 공통 관문이다.
+  noticePage = 1;
   const hiddenClosedCount = (!filtered.length && closedHidden)
     ? applyNoticeSubFilters(noticeData).length : 0;
   renderNoticeList(filtered, noticeData.length, hiddenClosedCount);
@@ -1360,11 +1416,12 @@ async function loadNoticeData(){
   statusEl.innerHTML = '<p class="rtitle">⏳ 불러오는 중...</p>';
   listEl.innerHTML = '';
 
-  // p_status는 status 칩만 반영한다.
-  // 🔴 마감 숨기기(hideClosedChk)는 서버로 나가지 않는다 — 아래 렌더 단계에서 클라이언트가 건다.
-  // 그래서 noticeData에는 마감 공고가 늘 들어 있고, 검색 0건일 때 마감 포함으로 다시 세는
+  // 🔴 p_status 는 이제 언제나 null 이다(2026-09-16) — 상태 칩이 날짜 판정으로 바뀌어
+  //    클라이언트에서 거른다. RPC 정의는 바꾸지 않았고 인자만 안 쓴다.
+  // 🔴 마감 숨기기(hideClosedChk)도 서버로 나가지 않는다 — 렌더 단계에서 클라이언트가 건다.
+  // 그래서 noticeData 에는 마감 공고가 늘 들어 있고(전량), 검색 0건일 때 마감 포함으로 다시 세는
   // applyNoticeSubFilters() 재질의 없는 안내가 성립한다. 여기서 서버에 넘기면 그게 깨진다.
-  let p_status = activeNoticeStatus || null;
+  const p_status = null;
 
   const body = JSON.stringify({
     p_region: activeNoticeRegion || null,
@@ -1605,6 +1662,9 @@ function zfSavedCardFrom(sr, r){
     savedAt:   sr.created_at||'',
     title:     r ? (r.title||'')        : '',
     region:    r ? (r.region||'')       : '',
+    // 🔴 저장 당시 값이 아니다 — 여기 오는 r 은 **지금 RPC 로 다시 조회한 대표행**이라
+    //    (zfResolveSavedCards) 표지 규칙을 그 자리에서 적용하면 목록 카드와 같은 문구가 된다.
+    cover:     r ? zfCoverPlaceText(r.region_names, r.block_count, r.sido_nm, r.sigungu_nm, r.region) : '',
     type:      r ? (r.housing_type||'') : '',
     url:       r ? (r.url||'')          : '',
     apply_end: r ? (r.apply_end||'')    : '',
@@ -1810,7 +1870,7 @@ function renderSavedNotices(){
         <p class="hname">${escapeHtml(s.title||'(공고명 없음)')}</p>
         <button style="background:none;border:none;font-size:18px;cursor:pointer;padding:2px 4px;color:#ccc" title="저장 삭제" onclick="toggleSaveNotice('${String(s.id).replace(/'/g,"\\'")}').then(renderSavedNotices)">✕</button>
       </div>
-      <p class="haddr">${escapeHtml(s.region||'')} · ${escapeHtml(s.type||'')}</p>
+      <p class="haddr">${escapeHtml(s.cover||s.region||'')} · ${escapeHtml(s.type||'')}</p>
       ${dateStr?`<p style="font-size:11px;color:#bbb;margin-top:4px">저장일: ${dateStr}</p>`:''}
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
         ${s.url?`<a class="detail-link" href="${s.url}" target="_blank">📄 공고 원문 보기</a>`:''}
@@ -2004,8 +2064,14 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
   statusEl.className = 'rbox ok';
   statusEl.innerHTML = '<p class="rtitle">✅ '+countText+'</p><p class="rdesc">수시로 자동 업데이트</p>';
 
-  const shown = filtered.slice(0, noticeVisibleCount);
-  let html = '';
+  // 🔴 쪽 범위를 먼저 고정한다 — 필터가 줄어 현재 쪽이 없어졌으면 마지막 쪽으로 당긴다.
+  const pageCount = Math.max(1, Math.ceil(filtered.length / noticePageSize));
+  if(noticePage > pageCount) noticePage = pageCount;
+  if(noticePage < 1) noticePage = 1;
+  const from  = (noticePage - 1) * noticePageSize;
+  const shown = filtered.slice(from, from + noticePageSize);
+  // 「113건 중 21–40」 — 지금 보고 있는 자리를 한 줄로 적는다.
+  let html = `<p class="pg-range">${filtered.length}건 중 ${from + 1}–${from + shown.length}</p>`;
   shown.forEach((n, idx) => {
     const isClosed   = n['처리상태']==='접수마감';
     const hasCancel  = n['has_cancel_notice']===true;
@@ -2039,7 +2105,9 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
     if(applyStart||applyEnd) detailRows.push(['접수기간', (applyStart||'-')+' ~ '+(applyEnd||'-')]);
 
     const nTitle = (n['공고명']||'').replace(/'/g,"\\'");
-    const nRegion = (n['지역']||'').replace(/'/g,"\\'");
+    // 🔴 공유 문구도 카드 표지와 같은 함수를 쓴다(2026-09-16) — 카드는 「구미시 외 2곳」인데
+    //    공유 텍스트만 대표 주소 한 곳이면 같은 공고를 두 이름으로 부르는 것이 된다.
+    const nRegion = zfCoverPlaceText(n['region_names'], n['block_count'], n['sido_nm'], n['sigungu_nm'], n['지역']).replace(/'/g,"\\'");
     const nType = (n['공급유형']||'').replace(/'/g,"\\'");
     const nUrl = (n['공고URL']||'').replace(/'/g,"\\'");
     const nId = (n['announcement_id']||String(idx)).replace(/'/g,"\\'");
@@ -2084,17 +2152,49 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
       ${detailHTML}
     </div>`;
   });
-  if(noticeVisibleCount < filtered.length){
-    html += `<button class="more-btn" onclick="noticeShowMore()">더 보기 (${filtered.length - noticeVisibleCount}건 더) ↓</button>`;
-  }
+  html += noticePagerHtml(pageCount, noticePage);
   listEl.innerHTML = html;
   // 캐시에 이미 있는 것은 즉시(깜빡임 없음), 없는 것만 물어보고 도착하면 채운다.
   zfFillSummarySlots();
   zfEnsurePriceSummaries(shown.map(n => n['announcement_id'])).then(ok => { if(ok) zfFillSummarySlots(); });
 }
 
-function noticeShowMore(){
-  noticeVisibleCount += 20;
+// 페이저 — 「‹ 이전 · 1 … 4 5 6 … 12 · 다음 ›」. 현재 쪽 좌우 1칸과 양 끝을 늘 보여주고
+// 사이가 벌어지면 「…」로 접는다. 🔵 한 쪽뿐이면 아무것도 그리지 않는다.
+function noticePageWindow(page, pageCount){
+  const keep = new Set([1, pageCount, page - 1, page, page + 1]);
+  const nums = [...keep].filter(n => n >= 1 && n <= pageCount).sort((a, b) => a - b);
+  const out = [];
+  nums.forEach((n, i) => { if(i > 0 && n - nums[i-1] > 1) out.push('…'); out.push(n); });
+  return out;
+}
+function noticePagerHtml(pageCount, page){
+  if(pageCount <= 1) return '';
+  const btn = (label, target, extra) =>
+    `<button class="pg-btn" ${extra||''} onclick="noticeGoPage(${target})">${label}</button>`;
+  let h = '<div class="pg-bar" role="navigation" aria-label="공고 목록 페이지">';
+  h += page > 1 ? btn('‹', page - 1, 'aria-label="이전 쪽"')
+                : '<button class="pg-btn" disabled aria-label="이전 쪽">‹</button>';
+  noticePageWindow(page, pageCount).forEach(n => {
+    if(n === '…') { h += '<span class="pg-gap">…</span>'; return; }
+    h += n === page ? `<button class="pg-btn" aria-current="page" onclick="noticeGoPage(${n})">${n}</button>`
+                    : btn(n, n);
+  });
+  h += page < pageCount ? btn('›', page + 1, 'aria-label="다음 쪽"')
+                        : '<button class="pg-btn" disabled aria-label="다음 쪽">›</button>';
+  return h + '</div>';
+}
+function noticeGoPage(n){
+  noticePage = n;
+  renderNoticeList(noticeFiltered, noticeData.length);
+  // 쪽을 넘기면 목록 맨 위로 — 안 그러면 새 쪽의 한가운데를 보고 있게 된다.
+  const el = document.getElementById('notice-status');
+  if(el && el.scrollIntoView) el.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+function noticeSetPageSize(v){
+  const n = Number(v);
+  noticePageSize = NOTICE_PAGE_SIZES.includes(n) ? n : 20;
+  noticePage = 1;                       // 보기 개수를 바꾸면 1쪽으로
   renderNoticeList(noticeFiltered, noticeData.length);
 }
 </script>
@@ -2325,7 +2425,7 @@ function renderPersonalizedRecommendations(){
         <p class="hname">${n['공고명']||n['name']||'(공고명 없음)'}</p>
         <span class="htag tag-apt">${n['처리상태']||'-'}</span>
       </div>
-      <p class="haddr">${n['지역']||''} · ${n['공급유형']||''}</p>
+      <p class="haddr">${zfCoverPlace(n['region_names'], n['block_count'], n['sido_nm'], n['sigungu_nm'], n['지역'])} · ${n['공급유형']||''}</p>
       <div class="chip-row" style="margin:6px 0;gap:5px">
         ${hasCancel?'<span class="chip sel" title="같은 이름의 [취소공고]가 따로 게시됐어요. 공고 원문을 반드시 확인하세요." style="cursor:help;padding:4px 10px;font-size:11px;background:#A32D2D;border-color:#A32D2D">🚫 취소공고 있음</span>':''}
         ${isNewNotice(n)?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
@@ -4928,7 +5028,7 @@ function renderMatchResults(rows){
     if(applyStart||applyEnd) detailRows.push(['접수기간', (applyStart||'-')+' ~ '+(applyEnd||'-')]);
 
     const mTitle = (n.title||'').replace(/'/g,"\\'");
-    const mRegion = (n.region||'').replace(/'/g,"\\'");
+    const mRegion = zfCoverPlaceText(n.region_names, n.block_count, n.sido_nm, n.sigungu_nm, n.region).replace(/'/g,"\\'");
     const mType = (n.housing_type||'').replace(/'/g,"\\'");
     const mUrl = (n.url||'').replace(/'/g,"\\'");
     const mId = (n.announcement_id||'m'+idx).replace(/'/g,"\\'");
@@ -4953,7 +5053,7 @@ function renderMatchResults(rows){
         <p class="hname">${normalizeRevisedTitle(n.title)||'(공고명 없음)'}</p>
         <span class="htag ${isClosed?'tag-mix':'tag-apt'}">${n.status||'-'}</span>
       </div>
-      <p class="haddr">${n.region||''} · ${classifyNoticeType(n.housing_type||'',n.title||'')} · ${n.housing_type||''}</p>
+      <p class="haddr">${zfCoverPlace(n.region_names, n.block_count, n.sido_nm, n.sigungu_nm, n.region)} · ${classifyNoticeType(n.housing_type||'',n.title||'')} · ${n.housing_type||''}</p>
       <div class="chip-row" style="margin:8px 0;gap:5px">
         ${hasCancel?'<span class="chip sel" title="같은 이름의 [취소공고]가 따로 게시됐어요. 공고 원문을 반드시 확인하세요." style="cursor:help;padding:4px 10px;font-size:11px;background:#A32D2D;border-color:#A32D2D">🚫 취소공고 있음</span>':''}
         ${n.building_name?`<span class="chip" style="cursor:default;padding:4px 10px;font-size:11px">🏢 ${escapeHtml(n.building_name)}</span>`:''}
