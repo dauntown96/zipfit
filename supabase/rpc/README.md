@@ -51,6 +51,33 @@ anon·authenticated에 주고 있어, **새 함수는 열린 채로 태어난다
 
 기록만 한다. 여기를 고쳐도 DB는 바뀌지 않는다 — 위 「배포 경로가 아니다」와 같다.
 
+### 2026-09-16 — `get_announcement_price_summary` 재생성, 권한은 전과 같게 되돌림
+
+`round_state`·`source_round` 두 컬럼을 **더하느라** `RETURNS TABLE`이 바뀌었다.
+🔴 그 경우 `CREATE OR REPLACE`가 거부되므로 `DROP FUNCTION` 후 재생성해야 하고,
+**DROP과 함께 ACL이 통째로 사라진다.** 그래서 재생성 직후 손으로 되돌렸다.
+
+재생성 **전** ACL(`proacl`) — 이것이 되돌림 기준이다:
+
+```
+postgres=X/postgres | service_role=X/postgres | anon=X/postgres | authenticated=X/postgres
+```
+
+```sql
+-- 재생성 직후 그 자리에서 (원칙 15 — 새 함수는 만든 자리에서 손으로 닫는다)
+revoke execute on function public.get_announcement_price_summary(text[]) from public;
+grant  execute on function public.get_announcement_price_summary(text[]) to anon, authenticated, service_role;
+```
+
+재생성 **후** ACL — 전과 **같다**(실측으로 대조함):
+
+```
+postgres=X/postgres | service_role=X/postgres | anon=X/postgres | authenticated=X/postgres
+```
+
+⚠️ `anon`이 남아 있어야 한다 — 카드 1층 요약은 로그인 없이도 뜨고 프론트가 anon 키로 부른다.
+⚠️ 속성도 함께 확인했다: `STABLE` · `SECURITY INVOKER` · owner `postgres` 전부 전과 같다.
+
 ### 2026-09-11 — 쓰기 함수 2개의 EXECUTE를 anon·authenticated에서 회수
 
 `bulk_set_revision_note`·`bump_detail_fetch_fail`은 둘 다 `SECURITY DEFINER`이고 역할 검사가
