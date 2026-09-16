@@ -766,6 +766,266 @@ async function collect() {
   }
 }
 
+// ── 관측 전용 probe (2026-09-17 신설) ─────────────────────────────
+// 🔴 무엇인가: `?mode=probe`로 부르면 **DB에 한 줄도 쓰지 않고** LH 목록·상세와 MYHOME 목록을
+// 받아 업스트림 원문을 요약해 JSON으로 돌려준다. 매퍼를 바꾸기 전에 「원문이 실제로 무엇을
+// 주는가」를 봐야 하는데, 컨테이너 프록시가 apis.data.go.kr에 닿지 않아 EF 안에서 볼 수밖에 없다.
+// collect-sh-announcements의 `?mode=probe`와 같은 자리·같은 모양이다.
+//
+// 🔴 의존 방향이 한쪽이다 — probe가 수집 쪽 함수를 부르는 것은 있어도(fetchListPage·
+// fetchJsonStrict·snippetOf) **그 반대는 없다.** collect()도 mapLHRow도 이 블록을 모른다.
+// 그래서 이 블록을 통째로 지워도 정기 실행은 글자 그대로 같다.
+//
+// 🔴 DB에 쓰지 않는다 — 이 블록 어디에서도 supabase.*를 부르지 않는다. collection_run_log에도
+// 남지 않는다(로그 기록은 collect() 안에만 있다).
+//
+// 🔴 외부 요청 상한은 호출당 고정이다: LH 목록 1쪽 + LH 상세 최대 5건 + MYHOME 1쪽 = 최대 7회.
+// 목록의 쪽·카테고리는 파라미터로 받되 **한 번에 한 쪽**이다. 더 보려면 다시 부른다.
+//
+// 🔴 비밀값은 어떤 형태로도 응답에 싣지 않는다. 응답 문자열 전체에 scrubSecrets()를 한 번 더
+// 건다 — URL을 담지 않는 것이 1차 방어이고, 이것이 2차 방어다.
+const PROBE_MAX_DETAIL   = 5
+const PROBE_MAX_ELEMENTS = 20    // 원소 배열을 통째로 싣되 이 수에서 자른다
+const PROBE_LIST_TIMEOUT_MS   = 12000
+const PROBE_DETAIL_TIMEOUT_MS = 20000   // 관측용이라 수집(5초)보다 길게 — 느린 공고도 봐야 한다
+
+// 키가 URL 인코딩된 형태로 섞여 들어갈 수 있어 변형까지 함께 막는다.
+const secretVariants = (v: string): string[] => {
+  const out = new Set<string>([v])
+  try { out.add(encodeURIComponent(v)) } catch { /* 무시 */ }
+  try { out.add(decodeURIComponent(v)) } catch { /* 무시 */ }
+  return [...out].filter(s => s.length >= 8)
+}
+const PROBE_SECRETS = [...secretVariants(LH_API_KEY), ...secretVariants(CRON_SECRET)]
+const scrubSecrets = (text: string): string => {
+  let out = redactKey(text)
+  for (const s of PROBE_SECRETS) out = out.split(s).join('***')
+  return out
+}
+
+// 「0」과 「"0"」과 「""」과 「없음」을 갈라 말한다 — mapMyHomeRow의 0 접기를 판정할 유일한 근거다.
+// DB로는 못 가른다(넷이 전부 NULL로 합류한다).
+const rawKind = (v: unknown): string => {
+  if (v === undefined) return 'absent'
+  if (v === null) return 'null'
+  if (typeof v === 'number') return v === 0 ? 'number:0' : 'number'
+  if (typeof v === 'string') {
+    const t = v.trim()
+    if (t === '') return 'string:empty'
+    if (/^0+(\.0+)?$/.test(t)) return 'string:zero'
+    return 'string'
+  }
+  return typeof v
+}
+const isZeroKind = (k: string): boolean => k === 'number:0' || k === 'string:zero'
+
+const probeListRow = (i: NoticeItem) => ({
+  PAN_ID: i.PAN_ID, PAN_NM: i.PAN_NM, PAN_SS: i.PAN_SS,
+  PAN_NT_ST_DT: i.PAN_NT_ST_DT, PAN_DT: i.PAN_DT,
+  CLSG_DT: i.CLSG_DT, CNP_CD_NM: i.CNP_CD_NM,
+})
+
+// 목록 1쪽. 🔴 fetchNoticeList를 부르지 않는다 — 그 함수는 카테고리를 끝까지 페이징해서
+// 상한(1쪽)을 넘긴다. 윈도우 산출은 그 함수와 같은 식을 쓰되 **읽기만** 한다.
+async function probeList(tp: string, page: number, sampleN: number, panIds: string[]) {
+  const today  = new Date()
+  const past   = new Date(today); past.setDate(today.getDate() - 90)
+  const future = new Date(today); future.setDate(today.getDate() + 365)
+  const fmt    = (d: Date) =>
+    `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`
+
+  const url = `https://apis.data.go.kr/B552555/lhLeaseNoticeInfo1/lhLeaseNoticeInfo1` +
+    `?ServiceKey=${LH_API_KEY}&PG_SZ=100&PAGE=${page}&UPP_AIS_TP_CD=${tp}` +
+    `&PAN_ST_DT=${fmt(past)}&PAN_ED_DT=${fmt(today)}` +
+    `&CLSG_ST_DT=${fmt(past)}&CLSG_ED_DT=${fmt(future)}`
+
+  const items = await fetchListPage(url, PROBE_LIST_TIMEOUT_MS)
+
+  let same = 0, differ = 0, panDtMissing = 0, panNtMissing = 0
+  for (const i of items) {
+    const a = san(i.PAN_NT_ST_DT), b = san(i.PAN_DT)
+    if (!b) panDtMissing++
+    if (!a) panNtMissing++
+    if (a && b) (parseDate(a) === parseDate(b) ? same++ : differ++)
+  }
+
+  const revised = items.filter(i =>
+    String(i.PAN_SS ?? '').includes('정정') || String(i.PAN_NM ?? '').startsWith('[정정공고]'))
+
+  const wanted = new Set(panIds)
+  const matched = items.filter(i => wanted.has(String(i.PAN_ID)))
+
+  return {
+    summary: {
+      upp_ais_tp_cd: tp, page,
+      window: { PAN_ST_DT: fmt(past), PAN_ED_DT: fmt(today), CLSG_ED_DT: fmt(future) },
+      count: items.length,
+      // 🔴 A-1의 핵심 관측 — 목록이 PAN_DT와 PAN_NT_ST_DT를 실제로 다르게 주는가.
+      date_compare: { same, differ, pan_dt_missing: panDtMissing, pan_nt_st_dt_missing: panNtMissing },
+      list_row_keys: items.length ? Object.keys(items[0] as unknown as Record<string, unknown>) : [],
+    },
+    sample:   items.slice(0, sampleN).map(probeListRow),
+    revised:  revised.map(probeListRow),          // 이 쪽 안의 정정 전수
+    requested: {
+      asked: panIds,
+      found: matched.map(probeListRow),
+      missing: panIds.filter(id => !matched.some(i => String(i.PAN_ID) === id)),
+    },
+    _items: items,   // 상세조회에 넘길 원본. 응답에서는 지운다.
+  }
+}
+
+// 상세 1건. 🔴 fetchDetailWithTimeout을 쓰지 않는다 — 그쪽은 원소 [0]만 남기고 버리는데,
+// 여기서 보려는 것이 바로 「원소가 몇 개이고 각각 무엇을 담는가」다.
+async function probeDetail(item: NoticeItem): Promise<Record<string, unknown>> {
+  const url = `https://apis.data.go.kr/B552555/lhLeaseNoticeDtlInfo1/getLeaseNoticeDtlInfo1` +
+    `?serviceKey=${LH_API_KEY}` +
+    `&SPL_INF_TP_CD=${item.SPL_INF_TP_CD}&CCR_CNNT_SYS_DS_CD=${item.CCR_CNNT_SYS_DS_CD}` +
+    `&PAN_ID=${item.PAN_ID}&UPP_AIS_TP_CD=${item.UPP_AIS_TP_CD}&AIS_TP_CD=${item.AIS_TP_CD}`
+
+  const base = { pan_id: item.PAN_ID, list_row: probeListRow(item) }
+  let res: Response
+  try {
+    res = await fetch(url, { signal: AbortSignal.timeout(PROBE_DETAIL_TIMEOUT_MS) })
+  } catch (e) {
+    return { ...base, error: `network:${e instanceof Error ? e.name : 'Error'}` }
+  }
+  const contentType = res.headers.get('content-type')
+  const text = await res.text().catch(() => '')
+  if (!res.ok) return { ...base, error: 'http_error', status: res.status, content_type: contentType, snippet: snippetOf(text) }
+
+  let parsed: unknown
+  try { parsed = JSON.parse(text) }
+  catch { return { ...base, error: 'json_parse_failed', content_type: contentType, snippet: snippetOf(text) } }
+  if (!Array.isArray(parsed)) {
+    return { ...base, error: 'not_an_array', content_type: contentType, snippet: snippetOf(JSON.stringify(parsed)) }
+  }
+
+  const containers = parsed as Record<string, unknown>[]
+  const arrOf = (k: string): Record<string, unknown>[] => {
+    const c = containers.find(x => Array.isArray(x[k]))
+    return c ? (c[k] as Record<string, unknown>[]) : []
+  }
+  const sbd  = arrOf('dsSbd')
+  const scdl = arrOf('dsSplScdl')
+  const etc  = arrOf('dsEtcInfo')
+  const ahfl = arrOf('dsAhflInfo')
+
+  return {
+    ...base,
+    container_keys: containers.flatMap(c => Object.keys(c)),
+    ds_sbd_count: sbd.length,
+    ds_sbd: sbd.slice(0, PROBE_MAX_ELEMENTS),
+    ds_spl_scdl_count: scdl.length,
+    ds_spl_scdl: scdl.slice(0, PROBE_MAX_ELEMENTS),
+    ds_etc_info_count: etc.length,
+    ds_ahfl_info_count: ahfl.length,
+  }
+}
+
+// MYHOME 목록 1쪽. 임대료·보증금·공급호수의 **원시 값과 타입**을 그대로 본다.
+const PROBE_MYHOME_FIELDS = ['rentGtn', 'mtRntchrg', 'sumSuplyCo'] as const
+
+async function probeMyHome(sampleN: number) {
+  const url = `https://apis.data.go.kr/1613000/HWSPR02/rsdtRcritNtcList` +
+    `?serviceKey=${LH_API_KEY}&numOfRows=100&pageNo=1&type=json`
+  const { value } = await fetchJsonStrict(url, MYHOME_TIMEOUT_MS)
+  const raw = value as { response?: { body?: { totalCount?: unknown; item?: unknown } } }
+  const itemsRaw = raw?.response?.body?.item
+  const items: MyHomeItem[] = Array.isArray(itemsRaw) ? itemsRaw : itemsRaw ? [itemsRaw as MyHomeItem] : []
+
+  const kinds: Record<string, Record<string, number>> = {}
+  for (const f of PROBE_MYHOME_FIELDS) kinds[f] = {}
+  for (const it of items) {
+    for (const f of PROBE_MYHOME_FIELDS) {
+      const k = rawKind((it as Record<string, unknown>)[f])
+      kinds[f][k] = (kinds[f][k] ?? 0) + 1
+    }
+  }
+
+  const viewOf = (it: MyHomeItem) => {
+    const o: Record<string, unknown> = {
+      pblancId: it['pblancId'], houseSn: it['houseSn'], pblancNm: it['pblancNm'],
+      brtcNm: it['brtcNm'], signguNm: it['signguNm'],
+    }
+    for (const f of PROBE_MYHOME_FIELDS) {
+      const v = (it as Record<string, unknown>)[f]
+      o[f] = { value: v, typeof: typeof v, kind: rawKind(v) }
+    }
+    return o
+  }
+
+  // 🔴 A-6의 핵심 관측 — 업스트림이 실제로 0을 주는가. 주면 어떤 공고인가.
+  const zeroRows = items.filter(it =>
+    PROBE_MYHOME_FIELDS.some(f => isZeroKind(rawKind((it as Record<string, unknown>)[f]))))
+
+  return {
+    summary: {
+      total_count: raw?.response?.body?.totalCount ?? null,
+      page_count: items.length,
+      item_keys: items.length ? Object.keys(items[0] as Record<string, unknown>) : [],
+      kinds,
+      zero_row_count: zeroRows.length,
+    },
+    zero_rows: zeroRows.slice(0, PROBE_MAX_ELEMENTS).map(viewOf),
+    sample: items.slice(0, sampleN).map(viewOf),
+  }
+}
+
+async function probe(params: URLSearchParams): Promise<Record<string, unknown>> {
+  const tp      = (params.get('tp') ?? '06').replace(/[^0-9]/g, '').slice(0, 2) || '06'
+  const page    = Math.min(Math.max(parseInt(params.get('page') ?? '1', 10) || 1, 1), 10)
+  const sampleN = Math.min(Math.max(parseInt(params.get('n') ?? '10', 10) || 10, 1), 100)
+  const panIds  = (params.get('pan_ids') ?? '').split(',')
+    .map(s => s.trim()).filter(Boolean).slice(0, PROBE_MAX_DETAIL)
+  const wantMyHome = params.get('myhome') !== '0'
+
+  const out: Record<string, unknown> = {
+    params: { tp, page, n: sampleN, pan_ids: panIds, myhome: wantMyHome },
+    limits: { list_pages: 1, detail_max: PROBE_MAX_DETAIL, myhome_pages: wantMyHome ? 1 : 0 },
+  }
+
+  let listItems: NoticeItem[] = []
+  try {
+    const l = await probeList(tp, page, sampleN, panIds)
+    listItems = l._items
+    const { _items, ...rest } = l
+    out.lh_list = rest
+  } catch (e) {
+    out.lh_list = { error: e instanceof UpstreamError ? describeFail('LH 목록', e.info) : String(e) }
+  }
+
+  if (panIds.length > 0) {
+    const targets = listItems.filter(i => panIds.includes(String(i.PAN_ID))).slice(0, PROBE_MAX_DETAIL)
+    const details: unknown[] = []
+    for (const id of panIds) {
+      if (!targets.some(t => String(t.PAN_ID) === id)) {
+        // 🔴 상세조회에 필요한 코드 4종(SPL_INF_TP_CD·CCR_CNNT_SYS_DS_CD·UPP_AIS_TP_CD·AIS_TP_CD)은
+        // 목록 행에만 있다. 이 쪽에 없으면 지어내지 않고 「못 찾았다」고 적는다 — tp·page를 바꿔 다시 부른다.
+        details.push({ pan_id: id, error: 'not_in_list_page', hint: 'tp·page를 바꿔 다시 부른다' })
+      }
+    }
+    for (const t of targets) {
+      try { details.push(await probeDetail(t)) }
+      catch (e) { details.push({ pan_id: t.PAN_ID, error: String(e) }) }
+    }
+    out.lh_detail = details
+  } else {
+    out.lh_detail = { skipped: 'pan_ids 미지정 — 상세 호출 0회' }
+  }
+
+  if (wantMyHome) {
+    try { out.myhome = await probeMyHome(sampleN) }
+    catch (e) {
+      out.myhome = { error: e instanceof UpstreamError ? describeFail('MYHOME 목록', e.info) : String(e) }
+    }
+  } else {
+    out.myhome = { skipped: 'myhome=0' }
+  }
+
+  return out
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: {
     'Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'POST,OPTIONS',
@@ -774,6 +1034,15 @@ Deno.serve(async (req: Request) => {
   if (req.method !== 'POST') return new Response(JSON.stringify({error:'Method not allowed'}), {status:405})
   if (!matchCronSecret(req)) return new Response(JSON.stringify({error:'Unauthorized'}), {status:401})
   if (new URL(req.url).searchParams.get('mode') === 'authcheck') return authcheckResponse()
+
+  // 🔴 관측 전용 경로. 여기서 반환하면 collect()는 아예 호출되지 않는다 — DB에 한 줄도 쓰지 않고,
+  // collection_run_log에도 남지 않는다. 정기 실행(mode 미지정 = collect)은 이 분기를 지나치기만 한다.
+  const probeParams = new URL(req.url).searchParams
+  if (probeParams.get('mode') === 'probe') {
+    const probed = await probe(probeParams)
+    return new Response(scrubSecrets(JSON.stringify({ mode: 'probe', ...probed })),
+      { headers: { 'Content-Type': 'application/json' } })
+  }
 
   const started = new Date().toISOString()
   const result  = await collect()
