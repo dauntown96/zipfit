@@ -228,6 +228,8 @@ body.theme-dark .extras-missing-note{color:#d8c48a;background:#2a2721;border-col
    🔴 .hu-item 전체를 풀지 않는다. 나머지 항목의 「자기 내용 폭만큼 차지하고 통째로 넘어간다」는
    배치가 그대로 유지돼야 한다 — 여기만 한 줄을 통째로 쓰고 안에서 접는다. */
 .hu-item-wide{white-space:normal;flex:1 1 100%;min-width:0;overflow-wrap:anywhere}
+/* 세대 정보가 아직 없는 블록 — 빈 상자를 남기지 않는다(「세대수 정보 없음」과 같은 형태). */
+.blk-empty{font-size:12px;color:#999;margin:6px 0;padding:8px 10px;background:#f4f4f2;border-radius:8px}
 .hu-label{color:#999;margin-right:4px}
 .hu-note-wrap{margin-top:8px;padding-top:8px;border-top:1px dashed #e0e0d8}
 .hu-note-item{margin:4px 0}
@@ -920,10 +922,20 @@ function isClosingSoon(row){
 // 4건은 첨부 PDF에만 있으며, 3건은 상세 페이지 자체가 없다. 상세를 전부 긁어도
 // 44%는 여전히 미상이다 — 그래서 읽어 채우는 대신 '미상'을 화면에 드러낸다.
 function applyWindowState(row){
+  const today = startOfLocalDay(new Date());
+  // 🔴 당첨발표일이 지났으면 그 공고의 접수는 끝났다 — 업스트림의 상태·마감일보다 이 관계가 우선이다.
+  //    계기: MYHOME 이 2025.09.15 울산 정례모집(과 그 정정공고)을 「모집중」으로 돌려주고
+  //    apply_end 를 2029-10-01 로 준다. 실제로는 2026-01-30 에 당첨발표가 끝난 공고다.
+  //    🔵 DB 값은 고치지 않는다(업스트림 오류를 우리가 덮어쓰면 다음 수집이 되살린다). 화면 판정으로만 푼다.
+  //    [VERIFY] 예외를 마감 포함 전수에서 먼저 셌다(2026-09-16 11:51 KST, 모수 get_announcements_deduped):
+  //    winner_announce_date 가 오늘보다 이른 공고 73건 중 **apply_end 가 미래인 것은 1건뿐**이고 그것이
+  //    이 울산 건이다. 즉 「발표 뒤에도 접수가 이어지는」 공고는 전수에 없어 규칙을 좁힐 조건이 없었다.
+  //    상시·수시모집은 애초에 winner_announce_date 가 NULL 이라(875건 중 408건) 이 가지를 타지 않는다.
+  const w = parseNoticeDate(row['winner_announce_date']||'');
+  if(w && startOfLocalDay(w) < today) return 'closed';
   const s = parseNoticeDate(row['신청시작일']||row['apply_start']||'');
   const e = parseNoticeDate(row['신청마감일']||row['apply_end']||'');
   if(!s || !e) return 'unknown';
-  const today = startOfLocalDay(new Date());
   const dS = Math.round((startOfLocalDay(s) - today) / (1000*60*60*24));
   const dE = Math.round((startOfLocalDay(e) - today) / (1000*60*60*24));
   if(dS > 0)  return 'before';
@@ -1187,6 +1199,56 @@ function zfRegionAliases(sido, sigungu){
   return out;
 }
 
+// 🔴 곳 수를 셀 때는 「다른 원소의 접두인 원소」를 흡수한다 — 가장 구체적인 표기만 남긴다.
+//    region_names 에는 검색용으로 「부천시 소사구」의 첫 마디(「부천시」)가 함께 들어 있어서,
+//    그대로 세면 한 시의 두 구가 3곳으로 부풀어 오른다.
+//    [VERIFY] 2026-09-16 활성 113건에서 흡수 후 2곳 이상이 25건이고, 이는 형제 행 축으로 센 25건과 같다.
+function zfPlaceNames(regionNames){
+  const arr = Array.isArray(regionNames) ? regionNames.filter(Boolean) : [];
+  return arr.filter(x => !arr.some(y => y !== x && y.indexOf(x + ' ') === 0));
+}
+// 「경기도 하남시」 → 「하남시」. 표지는 폭이 좁아 시·도를 뗀다(시·도는 이미 지역 칩이 말한다).
+function zfShortPlace(v){
+  const t = String(v || '').trim().split(/\s+/);
+  return t.length > 1 ? t.slice(1).join(' ') : t.join(' ');
+}
+// 🔴 대표는 「지금 표지에 이미 보이던 곳」을 그대로 앞세운다 — 바뀌는 것은 표지의 성격이지 대표가 아니다.
+//    ① 종전 표지 주소(best_location = 카드의 '지역')가 어느 원소로 시작하면 그것(가장 긴 것)
+//    ② 없으면 카드의 (sido_nm, sigungu_nm)
+//    ③ 그것도 목록에 없으면 가나다순 첫 번째(RPC 가 ORDER BY nm 으로 담는다)
+function zfPickLeadPlace(places, sido, sigungu, cover){
+  const c = String(cover || '').trim();
+  const byCover = places.filter(p => c === p || c.indexOf(p + ' ') === 0)
+                        .sort((a, b) => b.length - a.length)[0];
+  if(byCover) return byCover;
+  const own = [sido, sigungu].filter(Boolean).join(' ');
+  return (own && places.indexOf(own) >= 0) ? own : places[0];
+}
+// 표지 지역 문구 — 세 갈래다. 🔴 대표 한 곳만 적는 종전 문구는 남기지 않는다(「우리 동네가 아니네」로 읽힌다).
+function zfCoverPlace(regionNames, blockCount, sido, sigungu, fallback){
+  const places = zfPlaceNames(regionNames);
+  const blocks = Number(blockCount) || 1;
+  if(places.length >= 2){
+    return escapeHtml(zfShortPlace(zfPickLeadPlace(places, sido, sigungu, fallback))) + ' 외 ' + (places.length - 1) + '곳';
+  }
+  if(places.length === 1 && blocks >= 2){
+    return escapeHtml(zfShortPlace(places[0])) + ' · ' + blocks + '개 단지';
+  }
+  return escapeHtml(fallback || '');   // 한 곳·한 단지는 종전 그대로
+}
+// 상세의 전체 시군구 목록 — 표지가 「외 N곳」으로 줄이므로 여기서 전부 펼쳐 보여준다.
+//    한 곳뿐이면 표지가 이미 그 이름을 적었으므로 아무것도 그리지 않는다.
+function zfPlacesLine(regionNames){
+  const places = zfPlaceNames(regionNames);
+  if(places.length < 2) return '';
+  return `<p style="font-size:12px;color:#666;margin:8px 0 0;line-height:1.6">📍 <span style="color:#999">이 공고의 주택이 있는 지역</span> ${places.map(x => escapeHtml(zfShortPlace(x))).join(' · ')}</p>`;
+}
+// 단지명 배지 — 단지가 여럿이면 대표 단지명 뒤에 나머지 수를 적는다.
+function zfBuildingLabel(buildingName, blockCount){
+  const blocks = Number(blockCount) || 1;
+  return escapeHtml(buildingName) + (blocks >= 2 ? ` 외 ${blocks - 1}개 단지` : '');
+}
+
 function searchFilterNotices(list, query, scope){
   const q = (query || '').trim().toLowerCase();
   if(!q) return list;
@@ -1196,7 +1258,10 @@ function searchFilterNotices(list, query, scope){
     const buildingName = (n['building_name'] || '').toLowerCase();
     const titleMatch = title.includes(q) || buildingName.includes(q);
     if(scope === 'title') return titleMatch;
+    // 🔴 대표행의 sigungu_nm 하나만 보던 자리다 — 「경기북부 7개 시군」 공고를 「하남시」로 못 찾았다.
+    //    region_names 가 그룹 형제 행의 시군구 전부를 담고 있으므로 그것을 잇는다(2026-09-16).
     const regionText = [n['지역'], n['sido_nm'], n['sigungu_nm'], n['precise_address']]
+      .concat(Array.isArray(n['region_names']) ? n['region_names'] : [])
       .concat(zfRegionAliases(n['sido_nm'], n['sigungu_nm']))
       .filter(Boolean).join(' ').toLowerCase();
     if(scope === 'title-region') return titleMatch || regionText.includes(q);
@@ -1367,6 +1432,9 @@ async function loadNoticeData(){
       'doc_submit_start': r.doc_submit_start||'',
       'doc_submit_end': r.doc_submit_end||'',
       'winner_announce_date': r.winner_announce_date||'',
+      // 🔴 2026-09-16 신설 — 그룹이 걸친 시군구 전부와 단지(블록) 수. RPC 가 조회 시점에 계산한다.
+      'region_names': r.region_names||null,
+      'block_count': r.block_count||1,
       'contract_start': r.contract_start||'',
       'contract_end': r.contract_end||'',
       'building_name': r.building_name||'',
@@ -1983,6 +2051,7 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
           <div class="detail-grid">
             ${detailRows.map(([k,v])=>`<div style="font-size:12px"><span style="color:#999">${k}</span><br><span style="color:#333;font-weight:500">${v}</span></div>`).join('')}
           </div>
+          ${zfPlacesLine(n['region_names'])}
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
             ${n['공고URL']?`<a class="detail-link" href="${n['공고URL']}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a>`:''}
             ${shareBtn}
@@ -1996,10 +2065,10 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
         <p class="hname">${normalizeRevisedTitle(n['공고명'])||'(공고명 없음)'}</p>
         <span class="htag ${isClosed?'tag-mix':'tag-apt'}">${n['처리상태']||'-'}</span>
       </div>
-      <p class="haddr">${n['지역']||''} · ${classifyNoticeType(n['공급유형'],n['공고명'])} · ${n['공급유형']||''}</p>
+      <p class="haddr">${zfCoverPlace(n['region_names'], n['block_count'], n['sido_nm'], n['sigungu_nm'], n['지역'])} · ${classifyNoticeType(n['공급유형'],n['공고명'])} · ${n['공급유형']||''}</p>
       <div class="chip-row" style="margin:8px 0;gap:5px">
         ${hasCancel?'<span class="chip sel" title="같은 이름의 [취소공고]가 따로 게시됐어요. 공고 원문을 반드시 확인하세요." style="cursor:help;padding:4px 10px;font-size:11px;background:#A32D2D;border-color:#A32D2D">🚫 취소공고 있음</span>':''}
-        ${n['building_name']?`<span class="chip" style="cursor:default;padding:4px 10px;font-size:11px">🏢 ${escapeHtml(n['building_name'])}</span>`:''}
+        ${n['building_name']?`<span class="chip" style="cursor:default;padding:4px 10px;font-size:11px">🏢 ${zfBuildingLabel(n['building_name'], n['block_count'])}</span>`:''}
         ${isAmended?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#7B5EA7;border-color:#7B5EA7">🔄 정정</span>':''}
         ${(isAmended && revisionNoteEsc)?`<span title="${revisionNoteEsc}" style="cursor:help;font-size:11px;color:#666;border:1px solid #ccc;border-radius:10px;padding:1px 6px">ℹ️ 정정사유</span>`:''}
         ${isNew?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
@@ -3959,7 +4028,13 @@ document.addEventListener('keydown', e => {
 // "같은 제목(dedup_key)을 공유하는 원본 행들의 주소/세대수가 서로 다르면 블록으로 취급"하는 범용 로직
 const blockAnnIds = {};
 const blockInfo = {};
-const blockLoaded = {};
+// 🔴 `blockLoaded` 를 걷어냈다(2026-09-16). 카드 id(`ncard-detail-{인덱스}`)를 키로 쓰는 모듈 수준
+//    캐시였는데 그 인덱스는 목록을 다시 그릴 때마다 **다른 공고에 재배정**된다. 한 번 펼친 자리에
+//    다른 공고가 오면 `blockLoaded[key]` 가 아직 참이라 `toggleBlockGroup` 이 조회를 건너뛰고,
+//    새로 그려진 **빈 본문이 그대로 남았다**(2026-09-16 실측: 경북서부 → 원주 순서에서 6블록 전부 빔).
+//    PR #130 과 같은 처방이다 — 상태를 **그 본문 원소 자신에게** 둔다. 원소가 새로 그려지면
+//    표시도 함께 사라지므로 낡을 수가 없다. `blockAnnIds`·`blockInfo` 는 카드를 열 때마다
+//    `loadAnnouncementBlocks` 가 덮어쓰므로(상세 div 가 매 렌더 새로 생겨 `blocksLoaded` 도 비어 있다) 그대로 둔다.
 
 // 카드 상세의 "사진·평면도" 섹션은 원래 카드 자체의 announcement_id(대표행) 것만 보여주는데,
 // 블록이 여러 개인 공고는 그 대표행이 사실 여러 블록 중 하나일 뿐이라 블록별 섹션과 중복/혼동되어
@@ -4019,9 +4094,10 @@ function toggleBlockGroup(id, idx){
   if(blk && blk.precise_address){
     initMapForHouse({ addr: blk.precise_address, name: blk.precise_address }, id);
   }
-  const key = id+'-'+idx;
   const subId = id+'-blk'+idx;
-  if(blockLoaded[key]){
+  const annIdForBlock = (blockAnnIds[id]||[])[idx] || '';
+  // 🔴 이 본문이 **지금 이 공고의 이 블록으로** 채워졌을 때만 재사용한다(원소 자신이 든 표시).
+  if(bodyEl.dataset.blkLoadedFor && bodyEl.dataset.blkLoadedFor === annIdForBlock){
     // 이미 데이터를 불러온 블록을 다시 여는 경우 — Supabase 재조회는 불필요하지만
     // 지도는 이 블록의 위치로 다시 옮겨야 하므로, 캐시해둔 세대정보에서 주소를 꺼내 재이동시킨다.
     const groups = huGroupsCache[subId];
@@ -4032,12 +4108,14 @@ function toggleBlockGroup(id, idx){
     }
     return;
   }
-  blockLoaded[key] = true;
-  const annId = (blockAnnIds[id]||[])[idx];
-  if(!annId) return;
-  bodyEl.innerHTML = `<div id="hu-slot-${subId}"></div><div id="extras-slot-${subId}"></div>`;
-  loadHousingUnits(annId, null, subId, false, id);
-  loadAnnouncementExtras(annId, null, subId);
+  if(!annIdForBlock) return;
+  bodyEl.dataset.blkLoadedFor = annIdForBlock;
+  // 🔵 세대정보가 아직 없는 블록은 본문이 통째로 비었다(원주 09-15 회차 3블록이 그렇다).
+  //    빈 상자를 남기지 않고 문구를 먼저 깔아 둔다 — 세대정보가 도착하면 그 위에 얹힌다.
+  bodyEl.innerHTML = `<p class="blk-empty">이 단지의 세대 정보는 아직 없어요.</p>`
+    + `<div id="hu-slot-${subId}"></div><div id="extras-slot-${subId}"></div>`;
+  loadHousingUnits(annIdForBlock, null, subId, false, id);
+  loadAnnouncementExtras(annIdForBlock, null, subId);
 }
 
 function loadAnnouncementPolicies(annId, detailEl, id, useGroup){
@@ -4348,7 +4426,12 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
     wrap.innerHTML = `<summary class="hu-title">${huTitle}</summary>` + staleHtml + `<div class="hu-list" id="hu-list-${id}"></div>` + pastHtml;
     if(groups.length === 1 || pastOnly) wrap.open = true; // 건물이 1개뿐이거나, 바깥에 안내만 있을 때는 펼쳐서 보여줌
     const slot = document.getElementById('hu-slot-'+id);
-    if(slot) slot.appendChild(wrap);
+    if(slot){
+      slot.appendChild(wrap);
+      // 🔵 블록 본문에 미리 깔아 둔 「아직 없어요」를 걷는다 — 실제로 왔으므로 더는 참이 아니다.
+      const emptyNote = slot.parentElement && slot.parentElement.querySelector('.blk-empty');
+      if(emptyNote) emptyNote.remove();
+    }
     // 🔴 pastOnly 면 행은 이미 접힘 안에 그려져 있다 — 바깥에 또 그리지 않고 지도만 맞춘다.
     renderHousingGroupRows(id, 5, pastOnly);
   }).catch(err => {

@@ -1,5 +1,5 @@
 CREATE OR REPLACE FUNCTION public.get_announcements_deduped(p_region text DEFAULT NULL::text, p_type text DEFAULT NULL::text, p_status text DEFAULT NULL::text)
- RETURNS TABLE(id bigint, source text, announcement_id text, title text, region text, region_top text, sido_nm text, sigungu_nm text, housing_type text, supply_org text, announcement_date date, apply_start date, apply_end date, status text, status_normalized text, url text, is_revised boolean, area_min numeric, area_max numeric, rent_min integer, rent_max integer, deposit_min bigint, deposit_max bigint, total_units integer, move_in_date text, target_type text, heating_type text, created_at timestamp with time zone, updated_at timestamp with time zone, mymy_applicable boolean, supply_form text, application_method text, recruit_multiplier text, pair_announcement_key text, housing_change_allowed boolean, precise_address text, is_relaxed_recruitment boolean, relaxation_detail text, selection_method text, subscription_months_required integer, subscription_payments_required integer, contract_before_verification boolean, rent_exemption_until date, rent_exemption_note text, revision_note text, revised_at timestamp with time zone, special_notes jsonb, revised_at_source text, first_seen_at timestamp with time zone, doc_submit_announce_date date, doc_submit_start date, doc_submit_end date, winner_announce_date date, contract_start date, contract_end date, building_name text, attachment_urls jsonb, has_cancel_notice boolean)
+ RETURNS TABLE(id bigint, source text, announcement_id text, title text, region text, region_top text, sido_nm text, sigungu_nm text, housing_type text, supply_org text, announcement_date date, apply_start date, apply_end date, status text, status_normalized text, url text, is_revised boolean, area_min numeric, area_max numeric, rent_min integer, rent_max integer, deposit_min bigint, deposit_max bigint, total_units integer, move_in_date text, target_type text, heating_type text, created_at timestamp with time zone, updated_at timestamp with time zone, mymy_applicable boolean, supply_form text, application_method text, recruit_multiplier text, pair_announcement_key text, housing_change_allowed boolean, precise_address text, is_relaxed_recruitment boolean, relaxation_detail text, selection_method text, subscription_months_required integer, subscription_payments_required integer, contract_before_verification boolean, rent_exemption_until date, rent_exemption_note text, revision_note text, revised_at timestamp with time zone, special_notes jsonb, revised_at_source text, first_seen_at timestamp with time zone, doc_submit_announce_date date, doc_submit_start date, doc_submit_end date, winner_announce_date date, contract_start date, contract_end date, building_name text, attachment_urls jsonb, has_cancel_notice boolean, region_names text[], block_count integer)
  LANGUAGE sql
  STABLE
 AS $function$
@@ -45,6 +45,46 @@ best_schedule AS (
 first_seen AS (
   SELECT dedup_key, min(created_at) AS first_seen_at
   FROM base
+  GROUP BY dedup_key
+),
+-- 🔴 그룹이 걸친 시군구 전부 (2026-09-16 신설). 대표행의 sigungu_nm 하나로는
+-- 「경기북부 7개 시군」 같은 공고가 한 곳으로만 잡혀 나머지 시군 사용자가 못 찾는다.
+-- 🔴 파생을 저장하지 않고 조회 시점에 계산한다 — 원천(형제 행)이 이미 여기 있으므로
+-- 사본을 만들면 갈릴 자리만 생긴다. base 를 한 번 더 GROUP BY 할 뿐이라
+-- best_schedule·first_seen 과 같은 비용이다.
+-- 제외: sigungu_nm NULL · '외'(지역본부명 오인 잔존분) · sido_nm NULL.
+-- 🔴 시·도와 짝지어 담는다 — 「군위군」이 대구인지 경북인지 갈리지 않으면 안 된다.
+-- 「시 구」 두 마디(부천시 소사구)는 첫 마디(부천시)도 함께 담아 시 단위로 찾는 사용자를 잡는다.
+region_set AS (
+  SELECT dedup_key, array_agg(DISTINCT nm ORDER BY nm) AS region_names
+  FROM (
+    SELECT b.dedup_key, b.sido_nm || ' ' || b.sigungu_nm AS nm
+    FROM base b
+    WHERE b.sido_nm IS NOT NULL AND b.sigungu_nm IS NOT NULL AND b.sigungu_nm <> '외'
+    UNION
+    SELECT b.dedup_key, b.sido_nm || ' ' || split_part(b.sigungu_nm, ' ', 1)
+    FROM base b
+    WHERE b.sido_nm IS NOT NULL AND b.sigungu_nm IS NOT NULL AND b.sigungu_nm <> '외'
+      AND b.sigungu_nm LIKE '% %'
+  ) rn
+  GROUP BY dedup_key
+),
+-- 🔴 그 공고의 단지(블록) 수 (2026-09-16 신설). get_announcement_blocks 의 세는 규칙을
+-- 그대로 옮긴 것이다 — 괄호 꼬리를 뗀 precise_address(addr_core)의 distinct 수이고,
+-- MYHOME 주소가 하나라도 있으면 MYHOME 기준, 없으면 전체 소스 기준으로 센다.
+-- ⚠️ 규칙이 갈리면 화면의 블록 섹션과 카드 표지가 어긋난다. 2026-09-16 활성 113건 전수에서
+-- get_announcement_blocks 의 반환 행 수와 113/113 일치를 확인하고 넣었다.
+block_count AS (
+  SELECT dedup_key,
+    CASE WHEN count(*) FILTER (WHERE source = 'MYHOME' AND addr_core <> '') > 0
+         THEN count(DISTINCT addr_core) FILTER (WHERE source = 'MYHOME' AND addr_core <> '')
+         ELSE count(DISTINCT addr_core) FILTER (WHERE addr_core <> '')
+    END AS n
+  FROM (
+    SELECT dedup_key, source,
+      COALESCE(trim(regexp_replace(precise_address, '\s*\([^)]*\)\s*$', '')), '') AS addr_core
+    FROM base
+  ) ac
   GROUP BY dedup_key
 ),
 -- 취소공고를 원공고 그룹에 연결한다 (2026-09-12 신설).
@@ -108,11 +148,15 @@ SELECT
   COALESCE(w.contract_end, bs.best_contract_end) AS contract_end,
   COALESCE(w.building_name, bs.best_building_name) AS building_name,
   w.attachment_urls,
-  (w.dedup_key IN (SELECT orig_dedup_key FROM cancel_keys)) AS has_cancel_notice
+  (w.dedup_key IN (SELECT orig_dedup_key FROM cancel_keys)) AS has_cancel_notice,
+  rs.region_names,
+  CASE WHEN bc.n >= 2 THEN bc.n ELSE 1 END AS block_count
 FROM winner w
 JOIN best_location bl ON bl.dedup_key = w.dedup_key
 JOIN best_schedule bs ON bs.dedup_key = w.dedup_key
 JOIN first_seen fs ON fs.dedup_key = w.dedup_key
+LEFT JOIN region_set rs ON rs.dedup_key = w.dedup_key
+LEFT JOIN block_count bc ON bc.dedup_key = w.dedup_key
 WHERE (
     p_region IS NULL
     OR bl.best_sido = p_region
