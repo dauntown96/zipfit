@@ -224,6 +224,10 @@ body.theme-dark .extras-missing-note{color:#d8c48a;background:#2a2721;border-col
    각 항목이 자기 내용 폭만큼만 차지하고, 공간이 부족하면 항목 전체가 통째로 다음 줄로 넘어간다. */
 .hu-fields{display:flex;flex-wrap:wrap;gap:4px 12px}
 .hu-item{font-size:12px;white-space:nowrap;flex:0 0 auto}
+/* 임대조건 칸만 예외 — 「보증금 A·월 B 또는 보증금 C·월 D」는 한 줄로는 360px 폭을 넘긴다.
+   🔴 .hu-item 전체를 풀지 않는다. 나머지 항목의 「자기 내용 폭만큼 차지하고 통째로 넘어간다」는
+   배치가 그대로 유지돼야 한다 — 여기만 한 줄을 통째로 쓰고 안에서 접는다. */
+.hu-item-wide{white-space:normal;flex:1 1 100%;min-width:0;overflow-wrap:anywhere}
 .hu-label{color:#999;margin-right:4px}
 .hu-note-wrap{margin-top:8px;padding-top:8px;border-top:1px dashed #e0e0d8}
 .hu-note-item{margin:4px 0}
@@ -532,7 +536,7 @@ body.theme-dark .zf-footer a{color:#9aa0aa}
       <div style="display:flex;align-items:center;justify-content:space-between;margin-top:0.5rem">
         <div style="display:flex;align-items:center;gap:8px">
           <input type="checkbox" id="hideClosedChk" checked style="width:16px;height:16px;cursor:pointer">
-          <label for="hideClosedChk" style="font-size:13px;color:#555;cursor:pointer;margin:0">마감된 공고 숨기기</label>
+          <label for="hideClosedChk" style="font-size:13px;color:#555;cursor:pointer;margin:0">신청할 수 없는 공고 숨기기</label>
         </div>
         <button onclick="resetNoticeFilters()" style="font-size:12px;padding:5px 12px;border:1px solid #ddd;border-radius:8px;background:#fff;color:#666;cursor:pointer">필터 초기화</button>
       </div>
@@ -3448,6 +3452,11 @@ const STALE_SRC_MSG_MIXED   = '여러 회차의 정보가 함께 표시되고 �
 // 그래서 실제로 나뉜 경우에만 이 문구를 쓴다 — 화면 상태와 문구가 어긋나지 않게.
 // MIXED는 나누지 못한 경우(이번 회차 행이 하나도 없는 블록)에 그대로 남는다.
 const STALE_SRC_MSG_SPLIT   = '이 공고에는 지난 회차의 세대 정보도 함께 저장돼 있습니다. 위에 보이는 값은 이번 회차 기준이고, 지난 회차는 아래 「지난 회차 보기」를 펼쳐 확인할 수 있어요.';
+// 🔴 SPLIT 과 상태가 또 다르다 — 여기는 「이번 회차 값이 위에 있다」가 아니라 **하나도 없다**.
+// 붙은 산물이 전부 남의 회차인 경우다. SPLIT 문구를 그대로 쓰면 위에 있지도 않은 이번 회차 값을
+// 가리키게 되고, MIXED 문구를 쓰면 섞이지도 않은 것을 섞였다고 말하게 된다.
+// 종전에는 회차 「개수」만 세어 이 상태가 아예 판정되지 않았다(2026-09-16 활성 5건).
+const STALE_SRC_MSG_PAST_ONLY = '이 공고 회차의 세대 정보는 아직 없어요. 아래 「지난 회차 보기」에 있는 것은 같은 공고의 지난 회차 정보라 이번 공고와 다를 수 있습니다.';
 
 function cardElFor(id){ return document.querySelector(`[data-card-id="${id}"]`); }
 
@@ -3461,15 +3470,19 @@ function staleSourceBannerHtml(rawRows, annId, useGroup, id, rounds, split){
   if(!Array.isArray(rawRows) || rawRows.length === 0) return '';
   const orphan = !rawRows.some(r => r && r.announcement_id === annId);
   const mixed = !!(rounds && rounds.mixed);
+  const staleOnly = !!(rounds && rounds.staleOnly);
   // 🔴 게이트를 넓힌 자리 — 종전에는 orphan만 켰다. 대표행 자신의 산물이 있어도
   // 그 블록에 회차가 둘 이상 섞여 있으면 켠다(2026-09-13 김제하동이 이 사각지대였다).
-  if(!orphan && !mixed) return '';
+  if(!orphan && !mixed && !staleOnly) return '';
   const cardEl = cardElFor(id);
   const revised = cardEl && cardEl.dataset.revised === '1';
-  const msg = split ? STALE_SRC_MSG_SPLIT
+  // 🔴 staleOnly 가 가장 먼저다 — 이 상태에서는 SPLIT 도 MIXED 도 거짓이 된다.
+  const msg = staleOnly ? STALE_SRC_MSG_PAST_ONLY
+            : split ? STALE_SRC_MSG_SPLIT
             : (mixed ? STALE_SRC_MSG_MIXED : (revised ? STALE_SRC_MSG_REVISED : STALE_SRC_MSG_PLAIN));
   // 나뉜 뒤에는 경고할 상태가 아니다 — 낡은 값이 섞여 있지 않고 따로 접혀 있을 뿐이라 안내로 낮춘다.
-  const icon = split ? 'ℹ️' : '⚠️';
+  // staleOnly 도 같다 — 전부 접혀 있고 「없다」를 말하는 것이라 경고가 아니다.
+  const icon = (split || staleOnly) ? 'ℹ️' : '⚠️';
   const note = (cardEl && cardEl.dataset.revisionNoteFull) || '';
   return `<div class="stale-src" data-stale-src>`
     + `<span class="stale-src-msg">${icon} ${escapeHtml(msg)}</span>`
@@ -3657,7 +3670,23 @@ function fetchGroupRounds(ids, useGroup){
 
 // 🔴 형제 ID 수가 아니라 "화면에 실제로 온 행"의 회차를 센다. 형제가 아무리 많아도 산물이 한
 // 회차에만 있으면 화면에는 섞이지 않는다 — 그때는 켜지 않는다(정상 그룹 불변).
-function roundInfoFor(rawRows, annId, roundMap){
+//
+// 🔴 2026-09-16: 판정 축을 「회차가 몇 개인가」에서 **「이 공고의 회차와 같은가」**로 넓혔다.
+// 종전 조건(dates.size < 2 이면 null)은 **남의 회차 하나만** 붙은 블록을 통과시켰다 —
+// 회차는 하나뿐이니 "섞이지 않았다"고 읽은 것인데, 그 하나가 이 공고의 것이 아니었다.
+// 그러면 지난 회차 세대정보가 배지도 접힘도 없이 이번 공고의 것처럼 그대로 보인다.
+// 실측(2026-09-16, 모수 get_announcements_deduped): 활성 공고 중 세대정보가 붙은 13건에서
+// 남의 회차만 붙은 것이 5건(경북서부·양산대석·원주·남원노암·익산한스빌)이었다.
+//
+// 🔴 회차 축은 housing_units.source_file(파일명 글자)이 아니라 **그 산물이 달려 있는
+// announcements 행의 announcement_date**다. 이미 조회해 둔 값이고 날짜형이라 파싱이 없다.
+// (참고: 같은 13건을 source_file 날짜 축으로 세어도 결과가 같았다. 다만 source_file 은
+//  208행 중 171행이 파일명에 날짜가 없어 판정 불가다 — 축으로 쓰기에 구멍이 훨씬 크다.)
+//
+// 🔴 이 공고 자신의 회차를 못 얻으면 **판정하지 않는다**. 종전 폴백(산물 중 최신 날짜)은
+// current 가 언제나 dates 안에 들어가게 만들어 staleOnly 를 구조적으로 불가능하게 한다.
+// 모르는 것을 「섞였다」고도 「아니다」라고도 말하지 않는다.
+function roundInfoFor(rawRows, annId, roundMap, cardDate){
   if(!roundMap || !Array.isArray(rawRows) || rawRows.length === 0) return null;
   const dates = new Set();
   let anyRevised = false;
@@ -3667,12 +3696,16 @@ function roundInfoFor(rawRows, annId, roundMap){
     if(a.announcement_date) dates.add(a.announcement_date);
     if(a.is_revised) anyRevised = true;
   });
-  if(anyRevised || dates.size < 2) return null;
-  // 승자 선정식(get_announcements_deduped)의 첫 정렬키가 announcement_date DESC라 대표행이 곧
-  // 최신 회차다. 대표행의 날짜를 못 얻으면 최신 날짜로 대신한다.
-  const own = roundMap[annId] && roundMap[annId].announcement_date;
-  const current = own || Array.from(dates).sort().pop();
-  return { map: roundMap, current: current, mixed: true };
+  if(anyRevised || dates.size === 0) return null;
+  // 대표행의 날짜가 정본이고, 없으면 카드가 들고 있는 값(data-announcement-date)을 쓴다.
+  // 🔴 정정공고는 원공고와 announcement_date 가 같아 이 축에서 저절로 같은 회차가 된다 —
+  //    따로 규칙을 두지 않는다(2026-09-16 원주: 정정 …0767 · 원공고 …0677 둘 다 2026-09-15).
+  const current = (roundMap[annId] && roundMap[annId].announcement_date) || cardDate || '';
+  if(!current) return null;
+  const mixed     = dates.size >= 2;       // 여러 회차가 섞였다 (종전 축)
+  const staleOnly = !dates.has(current);   // 남의 회차만 왔다 (새 축)
+  if(!mixed && !staleOnly) return null;
+  return { map: roundMap, current: current, mixed: mixed, staleOnly: staleOnly };
 }
 
 // 사진·평면도·팸플릿 그룹별 아이템 목록 — 모달의 이전/다음 넘기기가 참조하는 레지스트리
@@ -4110,8 +4143,9 @@ function loadPreciseEligibility(annId, detailEl, id, useGroup){
         const assetExempt = r.asset_limit_exempt === true;
         const income = incomeExempt ? '소득기준 배제' : (r.income_pct ? `소득 ${r.income_pct}%` : '');
         const dual = (!incomeExempt && r.income_pct_dual_income) ? ` (맞벌이 ${r.income_pct_dual_income}%)` : '';
-        const asset = assetExempt ? '자산기준 배제' : (r.asset_limit ? `자산 ${(r.asset_limit/10000).toLocaleString()}만원` : '');
-        const car = r.car_limit ? `차량가액 ${(r.car_limit/10000).toLocaleString()}만원` : '';
+        // 🔴 (v/10000).toLocaleString() 은 만원 미만을 **조용히 반올림**한다 — manwonText 가 그 자리다.
+        const asset = assetExempt ? '자산기준 배제' : (r.asset_limit ? `자산 ${manwonText(r.asset_limit)}` : '');
+        const car = r.car_limit ? `차량가액 ${manwonText(r.car_limit)}` : '';
         // verification_requirements(jsonb, 키가 공고마다 다름) — 하드코딩 없이 Object.entries()로 범용 순회.
         // 중첩 객체(예: 자녀수별 자산기준표)는 raw JSON 대신 들여쓴 하위 목록으로, 숫자는 만원 단위로 변환.
         let vr = '';
@@ -4209,7 +4243,9 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
     }).then(r => r.ok ? r.json() : []),
     fetchGroupRounds(ids, useGroup)
   ])).then(([units, roundMap]) => {
-    const rounds = roundInfoFor(units, annId, roundMap);
+    // 🔴 이 공고 자신의 회차는 카드가 이미 들고 있다(data-announcement-date) — 새 속성을 만들지 않는다.
+    const cardDate = (cardElFor(id) && cardElFor(id).dataset.announcementDate) || '';
+    const rounds = roundInfoFor(units, annId, roundMap, cardDate);
     // 🔴 배너 판정은 중복제거 이전 원본으로 한다(종전 동작 유지) — 아래에서 쓴다.
     const rawUnits = units;
     const roundDateOf = u => (rounds && u && rounds.map[u.announcement_id] && rounds.map[u.announcement_id].announcement_date) || '';
@@ -4245,6 +4281,7 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
     // 양쪽이 다 있을 때만 나눈다. 이번 회차 행이 하나도 없는 블록(orphan)을 나누면 바깥이 비어버려
     // 정보가 사라진 것처럼 보이므로, 그때는 종전대로 통째로 보이고 배너도 종전 문구를 쓴다.
     let pastUnits = [];
+    let pastOnly = false;
     if(rounds && Array.isArray(units)){
       const past = units.filter(u => u.zfRoundLabel && !u.zfRoundCurrent);
       const cur  = units.filter(u => !(u.zfRoundLabel && !u.zfRoundCurrent));
@@ -4254,31 +4291,45 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
         past.sort((a, b) => (b.zfRoundDate || '').localeCompare(a.zfRoundDate || ''));
         units = cur;
         pastUnits = past;
+      } else if(rounds.staleOnly && past.length > 0 && cur.length === 0){
+        // 🔴 전부 남의 회차다. **지우지 않고** 통째로 「지난 회차 보기」 안으로 내린다 —
+        //    2026-09-14 회차 가르기와 같은 틀이고, 바깥에는 배너가 「이번 회차 것은 아직 없다」를 말한다.
+        //    바깥이 비는 것이 이 경우에는 맞다. 비어 있지 않은 것처럼 보이는 쪽이 거짓말이다.
+        past.sort((a, b) => (b.zfRoundDate || '').localeCompare(a.zfRoundDate || ''));
+        units = [];
+        pastUnits = past;
+        pastOnly = true;
       }
     }
     const staleHtml = staleSourceBannerHtml(rawUnits, annId, useGroup, id, rounds, pastUnits.length > 0);
-    if(!Array.isArray(units) || units.length === 0){
+    if(!pastOnly && (!Array.isArray(units) || units.length === 0)){
       // 세대별 정보가 없는 공고 — 시군구 단위 지도를 최후수단으로 사용
       const fb = huRegionFallback[id];
       const mid = huMapTargetId[id] || id;
       if(fb) initMapForHouse(fb, mid);
       return;
     }
-    huUnitsCache[id] = units;
-    const groups = groupHousingUnits(units);
+    // 🔴 캐시는 접힌 행까지 그대로 담는다 — 지도 소스가 여기서 나오므로(첫 건물 주소),
+    //    비우면 이 5건의 지도가 통째로 사라진다. 접는 것은 **보이는 자리**이지 데이터가 아니다.
+    huUnitsCache[id] = pastOnly ? pastUnits : units;
+    const groups = groupHousingUnits(huUnitsCache[id]);
     huGroupsCache[id] = groups;
     const wrap = document.createElement('details');
     wrap.className = 'hu-wrap';
     // 접힌 안에서도 회차 배지를 그대로 단다 — 지난 회차가 여럿이면 그 안에서 또 갈려야 한다.
     const pastHtml = pastUnits.length
-      ? `<details class="hu-past"><summary class="hu-past-title">🕘 지난 회차 보기 (${pastUnits.length}건)</summary>`
+      ? `<details class="hu-past"${pastOnly ? ' open' : ''}><summary class="hu-past-title">🕘 지난 회차 보기 (${pastUnits.length}건)</summary>`
         + `<div class="hu-past-list">${pastUnits.map(renderHousingUnitRow).join('')}</div></details>`
       : '';
-    wrap.innerHTML = `<summary class="hu-title">🏠 세대별 정보 (${units.length}건)</summary>` + staleHtml + `<div class="hu-list" id="hu-list-${id}"></div>` + pastHtml;
-    if(groups.length === 1) wrap.open = true; // 건물이 1개뿐이면 처음부터 펼쳐서 보여줌
+    const huTitle = pastOnly
+      ? `🏠 세대별 정보 (지난 회차 ${pastUnits.length}건)`
+      : `🏠 세대별 정보 (${units.length}건)`;
+    wrap.innerHTML = `<summary class="hu-title">${huTitle}</summary>` + staleHtml + `<div class="hu-list" id="hu-list-${id}"></div>` + pastHtml;
+    if(groups.length === 1 || pastOnly) wrap.open = true; // 건물이 1개뿐이거나, 바깥에 안내만 있을 때는 펼쳐서 보여줌
     const slot = document.getElementById('hu-slot-'+id);
     if(slot) slot.appendChild(wrap);
-    renderHousingGroupRows(id, 5);
+    // 🔴 pastOnly 면 행은 이미 접힘 안에 그려져 있다 — 바깥에 또 그리지 않고 지도만 맞춘다.
+    renderHousingGroupRows(id, 5, pastOnly);
   }).catch(err => {
     console.error('ZipFit 세대정보 로드 실패:', err);
     const fb = huRegionFallback[id];
@@ -4303,11 +4354,21 @@ function groupHousingUnits(units){
   return Array.from(map.values());
 }
 
-function renderHousingGroupRows(id, visibleCount){
+function renderHousingGroupRows(id, visibleCount, mapOnly){
   const groups = huGroupsCache[id];
   const listEl = document.getElementById('hu-list-'+id);
   if(!groups || !listEl) return;
   const mapId = huMapTargetId[id] || id;
+
+  // 🔴 남의 회차만 온 블록(pastOnly) — 행은 「지난 회차 보기」 안에 이미 있다. 같은 행을 두 곳에
+  //    그리지 않도록 바깥 목록은 비워 두고 지도만 종전과 똑같은 소스(첫 건물 주소)로 맞춘다.
+  //    건물 강조(setActiveHousingGroup)는 건너뛴다 — 강조할 머리글이 바깥에 없다.
+  if(mapOnly){
+    const g0 = groups[0];
+    const a0 = g0 && (g0.address || g0.building_name);
+    if(a0) initMapForHouse({ addr: a0, name: g0.building_name || '' }, mapId);
+    return;
+  }
 
   // 건물이 1개뿐이면 "단지명 클릭" 단계를 생략하고 세대 행을 바로 표시
   if(groups.length === 1){
@@ -4392,7 +4453,7 @@ function renderHousingUnitRow(u){
   const depositP1 = u.deposit_priority1 != null ? Number(u.deposit_priority1).toLocaleString()+'원' : '-';
   const rentP1 = (u.rent_priority1 == null || Number(u.rent_priority1) === 0) ? '월세없음' : Number(u.rent_priority1).toLocaleString()+'원';
   const depositRent = hasPriority1
-    ? `<div class="hu-item"><span class="hu-label">임대조건</span><span class="hu-value">보증금 ${deposit}·월 ${rent} 또는 보증금 ${depositP1}·월 ${rentP1}<br><span style="font-size:11px;color:#888">어느 조건이 적용되는지는 비고·공고문에서 확인하세요</span></span></div>`
+    ? `<div class="hu-item hu-item-wide"><span class="hu-label">임대조건</span><span class="hu-value">보증금 ${deposit}·월 ${rent} 또는 보증금 ${depositP1}·월 ${rentP1}<br><span style="font-size:11px;color:#888">어느 조건이 적용되는지는 비고·공고문에서 확인하세요</span></span></div>`
     : `<div class="hu-item"><span class="hu-label">보증금</span><span class="hu-value">${deposit}</span></div>
       <div class="hu-item"><span class="hu-label">월임대료</span><span class="hu-value">${rent}</span></div>`;
   const conv = u.conversion_date ? `<div class="hu-item"><span class="hu-label">분양전환</span><span class="hu-value">${u.conversion_date}</span></div>` : '';
@@ -4490,27 +4551,60 @@ function toGeocodeAddress(addr){
   return a;
 }
 
-// 🔴 시·도까지만 아는 공고는 지도도 주변시설도 그리지 않는다.
-//    핀은 「대략」으로 완화되지만 **주변시설 목록은 완화가 안 된다** — 도청 반경 1km의
-//    지하철·편의점이 「이 공고 주변」으로 나열되면 그것은 틀린 정보다. 그래서 둘을 함께 닫는다.
+// 지도 상자를 닫고 주변시설까지 함께 내리는 공통 자리. 🔴 두 경우가 상태가 달라 문구만 갈린다.
 //    🔵 빈 상자로 두지 않고 문구를 넣는다(「세대수 정보 없음」과 같은 형태).
-//    ⚠️ 문구는 두 부류 모두에 대해 거짓이 아니어야 한다 — 단지가 미정인 전세임대·리츠와,
-//       시군구 정보가 우리 쪽에 없는 공고. 그래서 이유를 단정하지 않고 「…일 수 있어요」로 둔다.
-function closeMapAsSidoOnly(id){
+function closeMapBox(id, html){
   const mapEl = document.getElementById('map-'+id);
   if(!mapEl) return false;
-  // 🔵 카드에 data-url 이 없어 새 속성을 만들지 않고 글로 가리킨다 —
-  //    같은 상세 안에 「📄 공고 원문 보기」 링크가 이미 있다.
-  mapEl.innerHTML = '<p class="map-closed"><strong>📍 위치 정보가 시·도까지만 있어 지도를 표시하지 않았어요</strong>'
-    + '<span class="sub">전세임대처럼 단지가 미리 정해지지 않은 유형일 수 있어요. '
-    + '정확한 위치는 아래 📄 공고 원문에서 확인하세요.</span></p>';
+  mapEl.innerHTML = html;
   setMapApproxNote(mapEl, false);                 // 「대략의 위치예요」는 붙이지 않는다
   const sec = mapEl.parentElement && mapEl.parentElement.querySelector('.poi-section');
   if(sec) sec.style.display = 'none';             // 🔴 주변시설을 함께 닫는다 — 이 작업의 목적이다
   return true;
 }
 
+// 🔴 시·도까지만 아는 공고는 지도도 주변시설도 그리지 않는다.
+//    핀은 「대략」으로 완화되지만 **주변시설 목록은 완화가 안 된다** — 도청 반경 1km의
+//    지하철·편의점이 「이 공고 주변」으로 나열되면 그것은 틀린 정보다. 그래서 둘을 함께 닫는다.
+//    ⚠️ 여기는 「정보가 모자란」 쪽이다. 원문에 단지 목록이 있을 수 있어 원문을 가리킨다 —
+//       전세임대는 아래 closeMapAsJeonseLease 로 갈라져 이 문구를 쓰지 않는다(2026-09-16).
+function closeMapAsSidoOnly(id){
+  // 🔵 카드에 data-url 이 없어 새 속성을 만들지 않고 글로 가리킨다 —
+  //    같은 상세 안에 「📄 공고 원문 보기」 링크가 이미 있다.
+  return closeMapBox(id,
+    '<p class="map-closed"><strong>📍 위치 정보가 시·도까지만 있어 지도를 표시하지 않았어요</strong>'
+    + '<span class="sub">청년신혼부부매입임대리츠처럼 단지가 아직 정해지지 않은 유형일 수 있어요. '
+    + '정확한 위치는 아래 📄 공고 원문에서 확인하세요.</span></p>');
+}
+
+// 🔴 전세임대는 위치가 **모자란** 것이 아니라 **성립하지 않는다.**
+//    LH·SH가 주택 소유자와 전세계약을 맺고 입주자에게 재임대하는 제도라, 주택은 공고 뒤에
+//    입주자가 직접 찾아 고른다. 그래서 결손 프레임(「…까지만 있어」)도 추정(「…일 수 있어요」)도 틀리고,
+//    🔴 **원문을 가리키면 거짓 안내가 된다 — 원문에도 주소가 없다.**
+function closeMapAsJeonseLease(id){
+  return closeMapBox(id,
+    '<p class="map-closed"><strong>📍 전세임대는 미리 정해진 단지가 없어요</strong>'
+    + '<span class="sub">입주자가 조건에 맞는 주택을 직접 찾아 계약하는 유형이라, '
+    + '공고 단계에서는 위치가 정해지지 않습니다.</span></p>');
+}
+
+// 🔴 유형 판정을 새로 만들지 않는다 — classifyNoticeType 이 이미 쓰는 낱말('전세임대')을 그대로 읽는다.
+//    ⚠️ 그 함수 자체는 건드리지 않는다. 반환값('매입·전세임대')에 필터 칩과 저장된 선호유형이 묶여
+//       있어, 바꾸면 RPC·저장값과 같은 배포로 함께 움직여야 한다.
+//    🔴 그 함수의 '전세주택'은 여기 쓰면 안 된다 — **든든전세주택(매입임대)·장기전세주택(SH)**까지
+//       잡히는데 그것들은 단지가 정해져 있다. [VERIFY] 2026-09-16 실측(모수 get_announcements_deduped):
+//       제목 규칙('전세임대|전세주택')은 42건을 더 잡고 그중 매입임대 32건 중 21건에 sigungu_nm 이,
+//       장기전세 1건에는 precise_address 까지 있다. housing_type 축은 9건(활성 4건)이고 그중
+//       precise_address·sigungu_nm 을 가진 것은 0건이다. 제목에만 '전세임대'가 있는 공고도 0건이다.
+function isJeonseLeaseCard(id){
+  const el = cardElFor(id);
+  return !!(el && String(el.dataset.housingType || '').includes('전세임대'));
+}
+
 function initMapForHouse(h,id){
+  // 🔴 전세임대는 **주소 유무와 무관하게** 닫는다 — 판정이 주소에 매여 있으면 시군구가 들어오는
+  //    순간 지도와 주변시설이 뜨는데, 그 핀이 가리킬 단지가 애초에 없다(2026-09-16).
+  if(isJeonseLeaseCard(id) && closeMapAsJeonseLease(id)) return;
   // 🔴 level 은 pickRegionAddr 이 이미 판정해 둔 것을 **읽기만** 한다(새로 만들지 않는다).
   //    'sido' 면 지오코딩도 하지 않는다 — 카카오 SDK를 부를 이유가 없다.
   if(h && h.level === 'sido' && closeMapAsSidoOnly(id)) return;
