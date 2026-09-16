@@ -1227,7 +1227,7 @@ function applyNoticeSubFilters(rows){
   return searchFilterNotices(out, searchQuery, searchScope);
 }
 
-// 안내에서 「마감 공고까지 보기」를 눌렀을 때. 체크박스를 코드로 바꾸면 onchange가 안 뜨므로
+// 안내에서 「신청할 수 없는 공고까지 보기」를 눌렀을 때. 체크박스를 코드로 바꾸면 onchange가 안 뜨므로
 // 직접 다시 그린다 — noticeData에 마감이 이미 있어 서버 재질의는 필요 없다.
 function showClosedNotices(){
   const chk = document.getElementById('hideClosedChk');
@@ -1920,8 +1920,11 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
     statusEl.className = 'rbox warn';
     statusEl.innerHTML = hiddenClosedCount > 0
       ? `<p class="rtitle">⚠ 접수 중인 공고가 없어요</p>`
-        + `<p class="rdesc">마감된 공고까지 포함하면 ${hiddenClosedCount}건이 있어요.</p>`
-        + `<button class="btn btn-sec btn-sm" style="margin-top:8px" onclick="showClosedNotices()">마감 공고까지 보기 (${hiddenClosedCount}건) →</button>`
+        // 🔴 낱말을 체크박스 라벨과 맞춘다(2026-09-16). 이 필터가 감추는 것은 「마감된 것」만이
+        //    아니라 **신청할 수 없는 것 전부**다 — 날짜상 마감 + 접수기간을 모르는데 기관이
+        //    마감이라고 한 것. 라벨만 바꾸고 여기를 두면 같은 필터를 두 이름으로 부르게 된다.
+        + `<p class="rdesc">신청할 수 없는 공고까지 포함하면 ${hiddenClosedCount}건이 있어요.</p>`
+        + `<button class="btn btn-sec btn-sm" style="margin-top:8px" onclick="showClosedNotices()">신청할 수 없는 공고까지 보기 (${hiddenClosedCount}건) →</button>`
       : '<p class="rtitle">⚠ 조건에 맞는 공고가 없어요</p>';
     return;
   }
@@ -2487,8 +2490,8 @@ function renderInsight(rows, wrap, statsRows){
 
     <div style="${S}">
       <p style="${T};margin-bottom:4px">📍 지역별 공고 현황 (${regionAll.length}개 지역)</p>
-      <p style="font-size:12px;color:#888;margin:0 0 14px;line-height:1.5">마감된 공고는 빼고 <strong style="color:#5a7af7">${regionRows.length.toLocaleString()}건</strong>을 세었어요 · 목록에 없는 지역은 아직 마감되지 않은 공고가 없는 곳이에요</p>
-      ${regionAll.length===0 ? '<p style="font-size:13px;color:#aaa;text-align:center;padding:20px 0">아직 마감되지 않은 공고가 없어요</p>' : `
+      <p style="font-size:12px;color:#888;margin:0 0 14px;line-height:1.5">신청할 수 없는 공고는 빼고 <strong style="color:#5a7af7">${regionRows.length.toLocaleString()}건</strong>을 세었어요 · 목록에 없는 지역은 지금 신청할 수 있는 공고가 없는 곳이에요</p>
+      ${regionAll.length===0 ? '<p style="font-size:13px;color:#aaa;text-align:center;padding:20px 0">지금 신청할 수 있는 공고가 없어요</p>' : `
       <div style="display:flex;flex-direction:column;gap:10px">
         ${regionTop.map(regionRowHTML).join('')}
       </div>
@@ -3466,8 +3469,12 @@ function cardElFor(id){ return document.querySelector(`[data-card-id="${id}"]`);
 // rounds는 회차 혼입 판정 결과(roundInfoFor). 넘기지 않으면 종전과 똑같이 orphan만 본다 —
 // policies·extras·eligibility 세 로더는 넘기지 않으므로 동작이 바뀌지 않는다.
 function staleSourceBannerHtml(rawRows, annId, useGroup, id, rounds, split){
-  if(!useGroup || !annId) return '';
+  if(!annId) return '';
   if(!Array.isArray(rawRows) || rawRows.length === 0) return '';
+  // 🔴 종전에는 `!useGroup` 이면 무조건 빈 문자열이었다. 블록 경로가 `useGroup=false` 라
+  //    거기서는 배너가 구조적으로 뜰 수 없었다. 회차 판정이 무언가를 말할 때만 그 문을 연다 —
+  //    rounds 를 넘기지 않는 로더(policies·extras·eligibility)의 동작은 그대로다.
+  if(!useGroup && !(rounds && (rounds.mixed || rounds.staleOnly))) return '';
   const orphan = !rawRows.some(r => r && r.announcement_id === annId);
   const mixed = !!(rounds && rounds.mixed);
   const staleOnly = !!(rounds && rounds.staleOnly);
@@ -3656,8 +3663,13 @@ function idFilterFor(ids){
 //    is_revised 하나다. 정정은 같은 회차라 옛 산물이 유효하므로 그때는 켜지 않는다.
 // 🔴 함수(get_announcement_group_ids)를 고치지 않는다 — 반환 타입 변경은 DROP 후 재생성이라
 //    ACL까지 다시 세워야 한다. 화면이 announcements를 한 번 더 조회한다.
-function fetchGroupRounds(ids, useGroup){
-  if(!useGroup || !Array.isArray(ids) || ids.length < 2) return Promise.resolve(null);
+// 🔴 2026-09-16: 「부를지 말지」를 호출자가 정한다. 종전 조건(`useGroup && ids.length >= 2`)은
+// **블록 경로를 구조적으로 배제**했다 — `toggleBlockGroup` 이 `useGroup=false` · 단일 id 로 부르므로
+// roundMap 이 언제나 null 이었고, 그래서 `roundInfoFor` 도 언제나 null 이었다. 블록을 펼치면
+// 지난 회차 세대 행이 배지도 접힘도 없이 이번 공고의 것처럼 그대로 나왔다(2026-09-16 실측).
+// 종전 두 조건은 호출부에 그대로 남아 있어 **기존 경로의 발사 횟수는 변하지 않는다.**
+function fetchGroupRounds(ids, need){
+  if(!need || !Array.isArray(ids) || ids.length === 0) return Promise.resolve(null);
   return fetch(`${SUPABASE_URL}/rest/v1/announcements?select=announcement_id,announcement_date,is_revised&${idFilterFor(ids)}`, {
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
   }).then(r => r.ok ? r.json() : null).then(rows => {
@@ -3697,10 +3709,12 @@ function roundInfoFor(rawRows, annId, roundMap, cardDate){
     if(a.is_revised) anyRevised = true;
   });
   if(anyRevised || dates.size === 0) return null;
-  // 대표행의 날짜가 정본이고, 없으면 카드가 들고 있는 값(data-announcement-date)을 쓴다.
-  // 🔴 정정공고는 원공고와 announcement_date 가 같아 이 축에서 저절로 같은 회차가 된다 —
-  //    따로 규칙을 두지 않는다(2026-09-16 원주: 정정 …0767 · 원공고 …0677 둘 다 2026-09-15).
-  const current = (roundMap[annId] && roundMap[annId].announcement_date) || cardDate || '';
+  // 🔴 「이 공고의 회차」는 **카드가 든 값이 먼저**다(2026-09-16 정정). annId 는 한 칸 경로에서는
+  //    카드 자신의 공고 id 라 둘이 같은 값이지만, **블록 경로에서는 annId 가 블록(형제 행)의 id**다.
+  //    거기서 roundMap[annId] 를 먼저 보면 current 가 곧 그 블록의 회차가 되어 staleOnly 가
+  //    구조적으로 언제나 거짓이 된다 — 자기 자신과 비교하는 꼴이다.
+  //    카드 값이 비어 있을 때만 행의 날짜로 떨어진다.
+  const current = cardDate || (roundMap[annId] && roundMap[annId].announcement_date) || '';
   if(!current) return null;
   const mixed     = dates.size >= 2;       // 여러 회차가 섞였다 (종전 축)
   const staleOnly = !dates.has(current);   // 남의 회차만 왔다 (새 축)
@@ -4235,16 +4249,23 @@ function renderHuDiffHtml(diff){
 function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
   if(!annId) return;
   huMapTargetId[id] = mapId || id;   // 지도용 id 등록 (없으면 자기 자신)
+  // 🔴 블록 경로는 `id` 가 `카드id-blk{n}` 이라 **그 id 로는 카드를 못 찾는다.** 지도 대상 id 가
+  //    곧 진짜 카드이므로 그것으로 찾는다. 한 칸 경로에서는 둘이 같은 값이라 동작이 안 바뀐다.
+  const huCardId = huMapTargetId[id];
+  const huIsBlock = huCardId !== id;   // 블록 하위 렌더인가
   // 🔴 회차는 announcements를 한 번 더 조회해 얻는다(그룹함수 미접촉). 세대정보 조회와 나란히
   // 보내므로 왕복이 늘지 않고, 그룹이 아니거나 형제가 하나면 요청 자체를 보내지 않는다.
   resolveAnnouncementIds(annId, useGroup).then(ids => Promise.all([
     fetch(`${SUPABASE_URL}/rest/v1/housing_units?${idFilterFor(ids)}&order=deposit.asc`, {
       headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
     }).then(r => r.ok ? r.json() : []),
-    fetchGroupRounds(ids, useGroup)
+    // 회차를 물어야 하는 경우는 둘이다 — ① 그룹조회로 형제가 여럿 온다(종전 조건 그대로)
+    // ② 블록 경로라 이 행이 애초에 카드 자신의 행이 아니다(2026-09-16 신설).
+    fetchGroupRounds(ids, (useGroup && Array.isArray(ids) && ids.length >= 2) || huIsBlock)
   ])).then(([units, roundMap]) => {
     // 🔴 이 공고 자신의 회차는 카드가 이미 들고 있다(data-announcement-date) — 새 속성을 만들지 않는다.
-    const cardDate = (cardElFor(id) && cardElFor(id).dataset.announcementDate) || '';
+    const cardEl = cardElFor(huCardId);
+    const cardDate = (cardEl && cardEl.dataset.announcementDate) || '';
     const rounds = roundInfoFor(units, annId, roundMap, cardDate);
     // 🔴 배너 판정은 중복제거 이전 원본으로 한다(종전 동작 유지) — 아래에서 쓴다.
     const rawUnits = units;
