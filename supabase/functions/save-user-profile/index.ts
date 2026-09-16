@@ -1,4 +1,4 @@
-import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { createClient } from 'jsr:@supabase/supabase-js@2.116.0'
 
 // 코딩원칙 16번: Deno.env.get('X')! 금지. 미설정이면 조용히 undefined로 잘못 동작한다.
 const requireEnv = (key: string): string => {

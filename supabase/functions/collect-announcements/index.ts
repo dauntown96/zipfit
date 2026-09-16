@@ -1,4 +1,4 @@
-import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { createClient } from 'jsr:@supabase/supabase-js@2.116.0'
 
 // 시크릿은 전부 환경변수 필수. 하드코딩 폴백을 두지 않는다.
 // TypeScript의 `!`는 타입 단언일 뿐 런타임 검사가 아니라서, 미설정 시 undefined로
