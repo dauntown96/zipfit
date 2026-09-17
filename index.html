@@ -950,14 +950,21 @@ function startOfLocalDay(d){
 //    회차가 열린 날은 이쪽이다. 🔴 NEW·「최신 공고순」·카드 표지가 **전부 이 함수 하나**를 본다 —
 //    사본을 두면 같은 공고가 자리마다 다른 날짜를 말한다.
 // ⚠️ MYHOME·SH 는 이 컬럼이 늘 비어 있어 종전 그대로 announcement_date 로 떨어진다.
+// 🔴 2026-09-17 개정 — **`is_revised` 가 관문이다.** 정정이 아닌데 두 날짜가 다른 LH 행이
+//    실재한다(2026-09-17 실측 3건: `…020502` 07-09/08-03 · `…020516` 07-22/08-05 ·
+//    태백철암1 `…020735` 는 `PAN_DT` 가 게시일보다 **뒤**인 09-14/09-11). 그것들에 「· 정정」을
+//    붙이면 거짓말이 되고, 회차 날짜를 PAN_DT 로 바꿀 근거도 없다 — 정정이 아니면 종전 그대로다.
 function zfNoticeDate(row){
-  return row['first_announcement_date'] || row['announcement_date'] || row['모집공고일'] || '';
+  const f = row['first_announcement_date'];
+  return (row['is_revised'] === true && f)
+    ? f
+    : (row['announcement_date'] || row['모집공고일'] || '');
 }
-// 정정으로 게시일이 원공고일보다 뒤로 밀린 경우에만 그 게시일을 돌려준다(아니면 빈 문자열).
+// 정정 행이면서 게시일이 원공고일보다 **뒤**일 때만 그 게시일을 돌려준다(아니면 빈 문자열).
 function zfRevisedDate(row){
-  const f = row['first_announcement_date'] || '';
+  const f = row['first_announcement_date'];
   const a = row['announcement_date'] || row['모집공고일'] || '';
-  return (f && a && f !== a) ? a : '';
+  return (row['is_revised'] === true && f && a && a > f) ? a : '';
 }
 // 「모집공고:」 뒤에 적을 글자. 정정으로 밀린 공고만 ` · 정정 MM-DD` 가 붙는다.
 function zfAnnDateLabel(row, fallback){
@@ -1474,10 +1481,24 @@ function zfPlacesLine(regionNames){
   if(places.length < 2) return '';
   return `<p style="font-size:12px;color:#666;margin:8px 0 0;line-height:1.6">📍 <span style="color:#999">이 공고의 주택이 있는 지역</span> ${places.map(x => escapeHtml(zfShortPlace(x))).join(' · ')}</p>`;
 }
+// 🔴 단지 수 한 벌 (2026-09-17). v43 부터 EF 가 `building_name` 에 「 외 N개 단지」를 **이미**
+//    싣는다. 그래서 표지가 block_count 로 또 붙이면 두 번 나오고, 두 수가 다르면
+//    (원주 — 접미 3원소 대 block_count 6) **한 카드가 단지 수를 둘로 말한다.**
+//    🔴 접미가 있으면 그 수가 정본이다 — EF 가 그 공고의 dsSbd 를 직접 세어 붙인 것이고,
+//    block_count 는 그룹 전체(지난 회차·다른 소스 포함)의 주소 코어 수라 축이 더 넓다.
+const ZF_COMPLEX_SUFFIX = /\s외\s+(\d+)개\s*단지\s*$/;
+function zfComplexCount(row){
+  const m = ZF_COMPLEX_SUFFIX.exec(String((row && row['building_name']) || ''));
+  if(m) return Number(m[1]) + 1;
+  return Number(row && row['block_count']) || 1;
+}
 // 단지명 배지 — 단지가 여럿이면 대표 단지명 뒤에 나머지 수를 적는다.
+// 🔴 접미가 이미 있으면 **그대로 쓰고 붙이지 않는다.**
 function zfBuildingLabel(buildingName, blockCount){
+  const name = String(buildingName || '');
+  if(ZF_COMPLEX_SUFFIX.test(name)) return escapeHtml(name);
   const blocks = Number(blockCount) || 1;
-  return escapeHtml(buildingName) + (blocks >= 2 ? ` 외 ${blocks - 1}개 단지` : '');
+  return escapeHtml(name) + (blocks >= 2 ? ` 외 ${blocks - 1}개 단지` : '');
 }
 
 function searchFilterNotices(list, query, scope){
@@ -1653,6 +1674,12 @@ function zfMapNoticeRows(rows){
     // 🔴 2026-09-16 신설 — 그룹이 걸친 시군구 전부와 단지(블록) 수. RPC 가 조회 시점에 계산한다.
     'region_names': r.region_names||null,
     'block_count': r.block_count||1,
+    // 🔴 2026-09-17 신설. **빈 값은 null 그대로 둔다**(||'' 로 빈 문자열을 만들지 않는다) —
+    //    schedule_varies 는 false 와 null 이 뜻이 다르고(「한 벌」 대 「모름」), 날짜도
+    //    빈 문자열이 되면 「없다」와 「모른다」가 섞인다(PR #137 과 같은 자리).
+    // ⚠️ 이 두 줄이 빠져 있어서 v112 배포본의 zfNoticeDate 가 늘 announcement_date 로 떨어졌다.
+    'first_announcement_date': r.first_announcement_date ?? null,
+    'schedule_varies': r.schedule_varies ?? null,
     'contract_start': r.contract_start||'',
     'contract_end': r.contract_end||'',
     'building_name': r.building_name||'',
@@ -1875,7 +1902,7 @@ function zfSavedCardFrom(sr, r){
     region:    r ? (r.region||'')       : '',
     // 🔴 저장 당시 값이 아니다 — 여기 오는 r 은 **지금 RPC 로 다시 조회한 대표행**이라
     //    (zfResolveSavedCards) 표지 규칙을 그 자리에서 적용하면 목록 카드와 같은 문구가 된다.
-    cover:     r ? zfCoverPlaceText(r.region_names, r.block_count, r.sido_nm, r.sigungu_nm, r.region) : '',
+    cover:     r ? zfCoverPlaceText(r.region_names, zfComplexCount(r), r.sido_nm, r.sigungu_nm, r.region) : '',
     type:      r ? (r.housing_type||'') : '',
     url:       r ? (r.url||'')          : '',
     apply_end: r ? (r.apply_end||'')    : '',
@@ -2372,7 +2399,7 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
     const nTitle = (n['공고명']||'').replace(/'/g,"\\'");
     // 🔴 공유 문구도 카드 표지와 같은 함수를 쓴다(2026-09-16) — 카드는 「구미시 외 2곳」인데
     //    공유 텍스트만 대표 주소 한 곳이면 같은 공고를 두 이름으로 부르는 것이 된다.
-    const nRegion = zfCoverPlaceText(n['region_names'], n['block_count'], n['sido_nm'], n['sigungu_nm'], n['지역']).replace(/'/g,"\\'");
+    const nRegion = zfCoverPlaceText(n['region_names'], zfComplexCount(n), n['sido_nm'], n['sigungu_nm'], n['지역']).replace(/'/g,"\\'");
     const nType = (n['공급유형']||'').replace(/'/g,"\\'");
     const nUrl = (n['공고URL']||'').replace(/'/g,"\\'");
     const nId = (n['announcement_id']||String(idx)).replace(/'/g,"\\'");
@@ -2404,10 +2431,10 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
            그중 49건은 「기타」로 뭉개져 「도시형생활주택」 같은 실재하는 이름을 잃는다.
            🔵 추천 탭·저장 목록이 이미 원문 한 벌만 쓰고 있어, 여섯 자리가 한 어휘로 모인다.
            🔴 classifyNoticeType 은 유형 칩·설정 매칭에서 그대로 쓴다 — 바꾼 것은 표시 문자열뿐이다. -->
-      <p class="haddr">${zfCoverPlace(n['region_names'], n['block_count'], n['sido_nm'], n['sigungu_nm'], n['지역'])} · ${n['공급유형']||''}</p>
+      <p class="haddr">${zfCoverPlace(n['region_names'], zfComplexCount(n), n['sido_nm'], n['sigungu_nm'], n['지역'])} · ${n['공급유형']||''}</p>
       <div class="chip-row" style="margin:8px 0;gap:5px">
         ${hasCancel?cancelNoticeBadge(n['공고명']||''):''}
-        ${n['building_name']?`<span class="chip" style="cursor:default;padding:4px 10px;font-size:11px">🏢 ${zfBuildingLabel(n['building_name'], n['block_count'])}</span>`:''}
+        ${n['building_name']?`<span class="chip" style="cursor:default;padding:4px 10px;font-size:11px">🏢 ${zfBuildingLabel(n['building_name'], zfComplexCount(n))}</span>`:''}
         ${isAmended?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#7B5EA7;border-color:#7B5EA7">🔄 정정</span>':''}
         ${(isAmended && revisionNoteEsc)?`<span title="${revisionNoteEsc}" style="cursor:help;font-size:11px;color:#666;border:1px solid #ccc;border-radius:10px;padding:1px 6px">ℹ️ 정정사유</span>`:''}
         ${isNew?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
@@ -2697,7 +2724,7 @@ function renderPersonalizedRecommendations(){
         <p class="hname">${n['공고명']||n['name']||'(공고명 없음)'}</p>
         <span class="htag tag-apt">${n['처리상태']||'-'}</span>
       </div>
-      <p class="haddr">${zfCoverPlace(n['region_names'], n['block_count'], n['sido_nm'], n['sigungu_nm'], n['지역'])} · ${n['공급유형']||''}</p>
+      <p class="haddr">${zfCoverPlace(n['region_names'], zfComplexCount(n), n['sido_nm'], n['sigungu_nm'], n['지역'])} · ${n['공급유형']||''}</p>
       <div class="chip-row" style="margin:6px 0;gap:5px">
         ${hasCancel?cancelNoticeBadge(n['공고명']||''):''}
         ${isNewNotice(n)?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
@@ -5383,7 +5410,7 @@ function renderMatchResults(rows){
     if(applyStart||applyEnd) detailRows.push(['접수기간', (applyStart||'-')+' ~ '+(applyEnd||'-')]);
 
     const mTitle = (n.title||'').replace(/'/g,"\\'");
-    const mRegion = zfCoverPlaceText(n.region_names, n.block_count, n.sido_nm, n.sigungu_nm, n.region).replace(/'/g,"\\'");
+    const mRegion = zfCoverPlaceText(n.region_names, zfComplexCount(n), n.sido_nm, n.sigungu_nm, n.region).replace(/'/g,"\\'");
     const mType = (n.housing_type||'').replace(/'/g,"\\'");
     const mUrl = (n.url||'').replace(/'/g,"\\'");
     const mId = (n.announcement_id||'m'+idx).replace(/'/g,"\\'");
@@ -5409,10 +5436,10 @@ function renderMatchResults(rows){
         <span class="htag ${isClosed?'tag-mix':'tag-apt'}">${n.status||'-'}</span>
       </div>
       <!-- 🔴 공고 탭과 같은 규칙 — 유형은 원문 한 번만(2026-09-16). -->
-      <p class="haddr">${zfCoverPlace(n.region_names, n.block_count, n.sido_nm, n.sigungu_nm, n.region)} · ${n.housing_type||''}</p>
+      <p class="haddr">${zfCoverPlace(n.region_names, zfComplexCount(n), n.sido_nm, n.sigungu_nm, n.region)} · ${n.housing_type||''}</p>
       <div class="chip-row" style="margin:8px 0;gap:5px">
         ${hasCancel?cancelNoticeBadge(n.title||''):''}
-        ${n.building_name?`<span class="chip" style="cursor:default;padding:4px 10px;font-size:11px">🏢 ${escapeHtml(n.building_name)}</span>`:''}
+        ${n.building_name?`<span class="chip" style="cursor:default;padding:4px 10px;font-size:11px">🏢 ${zfBuildingLabel(n.building_name, zfComplexCount(n))}</span>`:''}
         ${isAmended?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#7B5EA7;border-color:#7B5EA7">🔄 정정</span>':''}
         ${(isAmended && revisionNoteEscM)?`<span title="${revisionNoteEscM}" style="cursor:help;font-size:11px;color:#666;border:1px solid #ccc;border-radius:10px;padding:1px 6px">ℹ️ 정정사유</span>`:''}
         ${isNew?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
