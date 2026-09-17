@@ -4526,13 +4526,15 @@ function renderAnnouncementBlocks(blocks, id, roundMap){
   // 🔴 제목의 개수는 **이번 회차 블록만** 센다. 이번 회차가 0이면 그 사실을 한 줄로 말한다.
   // 🔴 2026-09-17 — 그 수(M)가 카드 1층의 단지 수(N)보다 **작으면** M 을 공고 전체처럼 말하지 않는다.
   //    LH 가 세는 단지 하나가 우리 DB 에 주소 행으로 없을 수 있어서다(보성운곡 5 대 4 · 영암용앙2 7 대 6).
+  // 🔵 사유 구절은 **「이번 회차」 주소 정보**로 한정한다 — 다른 회차 블록이 있는 카드에서는
+  //    빠진 단지가 아래 접힘에 보일 수 있어, 한정하지 않으면 그 카드에서 거짓이 된다.
   //    그대로 두면 한 카드가 1층에서는 「5개 단지」, 상세에서는 「블록 (4개)」로 **단지 수를 둘로 말한다.**
   // 🔵 N 을 못 얻거나(옛 캐시) M ≥ N 이면 shortfall 이 0 이라 **종전 문구 그대로**다.
   const shortfall = cardN > cur.length ? cardN - cur.length : 0;
   const head = cur.length
     ? (shortfall
-        ? `<div class="hu-title">🏘️ 이 공고에 포함된 블록 (주소 있는 ${cur.length}개)</div>`
-          + `<p class="blk-round-note">이 공고는 단지 ${cardN}개예요. 그중 주소 정보가 있는 ${cur.length}개만 여기 나열했고, 나머지 ${shortfall}개는 주소 정보가 없어 목록에 없습니다.</p>`
+        ? `<div class="hu-title">🏘️ 이 공고에 포함된 블록 (이번 회차 주소 있는 ${cur.length}개)</div>`
+          + `<p class="blk-round-note">이 공고는 단지 ${cardN}개예요. 그중 이번 회차 주소 정보가 있는 ${cur.length}개만 여기 나열했고, 나머지 ${shortfall}개는 이번 회차 주소 정보가 없어 목록에 없습니다.</p>`
         : `<div class="hu-title">🏘️ 이 공고에 포함된 블록 (${cur.length}개)</div>`)
     : `<div class="hu-title">🏘️ 이 공고에 포함된 블록</div>`
       + `<p class="blk-round-note">이번 회차 블록 정보는 아직 없어요.${cardN >= 2 ? ` 이 공고는 단지 ${cardN}개입니다.` : ''} 아래는 같은 공고의 다른 회차 정보라 이번 공고와 다를 수 있습니다.</p>`;
