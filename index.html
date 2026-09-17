@@ -238,7 +238,7 @@ body.theme-dark .extras-missing-note{color:#d8c48a;background:#2a2721;border-col
    배치가 그대로 유지돼야 한다 — 여기만 한 줄을 통째로 쓰고 안에서 접는다. */
 .hu-item-wide{white-space:normal;flex:1 1 100%;min-width:0;overflow-wrap:anywhere}
 /* 세대 정보가 아직 없는 블록 — 빈 상자를 남기지 않는다(「세대수 정보 없음」과 같은 형태). */
-.blk-empty{font-size:12px;color:#999;margin:6px 0;padding:8px 10px;background:#f4f4f2;border-radius:8px}
+.blk-empty,.blk-round-note{font-size:12px;color:#999;margin:6px 0;padding:8px 10px;background:#f4f4f2;border-radius:8px}
 /* 페이저 — 360px 한 줄에 들어가야 하므로 버튼을 최소로 줄인다. 새 색을 만들지 않고 기존 회색 토큰만 쓴다. */
 .pg-range{font-size:12px;color:#888;margin:0 0 8px;text-align:right}
 .pg-bar{display:flex;align-items:center;justify-content:center;gap:3px;flex-wrap:nowrap;margin:14px 0 4px}
@@ -4456,33 +4456,84 @@ function loadAnnouncementBlocks(annId, id, detailEl){
     }
     blockAnnIds[id] = blocks.map(b => b.announcement_id);
     blockInfo[id] = blocks;
-    const wrap = document.createElement('div');
-    wrap.className = 'hu-wrap';
-    wrap.innerHTML = `<div class="hu-title">🏘️ 이 공고에 포함된 블록 (${blocks.length}개)</div><div class="hu-list" id="blk-list-${id}"></div>`;
-    const slot = document.getElementById('blocks-slot-'+id);
-    if(!slot) return;
-    slot.appendChild(wrap);
-    const listEl = document.getElementById('blk-list-'+id);
-    listEl.innerHTML = blocks.map((b, idx) => {
-      const label = b.precise_address || `블록 ${idx+1}`;
-      // 🔴 상세 정보표의 세대수 행과 **같은 값**이다(announcements.total_units).
-      //    여기는 라벨이 없는 자리라 값 앞에 뜻을 붙인다.
-      // 🔵 블록 행은 **자기 source 를 안다**(get_announcement_blocks 가 `source` 를 반환한다).
-      //    그래서 카드 대표행이 아니라 **그 행 기준**으로 가른다 — 한 공고 안에 소스가 섞일 수 있다.
-      const unitsStr = b.total_units ? `${zfUnitsPrefix(b.source)}${b.total_units}세대` : '';
-      return `<div class="hu-group">
-        <div class="hu-group-head" id="blk-group-head-${id}-${idx}" onclick="event.stopPropagation();toggleBlockGroup('${id}',${idx})">
-          <span class="hu-group-name">${escapeHtml(label)}</span>
-          <span class="hu-group-count">${unitsStr} ▾</span>
-        </div>
-        <div class="hu-group-body" id="blk-group-body-${id}-${idx}" style="display:none"></div>
-      </div>`;
-    }).join('');
+    // 🔴 2026-09-17 — 블록 머리도 회차로 가른다. 종전에는 그룹 전체(제목 축)의 블록이 전부
+    //    「이 공고에 포함된 블록」으로 나열돼, 지난 회차에만 있는 단지가 이번 공고 것처럼 읽혔다
+    //    (원주 …020783 — 6개 중 3개가 2026-07-15 회차의 주소였다).
+    // 🔵 회차 재료는 **이미 있는 fetchGroupRounds 한 벌**로 받고 판정은 **zfNoticeDate 한 벌**이 한다.
+    //    사본을 늘리지 않으려고 SQL 에는 회차 규칙을 적지 않았다 — 그래서 주소 집합 판정
+    //    (addr_core·MYHOME 우선 distinct)도 그대로이고 get_announcements_deduped 의
+    //    block_count 거울은 손댈 것이 없다.
+    return fetchGroupRounds(blocks.map(b => b.announcement_id), true).then(roundMap => {
+      renderAnnouncementBlocks(blocks, id, roundMap);
+    });
   }).catch(err => {
     console.error('ZipFit 블록정보 로드 실패:', err);
     loadHousingUnits(annId, detailEl, id, true);
     loadAnnouncementExtras(annId, detailEl, id, true);
   });
+}
+
+// 🔴 블록 목록 렌더 — 이번 회차 / 다른 회차 / 회차 미상 셋으로 가른다 (2026-09-17).
+//    idx 는 **원래 배열의 자리**를 그대로 쓴다 — blockAnnIds·blockInfo 와 toggleBlockGroup(id, idx)
+//    이 그 자리로 짝지어져 있어서, 화면 순서를 바꾸면서 번호를 다시 매기면 다른 블록이 열린다.
+function renderAnnouncementBlocks(blocks, id, roundMap){
+  const slot = document.getElementById('blocks-slot-'+id);
+  if(!slot) return;
+  const cardEl = cardElFor(id);
+  // 카드의 회차 날짜 — PR #149 가 심은 data-round-date 를 읽고, 옛 캐시 카드는 종전 속성으로 떨어진다.
+  const cardRound = (cardEl && (cardEl.dataset.roundDate || cardEl.dataset.announcementDate)) || '';
+  // 🔵 회차를 아예 못 받았으면(조회 실패) 가르지 않고 **종전 그대로** 전부 나열한다 —
+  //    보이던 것을 빼지 않는다. 한 블록의 회차만 비는 것은 아래에서 「회차 미상」으로 따로 센다.
+  const canSplit = !!(roundMap && cardRound);
+  const roundOf = b => (roundMap && roundMap[b.announcement_id]) ? zfNoticeDate(roundMap[b.announcement_id]) : '';
+
+  const cur = [], other = [], unknown = [];
+  blocks.forEach((b, idx) => {
+    const r = canSplit ? roundOf(b) : cardRound;
+    const item = { b: b, idx: idx, round: r };
+    if(!canSplit || (r && r === cardRound)) cur.push(item);
+    else if(r) other.push(item);
+    else unknown.push(item);
+  });
+
+  const blkHtml = (it, badge) => {
+    const label = it.b.precise_address || `블록 ${it.idx + 1}`;
+    // 🔴 상세 정보표의 세대수 행과 **같은 값**이다(announcements.total_units).
+    //    여기는 라벨이 없는 자리라 값 앞에 뜻을 붙인다.
+    // 🔵 블록 행은 **자기 source 를 안다**(get_announcement_blocks 가 `source` 를 반환한다).
+    //    그래서 카드 대표행이 아니라 **그 행 기준**으로 가른다 — 한 공고 안에 소스가 섞일 수 있다.
+    // 🔴 2026-09-17 부터 세대수도 **그 행 자신의 값**이다(RPC 에서 min 을 걷었다).
+    const unitsStr = it.b.total_units ? `${zfUnitsPrefix(it.b.source)}${it.b.total_units}세대` : '';
+    return `<div class="hu-group">
+      <div class="hu-group-head" id="blk-group-head-${id}-${it.idx}" onclick="event.stopPropagation();toggleBlockGroup('${id}',${it.idx})">
+        <span class="hu-group-name">${escapeHtml(label)}${badge || ''}</span>
+        <span class="hu-group-count">${unitsStr} ▾</span>
+      </div>
+      <div class="hu-group-body" id="blk-group-body-${id}-${it.idx}" style="display:none"></div>
+    </div>`;
+  };
+  // 🔵 상세 아코디언의 「지난 회차」 배지와 **같은 색**(.hu-round-old)을 쓴다.
+  const oldBadge = r => `<span class="chip hu-round-badge hu-round-old">지난 회차 · ${escapeHtml(r)}</span>`;
+  const unkBadge = () => `<span class="chip hu-round-badge hu-round-old">회차 미상</span>`;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'hu-wrap';
+  // 🔴 제목의 개수는 **이번 회차 블록만** 센다. 이번 회차가 0이면 그 사실을 한 줄로 말한다.
+  const head = cur.length
+    ? `<div class="hu-title">🏘️ 이 공고에 포함된 블록 (${cur.length}개)</div>`
+    : `<div class="hu-title">🏘️ 이 공고에 포함된 블록</div>`
+      + `<p class="blk-round-note">이번 회차 블록 정보는 아직 없어요. 아래는 같은 공고의 다른 회차 정보라 이번 공고와 다를 수 있습니다.</p>`;
+  const otherHtml = other.length
+    ? `<details class="hu-past"><summary class="hu-past-title">🕘 다른 회차 블록 (${other.length}개)</summary>`
+      + `<div class="hu-list">${other.map(it => blkHtml(it, oldBadge(it.round))).join('')}</div></details>`
+    : '';
+  const unkHtml = unknown.length
+    ? `<details class="hu-past"><summary class="hu-past-title">❓ 회차 미상 블록 (${unknown.length}개)</summary>`
+      + `<div class="hu-list">${unknown.map(it => blkHtml(it, unkBadge())).join('')}</div></details>`
+    : '';
+  wrap.innerHTML = head + `<div class="hu-list" id="blk-list-${id}">${cur.map(it => blkHtml(it, '')).join('')}</div>`
+                 + otherHtml + unkHtml;
+  slot.appendChild(wrap);
 }
 
 function toggleBlockGroup(id, idx){

@@ -55,11 +55,16 @@ multi_blocks AS (
        ORDER BY CASE WHEN g2.source='LH' THEN 0 ELSE 1 END, length(g2.precise_address) DESC, g2.created_at DESC LIMIT 1),
       g.precise_address
     ) AS precise_address,
-    COALESCE(
-      (SELECT min(g2.total_units) FROM group_rows g2
-       WHERE g2.addr_core = g.addr_core AND g2.total_units IS NOT NULL),
-      g.total_units
-    ) AS total_units,
+    -- 🔴 2026-09-17 — 고른 행 **자신의** 세대수다. 종전에는 같은 addr_core 의 그룹 전체에서
+    --   min(total_units) 을 가져왔는데, group_rows 는 제목 축이라 **지난 회차 행까지 들어온다.**
+    --   그래서 블록 머리의 announcement_id·source(라벨) 는 이 행 것인데 세대수만 다른 행 것이
+    --   될 수 있었다. 실측(2026-09-17, 모수 get_announcements_deduped() · status<>'접수마감' ·
+    --   블록 2개 이상): 블록 154개 중 1개가 그랬다 — 경북서부 김천시 무실7길 38 이 자기 행의
+    --   20 대신 지난 회차(2026-07-15) 행의 5 를 보여 줬다.
+    -- ⚠️ min 을 쓴 의도는 어디에도 기록돼 있지 않다(코드 주석·docs/history.md·git log·⑩ 모두 0).
+    --   짐작되던 「같은 주소의 LH(단지 총세대수)와 MYHOME(모집 세대수) 중 작은 쪽」은 지금 발화하지
+    --   않는다 — 같은 addr_core 에 두 소스가 함께 있는 블록이 **0개**다(같은 실측).
+    g.total_units,
     g.announcement_id, g.source
   FROM group_rows g, distinct_addr_count c
   WHERE c.n >= 2 AND g.addr_core IS NOT NULL AND g.addr_core <> ''
@@ -75,7 +80,7 @@ single_repr AS (
        ORDER BY CASE WHEN g2.source='LH' THEN 0 ELSE 1 END, length(g2.precise_address) DESC, g2.created_at DESC LIMIT 1),
       NULL
     ) AS precise_address,
-    (SELECT min(g2.total_units) FROM group_rows g2 WHERE g2.total_units IS NOT NULL) AS total_units,
+    g.total_units,   -- 🔴 위와 같은 이유. 고른 행 자신의 값이다(2026-09-17).
     g.announcement_id, g.source
   FROM group_rows g, distinct_addr_count c
   WHERE c.n < 2
