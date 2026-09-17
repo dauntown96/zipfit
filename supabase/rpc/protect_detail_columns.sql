@@ -39,7 +39,10 @@ AS $function$
 -- deposit_min·rent_min — mapMyHomeRow가 0을 null로 접어(`rentRaw !== 0 ? rentRaw : null`)
 --   「0원」과 「모름」이 DB에서 갈리지 않는다. 보호하면 전세형 전환 공고에 낡은 월세가 영구히 남는다.
 --   EF 매핑을 고칠 문제다(백로그).
--- sido_nm·sigungu_nm — get_announcements_deduped의 best_location이 그룹 단위로 coalesce한다.
+-- sido_nm — get_announcements_deduped의 best_location이 그룹 단위로 coalesce한다.
+-- sigungu_nm — 🔴 2026-09-17부터 보호한다(아래 sbd 블록). 종전 제외 근거(best_location이 그룹 단위로
+--   coalesce한다)는 **화면**에서만 성립하고 컬럼 자체는 지워졌다. mapLHRow가 dsSbd 전 원소의 주소에서
+--   시군구를 뽑게 되면서 상세가 없는 런은 NULL을 싣는데, 그것이 매 런 기존 값을 지운다.
 -- announcement_date·status·title·url — 목록에서 매 런 오므로 NULL이 될 일이 없다.
 -- apply_end — 🔴 2026-09-15부터 보호한다(위 scdl 블록). 종전 제외 근거(「목록에서 매 런 온다」)는
 --   LH·MYHOME에만 성립하고 SH에는 성립하지 않는다 — collect-sh-announcements의 mapRow가
@@ -63,6 +66,15 @@ BEGIN
   NEW.heating_type             := coalesce(NEW.heating_type,             OLD.heating_type);
   NEW.move_in_date             := coalesce(NEW.move_in_date,             OLD.move_in_date);
   NEW.building_name            := coalesce(NEW.building_name,            OLD.building_name);
+  -- 🔴 2026-09-17 추가한 셋.
+  -- sigungu_nm — dsSbd 전 원소가 한 시군구로 수렴할 때만 실리고 수렴하지 않으면 NULL이라,
+  --   region처럼 별도 술어가 필요 없고 coalesce로 걸린다.
+  NEW.sigungu_nm               := coalesce(NEW.sigungu_nm,               OLD.sigungu_nm);
+  -- schedule_varies — dsSplScdl 파생이라 상세가 없는 런은 NULL을 싣는다.
+  NEW.schedule_varies          := coalesce(NEW.schedule_varies,          OLD.schedule_varies);
+  -- first_announcement_date — 목록(PAN_DT) 파생이라 매 런 오지만, 값이 빠진 회차가 기존 값을
+  --   지우지 않도록 같은 그물에 넣는다(MYHOME·SH는 애초에 NULL이라 무해하다).
+  NEW.first_announcement_date  := coalesce(NEW.first_announcement_date,  OLD.first_announcement_date);
   -- scdl(일정) 파생
   NEW.apply_start              := coalesce(NEW.apply_start,              OLD.apply_start);
   NEW.apply_end                := coalesce(NEW.apply_end,                OLD.apply_end);

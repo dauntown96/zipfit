@@ -224,23 +224,60 @@ async function fetchNoticeList(tps: string[]): Promise<{ items: NoticeItem[]; fa
   return { items: deduped, failures, failedTps }
 }
 
-async function fetchDetailWithTimeout(item: NoticeItem, timeoutMs: number): Promise<{ sbd: SbdItem | null; scdl: SplScdlItem | null; etcInfo: EtcInfoItem | null; ahflInfo: AhflInfoItem[] | null }> {
+// 🔴 2026-09-17: 반환이 「첫 원소」에서 **원소 배열 전체**로 바뀌었고, 통짜 try/catch가
+// 실패 **분류**를 함께 돌려주도록 갈라졌다(C-2). 분류는 collection_run_log.errors에
+// 분류별 건수 한 줄로만 남는다 — 런마다 수십 줄이 쌓이지 않게.
+// ⚠️ 게이트는 종전과 같다 — 종전 `r.sbd || r.scdl`(첫 원소가 있는가)과
+// 새 `sbds.length || scdls.length`(원소가 있는가)는 같은 집합이다.
+// ⚠️ `empty_containers`는 200인데 dsSbd·dsSplScdl이 둘 다 빈 경우다. 종전에도 실패로
+// 셌지만 네트워크 실패와 한 덩어리였다 — 매입임대 계열이 여기 들어온다(⑩).
+type DetailResult = {
+  sbds: SbdItem[]; scdls: SplScdlItem[]
+  etcInfo: EtcInfoItem | null; ahflInfo: AhflInfoItem[] | null
+  fail: string | null
+}
+
+async function fetchDetailWithTimeout(item: NoticeItem, timeoutMs: number): Promise<DetailResult> {
+  const empty = (fail: string): DetailResult =>
+    ({ sbds: [], scdls: [], etcInfo: null, ahflInfo: null, fail })
+
+  const url = `https://apis.data.go.kr/B552555/lhLeaseNoticeDtlInfo1/getLeaseNoticeDtlInfo1` +
+    `?serviceKey=${LH_API_KEY}` +
+    `&SPL_INF_TP_CD=${item.SPL_INF_TP_CD}&CCR_CNNT_SYS_DS_CD=${item.CCR_CNNT_SYS_DS_CD}` +
+    `&PAN_ID=${item.PAN_ID}&UPP_AIS_TP_CD=${item.UPP_AIS_TP_CD}&AIS_TP_CD=${item.AIS_TP_CD}`
+
+  let res: Response
   try {
-    const url = `https://apis.data.go.kr/B552555/lhLeaseNoticeDtlInfo1/getLeaseNoticeDtlInfo1` +
-      `?serviceKey=${LH_API_KEY}` +
-      `&SPL_INF_TP_CD=${item.SPL_INF_TP_CD}&CCR_CNNT_SYS_DS_CD=${item.CCR_CNNT_SYS_DS_CD}` +
-      `&PAN_ID=${item.PAN_ID}&UPP_AIS_TP_CD=${item.UPP_AIS_TP_CD}&AIS_TP_CD=${item.AIS_TP_CD}`
-    const raw  = await (await fetch(url, { signal: AbortSignal.timeout(timeoutMs) })).json() as Record<string,unknown>[]
-    const sbdBody   = raw.find(c => Array.isArray(c['dsSbd']))
-    const scdlBody  = raw.find(c => Array.isArray(c['dsSplScdl']))
-    const etcBody   = raw.find(c => Array.isArray(c['dsEtcInfo']))
-    const ahflBody  = raw.find(c => Array.isArray(c['dsAhflInfo']))
-    const sbds  = (sbdBody?.['dsSbd'] as SbdItem[]) ?? []
-    const scdls = (scdlBody?.['dsSplScdl'] as SplScdlItem[]) ?? []
-    const etcs  = (etcBody?.['dsEtcInfo'] as EtcInfoItem[]) ?? []
-    const ahfls = (ahflBody?.['dsAhflInfo'] as AhflInfoItem[]) ?? []
-    return { sbd: sbds[0] ?? null, scdl: scdls[0] ?? null, etcInfo: etcs[0] ?? null, ahflInfo: ahfls.length ? ahfls : null }
-  } catch { return { sbd: null, scdl: null, etcInfo: null, ahflInfo: null } }
+    res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) })
+  } catch (e) {
+    return empty(`network:${e instanceof Error ? e.name : 'Error'}`)
+  }
+
+  const contentType = res.headers.get('content-type')
+  const text = await res.text().catch(() => '')
+  if (!res.ok) return empty(`http_${res.status}`)
+  if (!/(application|text)\/(json|.*\+json)/i.test(contentType ?? '')) return empty('not_json_content_type')
+
+  let parsed: unknown
+  try { parsed = JSON.parse(text) } catch { return empty('json_parse_failed') }
+  if (!Array.isArray(parsed)) return empty('not_an_array')
+
+  const raw = parsed as Record<string, unknown>[]
+  const arrOf = <T,>(k: string): T[] => {
+    const c = raw.find(x => Array.isArray(x[k]))
+    return c ? (c[k] as T[]) : []
+  }
+  const sbds  = arrOf<SbdItem>('dsSbd')
+  const scdls = arrOf<SplScdlItem>('dsSplScdl')
+  const etcs  = arrOf<EtcInfoItem>('dsEtcInfo')
+  const ahfls = arrOf<AhflInfoItem>('dsAhflInfo')
+
+  return {
+    sbds, scdls,
+    etcInfo:  etcs[0] ?? null,
+    ahflInfo: ahfls.length ? ahfls : null,
+    fail: (sbds.length === 0 && scdls.length === 0) ? 'empty_containers' : null,
+  }
 }
 async function fetchDetail(item: NoticeItem) {
   return fetchDetailWithTimeout(item, 5000)
@@ -254,58 +291,154 @@ function parseArea(s: string | null | undefined): [number|null, number|null] {
   return [min, max]
 }
 
+// ── 다단지 전 원소 매핑 (2026-09-17 신설) ─────────────────────────
+// 🔴 `dsSbd`와 `dsSplScdl`은 같은 순서로 오지 않는다(2026-09-17 실측 — 다단지 표본 4건
+// 전부 어긋났고 순서가 같은 공고는 0건이었다). 그래서 아래 어느 함수도 두 배열의 같은
+// 인덱스를 한 단지로 가정하지 않는다. 짝이 필요하면 이름(LCC_NT_NM ↔ SBD_LGO_NM)으로
+// 조인해야 하는데, 지금 저장하는 값 중 짝을 필요로 하는 것이 없어 짝짓기 자체를 두지 않는다.
+//
+// 🔴 필드 이름과 실물이 다르다(2026-09-17 실측, 9공고 전 원소) — `SUM_TOT_HSH_CNT`·
+// `MIN_MAX_RSDN_DDO_AR`·`LCT_ARA_ADR`은 **전부 NULL**이고 값을 싣는 것은 각각
+// `HSH_CNT`·`DDO_AR`·`LGDN_ADR`이다. 아래 `??` 폴백이 매번 오른쪽으로 떨어진다.
+const distinctNames = (sbds: SbdItem[]): string[] =>
+  [...new Set(sbds.map(x => san(x.LCC_NT_NM)).filter((v): v is string => !!v))]
+
+// 「첫 원소 + 외 N개 단지」. N은 **이름이 다른 원소 수 − 1**이다(원소 수가 아니다 —
+// 같은 단지가 두 번 오면 수가 부풀려진다).
+const buildingNameOf = (sbds: SbdItem[]): string | null => {
+  const first = san(sbds[0]?.LCC_NT_NM)
+  if (!first) return null
+  const n = distinctNames(sbds).length
+  return n >= 2 ? `${first} 외 ${n - 1}개 단지` : first
+}
+
+// 전 원소 면적의 합집합 — min들의 min · max들의 max. 값 없는 원소는 건너뛴다.
+const areaUnion = (sbds: SbdItem[]): [number | null, number | null] => {
+  let lo: number | null = null
+  let hi: number | null = null
+  for (const x of sbds) {
+    const [a, b] = parseArea(san(x.MIN_MAX_RSDN_DDO_AR ?? x.DDO_AR))
+    if (a !== null && (lo === null || a < lo)) lo = a
+    if (b !== null && (hi === null || b > hi)) hi = b
+  }
+  return [lo, hi]
+}
+
+// 🔴 다단지면 null이다. 「단지 규모」는 한 단지의 수인데 다단지에서 첫 원소 값을 실으면
+// 그 수가 무엇의 규모도 아니게 된다(실측: 군산 5단지에서 831 = A-3블록 하나의 값).
+// ⚠️ `HSH_CNT`가 빈 문자열인 원소가 실재한다(울산 구영2BL) — sanNum이 null로 접는다.
+const totalUnitsOf = (sbds: SbdItem[]): number | null => {
+  if (distinctNames(sbds).length >= 2) return null
+  const n = sanNum(sbds[0]?.HSH_CNT ?? sbds[0]?.SUM_TOT_HSH_CNT)
+  return n ? Math.round(n) : null
+}
+
+// 주소 한 줄에서 「<시도>|<시군구>」 키를 만든다.
+// 🔴 「시 구」 두 마디를 살린다 — 앞 두 토큰만 보면 특례시·일반시의 행정구가 떨어져
+// 서로 다른 구가 같은 시로 뭉개지고 수렴이 거짓으로 참이 된다(청주시 흥덕구/서원구).
+// ⑩ 「`sigungu_nm`은 두 가지 모양으로 저장된다」와 같은 모양으로 맞춘다.
+const sidoSigunguKey = (addr: string | null): string | null => {
+  if (!addr) return null
+  const t = addr.trim().split(/\s+/)
+  if (t.length < 2) return null
+  if (t.length >= 3 && /시$/.test(t[1]) && /구$/.test(t[2])) return `${t[0]}|${t[1]} ${t[2]}`
+  if (!/(시|군|구)$/.test(t[1])) return null
+  return `${t[0]}|${t[1]}`
+}
+
+// 🔴 전 원소가 한 곳으로 수렴할 때만 싣는다. 하나라도 주소가 없거나 갈리면 null이고,
+// 그러면 protect_detail_columns의 coalesce가 기존 값을 지킨다(2026-09-17 가드 추가).
+// ⚠️ 수렴하지 않는 공고가 실재한다 — 울산 정례모집이 네 자치구다(2026-09-17 실측).
+// 🔴 목록 CNP_CD_NM 파생은 폴백으로도 두지 않는다. 그것은 지역본부명이라 실측상
+// 「<시도> 외」 하나뿐이었고 진짜 시군구를 만든 적이 한 번도 없다(⑩ 실측 NULL 840 + '외' 70).
+const sigunguOf = (sbds: SbdItem[]): string | null => {
+  if (sbds.length === 0) return null
+  const keys = new Set<string>()
+  for (const x of sbds) {
+    const k = sidoSigunguKey(san(x.LGDN_ADR))
+    if (!k) return null
+    keys.add(k)
+  }
+  return keys.size === 1 ? [...keys][0].split('|')[1] : null
+}
+
+// 일정이 몇 벌인가. ⚠️ `SBD_LGO_NM`(단지명)은 원소마다 다르므로 키에 넣지 않는다 —
+// 넣으면 모든 공고가 「여러 벌」이 된다.
+const scdlKey = (x: SplScdlItem): string =>
+  [x.SBSC_ACP_ST_DT, x.SBSC_ACP_CLSG_DT, x.PPR_SBM_OPE_ANC_DT, x.PPR_ACP_ST_DT,
+   x.PPR_ACP_CLSG_DT, x.PZWR_ANC_DT, x.CTRT_ST_DT, x.CTRT_ED_DT]
+    .map(v => san(v) ?? '').join('|')
+
+// 원소가 없으면 null(모름) — false가 아니다. 가드가 기존 값을 지키게 하려면 null이어야 한다.
+const scheduleVariesOf = (scdls: SplScdlItem[]): boolean | null =>
+  scdls.length === 0 ? null : new Set(scdls.map(scdlKey)).size >= 2
+
+// 여러 벌일 때만 쓴다 — 가장 이른 접수 시작.
+const earliestApplyStart = (scdls: SplScdlItem[]): string | null => {
+  let best: string | null = null
+  for (const x of scdls) {
+    const d = parseDate(x.SBSC_ACP_ST_DT)
+    if (d && (best === null || d < best)) best = d
+  }
+  return best
+}
+
 // 🔴 이 함수는 상세(sbd·scdl·ahflInfo)가 없으면 상세 파생 컬럼을 생략하지 않고 null로 채워 반환한다.
 // 그 null은 DB의 protect_detail_columns_trigger가 coalesce(NEW.x, OLD.x)로 무시하므로 기존 값이
 // 지워지지 않는다. 즉 「값을 지우지 않는다」는 불변식은 이 파일이 아니라 DB 쪽에 있다.
 // 🔴 그 트리거를 지우면 이 함수가 매 런 값을 지운다 — 트리거를 되돌릴 때 여기도 함께 본다.
 // (2026-09-09: 이 사실을 모르고 EF만 읽으면 「null이 덮어쓴다」로 읽혀서 남긴다. 트리거가 보호하는
-//  15컬럼과 보호하지 않는 것(deposit_min·rent_min 등)의 목록은 트리거 함수 주석에 있다.)
+//  18컬럼과 보호하지 않는 것(deposit_min·rent_min 등)의 목록은 트리거 함수 주석에 있다.)
 // 🔴 region도 2026-09-12부터 같은 트리거가 지킨다 — 다만 축이 다르다. 아래 `addr ?? regionRaw`는
 // 상세가 없으면 CNP_CD_NM(지역본부명)을 싣는데, 그것이 NULL이 아니라 「덜 정확한 값」이라
 // coalesce로는 안 걸린다. 트리거가 「NEW가 주소형이 아니고 OLD가 주소형이면 OLD 유지」로 막는다.
 // 그전까지는 422행 기본 upsert가 매 런 목록 전량의 주소를 지역본부명으로 되돌리고 있었다.
-function mapLHRow(item: NoticeItem, sbd: SbdItem | null, scdl: SplScdlItem | null, ahflInfo: AhflInfoItem[] | null) {
-  const areaStr = san(sbd?.MIN_MAX_RSDN_DDO_AR ?? sbd?.DDO_AR)
-  const [areaMin, areaMax] = parseArea(areaStr)
-  const units   = sanNum(sbd?.SUM_TOT_HSH_CNT ?? sbd?.HSH_CNT)
+function mapLHRow(item: NoticeItem, sbds: SbdItem[], scdls: SplScdlItem[], ahflInfo: AhflInfoItem[] | null) {
+  // 🔴 2026-09-17: 인자가 「첫 원소」에서 **원소 배열 전체**로 바뀌었다. 상세가 없으면 빈 배열을
+  // 넘기며, 그때 모든 상세 파생 컬럼은 종전과 똑같이 null이 된다(호출부 네 곳 전부 확인).
+  const [areaMin, areaMax] = areaUnion(sbds)
   const regionRaw = san(item.CNP_CD_NM) ?? ''
   const parts   = regionRaw.split(' ')
   const sido    = applySidoMerge(normSido(parts[0]) || null)
-  // 🔴 CNP_CD_NM은 지역본부명이라 둘째 토큰이 시군구가 아니다. 실제로 오는 값은 「인천광역시 외」
-  // 처럼 「<시도> 외」 하나뿐이고, 그 「외」가 그대로 sigungu_nm에 들어가 있었다(2026-09-12 실측 70행,
-  // LH의 sigungu_nm은 NULL 840 + '외' 70이 전부라 진짜 시군구가 들어온 적은 없다).
-  // 「외」는 「그 밖에도 있다」는 뜻이지 지명이 아니므로 시군구 없음(null)으로 둔다.
-  const rest    = parts.slice(1).join(' ').trim()
-  const sigungu = (rest && rest !== '외') ? rest : null
-  const addr    = san(sbd?.LCT_ARA_ADR ?? sbd?.LGDN_ADR)
+  const addr    = san(sbds[0]?.LCT_ARA_ADR ?? sbds[0]?.LGDN_ADR)
   const title   = normalizeTitle(san(item.PAN_NM))
+  // 🔴 일정이 여러 벌이면 대표 한 벌을 고르지 않는다 — 어느 단지 것인지 말할 수 없기 때문이다.
+  // 접수 시작만 「가장 이른 값」으로 두고(마감은 목록 CLSG_DT가 이미 가장 늦은 값이다),
+  // 나머지 scdl 파생은 null로 보내 가드가 기존 값을 지키게 한다.
+  const varies  = scheduleVariesOf(scdls)
+  const scdl    = scdls[0] ?? null
+  const oneKind = varies === false
   return {
     source:            'LH',
     announcement_id:   san(item.PAN_ID),
     title,
     region:            addr ?? (regionRaw || null),
     sido_nm:           sido,
-    sigungu_nm:        sigungu,
+    sigungu_nm:        sigunguOf(sbds),
     housing_type:      ([san(item.UPP_AIS_TP_NM), san(item.AIS_TP_CD_NM)].filter(Boolean).join(' - ')) || null,
     supply_org:        'LH',
     announcement_date: parseDate(item.PAN_NT_ST_DT),
-    apply_start:       parseDate(scdl?.SBSC_ACP_ST_DT),
+    // 🔴 게시일(PAN_NT_ST_DT)과 최초 공고일(PAN_DT)은 다른 값이다. 정정공고는 PAN_DT에
+    // 원공고일을 유지한다(2026-09-17 실측 300행: 정정 44건이 갈리고 정정 아닌 것은 1건뿐).
+    first_announcement_date: parseDate(item.PAN_DT),
+    apply_start:       varies === true ? earliestApplyStart(scdls) : parseDate(scdl?.SBSC_ACP_ST_DT),
     apply_end:         parseDate(item.CLSG_DT),
     status:            san(item.PAN_SS),
     url:               san(item.DTL_URL),
     is_revised:        String(item.PAN_SS ?? '').includes('정정') || (title ?? '').startsWith('[정정공고]'),
     area_min:          areaMin,
     area_max:          areaMax,
-    total_units:       units ? Math.round(units) : null,
-    heating_type:      san(sbd?.HTN_FMLA_DS_CD_NM ?? sbd?.HTN_FMLA_DESC),
-    move_in_date:      san(sbd?.MVIN_XPC_YM),
-    doc_submit_announce_date: parseDate(scdl?.PPR_SBM_OPE_ANC_DT),
-    doc_submit_start:         parseDate(scdl?.PPR_ACP_ST_DT),
-    doc_submit_end:           parseDate(scdl?.PPR_ACP_CLSG_DT),
-    winner_announce_date:     parseDate(scdl?.PZWR_ANC_DT),
-    contract_start:           parseDate(scdl?.CTRT_ST_DT),
-    contract_end:             parseDate(scdl?.CTRT_ED_DT),
-    building_name:     san(sbd?.LCC_NT_NM),
+    total_units:       totalUnitsOf(sbds),
+    heating_type:      san(sbds[0]?.HTN_FMLA_DS_CD_NM ?? sbds[0]?.HTN_FMLA_DESC),
+    move_in_date:      san(sbds[0]?.MVIN_XPC_YM),
+    schedule_varies:   varies,
+    doc_submit_announce_date: oneKind ? parseDate(scdl?.PPR_SBM_OPE_ANC_DT) : null,
+    doc_submit_start:         oneKind ? parseDate(scdl?.PPR_ACP_ST_DT)      : null,
+    doc_submit_end:           oneKind ? parseDate(scdl?.PPR_ACP_CLSG_DT)    : null,
+    winner_announce_date:     oneKind ? parseDate(scdl?.PZWR_ANC_DT)        : null,
+    contract_start:           oneKind ? parseDate(scdl?.CTRT_ST_DT)         : null,
+    contract_end:             oneKind ? parseDate(scdl?.CTRT_ED_DT)         : null,
+    building_name:     buildingNameOf(sbds),
     attachment_urls:   ahflInfo ? ahflInfo.map(a => ({
       url: san(a.AHFL_URL), label: san(a.SL_PAN_AHFL_DS_CD_NM), filename: san(a.CMN_AHFL_NM)
     })) : null,
@@ -372,6 +505,18 @@ function mapMyHomeRow(it: MyHomeItem) {
   const annId = [pblancId, houseSn !== '0' ? houseSn : null, brtcNm, signguNm]
     .filter(Boolean).join('_')
 
+  // 🔴 보증금·월세의 0 (2026-09-17 개정). 업스트림이 실제로 숫자 0을 준다(실측: 1쪽 100행 중
+  // 12행). 그런데 그 12행은 **전부 보증금·월세가 동시에 0**인 일반 매입임대 한 공고였다 —
+  // 매입임대는 주택마다 조건이 달라 **대표값이 없는 자리**이지 「0원」이 아니다.
+  //   · 둘 다 0        → 둘 다 null (대표값 없음)
+  //   · 보증금>0·월세 0 → 보증금 값 · 월세 **0** (전세형 — 여기서만 0을 살린다)
+  //   · 보증금 0·월세>0 → 보증금 null · 월세 값 (관측 사례 없음. 보증금 0원 임대는 드물어
+  //                       대표값 없음으로 본다)
+  //   · 부재·빈 문자열  → null (sanNum이 이미 null로 준다 — 0과 갈린다)
+  const bothZero  = depositRaw === 0 && rentRaw === 0
+  const depositMin = (depositRaw === null || depositRaw === 0) ? null : depositRaw
+  const rentMin    = bothZero ? null : rentRaw
+
   const title = normalizeTitle(san(it['pblancNm']))
   return {
     source:            'MYHOME',
@@ -390,8 +535,8 @@ function mapMyHomeRow(it: MyHomeItem) {
     before_pblanc_id:  beforePblancId,
     is_revised:        sttusNm.includes('정정') || (title ?? '').startsWith('[정정공고]'),
     total_units:       unitsRaw ? Math.round(unitsRaw) : null,
-    deposit_min:       (depositRaw && depositRaw !== 0) ? depositRaw : null,
-    rent_min:          (rentRaw && rentRaw !== 0) ? rentRaw : null,
+    deposit_min:       depositMin,
+    rent_min:          rentMin,
     winner_announce_date: parseDate(it['przwnerPresnatnDe']),
     building_name:     san(it['hsmpNm']),
     precise_address:   san(it['fullAdres']) || null,
@@ -428,7 +573,7 @@ async function collect() {
     errors.push(`LH 목록(예상치 못한 오류): ${e}`)
   }
 
-  const lhBaseRows = lhNotices.map(n => mapLHRow(n, null, null, null)).filter(r => r.announcement_id && r.title)
+  const lhBaseRows = lhNotices.map(n => mapLHRow(n, [], [], null)).filter(r => r.announcement_id && r.title)
   let lhUpserted = 0
   for (let i = 0; i < lhBaseRows.length; i += 50) {
     const { data, error } = await supabase.from('announcements')
@@ -506,6 +651,9 @@ async function collect() {
   const detailRows: ReturnType<typeof mapLHRow>[] = []
   const failedIds: string[] = []
   const revisionCandidates: { id: string; note: string }[] = []
+  // 🔴 실패한 건의 분류를 id별로 들고 있는다. 느린 재시도가 성공하면 지우므로
+  // 런 끝의 집계가 failedIds와 **정확히 같은 수**가 된다(계수를 새로 만들지 않는다).
+  const failKindOf = new Map<string, string>()
 
   // ── 상세조회 마감 (2026-09-09 신설) ──────────────────────────────
   // 문제: 앞단에 마감이 없어서, 업스트림이 열화되면 이 루프가 예산을 통째로 먹고
@@ -545,10 +693,10 @@ async function collect() {
     const results = await Promise.all(batch.map(n => fetchDetail(n)))
     batch.forEach((n, j) => {
       const r = results[j]
-      if (r.sbd || r.scdl) {
+      if (r.sbds.length > 0 || r.scdls.length > 0) {
         lhDetailOk++
         detailRows.push({
-          ...mapLHRow(n, r.sbd, r.scdl, r.ahflInfo),
+          ...mapLHRow(n, r.sbds, r.scdls, r.ahflInfo),
           detail_fetch_fail_count: 0,
           detail_fetch_last_attempt: new Date().toISOString(),
         })
@@ -556,6 +704,7 @@ async function collect() {
         if (crcRsn) revisionCandidates.push({ id: n.PAN_ID, note: crcRsn })
       } else {
         failedIds.push(n.PAN_ID)
+        failKindOf.set(n.PAN_ID, r.fail ?? 'unknown')
       }
     })
     if (i + 5 < needDetail.length) await new Promise(r => setTimeout(r, 150))
@@ -592,15 +741,16 @@ async function collect() {
     )
     chronicNotices.forEach((n, j) => {
       const r = slowResults[j]
-      if (r.sbd || r.scdl) {
+      if (r.sbds.length > 0 || r.scdls.length > 0) {
         slowRetryOk++
         detailRows.push({
-          ...mapLHRow(n, r.sbd, r.scdl, r.ahflInfo),
+          ...mapLHRow(n, r.sbds, r.scdls, r.ahflInfo),
           detail_fetch_fail_count: 0,
           detail_fetch_last_attempt: new Date().toISOString(),
         })
         const idx = failedIds.indexOf(n.PAN_ID)
         if (idx >= 0) failedIds.splice(idx, 1)
+        failKindOf.delete(n.PAN_ID)
         const crcRsn = san(r.etcInfo?.CRC_RSN)
         if (crcRsn) revisionCandidates.push({ id: n.PAN_ID, note: crcRsn })
       }
@@ -624,6 +774,17 @@ async function collect() {
   if (failedIds.length > 0) {
     const { error } = await supabase.rpc('bump_detail_fetch_fail', { p_ids: failedIds })
     if (error) errors.push(`상세조회 실패추적: ${error.message}`)
+
+    // 🔴 분류별 건수 한 줄. 실패가 0건인 런은 이 줄을 만들지 않는다.
+    const tally = new Map<string, number>()
+    for (const id of failedIds) {
+      const k = failKindOf.get(id) ?? 'unknown'
+      tally.set(k, (tally.get(k) ?? 0) + 1)
+    }
+    errors.push(`상세조회 실패 ${failedIds.length}건: ` +
+      [...tally.entries()]
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .map(([k, v]) => `${k} ${v}`).join(' · '))
   }
 
   if (revisionCandidates.length > 0) {
@@ -688,7 +849,7 @@ async function collect() {
     if (failedTps.length > 0) {
       try {
         const again = await fetchNoticeList(failedTps)
-        const rows = again.items.map(n => mapLHRow(n, null, null, null)).filter(r => r.announcement_id && r.title)
+        const rows = again.items.map(n => mapLHRow(n, [], [], null)).filter(r => r.announcement_id && r.title)
         for (let i = 0; i < rows.length; i += 50) {
           const { data, error } = await supabase.from('announcements')
             .upsert(rows.slice(i, i+50), { onConflict: 'source,announcement_id', ignoreDuplicates: false })
@@ -920,15 +1081,24 @@ async function probeDetail(item: NoticeItem): Promise<Record<string, unknown>> {
     ds_spl_scdl: scdl.slice(0, PROBE_MAX_ELEMENTS),
     ds_etc_info_count: etc.length,
     ds_ahfl_info_count: ahfl.length,
+    // 🔴 C-3 (2026-09-17): 원문 옆에 **새 mapLHRow가 만들 행**을 함께 보여준다. DB에는
+    // 쓰지 않는다 — 배포 직후 정기 런 전에 표본을 대조하려고 두는 것이다.
+    // ⚠️ 이것이 probe가 collect() 쪽 함수를 부르는 유일한 자리이고, 방향은 여전히 한쪽이다.
+    mapped_row: mapLHRow(
+      item,
+      sbd as unknown as SbdItem[],
+      scdl as unknown as SplScdlItem[],
+      ahfl.length ? (ahfl as unknown as AhflInfoItem[]) : null,
+    ),
   }
 }
 
 // MYHOME 목록 1쪽. 임대료·보증금·공급호수의 **원시 값과 타입**을 그대로 본다.
 const PROBE_MYHOME_FIELDS = ['rentGtn', 'mtRntchrg', 'sumSuplyCo'] as const
 
-async function probeMyHome(sampleN: number) {
+async function probeMyHome(sampleN: number, page: number) {
   const url = `https://apis.data.go.kr/1613000/HWSPR02/rsdtRcritNtcList` +
-    `?serviceKey=${LH_API_KEY}&numOfRows=100&pageNo=1&type=json`
+    `?serviceKey=${LH_API_KEY}&numOfRows=100&pageNo=${page}&type=json`
   const { value } = await fetchJsonStrict(url, MYHOME_TIMEOUT_MS)
   const raw = value as { response?: { body?: { totalCount?: unknown; item?: unknown } } }
   const itemsRaw = raw?.response?.body?.item
@@ -961,6 +1131,7 @@ async function probeMyHome(sampleN: number) {
 
   return {
     summary: {
+      page,
       total_count: raw?.response?.body?.totalCount ?? null,
       page_count: items.length,
       item_keys: items.length ? Object.keys(items[0] as Record<string, unknown>) : [],
@@ -979,9 +1150,10 @@ async function probe(params: URLSearchParams): Promise<Record<string, unknown>> 
   const panIds  = (params.get('pan_ids') ?? '').split(',')
     .map(s => s.trim()).filter(Boolean).slice(0, PROBE_MAX_DETAIL)
   const wantMyHome = params.get('myhome') !== '0'
+  const mhPage  = Math.min(Math.max(parseInt(params.get('mh_page') ?? '1', 10) || 1, 1), 20)
 
   const out: Record<string, unknown> = {
-    params: { tp, page, n: sampleN, pan_ids: panIds, myhome: wantMyHome },
+    params: { tp, page, n: sampleN, pan_ids: panIds, myhome: wantMyHome, mh_page: mhPage },
     limits: { list_pages: 1, detail_max: PROBE_MAX_DETAIL, myhome_pages: wantMyHome ? 1 : 0 },
   }
 
@@ -1015,7 +1187,7 @@ async function probe(params: URLSearchParams): Promise<Record<string, unknown>> 
   }
 
   if (wantMyHome) {
-    try { out.myhome = await probeMyHome(sampleN) }
+    try { out.myhome = await probeMyHome(sampleN, mhPage) }
     catch (e) {
       out.myhome = { error: e instanceof UpstreamError ? describeFail('MYHOME 목록', e.info) : String(e) }
     }
