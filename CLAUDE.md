@@ -165,6 +165,7 @@ diagnose() / matchHouses() / renderMatchResults(lvl)
 - 🔴 **완료 보고에 병합 결과(PR 번호·병합 커밋)를 반드시 적는다.** 병합이 작업의 일부이므로 생략하지 않는다.
 - push 전에 **반드시 `git fetch origin main`** — 세션 시작 시 `origin/main` 원격추적 ref가 낡은 채로 seeding된다. 이걸 안 하면 `non-fast-forward` 거부를 환경 차단으로 오판한다.
 - push 검증은 로컬이 아니라 **원격 blob으로** — `git show origin/main:<파일>`.
+- 🔴 **누적 파일에 새 줄을 쓰기 전에 `origin/main`을 세션 브랜치에 먼저 머지한다**(2026-09-17 신설 — ⑦ 「2026-09-17 개정」 반영) — `docs/history.md`·`CLAUDE.md`처럼 맨 위에 append 하는 파일이 대상이다. **리베이스가 아니라 머지다.** 계기: squash 병합으로 세션 브랜치가 `main`과 갈려 같은 이력 줄을 두 쪽이 따로 갖게 됐고, PR 병합이 충돌로 거절됐다(PR #154·#155). 먼저 머지하면 그 자리에서 나던 충돌이 아예 생기지 않는다.
 - 예외(다운님 확인 후 진행): 되돌리기 어려운 변경(인증·로그인 경로, 컬럼 DROP, RLS 적용). 이때도 **PR 생성은 Claude Code가 한다**.
 - **코드(index.html 등) 변경 시 sw.js CACHE_NAME +1 규칙은 그대로 유지**(원칙 9번).
 - ⚠️ 원격 브랜치 삭제는 이 환경에서 프록시 403으로 막혀 있다. 정리는 다운님이 GitHub 웹에서 한다.
