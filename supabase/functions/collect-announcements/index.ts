@@ -934,7 +934,7 @@ async function collect() {
 // collect-sh-announcements의 `?mode=probe`와 같은 자리·같은 모양이다.
 //
 // 🔴 의존 방향이 한쪽이다 — probe가 수집 쪽 함수를 부르는 것은 있어도(fetchListPage·
-// fetchJsonStrict·snippetOf) **그 반대는 없다.** collect()도 mapLHRow도 이 블록을 모른다.
+// fetchJsonStrict·snippetOf·mapLHRow) **그 반대는 없다.** collect()도 mapLHRow도 이 블록을 모른다.
 // 그래서 이 블록을 통째로 지워도 정기 실행은 글자 그대로 같다.
 //
 // 🔴 DB에 쓰지 않는다 — 이 블록 어디에서도 supabase.*를 부르지 않는다. collection_run_log에도
@@ -1036,8 +1036,8 @@ async function probeList(tp: string, page: number, sampleN: number, panIds: stri
   }
 }
 
-// 상세 1건. 🔴 fetchDetailWithTimeout을 쓰지 않는다 — 그쪽은 원소 [0]만 남기고 버리는데,
-// 여기서 보려는 것이 바로 「원소가 몇 개이고 각각 무엇을 담는가」다.
+// 상세 1건. 🔴 fetchDetailWithTimeout을 쓰지 않는다 — 그쪽은 실패를 분류로 접어
+// 버리는데, 여기서 보려는 것은 원문 그 자체(원소가 몇 개이고 각각 무엇을 담는가)다.
 async function probeDetail(item: NoticeItem): Promise<Record<string, unknown>> {
   const url = `https://apis.data.go.kr/B552555/lhLeaseNoticeDtlInfo1/getLeaseNoticeDtlInfo1` +
     `?serviceKey=${LH_API_KEY}` +
@@ -1083,7 +1083,6 @@ async function probeDetail(item: NoticeItem): Promise<Record<string, unknown>> {
     ds_ahfl_info_count: ahfl.length,
     // 🔴 C-3 (2026-09-17): 원문 옆에 **새 mapLHRow가 만들 행**을 함께 보여준다. DB에는
     // 쓰지 않는다 — 배포 직후 정기 런 전에 표본을 대조하려고 두는 것이다.
-    // ⚠️ 이것이 probe가 collect() 쪽 함수를 부르는 유일한 자리이고, 방향은 여전히 한쪽이다.
     mapped_row: mapLHRow(
       item,
       sbd as unknown as SbdItem[],
