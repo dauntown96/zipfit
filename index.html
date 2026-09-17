@@ -656,7 +656,7 @@ body.theme-dark .zf-footer a{color:#9aa0aa}
     <!-- 카카오 로그인 직후: 알림 받을 이메일 수집 (필수 경로 — 카카오는 이메일을 주지 않음) -->
     <div id="zfAlertEmailGate" class="panel hidden">
       <p class="panel-title">알림 받을 이메일</p>
-      <p class="sub" style="margin-bottom:1rem">카카오 로그인은 이메일을 제공하지 않아요. 새 공고 알림을 메일로 받으시려면 주소를 입력해 주세요. 나중에 설정에서 바꿀 수 있어요.</p>
+      <p class="sub" style="margin-bottom:1rem">카카오 로그인은 이메일을 제공하지 않아요. 알림 기능이 열리면 이 주소로 보내 드릴 예정이에요. 나중에 설정에서 바꿀 수 있어요.</p>
       <div class="field">
         <label class="label" for="zfAlertEmailInput">이메일 주소</label>
         <input type="email" id="zfAlertEmailInput" placeholder="example@email.com">
@@ -750,11 +750,11 @@ body.theme-dark .zf-footer a{color:#9aa0aa}
           <label class="toggle"><input type="checkbox" id="toggleAlertOn" checked onchange="onSettingChange({alertOn:this.checked?'Y':'N'})"><span class="toggle-slider"></span></label>
         </div>
         <div class="setting-row">
-          <div><div class="setting-label">저장 조건 신규공고 알림</div><div class="setting-sub">내가 저장한 조건에 맞는 공고가 뜨면 알려드려요</div></div>
+          <div><div class="setting-label">저장 조건 신규공고 알림</div><div class="setting-sub">알림 발송 기능은 준비 중이에요. 켜 두시면 기능이 열릴 때 반영돼요</div></div>
           <label class="toggle"><input type="checkbox" id="toggleNewNotice" checked onchange="onSettingChange({newNoticeAlert:this.checked?'Y':'N'})"><span class="toggle-slider"></span></label>
         </div>
         <div class="setting-row">
-          <div><div class="setting-label">마케팅 소식 알림</div><div class="setting-sub">ZipFit 이벤트, 새 기능 소식 등을 받아요</div></div>
+          <div><div class="setting-label">마케팅 소식 알림</div><div class="setting-sub">알림 발송 기능은 준비 중이에요</div></div>
           <label class="toggle"><input type="checkbox" id="toggleMarketing" onchange="onSettingChange({marketingAlert:this.checked?'Y':'N'})"><span class="toggle-slider"></span></label>
         </div>
       </div>
@@ -2734,12 +2734,17 @@ function renderPersonalizedRecommendations(){
         ${closingSoon?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
         ${applyUnknownChip(n)}
       </div>
+      <div data-sum-for="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" data-sum-url="${(n['공고URL']||n['url']||'').replace(/"/g,'&quot;')}"></div>
       <p style="font-size:12px;color:#888;margin-bottom:8px">${dateLine}</p>
       ${(n['공고URL']||n['url'])?`<a class="detail-link" href="${n['공고URL']||n['url']}" target="_blank" rel="noopener" style="display:block" onclick="zfLog('recommend_click',{rank:${idx+1}},'${(n['announcement_id']||'').toString().replace(/'/g,'')}')">📄 공고 원문 보기</a>`:''}
     </div>`;
   });
   if(filtered.length>5) html+=`<p style="font-size:12px;color:#888;text-align:center;margin-top:8px">외 ${filtered.length-5}건 더 — 공고 탭에서 전체 확인</p>`;
   document.getElementById('personalizedList').innerHTML=html;
+  // 🔴 공고 탭·매칭 탭과 같은 두 줄이다(2026-09-17). 새 문구·새 함수를 만들지 않고
+  //    zfNotAnalyzedHtml 을 그대로 쓴다 — 채우는 주체는 zfFillSummarySlots 한 벌이다.
+  zfFillSummarySlots();
+  zfEnsurePriceSummaries(shown.map(n => n['announcement_id'])).then(ok => { if(ok) zfFillSummarySlots(); });
 }
 
 let zfLastTab = null;
@@ -3518,9 +3523,9 @@ async function diagnose(){
 
     // 청약통장 안내
     if(hasSavings === 'no'){
-      html+=`<div class="rbox warn" style="margin-top:6px"><p class="rtitle">📋 주택청약종합저축 미보유</p><p class="rdesc">건설형 행복주택·공공분양 신청 시 청약통장이 필수예요. 매입임대·기숙사형 등은 불필요하니 공고문을 확인하세요.</p></div>`;
+      html+=`<div class="rbox warn" style="margin-top:6px"><p class="rtitle">📋 주택청약종합저축 미보유</p><p class="rdesc">공공분양·행복주택 등 일부 유형은 청약통장이 필요할 수 있어요. 필요 여부는 공고문에서 확인하세요.</p></div>`;
     } else if(hasSavings === 'yes'){
-      html+=`<div class="rbox ok" style="margin-top:6px"><p class="rdesc" style="margin:0">✅ 청약통장 보유 — 모든 유형 신청 가능 (납입횟수 가점 확인 권장)</p></div>`;
+      html+=`<div class="rbox ok" style="margin-top:6px"><p class="rdesc" style="margin:0">✅ 청약통장 보유 — 통장이 필요한 유형도 신청할 수 있어요. 납입횟수·기간 요건은 공고문에서 확인하세요.</p></div>`;
     }
 
     // 최하층 우선배정 안내
@@ -4590,13 +4595,29 @@ function toggleBlockGroup(id, idx){
   loadAnnouncementExtras(annIdForBlock, null, subId);
 }
 
+// 🔴 분석 전 섹션의 빈 상태 안내 (2026-09-17 신설).
+// **정상 응답 0행일 때만** 부른다 — 요청 실패에 「아직 정리하지 못했어요」를 띄우면
+// 그 문장 자체가 거짓이 된다. 그래서 각 로더가 실패(null)와 0행([])을 먼저 가른다.
+// 스타일은 블록 본문이 이미 쓰는 .blk-empty를 그대로 쓴다(새 클래스를 만들지 않는다).
+// 같은 슬롯에 두 번 쌓이지 않게 이미 있으면 넣지 않는다.
+function zfEmptySectionNote(slotId, text){
+  const slot = document.getElementById(slotId);
+  if(!slot || slot.querySelector('.blk-empty')) return;
+  const p = document.createElement('p');
+  p.className = 'blk-empty';
+  p.textContent = text;
+  slot.appendChild(p);
+}
+
 function loadAnnouncementPolicies(annId, detailEl, id, useGroup){
   if(!annId) return;
   const ownerAnn = zfCardAnn(id);
   resolveAnnouncementIds(annId, useGroup).then(ids => fetch(`${SUPABASE_URL}/rest/v1/announcement_policies?${idFilterFor(ids)}&order=category`, {
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
-  })).then(r => r.ok ? r.json() : []).then(policies => {
+  })).then(r => r.ok ? r.json() : null).then(policies => {
     if(!zfStillOurs(id, ownerAnn)) return;
+    // 🔴 요청 실패(null)는 여기서 끝낸다 — 정상 0행([])만 아래에서 안내를 받는다.
+    if(policies === null) return;
     const staleHtml = staleSourceBannerHtml(policies, annId, useGroup, id);
     // 그룹조회로 형제 announcement_id 여러 곳에 동일 정책이 중복 백필된 경우를 대비해
     // 카테고리+내용이 완전히 같은 행은 하나만 남긴다.
@@ -4609,7 +4630,10 @@ function loadAnnouncementPolicies(annId, detailEl, id, useGroup){
         return true;
       });
     }
-    if(!Array.isArray(policies) || policies.length === 0) return;
+    if(!Array.isArray(policies) || policies.length === 0){
+      zfEmptySectionNote('policy-slot-'+id, '이 공고의 정책 안내는 아직 정리하지 못했어요. 공고 원문에서 확인해 주세요.');
+      return;
+    }
     const wrap = document.createElement('details');
     wrap.className = 'policy-wrap';
     wrap.innerHTML = `<summary class="policy-title">📋 정책 안내 (${policies.length}건)</summary>` + staleHtml +
@@ -4670,8 +4694,10 @@ function loadPreciseEligibility(annId, detailEl, id, useGroup){
   const ownerAnn = zfCardAnn(id);
   resolveAnnouncementIds(annId, useGroup).then(ids => fetch(`${SUPABASE_URL}/rest/v1/eligibility_criteria?${idFilterFor(ids)}&order=supply_form,rank`, {
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
-  })).then(r => r.ok ? r.json() : []).then(rows => {
+  })).then(r => r.ok ? r.json() : null).then(rows => {
     if(!zfStillOurs(id, ownerAnn)) return;
+    // 🔴 요청 실패(null)는 여기서 끝낸다 — 정상 0행([])만 아래에서 안내를 받는다.
+    if(rows === null) return;
     const staleHtml = staleSourceBannerHtml(rows, annId, useGroup, id);
     // 그룹조회로 형제 announcement_id 여러 곳에 동일 자격기준이 중복 백필된 경우를 대비해
     // 중복 행을 하나만 남긴다.
@@ -4700,7 +4726,10 @@ function loadPreciseEligibility(annId, detailEl, id, useGroup){
         return true;
       });
     }
-    if(!Array.isArray(rows) || rows.length === 0) return;
+    if(!Array.isArray(rows) || rows.length === 0){
+      zfEmptySectionNote('elig-slot-'+id, '이 공고의 자격기준은 아직 정리하지 못했어요. 공고 원문에서 확인해 주세요.');
+      return;
+    }
     const wrap = document.createElement('details');
     wrap.className = 'elig-wrap';
     wrap.innerHTML = `<summary class="elig-title">🎯 이 공고 정밀 자격기준 (${rows.length}건)</summary>` + staleHtml +
@@ -4852,11 +4881,15 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
   resolveAnnouncementIds(annId, useGroup).then(ids => Promise.all([
     fetch(`${SUPABASE_URL}/rest/v1/housing_units?${idFilterFor(ids)}&order=deposit.asc`, {
       headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
-    }).then(r => r.ok ? r.json() : []),
+    }).then(r => r.ok ? r.json() : null),
     // 회차를 물어야 하는 경우는 둘이다 — ① 그룹조회로 형제가 여럿 온다(종전 조건 그대로)
     // ② 블록 경로라 이 행이 애초에 카드 자신의 행이 아니다(2026-09-16 신설).
     fetchGroupRounds(ids, (useGroup && Array.isArray(ids) && ids.length >= 2) || huIsBlock)
   ])).then(([units, roundMap]) => {
+    // 🔴 요청 실패(null)와 정상 0행([])을 가른다. 실패해도 **지도 폴백은 종전 그대로** 돌아야
+    //    하므로 여기서 끝내지 않고 []로 바꾼 뒤, 아래 빈 분기에서 안내만 넣지 않는다.
+    const huFetchFailed = (units === null);
+    if(huFetchFailed) units = [];
     // 🔴 이 공고 자신의 회차는 카드가 들고 있다. 2026-09-17부터 축이 **회차 날짜**라
     //    data-round-date 를 읽는다(값은 카드를 그릴 때 zfNoticeDate 가 만든 것이다).
     //    ⚠️ data-announcement-date 로 떨어지는 폴백을 남긴다 — 옛 캐시의 카드 HTML 이 남아 있으면
@@ -4927,6 +4960,8 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
       const mid = huMapTargetId[id] || id;
       if(fb) initMapForHouse(fb, mid);
       else mapFail(mid, '위치 정보가 없어요', '세대정보도 폴백 주소도 없다(정밀주소·시군구 모두 비어 있음)');
+      // 🔴 한 칸 카드 상세 경로에서만 안내를 넣는다 — 블록 본문에는 이미 .blk-empty가 있다(중복 방지).
+      if(!huFetchFailed && !huIsBlock) zfEmptySectionNote('hu-slot-'+id, '이 공고의 세대 정보는 아직 정리하지 못했어요. 공고 원문에서 확인해 주세요.');
       return;
     }
     // 🔴 캐시는 접힌 행까지 그대로 담는다 — 지도 소스가 여기서 나오므로(첫 건물 주소),
@@ -5544,7 +5579,7 @@ function renderMatchResults(rows){
       : `<p style="font-size:12px;color:#A32D2D;margin-bottom:10px">설정 탭에서 로그인하면 조건을 저장할 수 있어요.</p>`}
     <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#444;margin-bottom:12px;cursor:pointer">
       <input type="checkbox" id="newNoticeOptIn" checked style="width:16px;height:16px">
-      저장한 조건으로 새 공고가 뜨면 알림 받기
+      새 공고 알림 받기 (준비 중)
     </label>
     <button class="btn btn-primary" style="margin:0" onclick="saveUserProfile('low')">조건 저장하기</button>
     <p id="alertSignupMsg" style="font-size:12px;margin-top:8px"></p>
@@ -5599,7 +5634,7 @@ async function saveUserProfile(lvl){
     return;
   }
   msgEl.style.color='#0F6E56';
-  msgEl.textContent = newNoticeOn==='Y' ? '✅ 조건 저장 완료! 새 공고가 뜨면 메일로 알려드릴게요.' : '✅ 조건이 저장됐어요.';
+  msgEl.textContent = '✅ 조건이 저장됐어요.';
   currentUser={...(currentUser||{}), ...payload,
     new_notice_alert:newNoticeOn==='Y',
     max_deposit:payload.maxDeposit, min_rooms:payload.minRooms,
