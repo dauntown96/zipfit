@@ -2513,6 +2513,11 @@ const HOUSING_TYPES = ['매입임대','행복주택','국민임대','영구임�
 let diagMarital='';
 let selectedRegions=new Set();
 let selectedTypes=new Set();
+// 🔴 추천 탭 칩을 저장값으로 되살렸는가(2026-09-17). **세션 진입당 한 번만** 되살린다.
+//    zfApplySession 은 SIGNED_IN 말고 **TOKEN_REFRESHED 에서도** 돈다(6207행) — 매번 되살리면
+//    진단 뒤 토큰이 갱신되는 순간 selectedTypes 가 저장값으로 되돌아가 진단 결과를 덮는다.
+//    로그아웃에서 다시 false 로 내려, 다른 계정으로 들어오면 그 계정 값으로 되살아난다.
+let zfRecChipsRestored=false;
 let currentSort='deposit-asc';
 let visibleCount=3;
 let lastFiltered=[];
@@ -6208,7 +6213,7 @@ if(zfAuthAvailable()){
       if(session) zfApplySession(session);
     } else if(event==='SIGNED_OUT'){
       zfSession=null;
-      currentUser=null; zfProfileLoaded=false;
+      currentUser=null; zfProfileLoaded=false; zfRecChipsRestored=false;
       zfForgetLocalUser();
     }
   });
@@ -6267,6 +6272,20 @@ function applySettingsToUI(p){
   settingsTypes=new Set(savedTypes);
   renderChipState('settingsRegionChips',settingsRegions);
   renderChipState('settingsTypeChips',settingsTypes);
+
+  // 🔴 추천 탭 칩도 **같은 저장값으로** 되살린다(2026-09-17). 종전에는 설정 탭만 되살아나고
+  //    추천 탭은 빈 Set 으로 남아, 그 상태로 추천 탭에서 저장하면 DB 의 지역이 빈 값으로
+  //    덮어써졌다. 되살리고 나면 빈 Set 은 「전체를 눌렀다」는 뜻만 남는다.
+  // 🔴 저장값이 비어 있으면 **비운 채로 둔다** — 그것이 「전체」이고, 되살릴 것이 없다.
+  // 🔴 한 번만 한다 — 이유는 zfRecChipsRestored 선언부에.
+  if(!zfRecChipsRestored){
+    zfRecChipsRestored=true;
+    selectedRegions=new Set(savedRegions);
+    selectedTypes=new Set(savedTypes);
+    renderChipState('regionChips',selectedRegions);
+    renderChipState('typeChips',selectedTypes);
+    zfRerenderRecIfVisible();   // 이미 그려져 있으면 갱신한다(기존 함수를 쓴다)
+  }
 }
 
 async function saveSettings(){
@@ -6354,7 +6373,7 @@ async function onSettingChange(patch){
 }
 
 async function logoutUser(){
-  currentUser=null; zfProfileLoaded=false;
+  currentUser=null; zfProfileLoaded=false; zfRecChipsRestored=false;
   if(zfAuthAvailable()){
     try{ await zfAuth.auth.signOut(); }catch(err){ console.warn('ZipFit: signOut 실패', err); }
   }
