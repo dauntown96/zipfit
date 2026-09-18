@@ -790,6 +790,21 @@ body.theme-dark .zf-footer a{color:#9aa0aa}
         <p class="slabel" style="margin:0 0 0.75rem">🚪 계정</p>
         <button class="btn btn-sec" onclick="logoutUser()">로그아웃하고 다른 계정으로 전환</button>
         <p style="font-size:12px;color:#888;margin:6px 0 0;line-height:1.5">지금 계정에서 로그아웃한 뒤 다른 계정으로 로그인합니다. 저장한 공고와 설정은 계정마다 따로 보관돼요.</p>
+
+        <!-- 🔴 탈퇴는 로그아웃과 다른 일이라 선으로 끊고 색을 달리한다(2026-09-18). 이 패널 전체가
+             #settingsBody 안이라 로그인 상태에서만 보인다 — 별도 분기를 두지 않는다. -->
+        <div id="zfDeleteZone" style="margin-top:1.25rem;padding-top:1rem;border-top:1px solid #e8e8e0">
+          <button id="zfDeleteBtn" class="btn btn-sec" style="border-color:#C0392B;color:#C0392B" onclick="zfDeleteAccountAsk()">회원 탈퇴</button>
+          <p style="font-size:12px;color:#888;margin:6px 0 0;line-height:1.5">계정과 저장된 정보를 모두 삭제합니다.</p>
+
+          <div id="zfDeleteConfirm" class="hidden" style="margin-top:10px;padding:12px;border:1px solid #C0392B;border-radius:8px;background:#FDF3F2">
+            <p style="font-size:13px;color:#7B241C;margin:0 0 10px;line-height:1.6">탈퇴하면 저장한 조건·찜한 공고·알림 설정과 이용 기록이 모두 삭제됩니다. 되돌릴 수 없습니다.</p>
+            <button id="zfDeleteGo" class="btn" style="background:#C0392B;color:#fff;border-color:#C0392B" onclick="zfDeleteAccountRun()">탈퇴합니다</button>
+            <button class="btn btn-sec" style="margin-left:6px" onclick="zfDeleteAccountCancel()">취소</button>
+          </div>
+
+          <p id="zfDeleteMsg" style="font-size:12px;margin:8px 0 0;line-height:1.5"></p>
+        </div>
       </div>
     </div>
   </div> <!-- /main5 -->
@@ -6385,6 +6400,59 @@ async function onSettingChange(patch){
     if(col) merged[col] = (v==='Y'||v==='N') ? (v==='Y') : v;
   }
   currentUser=merged;
+}
+
+// ===== 회원 탈퇴 =====
+// 🔴 되돌릴 수 없는 일이라 두 단계를 둔다 — 버튼 한 번으로는 지워지지 않는다.
+// 🔴 EF(delete-account)가 토큰의 sub 만 보고 지운다. 여기서 사용자 id 를 보내지 않는다 —
+//    보내면 「프론트가 준 id 를 지우는」 경로가 있는 것처럼 보여 다음 사람이 그걸 쓰게 된다.
+const DELETE_ACCOUNT_API_URL = "https://khdpjjyspmlqtzperoqg.supabase.co/functions/v1/delete-account";
+const ZF_DELETE_FAIL_MSG = '탈퇴 처리에 실패했습니다. 잠시 후 다시 시도해 주시고, 계속 실패하면 설정 · 개인정보처리방침의 연락처로 알려 주세요.';
+
+function zfDeleteMsg(text, tone){
+  const el = document.getElementById('zfDeleteMsg');
+  if(!el) return;
+  el.textContent = text || '';
+  el.style.color = tone === 'ok' ? '#0F6E56' : (tone === 'err' ? '#C0392B' : '#888');
+}
+
+function zfDeleteAccountAsk(){
+  const box = document.getElementById('zfDeleteConfirm');
+  if(box) box.classList.remove('hidden');
+  zfDeleteMsg('');
+}
+
+function zfDeleteAccountCancel(){
+  const box = document.getElementById('zfDeleteConfirm');
+  if(box) box.classList.add('hidden');
+  zfDeleteMsg('');
+}
+
+async function zfDeleteAccountRun(){
+  const go = document.getElementById('zfDeleteGo');
+  if(go && go.disabled) return;                 // 연타로 두 번 부르지 않는다
+  if(go) go.disabled = true;
+  zfDeleteMsg('탈퇴를 처리하고 있어요…');
+  try{
+    const res = await zfCallWithRetry(t => fetch(DELETE_ACCOUNT_API_URL,{
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+t },
+      body: JSON.stringify({ confirm:'DELETE' })
+    }));
+    // 🔴 실패를 성공처럼 보이게 하지 않는다. 세션 없음·HTTP 오류·본문 error 모두 실패다.
+    if(!res || !res.ok){ if(go) go.disabled=false; zfDeleteMsg(ZF_DELETE_FAIL_MSG,'err'); return; }
+    const json = await res.json().catch(()=>({}));
+    if(json.error || !json.success){ if(go) go.disabled=false; zfDeleteMsg(ZF_DELETE_FAIL_MSG,'err'); return; }
+  }catch(err){
+    if(go) go.disabled=false;
+    zfDeleteMsg(ZF_DELETE_FAIL_MSG,'err');
+    return;
+  }
+  // 계정이 사라졌으니 이 기기의 흔적도 지우고 로그인 화면으로 돌린다.
+  await logoutUser();
+  zfDeleteAccountCancel();
+  if(go) go.disabled = false;
+  zfAuthMsg('탈퇴가 완료됐습니다. 그동안 이용해 주셔서 감사합니다.');
 }
 
 async function logoutUser(){
