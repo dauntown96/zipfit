@@ -4617,13 +4617,28 @@ function zfEmptySectionNote(slotId, text){
 function loadAnnouncementPolicies(annId, detailEl, id, useGroup){
   if(!annId) return;
   const ownerAnn = zfCardAnn(id);
-  resolveAnnouncementIds(annId, useGroup).then(ids => fetch(`${SUPABASE_URL}/rest/v1/announcement_policies?${idFilterFor(ids)}&order=category`, {
-    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
-  })).then(r => r.ok ? r.json() : null).then(policies => {
+  // 🔴 회차를 함께 물어 온다(2026-09-18). 종전에는 rounds 를 안 넘겨 mixed·staleOnly 축이
+  //    죽어 있었고, 그래서 **대표에 자기 행이 하나라도 있으면** 지난 회차가 섞여도 배너가
+  //    뜨지 않았다. 세대별 정보가 쓰는 fetchGroupRounds·roundInfoFor 를 그대로 재사용한다.
+  //    조건에 huIsBlock 에 해당하는 항이 없는 것은 정책 로더에 블록 경로가 없기 때문이다.
+  resolveAnnouncementIds(annId, useGroup).then(ids => Promise.all([
+    fetch(`${SUPABASE_URL}/rest/v1/announcement_policies?${idFilterFor(ids)}&order=category`, {
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
+    }).then(r => r.ok ? r.json() : null),
+    fetchGroupRounds(ids, useGroup && Array.isArray(ids) && ids.length >= 2)
+  ])).then(([policies, roundMap]) => {
     if(!zfStillOurs(id, ownerAnn)) return;
     // 🔴 요청 실패(null)는 여기서 끝낸다 — 정상 0행([])만 아래에서 안내를 받는다.
     if(policies === null) return;
-    const staleHtml = staleSourceBannerHtml(policies, annId, useGroup, id);
+    const polCardEl = cardElFor(id);
+    const polCardDate = (polCardEl && (polCardEl.dataset.roundDate || polCardEl.dataset.announcementDate)) || '';
+    const polRounds = roundInfoFor(policies, annId, roundMap, polCardDate);
+    // 🔴 staleOnly 는 넘기지 않는다 — 그 갈래의 문구(STALE_SRC_MSG_PAST_ONLY)가 「세대 정보」와
+    //    「아래 「지난 회차 보기」」를 말하는데 정책 안내에는 그 접힘이 없다. 정책에서 staleOnly 는
+    //    **언제나 orphan 과 함께 참이라**(자기 id 행이 있으면 그 회차가 곧 카드 회차다) 종전 경로인
+    //    orphan → STALE_SRC_MSG_PLAIN 이 그대로 맞는 말을 한다. 새 문구는 만들지 않았다.
+    const staleHtml = staleSourceBannerHtml(policies, annId, useGroup, id,
+      polRounds ? { ...polRounds, staleOnly: false } : null);
     // 그룹조회로 형제 announcement_id 여러 곳에 동일 정책이 중복 백필된 경우를 대비해
     // 카테고리+내용이 완전히 같은 행은 하나만 남긴다.
     if(Array.isArray(policies) && policies.length > 0){
