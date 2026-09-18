@@ -3899,10 +3899,13 @@ const ELIG_KEY_LABELS = {
   '소득기준_자녀수별': '소득기준(자녀수별)',
   '차량가액기준_자녀수별': '차량가액기준(자녀수별)',
 };
+// 🔴 첫 `_` 만 괄호로 바꾸면 **괄호 안에 밑줄이 남는다**(2026-09-18) — 「경쟁(시_순서)」·
+//    「출산자녀(1인_10%p)」처럼 화면에 그대로 나갔다. 괄호 안의 `_` 는 공백으로 바꾼다.
+//    ⚠️ ELIG_KEY_LABELS 명시 매핑은 그대로 — 손으로 적은 라벨을 건드리지 않는다.
 function prettifyEligKey(k){
   if(ELIG_KEY_LABELS[k]) return ELIG_KEY_LABELS[k];
   const m = k.match(/^([^_]+)_(.+)$/);
-  return m ? `${m[1]}(${m[2]})` : k;
+  return m ? `${m[1]}(${m[2].replace(/_/g, ' ')})` : k;
 }
 
 // verification_requirements의 값을 재귀 렌더링 — 숫자는 만원 단위, 중첩 객체는 들여쓴 하위 목록으로 변환해
@@ -4867,7 +4870,10 @@ function loadPreciseEligibility(annId, detailEl, id, useGroup){
         const baseLabel = INCOME_BASE_LABEL[r.income_base] || '';
         const pctText = p => baseLabel ? `${baseLabel} ${p}%` : `소득 ${p}%`;
         const income = incomeExempt ? '소득기준 배제' : (r.income_pct ? pctText(r.income_pct) : '');
-        const dual = (!incomeExempt && r.income_pct_dual_income)
+        // 🔴 기본값과 같으면 그리지 않는다 — 「소득 100% (맞벌이 100%)」는 되풀이일 뿐
+        //    「맞벌이는 더 높다」는 없는 뜻을 만든다(2026-09-18).
+        const dualSame = String(r.income_pct_dual_income) === String(r.income_pct);
+        const dual = (!incomeExempt && r.income_pct_dual_income && !dualSame)
           ? ` (맞벌이 ${baseLabel ? `${baseLabel} ` : ''}${r.income_pct_dual_income}%)` : '';
         // 🔴 (v/10000).toLocaleString() 은 만원 미만을 **조용히 반올림**한다 — manwonText 가 그 자리다.
         const asset = assetExempt ? '자산기준 배제' : (r.asset_limit ? `자산 ${manwonText(r.asset_limit)}` : '');
