@@ -739,6 +739,17 @@ body.theme-dark .zf-footer a{color:#9aa0aa}
 
       <div class="panel" style="margin-bottom:1rem">
         <p class="slabel" style="margin:0 0 0.75rem">🔔 알림 설정</p>
+
+        <!-- 🔴 게이트(#zfAlertEmailGate)는 alert_email 이 없을 때 한 번만 뜬다. 바꾸는 자리가
+             여기 없으면 게이트의 「나중에 설정에서 바꿀 수 있어요」가 거짓말이 된다(2026-09-18). -->
+        <div class="field" style="margin:0 0 1rem">
+          <label class="label" for="zfSettingsAlertEmail">알림 받을 이메일</label>
+          <input type="email" id="zfSettingsAlertEmail" placeholder="example@email.com">
+          <button class="btn btn-sec" style="margin-top:8px"
+                  onclick="zfSaveAlertEmail('zfSettingsAlertEmail','zfSettingsAlertEmailMsg')">알림 이메일 저장</button>
+          <p id="zfSettingsAlertEmailMsg" style="font-size:12px;margin:6px 0 0;color:#888"></p>
+        </div>
+
         <div class="setting-row">
           <div><div class="setting-label">전체 알림</div><div class="setting-sub">모든 알림을 받을지 결정해요</div></div>
           <label class="toggle"><input type="checkbox" id="toggleAlertOn" checked onchange="onSettingChange({alertOn:this.checked?'Y':'N'})"><span class="toggle-slider"></span></label>
@@ -789,7 +800,7 @@ body.theme-dark .zf-footer a{color:#9aa0aa}
              #settingsBody 안이라 로그인 상태에서만 보인다 — 별도 분기를 두지 않는다. -->
         <div id="zfDeleteZone" style="margin-top:1.25rem;padding-top:1rem;border-top:1px solid #e8e8e0">
           <button id="zfDeleteBtn" class="btn btn-sec" style="border-color:#C0392B;color:#C0392B" onclick="zfDeleteAccountAsk()">회원 탈퇴</button>
-          <p style="font-size:12px;color:#888;margin:6px 0 0;line-height:1.5">계정과 저장된 정보를 모두 삭제합니다.</p>
+          <p style="font-size:12px;color:#888;margin:6px 0 0;line-height:1.5">계정과 이 계정에 저장된 정보를 삭제합니다.</p>
 
           <div id="zfDeleteConfirm" class="hidden" style="margin-top:10px;padding:12px;border:1px solid #C0392B;border-radius:8px;background:#FDF3F2">
             <p style="font-size:13px;color:#7B241C;margin:0 0 10px;line-height:1.6">탈퇴하면 저장한 조건·찜한 공고·알림 설정과 이 계정에 연결된 이용 기록이 삭제됩니다. 되돌릴 수 없습니다.</p>
@@ -6113,11 +6124,22 @@ function zfShowSettingsBody(){
   if(alertGate) alertGate.classList.add('hidden');
   document.getElementById('settingsBody').classList.remove('hidden');
   const c=currentUser||{};
+  // 🔴 이 줄은 **로그인 수단**을 말한다(2026-09-18). 종전에는 (alert_email || email) 을 썼는데,
+  //    카카오 계정은 로그인 이메일이 없어 **알림 이메일이 계정 이름 자리에 떴다** — 다운님이
+  //    「카카오로 로그인했는데 다른 이메일이 뜬다」로 읽었다. 알림 이메일은 아래 칸에서만 보인다.
   const label=document.getElementById('currentUserEmail');
   if(label){
-    const shown=(c.alert_email||c.email||'').trim();
-    label.textContent = shown ? (shown+'님 환영해요') : '로그인됨 (알림 이메일 미설정)';
+    const u = (zfSession && zfSession.user) || {};
+    const app = u.app_metadata || {};
+    const prov = (app.provider || (Array.isArray(app.providers) ? app.providers[0] : '') || '').toLowerCase();
+    const loginEmail = (u.email || c.email || '').trim();
+    label.textContent = prov === 'kakao' ? '카카오 계정으로 로그인했어요'
+                      : loginEmail       ? (loginEmail + '로 로그인했어요')
+                                         : '로그인했어요';
   }
+  // 설정 탭 알림 이메일 칸에 현재 값을 채운다(없으면 비워 둔다 — placeholder 가 안내한다)
+  const aInput=document.getElementById('zfSettingsAlertEmail');
+  if(aInput) aInput.value = (c.alert_email||'').trim();
 }
 
 // 세션 기반 진입.
@@ -6161,16 +6183,20 @@ async function zfApplySession(session){
   return true;
 }
 
-async function zfSaveAlertEmail(){
-  const input=document.getElementById('zfAlertEmailInput');
-  const msg=document.getElementById('zfAlertEmailMsg');
+// 🔵 게이트와 설정 탭이 **같은 함수**를 쓴다 — 인자 없이 부르면 게이트 칸이다.
+//    저장 경로를 두 벌로 두면 한쪽만 고쳐져 서로 다르게 동작한다.
+async function zfSaveAlertEmail(inputId, msgId){
+  const fromGate = !inputId;
+  const input=document.getElementById(inputId || 'zfAlertEmailInput');
+  const msg=document.getElementById(msgId || 'zfAlertEmailMsg');
+  if(!input) return;
   const val=(input.value||'').trim();
   if(!val || !val.includes('@')){
     msg.style.color='#A32D2D';
     msg.textContent='올바른 이메일 주소를 입력해주세요.';
     return;
   }
-  if(!zfCanSaveProfile('zfAlertEmailMsg')) return;
+  if(!zfCanSaveProfile(msgId || 'zfAlertEmailMsg')) return;
   msg.style.color='#888';
   msg.textContent='저장 중...';
   const res=await zfPostProfile({ alertEmail: val });   // 바꾼 값 하나만
@@ -6180,9 +6206,12 @@ async function zfSaveAlertEmail(){
     return;
   }
   currentUser = Object.assign({}, currentUser||{}, { alert_email: val });
-  msg.textContent='';
-  input.value='';
-  zfShowSettingsBody();
+  if(fromGate) input.value='';   // 게이트 칸만 비운다 — 설정 탭은 방금 저장한 값을 그대로 보여준다
+  zfShowSettingsBody();          // 환영 줄과 설정 탭 칸을 다시 그린다
+  if(msg){
+    msg.style.color = '#0F6E56';
+    msg.textContent = fromGate ? '' : '알림 이메일을 저장했어요.';
+  }
 }
 
 function zfSkipAlertEmail(){
