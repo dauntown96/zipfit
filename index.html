@@ -189,6 +189,10 @@ select:focus,input:focus{border-color:#5DCAA5}
 .elig-row:last-child{margin-bottom:0}
 .elig-key{font-weight:600;color:#333;flex-shrink:0}
 .elig-subrows{flex:1;min-width:0}
+.elig-fold{flex:1;min-width:0}
+.elig-fold>summary{font-size:11.5px;color:#1D9E75;cursor:pointer;text-align:right}
+.elig-fold-body{margin-top:4px}
+body.theme-dark .elig-fold>summary{color:#5DCAA5}
 .elig-subrow{display:flex;justify-content:space-between;gap:8px;padding:2px 0 2px 10px;border-left:2px solid #e8e8e0;font-size:11.5px}
 .elig-subrow span:first-child{color:#777}
 body.theme-dark .elig-key{color:#e8e8e8}
@@ -283,6 +287,27 @@ body.theme-dark .hu-past-title{color:#cfcfcf}
 .hu-group-count{color:#888;white-space:nowrap;font-size:11px}
 .hu-group-body{display:flex;flex-direction:column;gap:6px;padding:8px;background:#fff}
 .hu-group-body .hu-row{background:#fafaf6}
+/* 🔵 주택형 묶음 — 원문 주택형(unit_group)이 있는 행만 묶는다. 표가 아니라 목록이다:
+   360px 폭에서 「계층·면적·보증금·월임대료」를 표로 두면 가로로 넘친다(직전 협의).
+   머리줄은 접을 수 있고 기본은 펼침 — 이 목록은 이미 「세대별 정보」와 「건물」 두 겹 안에 있어
+   세 번째 겹까지 접으면 금액을 보는 데 세 번을 눌러야 한다. */
+.hu-ug{border:1px solid #e8e8e0;border-radius:10px;overflow:hidden;background:#fff}
+.hu-ug>summary{display:flex;justify-content:space-between;align-items:center;gap:8px;background:#f8f8f8;padding:8px 10px;cursor:pointer;font-size:12px;list-style:none}
+.hu-ug>summary::-webkit-details-marker{display:none}
+.hu-ug>summary::before{content:'▸';color:#999;margin-right:4px;flex:0 0 auto}
+.hu-ug[open]>summary::before{content:'▾'}
+.hu-ug-name{font-weight:700;color:#333;flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
+.hu-ug-meta{color:#888;font-size:11px;white-space:nowrap;flex:0 0 auto}
+.hu-ug-list{display:flex;flex-direction:column;gap:8px;padding:8px}
+.hu-ug-row{border-bottom:1px dashed #eee;padding-bottom:8px}
+.hu-ug-row:last-child{border-bottom:0;padding-bottom:0}
+.hu-ug-line{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;font-size:12px}
+.hu-ug-target{font-weight:600;color:#333;flex:0 0 auto}
+.hu-ug-area{color:#888;flex:0 0 auto}
+.hu-ug-price{color:#333;flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
+.hu-ug-sub{font-size:11px;color:#888;margin-top:2px}
+body.theme-dark .hu-ug,body.theme-dark .hu-ug>summary{background:#1f2229;border-color:#2c2f38}
+body.theme-dark .hu-ug-name,body.theme-dark .hu-ug-target,body.theme-dark .hu-ug-price{color:#e8e8e8}
 .poi-section{margin-top:8px}
 .poi-tabs{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap}
 .poi-tab{padding:5px 11px;font-size:11px;border-radius:14px;border:1px solid #ddd;background:#fff;color:#666;cursor:pointer}
@@ -3898,14 +3923,38 @@ const ELIG_KEY_LABELS = {
   '자산기준_자녀수별': '자산기준(자녀수별)',
   '소득기준_자녀수별': '소득기준(자녀수별)',
   '차량가액기준_자녀수별': '차량가액기준(자녀수별)',
+  // 🔴 아래는 **첫 토큰만 괄호 밖으로 나가 어색해지는 키**다(2026-09-18, DB 조회로 골랐다).
+  //    「최종(소득기준 한도 신혼부부한부모 맞벌이)」처럼 앞 한 낱말이 제목 행세를 하던 자리다.
+  '최종_소득기준_한도_신혼부부한부모_맞벌이': '최종 소득기준 한도(신혼부부·한부모 맞벌이)',
+  '최종_소득기준_한도_그외': '최종 소득기준 한도(그 외)',
+  '가구원수별_소득기준_70%_2025년도': '가구원수별 소득기준 70%(2025년도)',
+  '공급대상_한정_소득가산': '공급대상 한정 소득가산',
+  '신혼부부_맞벌이_우대비율': '신혼부부 맞벌이 우대비율',
+  '청약저축_납입횟수_확인': '청약저축 납입횟수 확인',
+  '자산기준_가구원수및출산자녀별': '자산기준(가구원수·출산자녀별)',
+  '자동차가액_출산자녀별': '자동차가액(출산자녀별)',
+  '자동차가액_출산자녀가산': '자동차가액(출산자녀 가산)',
+  '2세미만자녀_우선배정': '2세 미만 자녀 우선배정',
+  '우선배정_2세미만자녀': '우선배정(2세 미만 자녀)',
+  '자산완화_출산2인이상': '자산 완화(출산 2인 이상)',
+  '재계약_소득자산완화자': '재계약(소득·자산 완화자)',
+  '무주택기간_산정기준': '무주택기간 산정기준',
+  'income_amount_1인': '소득 금액(1인 가구)',
+  'income_amount_2인': '소득 금액(2인 가구)',
+  'income_amount_3인': '소득 금액(3인 가구)',
 };
 // 🔴 첫 `_` 만 괄호로 바꾸면 **괄호 안에 밑줄이 남는다**(2026-09-18) — 「경쟁(시_순서)」·
 //    「출산자녀(1인_10%p)」처럼 화면에 그대로 나갔다. 괄호 안의 `_` 는 공백으로 바꾼다.
 //    ⚠️ ELIG_KEY_LABELS 명시 매핑은 그대로 — 손으로 적은 라벨을 건드리지 않는다.
+// 🔴 뒤쪽에 **이미 괄호가 있으면 괄호를 또 두르지 않는다**(2026-09-18) — 「선정방법(전용50㎡미만
+//    (부여규암 29·36…))」처럼 괄호가 겹쳐 어디가 어디인지 읽히지 않았다. 이 꼴은 키마다 괄호 안이
+//    달라 명시 매핑으로 덮을 수 없어(공고별 단지 목록) 규칙으로 푼다 — 그때는 공백으로만 잇는다.
 function prettifyEligKey(k){
   if(ELIG_KEY_LABELS[k]) return ELIG_KEY_LABELS[k];
   const m = k.match(/^([^_]+)_(.+)$/);
-  return m ? `${m[1]}(${m[2].replace(/_/g, ' ')})` : k;
+  if(!m) return k;
+  const rest = m[2].replace(/_/g, ' ');
+  return rest.indexOf('(') >= 0 ? `${m[1]} ${rest}` : `${m[1]}(${rest})`;
 }
 
 // verification_requirements의 값을 재귀 렌더링 — 숫자는 만원 단위, 중첩 객체는 들여쓴 하위 목록으로 변환해
@@ -3930,15 +3979,32 @@ function manwonText(v){
              : `${sign}${rest.toLocaleString()}원`;
 }
 
-function renderEligValue(v){
+// 🔴 **정보를 지우지 않는다 — 접기만 한다**(2026-09-18). 「가구원수별」 8인 × 열 여럿이 상세
+//    아코디언에 통째로 쏟아지던 자리다. 접힌 것을 펴면 언제나 전부가 나온다.
+// 🔵 기준: 항목 6개 이상인 객체 · 원소 12개 이상인 배열. 🔴 **접힘 안에서는 다시 접지 않는다**
+//    (inFold) — 8인 객체를 펴자마자 그 안에서 13열 배열이 또 접히면 한 표를 보는 데 아홉 번을
+//    눌러야 한다. 한 번 펴면 그 아래는 전부 보인다.
+const ELIG_FOLD_OBJ = 6;
+const ELIG_FOLD_ARR = 12;
+const eligFold = (summary, inner) =>
+  `<details class="elig-fold"><summary>${escapeHtml(summary)}</summary><div class="elig-fold-body">${inner}</div></details>`;
+
+function renderEligValue(v, inFold){
   if(v === null || v === undefined) return '<span></span>';
   if(typeof v === 'number') return `<span>${manwonText(v)}</span>`;
   if(typeof v === 'string') return `<span>${escapeHtml(v)}</span>`;
-  if(Array.isArray(v)) return `<span>${v.map(x => typeof x==='number' ? manwonText(x) : escapeHtml(String(x))).join(', ')}</span>`;
+  if(Array.isArray(v)){
+    const items = v.map(x => typeof x==='number' ? manwonText(x) : escapeHtml(String(x)));
+    const body = `<span>${items.join(', ')}</span>`;
+    return (!inFold && items.length >= ELIG_FOLD_ARR) ? eligFold(`${items.length}개 — 펼쳐 보기`, body) : body;
+  }
   if(typeof v === 'object'){
-    return `<div class="elig-subrows">` + Object.entries(v).map(([k,vv]) =>
-      `<div class="elig-subrow"><span>${escapeHtml(prettifyEligKey(k))}</span>${renderEligValue(vv)}</div>`
+    const entries = Object.entries(v);
+    const fold = !inFold && entries.length >= ELIG_FOLD_OBJ;
+    const body = `<div class="elig-subrows">` + entries.map(([k,vv]) =>
+      `<div class="elig-subrow"><span>${escapeHtml(prettifyEligKey(k))}</span>${renderEligValue(vv, inFold || fold)}</div>`
     ).join('') + `</div>`;
+    return fold ? eligFold(`${entries.length}개 항목 — 펼쳐 보기`, body) : body;
   }
   return `<span>${escapeHtml(String(v))}</span>`;
 }
@@ -4255,6 +4321,30 @@ function fetchGroupRounds(ids, need){
     const map = {};
     rows.forEach(r => { if(r && r.announcement_id) map[r.announcement_id] = r; });
     return map;
+  }).catch(() => null);
+}
+
+// 🔴 블록 줄의 세대수 — 수집 `total_units` 는 소스가 주는 값이라 공고 **전체 합**이 오기도 한다
+//    (정읍첨단 21197_6 이 160 인데 실제 모집은 110 — PR #174 E장에서 업스트림 `sumSuplyCo` 값임을
+//    probe 로 확인했다). 우리가 원문 공급호수를 읽어 둔 블록에서는 **그것을** 쓴다.
+// 🔴 `recruit_count` 합으로 대체하지 않는다 — 계층 행마다 같은 수를 되풀이해 둔 옛 회차 데이터가
+//    부풀려진다(7월 회차 20733_*). 합은 **`unit_group` 당 한 번**만 더한다.
+// 🔵 `group_recruit_count` 가 없는 블록은 응답에 아예 오지 않아 종전 `total_units` 로 떨어진다.
+function fetchBlockRecruitSums(ids){
+  if(!Array.isArray(ids) || ids.length === 0) return Promise.resolve(null);
+  return fetch(`${SUPABASE_URL}/rest/v1/housing_units?select=announcement_id,unit_group,group_recruit_count&group_recruit_count=not.is.null&${idFilterFor(ids)}`, {
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
+  }).then(r => r.ok ? r.json() : null).then(rows => {
+    if(!Array.isArray(rows) || rows.length === 0) return null;
+    const seen = new Set(), sum = {};
+    rows.forEach(r => {
+      if(!r || !r.announcement_id || !r.unit_group) return;
+      const k = r.announcement_id + '|' + r.unit_group;
+      if(seen.has(k)) return;
+      seen.add(k);
+      sum[r.announcement_id] = (sum[r.announcement_id] || 0) + Number(r.group_recruit_count);
+    });
+    return sum;
   }).catch(() => null);
 }
 
@@ -4579,8 +4669,12 @@ function loadAnnouncementBlocks(annId, id, detailEl){
     //    사본을 늘리지 않으려고 SQL 에는 회차 규칙을 적지 않았다 — 그래서 주소 집합 판정
     //    (addr_core·MYHOME 우선 distinct)도 그대로이고 get_announcements_deduped 의
     //    block_count 거울은 손댈 것이 없다.
-    return fetchGroupRounds(blocks.map(b => b.announcement_id), true).then(roundMap => {
-      renderAnnouncementBlocks(blocks, id, roundMap);
+    const blkIds = blocks.map(b => b.announcement_id);
+    return Promise.all([
+      fetchGroupRounds(blkIds, true),
+      fetchBlockRecruitSums(blkIds)
+    ]).then(([roundMap, recruitSums]) => {
+      renderAnnouncementBlocks(blocks, id, roundMap, recruitSums);
     });
   }).catch(err => {
     console.error('ZipFit 블록정보 로드 실패:', err);
@@ -4592,7 +4686,7 @@ function loadAnnouncementBlocks(annId, id, detailEl){
 // 🔴 블록 목록 렌더 — 이번 회차 / 다른 회차 / 회차 미상 셋으로 가른다 (2026-09-17).
 //    idx 는 **원래 배열의 자리**를 그대로 쓴다 — blockAnnIds·blockInfo 와 toggleBlockGroup(id, idx)
 //    이 그 자리로 짝지어져 있어서, 화면 순서를 바꾸면서 번호를 다시 매기면 다른 블록이 열린다.
-function renderAnnouncementBlocks(blocks, id, roundMap){
+function renderAnnouncementBlocks(blocks, id, roundMap, recruitSums){
   const slot = document.getElementById('blocks-slot-'+id);
   if(!slot) return;
   const cardEl = cardElFor(id);
@@ -4624,7 +4718,12 @@ function renderAnnouncementBlocks(blocks, id, roundMap){
     // 🔵 블록 행은 **자기 source 를 안다**(get_announcement_blocks 가 `source` 를 반환한다).
     //    그래서 카드 대표행이 아니라 **그 행 기준**으로 가른다 — 한 공고 안에 소스가 섞일 수 있다.
     // 🔴 2026-09-17 부터 세대수도 **그 행 자신의 값**이다(RPC 에서 min 을 걷었다).
-    const unitsStr = it.b.total_units ? `${zfUnitsPrefix(it.b.source)}${it.b.total_units}세대` : '';
+    // 🔴 원문 공급호수를 읽어 둔 블록에서는 그 합이 이긴다(fetchBlockRecruitSums 주석 참고).
+    //    그 값은 뜻이 하나뿐이라 소스별 접두어(zfUnitsPrefix)를 거치지 않고 「모집」으로 적는다.
+    const grSum = recruitSums && recruitSums[it.b.announcement_id];
+    const unitsStr = grSum
+      ? `모집 ${Number(grSum).toLocaleString()}세대`
+      : (it.b.total_units ? `${zfUnitsPrefix(it.b.source)}${it.b.total_units}세대` : '');
     return `<div class="hu-group">
       <div class="hu-group-head" id="blk-group-head-${id}-${it.idx}" onclick="event.stopPropagation();toggleBlockGroup('${id}',${it.idx})">
         <span class="hu-group-name">${escapeHtml(label)}${badge || ''}</span>
@@ -5041,7 +5140,11 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
       const seenHu = new Map();
       const keptHu = [];
       units.forEach(u => {
-        const key = [u.building_name, u.address, u.floor_info, u.unit_type, u.deposit, u.monthly_rent, u.deposit_priority1, u.rent_priority1].join('|');
+        // 🔴 화면이 그리는 필드는 전부 키에 있어야 한다 — 2026-09-18 에 묶음 렌더가 읽기 시작한
+        //    `area_sqm`·`unit_group`·`supply_target`·`group_recruit_count` 를 더했다. 키가 좁아지는
+        //    일은 없으므로(더하기만 한다) 남는 행이 줄지 않고, 실측으로도 **전 표에서 이 네 칸만
+        //    다른 행 묶음이 0** 이라 다른 공고의 결과는 글자까지 그대로다.
+        const key = [u.building_name, u.address, u.floor_info, u.unit_type, u.area_sqm, u.deposit, u.monthly_rent, u.deposit_priority1, u.rent_priority1, u.unit_group, u.supply_target, u.group_recruit_count].join('|');
         const prev = seenHu.get(key);
         if(prev){
           // 값까지 똑같은 세대가 두 회차에 다 있으면 남는 행의 회차를 최신 쪽으로 올린다.
@@ -5109,7 +5212,7 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
     // 접힌 안에서도 회차 배지를 그대로 단다 — 지난 회차가 여럿이면 그 안에서 또 갈려야 한다.
     const pastHtml = pastUnits.length
       ? `<details class="hu-past"${pastOnly ? ' open' : ''}><summary class="hu-past-title">🕘 지난 회차 보기 (${pastUnits.length}건)</summary>`
-        + `<div class="hu-past-list">${pastUnits.map(renderHousingUnitRow).join('')}</div></details>`
+        + `<div class="hu-past-list">${renderHousingUnitList(pastUnits)}</div></details>`
       : '';
     const huTitle = pastOnly
       ? `🏠 세대별 정보 (지난 회차 ${pastUnits.length}건)`
@@ -5170,7 +5273,7 @@ function renderHousingGroupRows(id, visibleCount, mapOnly){
   // 건물이 1개뿐이면 "단지명 클릭" 단계를 생략하고 세대 행을 바로 표시
   if(groups.length === 1){
     const g = groups[0];
-    listEl.innerHTML = g.units.map(renderHousingUnitRow).join('');
+    listEl.innerHTML = renderHousingUnitList(g.units);
     const addr = g.address || g.building_name;
     if(addr){
       setActiveHousingGroup(id, 0);
@@ -5239,6 +5342,104 @@ function renderExtraNoteHtml(note){
   }).join('');
 }
 
+// ── 세대 목록을 원문 주택형(unit_group)으로 묶는다 (2026-09-18) ─────────────────
+// 🔴 묶음 키는 **회차 + unit_group + group_recruit_count** 다.
+//    · 회차 — 같은 주택형이 두 회차에 다 있으면 합치면 안 된다. 회차 축은 loadHousingUnits 가
+//      이미 zfRoundDate/zfRoundLabel 로 붙여 두었고, 여기서는 그 값을 키로 쓰기만 한다.
+//    · group_recruit_count — 같은 이름의 주택형이 다른 단지에 있을 수 있다(정읍시기 36A 10 ·
+//      정읍첨단 36A 20). 건물 묶음(groupHousingUnits)이 이미 갈라 주지만 키가 한 번 더 막는다.
+// 🔴 unit_group 이 NULL 인 행은 **종전 renderHousingUnitRow 그대로** 묶음 아래에 이어 그린다.
+//    한 블록에 NULL 과 비-NULL 이 섞여도 NULL 쪽 모양은 바뀌지 않는다.
+function renderHousingUnitList(units){
+  if(!Array.isArray(units) || units.length === 0) return '';
+  const byKey = new Map();
+  const groups = [];
+  const plain = [];
+  units.forEach(u => {
+    if(!u || !u.unit_group){ if(u) plain.push(u); return; }
+    const key = [u.zfRoundDate || '', u.unit_group, u.group_recruit_count == null ? '' : u.group_recruit_count].join('|');
+    let g = byKey.get(key);
+    if(!g){
+      g = { group: u.unit_group, recruit: u.group_recruit_count, units: [] };
+      byKey.set(key, g);
+      groups.push(g);
+    }
+    g.units.push(u);
+  });
+  if(groups.length === 0) return plain.map(renderHousingUnitRow).join('');
+  return groups.map(renderHousingUnitGroup).join('') + plain.map(renderHousingUnitRow).join('');
+}
+
+// 면적은 **소수 둘째 자리까지** 적는다 — 평면(A1·A2)이 16.74/16.68 처럼 둘째 자리에서만 갈려서
+// 종전 세대 행의 toFixed(1) 로는 두 평면이 같은 글자가 된다.
+const huAreaText = v => v == null ? '' : parseFloat(v).toFixed(2) + '㎡';
+// 금액 글자는 종전 세대 행과 **같은 규칙**이다(toLocaleString + 「원」, 월세 0 은 「월세없음」).
+const huMoneyText = v => v == null ? '-' : Number(v).toLocaleString() + '원';
+const huRentText  = v => (v == null || Number(v) === 0) ? '월세없음' : Number(v).toLocaleString() + '원';
+function huPriceText(u){
+  const base = `보증금 ${huMoneyText(u.deposit)} · 월 ${huRentText(u.monthly_rent)}`;
+  if(u.deposit_priority1 == null && u.rent_priority1 == null) return base;
+  return `${base} 또는 보증금 ${huMoneyText(u.deposit_priority1)} · 월 ${huRentText(u.rent_priority1)}`;
+}
+
+// 🔵 A1·A2 평면 합치기는 **값의 완전 일치**로만 한다(계층·2슬롯 포함 금액 네 칸·비고·회차).
+//    조건이 완전 일치라 「같은 것인가」를 화면이 판단하지 않는다. 비고가 다르면 합치지 않으므로
+//    ⚠️ 표기 주의가 붙은 행은 절대로 다른 행에 흡수되지 않는다(절대원칙 6).
+function renderHousingUnitGroup(g){
+  const lineKey = u => [u.supply_target || '', u.deposit, u.monthly_rent, u.deposit_priority1, u.rent_priority1,
+                        u.extra_note || '', u.zfRoundLabel || '', u.zfPastOnly ? '1' : ''].join('|');
+  const byLine = new Map();
+  const lines = [];
+  g.units.forEach(u => {
+    const k = lineKey(u);
+    let ln = byLine.get(k);
+    if(!ln){ ln = { u: u, areas: [] }; byLine.set(k, ln); lines.push(ln); }
+    const a = huAreaText(u.area_sqm);
+    if(a && ln.areas.indexOf(a) === -1) ln.areas.push(a);
+  });
+  const allAreas = [];
+  g.units.forEach(u => { const a = huAreaText(u.area_sqm); if(a && allAreas.indexOf(a) === -1) allAreas.push(a); });
+  allAreas.sort((a, b) => parseFloat(a) - parseFloat(b));
+  lines.forEach(ln => ln.areas.sort((a, b) => parseFloat(a) - parseFloat(b)));
+
+  const headAreas = allAreas.length ? ` · 전용 ${allAreas.join('·')}` : '';
+  const headCount = g.recruit != null ? ` · 모집 ${Number(g.recruit).toLocaleString()}세대` : '';
+  const body = lines.map(ln => {
+    const u = ln.u;
+    // 줄 면적은 **그룹 안에 면적이 둘 이상이고 이 줄이 그 전부를 덮지 않을 때만** 적는다.
+    // 합쳐진 줄(A1·A2 전부)은 머리줄이 이미 두 면적을 말하므로 되풀이하지 않는다.
+    const needArea = allAreas.length > 1 && ln.areas.length < allAreas.length;
+    const area = needArea && ln.areas.length ? `<span class="hu-ug-area">${ln.areas.join('·')}</span>` : '';
+    // 행별 모집호수는 머리줄의 그룹 모집호수와 **다를 때만** 적는다(같으면 같은 수를 두 번 말한다).
+    const recruitBadge = (u.recruit_count != null && Number(u.recruit_count) !== Number(g.recruit))
+      ? `<span class="chip hu-recruit-badge">모집 ${u.recruit_count}세대</span>` : '';
+    const roundBadge = u.zfRoundLabel
+      ? `<span class="chip hu-round-badge${u.zfRoundCurrent ? '' : ' hu-round-old'}">${escapeHtml(u.zfRoundLabel)}</span>`
+      : '';
+    const pastOnlyBadge = u.zfPastOnly ? `<span class="chip hu-past-only">이번 회차에 같은 세대 없음</span>` : '';
+    const dual = (u.deposit_priority1 != null || u.rent_priority1 != null)
+      ? `<div class="hu-ug-sub">어느 조건이 적용되는지는 비고·공고문에서 확인하세요</div>` : '';
+    const floor = u.floor_info ? `<div class="hu-ug-sub">동호수 ${escapeHtml(u.floor_info)}</div>` : '';
+    const note = u.extra_note ? `<div class="hu-note-wrap"><span class="hu-label">비고</span>${renderExtraNoteHtml(u.extra_note)}</div>` : '';
+    return `<div class="hu-ug-row">
+      <div class="hu-ug-line">
+        <span class="hu-ug-target">${escapeHtml(u.supply_target || u.unit_type || '')}</span>
+        ${area}
+        <span class="hu-ug-price">${huPriceText(u)}</span>
+        ${recruitBadge}${roundBadge}${pastOnlyBadge}
+      </div>
+      ${dual}
+      ${floor}
+      ${renderHuDiffHtml(u.zfDiff)}
+      ${note}
+    </div>`;
+  }).join('');
+  return `<details class="hu-ug" open>
+    <summary><span class="hu-ug-name">${escapeHtml(g.group)}</span><span class="hu-ug-meta">${escapeHtml(headAreas + headCount)}</span></summary>
+    <div class="hu-ug-list">${body}</div>
+  </details>`;
+}
+
 function renderHousingUnitRow(u){
   const addr = u.address || '주소 정보 없음';
   const area = u.area_sqm != null ? parseFloat(u.area_sqm).toFixed(1)+'㎡' : '-';
@@ -5301,7 +5502,7 @@ function toggleHousingGroup(id, idx){
   bodyEl.style.display = isOpen ? 'none' : 'block';
   if(!isOpen && !bodyEl.dataset.rendered){
     bodyEl.dataset.rendered = '1';
-    bodyEl.innerHTML = g.units.map(renderHousingUnitRow).join('');
+    bodyEl.innerHTML = renderHousingUnitList(g.units);
   }
   setActiveHousingGroup(id, idx);
   const addr = g.address || g.building_name;
