@@ -264,7 +264,6 @@ body.theme-dark .extras-missing-note{color:#d8c48a;background:#2a2721;border-col
    어디까지가 한 벌인지 보이게 나눈다. */
 .hu-note-block + .hu-note-block{margin-top:6px;padding-top:6px;border-top:1px dotted #ddd}
 .hu-note-long{flex:1 1 100%;font-size:11px;color:#555;line-height:1.55}
-.hu-note-long .hu-note-badge{margin:0 4px 0 0}
 .hu-note-badge{padding:2px 8px;font-size:11px;cursor:default;display:inline-block;margin:2px 4px 2px 0}
 .hu-recruit-badge{padding:2px 9px;font-size:11px;cursor:default;display:inline-block;margin-left:6px;background:#1D9E75;color:#fff;border-color:#1D9E75;font-weight:600}
 /* 회차 배지 — 대표(이번) 회차는 초록 테두리, 지난 회차는 주의색 채움으로 눈에 갈리게 한다.
@@ -5345,31 +5344,35 @@ function renderHousingGroupRows(id, visibleCount, mapOnly){
 // 조건별로 나눠 표시하되, "보증금/월세" 조합처럼 값 자체가 여러 정보를 담은 경우만 뱃지+별도 줄로
 // 분리하고, "공급형: 60~70㎡"/"방수: 3" 같은 단순 라벨:값 쌍은 뱃지 하나에 "라벨: 값"으로 합쳐 표시
 // (짧은 값 하나만으로 줄 전체를 차지하는 어색함 방지).
-// 🔴 splitLong 을 켜면 **긴 조각이 알약을 벗고 제 줄을 갖는다**(A-4, 2026-09-21).
-//    끄면(인자 없음) 출력이 종전과 바이트까지 같다 — unit_group NULL 경로가 그대로여야 한다.
-// 🔵 기준은 길이 하나다. 「알약에 담기는가」는 화면 사정이지 데이터의 성질이 아니라서
-//    라벨:값 꼴인지로는 갈리지 않는다 — 「⚠️ 표기 주의: …」도 「전환: …」도 라벨:값 꼴이면서
-//    본문이 두세 줄짜리 문장이다.
+// 🔴 **긴 조각은 알약을 벗고 제 줄을 갖는다.** 알약에 담기는가는 화면 사정이지 데이터의
+//    성질이 아니라서 라벨:값 꼴인지로는 갈리지 않는다 — 「⚠️ 표기 주의: …」도 「전환: …」도
+//    라벨:값 꼴이면서 본문이 두세 줄짜리 문장이다. 기준은 길이 하나다.
+// 🔴 **긴 조각은 라벨과 값을 가르지 않고 원문 문면 그대로 싣는다**(2026-09-21 C-2).
+//    가르면 짧은 경로가 **글자로** 쓰던 「: 」이 마크업으로 바뀌어 사라진다 —
+//    「현재 공가 호수: 72호」가 「현재 공가 호수72호」로 나왔다. 가르지 않으면 그 자리가 없다.
+// 🔵 금액 조각(「…: 보증금…/월…」)만은 길이와 무관하게 종전 2단 표시를 유지한다 —
+//    거기는 값이 이미 두 정보라 라벨과 값을 가르는 것이 원문을 흐리지 않는다.
 const HU_NOTE_INLINE_MAX = 28;
-function renderExtraNoteHtml(note, splitLong){
+function renderExtraNoteHtml(note){
   if(!note) return '';
   const segments = note.split(/;\s*/).map(s => s.trim()).filter(Boolean);
   return segments.map(seg => {
     const m = seg.match(/^([^:]+):\s*(.+)$/);
-    if(!m) return splitLong && seg.length > HU_NOTE_INLINE_MAX
-      ? `<div class="hu-note-long">${escapeHtml(seg)}</div>`
-      : `<span class="chip hu-note-badge">${escapeHtml(seg)}</span>`;
-    const label = m[1].trim();
-    const detail = m[2].trim();
-    const priceMatch = detail.match(/보증금\s*([\d,]+)\s*원?\s*\/?\s*월(?:임대료)?\s*([\d,]+)\s*원?/);
-    if(priceMatch){
-      const priceLine = `보증금 ${priceMatch[1]}원 · 월 ${priceMatch[2]}원`;
-      return `<div class="hu-note-item"><span class="chip hu-note-badge">${escapeHtml(label)}</span><div class="hu-note-price">${escapeHtml(priceLine)}</div></div>`;
+    if(m){
+      const label = m[1].trim();
+      const detail = m[2].trim();
+      const priceMatch = detail.match(/보증금\s*([\d,]+)\s*원?\s*\/?\s*월(?:임대료)?\s*([\d,]+)\s*원?/);
+      if(priceMatch){
+        const priceLine = `보증금 ${priceMatch[1]}원 · 월 ${priceMatch[2]}원`;
+        return `<div class="hu-note-item"><span class="chip hu-note-badge">${escapeHtml(label)}</span><div class="hu-note-price">${escapeHtml(priceLine)}</div></div>`;
+      }
+      if(seg.length <= HU_NOTE_INLINE_MAX){
+        return `<span class="chip hu-note-badge">${escapeHtml(label)}: ${escapeHtml(detail)}</span>`;
+      }
+    } else if(seg.length <= HU_NOTE_INLINE_MAX){
+      return `<span class="chip hu-note-badge">${escapeHtml(seg)}</span>`;
     }
-    if(splitLong && detail.length > HU_NOTE_INLINE_MAX){
-      return `<div class="hu-note-long"><span class="chip hu-note-badge">${escapeHtml(label)}</span>${escapeHtml(detail)}</div>`;
-    }
-    return `<span class="chip hu-note-badge">${escapeHtml(label)}: ${escapeHtml(detail)}</span>`;
+    return `<div class="hu-note-long">${escapeHtml(seg)}</div>`;
   }).join('');
 }
 
@@ -5484,7 +5487,7 @@ function renderHousingUnitGroup(g){
     const floor = u.floor_info ? `<div class="hu-ug-sub">동호수 ${escapeHtml(u.floor_info)}</div>` : '';
     const note = ln.notes.length
       ? `<div class="hu-note-wrap"><span class="hu-label">비고</span>`
-        + ln.notes.map(n => `<div class="hu-note-block">${renderExtraNoteHtml(n, true)}</div>`).join('')
+        + ln.notes.map(n => `<div class="hu-note-block">${renderExtraNoteHtml(n)}</div>`).join('')
         + `</div>`
       : '';
     return `<div class="hu-ug-row">
@@ -5530,7 +5533,9 @@ function renderHousingUnitRow(u){
   // has_elevator는 원래 floor_info/extra_note에 섞여있던 걸 별도 컬럼으로 뽑아온 값이라
   // 원본 유무와 무관하게 항상 같은 고정 위치(주택유형 옆)에 표시한다.
   const elevator = u.has_elevator != null ? `<div class="hu-item"><span class="hu-label">승강기</span><span class="hu-value">${u.has_elevator ? '있음' : '없음'}</span></div>` : '';
-  const extraNote = u.extra_note ? `<div class="hu-note-wrap"><span class="hu-label">비고</span>${renderExtraNoteHtml(u.extra_note)}</div>` : '';
+  // 🔴 C-1(2026-09-21): unit_group 이 NULL 인 경로도 묶음 경로와 같은 비고 표시를 쓴다.
+  //    종전에는 여기만 종전 표시라 태백소도의 긴 조각이 알약 하나로 붙어 있었다.
+  const extraNote = u.extra_note ? `<div class="hu-note-wrap"><span class="hu-label">비고</span><div class="hu-note-block">${renderExtraNoteHtml(u.extra_note)}</div></div>` : '';
   // 금회 모집인원 — 경쟁률 가늠에 중요한 정보라 배지로 눈에 띄게 표시(기존 .chip 배지 스타일 재사용)
   const recruitBadge = u.recruit_count != null ? `<span class="chip hu-recruit-badge">모집 ${u.recruit_count}세대</span>` : '';
   // 회차 배지 — 한 블록에 회차가 섞였을 때만 loadHousingUnits가 zfRoundLabel을 붙인다.
