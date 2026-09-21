@@ -52,7 +52,7 @@ multi_blocks AS (
     COALESCE(
       (SELECT g2.precise_address FROM group_rows g2
        WHERE g2.addr_core = g.addr_core AND g2.precise_address IS NOT NULL
-       ORDER BY CASE WHEN g2.source='LH' THEN 0 ELSE 1 END, length(g2.precise_address) DESC, g2.created_at DESC LIMIT 1),
+       ORDER BY CASE WHEN g2.source='LH' THEN 0 ELSE 1 END, length(g2.precise_address) DESC, g2.created_at DESC, g2.id DESC LIMIT 1),
       g.precise_address
     ) AS precise_address,
     -- 🔴 2026-09-17 — 고른 행 **자신의** 세대수다. 종전에는 같은 addr_core 의 그룹 전체에서
@@ -70,21 +70,27 @@ multi_blocks AS (
   WHERE c.n >= 2 AND g.addr_core IS NOT NULL AND g.addr_core <> ''
   ORDER BY g.addr_core,
     CASE WHEN g.source = 'LH' THEN 0 ELSE 1 END,
-    g.created_at DESC
+    g.created_at DESC,
+    -- 🔴 2026-09-21 — 결정적 꼬리키. created_at 까지 완전히 같은 행이 실재한다
+    --   (양산 21282_* · 21283_* 가 2026-09-17 02:10:55.247566+00 로 동일).
+    --   그러면 승자가 물리적 행 순서로 갈리고, 수집 크론이 그 행을 UPDATE 할 때마다 바뀐다
+    --   — 같은 호출이 물금5를 21282_4 로 돌려줬다가 21283_4 로 돌려줬다(2026-09-21 실측).
+    --   id 는 PK 라 동률이 없고, DESC 는 앞의 created_at DESC 와 방향이 같다.
+    g.id DESC
 ),
 single_repr AS (
   SELECT
     COALESCE(
       (SELECT g2.precise_address FROM group_rows g2
        WHERE g2.precise_address IS NOT NULL
-       ORDER BY CASE WHEN g2.source='LH' THEN 0 ELSE 1 END, length(g2.precise_address) DESC, g2.created_at DESC LIMIT 1),
+       ORDER BY CASE WHEN g2.source='LH' THEN 0 ELSE 1 END, length(g2.precise_address) DESC, g2.created_at DESC, g2.id DESC LIMIT 1),
       NULL
     ) AS precise_address,
     g.total_units,   -- 🔴 위와 같은 이유. 고른 행 자신의 값이다(2026-09-17).
     g.announcement_id, g.source
   FROM group_rows g, distinct_addr_count c
   WHERE c.n < 2
-  ORDER BY CASE WHEN g.source = 'LH' THEN 0 ELSE 1 END, g.created_at DESC
+  ORDER BY CASE WHEN g.source = 'LH' THEN 0 ELSE 1 END, g.created_at DESC, g.id DESC
   LIMIT 1
 )
 SELECT * FROM multi_blocks

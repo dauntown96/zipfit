@@ -4345,22 +4345,37 @@ function fetchGroupRounds(ids, need){
 //    probe 로 확인했다). 우리가 원문 공급호수를 읽어 둔 블록에서는 **그것을** 쓴다.
 // 🔴 `recruit_count` 합으로 대체하지 않는다 — 계층 행마다 같은 수를 되풀이해 둔 옛 회차 데이터가
 //    부풀려진다(7월 회차 20733_*). 합은 **`unit_group` 당 한 번**만 더한다.
-// 🔵 `group_recruit_count` 가 없는 블록은 응답에 아예 오지 않아 종전 `total_units` 로 떨어진다.
+// 🔵 `group_recruit_count` 가 없는 블록은 합을 내지 않아 종전 `total_units` 로 떨어진다.
+// 🔴 2026-09-21 — 한 블록에 「계층 행(`group_recruit_count`)」과 「1:1 행(`recruit_count`)」이
+//    섞이면 종전 계산이 앞쪽만 더해 **부분합**을 보여 줬다(대구혁신10 171 → 129, 경산하양3 145 → 99).
+//    그래서 `unit_group` 당 `group_recruit_count` 를 한 번 더하고, 거기에 **`unit_group` 이 비어
+//    있는 행의 `recruit_count`** 를 더한다. 🔵 판정 축은 그대로다 — `group_recruit_count` 를 가진
+//    행이 하나도 없는 블록은 여전히 합을 내지 않는다(그 블록들의 회귀 0).
 function fetchBlockRecruitSums(ids){
   if(!Array.isArray(ids) || ids.length === 0) return Promise.resolve(null);
-  return fetch(`${SUPABASE_URL}/rest/v1/housing_units?select=announcement_id,unit_group,group_recruit_count&group_recruit_count=not.is.null&${idFilterFor(ids)}`, {
+  return fetch(`${SUPABASE_URL}/rest/v1/housing_units?select=announcement_id,unit_group,group_recruit_count,recruit_count&${idFilterFor(ids)}`, {
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
   }).then(r => r.ok ? r.json() : null).then(rows => {
     if(!Array.isArray(rows) || rows.length === 0) return null;
+    // 🔴 먼저 「계층 행을 가진 블록」만 추린다. 이 관문이 없으면 `recruit_count` 만 있는 블록까지
+    //    합이 생겨, 계층 행마다 같은 수를 되풀이해 둔 옛 회차 데이터가 그대로 부풀려진다.
+    const hasGroup = new Set();
+    rows.forEach(r => { if(r && r.announcement_id && r.group_recruit_count != null) hasGroup.add(r.announcement_id); });
+    if(hasGroup.size === 0) return null;
     const seen = new Set(), sum = {};
     rows.forEach(r => {
-      if(!r || !r.announcement_id || !r.unit_group) return;
-      const k = r.announcement_id + '|' + r.unit_group;
-      if(seen.has(k)) return;
-      seen.add(k);
-      sum[r.announcement_id] = (sum[r.announcement_id] || 0) + Number(r.group_recruit_count);
+      if(!r || !r.announcement_id || !hasGroup.has(r.announcement_id)) return;
+      if(r.unit_group){
+        if(r.group_recruit_count == null) return;
+        const k = r.announcement_id + '|' + r.unit_group;
+        if(seen.has(k)) return;
+        seen.add(k);
+        sum[r.announcement_id] = (sum[r.announcement_id] || 0) + Number(r.group_recruit_count);
+      } else if(r.recruit_count != null){
+        sum[r.announcement_id] = (sum[r.announcement_id] || 0) + Number(r.recruit_count);
+      }
     });
-    return sum;
+    return Object.keys(sum).length ? sum : null;
   }).catch(() => null);
 }
 
