@@ -27,7 +27,11 @@ best_location AS (
     (precise_address IS NULL),
     (sigungu_nm IS NULL),
     (sido_nm IS NULL),
-    created_at DESC
+    created_at DESC,
+    -- 🔴 2026-09-21 — 결정적 꼬리키. 같은 dedup_key 안에 created_at 까지 같은 행이 실재해
+    --   (양산 21282_* · 21283_*) 대표 주소가 물리적 행 순서로 갈렸다. 실측: 주소가 서로 다른
+    --   동률 그룹 137개(dedup_key 115개). 아래 winner CTE 가 이미 쓰는 것과 같은 컬럼이다.
+    id DESC
 ),
 best_schedule AS (
   SELECT dedup_key,
