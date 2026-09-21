@@ -33,7 +33,7 @@ body.theme-dark .label,body.theme-dark .sub,body.theme-dark .haddr,body.theme-da
 body.theme-dark select,body.theme-dark input{background:#262932;border-color:#3a3e48;color:#e8e8e8}
 body.theme-dark .maintabs{background:#262932}
 body.theme-dark .maintab.active{background:#1f2229;color:#5DCAA5}
-body.theme-dark .logo,body.theme-dark .setting-label,body.theme-dark .panel-title,body.theme-dark .hname,body.theme-dark .mval,body.theme-dark .hu-title,body.theme-dark .hu-addr,body.theme-dark .hu-value,body.theme-dark .hu-group-name,body.theme-dark .policy-title,body.theme-dark .policy-content,body.theme-dark .docs-title,body.theme-dark .docs-list li,body.theme-dark .elig-title,body.theme-dark .elig-row,body.theme-dark .extras-title,body.theme-dark .extras-group-label,body.theme-dark .hu-note-price{color:#e8e8e8}
+body.theme-dark .logo,body.theme-dark .setting-label,body.theme-dark .panel-title,body.theme-dark .hname,body.theme-dark .mval,body.theme-dark .hu-title,body.theme-dark .hu-addr,body.theme-dark .hu-value,body.theme-dark .hu-group-name,body.theme-dark .policy-title,body.theme-dark .policy-content,body.theme-dark .docs-title,body.theme-dark .docs-list li,body.theme-dark .elig-title,body.theme-dark .elig-row,body.theme-dark .extras-title,body.theme-dark .extras-group-label,body.theme-dark .hu-note-price,body.theme-dark .hu-note-long{color:#e8e8e8}
 body.theme-dark .hu-group-head.hu-group-active{background:#1d3d33;border-color:#5DCAA5}
 body.theme-dark .hu-note-wrap{border-color:#2c2f38}
 body.theme-dark .hu-group-head:hover{background:#262932}
@@ -253,6 +253,18 @@ body.theme-dark .extras-missing-note{color:#d8c48a;background:#2a2721;border-col
 .hu-label{color:#999;margin-right:4px}
 .hu-note-wrap{margin-top:8px;padding-top:8px;border-top:1px dashed #e0e0d8}
 .hu-note-item{margin:4px 0}
+/* 🔴 A-4(2026-09-21): 조각을 눈에 보이게 나눈다. 종전에는 조각이 전부 알약이라
+   긴 문장 알약과 그 앞 알약이 4px 만 두고 붙어 한 문장처럼 읽혔다
+   (「…잔금 8,462,600원」 + 「이 주택형은 월임대료를…」). flex+gap 으로 사이를 띄우고,
+   긴 조각은 알약을 벗고 제 줄을 갖는다(.hu-note-long). */
+.hu-note-block{display:flex;flex-wrap:wrap;gap:4px 6px;align-items:flex-start}
+.hu-note-block .hu-note-badge{margin:0}
+.hu-note-block .hu-note-item{margin:0;flex:1 1 100%}
+/* 🔵 A-3: 합쳐진 줄이 비고를 둘 이상 실을 때 — 원문 정보를 지우지 않으므로 둘 다 싣되
+   어디까지가 한 벌인지 보이게 나눈다. */
+.hu-note-block + .hu-note-block{margin-top:6px;padding-top:6px;border-top:1px dotted #ddd}
+.hu-note-long{flex:1 1 100%;font-size:11px;color:#555;line-height:1.55}
+.hu-note-long .hu-note-badge{margin:0 4px 0 0}
 .hu-note-badge{padding:2px 8px;font-size:11px;cursor:default;display:inline-block;margin:2px 4px 2px 0}
 .hu-recruit-badge{padding:2px 9px;font-size:11px;cursor:default;display:inline-block;margin-left:6px;background:#1D9E75;color:#fff;border-color:#1D9E75;font-weight:600}
 /* 회차 배지 — 대표(이번) 회차는 초록 테두리, 지난 회차는 주의색 채움으로 눈에 갈리게 한다.
@@ -292,12 +304,17 @@ body.theme-dark .hu-past-title{color:#cfcfcf}
    머리줄은 접을 수 있고 기본은 펼침 — 이 목록은 이미 「세대별 정보」와 「건물」 두 겹 안에 있어
    세 번째 겹까지 접으면 금액을 보는 데 세 번을 눌러야 한다. */
 .hu-ug{border:1px solid #e8e8e0;border-radius:10px;overflow:hidden;background:#fff}
-.hu-ug>summary{display:flex;justify-content:space-between;align-items:center;gap:8px;background:#f8f8f8;padding:8px 10px;cursor:pointer;font-size:12px;list-style:none}
+.hu-ug>summary{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:4px 8px;background:#f8f8f8;padding:8px 10px;cursor:pointer;font-size:12px;list-style:none}
 .hu-ug>summary::-webkit-details-marker{display:none}
 .hu-ug>summary::before{content:'▸';color:#999;margin-right:4px;flex:0 0 auto}
 .hu-ug[open]>summary::before{content:'▾'}
-.hu-ug-name{font-weight:700;color:#333;flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
-.hu-ug-meta{color:#888;font-size:11px;white-space:nowrap;flex:0 0 auto}
+/* 🔴 A-1(2026-09-21): 이름은 **글자 단위로 꺾지 않는다**(종전 overflow-wrap:anywhere 가
+   390px 에서 「16A」를 1/6/A 세 줄로 끊었다). 대신 옆 칸이 줄거나 다음 줄로 내려간다 —
+   summary 가 flex-wrap:wrap 이고 meta 가 flex:0 1 auto 다.
+   🔴 이름이 아주 길어도 한 줄로 밀어 가로 스크롤을 만들지 않는다: min-width:0 + 말줄임.
+      flex-grow 는 1 로 둔다 — 0 으로 두면 justify-content:space-between 이 이름을 오른쪽으로 민다. */
+.hu-ug-name{font-weight:700;color:#333;flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hu-ug-meta{color:#888;font-size:11px;white-space:nowrap;flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
 .hu-ug-list{display:flex;flex-direction:column;gap:8px;padding:8px}
 .hu-ug-row{border-bottom:1px dashed #eee;padding-bottom:8px}
 .hu-ug-row:last-child{border-bottom:0;padding-bottom:0}
@@ -5210,13 +5227,16 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
     const wrap = document.createElement('details');
     wrap.className = 'hu-wrap';
     // 접힌 안에서도 회차 배지를 그대로 단다 — 지난 회차가 여럿이면 그 안에서 또 갈려야 한다.
+    // 🔴 A-2: 건수는 **그 목록이 실제로 그리는 줄 수**로 센다. 세 자리 전부 같은 함수가
+    //    그리는 같은 목록이라 한 자리만 줄 수로 바꾸면 나머지와 갈린다.
+    const pastLineCount = countHousingUnitLines(pastUnits);
     const pastHtml = pastUnits.length
-      ? `<details class="hu-past"${pastOnly ? ' open' : ''}><summary class="hu-past-title">🕘 지난 회차 보기 (${pastUnits.length}건)</summary>`
+      ? `<details class="hu-past"${pastOnly ? ' open' : ''}><summary class="hu-past-title">🕘 지난 회차 보기 (${pastLineCount}건)</summary>`
         + `<div class="hu-past-list">${renderHousingUnitList(pastUnits)}</div></details>`
       : '';
     const huTitle = pastOnly
-      ? `🏠 세대별 정보 (지난 회차 ${pastUnits.length}건)`
-      : `🏠 세대별 정보 (${units.length}건)`;
+      ? `🏠 세대별 정보 (지난 회차 ${pastLineCount}건)`
+      : `🏠 세대별 정보 (${countHousingUnitLines(units)}건)`;
     wrap.innerHTML = `<summary class="hu-title">${huTitle}</summary>` + staleHtml + `<div class="hu-list" id="hu-list-${id}"></div>` + pastHtml;
     if(groups.length === 1 || pastOnly) wrap.open = true; // 건물이 1개뿐이거나, 바깥에 안내만 있을 때는 펼쳐서 보여줌
     const slot = document.getElementById('hu-slot-'+id);
@@ -5325,18 +5345,29 @@ function renderHousingGroupRows(id, visibleCount, mapOnly){
 // 조건별로 나눠 표시하되, "보증금/월세" 조합처럼 값 자체가 여러 정보를 담은 경우만 뱃지+별도 줄로
 // 분리하고, "공급형: 60~70㎡"/"방수: 3" 같은 단순 라벨:값 쌍은 뱃지 하나에 "라벨: 값"으로 합쳐 표시
 // (짧은 값 하나만으로 줄 전체를 차지하는 어색함 방지).
-function renderExtraNoteHtml(note){
+// 🔴 splitLong 을 켜면 **긴 조각이 알약을 벗고 제 줄을 갖는다**(A-4, 2026-09-21).
+//    끄면(인자 없음) 출력이 종전과 바이트까지 같다 — unit_group NULL 경로가 그대로여야 한다.
+// 🔵 기준은 길이 하나다. 「알약에 담기는가」는 화면 사정이지 데이터의 성질이 아니라서
+//    라벨:값 꼴인지로는 갈리지 않는다 — 「⚠️ 표기 주의: …」도 「전환: …」도 라벨:값 꼴이면서
+//    본문이 두세 줄짜리 문장이다.
+const HU_NOTE_INLINE_MAX = 28;
+function renderExtraNoteHtml(note, splitLong){
   if(!note) return '';
   const segments = note.split(/;\s*/).map(s => s.trim()).filter(Boolean);
   return segments.map(seg => {
     const m = seg.match(/^([^:]+):\s*(.+)$/);
-    if(!m) return `<span class="chip hu-note-badge">${escapeHtml(seg)}</span>`;
+    if(!m) return splitLong && seg.length > HU_NOTE_INLINE_MAX
+      ? `<div class="hu-note-long">${escapeHtml(seg)}</div>`
+      : `<span class="chip hu-note-badge">${escapeHtml(seg)}</span>`;
     const label = m[1].trim();
     const detail = m[2].trim();
     const priceMatch = detail.match(/보증금\s*([\d,]+)\s*원?\s*\/?\s*월(?:임대료)?\s*([\d,]+)\s*원?/);
     if(priceMatch){
       const priceLine = `보증금 ${priceMatch[1]}원 · 월 ${priceMatch[2]}원`;
       return `<div class="hu-note-item"><span class="chip hu-note-badge">${escapeHtml(label)}</span><div class="hu-note-price">${escapeHtml(priceLine)}</div></div>`;
+    }
+    if(splitLong && detail.length > HU_NOTE_INLINE_MAX){
+      return `<div class="hu-note-long"><span class="chip hu-note-badge">${escapeHtml(label)}</span>${escapeHtml(detail)}</div>`;
     }
     return `<span class="chip hu-note-badge">${escapeHtml(label)}: ${escapeHtml(detail)}</span>`;
   }).join('');
@@ -5350,11 +5381,15 @@ function renderExtraNoteHtml(note){
 //      정읍첨단 36A 20). 건물 묶음(groupHousingUnits)이 이미 갈라 주지만 키가 한 번 더 막는다.
 // 🔴 unit_group 이 NULL 인 행은 **종전 renderHousingUnitRow 그대로** 묶음 아래에 이어 그린다.
 //    한 블록에 NULL 과 비-NULL 이 섞여도 NULL 쪽 모양은 바뀌지 않는다.
-function renderHousingUnitList(units){
-  if(!Array.isArray(units) || units.length === 0) return '';
+// 🔴 A-2(2026-09-21): 「세대별 정보 (N건)」의 N 이 **화면에 보이는 줄 수**여야 한다.
+//    물리 행 수는 우리 저장 사정이고(정읍첨단 22행), 사용자가 세는 것은 줄이다(19줄).
+//    그래서 세는 쪽이 렌더를 흉내 내지 않고 **렌더와 같은 구성 함수**를 쓴다 —
+//    흉내 내면 한쪽만 고쳐졌을 때 두 수가 조용히 갈린다.
+function buildHousingUnitList(units){
   const byKey = new Map();
   const groups = [];
   const plain = [];
+  if(!Array.isArray(units)) return { groups, plain };
   units.forEach(u => {
     if(!u || !u.unit_group){ if(u) plain.push(u); return; }
     const key = [u.zfRoundDate || '', u.unit_group, u.group_recruit_count == null ? '' : u.group_recruit_count].join('|');
@@ -5366,8 +5401,19 @@ function renderHousingUnitList(units){
     }
     g.units.push(u);
   });
-  if(groups.length === 0) return plain.map(renderHousingUnitRow).join('');
-  return groups.map(renderHousingUnitGroup).join('') + plain.map(renderHousingUnitRow).join('');
+  groups.forEach(g => { g.lines = buildUnitGroupLines(g); });
+  return { groups, plain };
+}
+// unit_group 이 NULL 인 행은 묶이지 않으므로 종전대로 **행 수**가 곧 줄 수다.
+function countHousingUnitLines(units){
+  const b = buildHousingUnitList(units);
+  return b.groups.reduce((n, g) => n + g.lines.length, 0) + b.plain.length;
+}
+function renderHousingUnitList(units){
+  if(!Array.isArray(units) || units.length === 0) return '';
+  const b = buildHousingUnitList(units);
+  if(b.groups.length === 0) return b.plain.map(renderHousingUnitRow).join('');
+  return b.groups.map(renderHousingUnitGroup).join('') + b.plain.map(renderHousingUnitRow).join('');
 }
 
 // 면적은 **소수 둘째 자리까지** 적는다 — 평면(A1·A2)이 16.74/16.68 처럼 둘째 자리에서만 갈려서
@@ -5382,26 +5428,42 @@ function huPriceText(u){
   return `${base} 또는 보증금 ${huMoneyText(u.deposit_priority1)} · 월 ${huRentText(u.rent_priority1)}`;
 }
 
-// 🔵 A1·A2 평면 합치기는 **값의 완전 일치**로만 한다(계층·2슬롯 포함 금액 네 칸·비고·회차).
-//    조건이 완전 일치라 「같은 것인가」를 화면이 판단하지 않는다. 비고가 다르면 합치지 않으므로
-//    ⚠️ 표기 주의가 붙은 행은 절대로 다른 행에 흡수되지 않는다(절대원칙 6).
-function renderHousingUnitGroup(g){
-  const lineKey = u => [u.supply_target || '', u.deposit, u.monthly_rent, u.deposit_priority1, u.rent_priority1,
-                        u.extra_note || '', u.zfRoundLabel || '', u.zfPastOnly ? '1' : ''].join('|');
+// 🔵 평면 합치기는 **화면에 보이는 값의 완전 일치**로만 한다(계층 라벨·금액 네 칸·동호수·회차).
+//    조건이 완전 일치라 「같은 것인가」를 화면이 판단하지 않는다.
+// 🔴 A-3(2026-09-21): 합치는 조건에서 **비고를 뺐다.** 청주산남2-1 26.37 은 202-203동과
+//    204-205동이 계층도 금액도 같고 비고만 달라 **같은 줄이 두 번** 보였다. 비고는 「다른 줄인가」의
+//    근거가 아니라 그 줄이 **함께 싣는 것**이다 — 합친 줄에 둘 다 순서대로 싣는다.
+//    ⚠️ 표기 주의가 붙은 행도 흡수되지 않고 그 줄의 비고에 그대로 남는다(절대원칙 6).
+// 🔵 계층 라벨은 화면이 실제로 그리는 `supply_target || unit_type` 로 잡는다 — supply_target 만
+//    보면 그 칸이 비고 unit_type 으로 갈리는 행들이 한 줄로 뭉쳐 라벨 하나만 남는다.
+// 🔵 동호수(floor_info)를 키에 넣는다. 비고가 빠진 자리를 메우는 것이 아니라, 이 칸도 줄마다
+//    따로 그려지므로 다르면 합칠 수 없기 때문이다(종전에는 빠져 있었다).
+function buildUnitGroupLines(g){
+  const lineKey = u => [u.supply_target || u.unit_type || '', u.deposit, u.monthly_rent,
+                        u.deposit_priority1, u.rent_priority1, u.floor_info || '',
+                        u.zfRoundLabel || '', u.zfPastOnly ? '1' : ''].join('|');
   const byLine = new Map();
   const lines = [];
   g.units.forEach(u => {
     const k = lineKey(u);
     let ln = byLine.get(k);
-    if(!ln){ ln = { u: u, areas: [] }; byLine.set(k, ln); lines.push(ln); }
+    if(!ln){ ln = { u: u, areas: [], notes: [] }; byLine.set(k, ln); lines.push(ln); }
     const a = huAreaText(u.area_sqm);
     if(a && ln.areas.indexOf(a) === -1) ln.areas.push(a);
+    // 문면이 같은 비고는 한 번만 — 같은 글자를 두 번 싣는 것은 원문 보존이 아니다.
+    if(u.extra_note && ln.notes.indexOf(u.extra_note) === -1) ln.notes.push(u.extra_note);
   });
   const allAreas = [];
   g.units.forEach(u => { const a = huAreaText(u.area_sqm); if(a && allAreas.indexOf(a) === -1) allAreas.push(a); });
   allAreas.sort((a, b) => parseFloat(a) - parseFloat(b));
   lines.forEach(ln => ln.areas.sort((a, b) => parseFloat(a) - parseFloat(b)));
+  g.allAreas = allAreas;
+  return lines;
+}
 
+function renderHousingUnitGroup(g){
+  const lines = g.lines || buildUnitGroupLines(g);
+  const allAreas = g.allAreas || [];
   const headAreas = allAreas.length ? ` · 전용 ${allAreas.join('·')}` : '';
   const headCount = g.recruit != null ? ` · 모집 ${Number(g.recruit).toLocaleString()}세대` : '';
   const body = lines.map(ln => {
@@ -5420,7 +5482,11 @@ function renderHousingUnitGroup(g){
     const dual = (u.deposit_priority1 != null || u.rent_priority1 != null)
       ? `<div class="hu-ug-sub">어느 조건이 적용되는지는 비고·공고문에서 확인하세요</div>` : '';
     const floor = u.floor_info ? `<div class="hu-ug-sub">동호수 ${escapeHtml(u.floor_info)}</div>` : '';
-    const note = u.extra_note ? `<div class="hu-note-wrap"><span class="hu-label">비고</span>${renderExtraNoteHtml(u.extra_note)}</div>` : '';
+    const note = ln.notes.length
+      ? `<div class="hu-note-wrap"><span class="hu-label">비고</span>`
+        + ln.notes.map(n => `<div class="hu-note-block">${renderExtraNoteHtml(n, true)}</div>`).join('')
+        + `</div>`
+      : '';
     return `<div class="hu-ug-row">
       <div class="hu-ug-line">
         <span class="hu-ug-target">${escapeHtml(u.supply_target || u.unit_type || '')}</span>
