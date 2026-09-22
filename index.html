@@ -4460,9 +4460,11 @@ function loadAnnouncementExtras(annId, detailEl, id, useGroup){
     // 광주전남 신혼신생아Ⅱ 부영애시앙 평면도 1). 컬럼 값 자체는 그대로 두었다.
     // ⚠️ 키의 뜻이 바뀐다 — 「내용이 같으면 하나」가 아니라 「같은 Drive 파일이면 하나」다.
     // Drive ID 추출 실패율은 1,152행에서 0%였다(전부 drive.google.com/file/d/<ID>/… 형태).
+    // 🔴 2026-09-22: 키에 extra_type을 더했다. 합본 파일(한 PDF에 평면도+주택사진)을 두 행으로
+    // 넣으면 종전 키로는 한쪽이 사라졌다. 파이프라인 중복은 같은 파일·같은 타입이라 여전히 걸린다.
     const seen = new Set();
     rows = rows.filter(r => {
-      const key = driveFileIdFrom(r.file_url) || r.id;
+      const key = (driveFileIdFrom(r.file_url) || r.id) + '|' + (r.extra_type || '');
       if(seen.has(key)) return false;
       seen.add(key);
       return true;
