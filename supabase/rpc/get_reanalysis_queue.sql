@@ -8,7 +8,7 @@ AS $function$
 -- 🔴 분류·우선순위 점수를 만들지 않는다(사유 텍스트는 원문 그대로 반환하고, 순서는 호출 측이 정한다).
 WITH winner AS (
   SELECT d.announcement_id, d.source, d.title, d.announcement_date,
-         d.is_revised, d.revision_note,
+         d.is_revised, d.revision_note, d.apply_end,
          announcement_dedup_key(d.title) AS dedup_key
   FROM get_announcements_deduped(NULL, NULL, NULL) d
 ),
@@ -48,5 +48,18 @@ JOIN grp g ON g.dedup_key = w.dedup_key
 LEFT JOIN child_counts cw ON cw.announcement_id = w.announcement_id
 WHERE COALESCE(cw.n, 0) = 0
   AND g.group_child_count > 0
+  -- 🔴 2026-09-23(B24) — 같은 회차 완료분 제외. 대표와 같은 apply_end 의 구성원이 완료 계열
+  --   분석을 가졌으면 그 회차는 이미 분석된 것이라 큐에 올리지 않는다(⑨ 5장 분석률 산식과 같은 축).
+  --   대표 apply_end 가 NULL 이면 = 가 성립하지 않아 종전대로 큐에 남는다.
+  AND NOT EXISTS (
+    SELECT 1
+    FROM announcements m
+    JOIN announcement_analysis aa ON aa.announcement_id = m.announcement_id
+    WHERE m.title IS NOT NULL
+      AND m.hidden_from_listing IS NOT TRUE
+      AND announcement_dedup_key(m.title) = w.dedup_key
+      AND m.apply_end = w.apply_end
+      AND aa.status IN ('완료', '완료(보조 누락)', '완료(판정 대기)', '완료(소급)')
+  )
 ORDER BY g.group_child_count DESC, w.announcement_id;
 $function$
