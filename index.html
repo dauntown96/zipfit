@@ -2594,6 +2594,12 @@ let selectedTypes=new Set();
 //    진단 뒤 토큰이 갱신되는 순간 selectedTypes 가 저장값으로 되돌아가 진단 결과를 덮는다.
 //    로그아웃에서 다시 false 로 내려, 다른 계정으로 들어오면 그 계정 값으로 되살아난다.
 let zfRecChipsRestored=false;
+// 🔴 설정 탭 조건 폼·칩을 저장값으로 채웠는가(2026-09-23). **세션 진입당 한 번만** 채운다 — 위 플래그와 같은 이유다.
+//    조건 폼은 「조건 저장하기」를 눌러야 저장되는데, 누르기 전에 TOKEN_REFRESHED 가 오거나 설정 탭을
+//    다시 열면(goMain(5) → renderSettingsGate) 고치던 값이 저장값으로 되돌아갔다(B17 재현).
+//    🔴 프로필 조회가 **성공한 뒤에만** 올린다 — 첫 조회가 실패해 빈 값으로 채운 폼은 다음 성공 때 다시 채운다.
+//    로그아웃에서 false 로 내린다.
+let zfSettingsFormApplied=false;
 let currentSort='deposit-asc';
 let visibleCount=3;
 let lastFiltered=[];
@@ -4208,6 +4214,9 @@ const STALE_SRC_MSG_PLAIN   = '대표 공고와 다른 회차의 분석 데이�
 // 아래 MIXED는 상태가 다르다 — 대표 회차와 지난 회차가 "같은 블록 안에 섞여" 있다.
 // PLAIN을 그대로 쓰면 대표 회차 행까지 낡은 것처럼 읽히므로 문구를 새로 둔다(기존 문구는 건드리지 않는다).
 const STALE_SRC_MSG_MIXED   = '여러 회차의 정보가 함께 표시되고 있습니다. 행마다 회차를 적었으니 「이번 회차」 표시가 없는 값은 공고 원문과 함께 확인하세요.';
+// 🔴 정책 칸의 mixed 문구(2026-09-23). 위 MIXED 는 「행마다 회차를 적었으니」를 말하는데, 행별 회차 표시는
+//    세대별 정보 칸에만 있고 정책 칸에는 없다 — 화면에 없는 표시를 가리키게 된다. 정책 칸은 이 문구를 쓴다.
+const STALE_SRC_MSG_MIXED_POLICY = '여러 회차 공고의 안내가 함께 표시되고 있습니다. 이번 공고와 다른 내용이 있을 수 있으니 공고 원문과 함께 확인하세요.';
 // 🔴 MIXED는 「섞여 있다」는 경고인데, 지난 회차를 접어 아래로 내리면 더 이상 섞여 있지 않다.
 // 그래서 실제로 나뉜 경우에만 이 문구를 쓴다 — 화면 상태와 문구가 어긋나지 않게.
 // MIXED는 나누지 못한 경우(이번 회차 행이 하나도 없는 블록)에 그대로 남는다.
@@ -4225,7 +4234,8 @@ function cardElFor(id){ return document.querySelector(`[data-card-id="${id}"]`);
 // 자식을 들고 있는 winner를 폴백으로 오판한다.
 // rounds는 회차 혼입 판정 결과(roundInfoFor). 넘기지 않으면 종전과 똑같이 orphan만 본다 —
 // policies·extras·eligibility 세 로더는 넘기지 않으므로 동작이 바뀌지 않는다.
-function staleSourceBannerHtml(rawRows, annId, useGroup, id, rounds, split){
+// mixedMsg 는 mixed 갈래의 문구를 바꿀 때만 넘긴다(정책 칸). 넘기지 않으면 종전 STALE_SRC_MSG_MIXED 다.
+function staleSourceBannerHtml(rawRows, annId, useGroup, id, rounds, split, mixedMsg){
   if(!annId) return '';
   if(!Array.isArray(rawRows) || rawRows.length === 0) return '';
   // 🔴 종전에는 `!useGroup` 이면 무조건 빈 문자열이었다. 블록 경로가 `useGroup=false` 라
@@ -4243,7 +4253,7 @@ function staleSourceBannerHtml(rawRows, annId, useGroup, id, rounds, split){
   // 🔴 staleOnly 가 가장 먼저다 — 이 상태에서는 SPLIT 도 MIXED 도 거짓이 된다.
   const msg = staleOnly ? STALE_SRC_MSG_PAST_ONLY
             : split ? STALE_SRC_MSG_SPLIT
-            : (mixed ? STALE_SRC_MSG_MIXED : (revised ? STALE_SRC_MSG_REVISED : STALE_SRC_MSG_PLAIN));
+            : (mixed ? (mixedMsg || STALE_SRC_MSG_MIXED) : (revised ? STALE_SRC_MSG_REVISED : STALE_SRC_MSG_PLAIN));
   // 나뉜 뒤에는 경고할 상태가 아니다 — 낡은 값이 섞여 있지 않고 따로 접혀 있을 뿐이라 안내로 낮춘다.
   // staleOnly 도 같다 — 전부 접혀 있고 「없다」를 말하는 것이라 경고가 아니다.
   const icon = (split || staleOnly) ? 'ℹ️' : '⚠️';
@@ -4973,7 +4983,7 @@ function loadAnnouncementPolicies(annId, detailEl, id, useGroup){
     //    **언제나 orphan 과 함께 참이라**(자기 id 행이 있으면 그 회차가 곧 카드 회차다) 종전 경로인
     //    orphan → STALE_SRC_MSG_PLAIN 이 그대로 맞는 말을 한다. 새 문구는 만들지 않았다.
     const staleHtml = staleSourceBannerHtml(policies, annId, useGroup, id,
-      polRounds ? { ...polRounds, staleOnly: false } : null);
+      polRounds ? { ...polRounds, staleOnly: false } : null, false, STALE_SRC_MSG_MIXED_POLICY);
     // 그룹조회로 형제 announcement_id 여러 곳에 동일 정책이 중복 백필된 경우를 대비해
     // 카테고리+내용이 완전히 같은 행은 하나만 남긴다.
     if(Array.isArray(policies) && policies.length > 0){
@@ -6716,7 +6726,7 @@ if(zfAuthAvailable()){
       if(session) zfApplySession(session);
     } else if(event==='SIGNED_OUT'){
       zfSession=null;
-      currentUser=null; zfProfileLoaded=false; zfRecChipsRestored=false;
+      currentUser=null; zfProfileLoaded=false; zfRecChipsRestored=false; zfSettingsFormApplied=false;
       zfForgetLocalUser();
     }
   });
@@ -6757,24 +6767,27 @@ function applySettingsToUI(p){
   setTheme(p.theme==='dark'?'dark':'light',true);
   setFontSize(p.font_size||'normal',true);
 
-  // 조건 설정 폼
+  // 조건 설정 폼 — 🔴 한 번만 채운다(이유는 zfSettingsFormApplied 선언부에)
   const sv=(id,val)=>{ const el=document.getElementById(id); if(el&&val!=null) el.value=val; };
-  sv('set_marital', p.marital||'');
-  sv('set_children', p.children!=null?p.children:'');
-  sv('set_members', p.members!=null?p.members:'');
-  sv('set_income', p.income||'');
-  sv('set_assets', p.assets||'');
-  sv('set_birthYear', p.birth_year!=null?p.birth_year:'');
-  sv('set_maxDeposit', p.max_deposit||'');
-  sv('set_minRooms', p.min_rooms||0);
-
-  // 지역/유형 칩 복원
   const savedRegions=Array.isArray(p.regions)?p.regions:(typeof p.regions==='string'?p.regions.split(',').filter(Boolean):[]);
   const savedTypes=Array.isArray(p.types)?p.types:(typeof p.types==='string'?p.types.split(',').filter(Boolean):[]);
-  settingsRegions=new Set(savedRegions);
-  settingsTypes=new Set(savedTypes);
-  renderChipState('settingsRegionChips',settingsRegions);
-  renderChipState('settingsTypeChips',settingsTypes);
+  if(!zfSettingsFormApplied){
+    sv('set_marital', p.marital||'');
+    sv('set_children', p.children!=null?p.children:'');
+    sv('set_members', p.members!=null?p.members:'');
+    sv('set_income', p.income||'');
+    sv('set_assets', p.assets||'');
+    sv('set_birthYear', p.birth_year!=null?p.birth_year:'');
+    sv('set_maxDeposit', p.max_deposit||'');
+    sv('set_minRooms', p.min_rooms||0);
+
+    // 지역/유형 칩 복원
+    settingsRegions=new Set(savedRegions);
+    settingsTypes=new Set(savedTypes);
+    renderChipState('settingsRegionChips',settingsRegions);
+    renderChipState('settingsTypeChips',settingsTypes);
+    if(zfProfileLoaded) zfSettingsFormApplied=true;
+  }
 
   // 🔴 추천 탭 칩도 **같은 저장값으로** 되살린다(2026-09-17). 종전에는 설정 탭만 되살아나고
   //    추천 탭은 빈 Set 으로 남아, 그 상태로 추천 탭에서 저장하면 DB 의 지역이 빈 값으로
@@ -6929,7 +6942,7 @@ async function zfDeleteAccountRun(){
 }
 
 async function logoutUser(){
-  currentUser=null; zfProfileLoaded=false; zfRecChipsRestored=false;
+  currentUser=null; zfProfileLoaded=false; zfRecChipsRestored=false; zfSettingsFormApplied=false;
   if(zfAuthAvailable()){
     try{ await zfAuth.auth.signOut(); }catch(err){ console.warn('ZipFit: signOut 실패', err); }
   }
