@@ -400,10 +400,10 @@ body.theme-dark .zf-footer a{color:#9aa0aa}
       <div class="field">
         <label class="label">자녀 수 (미성년)</label>
         <select id="children">
-          <option value="0">없음</option>
-          <option value="1">1명</option>
-          <option value="2">2명</option>
-          <option value="3">3명 이상</option>
+          <option value="0">자녀 수: 없음</option>
+          <option value="1">자녀 수: 1명</option>
+          <option value="2">자녀 수: 2명</option>
+          <option value="3">자녀 수: 3명 이상</option>
         </select>
       </div>
     </div>
@@ -411,14 +411,14 @@ body.theme-dark .zf-footer a{color:#9aa0aa}
       <div class="field">
         <label class="label">가구원 수</label>
         <select id="members">
-          <option value="1">1인</option>
-          <option value="2" selected>2인</option>
-          <option value="3">3인</option>
-          <option value="4">4인</option>
-          <option value="5">5인</option>
-          <option value="6">6인</option>
-          <option value="7">7인</option>
-          <option value="8">8인 이상</option>
+          <option value="1">가구원 수: 1인</option>
+          <option value="2" selected>가구원 수: 2인</option>
+          <option value="3">가구원 수: 3인</option>
+          <option value="4">가구원 수: 4인</option>
+          <option value="5">가구원 수: 5인</option>
+          <option value="6">가구원 수: 6인</option>
+          <option value="7">가구원 수: 7인</option>
+          <option value="8">가구원 수: 8인 이상</option>
         </select>
       </div>
       <div class="field">
@@ -433,9 +433,9 @@ body.theme-dark .zf-footer a{color:#9aa0aa}
              기본값은 「모름」이고, 모름·아니오는 단독 기준으로 판정한 뒤 갈리는 유형만 안내한다. -->
         <label class="label" for="dualIncome">본인과 배우자 모두 소득이 있나요?</label>
         <select id="dualIncome">
-          <option value="unknown" selected>모름</option>
-          <option value="no">아니오</option>
-          <option value="yes">예</option>
+          <option value="unknown" selected>부부 모두 소득: 모름</option>
+          <option value="no">부부 모두 소득: 아니오</option>
+          <option value="yes">부부 모두 소득: 예</option>
         </select>
       </div>
     </div>
@@ -447,9 +447,9 @@ body.theme-dark .zf-footer a{color:#9aa0aa}
              진단에서만 쓰고 프로필에 저장하지 않는다 — 맞벌이 문항과 같다. -->
         <label class="label" for="birthAfterBase">2023년 3월 28일 이후 출산(입양·임신 포함)한 자녀가 있나요?</label>
         <select id="birthAfterBase">
-          <option value="unknown" selected>모름</option>
-          <option value="no">아니오</option>
-          <option value="yes">예</option>
+          <option value="unknown" selected>'23.3.28 이후 출산 자녀: 모름</option>
+          <option value="no">'23.3.28 이후 출산 자녀: 아니오</option>
+          <option value="yes">'23.3.28 이후 출산 자녀: 예</option>
         </select>
       </div>
     </div>
@@ -461,8 +461,8 @@ body.theme-dark .zf-footer a{color:#9aa0aa}
       <div class="field">
         <label class="label">주택 소유 여부</label>
         <select id="owned">
-          <option value="no">없음 (무주택)</option>
-          <option value="yes">있음</option>
+          <option value="no">주택 소유: 없음 (무주택)</option>
+          <option value="yes">주택 소유: 있음</option>
         </select>
       </div>
     </div>
@@ -490,16 +490,16 @@ body.theme-dark .zf-footer a{color:#9aa0aa}
       <div class="field">
         <label class="label">주택청약종합저축 보유</label>
         <select id="hasSavings">
-          <option value="unknown">모름</option>
-          <option value="yes">있음</option>
-          <option value="no">없음</option>
+          <option value="unknown">청약통장: 모름</option>
+          <option value="yes">청약통장: 있음</option>
+          <option value="no">청약통장: 없음</option>
         </select>
       </div>
       <div class="field">
         <label class="label">최하층 우선배정 신청 여부</label>
         <select id="wantsGroundFloor">
-          <option value="no">해당 없음</option>
-          <option value="yes">신청 희망 (장애인·노약자)</option>
+          <option value="no">최하층 우선배정: 해당 없음</option>
+          <option value="yes">최하층 우선배정: 신청 희망 (장애인·노약자)</option>
         </select>
       </div>
     </div>
@@ -2607,7 +2607,6 @@ let zfRecChipsRestored=false;
 //    🔴 프로필 조회가 **성공한 뒤에만** 올린다 — 첫 조회가 실패해 빈 값으로 채운 폼은 다음 성공 때 다시 채운다.
 //    로그아웃에서 false 로 내린다.
 let zfSettingsFormApplied=false;
-let currentSort='deposit-asc';
 let visibleCount=3;
 let lastFiltered=[];
 
@@ -3523,8 +3522,10 @@ async function diagnose(){
   // 가리켜 숫자가 갈렸다 — 축별 문구는 기준 행을, 아래 목록은 판정을 통과한 기준 행을,
   // 유형 칩은 고유 housing_type을 센다. 실측 한 입력에서 10·9·8·5가 동시에 떴다.
   // 실제 개수는 아래 「신청 가능한 주택 유형」 목록이 보여준다. 여기서는 충족 여부와 한도만 말한다.
+  // 🔴 자산도 소득·자동차와 같이 가산 적용 한도로 잰다(2026-09-23 B20) — 원 한도(asset_limit)로 재면
+  //    「예」로 가산 통과한 유형이 ✅에 있는데 이 줄은 「자산 기준 초과」라고 말한다.
   const assetOk1 = assets>0 && judgeRows.some(c => {
-    const lim = Number(c.asset_limit) || 0;
+    const lim = limitsFor(c, birthTierApplied, dualApplied).assetLim || 0;
     return lim > 0 && assets <= lim;
   });
   const incomeOk1 = income>0 && judgeRows.some(c => {
@@ -3552,7 +3553,7 @@ async function diagnose(){
 
   let assetMsg='';
   if(assets>0){
-    const limMax = Math.max(0, ...judgeRows.map(c => Number(c.asset_limit) || 0));
+    const limMax = Math.max(0, ...judgeRows.map(c => limitsFor(c, birthTierApplied, dualApplied).assetLim || 0));
     assetMsg = assetOk1
       ? `자산 ${fmtEok(assets)} — 자산 기준을 충족하는 유형이 있어요 (유형별 한도 최대 ${fmtEok(limMax)})`
       : `자산 기준 초과 — 모든 유형의 자산 한도(최대 ${fmtEok(limMax)})를 넘어요`;
@@ -3684,14 +3685,17 @@ async function diagnose(){
 
   // 🔴 가산 적용 결과와 미적용 결과가 갈릴 때만 띄운다. 갈리지 않으면 아무것도 띄우지 않는다.
   // 완화 폭은 DB 값끼리의 차이로 만든다 — 화면에 숫자를 박지 않는다.
+  // 🔵 같은 유형에 공급형태가 둘 이상이면 「일반」도 적는다(2026-09-23 B19 🍼 · B20 ✅) — 「매입임대」만 적으면
+  //    전세형·청년과 구분되지 않는데 실제로는 매입임대/일반 행이다.
+  const sfKinds = {};
+  criteria.forEach(x => { (sfKinds[x.housing_type] = sfKinds[x.housing_type] || new Set()).add(x.supply_form || '일반'); });
+  const sfLabelOf = c => {
+    const sfName = c.supply_form || '일반';
+    return (sfName !== '일반' || (sfKinds[c.housing_type] && sfKinds[c.housing_type].size > 1)) ? `(${sfName})` : '';
+  };
   if(bonusOnlyEntries.length){
-    // 🔵 같은 유형에 공급형태가 둘 이상이면 「일반」도 적는다(2026-09-23 B19) — 「매입임대」만 적으면
-    //    전세형·청년과 구분되지 않는데 실제로는 매입임대/일반 행이다.
-    const sfKinds = {};
-    criteria.forEach(x => { (sfKinds[x.housing_type] = sfKinds[x.housing_type] || new Set()).add(x.supply_form || '일반'); });
     const bonusLabels = bonusOnlyEntries.map(c => {
-      const sfName = c.supply_form || '일반';
-      const sf = (sfName !== '일반' || (sfKinds[c.housing_type] && sfKinds[c.housing_type].size > 1)) ? `(${sfName})` : '';
+      const sf = sfLabelOf(c);
       const b = limitsFor(c, 0, dualApplied), a = limitsFor(c, birthTier, dualApplied);
       const parts=[];
       if(a.assetLim!=null && b.assetLim!=null && a.assetLim>b.assetLim) parts.push(`자산 ${fmtEok(b.assetLim)} → ${fmtEok(a.assetLim)}`);
@@ -3767,7 +3771,7 @@ async function diagnose(){
   } else {
     // 공급형태별 세분화 목록
     const entryLabels = eligibleEntries.map(c => {
-      const sf = (c.supply_form && c.supply_form !== '일반') ? `(${c.supply_form})` : '';
+      const sf = sfLabelOf(c);
       return `· ${c.housing_type}${sf}`;
     }).join(' ');
     // 자동차를 축에 적는 조건: 실제로 입력했고, 목록의 모든 행에 한도가 있어 정말로 판정된 경우.
@@ -6007,23 +6011,6 @@ function searchPoi(id,coords,catCode){
     const top=data.slice(0,5);
     listEl.innerHTML=top.map(p=>`<div class="poi-item"><span>${p.place_name}</span><span class="poi-dist">${Math.round(p.distance)}m</span></div>`).join('');
   },{location:coords,radius:1000,sort:kakao.maps.services.SortBy.DISTANCE});
-}
-
-function sortHouses(list,sortKey,lvl){
-  const dep=h=>lvl==='low'?h.dL:h.dH;
-  const rent=h=>lvl==='low'?h.rL:h.rH;
-  const sorted=[...list];
-  switch(sortKey){
-    case 'deposit-asc': sorted.sort((a,b)=>dep(a)-dep(b)); break;
-    case 'deposit-desc': sorted.sort((a,b)=>dep(b)-dep(a)); break;
-    case 'area-asc': sorted.sort((a,b)=>a.area-b.area); break;
-    case 'area-desc': sorted.sort((a,b)=>b.area-a.area); break;
-    case 'rent-asc': sorted.sort((a,b)=>rent(a)-rent(b)); break;
-    case 'rent-desc': sorted.sort((a,b)=>rent(b)-rent(a)); break;
-    case 'floor-asc': sorted.sort((a,b)=>a.floor-b.floor); break;
-    case 'floor-desc': sorted.sort((a,b)=>b.floor-a.floor); break;
-  }
-  return sorted;
 }
 
 function showMore(){
