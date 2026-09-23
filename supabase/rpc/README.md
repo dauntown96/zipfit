@@ -702,3 +702,21 @@ GRANT SELECT ON public.collection_run_log TO anon, authenticated;   -- 되돌릴
 
 ⚠️ **이미 닫힌 행은 자동으로 안 열린다.** `sh_auto_close_log`의 `prev_status`로 되돌린다.
 🔵 단, 그 공고가 SH 목록에 다시 나타나면 **다음 스크랩이 스스로 연다.**
+
+### 2026-09-23 (B24) — `get_reanalysis_queue()`에 「같은 회차 완료분 제외」 한 줄
+
+**무엇을.** `winner` CTE에 `d.apply_end`를 더하고, 맨 끝 `WHERE`에 `NOT EXISTS` 하나를 더했다 —
+대표와 **같은 `apply_end`**의 그룹 구성원(`announcement_dedup_key(title)` 같음 · 숨김 제외)이 완료 계열
+`announcement_analysis`(`완료`·`완료(보조 누락)`·`완료(판정 대기)`·`완료(소급)`)를 가지면 큐에서 뺀다.
+⑨ 5장 분석률 산식(2026-09-23 개정 — 대표와 같은 `apply_end` 구성원)과 같은 축이다.
+대표 `apply_end`가 NULL이면 `=`가 성립하지 않아 종전대로 남는다.
+
+**실측(2026-09-23).** 적용 전 12건(16:03Z) → 적용 후 4건(16:04Z). 빠진 8건은 donor가 전부 같은 회차인
+7건과 섞인 1건(양산대석 `…0817`)이고, 지난 회차 donor만 있는 4건(`…0687`·`…0690`·`…0694`·`…0822`)은 그대로다.
+ACL(`postgres`·`service_role` EXECUTE)은 `CREATE OR REPLACE`라 그대로다. md5 `bb1c4032…` → `fa40c50b…`.
+
+**되돌리기.** 직전 정의를 그대로 다시 실행한다.
+
+```
+git show 1159e0b:supabase/rpc/get_reanalysis_queue.sql
+```
