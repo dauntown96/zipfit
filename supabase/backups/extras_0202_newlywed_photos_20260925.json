@@ -1,0 +1,37 @@
+{
+ "what": "B32(2026-09-25) — announcement_extras 에서 지운 …020202(6/25 광주전남 청년 매입임대) 사진 2행. 전 컬럼 그대로.",
+ "why": "두 파일은 Drive 원본 제목이 「주택사진_신혼부부…」이고, 6/25 청년 공급주택목록(49행)에도 같은 날 신혼·신생아Ⅰ(37행)·Ⅱ(전세형, 22행) 공급주택목록에도 그 주소(순천시 도장안길 24(연향동) · 순천시 가곡길 231(가곡동))가 없다. 그래서 …020773 카드 갤러리(그룹 읽기)에 공고와 무관한 건물 사진으로 떴다. B32 확인서 판정: 어느 목록에도 없으면 백업 후 삭제(Drive 파일은 그대로).",
+ "source_query": "select * from public.announcement_extras where id in ('79af7910-65b5-4b58-b775-d70538f3bb55','11710c62-692d-456f-b3b0-a1827eb86057')",
+ "row_count": 2,
+ "seal": {
+  "expr": "md5(string_agg(concat_ws('|',id,announcement_id,extra_type,building_address,dong_ho,file_url,file_hash,created_at::text,unit_key,unit_key_source), E'\\n' order by id::text collate \"C\"))",
+  "value": "6fb14931c0b57be1f94b4b48293d00ab"
+ },
+ "restore": "insert into public.announcement_extras select * from json_populate_recordset(null::public.announcement_extras, '<이 파일의 rows 배열>'::json);  -- json_populate_recordset은 이름으로 맞춘다. id가 그대로라 되돌린 뒤 seal 식이 같은 값을 내야 한다.",
+ "rows": [
+  {
+   "id": "11710c62-692d-456f-b3b0-a1827eb86057",
+   "announcement_id": "2015122300020202",
+   "extra_type": "photo",
+   "building_address": "순천가곡동성하파밀리아",
+   "dong_ho": null,
+   "file_url": "https://drive.google.com/file/d/1G8j1m79k1ZRL9RPiUdjesqxG3ui-TJAn/view",
+   "file_hash": "580322",
+   "created_at": "2026-07-01 03:08:32.849783+00",
+   "unit_key": null,
+   "unit_key_source": null
+  },
+  {
+   "id": "79af7910-65b5-4b58-b775-d70538f3bb55",
+   "announcement_id": "2015122300020202",
+   "extra_type": "photo",
+   "building_address": "연향동순천원도빌",
+   "dong_ho": null,
+   "file_url": "https://drive.google.com/file/d/1aCtEWsHDn7ob268bR5DHZYWWJLdcAB1M/view",
+   "file_hash": "773130",
+   "created_at": "2026-07-01 03:08:32.849783+00",
+   "unit_key": null,
+   "unit_key_source": null
+  }
+ ]
+}
