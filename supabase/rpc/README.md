@@ -830,3 +830,28 @@ md5 `819f1443…` → `72da7fa5…`(= 이 파일).
 ```
 git show cab3a16:supabase/rpc/get_announcements_deduped.sql
 ```
+
+---
+
+### 2026-09-25 (H1) — `get_announcements_deduped()` `cancel_keys`를 `MATERIALIZED`로 (anon statement timeout 긴급 수정)
+
+**무엇을.** `cancel_keys AS (` → `cancel_keys AS MATERIALIZED (` 한 자리와 주석 두 줄. 식·반환 타입·ACL 불변.
+
+**왜.** B30 적용(10:15Z) 뒤 비로그인 목록이 비었다 — `rpc/get_announcements_deduped` HTTP 500, Postgres 로그
+`canceling statement due to statement timeout`(10:31Z · 10:32Z · 13:16Z). `anon`의 `statement_timeout`은 **3s**다.
+B30이 `has_cancel_notice`를 `title_key`+`apply_end` 조건의 EXISTS로 바꾸자 플래너가 `cancel_keys`를 인라인해,
+대표행 906개마다 `base` 3,066행을 다시 훑는 상관 서브쿼리(`loops=906`)가 됐다. 한 번만 계산하면 2행짜리 집합이다.
+
+**검증(13:25Z, postgres · 한 번의 조회).** 옛 정의 ↔ 새 정의(`pg_temp` 사본) 전 칸 `EXCEPT ALL` 양방향 0 ·
+906 = 906 · 인자 3종(`'서울특별시'` · `'국민임대'` · `'정정공고'`)도 차 0.
+**속도(anon · `statement_timeout='3s'` · 전 컬럼).** 1,842ms → **177ms**, 전 행 md5 `a9799b7c…` 전·후 같음.
+`EXPLAIN ANALYZE` 실행 1,734ms(claude.ai 실측) → **155ms**.
+**운영.** 공개 REST(anon 키) 200 · 906행 · Edge 500은 적용(13:25:30Z 무렵) 뒤 0(마지막 500 13:21:49Z).
+md5 `72da7fa5…` → `b6b88a8a…`(= 이 파일). 마이그레이션 `h1_cancel_keys_materialized`는 라이브 정의가
+`72da7fa5`일 때만 그 한 조각을 바꾸도록 가드했다.
+
+**되돌리기.** 직전 정의를 그대로 다시 실행한다(의미가 같아 화면 거울과 무관하다).
+
+```
+git show 3e82cb0:supabase/rpc/get_announcements_deduped.sql
+```
