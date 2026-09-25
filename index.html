@@ -757,6 +757,8 @@ body.theme-dark .zf-footer a{color:#9aa0aa}
           <div class="field">
             <label class="label" for="set_assets">총 자산 (만원)</label>
             <input type="number" id="set_assets" min="0" placeholder="예: 15000">
+            <!-- 🔵 2026-09-25 B26 — 자격진단 #assets 아래와 같은 문장(B24). 판정·저장 코드는 바꾸지 않는다. -->
+            <p style="font-size:11px;color:#999;margin:0.35rem 0 0">부동산·자동차·금융자산 등을 모두 더하고 부채를 뺀 금액이에요.</p>
           </div>
           <div class="field">
             <label class="label" for="set_maxDeposit">최대 보증금 (만원)</label>
@@ -4677,6 +4679,8 @@ function loadAnnouncementExtras(annId, detailEl, id, useGroup){
 //   둘 다 62MB·87MB 팸플릿 PDF이고 파일 자체는 멀쩡하다(아래 extrasThumbFailed 주석).
 //   즉 이 코드는 「지금 몇 개가 없다」를 전제로 하지 않는다 — 무엇이 실패하든 그 자리에서
 //   정직하게 다루는 장치이고, 그래서 공개 설정이 바뀌어도 그대로 맞는다.
+//   🔵 2026-09-23 재측정(1,920개): 이미지 1,624 · 로그인 페이지 207(9/12의 207개와 같은 집합 — 9/13 뒤
+//   다시 막혔다) · 썸네일 404 89(파일은 있고 /preview 는 열린다). 위 문단은 9/13 시점의 사실로 남긴다.
 //
 // 🔴 왜 onerror인가 — 미리 확인하는 길이 브라우저에는 없다.
 //   drive.google.com은 Access-Control-Allow-Origin을 주지 않아 fetch/XHR HEAD가 CORS로
@@ -4696,32 +4700,30 @@ function loadAnnouncementExtras(annId, detailEl, id, useGroup){
 //
 // 🔴 DB는 건드리지 않는다. 없어진 210행은 그대로 있다 — 이건 증상을 정직하게 보이게
 //   한 것이지 데이터를 고친 것이 아니다.
-const extrasFailedIds = new Set();
 
 // 🔴 팸플릿(PDF)은 썸네일이 안 떠도 「없다」고 말하지 않는다 — 실측으로 갈렸다.
 //   2026-09-13 전수 조회에서 썸네일이 404로 떨어진 것은 1,126개 중 2개였고 둘 다 팸플릿이며
 //   둘 다 파일은 멀쩡하다 — 부천원종 C1블록 62,192,176B · 당진우강송산 86,584,736B(Drive
 //   메타데이터로 확인, 앞의 것은 uc?export=view가 PDF 본문까지 돌려줬다). 용량이 커서
 //   Drive가 썸네일을 만들어 주지 않는 것뿐이다.
-//   사진·평면도는 썸네일이 곧 표시 경로라 실패가 곧 「못 본다」지만, 팸플릿의 표시 경로는
-//   모달의 /preview라 썸네일 실패가 파일에 대한 근거가 되지 못한다. 그래서 팸플릿은
-//   중립 문구(미리보기 없음)로 두고 (N건)에서도 빼지 않으며 모달도 그대로 열어 준다.
+// 🔴 2026-09-25(B26) — 사진·평면도도 같은 처리로 옮겼다. 2026-09-23 전수(1,920개)에서 썸네일 404가
+//   89개였고, 그중 87개는 9/22에 올린 매입임대 「평면도·주택사진」 PDF다. 파일은 있고 익명 /preview 로는
+//   열리는데 Drive가 썸네일만 만들지 않았다. 그래서 썸네일 실패를 「없다」의 근거로 쓰지 않는다 —
+//   타일은 「📄 미리보기 없음 · 눌러서 보기」, (N건)에서도 빼지 않고, 모달은 /preview 로 연다.
+//   ⚠️ 한계: Drive에서 사라진 파일(2026-09-23 기준 207개)도 같은 타일이 되고 모달 안에 Drive 자신의
+//   「Page not found」가 뜬다. 화면은 둘을 가르지 못한다(img onerror 는 상태코드를 주지 않고,
+//   iframe 안은 교차출처다). 문구가 원인을 단정하지 않는 이유다.
+const extrasNoThumbIds = new Set();
 function extrasThumbFailed(img){
   img.onerror = null;
   const a = img.closest ? img.closest('.extras-thumb') : null;
   if(!a) return;
   const fid = a.getAttribute('data-fid');
-  const isPdf = a.getAttribute('data-kind') === 'pamphlet';
+  if(fid) extrasNoThumbIds.add(fid);
   const mark = document.createElement('span');
   mark.className = 'extras-thumb-missing-mark';
-  if(isPdf){
-    a.classList.add('extras-thumb-nopreview');
-    mark.textContent = '📄 미리보기 없음';
-  }else{
-    if(fid) extrasFailedIds.add(fid);
-    a.classList.add('extras-thumb-missing');
-    mark.textContent = '불러올 수 없음';
-  }
+  a.classList.add('extras-thumb-nopreview');
+  mark.textContent = '📄 미리보기 없음 · 눌러서 보기';
   a.replaceChild(mark, img);
   refreshExtrasCounts(a.closest('.extras-wrap'));
 }
@@ -4729,28 +4731,39 @@ function extrasThumbFailed(img){
 // 묶음 제목·그룹 라벨의 (N건)을 "지금 실제로 보이는 타일 수"로 다시 쓴다.
 // 못 띄운 수는 감추지 않고 라벨 뒤에 따로 적는다 — 세는 수와 보이는 수는 맞추되
 // 사라진 사실 자체는 남긴다.
+// 🔴 2026-09-25(B26) — 무엇을 세는가가 둘로 갈렸다.
+//   ① 불러올 수 없음(.extras-thumb-missing) — 띄울 파일 ID 자체가 없는 행. (N건)에서 빼고 「불러오기 실패」로 적는다.
+//   ② 미리보기 없음(.extras-thumb-nopreview) — 썸네일만 실패한 행. 눌러서 원본을 열 수 있으므로 (N건)에 남기고
+//      「미리보기 없음」으로 따로 적는다. 원본이 지워진 파일도 여기 들어온다 — 그래서 안내줄이 그 가능성을 함께 말한다.
 function refreshExtrasCounts(wrap){
   if(!wrap) return;
-  let shown = 0, missing = 0;
+  let shown = 0, missing = 0, noPreview = 0;
   wrap.querySelectorAll('.extras-grid').forEach(grid => {
     const all = grid.querySelectorAll('.extras-thumb').length;
     const gone = grid.querySelectorAll('.extras-thumb-missing').length;
+    const np = grid.querySelectorAll('.extras-thumb-nopreview').length;
     shown += all - gone;
     missing += gone;
+    noPreview += np;
     const label = grid.previousElementSibling;
     if(label && label.classList.contains('extras-group-label')){
       const base = label.getAttribute('data-label') || '';
-      label.textContent = `${base} (${all - gone}건)` + (gone ? ` · ${gone}건은 지금 불러올 수 없어요` : '');
+      label.textContent = `${base} (${all - gone}건)`
+        + (np ? ` · ${np}건 미리보기 없음` : '')
+        + (gone ? ` · ${gone}건은 지금 불러올 수 없어요` : '');
     }
   });
   const title = wrap.querySelector('.extras-title');
-  if(title) title.textContent = `📷 사진·평면도·팸플릿 (${shown}건)` + (missing ? ` · ${missing}건 불러오기 실패` : '');
+  if(title) title.textContent = `📷 사진·평면도·팸플릿 (${shown}건)`
+    + (noPreview ? ` · ${noPreview}건 미리보기 없음` : '')
+    + (missing ? ` · ${missing}건 불러오기 실패` : '');
   const note = wrap.querySelector('.extras-missing-note');
   if(note){
-    note.textContent = missing
-      ? `${missing}건은 지금 불러올 수 없어요. 원본 파일이 지워졌거나 자리를 옮겼을 수 있고, 열람 권한이 없어서일 수도 있어요.`
-      : '';
-    note.style.display = missing ? '' : 'none';
+    const parts = [];
+    if(noPreview) parts.push(`${noPreview}건은 미리보기 그림이 없어요. 눌러서 원본을 열어 보세요 — 다만 원본이 지워졌거나 열람 권한이 없으면 열리지 않을 수 있어요.`);
+    if(missing) parts.push(`${missing}건은 지금 불러올 수 없어요. 원본 파일이 지워졌거나 자리를 옮겼을 수 있고, 열람 권한이 없어서일 수도 있어요.`);
+    note.textContent = parts.join(' ');
+    note.style.display = parts.length ? '' : 'none';
   }
 }
 
@@ -4802,11 +4815,19 @@ function renderExtrasModal(){
   // 실패를 근거로 삼을 수도 없다(위 extrasThumbFailed 주석 — 62MB PDF가 그 반례다). 그래서
   // 팸플릿은 종전처럼 /preview를 띄우고, 원본이 없으면 Drive가 자기 문구를 보여준다.
   // 지워진 팸플릿을 우리 문구로 바꿔 주지는 못한다 — 교차출처라 판정 근거가 없다.
-  document.getElementById('extrasModalContent').innerHTML = !fid || (!isPdf && extrasFailedIds.has(fid))
+  // 🔴 2026-09-25(B26) — 사진·평면도도 타일 썸네일이 실패했으면(extrasNoThumbIds) 곧장 /preview 로 연다.
+  //    그 파일들은 대부분 PDF라 uc?export=view 가 PDF 본문을 주고 <img>가 실패한다 — 두 단계를 거칠 이유가 없다.
+  //    썸네일이 떴던 파일이 모달에서만 실패해도 마지막 단계는 안내 문구가 아니라 /preview 다(extrasModalImgFailed).
+  const usePreview = isPdf || (fid && extrasNoThumbIds.has(fid));
+  document.getElementById('extrasModalContent').innerHTML = !fid
     ? extrasUnavailableHtml()
-    : isPdf
-      ? `<iframe src="https://drive.google.com/file/d/${fid}/preview" allow="autoplay"></iframe>`
+    : usePreview
+      ? extrasPreviewHtml(fid)
       : `<img src="https://drive.google.com/uc?export=view&id=${fid}" alt="${escapeHtml(caption)}" data-fid="${escapeHtml(fid)}" onerror="extrasModalImgFailed(this)">`;
+}
+
+function extrasPreviewHtml(fid){
+  return `<iframe src="https://drive.google.com/file/d/${encodeURIComponent(fid)}/preview" allow="autoplay"></iframe>`;
 }
 
 function extrasModalImgFailed(img){
@@ -4818,9 +4839,10 @@ function extrasModalImgFailed(img){
     return;
   }
   img.onerror = null;
-  if(fid) extrasFailedIds.add(fid);
+  // 2단계도 실패 → /preview 로 연다(원본이 없으면 그 안에 Drive 자신의 문구가 뜬다 — 위 한계 주석).
+  if(fid) extrasNoThumbIds.add(fid);
   const box = document.getElementById('extrasModalContent');
-  if(box) box.innerHTML = extrasUnavailableHtml();
+  if(box) box.innerHTML = fid ? extrasPreviewHtml(fid) : extrasUnavailableHtml();
 }
 
 document.addEventListener('keydown', e => {
