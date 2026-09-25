@@ -801,3 +801,32 @@ md5 `50a0357c…` → `819f1443…`(= 이 파일).
 ```
 git show d5a6791:supabase/rpc/get_announcements_deduped.sql
 ```
+
+---
+
+### 2026-09-25 (B30) — `get_announcements_deduped()` 취소공고 배지에 회차 조건(제목 키 + `apply_end`)
+
+**무엇을.** 두 자리만 바꿨다.
+- `cancel_keys`: `dedup_key` 대신 `title_key`로 짝을 찾고, 취소공고의 `apply_end`를 함께 담는다(`orig_title_key`·`cancel_apply_end`).
+- `has_cancel_notice`: 제목 키가 같고 **`apply_end`가 같을 때만** 참. 어느 한쪽 `apply_end`가 NULL이면 종전처럼 제목만 본다.
+
+`title_key`를 쓰는 까닭은 P1(B26)으로 떼어진 회차(`dedup_key`에 `#회차날짜` 꼬리)도 짝이 되게 하려는 것이다.
+반환 타입 불변 · ACL 불변 · 나머지 CTE 불변.
+
+**왜.** 제목 키만 보면 배지가 그룹 대표(최신 회차)에 붙었다. 적용 시점에 참이던 2건(태백철암1 9/14 `21199_1` ·
+청주지북A4 6/5 `…020066`)은 둘 다 **다른 회차**였다 — 취소공고 `…020645`(마감 10/14)·`…020011`(마감 5/29)의
+대상 회차는 마감일이 같은 앞 회차이고, 그 회차는 목록 대표가 아니다.
+
+**화면 거울.** `index.html`의 `zfPairedCancelIds`(짝 있는 취소행을 목록에서 뺀다) · `zfCheckDedupMirror` ·
+`zfResolveSavedCards` · `cancelNoticeBadge`가 같은 규칙(`zfCancelEndMatch`)을 쓴다. 같은 커밋이다 —
+배지만 고치면 「배지 없음 + 취소행도 빠짐」으로 취소 사실이 화면에서 사라진다.
+
+**검증(10:07:12Z, 한 번의 조회).** 옛 정의와 새 정의(`pg_temp` 사본)를 같은 쿼리에서 대조 —
+행 906 = 906 · ID 집합 차 0 · `has_cancel_notice`를 뺀 전 칸 같음 · `has_cancel_notice` 참 2 → 0.
+md5 `819f1443…` → `72da7fa5…`(= 이 파일).
+
+**되돌리기.** 직전 정의를 그대로 다시 실행한다. 🔴 화면(`index.html`)도 함께 되돌려야 거울이 맞는다.
+
+```
+git show cab3a16:supabase/rpc/get_announcements_deduped.sql
+```

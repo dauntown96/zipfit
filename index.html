@@ -1512,22 +1512,40 @@ function zfDedupKey(title){
     .replace(/\.{2,}/g, '.');
 }
 // 원공고 dedup 키 → 그 짝 취소공고. 🔵 카드 id 가 아니라 **제목에서 나온 키**라 재렌더로 낡지 않는다.
+// 🔴 2026-09-25(B30) — 짝은 **제목 키 + 접수 마감일**이다. DB `cancel_keys` 의 거울이다.
+//    제목 키만 보면 같은 제목의 다음 회차(취소되지 않은 것)에 짝이 붙었다(태백철암1 9/14 · 청주지북A4 6/5).
+//    한쪽 마감일이 비면 종전처럼 제목만 본다 — DB 도 같다.
+function zfCancelEndMatch(cancelEnd, origEnd){
+  const a = String(cancelEnd || '').slice(0, 10), b = String(origEnd || '').slice(0, 10);
+  return !a || !b || a === b;
+}
+// 원공고 dedup 키 → 짝이 된 [취소공고] 목록([{ url, title, id, applyEnd }]).
+// 같은 제목에 회차가 여럿일 수 있어 목록으로 둔다 — 찾을 때는 마감일로 고른다(zfCancelInfoFor).
 const zfCancelByOrigKey = {};
+function zfCancelInfoFor(title, applyEnd){
+  const list = zfCancelByOrigKey[zfDedupKey(title)] || [];
+  return list.find(c => zfCancelEndMatch(c.applyEnd, applyEnd)) || null;
+}
 // 목록에서 뺄 [취소공고] 행의 announcement_id 집합을 돌려준다.
 // 🔴 **짝이 없는 취소공고는 남긴다** — 원공고를 못 찾은 채 숨기면 취소 사실이 화면에서 사라진다.
+//    B30 뒤로는 「같은 제목의 원공고는 있지만 마감일이 다른」 취소공고도 짝이 없는 것이다(태백 …020645).
 function zfPairedCancelIds(rows, pick){
-  const origKeys = new Set();
-  rows.forEach(r => { const k = zfDedupKey(pick(r).title);
-    if(!k.startsWith(ZF_CANCEL_PREFIX)) origKeys.add(k); });
+  const origEnds = new Map();   // 원공고 dedup 키 → 그 키를 가진 행들의 마감일
+  rows.forEach(r => { const p = pick(r); const k = zfDedupKey(p.title);
+    if(k.startsWith(ZF_CANCEL_PREFIX)) return;
+    if(!origEnds.has(k)) origEnds.set(k, []);
+    origEnds.get(k).push(p.applyEnd || ''); });
   const drop = new Set();
   rows.forEach(r => {
     const p = pick(r);
     const k = zfDedupKey(p.title);
     if(!k.startsWith(ZF_CANCEL_PREFIX)) return;
     const orig = k.slice(ZF_CANCEL_PREFIX.length);
-    if(!origKeys.has(orig)) return;
+    const ends = origEnds.get(orig);
+    if(!ends || !ends.some(e => zfCancelEndMatch(p.applyEnd, e))) return;
     drop.add(p.id);
-    zfCancelByOrigKey[orig] = { url: p.url || '', title: p.title, id: p.id };
+    const list = zfCancelByOrigKey[orig] || (zfCancelByOrigKey[orig] = []);
+    if(!list.some(c => c.id === p.id)) list.push({ url: p.url || '', title: p.title, id: p.id, applyEnd: p.applyEnd || '' });
   });
   return drop;
 }
@@ -1545,7 +1563,8 @@ function zfCheckDedupMirror(rows){
       const k = zfDedupKey(n['공고명'] || '');
       if(!k.startsWith(ZF_CANCEL_PREFIX)) return;
       const orig = k.slice(ZF_CANCEL_PREFIX.length);
-      rows.forEach(m => { if(zfDedupKey(m['공고명'] || '') === orig) byMirror.add(m['announcement_id']); });
+      // 🔵 B30 — 마감일도 같은 규칙으로 본다(zfCancelEndMatch). RPC 도 제목 키 + 마감일이다.
+      rows.forEach(m => { if(zfDedupKey(m['공고명'] || '') === orig && zfCancelEndMatch(n['apply_end'], m['apply_end'])) byMirror.add(m['announcement_id']); });
     });
     const byRpc = new Set(rows.filter(n => n['has_cancel_notice'] === true).map(n => n['announcement_id']));
     const onlyMirror = [...byMirror].filter(x => !byRpc.has(x));
@@ -1560,10 +1579,10 @@ function zfCheckDedupMirror(rows){
 }
 
 // 「취소공고 있음」 배지 — 취소공고 원문 URL 을 알면 링크로, 모르면 종전 칩 그대로.
-function cancelNoticeBadge(title){
+function cancelNoticeBadge(title, applyEnd){
   const st  = 'cursor:help;padding:4px 10px;font-size:11px;background:#A32D2D;border-color:#A32D2D';
   const tip = '같은 이름의 [취소공고]가 따로 게시됐어요. 공고 원문을 반드시 확인하세요.';
-  const info = zfCancelByOrigKey[zfDedupKey(title)];
+  const info = zfCancelInfoFor(title, applyEnd);
   if(info && info.url){
     return `<a class="chip sel" href="${escapeHtml(info.url)}" target="_blank" rel="noopener"`
       + ` title="${tip} 눌러 취소공고 원문을 엽니다." onclick="event.stopPropagation()"`
@@ -1791,7 +1810,7 @@ function zfMapNoticeRows(rows){
   //    목록·상태 칩 건수·검색·「전체 N건」이 **한 자리에서 함께** 줄어든다(사본 없음).
   //    🔵 빼기 전에 그 행의 원문 URL 을 원공고 쪽 배지가 쓰도록 담아 둔다.
   const dropCancel = zfPairedCancelIds(out,
-    n => ({ id: n['announcement_id'], title: n['공고명'] || '', url: n['공고URL'] || '' }));
+    n => ({ id: n['announcement_id'], title: n['공고명'] || '', url: n['공고URL'] || '', applyEnd: n['apply_end'] || '' }));
   // 🔴 거울 자기점검(2026-09-16) — `zfDedupKey` 는 DB `announcement_dedup_key` 의 사본이라
   //    DB 쪽이 바뀌면 조용히 어긋난다. 목록을 받을 때마다 **RPC 가 스스로 표시한 값**과 대조한다.
   //    사용자 화면에는 영향이 없다. 한 번만 경고한다(목록을 다시 받을 때마다 도배하지 않게).
@@ -2049,12 +2068,13 @@ async function zfResolveSavedCards(){
   //    ① 저장한 것이 [취소공고] 행이면 **원공고 카드로 바꿔** 보여주고 취소 표시를 붙인다.
   //    ② 원공고를 못 찾으면 취소공고 카드를 그대로 두고 같은 표시를 붙인다.
   //    ③ 원공고를 저장한 경우에는 기존 배지 그대로다(여기서 아무것도 하지 않는다).
+  // 🔵 B30 — 원공고는 제목 키 + 마감일로 고른다(zfCancelEndMatch). 마감일이 다른 같은 제목 행은 원공고가 아니다.
   const byKey = new Map();
-  rows.forEach(r => { const k = zfDedupKey(r.title || ''); if(!byKey.has(k)) byKey.set(k, r); });
+  rows.forEach(r => { const k = zfDedupKey(r.title || ''); if(!byKey.has(k)) byKey.set(k, []); byKey.get(k).push(r); });
   const resolved = cards.map(c => {
     const k = zfDedupKey(c.title || '');
     if(!k.startsWith(ZF_CANCEL_PREFIX)) return c;
-    const orig = byKey.get(k.slice(ZF_CANCEL_PREFIX.length));
+    const orig = (byKey.get(k.slice(ZF_CANCEL_PREFIX.length)) || []).find(r => zfCancelEndMatch(c.apply_end, r.apply_end));
     const base = orig ? zfSavedCardFrom({ announcement_id: c.id, created_at: c.savedAt }, orig) : c;
     return Object.assign({}, base, { cancelled: true });
   });
@@ -2222,8 +2242,8 @@ function renderSavedNotices(){
         <button style="background:none;border:none;font-size:18px;cursor:pointer;padding:2px 4px;color:#ccc" title="저장 삭제" onclick="toggleSaveNotice('${String(s.id).replace(/'/g,"\\'")}').then(renderSavedNotices)">✕</button>
       </div>
       <p class="haddr">${escapeHtml(s.cover||s.region||'')} · ${escapeHtml(s.type||'')}</p>
-      ${(s.cancelled || zfCancelByOrigKey[zfDedupKey(s.title||'')])
-        ? `<div style="margin-top:6px">${cancelNoticeBadge(s.title||'')}</div>` : ''}
+      ${(s.cancelled || zfCancelInfoFor(s.title||'', s.apply_end))
+        ? `<div style="margin-top:6px">${cancelNoticeBadge(s.title||'', s.apply_end)}</div>` : ''}
       ${dateStr?`<p style="font-size:11px;color:#bbb;margin-top:4px">저장일: ${dateStr}</p>`:''}
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
         ${s.url?`<a class="detail-link" href="${s.url}" target="_blank">📄 공고 원문 보기</a>`:''}
@@ -2535,7 +2555,7 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
            🔴 classifyNoticeType 은 유형 칩·설정 매칭에서 그대로 쓴다 — 바꾼 것은 표시 문자열뿐이다. -->
       <p class="haddr">${zfCoverPlace(n['region_names'], zfComplexCount(n), n['sido_nm'], n['sigungu_nm'], n['지역'])} · ${n['공급유형']||''}</p>
       <div class="chip-row" style="margin:8px 0;gap:5px">
-        ${hasCancel?cancelNoticeBadge(n['공고명']||''):''}
+        ${hasCancel?cancelNoticeBadge(n['공고명']||'', n['apply_end']):''}
         ${n['building_name']?`<span class="chip" style="cursor:default;padding:4px 10px;font-size:11px">🏢 ${zfBuildingLabel(n['building_name'], zfComplexCount(n))}</span>`:''}
         ${isAmended?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#7B5EA7;border-color:#7B5EA7">🔄 정정</span>':''}
         ${(isAmended && revisionNoteEsc)?`<span title="${revisionNoteEsc}" style="cursor:help;font-size:11px;color:#666;border:1px solid #ccc;border-radius:10px;padding:1px 6px">ℹ️ 정정사유</span>`:''}
@@ -2841,7 +2861,7 @@ function renderPersonalizedRecommendations(){
       </div>
       <p class="haddr">${zfCoverPlace(n['region_names'], zfComplexCount(n), n['sido_nm'], n['sigungu_nm'], n['지역'])} · ${n['공급유형']||''}</p>
       <div class="chip-row" style="margin:6px 0;gap:5px">
-        ${hasCancel?cancelNoticeBadge(n['공고명']||''):''}
+        ${hasCancel?cancelNoticeBadge(n['공고명']||'', n['apply_end']):''}
         ${isNewNotice(n)?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
         ${closingSoon?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
         ${applyUnknownChip(n)}
@@ -3898,7 +3918,7 @@ async function matchHouses(){
     rows = rows.filter(r => !isHiddenAsClosed(r));
     // 🔴 공고 탭과 같은 판정 함수를 쓴다(2026-09-16) — 짝 있는 [취소공고] 행은 여기서도 뺀다.
     const dropCancelM = zfPairedCancelIds(rows,
-      r => ({ id: r.announcement_id, title: r.title || '', url: r.url || '' }));
+      r => ({ id: r.announcement_id, title: r.title || '', url: r.url || '', applyEnd: r.apply_end || '' }));
     if(dropCancelM.size) rows = rows.filter(r => !dropCancelM.has(r.announcement_id));
     if(regions.length > 0) {
       rows = rows.filter(r => regions.some(rg => (r.region||'').includes(rg)));
@@ -6263,7 +6283,7 @@ function renderMatchResults(rows){
       <!-- 🔴 공고 탭과 같은 규칙 — 유형은 원문 한 번만(2026-09-16). -->
       <p class="haddr">${zfCoverPlace(n.region_names, zfComplexCount(n), n.sido_nm, n.sigungu_nm, n.region)} · ${n.housing_type||''}</p>
       <div class="chip-row" style="margin:8px 0;gap:5px">
-        ${hasCancel?cancelNoticeBadge(n.title||''):''}
+        ${hasCancel?cancelNoticeBadge(n.title||'', n.apply_end):''}
         ${n.building_name?`<span class="chip" style="cursor:default;padding:4px 10px;font-size:11px">🏢 ${zfBuildingLabel(n.building_name, zfComplexCount(n))}</span>`:''}
         ${isAmended?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#7B5EA7;border-color:#7B5EA7">🔄 정정</span>':''}
         ${(isAmended && revisionNoteEscM)?`<span title="${revisionNoteEscM}" style="cursor:help;font-size:11px;color:#666;border:1px solid #ccc;border-radius:10px;padding:1px 6px">ℹ️ 정정사유</span>`:''}
