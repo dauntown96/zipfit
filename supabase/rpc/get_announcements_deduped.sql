@@ -150,7 +150,9 @@ block_count AS (
 --   한쪽 apply_end 가 NULL 이면 종전처럼 제목만 본다.
 --   dedup_key 대신 title_key 를 써서 P1 으로 떼어진 회차('#회차날짜' 꼬리)도 배지를 받는다.
 --   ⚠️ 화면 zfPairedCancelIds · zfCheckDedupMirror 가 같은 규칙의 거울이다 — 함께 바꾼다.
-cancel_keys AS (
+-- 🔴 2026-09-25(H1) — MATERIALIZED: 한 번만 계산한다. 인라인되면 아래 has_cancel_notice EXISTS 가
+--   대표행마다 base 전체(3,066행)를 다시 훑는 상관 서브쿼리가 되어(loops=906) anon statement_timeout 3s 를 넘었다.
+cancel_keys AS MATERIALIZED (
   SELECT DISTINCT substr(title_key, 7) AS orig_title_key, apply_end AS cancel_apply_end
   FROM base
   WHERE substr(title_key, 1, 6) = '[취소공고]'
