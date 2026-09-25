@@ -25,7 +25,7 @@ superseded_pblanc_ids AS (
 --   dedup_key 에 '#회차날짜' 꼬리를 붙여 따로 떼어 낸다. 같은 회차 날짜의 MYHOME 짝도 함께 떨어진다.
 --   🔵 앞 회차가 접수마감이 되면 조건이 풀려 저절로 원래 그룹으로 돌아간다.
 --   ⚠️ title_winner 의 ORDER BY 는 아래 winner CTE 와 **같아야 한다**(대표를 두 번 고르는 셈이다).
---   ⚠️ 떼어진 회차는 cancel_keys(제목 키 짝)와 맞지 않아 취소공고 배지를 받지 않는다.
+--   🔵 2026-09-25(B30) — 떼어진 회차도 cancel_keys 와 맞는다(dedup_key 가 아니라 title_key 로 짝짓는다).
 title_winner AS (
   SELECT DISTINCT ON (r.title_key) r.title_key, r.round_date, r.apply_end
   FROM raw_base r
@@ -143,11 +143,18 @@ block_count AS (
 -- `[취소공고]`에는 공백·따옴표·마침표가 없어 정규화를 거쳐도 접두 6글자가 그대로 남는다.
 -- ⚠️ 소스를 조건에 넣지 않는다 — 표본 2건이 전부 LH일 뿐 LH 전용이라는 근거가 없다.
 -- ⚠️ 취소행 자체는 여전히 자기 그룹으로 조회된다. 숨기지 않는다.
+-- 🔴 2026-09-25(B30) — 회차 조건을 더했다: 제목 키 + 접수 마감일(apply_end).
+--   제목 키만 보면 그룹 대표(최신 회차)에 배지가 붙어, 취소되지 않은 다음 회차가 취소된 것처럼 보였다
+--   (태백철암1 9/14 회차 · 청주지북A4 6/5 회차 — 둘 다 취소 대상은 앞 회차였다).
+--   취소공고 2건 모두 대상 회차와 apply_end 가 같다(태백 10/14 · 청주 5/29). 공고일은 청주에서 갈린다(취소 5/21 ↔ 대상 5/15).
+--   한쪽 apply_end 가 NULL 이면 종전처럼 제목만 본다.
+--   dedup_key 대신 title_key 를 써서 P1 으로 떼어진 회차('#회차날짜' 꼬리)도 배지를 받는다.
+--   ⚠️ 화면 zfPairedCancelIds · zfCheckDedupMirror 가 같은 규칙의 거울이다 — 함께 바꾼다.
 cancel_keys AS (
-  SELECT DISTINCT substr(dedup_key, 7) AS orig_dedup_key
+  SELECT DISTINCT substr(title_key, 7) AS orig_title_key, apply_end AS cancel_apply_end
   FROM base
-  WHERE substr(dedup_key, 1, 6) = '[취소공고]'
-    AND length(dedup_key) > 6
+  WHERE substr(title_key, 1, 6) = '[취소공고]'
+    AND length(title_key) > 6
 ),
 winner AS (
   SELECT DISTINCT ON (b.dedup_key) b.*
@@ -195,7 +202,9 @@ SELECT
   COALESCE(w.contract_end, bs.best_contract_end) AS contract_end,
   COALESCE(w.building_name, bs.best_building_name) AS building_name,
   w.attachment_urls,
-  (w.dedup_key IN (SELECT orig_dedup_key FROM cancel_keys)) AS has_cancel_notice,
+  EXISTS (SELECT 1 FROM cancel_keys ck
+          WHERE ck.orig_title_key = w.title_key
+            AND (ck.cancel_apply_end IS NULL OR w.apply_end IS NULL OR ck.cancel_apply_end = w.apply_end)) AS has_cancel_notice,
   rs.region_names,
   CASE WHEN bc.n >= 2 THEN bc.n ELSE 1 END AS block_count,
   -- 🔴 2026-09-17 추가한 둘. 대표행(winner) 값을 그대로 낸다 — 형제 행에서 끌어오지
