@@ -422,6 +422,58 @@ alter table public.user_profiles drop column usage_log_consent;
 
 ⚠️ 그때까지 기록된 동의 여부가 함께 사라진다.
 
+### 2026-09-25 (B28) — `announcement_extras.unit_key` · `unit_key_source` 추가 (사진·평면도 ↔ 세대 행 묶음)
+
+사진·평면도 한 행이 **어느 세대 행 묶음의 자료인지**를 저장한다. 그 전에는 잇는 키가 컬럼에도 코드에도 없었다(B25 조사 3).
+
+**실행** (마이그레이션 `b28_extras_unit_key` · `b28_extras_unit_key_comment_composite`)
+
+```sql
+alter table public.announcement_extras
+  add column unit_key text,
+  add column unit_key_source text
+    constraint announcement_extras_unit_key_source_chk
+    check (unit_key_source in ('string_match','supply_list','image_link')),
+  add constraint announcement_extras_unit_key_pair_chk
+    check ((unit_key is null) = (unit_key_source is null));
+```
+
+(`COMMENT` 2건은 생략했다 — 마이그레이션에 전문이 있다.)
+
+#### 값 규약
+
+| 공고 | `unit_key` | 예 |
+|---|---|---|
+| 매입임대(건물 단위) | 건물 머리 키 `coalesce(nullif(btrim(building_name),''), address, '주소 정보 없음')` — 렌더러 `groupHousingUnits`와 같은 식 | `강남개포동(T&K개포)` |
+| 단지형(주택형 단위) | `건물 머리 키 || '::' || coalesce(unit_group, unit_type)` | `아산탕정LH7단지::37B` |
+| 카드 단위 자료 · 아직 못 이은 행 | `NULL` | 팸플릿 · 조감도 · 배치도 |
+
+- `unit_key_source`: `string_match`(캡션 문자열 대조로 채움) · `supply_list`(공급주택목록·모집표로 확인) · `image_link`(이미지 연결 때 기록).
+- 🔴 **주택형에 건물을 붙인 이유** — 아산 `…020726`은 「46형」이 배방15단지의 `unit_group`이면서 신창소화마을의 `unit_type`이다. 이름만으로는 1:1이 서지 않는다.
+
+#### 백필 (같은 날, 한 트랜잭션씩)
+
+- 매입임대 `photo`·`floorplan` 1,040행 중 한 건물로 좁혀지는 **815행**(B25 조사 3 ② 규칙 그대로 — 캡션 뒤쪽을 뗀 값 = 정규화한 `building_name`, 또는 ⊂ 정규화한 `address`).
+- 단지형 `floorplan`에서 캡션의 주택형 토큰이 하나이고 같은 ID에서 **(건물, 주택형) 한 쌍**에만 맞는 **218행**.
+  - 처음엔 주택형만으로 223행을 채웠다가, 두 건물에 걸린 5행을 `NULL`로 되돌리고 나머지를 `건물::주택형`으로 고쳤다.
+- 🔴 B27의 죽은 210행(7/15 회차 17공고)은 채우지 않았다.
+- 전부 `string_match`. 앞의 8개 컬럼 md5 `92d5f573…` 불변 · 행 수 2,016 불변.
+
+#### 권한
+
+컬럼 ACL을 따로 만들지 않았다 — 테이블 SELECT(`anon=r`·`authenticated=r`)가 그대로 덮는다. 쓰기는 service_role뿐이다.
+
+#### 되돌리기
+
+```sql
+alter table public.announcement_extras
+  drop constraint announcement_extras_unit_key_pair_chk,
+  drop column unit_key_source,
+  drop column unit_key;
+```
+
+⚠️ 채운 1,033행의 연결이 함께 사라진다. 화면은 키가 없으면 종전 갤러리로 돌아간다(대역 실측으로 확인).
+
 ## 함수 본문 변경 이력
 
 권한·DDL과 달리 이쪽은 **파일 diff가 곧 기록**이다. 아래는 그 diff를 어디서 찾는지와

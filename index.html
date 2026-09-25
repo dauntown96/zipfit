@@ -296,6 +296,16 @@ body.theme-dark .hu-past-title{color:#cfcfcf}
 .hu-group-head.hu-group-active{background:#E1F5EE;border-color:#1D9E75}
 .hu-group-name{font-weight:600;color:#333;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hu-group-count{color:#888;white-space:nowrap;font-size:11px}
+/* 🔵 B28 — 세대 머리의 「📷 N」 칩. 이름이 줄고(말줄임) 칩·건수는 줄지 않는다 — 360px에서도 한 줄. */
+.hu-group-head .hu-group-name{flex:1 1 auto;min-width:0}
+.hu-x-slot{flex:0 0 auto;display:inline-flex}
+.hu-x-slot:empty{display:none}
+.hu-x-chip{padding:2px 8px;font-size:11px;line-height:1.4;white-space:nowrap;background:#fff;border-color:#cfd8d3;color:#1D6F55;font-weight:600}
+.hu-addr .hu-x-slot,.hu-ug>summary .hu-x-slot{margin-left:6px}
+.hu-x-single{display:flex;justify-content:flex-end}
+.hu-x-single:has(.hu-x-slot:empty){display:none}
+.extras-linked-note{font-size:11px;color:#1D6F55;margin:0 0 8px}
+body.theme-dark .hu-x-chip{background:#1f2229;border-color:#2c2f38;color:#5DCAA5}
 .hu-group-body{display:flex;flex-direction:column;gap:6px;padding:8px;background:#fff}
 .hu-group-body .hu-row{background:#fafaf6}
 /* 🔵 주택형 묶음 — 원문 주택형(unit_group)이 있는 행만 묶는다. 표가 아니라 목록이다:
@@ -4606,9 +4616,12 @@ let extrasGroupSeq = 0;
 function loadAnnouncementExtras(annId, detailEl, id, useGroup){
   if(!annId) return;
   const ownerAnn = zfCardAnn(id);
+  // 🔵 B28 — 세대 목록이 넘길 머리 키. loadHousingUnits 가 바로 앞에서 만든 약속을 **지금** 잡는다
+  //    (나중에 잡으면 같은 자리에 다시 불린 다음 공고의 약속을 잡을 수 있다). 없으면 머리 없음으로 본다.
+  const keysP = huKeysReady[id] ? huKeysReady[id].promise : Promise.resolve(null);
   resolveAnnouncementIds(annId, useGroup).then(ids => fetch(`${SUPABASE_URL}/rest/v1/announcement_extras?${idFilterFor(ids)}&order=extra_type,building_address`, {
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
-  })).then(r => r.ok ? r.json() : []).then(rows => {
+  })).then(r => r.ok ? r.json() : []).then(rows => keysP.then(keys => [rows, keys])).then(([rows, keys]) => {
     if(!zfStillOurs(id, ownerAnn)) return;   // 그 사이 이 자리에 다른 공고가 왔다
     if(!Array.isArray(rows) || rows.length === 0) return;
     const staleHtml = staleSourceBannerHtml(rows, annId, useGroup, id);
@@ -4630,6 +4643,36 @@ function loadAnnouncementExtras(annId, detailEl, id, useGroup){
       seen.add(key);
       return true;
     });
+    // 🔵 B28 — 세대 머리에 닿는 행은 칩으로 보내고 갤러리에서 뺀다. 닿지 않는 행(키 없음·머리 없음)은
+    //    종전대로 갤러리에 남는다 — 이것이 「공고 단위 자료」와 「아직 이어지지 않은 행」이다.
+    const byKey = new Map();
+    if(keys){
+      rows = rows.filter(r => {
+        const k = r.unit_key;
+        if(!k) return true;
+        const kind = keys.building.has(k) ? '건물' : (keys.types.has(k) ? '주택형' : '');
+        if(!kind) return true;
+        if(!byKey.has(k)) byKey.set(k, { kind, items: [] });
+        byKey.get(k).items.push(r);
+        return false;
+      });
+    }
+    let linkedCount = 0;
+    byKey.forEach(g => {
+      // 모달에서 넘기는 순서는 갤러리와 같게 — 사진 먼저, 그다음 평면도
+      g.items.sort((a, b) => (a.extra_type || '').localeCompare(b.extra_type || '') * -1 || (a.building_address || '').localeCompare(b.building_address || ''));
+      g.gid = 'eg' + (extrasGroupSeq++);
+      extrasGroupsRegistry[g.gid] = g.items;
+      linkedCount += g.items.length;
+    });
+    if(byKey.size){
+      extrasByUnitKey[id] = byKey;
+      zfFillUnitChips(id);
+    }
+    if(rows.length === 0) return;   // 전부 세대 머리로 갔다 — 갤러리를 따로 두지 않는다
+    const linkedHtml = linkedCount
+      ? `<div class="extras-linked-note">건물·주택형별 사진·평면도 ${linkedCount}건은 위 세대 목록의 📷 칩에 있어요.</div>`
+      : '';
     const photos = rows.filter(r => r.extra_type === 'photo');
     const floorplans = rows.filter(r => r.extra_type === 'floorplan');
     const pamphlets = rows.filter(r => r.extra_type === 'pamphlet');
@@ -4655,7 +4698,7 @@ function loadAnnouncementExtras(annId, detailEl, id, useGroup){
     };
     const wrap = document.createElement('details');
     wrap.className = 'extras-wrap';
-    wrap.innerHTML = `<summary class="extras-title">📷 사진·평면도·팸플릿 (${rows.length}건)</summary>` + staleHtml +
+    wrap.innerHTML = `<summary class="extras-title">📷 사진·평면도·팸플릿 (${rows.length}건)</summary>` + staleHtml + linkedHtml +
       `<div class="extras-missing-note" style="display:none"></div>` +
       renderGroup('사진', photos) + renderGroup('평면도', floorplans) + renderGroup('팸플릿', pamphlets);
     const slot = document.getElementById('extras-slot-'+id);
@@ -5234,6 +5277,68 @@ const huMapState = {};
 const huRegionFallback = {};
 const huMapTargetId = {};   // "세대정보 리스트 id" → "실제 지도를 그려야 할 카드 id" 매핑
 
+// ── 사진·평면도를 세대 행 묶음에 잇는다 (2026-09-25 · B28) ─────────────────────
+// 🔴 잇는 키는 DB 컬럼 announcement_extras.unit_key 다. 값은 같은 announcement_id 의 세대 행에서
+//    매입임대 = 건물 머리 키(groupHousingUnits 와 같은 식), 단지형 = 「건물 머리 키::주택형 머리」
+//    (주택형 머리 = unit_group || unit_type). 🔴 주택형에 건물을 붙인 이유 — 아산 …020726 은 「46형」이
+//    배방15단지의 unit_group 이면서 신창소화마을의 unit_type 이다. 이름만으로는 칩이 엉뚱한 건물에 붙는다.
+//    화면은 키를 **만들지 않는다** — 채운 값과 채운 방법(unit_key_source)은 DB가 들고 있다.
+// 🔴 두 로더가 따로 돈다. 그래서 세대 목록이 「이 카드에 실제로 있는 머리 키」를 확정해 약속으로 넘기고,
+//    첨부 로더가 그것을 기다려 가른다 — 키가 머리에 닿는 행만 칩으로 가고 **나머지는 전부 카드 갤러리에**
+//    남는다. 키가 있어도 머리가 없으면(세대 조회 실패·지난 회차만 등) 갤러리에 남으므로 행이 사라지지 않는다.
+// 🔴 같은 행을 두 곳에 그리지 않는다 — 칩으로 간 행은 갤러리에서 빠지고, 갤러리에 한 줄로 그 수를 알린다.
+const huKeysReady = {};       // id → { promise, resolve, done } — loadHousingUnits 가 머리 키를 확정하면 풀린다
+const extrasByUnitKey = {};   // id → Map(key → { gid, items })
+function zfNewHuKeys(id){
+  let res;
+  const p = new Promise(r => { res = r; });
+  const d = { promise: p, resolve: res, done: false };
+  huKeysReady[id] = d;
+  delete extrasByUnitKey[id];
+  return d;
+}
+function zfResolveHuKeys(d, keys){
+  if(d && !d.done){ d.done = true; d.resolve(keys); }
+}
+// 머리 키 모음 — 건물 머리는 바깥 목록에 그려질 때만(지난 회차만 온 블록은 머리가 없다),
+// 주택형 머리는 이번·지난 회차 목록 어디든 그려지므로 둘 다 센다.
+function zfHuHeadKeys(groups, units, pastUnits, pastOnly){
+  const building = new Set(pastOnly ? [] : (groups || []).map(g => g.label));
+  const types = new Set();
+  (units || []).concat(pastUnits || []).forEach(u => {
+    const k = zfUnitTypeKey(u, u && u.unit_group);
+    if(k) types.add(k);
+  });
+  return { building, types };
+}
+// 건물 머리 키 — groupHousingUnits 와 **같은 식**이어야 한다(DB 백필도 이 식을 SQL로 옮긴 것이다).
+function zfBuildingKeyOf(u){
+  return (u && u.building_name && u.building_name.trim()) || (u && u.address) || '주소 정보 없음';
+}
+// 주택형 머리 키 — head 를 넘기지 않으면 그 행의 unit_type 을 쓴다(묶이지 않은 행).
+function zfUnitTypeKey(u, head){
+  const h = head || (u && u.unit_type);
+  return (u && h) ? zfBuildingKeyOf(u) + '::' + h : '';
+}
+// 칩 자리 — 렌더 함수는 자리만 둔다. 채우는 것은 zfFillUnitChips 다(첨부가 늦게 와도 그 자리에 붙는다).
+function zfUnitChipSlot(key){
+  return key ? `<span class="hu-x-slot" data-xkey="${escapeHtml(key)}"></span>` : '';
+}
+// 같은 키의 자리가 여럿이면(같은 주택형 행이 여러 줄) **문서 순서로 첫 자리에만** 단다 — 두 번 세지 않는다.
+function zfFillUnitChips(id){
+  const map = extrasByUnitKey[id];
+  const root = document.getElementById('hu-slot-'+id);
+  if(!map || !root) return;
+  const used = new Set();
+  root.querySelectorAll('.hu-x-slot').forEach(el => {
+    const key = el.getAttribute('data-xkey');
+    const g = map.get(key);
+    if(!g || used.has(key)){ el.innerHTML = ''; return; }
+    used.add(key);
+    el.innerHTML = `<button type="button" class="chip hu-x-chip" title="이 ${escapeHtml(g.kind)}의 사진·평면도 ${g.items.length}건" onclick="event.preventDefault();event.stopPropagation();openExtrasViewer('${g.gid}',0)">📷 ${g.items.length}</button>`;
+  });
+}
+
 // ===== 카드 id 안정 키 + 공통 가드 (2026-09-16 · G-4 2단계) =====
 // 🔴 **1단계 — 공통 가드.** 비동기 응답이 돌아왔을 때 「이 자리가 아직 그 공고의 것인가」를
 //    한 함수로 묻는다. 기존 원소 동일성 가드(`huMapState.el`·`dataset.blkLoadedFor`)는 그대로 둔다 —
@@ -5337,6 +5442,8 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
   const huCardId = huMapTargetId[id];
   const huIsBlock = huCardId !== id;   // 블록 하위 렌더인가
   const ownerAnn = zfCardAnn(id);      // 응답이 돌아왔을 때 이 자리가 아직 그 공고인지 볼 기준
+  // 🔵 B28 — 첨부 로더가 기다릴 머리 키 약속. **모든 출구에서** 푼다(안 풀면 갤러리가 영영 안 뜬다).
+  const huKeys = zfNewHuKeys(id);
   // 🔴 회차는 announcements를 한 번 더 조회해 얻는다(그룹함수 미접촉). 세대정보 조회와 나란히
   // 보내므로 왕복이 늘지 않고, 그룹이 아니거나 형제가 하나면 요청 자체를 보내지 않는다.
   resolveAnnouncementIds(annId, useGroup).then(ids => Promise.all([
@@ -5417,9 +5524,10 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
         pastOnly = true;
       }
     }
-    if(!zfStillOurs(id, ownerAnn)) return;   // 그 사이 이 자리에 다른 공고가 왔다
+    if(!zfStillOurs(id, ownerAnn)){ zfResolveHuKeys(huKeys, null); return; }   // 그 사이 이 자리에 다른 공고가 왔다
     const staleHtml = staleSourceBannerHtml(rawUnits, annId, useGroup, id, rounds, pastUnits.length > 0);
     if(!pastOnly && (!Array.isArray(units) || units.length === 0)){
+      zfResolveHuKeys(huKeys, zfHuHeadKeys([], [], [], true));   // 머리가 없다 — 첨부는 전부 갤러리로
       // 세대별 정보가 없는 공고 — 시군구 단위 지도를 최후수단으로 사용
       const fb = huRegionFallback[id];
       const mid = huMapTargetId[id] || id;
@@ -5458,7 +5566,10 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
     }
     // 🔴 pastOnly 면 행은 이미 접힘 안에 그려져 있다 — 바깥에 또 그리지 않고 지도만 맞춘다.
     renderHousingGroupRows(id, 5, pastOnly);
+    // 🔵 B28 — 머리를 다 그린 뒤에 키를 넘긴다(칩 자리가 DOM에 있어야 첨부 로더가 채운다).
+    zfResolveHuKeys(huKeys, zfHuHeadKeys(groups, units, pastUnits, pastOnly));
   }).catch(err => {
+    zfResolveHuKeys(huKeys, zfHuHeadKeys([], [], [], true));
     console.error('ZipFit 세대정보 로드 실패:', err);
     const fb = huRegionFallback[id];
     const mid = huMapTargetId[id] || id;
@@ -5497,13 +5608,16 @@ function renderHousingGroupRows(id, visibleCount, mapOnly){
     const a0 = g0 && (g0.address || g0.building_name);
     if(a0) initMapForHouse({ addr: a0, name: g0.building_name || '' }, mapId);
     else mapFail(mapId, '위치 정보가 없어요', '지난 회차 블록의 첫 건물에 주소·단지명이 없다');
+    zfFillUnitChips(id);
     return;
   }
 
   // 건물이 1개뿐이면 "단지명 클릭" 단계를 생략하고 세대 행을 바로 표시
+  // 🔵 B28 — 건물 머리가 없으므로 그 건물의 📷 칩은 목록 맨 위 한 줄에 둔다(칩이 없으면 빈 줄로 접힌다).
   if(groups.length === 1){
     const g = groups[0];
-    listEl.innerHTML = renderHousingUnitList(g.units);
+    listEl.innerHTML = `<div class="hu-x-single">${zfUnitChipSlot(g.label)}</div>` + renderHousingUnitList(g.units);
+    zfFillUnitChips(id);
     const addr = g.address || g.building_name;
     if(addr){
       setActiveHousingGroup(id, 0);
@@ -5520,6 +5634,7 @@ function renderHousingGroupRows(id, visibleCount, mapOnly){
     return `<div class="hu-group">
       <div class="hu-group-head" id="hu-group-head-${id}-${idx}" onclick="event.stopPropagation();toggleHousingGroup('${id}',${idx})">
         <span class="hu-group-name">${label}</span>
+        ${zfUnitChipSlot(g.label)}
         <span class="hu-group-count">${g.units.length}건 ▾</span>
       </div>
       <div class="hu-group-body" id="hu-group-body-${id}-${idx}" style="display:none"></div>
@@ -5529,6 +5644,7 @@ function renderHousingGroupRows(id, visibleCount, mapOnly){
     html += `<button class="hu-more-btn" onclick="event.stopPropagation();renderHousingGroupRows('${id}',${visibleCount+10})">더 보기 (건물 ${groups.length-visibleCount}개 더) ↓</button>`;
   }
   listEl.innerHTML = html;
+  zfFillUnitChips(id);   // 🔵 B28 — 「더 보기」로 새로 그린 머리에도 칩을 단다
   // "더보기"로 목록을 다시 그려도 기존에 선택돼있던 건물의 강조 표시는 유지
   const activeIdx = huActiveGroup[id];
   if(activeIdx != null){
@@ -5715,7 +5831,7 @@ function renderHousingUnitGroup(g){
     </div>`;
   }).join('');
   return `<details class="hu-ug" open>
-    <summary><span class="hu-ug-name">${escapeHtml(g.group)}</span><span class="hu-ug-meta">${escapeHtml(headAreas + headCount)}</span></summary>
+    <summary><span class="hu-ug-name">${escapeHtml(g.group)}</span><span class="hu-ug-meta">${escapeHtml(headAreas + headCount)}</span>${zfUnitChipSlot(zfUnitTypeKey(g.units[0], g.group))}</summary>
     <div class="hu-ug-list">${body}</div>
   </details>`;
 }
@@ -5759,7 +5875,7 @@ function renderHousingUnitRow(u){
   // 변화 요약 — 이번 회차 행에만 붙는다(attachRoundDiffs가 채운다). 접지 않아도 보이도록 행 안에 둔다.
   const diffHtml = renderHuDiffHtml(u.zfDiff);
   return `<div class="hu-row">
-    <div class="hu-addr">${addr}${recruitBadge}${roundBadge}${pastOnlyBadge}</div>
+    <div class="hu-addr">${addr}${recruitBadge}${roundBadge}${pastOnlyBadge}${u.unit_group ? '' : zfUnitChipSlot(zfUnitTypeKey(u))}</div>
     <div class="hu-fields">
       <div class="hu-item"><span class="hu-label">전용면적</span><span class="hu-value">${area}</span></div>
       ${depositRent}
@@ -5785,6 +5901,7 @@ function toggleHousingGroup(id, idx){
   if(!isOpen && !bodyEl.dataset.rendered){
     bodyEl.dataset.rendered = '1';
     bodyEl.innerHTML = renderHousingUnitList(g.units);
+    zfFillUnitChips(id);   // 🔵 B28 — 건물 안 주택형 머리에 붙는 칩
   }
   setActiveHousingGroup(id, idx);
   const addr = g.address || g.building_name;
