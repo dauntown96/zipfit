@@ -1511,6 +1511,13 @@ function zfDedupKey(title){
     .replace(/\s+/g, '')
     .replace(/\.{2,}/g, '.');
 }
+// [취소공고] 행인가 — 짝 판정과 같은 제목 키(머리 `[취소공고]`)를 본다.
+// 🔴 2026-09-25(B31) — 짝이 없어 목록에 남은 취소공고 카드는 모집 공고처럼 그리지 않는다
+//    (상태·접수기간 칩 · 원문 정리 전 상자를 빼고 「🚫 취소공고」 칩 · 모집공고일 · 원문 링크만).
+//    추천·매칭 후보에서도 뺀다 — 신청할 공고가 아니다.
+function zfIsCancelRow(title){
+  return zfDedupKey(title).startsWith(ZF_CANCEL_PREFIX);
+}
 // 원공고 dedup 키 → 그 짝 취소공고. 🔵 카드 id 가 아니라 **제목에서 나온 키**라 재렌더로 낡지 않는다.
 // 🔴 2026-09-25(B30) — 짝은 **제목 키 + 접수 마감일**이다. DB `cancel_keys` 의 거울이다.
 //    제목 키만 보면 같은 제목의 다음 회차(취소되지 않은 것)에 짝이 붙었다(태백철암1 9/14 · 청주지북A4 6/5).
@@ -1578,6 +1585,20 @@ function zfCheckDedupMirror(rows){
   }catch(e){ /* 점검이 화면을 막지 않는다 */ }
 }
 
+// 🔴 B31 — 짝 없이 남은 [취소공고] 행 카드의 표지와 날짜 줄.
+//    칩은 이 한 개뿐이다(상태·접수기간·NEW·마감임박을 달지 않는다 — 신청할 공고가 아니다).
+function cancelRowChip(){
+  return '<span class="chip sel" title="취소 공고예요. 무엇이 취소됐는지는 원문에서 확인하세요." '
+    + 'style="cursor:help;padding:4px 10px;font-size:11px;background:#A32D2D;border-color:#A32D2D">🚫 취소공고</span>';
+}
+function cancelRowDateLine(row, annDate, url){
+  const annLabel = zfAnnDateLabel(row, annDate);
+  const head = annLabel ? `모집공고: ${annLabel}` : '';
+  const link = url
+    ? `<a href="${url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:#0F6E56;font-weight:600;text-decoration:underline">📄 취소공고 원문 보기</a>`
+    : '';
+  return [head, link].filter(Boolean).join(' · ');
+}
 // 「취소공고 있음」 배지 — 취소공고 원문 URL 을 알면 링크로, 모르면 종전 칩 그대로.
 function cancelNoticeBadge(title, applyEnd){
   const st  = 'cursor:help;padding:4px 10px;font-size:11px;background:#A32D2D;border-color:#A32D2D';
@@ -1684,7 +1705,11 @@ function applyNoticeFiltersAndRender(keepPage){
 
   const sortVal = document.getElementById('noticeSortSel')?.value || 'date-desc';
   const nullLast = zfNullLast;   // 🔵 사본을 두지 않는다 — 빈 값 처리가 한 곳이다
-  filtered = [...filtered].sort((a,b) => {
+  // 🔴 B31 — 짝 없이 남은 [취소공고] 행은 어느 정렬에서나 맨 뒤다. 날짜로 두면 「최신 공고순」에서
+  //    접수 중 공고보다 앞에 섰다(태백 …020645 8/31). 취소공고끼리는 고른 정렬 그대로다.
+  const cancelLast = (a,b) => (zfIsCancelRow(a['공고명']) ? 1 : 0) - (zfIsCancelRow(b['공고명']) ? 1 : 0);
+  filtered = [...filtered].sort((a,b) => cancelLast(a,b) || noticeSortCmp(a,b));
+  function noticeSortCmp(a,b){
     // 🔴 접수 단계 그룹 선비교(applyWindowRank)를 **공고 탭에서 걷었다**(2026-09-16).
     //    「최신 공고순」을 골랐는데 최신 공고가 위에 안 오던 것이 이것이었다 — 정렬 위에
     //    또 하나의 정렬이 얹혀 있었다. 공고 탭은 「전체를 나열하고 필터·정렬로 찾는 곳」이고
@@ -1721,7 +1746,7 @@ function applyNoticeFiltersAndRender(keepPage){
     if(sortVal==='org-asc')       return (a['org_nm']||a['공급기관']||'').localeCompare(b['org_nm']||b['공급기관']||'', 'ko');
     if(sortVal==='revised-first') return (b['is_revised']?1:0)-(a['is_revised']?1:0);
     return 0;
-  });
+  }
 
   noticeFiltered = filtered;
   // 🔴 필터·칩·정렬·검색이 바뀌면 언제나 1쪽으로 간다 — 이 함수가 그 넷의 공통 관문이다.
@@ -2487,6 +2512,8 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
   shown.forEach((n, idx) => {
     const isClosed   = n['처리상태']==='접수마감';
     const hasCancel  = n['has_cancel_notice']===true;
+    // 🔴 B31 — 짝 없이 남은 [취소공고] 행. 모집 공고의 표지(상태·접수기간·원문 정리 전)를 빼고 그린다.
+    const isCancelRow = zfIsCancelRow(n['공고명']);
     const isAmended  = (n['공고명']||'').includes('[정정공고]') || n['is_revised'];
     const demoTags   = classifyDemographics(n['공급유형'], n['공고명']);
     const isNew      = !isClosed && isNewNotice(n);
@@ -2498,7 +2525,10 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
     const applyEnd   = n['신청마감일']||n['apply_end']||'';
     const annDate    = n['announcement_date']||'';
     // 모집공고일 = 접수시작일이면 중복 제거. unknown이면 '미상'+원문 링크(applyDateLine).
-    const dateLine   = applyDateLine(n, annDate, applyStart, applyEnd, n['공고URL']||'');
+    // 🔴 B31 — 취소공고 행은 모집공고일과 원문 링크만 적는다. 취소 대상 회차는 추정해서 적지 않는다(원문으로 보낸다).
+    const dateLine   = isCancelRow
+      ? cancelRowDateLine(n, annDate, n['공고URL']||'')
+      : applyDateLine(n, annDate, applyStart, applyEnd, n['공고URL']||'');
     // 🔴 목록 안 인덱스가 아니라 announcement_id 에서 만든다(2026-09-16) — 목록을 다시 그려도·쪽을
     //    넘겨도 같은 공고는 같은 id 다. 접두(`ncard-`/`mcard-`)는 유지해 두 탭이 동시에 DOM 에 있어도 안 겹친다.
     const cardId = 'ncard-' + zfCardKey(n['announcement_id'] || idx);
@@ -2516,7 +2546,7 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
     if(n['deposit_min']) detailRows.push(['보증금', Number(n['deposit_min']).toLocaleString()+'원']);
     if(n['rent_min']) detailRows.push(['월임대료', Number(n['rent_min']).toLocaleString()+'원']);
     if(annDate) detailRows.push(['공고일', annDate]);
-    if(applyStart||applyEnd) detailRows.push(['접수기간', (applyStart||'-')+' ~ '+(applyEnd||'-')]);
+    if(!isCancelRow && (applyStart||applyEnd)) detailRows.push(['접수기간', (applyStart||'-')+' ~ '+(applyEnd||'-')]);
 
     const nTitle = (n['공고명']||'').replace(/'/g,"\\'");
     // 🔴 공유 문구도 카드 표지와 같은 함수를 쓴다(2026-09-16) — 카드는 「구미시 외 2곳」인데
@@ -2545,7 +2575,7 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
     html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n['지역']||'').replace(/"/g,'&quot;')}" data-sido="${(n['sido_nm']||'').replace(/"/g,'&quot;')}" data-sigungu="${(n['sigungu_nm']||'').replace(/"/g,'&quot;')}" data-title="${(n['공고명']||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" data-housing-type="${(n['공급유형']||'').replace(/"/g,'&quot;')}" data-precise-address="${(n['precise_address']||'').replace(/"/g,'&quot;')}" data-relaxed="${n['is_relaxed_recruitment']===true?'1':''}" data-relaxation-detail="${(n['relaxation_detail']||'').replace(/"/g,'&quot;')}" data-contract-verify="${n['contract_before_verification']===true?'1':''}" data-rent-exempt-until="${(n['rent_exemption_until']||'').replace(/"/g,'&quot;')}" data-rent-exempt-note="${(n['rent_exemption_note']||'').replace(/"/g,'&quot;')}" data-revised="${isAmended?'1':''}" data-revision-note-full="${revisionNoteEsc}" data-special-notes="${n['special_notes']?JSON.stringify(n['special_notes']).replace(/"/g,'&quot;'):''}" data-apply-start="${(n['apply_start']||'').replace(/"/g,'&quot;')}" data-apply-end="${(n['apply_end']||'').replace(/"/g,'&quot;')}" data-announcement-date="${(n['announcement_date']||'').replace(/"/g,'&quot;')}" data-round-date="${zfNoticeDate(n).replace(/"/g,'&quot;')}" data-complex-count="${zfComplexCount(n)}" data-doc-submit-announce="${(n['doc_submit_announce_date']||'').replace(/"/g,'&quot;')}" data-doc-submit-start="${(n['doc_submit_start']||'').replace(/"/g,'&quot;')}" data-doc-submit-end="${(n['doc_submit_end']||'').replace(/"/g,'&quot;')}" data-winner-announce="${(n['winner_announce_date']||'').replace(/"/g,'&quot;')}" data-contract-start="${(n['contract_start']||'').replace(/"/g,'&quot;')}" data-contract-end="${(n['contract_end']||'').replace(/"/g,'&quot;')}" data-attachment-urls="${n['attachment_urls']?JSON.stringify(n['attachment_urls']).replace(/"/g,'&quot;'):''}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this,'notice')" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
       <div class="htop">
         <p class="hname">${normalizeRevisedTitle(n['공고명'])||'(공고명 없음)'}</p>
-        <span class="htag ${isClosed?'tag-mix':'tag-apt'}">${n['처리상태']||'-'}</span>
+        ${isCancelRow?'':`<span class="htag ${isClosed?'tag-mix':'tag-apt'}">${n['처리상태']||'-'}</span>`}
       </div>
       <!-- 🔴 유형은 **한 번만** 적는다(2026-09-16). 종전에는 classifyNoticeType() 결과와 housing_type
            원문이 나란히 붙어 「국민임대 · 임대주택 - 국민임대」처럼 같은 말이 두 번 나왔다.
@@ -2554,7 +2584,7 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
            🔵 추천 탭·저장 목록이 이미 원문 한 벌만 쓰고 있어, 여섯 자리가 한 어휘로 모인다.
            🔴 classifyNoticeType 은 유형 칩·설정 매칭에서 그대로 쓴다 — 바꾼 것은 표시 문자열뿐이다. -->
       <p class="haddr">${zfCoverPlace(n['region_names'], zfComplexCount(n), n['sido_nm'], n['sigungu_nm'], n['지역'])} · ${n['공급유형']||''}</p>
-      <div class="chip-row" style="margin:8px 0;gap:5px">
+      <div class="chip-row" style="margin:8px 0;gap:5px">${isCancelRow ? cancelRowChip() : `
         ${hasCancel?cancelNoticeBadge(n['공고명']||'', n['apply_end']):''}
         ${n['building_name']?`<span class="chip" style="cursor:default;padding:4px 10px;font-size:11px">🏢 ${zfBuildingLabel(n['building_name'], zfComplexCount(n))}</span>`:''}
         ${isAmended?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#7B5EA7;border-color:#7B5EA7">🔄 정정</span>':''}
@@ -2565,9 +2595,9 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
         ${demoTags.map(t=>`<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:${t.color};border-color:${t.color}">${t.label}</span>`).join('')}
         ${convBadges}
         ${zfWarnBadges({contractVerify:n['contract_before_verification']===true, selectionMethod:n['selection_method'], rentExemptUntil:n['rent_exemption_until'], rentExemptNote:n['rent_exemption_note'], specialNotes:n['special_notes']})}
-      </div>
-      ${pairKey?`<div style="font-size:11px;color:#A32D2D;background:#FFF3F3;border:1px solid #F5C2C2;border-radius:8px;padding:5px 10px;margin-bottom:6px">⚠️ 동일 회차 짝공고와 <b>중복 신청 시 자동 탈락</b>될 수 있어요. 공고문을 반드시 확인하세요.</div>`:''}
-      <div data-sum-for="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" data-sum-url="${(n['공고URL']||'').replace(/"/g,'&quot;')}"></div>
+      `}</div>
+      ${(pairKey && !isCancelRow)?`<div style="font-size:11px;color:#A32D2D;background:#FFF3F3;border:1px solid #F5C2C2;border-radius:8px;padding:5px 10px;margin-bottom:6px">⚠️ 동일 회차 짝공고와 <b>중복 신청 시 자동 탈락</b>될 수 있어요. 공고문을 반드시 확인하세요.</div>`:''}
+      ${isCancelRow?'':`<div data-sum-for="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" data-sum-url="${(n['공고URL']||'').replace(/"/g,'&quot;')}"></div>`}
       <p style="font-size:12px;color:#888;margin-bottom:8px">${dateLine}</p>
       ${detailHTML}
     </div>`;
@@ -2824,6 +2854,8 @@ function renderPersonalizedRecommendations(){
   let filtered=noticeData.filter(n=>{
     // 🔴 날짜 축이다. 'unknown'(접수기간 미상)은 남긴다 — 마감된 것이 아니다.
     if(isHiddenAsClosed(n)) return false;
+    // 🔴 B31 — [취소공고] 행은 신청할 공고가 아니다(짝 없이 목록에 남은 것도).
+    if(zfIsCancelRow(n['공고명'])) return false;
     // 🔴 칩이 region_top이 됐으므로 여기도 같은 값을 본다 — noticeData가 이미 담고 있다(1181행).
     // 다시 파싱하면 저장된 「서울특별시」가 region='서울'인 73행을 조용히 걸러낸다.
     if(savedRegions.length && !savedRegions.includes(n['지역대분류'])) return false;
@@ -2833,7 +2865,7 @@ function renderPersonalizedRecommendations(){
 
   const desc=document.getElementById('personalizedDesc');
   if(!hasConditions){
-    filtered=noticeData.filter(n=>!isHiddenAsClosed(n)).slice(0,5);
+    filtered=noticeData.filter(n=>!isHiddenAsClosed(n) && !zfIsCancelRow(n['공고명'])).slice(0,5);
     // 조건 저장 안내는 위 안내 박스(noCond)가 맡는다 — 여기서 되풀이하지 않는다.
     desc.textContent='저장된 조건이 없어 전체 공고를 표시해요.';
   } else {
@@ -3920,6 +3952,8 @@ async function matchHouses(){
     const dropCancelM = zfPairedCancelIds(rows,
       r => ({ id: r.announcement_id, title: r.title || '', url: r.url || '', applyEnd: r.apply_end || '' }));
     if(dropCancelM.size) rows = rows.filter(r => !dropCancelM.has(r.announcement_id));
+    // 🔴 B31 — 짝 없이 남은 [취소공고] 행도 매칭 후보가 아니다. 짝 판정(위)은 배지 링크를 담느라 먼저 돈다.
+    rows = rows.filter(r => !zfIsCancelRow(r.title));
     if(regions.length > 0) {
       rows = rows.filter(r => regions.some(rg => (r.region||'').includes(rg)));
     }
