@@ -3,10 +3,12 @@ CREATE OR REPLACE FUNCTION public.get_announcements_deduped(p_region text DEFAUL
  LANGUAGE sql
  STABLE
 AS $function$
-WITH base AS (
+WITH raw_base AS (
   SELECT *,
-    announcement_dedup_key(title) AS dedup_key,
-    CASE WHEN source = 'MYHOME' THEN split_part(announcement_id, '_', 1) ELSE NULL END AS own_pblanc_id
+    announcement_dedup_key(title) AS title_key,
+    CASE WHEN source = 'MYHOME' THEN split_part(announcement_id, '_', 1) ELSE NULL END AS own_pblanc_id,
+    -- 회차 날짜 — 정정이면 첫 공고일, 아니면 공고일(get_announcement_price_summary·화면 zfNoticeDate 와 같은 규칙)
+    CASE WHEN is_revised AND first_announcement_date IS NOT NULL THEN first_announcement_date ELSE announcement_date END AS round_date
   FROM announcements
   WHERE title IS NOT NULL
     AND hidden_from_listing IS NOT TRUE
@@ -15,6 +17,41 @@ superseded_pblanc_ids AS (
   SELECT DISTINCT before_pblanc_id AS pblanc_id
   FROM announcements
   WHERE before_pblanc_id IS NOT NULL AND before_pblanc_id <> ''
+),
+-- 🔴 2026-09-25(B26 · P1) — 열린 지난 회차를 목록에 되살린다.
+--   제목 키(title_key)만으로 묶으면 그룹당 최신 회차 한 행만 남아, 같은 제목의 새 회차가 올라오는 순간
+--   아직 접수 전·중인 앞 회차가 목록에서 사라졌다(군산나운4 …020801 접수 9/29 ← …020822 접수 10/6).
+--   그래서 「제목 그룹의 대표와 회차 날짜·apply_end 가 둘 다 다르고, LH 행 status 가 공고중·접수중인 회차」만
+--   dedup_key 에 '#회차날짜' 꼬리를 붙여 따로 떼어 낸다. 같은 회차 날짜의 MYHOME 짝도 함께 떨어진다.
+--   🔵 앞 회차가 접수마감이 되면 조건이 풀려 저절로 원래 그룹으로 돌아간다.
+--   ⚠️ title_winner 의 ORDER BY 는 아래 winner CTE 와 **같아야 한다**(대표를 두 번 고르는 셈이다).
+--   ⚠️ 떼어진 회차는 cancel_keys(제목 키 짝)와 맞지 않아 취소공고 배지를 받지 않는다.
+title_winner AS (
+  SELECT DISTINCT ON (r.title_key) r.title_key, r.round_date, r.apply_end
+  FROM raw_base r
+  ORDER BY r.title_key,
+    r.announcement_date DESC NULLS LAST,
+    CASE WHEN r.own_pblanc_id IN (SELECT pblanc_id FROM superseded_pblanc_ids) THEN 1 ELSE 0 END,
+    CASE WHEN r.is_revised THEN 0 ELSE 1 END,
+    CASE r.source WHEN 'LH' THEN 1 WHEN 'MYHOME' THEN 2 ELSE 3 END,
+    r.created_at DESC,
+    r.id ASC
+),
+open_past_rounds AS (
+  SELECT DISTINCT r.title_key, r.round_date
+  FROM raw_base r
+  JOIN title_winner tw ON tw.title_key = r.title_key
+  WHERE r.source = 'LH'
+    AND r.status IN ('공고중', '접수중')
+    AND r.round_date IS NOT NULL
+    AND r.round_date IS DISTINCT FROM tw.round_date
+    AND r.apply_end IS DISTINCT FROM tw.apply_end
+),
+base AS (
+  SELECT r.*,
+    CASE WHEN o.round_date IS NOT NULL THEN r.title_key || '#' || o.round_date::text ELSE r.title_key END AS dedup_key
+  FROM raw_base r
+  LEFT JOIN open_past_rounds o ON o.title_key = r.title_key AND o.round_date = r.round_date
 ),
 best_location AS (
   SELECT DISTINCT ON (dedup_key)
@@ -33,16 +70,22 @@ best_location AS (
     --   동률 그룹 137개(dedup_key 115개). 아래 winner CTE 가 이미 쓰는 것과 같은 컬럼이다.
     id DESC
 ),
+-- 🔴 2026-09-25(B26) — 결정적 꼬리키 id DESC 를 더했다. 같은 dedup_key 안에 created_at 이 같은 행
+--   (MYHOME 다블록 한 배치)이 실재해, 어느 형제의 값이 뽑히는지가 실행 계획에 따라 갈렸다 — P1 로 계획이
+--   바뀌자 접수마감 카드들의 building_name 이 다른 블록 이름으로 바뀐 것으로 드러났다. 종전 정의도 같은
+--   데이터에서 계획에 따라 다른 값을 냈다(2026-09-25 실측) — 되돌아갈 「종전 값」이 고정돼 있지 않았다.
+--   방향은 best_location 과 같은 id DESC 다 — 표지의 주소(best_precise)와 건물명이 같은 블록 행에서 온다
+--   (건물명이 2종 이상인 146그룹 중 id DESC 142 · id ASC 29).
 best_schedule AS (
   SELECT dedup_key,
-    (array_agg(apply_start ORDER BY created_at DESC) FILTER (WHERE apply_start IS NOT NULL))[1] AS best_apply_start,
-    (array_agg(doc_submit_announce_date ORDER BY created_at DESC) FILTER (WHERE doc_submit_announce_date IS NOT NULL))[1] AS best_doc_submit_announce_date,
-    (array_agg(doc_submit_start ORDER BY created_at DESC) FILTER (WHERE doc_submit_start IS NOT NULL))[1] AS best_doc_submit_start,
-    (array_agg(doc_submit_end ORDER BY created_at DESC) FILTER (WHERE doc_submit_end IS NOT NULL))[1] AS best_doc_submit_end,
-    (array_agg(winner_announce_date ORDER BY created_at DESC) FILTER (WHERE winner_announce_date IS NOT NULL))[1] AS best_winner_announce_date,
-    (array_agg(contract_start ORDER BY created_at DESC) FILTER (WHERE contract_start IS NOT NULL))[1] AS best_contract_start,
-    (array_agg(contract_end ORDER BY created_at DESC) FILTER (WHERE contract_end IS NOT NULL))[1] AS best_contract_end,
-    (array_agg(building_name ORDER BY created_at DESC) FILTER (WHERE building_name IS NOT NULL))[1] AS best_building_name
+    (array_agg(apply_start ORDER BY created_at DESC, id DESC) FILTER (WHERE apply_start IS NOT NULL))[1] AS best_apply_start,
+    (array_agg(doc_submit_announce_date ORDER BY created_at DESC, id DESC) FILTER (WHERE doc_submit_announce_date IS NOT NULL))[1] AS best_doc_submit_announce_date,
+    (array_agg(doc_submit_start ORDER BY created_at DESC, id DESC) FILTER (WHERE doc_submit_start IS NOT NULL))[1] AS best_doc_submit_start,
+    (array_agg(doc_submit_end ORDER BY created_at DESC, id DESC) FILTER (WHERE doc_submit_end IS NOT NULL))[1] AS best_doc_submit_end,
+    (array_agg(winner_announce_date ORDER BY created_at DESC, id DESC) FILTER (WHERE winner_announce_date IS NOT NULL))[1] AS best_winner_announce_date,
+    (array_agg(contract_start ORDER BY created_at DESC, id DESC) FILTER (WHERE contract_start IS NOT NULL))[1] AS best_contract_start,
+    (array_agg(contract_end ORDER BY created_at DESC, id DESC) FILTER (WHERE contract_end IS NOT NULL))[1] AS best_contract_end,
+    (array_agg(building_name ORDER BY created_at DESC, id DESC) FILTER (WHERE building_name IS NOT NULL))[1] AS best_building_name
   FROM base
   GROUP BY dedup_key
 ),
