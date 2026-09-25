@@ -720,3 +720,32 @@ ACL(`postgres`·`service_role` EXECUTE)은 `CREATE OR REPLACE`라 그대로다. 
 ```
 git show 1159e0b:supabase/rpc/get_reanalysis_queue.sql
 ```
+
+### 2026-09-25 (B26 · P1) — `get_announcements_deduped()` 열린 지난 회차 분리 · `best_schedule` 동률 꼬리키
+
+**무엇을 (1) — P1.** `base` 앞에 CTE 셋을 더했다.
+- `raw_base`: 종전 `base`에 `title_key`(= `announcement_dedup_key(title)`)와 `round_date`(정정이면 `first_announcement_date`,
+  아니면 `announcement_date`)를 더한 것
+- `title_winner`: 제목 키마다 대표 한 행(`winner` CTE와 같은 `ORDER BY`)
+- `open_past_rounds`: 대표와 `round_date`·`apply_end`가 **둘 다** 다르고 `source='LH'` ∧ `status IN ('공고중','접수중')`인 회차
+
+`base.dedup_key`는 그 회차에 속한 행(같은 `round_date`면 MYHOME 짝 포함)만 `title_key || '#' || round_date`이고 나머지는
+종전과 같은 `title_key`다. 뒤의 CTE 7개는 손대지 않았고 그대로 새 키를 따른다. 반환 타입 불변 · ACL 불변.
+적용 시점(2026-09-25 03:09Z) 걸린 것은 군산나운4 `…020801`+`21309_1` 한 그룹이다.
+
+**무엇을 (2) — 동률 꼬리키.** `best_schedule`의 `array_agg(… ORDER BY created_at DESC)` 8개에 `id DESC`를 더했다.
+`created_at`까지 같은 형제 행(MYHOME 다블록 한 배치)이 있어, 어느 행의 값이 뽑히는지가 실행 계획에 따라 갈렸다.
+P1을 넣자 계획이 바뀌어 접수마감 카드들의 `building_name`이 다른 블록 이름으로 바뀌는 것으로 드러났다.
+꼬리키가 없는 종전 식을 같은 데이터에 두 번 돌리면 한 번은 `id ASC`와, 한 번은 `id DESC`와 같았다(03:15Z · 03:18Z) —
+고정된 「종전 값」은 없었다. 방향은 `best_location`과 같은 `id DESC`다(건물명과 표지 주소가 같은 블록 행에서 온다:
+건물명이 2종 이상인 146그룹 중 `id DESC` 142 · `id ASC` 29).
+
+**검증(03:17:52Z, 한 번의 조회).** 「종전 정의 + 같은 꼬리키」를 같은 쿼리 안에서 계산해 새 함수와 대조했다 —
+905 → 906, 늘어난 ID는 `…020801` 하나, 나머지 905행은 15개 필드까지 같다(`…020822` 포함) · `has_cancel_notice` 참 2건 불변.
+md5 `50a0357c…` → `819f1443…`(= 이 파일).
+
+**되돌리기.** 직전 정의를 그대로 다시 실행한다(반환 타입이 같아 `CREATE OR REPLACE`로 된다).
+
+```
+git show d5a6791:supabase/rpc/get_announcements_deduped.sql
+```
