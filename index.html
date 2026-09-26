@@ -281,6 +281,7 @@ body.theme-dark .extras-missing-note{color:#d8c48a;background:#2a2721;border-col
 .hu-past-title{font-size:12px;font-weight:600;color:#777;cursor:pointer}
 .hu-past-list{display:flex;flex-direction:column;gap:6px;margin-top:8px}
 .hu-past-list .hu-row{background:#fafaf6}
+.policy-round-head{font-size:12px;font-weight:600;color:#777;margin:10px 0 6px}
 .hu-past-only{padding:2px 9px;font-size:11px;cursor:default;display:inline-block;margin-left:6px;background:#f0efe9;color:#777;border-color:#ddd}
 /* 🔵 카드 1층 회차 칩 — 상세 아코디언의 「지난 회차」 배지(.hu-round-old)와 **같은 색**을 쓴다.
    한 카드 안에서 같은 뜻이 두 색으로 보이면 안 된다. */
@@ -4351,12 +4352,16 @@ const STALE_SRC_MSG_MIXED_POLICY = '여러 회차 공고의 안내가 함께 표
 // 🔴 MIXED는 「섞여 있다」는 경고인데, 지난 회차를 접어 아래로 내리면 더 이상 섞여 있지 않다.
 // 그래서 실제로 나뉜 경우에만 이 문구를 쓴다 — 화면 상태와 문구가 어긋나지 않게.
 // MIXED는 나누지 못한 경우(이번 회차 행이 하나도 없는 블록)에 그대로 남는다.
-const STALE_SRC_MSG_SPLIT   = '이 공고에는 지난 회차의 세대 정보도 함께 저장돼 있습니다. 위에 보이는 값은 이번 회차 기준이고, 지난 회차는 아래 「지난 회차 보기」를 펼쳐 확인할 수 있어요.';
+const STALE_SRC_MSG_SPLIT   = '이 공고에는 다른 회차의 세대 정보도 함께 저장돼 있습니다. 위에 보이는 값은 이번 회차 기준이고, 다른 회차는 아래 「다른 회차 보기」를 펼쳐 확인할 수 있어요.';
 // 🔴 SPLIT 과 상태가 또 다르다 — 여기는 「이번 회차 값이 위에 있다」가 아니라 **하나도 없다**.
 // 붙은 산물이 전부 남의 회차인 경우다. SPLIT 문구를 그대로 쓰면 위에 있지도 않은 이번 회차 값을
 // 가리키게 되고, MIXED 문구를 쓰면 섞이지도 않은 것을 섞였다고 말하게 된다.
 // 종전에는 회차 「개수」만 세어 이 상태가 아예 판정되지 않았다(2026-09-16 활성 5건).
-const STALE_SRC_MSG_PAST_ONLY = '이 공고 회차의 세대 정보는 아직 없어요. 아래 「지난 회차 보기」에 있는 것은 같은 공고의 지난 회차 정보라 이번 공고와 다를 수 있습니다.';
+const STALE_SRC_MSG_PAST_ONLY = '이 공고 회차의 세대 정보는 아직 없어요. 아래 「다른 회차 보기」에 있는 것은 같은 공고의 다른 회차 정보라 이번 공고와 다를 수 있습니다.';
+// 🔵 B46 — 정책 안내를 이번/다른 회차로 가른 뒤의 문구. 다른 회차 행이 없으면 배너 자체를 띄우지 않는다.
+// 🔴 B46 — 세대·블록의 「지난 회차」 낱말을 「다른 회차」로 바꿨다. 출처 공고가 카드보다 **뒤**인 회차도
+//    이 자리에 오는데(군산나운4 9/18 카드의 9/23 회차) 「지난」이라 부르면 거짓이 된다 — 앞뒤를 가리지 않는다.
+const STALE_SRC_MSG_POLICY_SPLIT = '이 단지의 다른 회차 공고 안내는 아래 「다른 회차 안내」에 따로 모아 두었어요.';
 
 function cardElFor(id){ return document.querySelector(`[data-card-id="${id}"]`); }
 
@@ -4568,7 +4573,8 @@ function idFilterFor(ids){
 // 종전 두 조건은 호출부에 그대로 남아 있어 **기존 경로의 발사 횟수는 변하지 않는다.**
 function fetchGroupRounds(ids, need){
   if(!need || !Array.isArray(ids) || ids.length === 0) return Promise.resolve(null);
-  return fetch(`${SUPABASE_URL}/rest/v1/announcements?select=announcement_id,announcement_date,is_revised,first_announcement_date&${idFilterFor(ids)}`, {
+  // 🔵 B46 — apply_start·apply_end 를 함께 받는다(정책 안내의 이번/다른 회차 판정과 소제목). 같은 테이블·같은 요청이다.
+  return fetch(`${SUPABASE_URL}/rest/v1/announcements?select=announcement_id,announcement_date,is_revised,first_announcement_date,apply_start,apply_end&${idFilterFor(ids)}`, {
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
   }).then(r => r.ok ? r.json() : null).then(rows => {
     if(!Array.isArray(rows) || rows.length === 0) return null;
@@ -5057,7 +5063,7 @@ function renderAnnouncementBlocks(blocks, id, roundMap, recruitSums){
     </div>`;
   };
   // 🔵 상세 아코디언의 「지난 회차」 배지와 **같은 색**(.hu-round-old)을 쓴다.
-  const oldBadge = r => `<span class="chip hu-round-badge hu-round-old">지난 회차 · ${escapeHtml(r)}</span>`;
+  const oldBadge = r => `<span class="chip hu-round-badge hu-round-old">다른 회차 · ${escapeHtml(r)}</span>`;
   const unkBadge = () => `<span class="chip hu-round-badge hu-round-old">회차 미상</span>`;
 
   const wrap = document.createElement('div');
@@ -5161,37 +5167,101 @@ function loadAnnouncementPolicies(annId, detailEl, id, useGroup){
     if(policies === null) return;
     const polCardEl = cardElFor(id);
     const polCardDate = (polCardEl && (polCardEl.dataset.roundDate || polCardEl.dataset.announcementDate)) || '';
-    const polRounds = roundInfoFor(policies, annId, roundMap, polCardDate);
-    // 🔴 staleOnly 는 넘기지 않는다 — 그 갈래의 문구(STALE_SRC_MSG_PAST_ONLY)가 「세대 정보」와
-    //    「아래 「지난 회차 보기」」를 말하는데 정책 안내에는 그 접힘이 없다. 정책에서 staleOnly 는
-    //    **언제나 orphan 과 함께 참이라**(자기 id 행이 있으면 그 회차가 곧 카드 회차다) 종전 경로인
-    //    orphan → STALE_SRC_MSG_PLAIN 이 그대로 맞는 말을 한다. 새 문구는 만들지 않았다.
-    const staleHtml = staleSourceBannerHtml(policies, annId, useGroup, id,
-      polRounds ? { ...polRounds, staleOnly: false } : null, false, STALE_SRC_MSG_MIXED_POLICY);
+    // 🔴 B46(2026-09-26) — 정책 안내를 「이번 회차」와 「다른 회차」로 가른다.
+    //    이번 회차 = 행의 출처 공고 apply_end 가 **카드 대표의 apply_end 와 같다**(같은 회차의 MYHOME
+    //    블록·정정본 포함). 세대별 정보의 회차 축(zfNoticeDate)을 쓰지 않는 것은, 같은 회차인데 LH 와
+    //    MYHOME 의 공고일이 갈리는 공고가 있어서다(태백철암1 — LH 09-11 · MYHOME 09-14, 마감 둘 다 10-28).
+    //    판정할 재료(카드 apply_end · 행의 회차 조회)가 없으면 가르지 않고 종전 그대로 그린다.
+    const polCardEnd = (polCardEl && polCardEl.dataset.applyEnd) || '';
+    let curPol = Array.isArray(policies) ? policies : [];
+    let otherPol = [];
+    if(roundMap && polCardEnd && curPol.length > 0){
+      // 회차 조회에 없는 행(출처 공고 행을 못 받음)은 이번 회차 쪽에 둔다 — 모르는 것을 숨기지 않는다.
+      const isOther = p => { const a = roundMap[p.announcement_id]; return !!a && (a.apply_end || '') !== polCardEnd; };
+      otherPol = curPol.filter(isOther);
+      curPol = curPol.filter(p => !isOther(p));
+    }
+    // 🔴 이번 회차 행이 하나도 없으면(orphan) 가르지 않는다 — 종전 동작 그대로(사양 6).
+    const polSplit = curPol.length > 0 && otherPol.length > 0;
     // 그룹조회로 형제 announcement_id 여러 곳에 동일 정책이 중복 백필된 경우를 대비해
-    // 카테고리+내용이 완전히 같은 행은 하나만 남긴다.
-    if(Array.isArray(policies) && policies.length > 0){
-      const seenPol = new Set();
-      policies = policies.filter(p => {
-        const key = (p.category||'') + '|' + (p.content_raw||'');
-        if(seenPol.has(key)) return false;
-        seenPol.add(key);
-        return true;
-      });
+    // 카테고리+내용이 완전히 같은 행은 하나만 남긴다. 🔴 가른 뒤에는 이번 회차 쪽을 먼저 남긴다 —
+    // 같은 행이 두 회차에 다 있으면 이번 회차 쪽에 한 번만 나온다.
+    const seenPol = new Set();
+    const dedupPol = rows => rows.filter(p => {
+      const key = (p.category||'') + '|' + (p.content_raw||'');
+      if(seenPol.has(key)) return false;
+      seenPol.add(key);
+      return true;
+    });
+    let staleHtml = '';
+    if(polSplit){
+      curPol = dedupPol(curPol);
+      otherPol = dedupPol(otherPol);
+      policies = curPol;
+      if(otherPol.length){
+        staleHtml = `<div class="stale-src" data-stale-src><span class="stale-src-msg">ℹ️ ${escapeHtml(STALE_SRC_MSG_POLICY_SPLIT)}</span></div>`;
+      }
+    } else if(roundMap && polCardEnd && otherPol.length === 0){
+      // 다른 회차 행이 없다 — 배너 없음(사양 5).
+      policies = dedupPol(curPol);
+    } else {
+      // 종전 경로(판정 재료 없음 · orphan) — 배너 판정도 종전 그대로다.
+      policies = Array.isArray(policies) ? policies : [];
+      const polRounds = roundInfoFor(policies, annId, roundMap, polCardDate);
+      // 🔴 staleOnly 는 넘기지 않는다 — 그 갈래의 문구(STALE_SRC_MSG_PAST_ONLY)가 「세대 정보」와
+      //    「아래 「다른 회차 보기」」를 말하는데 정책 안내에는 그 접힘이 없다. 정책에서 staleOnly 는
+      //    **언제나 orphan 과 함께 참이라**(자기 id 행이 있으면 그 회차가 곧 카드 회차다) 종전 경로인
+      //    orphan → STALE_SRC_MSG_PLAIN 이 그대로 맞는 말을 한다. 새 문구는 만들지 않았다.
+      staleHtml = staleSourceBannerHtml(policies, annId, useGroup, id,
+        polRounds ? { ...polRounds, staleOnly: false } : null, false, STALE_SRC_MSG_MIXED_POLICY);
+      policies = dedupPol(policies);
+      otherPol = [];
     }
     if(!Array.isArray(policies) || policies.length === 0){
       zfEmptySectionNote('policy-slot-'+id, '이 공고의 정책 안내는 아직 정리하지 못했어요. 공고 원문에서 확인해 주세요.');
       return;
     }
-    const wrap = document.createElement('details');
-    wrap.className = 'policy-wrap';
-    wrap.innerHTML = `<summary class="policy-title">📋 정책 안내 (${policies.length}건)</summary>` + staleHtml +
-      policies.map(p => `
+    const polItemHtml = p => `
         <div class="policy-item">
           <div class="policy-category">${escapeHtml(p.category || '')}</div>
           <div class="policy-content">${escapeHtml(p.content_raw || '')}</div>
         </div>
-      `).join('');
+      `;
+    // 다른 회차 행은 회차(출처 공고 apply_end)별로 묶어 소제목을 단다 — 공고일 · 접수기간.
+    let otherHtml = '';
+    if(otherPol.length){
+      const byRound = new Map();
+      otherPol.forEach(p => {
+        const k = (roundMap[p.announcement_id] || {}).apply_end || '';
+        if(!byRound.has(k)) byRound.set(k, { end: k, start: '', date: '', rows: [] });
+        byRound.get(k).rows.push(p);
+      });
+      // 소제목의 공고일·접수 시작일은 **같은 회차 구성원 전부**에서 가장 이른 값을 쓴다 — 정책 행이 붙은
+      // 공고 행에 접수 시작일이 비어 있어도(LH 행) 같은 회차의 MYHOME 행이 들고 있는 경우가 있다.
+      Object.values(roundMap).forEach(a => {
+        const g = a && byRound.get(a.apply_end || '');
+        if(!g) return;
+        const d = zfNoticeDate(a);
+        if(d && (!g.date || d < g.date)) g.date = d;
+        if(a.apply_start && (!g.start || a.apply_start < g.start)) g.start = a.apply_start;
+      });
+      const rounds = Array.from(byRound.values()).sort((a, b) => (b.end || '').localeCompare(a.end || ''));
+      // 🔴 모르는 값은 채우지 않는다 — 시작일이 없으면 마감일만, 둘 다 없으면 공고일만 적는다.
+      const headOf = g => {
+        const parts = [];
+        if(g.date) parts.push(`${g.date} 공고`);
+        if(g.start && g.end) parts.push(`접수 ${g.start} ~ ${g.end}`);
+        else if(g.end) parts.push(`접수 마감 ${g.end}`);
+        return parts.length ? parts.join(' · ') : '회차 정보 없음';
+      };
+      otherHtml = `<details class="hu-past"><summary class="hu-past-title">🕘 다른 회차 안내 (${otherPol.length})</summary>`
+        + rounds.map(g => `<div class="policy-round-head">${escapeHtml(headOf(g))}</div>` + g.rows.map(polItemHtml).join('')).join('')
+        + `</details>`;
+    }
+    const wrap = document.createElement('details');
+    wrap.className = 'policy-wrap';
+    wrap.innerHTML = `<summary class="policy-title">📋 정책 안내 (${policies.length}건)</summary>` + staleHtml +
+      policies.map(polItemHtml).join('') + otherHtml;
     const slot = document.getElementById('policy-slot-'+id);
     if(slot) slot.appendChild(wrap);
   }).catch(err => {
@@ -5485,7 +5555,7 @@ function renderHuDiffHtml(diff){
   const items = diff.parts.map(p =>
     `<span class="chip hu-diff-item${p.up ? '' : ' hu-diff-down'}">${escapeHtml(p.label)} ${p.up ? '+' : '−'}${p.abs.toLocaleString()}원</span>`
   ).join('');
-  return `<div class="hu-diff"><span class="hu-diff-head">지난 회차(${escapeHtml(diff.date)}) 대비</span>${items}</div>`;
+  return `<div class="hu-diff"><span class="hu-diff-head">다른 회차(${escapeHtml(diff.date)}) 대비</span>${items}</div>`;
 }
 
 function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
@@ -5551,7 +5621,7 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
       units.forEach(u => {
         if(!u.zfRoundDate) return;
         u.zfRoundCurrent = (u.zfRoundDate === rounds.current);
-        u.zfRoundLabel = (u.zfRoundCurrent ? '이번 회차 · ' : '지난 회차 · ') + u.zfRoundDate;
+        u.zfRoundLabel = (u.zfRoundCurrent ? '이번 회차 · ' : '다른 회차 · ') + u.zfRoundDate;
       });
     }
     // 🔴 지난 회차를 거르지 않고 계층을 나눈다 — 바깥에는 이번 회차만, 지난 회차는 접어서 그대로 둔다.
@@ -5603,11 +5673,11 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
     //    그리는 같은 목록이라 한 자리만 줄 수로 바꾸면 나머지와 갈린다.
     const pastLineCount = countHousingUnitLines(pastUnits);
     const pastHtml = pastUnits.length
-      ? `<details class="hu-past"${pastOnly ? ' open' : ''}><summary class="hu-past-title">🕘 지난 회차 보기 (${pastLineCount}건)</summary>`
+      ? `<details class="hu-past"${pastOnly ? ' open' : ''}><summary class="hu-past-title">🕘 다른 회차 보기 (${pastLineCount}건)</summary>`
         + `<div class="hu-past-list">${renderHousingUnitList(pastUnits)}</div></details>`
       : '';
     const huTitle = pastOnly
-      ? `🏠 세대별 정보 (지난 회차 ${pastLineCount}건)`
+      ? `🏠 세대별 정보 (다른 회차 ${pastLineCount}건)`
       : `🏠 세대별 정보 (${countHousingUnitLines(units)}건)`;
     wrap.innerHTML = `<summary class="hu-title">${huTitle}</summary>` + staleHtml + `<div class="hu-list" id="hu-list-${id}"></div>` + pastHtml;
     if(groups.length === 1 || pastOnly) wrap.open = true; // 건물이 1개뿐이거나, 바깥에 안내만 있을 때는 펼쳐서 보여줌
