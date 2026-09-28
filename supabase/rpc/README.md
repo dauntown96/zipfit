@@ -527,6 +527,15 @@ alter table public.housing_units drop constraint housing_units_extracted_pair,
 - **초기 6행**: 경상북도개발공사 `check` 10/10(B56) · `ok` 1/0 다섯(B59 표본 대조). 대조 불가 공사는 행 없음.
 - **`zipfit-backup`**: `schema_guard`가 새 표·정책을 「추가」 알림으로 통과시킨다(로컬 모의 실행 exit 0). `backup.yml` env 변경 불필요.
 
+### 2026-09-28 (B61) — `announcement_apply_routes.phase_text` 추가 (순위·차수 이름)
+
+전문·되돌리기: `supabase/ddl/2026-09-28_b61.sql`.
+
+- **칸**: `phase_text text NULL` — 순위·차수 이름(원문 부분 문자열). `route`는 뜻을 그대로 둔다(접수 **경로**). 차수는 경로와 다른 축이라 `route` CHECK를 넓히지도, 단지 칸 `site_text`를 빌리지도 않았다(B59 ⑤ 판정).
+- **적재**: 경기북부 `…0713`·경남 `…0706` 각 2행(`route='현장'` · 「1순위 (우선)」·「1순위 (일반) ⋅ 2순위」 · `B61-phase-v1`). 가드 — 기존 21행 md5 불변 · 새 칸 값이 정책 행 부분 문자열 · ACL 불변.
+- **권한**: 칸 추가라 테이블 ACL·RLS 정책은 그대로다.
+- **`zipfit-backup`**: `schema_guard`가 칸 추가를 「추가」 알림으로 통과시킨다.
+
 ## 함수 본문 변경 이력
 
 권한·DDL과 달리 이쪽은 **파일 diff가 곧 기록**이다. 아래는 그 diff를 어디서 찾는지와
