@@ -474,6 +474,49 @@ alter table public.announcement_extras
 
 ⚠️ 채운 1,033행의 연결이 함께 사라진다. 화면은 키가 없으면 종전 갤러리로 돌아간다(대역 실측으로 확인).
 
+### 2026-09-28 (B57) — 기반 공사: 표 7 · `housing_units` 칸 2 · 뷰 1
+
+실행한 DDL 전문은 [`../ddl/2026-09-28_b57.sql`](../ddl/2026-09-28_b57.sql). 🔴 **기존 행의 값은 한 칸도 바꾸지 않았다** — 새 표·새 칸에만 썼다. 함수·트리거 변경 0. 화면(`index.html`)은 아직 아무것도 읽지 않는다.
+
+| 항목 | 객체 | 적재 | 가드(한 트랜잭션 안) |
+|---|---|---|---|
+| ① 정책 분류 | `policy_classes`(standard 38 = B52 37분류 + 「정정 내용」 · user 9 = 화면 칩) · `policy_category_classes`(category 문자열 → 분류) · `policy_row_classes`(행 단위 덮어쓰기) · 뷰 `policy_category_unmapped` | 47 · 1,648(standard 730 + user 918) · 25(정책 10행) | category 730종 전부 standard 정확히 1 · user ≤ 2 · ⚠️·정정 내용·기타는 user 0 · 적재 뒤 DB 값 = 생성본(글자 단위 대조) |
+| ② 사실 칸 | `housing_units.extracted_facts jsonb` · `extracted_by text`(짝 CHECK) | 608행(`B57-facts-v1`) | `extra_note` md5 `f822ed12…` 전후 불변 · 모든 `text` 조각이 그 행 `extra_note`의 부분 문자열 |
+| ③ 유형 표준 | `housing_type_std`(13) · `housing_type_map`(`announcements` LH 11·MYHOME 10·SH 12 · `eligibility_criteria` 31 · `scoring_criteria` 2 = 66) | 13 · 66 | 세 표의 값 전부 매핑(미매핑 0) |
+| ④ 게시물 링크 | `announcement_post_links` | 6(규칙 `B57-link-v1` — DDL 파일의 INSERT … SELECT 가 곧 규칙) | 기대 6쌍과 일치 |
+| ⑤ 경로별 일정 | `announcement_apply_routes` | 21행 · 7공고(`B57-routes-v1`) | `*_text` 칸 전부 그 정책 행 `content_raw`의 부분 문자열 · 정책 category 가 모집일정 계열 |
+
+- **RLS·권한** — 표 7개 모두 RLS on + `select to anon, authenticated using (true)` 하나 · 쓰기 정책 없음. ACL은 기본 권한대로 `anon=r`·`authenticated=r`(조회로 확인). 뷰 `policy_category_unmapped`는 `security_invoker` · `public, anon, authenticated` 전부 회수(service_role만). 불변식 `supabase/invariants/v3.2.sql` 위반 0.
+- **FK** — `policy_row_classes`·`announcement_apply_routes` → `announcement_policies(id) on delete cascade`(정책 행을 지우면 따라 지워진다 — 막지 않는다). `announcements`에는 FK를 걸지 않았다(수집·정리가 행을 지울 때 막지 않도록).
+- **새 category** — 분석 회차가 새 이름을 쓰면 `policy_category_unmapped`에 뜬다. `policy_category_classes`에 standard 1 + user 0~2를 넣는다.
+- **`zipfit-backup`** — `schema_guard`는 새 이름을 알림으로만 통과시킨다(로컬 사전 실행 exit 0). 판단 매핑 6종은 `IRREPLACEABLE`에 더했다(zipfit-backup PR #17).
+
+#### ③ RPC 하드코딩 이관 — 설계만(실행 안 함)
+
+`get_announcements_deduped.sql:19`의 `housing_type <> ALL (ARRAY['임대주택 - 가정어린이집'])`를 다음으로 바꾸는 안이다. 🔴 목록 RPC라 원칙 29(anon `statement_timeout` · 공개 REST 200)로 재는 **단독 회차**에서 한다.
+
+```sql
+AND NOT EXISTS (SELECT 1 FROM public.housing_type_map m JOIN public.housing_type_std s ON s.name = m.std_type
+                WHERE m.source_table = 'announcements' AND m.source = a.source
+                  AND m.housing_type = a.housing_type AND NOT s.is_housing)
+```
+
+- 지금 `비주택`은 LH 「임대주택 - 가정어린이집」 한 값뿐이라 결과 집합은 같다. 달라지는 것은 **새 비주택 유형이 매핑 한 줄로 빠진다**는 것.
+- ⚠️ 매핑이 없는 새 `housing_type`은 이 조건에 안 걸려 **목록에 남는다**(모르는 것을 숨기지 않는다).
+
+#### 되돌리기
+
+```sql
+drop view  public.policy_category_unmapped;
+drop table public.policy_row_classes, public.policy_category_classes, public.policy_classes,
+           public.housing_type_map, public.housing_type_std,
+           public.announcement_post_links, public.announcement_apply_routes;
+alter table public.housing_units drop constraint housing_units_extracted_pair,
+                                 drop column extracted_by, drop column extracted_facts;
+```
+
+⚠️ 표·칸 삭제는 `zipfit-backup` `schema_guard`가 **삭제로 읽는다** — 그날 백업을 `allow_removed` 입력으로 승인해야 한다.
+
 ## 함수 본문 변경 이력
 
 권한·DDL과 달리 이쪽은 **파일 diff가 곧 기록**이다. 아래는 그 diff를 어디서 찾는지와
