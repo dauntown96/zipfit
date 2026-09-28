@@ -85,6 +85,21 @@ const MAX_REDIRECTS = 3
 const FETCH_TIMEOUT_MS = 60_000
 const DRIVE_TIMEOUT_MS = 120_000
 
+// 🔴 큰 첨부 분할 업로드(2026-09-28 B54) — `mode=upload&large=resumable`일 때만 탄다.
+//   이 파라미터가 없는 호출은 위 6MB 상한과 종전 경로를 그대로 탄다(바이트 불변).
+//   LH 응답을 받는 대로 Drive resumable 세션에 청크로 흘려보낸다 — 메모리에는 청크 하나만 둔다.
+//   왜: 팸플릿(부산문현2 36,332,388B · 전주동서학 16,041,200B · 인천논현 140,130,317B)이
+//   6MB 상한에 걸려 「미수집 고정」이었다. 종전 경로는 파일 전체를 버퍼에 모으고(readCapped)
+//   multipart 본문을 한 번 더 만든다(buildMultipart) — 크기의 두 배가 메모리에 선다.
+// 청크는 256KiB의 배수여야 한다(Drive 규약 — 마지막 청크만 예외).
+const RESUMABLE_CHUNK_BYTES = 8 * 1024 * 1024
+// 인천논현 팸플릿(140,130,317B)이 들어가는 값. 실측 최대보다 크게, 공고 첨부 실물보다 조금 넉넉히.
+const MAX_RESUMABLE_BYTES = 200_000_000
+// 요청 무활동 150초 한도 아래에서 끝낸다. 넘으면 LH 수신을 끊고 Drive 세션을 버린다.
+const RESUMABLE_TIMEOUT_MS = 140_000
+// Drive가 돌려주는 세션 URI는 이 접두로 시작해야 한다 — 다른 곳으로 청크를 보내지 않는다.
+const DRIVE_UPLOAD_PREFIX = 'https://www.googleapis.com/upload/drive/v3/files'
+
 // 앱 소유 루트 폴더 이름. drive.file scope라 앱이 만든 것만 보이고 만질 수 있다.
 // 기존 Drive 공고 폴더에는 구조적으로 접근할 수 없다(권한이 아니라 scope 문제다).
 const DRIVE_ROOT_NAME = 'ZipFit 자동수집'
@@ -419,6 +434,140 @@ const uploadFile = async (
   )
 }
 
+// ───────────────────────── 큰 첨부 — resumable 업로드 ─────────────────────────
+//
+// 세션을 열고(POST/PATCH ?uploadType=resumable) → 청크를 PUT 한다.
+// 중간 청크는 `bytes a-b/*`, 마지막은 `bytes a-b/<총량>`(스트림이 청크 경계에서 끝나면 `bytes */<총량>`).
+// 🔴 원본 해시를 EF에서 계산하지 않는다 — CPU 2초 한도 안에 140MB SHA-256이 들어간다는 보장이 없다.
+//   무결성은 Drive가 계산한 sha256Checksum·size로 보고, 중복은 업로드 **뒤에** 그 값으로 가린다.
+
+const openResumable = async (
+  opts: { name: string; parent: string; mimeType: string; total: number | null; replaceFileId: string | null },
+  token: string,
+  s: DriveSecrets,
+): Promise<string> => {
+  const metadata: Record<string, unknown> = { name: opts.name, mimeType: opts.mimeType }
+  let url: string
+  let method: string
+  if (opts.replaceFileId) {
+    url = `${DRIVE_UPLOAD_PREFIX}/${opts.replaceFileId}?uploadType=resumable&fields=${FILE_FIELDS}`
+    method = 'PATCH'
+  } else {
+    metadata.parents = [opts.parent]
+    url = `${DRIVE_UPLOAD_PREFIX}?uploadType=resumable&fields=${FILE_FIELDS}`
+    method = 'POST'
+  }
+  const headers: Record<string, string> = {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json; charset=UTF-8',
+    'X-Upload-Content-Type': opts.mimeType,
+  }
+  if (opts.total !== null) headers['X-Upload-Content-Length'] = String(opts.total)
+  const ac = new AbortController()
+  const timer = setTimeout(() => ac.abort(), DRIVE_TIMEOUT_MS)
+  try {
+    const res = await fetch(url, { method, headers, body: JSON.stringify(metadata), signal: ac.signal })
+    const text = await res.text()
+    if (!res.ok) throw new Error(`Drive 세션 열기 ${res.status}: ${redact(text.slice(0, 500), s)}`)
+    const loc = res.headers.get('location')
+    if (!loc || !loc.startsWith(DRIVE_UPLOAD_PREFIX)) throw new Error('Drive 세션 URI가 없거나 예상 밖이다')
+    return loc
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+// 청크 하나를 보낸다. 308이면 Drive가 받은 마지막 바이트 위치를, 200·201이면 파일 메타를 돌려준다.
+const putChunk = async (
+  session: string,
+  chunk: Uint8Array,
+  start: number,
+  last: boolean,
+  token: string,
+  s: DriveSecrets,
+  signal: AbortSignal,
+): Promise<{ done: boolean; persistedEnd: number; file: Record<string, unknown> | null }> => {
+  const total = last ? String(start + chunk.length) : '*'
+  const range = chunk.length === 0
+    ? `bytes */${total}`
+    : `bytes ${start}-${start + chunk.length - 1}/${total}`
+  const res = await fetch(session, {
+    method: 'PUT',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Range': range },
+    body: chunk,
+    signal,
+  })
+  const text = await res.text()
+  if (res.status === 308) {
+    const r = res.headers.get('range')   // 'bytes=0-8388607'
+    const m = r ? r.match(/bytes=0-(\d+)/) : null
+    return { done: false, persistedEnd: m ? Number(m[1]) : -1, file: null }
+  }
+  if (res.status === 200 || res.status === 201) {
+    return { done: true, persistedEnd: start + chunk.length - 1, file: text ? JSON.parse(text) : {} }
+  }
+  throw new Error(`Drive 청크 ${range} ${res.status}: ${redact(text.slice(0, 300), s)}`)
+}
+
+// 스트림을 청크로 잘라 흘려보낸다. 상한을 넘으면 그 자리에서 멈추고 세션을 버린다.
+const streamResumable = async (
+  body: ReadableStream<Uint8Array>,
+  session: string,
+  token: string,
+  s: DriveSecrets,
+  signal: AbortSignal,
+): Promise<{ file: Record<string, unknown> | null; sent: number; chunks: number; exceeded: boolean }> => {
+  const reader = body.getReader()
+  const buf = new Uint8Array(RESUMABLE_CHUNK_BYTES)
+  let fill = 0
+  let sent = 0
+  let chunks = 0
+  // 중간 청크 — Drive가 전부 받았는지 308의 Range로 확인하고, 덜 받았으면 나머지를 다시 보낸다.
+  const flush = async () => {
+    let off = 0
+    for (let attempt = 0; attempt < 3 && off < fill; attempt++) {
+      const r = await putChunk(session, buf.subarray(off, fill), sent + off, false, token, s, signal)
+      if (r.done) throw new Error('중간 청크에서 Drive가 업로드를 끝냈다')
+      off = r.persistedEnd + 1 - sent
+    }
+    if (off !== fill) throw new Error(`Drive가 청크를 다 받지 않았다: ${sent + off}/${sent + fill}`)
+    sent += fill
+    fill = 0
+    chunks++
+  }
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    if (sent + fill + value.length > MAX_RESUMABLE_BYTES) {
+      await reader.cancel()
+      return { file: null, sent: sent + fill + value.length, chunks, exceeded: true }
+    }
+    let v = value
+    while (v.length) {
+      const n = Math.min(v.length, RESUMABLE_CHUNK_BYTES - fill)
+      buf.set(v.subarray(0, n), fill)
+      fill += n
+      v = v.subarray(n)
+      if (fill === RESUMABLE_CHUNK_BYTES) await flush()
+    }
+  }
+  // 마지막 청크(0바이트일 수 있다 — 스트림이 청크 경계에서 끝난 경우).
+  const r = await putChunk(session, buf.subarray(0, fill), sent, true, token, s, signal)
+  if (!r.done) throw new Error('마지막 청크 뒤에도 Drive가 업로드를 끝내지 않았다')
+  sent += fill
+  chunks++
+  return { file: r.file, sent, chunks, exceeded: false }
+}
+
+// 세션을 버린다(Drive 규약: 세션 URI에 DELETE → 499). 실패해도 무시한다 — 세션은 1주 뒤 스스로 만료된다.
+const cancelResumable = async (session: string) => {
+  try { const r = await fetch(session, { method: 'DELETE' }); await r.body?.cancel() } catch { /* 무시 */ }
+}
+
+const deleteDriveFile = async (id: string, token: string, s: DriveSecrets) => {
+  await driveFetch(`https://www.googleapis.com/drive/v3/files/${id}`, { method: 'DELETE' }, token, s)
+}
+
 // ───────────────────────── 파일명·형식 ─────────────────────────
 
 // 🔴 확장자를 먼저 본다. LH는 hwpx에도 application/octet-stream을 준다.
@@ -490,6 +639,127 @@ const filenameFromDisposition = (cd: string | null): string | null => {
 const safeName = (name: string): string =>
   name.replace(/[\/\\]/g, '_').replace(/^\.+/, '').trim().slice(0, 200) || 'attachment'
 
+// ───────────────────────── 큰 첨부 — 요청 처리 ─────────────────────────
+//
+// 종전 업로드 경로와 응답 모양을 맞춘다(uploaded · drive.{action,…}). 다른 점:
+//   · 원본 sha256을 계산하지 않는다(위 주석) — `sha256`은 null, 비교는 Drive 값으로 한다
+//   · 같은 이름이 있으면 **올린 뒤에** 가린다: 내용이 같으면 새 파일을 지우고 skipped_identical,
+//     다르면 on_dupe=skip은 새 파일을 지우고 conflict(종전처럼 아무것도 바뀌지 않는다),
+//     on_dupe=replace는 처음부터 기존 파일 ID에 PATCH 세션을 연다
+//   · 재는 값: 걸린 시간(LH 수신+Drive 전송) · 청크 수 · 메모리(`Deno.memoryUsage`, 있으면)
+const handleResumable = async (
+  res: Response,
+  base: Record<string, unknown>,
+  declaredLen: number | null,
+  p: { announcementId: string; folderId: string; nameOverride: string | null; onDupe: string; current: URL },
+  started: number,
+  ac: AbortController,
+  timer: number,
+): Promise<Response> => {
+  const out: Record<string, unknown> = { ...base, limit_bytes: MAX_RESUMABLE_BYTES, transfer: 'resumable' }
+  const finish = (extra: Record<string, unknown>, status = 200) => {
+    clearTimeout(timer)
+    let memory: unknown = null
+    try { memory = (Deno as unknown as { memoryUsage?: () => unknown }).memoryUsage?.() ?? null } catch { memory = null }
+    return json({ ...out, ...extra, memory, elapsed_ms: Date.now() - started }, status)
+  }
+  if (declaredLen !== null && Number.isFinite(declaredLen) && declaredLen > MAX_RESUMABLE_BYTES) {
+    await res.body?.cancel()
+    return finish({
+      body_included: false, uploaded: false, reason: 'size_exceeded_declared',
+      detail: `선언된 크기 ${declaredLen}B가 분할 상한 ${MAX_RESUMABLE_BYTES}B를 넘는다`, bytes: declaredLen,
+    })
+  }
+  if (!res.body) return finish({ body_included: false, uploaded: false, reason: 'no_body' })
+
+  const filename = safeName(
+    p.nameOverride ||
+    filenameFromDisposition(res.headers.get('content-disposition')) ||
+    p.current.pathname.split('/').pop() ||
+    'attachment',
+  )
+  const mimeType = mimeFor(filename, res.headers.get('content-type'))
+  let secrets: DriveSecrets | null = null
+  let session: string | null = null
+  try {
+    secrets = await getDriveSecrets()
+    const token = await getAccessToken(secrets)
+    const existing = await findFileInFolder(filename, p.folderId, token, secrets)
+    const replaceId = existing && p.onDupe === 'replace' ? existing.id as string : null
+    session = await openResumable(
+      { name: filename, parent: p.folderId, mimeType, total: declaredLen, replaceFileId: replaceId },
+      token, secrets,
+    )
+    const t0 = Date.now()
+    const r = await streamResumable(res.body, session, token, secrets, ac.signal)
+    const transferMs = Date.now() - t0
+    if (r.exceeded) {
+      await cancelResumable(session)
+      return finish({
+        body_included: false, uploaded: false, reason: 'size_exceeded_actual',
+        detail: `실제 수신이 분할 상한 ${MAX_RESUMABLE_BYTES}B를 넘어 중단했다`, bytes_read_before_abort: r.sent,
+      })
+    }
+    const uploaded = r.file as Record<string, unknown>
+    const uploadedSize = uploaded.size === undefined ? null : Number(uploaded.size)
+    let action = replaceId ? 'replaced' : 'uploaded'
+    let comparedBy: string | null = null
+    let file = uploaded
+    if (existing && !replaceId) {
+      const a = existing.sha256Checksum as string | undefined
+      const b = uploaded.sha256Checksum as string | undefined
+      let same: boolean
+      if (a && b) {
+        comparedBy = 'sha256Checksum'
+        same = a.toLowerCase() === b.toLowerCase()
+      } else {
+        comparedBy = 'size'
+        same = (existing.size === undefined ? null : Number(existing.size)) === uploadedSize
+      }
+      // 🔴 방금 올린 것을 지운다 — 같은 이름 두 벌을 폴더에 남기지 않는다.
+      await deleteDriveFile(uploaded.id as string, token, secrets)
+      action = same ? 'skipped_identical' : 'conflict'
+      file = existing
+    }
+    return finish({
+      bytes: r.sent,
+      sha256: null,
+      uploaded: action === 'uploaded' || action === 'replaced',
+      body_included: false,
+      reason: 'uploaded_via_drive',
+      transfer_ms: transferMs,
+      chunks: r.chunks,
+      chunk_bytes: RESUMABLE_CHUNK_BYTES,
+      drive: {
+        action,
+        secret_source: secrets.source,
+        folder_source: 'param',
+        notice_folder_id: p.folderId,
+        file_id: file.id ?? null,
+        file_name: file.name ?? null,
+        file_size: file.size === undefined ? null : Number(file.size),
+        file_mime_type: file.mimeType ?? null,
+        file_sha256: file.sha256Checksum ?? null,
+        file_md5: file.md5Checksum ?? null,
+        web_view_link: file.webViewLink ?? null,
+        requested_mime_type: mimeType,
+        // 보낸 바이트 수와 Drive가 받은 크기. 원본 해시가 없으니 이것과 선언 크기가 무결성의 근거다.
+        size_match: uploadedSize === null ? null : uploadedSize === r.sent,
+        declared_match: declaredLen === null ? null : declaredLen === r.sent,
+        uploaded_sha256: uploaded.sha256Checksum ?? null,
+        mime_preserved: file.mimeType === mimeType,
+        duplicate_compared_by: comparedBy,
+      },
+    })
+  } catch (e) {
+    if (session) await cancelResumable(session)
+    return finish({
+      ok: false, uploaded: false,
+      drive_error: redact(String(e instanceof Error ? e.message : e), secrets),
+    }, 502)
+  }
+}
+
 // ───────────────────────── 본체 ─────────────────────────
 
 Deno.serve(async (req: Request) => {
@@ -515,6 +785,8 @@ Deno.serve(async (req: Request) => {
   const onDupe = reqUrl.searchParams.get('on_dupe') ?? 'skip'
   // 🔴 미리 확보해 둔 공고 폴더의 ID. 오면 폴더를 찾지도 만들지도 않는다.
   const folderIdParam = reqUrl.searchParams.get('folder_id')
+  // 🔴 큰 첨부 분할 업로드. 이 값이 없으면 아래 종전 경로가 한 줄도 달라지지 않는다.
+  const largeParam = reqUrl.searchParams.get('large')
 
   // 시크릿이 어디에 있는지만 확인한다. 값은 돌려주지 않는다.
   if (mode === 'selftest') {
@@ -590,6 +862,14 @@ Deno.serve(async (req: Request) => {
   if (wantUpload && folderIdParam !== null && !DRIVE_ID_RE.test(folderIdParam)) {
     return json({ ok: false, error: 'folder_id가 Drive ID 형식이 아니다' }, 400)
   }
+  if (largeParam !== null && largeParam !== 'resumable') {
+    return json({ ok: false, error: `large는 resumable만 받는다: ${largeParam}` }, 400)
+  }
+  const wantResumable = largeParam === 'resumable'
+  // 🔴 분할 업로드는 미리 확보한 폴더에만 올린다 — 폴더를 여기서 만들지 않는다(check-then-act 없음).
+  if (wantResumable && (!wantUpload || folderIdParam === null)) {
+    return json({ ok: false, error: 'large=resumable은 mode=upload와 folder_id가 함께 있어야 한다' }, 400)
+  }
 
   if (!target) return json({ ok: false, error: 'url 파라미터가 없다' }, 400)
 
@@ -605,7 +885,7 @@ Deno.serve(async (req: Request) => {
 
   const started = Date.now()
   const ac = new AbortController()
-  const timer = setTimeout(() => ac.abort(), FETCH_TIMEOUT_MS)
+  const timer = setTimeout(() => ac.abort(), wantResumable ? RESUMABLE_TIMEOUT_MS : FETCH_TIMEOUT_MS)
   // 어디를 거쳐 왔는지 남긴다. 리다이렉트가 실제로 일어나는지 이 값으로 안다.
   const hops: string[] = []
 
@@ -654,6 +934,16 @@ Deno.serve(async (req: Request) => {
       content_disposition: res.headers.get('content-disposition'),
       header_content_length: declared,
       limit_bytes: MAX_SOURCE_BYTES,
+    }
+
+    if (wantResumable) {
+      return await handleResumable(res, base, declaredLen, {
+        announcementId: announcementId as string,
+        folderId: folderIdParam as string,
+        nameOverride,
+        onDupe,
+        current,
+      }, started, ac, timer)
     }
 
     // ① Content-length가 있고 상한을 넘으면 본문을 아예 받지 않는다.
