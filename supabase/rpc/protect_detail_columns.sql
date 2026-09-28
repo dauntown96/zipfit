@@ -55,6 +55,23 @@ AS $function$
 --   「NEW가 주소형이 아니고 OLD가 주소형이면 OLD 유지」라는 별도 술어를 쓴다.
 --   NULL 쓰기는 여전히 막지 않는다 — mapLHRow가 region에 NULL을 싣는 경로가 없다.
 BEGIN
+  -- 🔴 2026-09-28(B53) — 분석으로 확정한 접수기간이 있으면 수집값보다 먼저 선다.
+  --   왜: LH 한 게시물(PAN_ID)에 공고문 두 벌이 붙으면 목록 CLSG_DT 가 게시물 전체의 마감이라,
+  --   이 카드의 공고가 아닌 날짜가 apply_end 로 들어온다(…020734 목포 등 6단지 원문 접수
+  --   09-30~10-01 ↔ 수집 10-02 — 10-02 는 같은 게시물의 영암용앙1 접수일). 수집이 매 런 덮어써서
+  --   값을 손으로 고쳐도 되돌아간다.
+  --   왜 RPC 가 아니라 여기서: apply_end 를 읽는 곳이 목록 RPC 하나가 아니다 — 회차 조회(화면
+  --   fetchGroupRounds · B46 정책 회차 판정) · get_reanalysis_queue · 분석률 · 수집 EF 의 마감 처리가
+  --   전부 원래 칸을 읽는다. 칸 자체를 확정값으로 고정하면 읽는 쪽이 한 곳도 갈리지 않는다.
+  --   수집값은 남지 않는다(필요하면 collect-announcements ?mode=probe 로 원본을 본다).
+  --   allow_null_clear 보다 앞에 둔다 — 확정값을 풀려면 *_confirmed 를 NULL 로 되돌린다.
+  IF NEW.apply_start_confirmed IS NOT NULL THEN
+    NEW.apply_start := NEW.apply_start_confirmed;
+  END IF;
+  IF NEW.apply_end_confirmed IS NOT NULL THEN
+    NEW.apply_end := NEW.apply_end_confirmed;
+  END IF;
+
   IF coalesce(current_setting('zipfit.allow_null_clear', true), '') = 'on' THEN
     RETURN NEW;
   END IF;

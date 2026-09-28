@@ -12,6 +12,11 @@ WITH raw_base AS (
   FROM announcements
   WHERE title IS NOT NULL
     AND hidden_from_listing IS NOT TRUE
+    -- 🔴 2026-09-28(B53) — 비주택 유형을 목록에서 뺀다. 거주자 모집이 아니다(가정어린이집 운영예정자
+    --   모집 …020085 · …020812). 수집은 그대로다 — 행은 남고 목록·그룹 대표에만 안 선다.
+    --   🔵 유형 목록은 여기 한 곳이다. housing_type 표준 매핑이 들어오면 그리로 옮긴다.
+    --   ⚠️ 분석률·재분석 큐가 이 RPC 를 모수로 쓰므로 같은 제외가 저절로 따라간다.
+    AND (housing_type IS NULL OR housing_type <> ALL (ARRAY['임대주택 - 가정어린이집']))
 ),
 superseded_pblanc_ids AS (
   SELECT DISTINCT before_pblanc_id AS pblanc_id
