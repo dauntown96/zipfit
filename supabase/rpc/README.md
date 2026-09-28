@@ -517,6 +517,16 @@ alter table public.housing_units drop constraint housing_units_extracted_pair,
 
 ⚠️ 표·칸 삭제는 `zipfit-backup` `schema_guard`가 **삭제로 읽는다** — 그날 백업을 `allow_removed` 입력으로 승인해야 한다.
 
+### 2026-09-28 (B59) — `supply_org_period_trust` 신설 (공사 단위 접수기간 신뢰)
+
+전문·초기 값·되돌리기: `supabase/ddl/2026-09-28_b59.sql`.
+
+- **칸**: `supply_org` PK · `period_trust`(`ok`/`check`) · `checked_posts` · `wrong_posts` · `last_checked_on` · `note` · `recorded_by`.
+- **RLS·권한**: RLS on + `anon, authenticated` SELECT 정책 하나(`using (true)`) · 쓰기 정책 없음. ACL은 기본 권한대로 `anon=r`·`authenticated=r`(조회로 확인).
+  🔴 **SELECT 정책을 둔 이유**: 이 표를 읽는 `get_announcements_deduped()`가 `SECURITY INVOKER`라 anon이 부른다 — 정책이 없으면 표가 0행으로 보여 판정이 조용히 전부 false가 된다(`CLAUDE.md` 원칙 15). 요청서의 「anon 정책 없음이 기본」과 다르게 둔 자리다.
+- **초기 6행**: 경상북도개발공사 `check` 10/10(B56) · `ok` 1/0 다섯(B59 표본 대조). 대조 불가 공사는 행 없음.
+- **`zipfit-backup`**: `schema_guard`가 새 표·정책을 「추가」 알림으로 통과시킨다(로컬 모의 실행 exit 0). `backup.yml` env 변경 불필요.
+
 ## 함수 본문 변경 이력
 
 권한·DDL과 달리 이쪽은 **파일 diff가 곧 기록**이다. 아래는 그 diff를 어디서 찾는지와
@@ -898,3 +908,11 @@ md5 `72da7fa5…` → `b6b88a8a…`(= 이 파일). 마이그레이션 `h1_cancel
 ```
 git show 3e82cb0:supabase/rpc/get_announcements_deduped.sql
 ```
+
+### 2026-09-28 (B59) — `get_announcements_deduped()` 칸 둘 추가 · 비주택 제외를 표준 조회로
+
+- **바뀐 것**: ① 반환 칸 끝에 `apply_end_confirmed`(date) · `apply_period_check`(boolean) ② `raw_base`의 `housing_type <> ALL (ARRAY['임대주택 - 가정어린이집'])` → `housing_type_map`·`housing_type_std.is_housing = false` `NOT EXISTS`(B57 ③ 설계안) ③ `LEFT JOIN supply_org_period_trust`.
+- **반환형이 바뀌어 `DROP FUNCTION` → `CREATE`** 했다. 같은 트랜잭션에서 `anon`·`authenticated`·`service_role` EXECUTE를 다시 줬고 ACL이 종전과 같음을 가드로 확인했다(PUBLIC 포함).
+- **검증(한 트랜잭션 안 전후 비교)**: 카드 906 = 906 · 대표 ID 집합 diff 0 · 기존 62칸 값 변화 0(`to_jsonb(new) - 새 칸 = to_jsonb(old)`) · 판정 true 6. anon `statement_timeout` 3s 조건 `EXPLAIN ANALYZE` 전 148~172ms / 후 150~155ms · 공개 REST(anon 키, pg_net 경유) 200 · 906행.
+- **md5**: 전 `7b61f7e7…` → 후 `bc563416…`(= 이 파일).
+- **되돌리기**: 이 파일의 직전 커밋 정의로 `DROP` → `CREATE` → 세 역할 EXECUTE 재부여. 화면은 새 칸을 읽지 않으므로 되돌려도 화면 영향 0.
