@@ -1,5 +1,5 @@
 CREATE OR REPLACE FUNCTION public.get_announcements_deduped(p_region text DEFAULT NULL::text, p_type text DEFAULT NULL::text, p_status text DEFAULT NULL::text)
- RETURNS TABLE(id bigint, source text, announcement_id text, title text, region text, region_top text, sido_nm text, sigungu_nm text, housing_type text, supply_org text, announcement_date date, apply_start date, apply_end date, status text, status_normalized text, url text, is_revised boolean, area_min numeric, area_max numeric, rent_min integer, rent_max integer, deposit_min bigint, deposit_max bigint, total_units integer, move_in_date text, target_type text, heating_type text, created_at timestamp with time zone, updated_at timestamp with time zone, mymy_applicable boolean, supply_form text, application_method text, recruit_multiplier text, pair_announcement_key text, housing_change_allowed boolean, precise_address text, is_relaxed_recruitment boolean, relaxation_detail text, selection_method text, subscription_months_required integer, subscription_payments_required integer, contract_before_verification boolean, rent_exemption_until date, rent_exemption_note text, revision_note text, revised_at timestamp with time zone, special_notes jsonb, revised_at_source text, first_seen_at timestamp with time zone, doc_submit_announce_date date, doc_submit_start date, doc_submit_end date, winner_announce_date date, contract_start date, contract_end date, building_name text, attachment_urls jsonb, has_cancel_notice boolean, region_names text[], block_count integer, first_announcement_date date, schedule_varies boolean)
+ RETURNS TABLE(id bigint, source text, announcement_id text, title text, region text, region_top text, sido_nm text, sigungu_nm text, housing_type text, supply_org text, announcement_date date, apply_start date, apply_end date, status text, status_normalized text, url text, is_revised boolean, area_min numeric, area_max numeric, rent_min integer, rent_max integer, deposit_min bigint, deposit_max bigint, total_units integer, move_in_date text, target_type text, heating_type text, created_at timestamp with time zone, updated_at timestamp with time zone, mymy_applicable boolean, supply_form text, application_method text, recruit_multiplier text, pair_announcement_key text, housing_change_allowed boolean, precise_address text, is_relaxed_recruitment boolean, relaxation_detail text, selection_method text, subscription_months_required integer, subscription_payments_required integer, contract_before_verification boolean, rent_exemption_until date, rent_exemption_note text, revision_note text, revised_at timestamp with time zone, special_notes jsonb, revised_at_source text, first_seen_at timestamp with time zone, doc_submit_announce_date date, doc_submit_start date, doc_submit_end date, winner_announce_date date, contract_start date, contract_end date, building_name text, attachment_urls jsonb, has_cancel_notice boolean, region_names text[], block_count integer, first_announcement_date date, schedule_varies boolean, apply_end_confirmed date, apply_period_check boolean)
  LANGUAGE sql
  STABLE
 AS $function$
@@ -9,14 +9,19 @@ WITH raw_base AS (
     CASE WHEN source = 'MYHOME' THEN split_part(announcement_id, '_', 1) ELSE NULL END AS own_pblanc_id,
     -- 회차 날짜 — 정정이면 첫 공고일, 아니면 공고일(get_announcement_price_summary·화면 zfNoticeDate 와 같은 규칙)
     CASE WHEN is_revised AND first_announcement_date IS NOT NULL THEN first_announcement_date ELSE announcement_date END AS round_date
-  FROM announcements
+  FROM announcements a
   WHERE title IS NOT NULL
     AND hidden_from_listing IS NOT TRUE
     -- 🔴 2026-09-28(B53) — 비주택 유형을 목록에서 뺀다. 거주자 모집이 아니다(가정어린이집 운영예정자
     --   모집 …020085 · …020812). 수집은 그대로다 — 행은 남고 목록·그룹 대표에만 안 선다.
-    --   🔵 유형 목록은 여기 한 곳이다. housing_type 표준 매핑이 들어오면 그리로 옮긴다.
     --   ⚠️ 분석률·재분석 큐가 이 RPC 를 모수로 쓰므로 같은 제외가 저절로 따라간다.
-    AND (housing_type IS NULL OR housing_type <> ALL (ARRAY['임대주택 - 가정어린이집']))
+    -- 🔴 2026-09-28(B59) — 유형 목록을 하드코딩에서 표준 조회로 옮겼다(B57 ③ 설계안).
+    --   housing_type_map → housing_type_std.is_housing = false 인 (source, housing_type) 만 뺀다.
+    --   지금 비주택은 LH 「임대주택 - 가정어린이집」 하나라 결과 집합은 종전과 같다(전후 대표 ID 집합 diff 0).
+    --   ⚠️ 매핑이 없는 새 housing_type 은 이 조건에 안 걸려 목록에 남는다(모르는 것을 숨기지 않는다).
+    AND NOT EXISTS (SELECT 1 FROM public.housing_type_map m JOIN public.housing_type_std s ON s.name = m.std_type
+                    WHERE m.source_table = 'announcements' AND m.source = a.source
+                      AND m.housing_type = a.housing_type AND NOT s.is_housing)
 ),
 superseded_pblanc_ids AS (
   SELECT DISTINCT before_pblanc_id AS pblanc_id
@@ -217,13 +222,23 @@ SELECT
   -- 🔴 2026-09-17 추가한 둘. 대표행(winner) 값을 그대로 낸다 — 형제 행에서 끌어오지
   -- 않는다(best_* 계열과 다르다). 회차 축은 이번에 바꾸지 않으므로 화면이 읽기만 한다.
   w.first_announcement_date,
-  w.schedule_varies
+  w.schedule_varies,
+  -- 🔴 2026-09-28(B59) 추가한 둘 — 대표행(winner) 값만 본다. 기존 칸·행 집합은 그대로다(칸 추가뿐, 숨기지 않는다).
+  --   apply_end_confirmed : 원문으로 확정한 접수 마감일(B53 칸). 있으면 apply_end 도 이미 이 값이다(보호 트리거).
+  --   apply_period_check  : 「접수기간 확인 필요」 — MYHOME 대표 ∧ 공급기관이 LH 아님 ∧ 확정값 없음
+  --                          ∧ (공사 신뢰 check ∨ apply_end = winner_announce_date). 대표가 LH 행이면 판정하지 않는다.
+  --   ⚠️ supply_org 가 NULL 인 MYHOME 행은 공사를 모르므로 판정하지 않는다(false).
+  w.apply_end_confirmed,
+  (w.source = 'MYHOME' AND w.supply_org IS NOT NULL AND w.supply_org <> 'LH'
+   AND w.apply_start_confirmed IS NULL AND w.apply_end_confirmed IS NULL
+   AND (pt.period_trust = 'check' OR w.apply_end = w.winner_announce_date)) IS TRUE AS apply_period_check
 FROM winner w
 JOIN best_location bl ON bl.dedup_key = w.dedup_key
 JOIN best_schedule bs ON bs.dedup_key = w.dedup_key
 JOIN first_seen fs ON fs.dedup_key = w.dedup_key
 LEFT JOIN region_set rs ON rs.dedup_key = w.dedup_key
 LEFT JOIN block_count bc ON bc.dedup_key = w.dedup_key
+LEFT JOIN public.supply_org_period_trust pt ON pt.supply_org = w.supply_org
 WHERE (
     p_region IS NULL
     OR bl.best_sido = p_region
