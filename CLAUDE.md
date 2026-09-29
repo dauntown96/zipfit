@@ -48,7 +48,7 @@
 |---|---|
 | 프론트엔드 | HTML/CSS/JS 단일 파일 (index.html) |
 | 공고 데이터 | Supabase RPC `get_announcements_deduped()` |
-| 데이터 수집 | **LH·MYHOME**은 Edge Function `collect-announcements`를 pg_cron이 주간(KST 09~18시) 10분 간격 + 아침 워밍 2회 + 야간 1회 부르고, **SH**는 `collect-sh-announcements`를 하루 4회(KST 09·12·15·18시) 부른다. 스케줄은 UTC로 등록돼 있고 현행 값은 `cron.job` 조회로 본다. 상세: ⑩ 「수집 크론은 언제 도나」 |
+| 데이터 수집 | **LH·MYHOME**은 Edge Function `collect-announcements`를 pg_cron이 주간(KST 09~18시) 10분 간격 + 아침 워밍 2회 + 야간 1회 부르고, **SH**는 `collect-sh-announcements`를 하루 4회(KST 09·12·15·18시) 부른다. **LH 매입 홍보물 목록**은 `collect-lh-promo`가 KST 09:05~18:35 30분마다 새 공고·첨부 바뀐 공고만 `announcement_promo_files`에 남긴다(목록만 — 받기·Drive·extras 연결은 분석 회차). 스케줄은 UTC로 등록돼 있고 현행 값은 `cron.job` 조회로 본다. 상세: ⑩ 「수집 크론은 언제 도나」 |
 | 사용자 프로필 | Edge Function `save-user-profile` (GET/POST, **`verify_jwt=true`**, 식별자는 JWT의 `auth.uid()` — 이메일 기반 식별은 2026-08-13 폐기, CORS는 `https://dauntown96.github.io` 고정) |
 | 공고 첨부 수신 | Edge Function `fetch-attachment`는 호출자가 준 URL(허용목록 호스트만)의 바이트를 돌려주거나 `mode=upload`로 Google Drive `[임시] <announcement_id>` 폴더에 직접 올린다(폴더는 `mode=ensure_folder`로 먼저 확보해 `folder_id`로 넘긴다 · DB 쓰기 없음). 운반 상한은 기본 6MB이고 `mode=upload&large=resumable`만 200MB이며, 인증은 Vault `cron_secret_v2`의 `x-cron-secret`이다. 상세: ⑩ 「공고 첨부 수집」 |
 | 알림·트리거 | 🔴 **없음 — Make.com은 2026-08-27 미사용 확정**. 검토했고 안 쓰기로 한 것이지 미검토가 아니다(재검토 트리거는 📦 아카이브 「MCP 생태계 보류」에). 알림 경로는 미구현 상태이며 후보는 백로그 「카카오 알림톡」 |
@@ -150,9 +150,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-09-29 | **매입 홍보물 자동 수집** — 새 EF `collect-lh-promo`(Actions 배포 · cron 30분) LH 매입 홍보물 목록 → `announcement_promo_files`(활성 26공고 717파일 = 버튼 합 · 오류 0 · 수집 런 +4.5% 이내) · 역전파 네 공고는 홍보물 버튼 0 · 대표 이름 규칙 넓힘(`…0663`만) · backup 목록. PR #262 · #263 |
 | 2026-09-29 | **코드 회차 3**(우편함 첫 회차) — `get_announcements_deduped()` LH 다단지 단지명을 같은 회차 세대 행으로 다시 셈(`…0667` → 「보성회정 외 3개 단지」 · `…0734` → 「영암용앙2 외 5개 단지」 · 나머지 909행 불변 · anon 115ms) · `…20787` 미소지움 PDF 연결 → 「완료」 · 우편함 규약 한 줄. PR #261 |
 | 2026-09-29 | **B65** — 머리(0-1 V10a 근거 정책 행 category 「모집일정」 2행 → 불변식 위반 4→0 · 0-2 ⚠️ 행 연결 문장 2개 걷음) + 공고 분석 1건(대전충남 신혼·신생아Ⅱ(전세형) 매입 `…20787` 세대 105 · 홍보물 이미지 33 연결 · PDF 1 판단 대기 → 완료(보조 누락)) · 접수 전 분석률 17/18 → 18/18. PR #260 |
-| 2026-09-29 | **코드 회차 2 잔여 + 배포 자동화**(번호 미정) — `get_announcement_price_summary` `analysis_done`·`has_attachments`(SECURITY DEFINER · anon 실호출 가드) · 카드 문구 둘(v148 · PR #257) · 큐 첫 채움 제외·`attachment_reviewed_at` · backup 목록 · Edge Function 배포 워크플로 + 원칙 31. PR #258 |
 
 ---
 

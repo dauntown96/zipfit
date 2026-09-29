@@ -191,7 +191,7 @@ winner AS (
 --      (2026-09-29 실측: 접미 카드 중 같은 회차 세대 행이 있는 것은 전부 같은 회차 완료 계열 분석이 있다).
 --   단지 키 = 건물 머리 키(화면 zfBuildingKeyOf 와 같은 식: building_name, 없으면 address)에서 꼬리 「(N개동)」·「(…, N개동)」만 뗀 것.
 --   🔴 괄호 꼬리를 통째로 떼지 않는다 — 제주 일도·삼도 …0804 의 「(H-1BL)」·「(H-2BL)」은 서로 다른 단지다(떼면 3 → 2).
---   바꾸는 것은 **센 수가 접미의 수와 다르고 2 이상일 때만**이다 — 같으면 EF 이름을 그대로 둔다(대조군 불변).
+--   바꾸는 것은 **센 수가 2 이상이고, 접미의 수와 다르거나 대표 이름이 단지 키에 없을 때**다 — 둘 다 맞으면 EF 이름을 그대로 둔다(대조군 불변).
 --   대표 이름 A: 종전 이름(접미를 뗀 것)이 같은 회차 단지 키와 공백 무시 부분 일치하면 그대로 · 아니면 대표 주소(region)의
 --   시군구에 있는 단지 · 그래도 없으면 구성원 ID 순 첫 단지. 형식 「A 외 N개 단지」는 종전과 같다.
 --   지역(region_names)·block_count 는 바꾸지 않는다 — 두 카드 모두 같은 회차 세대 행의 구성원 지역과 이미 같다(2026-09-29 대조).
@@ -211,7 +211,11 @@ same_round_complex AS (
     regexp_replace(max(w_building_name), '\s외\s+\d+개\s*단지\s*$', '') AS old_lead,
     count(DISTINCT unit_key) AS n,
     bool_or(position(regexp_replace(unit_key, '\s', '', 'g') IN regexp_replace(regexp_replace(w_building_name, '\s외\s+\d+개\s*단지\s*$', ''), '\s', '', 'g')) > 0
-         OR position(regexp_replace(regexp_replace(w_building_name, '\s외\s+\d+개\s*단지\s*$', ''), '\s', '', 'g') IN regexp_replace(unit_key, '\s', '', 'g')) > 0) AS lead_found,
+         OR position(regexp_replace(regexp_replace(w_building_name, '\s외\s+\d+개\s*단지\s*$', ''), '\s', '', 'g') IN regexp_replace(unit_key, '\s', '', 'g')) > 0
+         -- 🔵 2026-09-29(매입 홍보물 회차 3) — 종전 이름 첫 한글 덩어리(2자 이상)가 단지 키에 들어 있어도 같은 단지로 본다.
+         --   EF 이름과 세대 행 이름은 같은 단지를 다르게 적는다: 「원주무실(7) 국민임대」↔「원주무실7」 · 「아산탕정2-A7BL」↔「아산탕정LH7단지」
+         --   · 「경산하양 A-3블록 행복주택」↔「경산하양3」 · 「인천서창 14BL」↔「인천서창 14단지」 · 「효자5국민임대 B1블록」↔「전주효자5」.
+         OR position(substring(w_building_name FROM '[가-힣]{2,}') IN regexp_replace(unit_key, '\s', '', 'g')) > 0) AS lead_found,
     (array_agg(unit_key ORDER BY (w_region LIKE sido_nm || ' ' || sigungu_nm || ' %') IS NOT TRUE, gid, unit_key))[1] AS fallback_lead
   FROM same_round_units
   WHERE unit_key IS NOT NULL AND unit_key <> ''
@@ -222,7 +226,9 @@ complex_name AS (
     CASE WHEN lead_found THEN old_lead ELSE fallback_lead END || ' 외 ' || (n - 1) || '개 단지' AS building_name
   FROM same_round_complex
   WHERE n >= 2
-    AND n <> substring(w_building_name FROM '\s외\s+(\d+)개\s*단지\s*$')::int + 1
+    AND (n <> substring(w_building_name FROM '\s외\s+(\d+)개\s*단지\s*$')::int + 1
+         -- 🔵 2026-09-29(매입 홍보물 회차 3) — 수가 같아도 대표 이름이 같은 회차 단지 키에 없으면 고른다(군산 …0663).
+         OR NOT lead_found)
 )
 SELECT
   w.id, w.source, w.announcement_id, w.title, w.region,
