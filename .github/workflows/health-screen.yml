@@ -1,0 +1,82 @@
+# A. 화면 점검 — 배포본이 사실과 같은 말을 하는가(2026-09-29 신설 · 우편함 「화면 점검·운영 건강 점검 자동화」)
+# 🔴 읽기·알림만 한다. 배포본(GitHub Pages)을 390px Chromium 으로 열고, 카드 문구 기대값은 DB 에서 따로 계산한다
+#    (관리 API · `set transaction read only`). 비밀값: 기존 SUPABASE_ACCESS_TOKEN 하나 · 공개 anon 키.
+# 언제: index.html·sw.js 가 바뀐 main 병합 뒤(Pages 반영을 기다린다) · 매일 1회 · 수동.
+# 알림: 실패면 라벨 health-screen 이슈를 하나 열고(열려 있으면 댓글), 통과하면 스스로 닫는다.
+name: Health — Screen (A)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'sw.js'
+  schedule:
+    - cron: '50 23 * * *'   # KST 08:50 — 아침 워밍 수집(23:40·23:50 UTC) 뒤
+  workflow_dispatch:
+    inputs:
+      simulate:
+        description: '알림 경로 시험 — fail 이면 카드 하나의 기대 문구를 없는 문구로 바꾼다'
+        type: choice
+        options: [none, fail]
+        default: none
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: health-screen
+  cancel-in-progress: false
+
+jobs:
+  screen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Pages 반영 기다리기(push 때만)
+        if: github.event_name == 'push'
+        run: |
+          set -euo pipefail
+          want=$(grep -o "CACHE_NAME *= *'[^']*'" sw.js | head -1)
+          for i in $(seq 1 30); do
+            got=$(curl -fsS "https://dauntown96.github.io/zipfit/sw.js?t=$(date +%s)" | grep -o "CACHE_NAME *= *'[^']*'" | head -1 || true)
+            if [ "$got" = "$want" ]; then echo "배포본 반영 확인: $got"; exit 0; fi
+            echo "기다림 $i/30 — 배포본 ${got:-?} · 저장소 $want"; sleep 20
+          done
+          echo "::warning::10분 안에 배포본이 저장소 sw.js 와 같아지지 않았다 — 그대로 점검한다"
+      - name: Playwright 준비
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/pw" && cd "$RUNNER_TEMP/pw"
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund playwright@1.55.0 >/dev/null
+          npx playwright install --with-deps chromium >/dev/null
+          echo "NODE_PATH=$RUNNER_TEMP/pw/node_modules" >> "$GITHUB_ENV"
+      - name: 점검
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SIMULATE: ${{ inputs.simulate || 'none' }}
+        run: |
+          # ESM 은 NODE_PATH 를 보지 않는다 — 설치한 곳에 링크를 둔다.
+          ln -sfn "$RUNNER_TEMP/pw/node_modules" .github/health/node_modules
+          node .github/health/screen-check.mjs
+      - name: 결과 올리기
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: health-result
+          path: |
+            health-result.json
+            health-screen.png
+          retention-days: 14
+      - name: 알림(이슈 열기·닫기)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: bash .github/health/issue.sh health-screen "[자동 점검 A] 화면 점검 실패"

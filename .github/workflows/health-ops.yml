@@ -1,0 +1,55 @@
+# B. 운영 건강 점검 — 사람 손 없이 도는가(2026-09-29 신설 · 우편함 「화면 점검·운영 건강 점검 자동화」)
+# 🔴 읽기·알림만 한다. DB 는 관리 API 로 읽되 모든 SQL 이 `set transaction read only` 안에서 돈다(.github/health/lib.mjs).
+# 비밀값: 기존 Actions Secret SUPABASE_ACCESS_TOKEN 하나 · 공개 anon 키. 새 비밀값 0.
+# 알림: 실패면 라벨 health-ops 이슈를 하나 열고(열려 있으면 댓글), 통과하면 스스로 닫는다(.github/health/issue.sh).
+name: Health — Ops (B)
+
+on:
+  schedule:
+    # 수집이 도는 시간대(UTC 0~10시 = KST 09~19시) 매시 25분 + 새벽 1회(UTC 20:25 = KST 05:25).
+    # 25분 — 수집(10분 주기)·홍보물(5·35분) 런이 끝난 뒤다. GitHub 예약 실행은 몇 분 밀릴 수 있다.
+    - cron: '25 0-10 * * *'
+    - cron: '25 20 * * *'
+  workflow_dispatch:
+    inputs:
+      simulate:
+        description: '알림 경로 시험 — fail 이면 실패 점검 하나를 일부러 더한다'
+        type: choice
+        options: [none, fail]
+        default: none
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: health-ops
+  cancel-in-progress: false
+
+jobs:
+  ops:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: 점검
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SIMULATE: ${{ inputs.simulate || 'none' }}
+        run: node .github/health/ops-check.mjs
+      - name: 결과 올리기
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: health-result
+          path: health-result.json
+          retention-days: 14
+      - name: 알림(이슈 열기·닫기)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: bash .github/health/issue.sh health-ops "[자동 점검 B] 운영 건강 점검 실패"
