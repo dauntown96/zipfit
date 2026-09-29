@@ -72,6 +72,18 @@ BEGIN
     NEW.apply_end := NEW.apply_end_confirmed;
   END IF;
 
+  -- 🔵 2026-09-29 코드 회차 3 — 확정 마감일이 이미 지났고 이미 「접수마감」인 행은 수집 upsert 가
+  --   원천 status(「공고중」 등)로 되돌리지 못하게 한다. 이것이 없으면 매 런 upsert 가 되돌리고
+  --   같은 런 끝의 markExpired 가 다시 「접수마감」으로 바꿨다(칠곡 MYHOME 5행 · expired_marked 매 런 5).
+  --   조건은 markExpired 와 같은 축이다 — apply_end < UTC 오늘(EF 가 new Date().toISOString() 날짜로 비교).
+  --   확정값이 없는 행 · 확정 마감일이 오늘 이후인 행 · OLD 가 「접수마감」이 아닌 행은 건드리지 않는다.
+  IF NEW.apply_end_confirmed IS NOT NULL
+     AND NEW.apply_end < (now() AT TIME ZONE 'UTC')::date
+     AND OLD.status = '접수마감'
+     AND NEW.status IS DISTINCT FROM '접수마감' THEN
+    NEW.status := OLD.status;
+  END IF;
+
   IF coalesce(current_setting('zipfit.allow_null_clear', true), '') = 'on' THEN
     RETURN NEW;
   END IF;

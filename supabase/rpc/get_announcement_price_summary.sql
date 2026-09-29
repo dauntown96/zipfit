@@ -82,8 +82,10 @@ AS $function$
     select m.aid, m.gid, m.round_date from meta m where m.aid not in (select aid from cur_has)
   )
   select p.aid,
-         min(h.deposit)::bigint, max(h.deposit)::bigint,
-         min(h.monthly_rent)::bigint, max(h.monthly_rent)::bigint,
+         -- 🔵 2026-09-29 코드 회차 — 세대 하나에 임대조건 두 벌(deposit/monthly_rent + deposit_priority1/rent_priority1)이면
+         --    둘째 벌도 min~max에 넣는다. least/greatest는 NULL을 건너뛰므로 한 벌만 있는 행(supply_target 두 행 포함)은 값이 그대로다.
+         min(least(h.deposit, h.deposit_priority1))::bigint, max(greatest(h.deposit, h.deposit_priority1))::bigint,
+         min(least(h.monthly_rent, h.rent_priority1))::bigint, max(greatest(h.monthly_rent, h.rent_priority1))::bigint,
          min(h.area_sqm), max(h.area_sqm),
          -- 🔴 'unknown' 은 이제 **대표행의 회차 날짜가 없을 때 하나뿐**이다(2026-09-17).
          --    종전의 `any_revised and date_kinds >= 2` 는 「정정이 섞이면 날짜로 못 가린다」였는데,
