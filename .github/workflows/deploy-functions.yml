@@ -1,0 +1,125 @@
+# Edge Function 배포 — main 병합 = 배포 (2026-09-29 신설 · 코드 회차 2 잔여 B)
+# 🔴 바뀐 함수만 하나씩 배포한다. 한 번에 전부(`supabase functions deploy` 인자 없이)는 쓰지 않는다 —
+#    안 바뀐 함수의 버전이 오르면 「배포본 = 저장소」 대조가 흐려진다.
+# 🔴 허용 목록(ALLOWED) 밖 함수는 배포하지 않는다 — 저장소에만 있고 배포된 적 없는 함수
+#    (fetch-attachment-probe · upsert-announcement)가 새로 생기지 않게. 목록 = supabase/config.toml 의 [functions.*].
+# 🔴 verify_jwt 는 supabase/config.toml 이 정본이다(2026-09-29 배포본 값을 관리 API로 읽어 옮겼다).
+#    배포 명령에도 같은 값을 플래그로 싣고, 배포 뒤 관리 API로 다시 읽어 다르면 실패로 끝낸다.
+# 되돌리기: 이전 커밋으로 되돌린 PR을 병합하거나, 그 커밋에서 workflow_dispatch 로 함수 하나를 재배포한다.
+# ⚠️ 함수끼리 공유하는 폴더(예: supabase/functions/_shared)는 지금 없다. 생기면 그 폴더 변경을 쓰는 함수로 펴는 규칙을 먼저 더한다.
+name: Deploy Edge Functions
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/**'
+  workflow_dispatch:
+    inputs:
+      function:
+        description: '재배포할 함수 하나 — 이 실행이 가리키는 커밋의 코드 그대로 배포한다'
+        required: true
+        type: choice
+        options:
+          - collect-announcements
+          - collect-rental-stats
+          - collect-sh-announcements
+          - delete-account
+          - fetch-attachment
+          - save-user-profile
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-functions
+  cancel-in-progress: false
+
+env:
+  PROJECT_REF: khdpjjyspmlqtzperoqg
+  ALLOWED: collect-announcements collect-rental-stats collect-sh-announcements delete-account fetch-attachment save-user-profile
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 배포할 함수 고르기
+        id: pick
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_FN: ${{ inputs.function }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            cand="$INPUT_FN"
+          else
+            if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+              echo "::error::push 직전 커밋(${BEFORE})을 찾지 못해 바뀐 함수를 가릴 수 없다 — 배포하지 않는다. workflow_dispatch 로 함수를 골라 배포할 것."
+              exit 1
+            fi
+            # supabase/functions/<함수>/<파일> → <함수>
+            cand=$(git diff --name-only "$BEFORE" "$AFTER" -- supabase/functions/ | awk -F/ 'NF>=4 {print $3}' | sort -u | tr '\n' ' ')
+          fi
+          deploy=""
+          for fn in $cand; do
+            if [[ " $ALLOWED " == *" $fn "* ]]; then
+              deploy="$deploy $fn"
+            else
+              echo "::notice::$fn — 허용 목록 밖이라 배포하지 않는다"
+            fi
+          done
+          deploy=$(echo $deploy)
+          echo "배포 대상: ${deploy:-(없음)}"
+          echo "functions=$deploy" >> "$GITHUB_OUTPUT"
+
+      - uses: supabase/setup-cli@v1
+        if: steps.pick.outputs.functions != ''
+        with:
+          version: 2.118.0
+
+      - name: 배포
+        if: steps.pick.outputs.functions != ''
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          FUNCS: ${{ steps.pick.outputs.functions }}
+        run: |
+          set -euo pipefail
+          for fn in $FUNCS; do
+            want=$(python3 -c 'import sys,tomllib; print(str(tomllib.load(open("supabase/config.toml","rb"))["functions"][sys.argv[1]]["verify_jwt"]).lower())' "$fn")
+            flag=""
+            if [ "$want" = "false" ]; then flag="--no-verify-jwt"; fi
+            echo "::group::$fn (verify_jwt=$want)"
+            supabase functions deploy "$fn" --project-ref "$PROJECT_REF" $flag
+            echo "::endgroup::"
+          done
+
+      - name: 배포 뒤 확인 — verify_jwt 가 config.toml 과 같은가 · 새 버전
+        if: steps.pick.outputs.functions != ''
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          FUNCS: ${{ steps.pick.outputs.functions }}
+        run: |
+          set -euo pipefail
+          fail=0
+          echo "| 함수 | 버전 | verify_jwt | config.toml |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| --- | ---: | --- | --- |" >> "$GITHUB_STEP_SUMMARY"
+          for fn in $FUNCS; do
+            want=$(python3 -c 'import sys,tomllib; print(str(tomllib.load(open("supabase/config.toml","rb"))["functions"][sys.argv[1]]["verify_jwt"]).lower())' "$fn")
+            meta=$(curl -fsS -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" "https://api.supabase.com/v1/projects/${PROJECT_REF}/functions/${fn}")
+            got=$(printf '%s' "$meta" | python3 -c 'import json,sys; print(str(json.load(sys.stdin).get("verify_jwt")).lower())')
+            ver=$(printf '%s' "$meta" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("version"))')
+            echo "$fn: version=$ver verify_jwt=$got (config.toml=$want)"
+            echo "| \`$fn\` | $ver | $got | $want |" >> "$GITHUB_STEP_SUMMARY"
+            if [ "$got" != "$want" ]; then
+              echo "::error::$fn verify_jwt 가 배포 뒤 $got 인데 config.toml 은 $want 다"
+              fail=1
+            fi
+          done
+          exit $fail

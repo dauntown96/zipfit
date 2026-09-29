@@ -149,9 +149,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-09-29 | **코드 회차 2 잔여 + 배포 자동화**(번호 미정) — `get_announcement_price_summary` `analysis_done`·`has_attachments`(SECURITY DEFINER · anon 실호출 가드) · 카드 문구 둘(v148 · PR #257) · 큐 첫 채움 제외·`attachment_reviewed_at` · backup 목록 · Edge Function 배포 워크플로 + 원칙 31. PR #258 |
 | 2026-09-29 | **코드 회차 2**(번호 미정) — 3 첨부 목록 변경 이력 표·트리거·재분석 큐 갈래 · 4 첫 화면 「분양」 삭제(v147) · 5 목포·보성은 설계만 · 🔴 1 `analysis_done`은 anon 권한으로 죽어 즉시 되돌림 → 정의자 함수 재적용은 분류기 거부로 ⏸(2·6도 ⏸). PR #256 |
 | 2026-09-29 | **EF 배포 회차 재개**(번호 미정) — 다운님 허용으로 `fetch-attachment` v8(`/upload/Files/`, 그림·PDF만)·`collect-announcements` v45(probe `dsSbdAhfl` · `last_seen_at` 매퍼) 배포 · LH 이미지 20 + 매입 홍보물 27 연결 · 5공고 「완료」 · `last_seen_at` DDL·RPC 칸·매핑(v146). PR #255 |
-| 2026-09-29 | **EF 배포 회차**(번호 미정) — EF 배포가 자동 모드 분류기에 거부돼 1 `fetch-attachment` `/upload/Files/`·2 LH 단지 이미지·3 probe·4 `last_seen_at`은 ⏸ · 6 불변식 v3.3(V9 `unit_key` · V10 경로 표 — 위반 4, 전부 category 「신청일정」) · 7 매칭 「분석된 공고」 축은 RPC가 필요해 설계만. PR #254 |
 
 ---
 
@@ -306,6 +306,12 @@ const requireEnv = (key: string): string => {
 - 🔴 **제안은 승인 없이 구현하지 않는다** — 지시서·요청서가 명시한 것만 만든다. 「작아서」·「명백해서」는 예외 사유가 아니다(원칙 23의 두 시험은 **잘못된 것을 고치는** 자리에만 선다).
 - 🔴 **우회로를 짜기 전에 「도구가 있으면 끝나는가」를 먼저 묻는다** — 스킬·MCP·에이전트·연동이 필요하면 다운님께 말한다(설치·연결은 다운님 몫). 찾을 때는 GitHub의 별 많은 저장소부터 본다. 요청할 때는 **무엇이 · 왜 · 없으면 무엇을 대신 하는지**를 한 줄씩 적는다.
 - ⚠️ 이 원칙은 권한을 넓히지 않는다 — 되돌리기 어려운 것(원칙 13 예외·원칙 23)은 그대로 멈추고 확인받는다.
+
+31. **Edge Function은 직접 배포하지 않는다 — `main` 병합이 배포다** (2026-09-29 신설 — 배포 자동화 회차)
+- `supabase/functions/**`를 고친 PR을 병합하면 `.github/workflows/deploy-functions.yml`이 **바뀐 함수만** 하나씩 배포한다. 🔴 병합 뒤 Actions 결과(성공 · 새 버전)를 회신 ④에 적는다.
+- 되돌리기는 이전 커밋으로 되돌린 PR, 또는 `workflow_dispatch`로 함수 하나를 재배포한다.
+- `verify_jwt`의 정본은 `supabase/config.toml`이다(배포 뒤 워크플로가 관리 API 값과 대조해 다르면 실패). 🔴 허용 목록 밖 함수(`fetch-attachment-probe` · `upsert-announcement`)는 배포하지 않는다 — 새 함수를 배포하려면 워크플로 `ALLOWED`·dispatch 선택지·`config.toml`을 같은 PR에서 고친다.
+- 토큰은 Actions Secret `SUPABASE_ACCESS_TOKEN`만 쓴다(저장소 설정은 다운님 몫).
 
 ---
 
