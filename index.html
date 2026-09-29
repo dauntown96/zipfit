@@ -139,6 +139,10 @@ select:focus,input:focus{border-color:#5DCAA5}
 .chip:hover{border-color:#5DCAA5}
 .chip.sel{background:#1D9E75;border-color:#1D9E75;color:#fff;font-weight:500}
 .chip-all{font-weight:600}
+/* 🔵 표시층 B ① — 카드 칩 행: 칩 단위로 줄을 바꾼다(칩 하나는 한 줄). 카드 폭보다 긴 칩만 말줄임 — 전문은 툴팁(zfTitleClippedChips) */
+.chip-row{display:flex;flex-wrap:wrap;align-items:center}
+.chip-row>*{white-space:nowrap;max-width:100%;min-width:0;overflow:hidden;text-overflow:ellipsis;box-sizing:border-box}
+.chip-row>:empty{display:none}
 /* 범위 입력 */
 .range-row{display:flex;align-items:center;gap:8px}
 .range-row input{flex:1}
@@ -188,9 +192,14 @@ details.pol-item>summary::after{content:' ▾';color:#aaa;font-weight:400}
 details.pol-item[open]>summary::after{content:' ▴'}
 details.pol-item>.policy-content{padding:0 12px 10px}
 .pol-empty{font-size:12px;color:#888;padding:6px 2px}
-/* 🔵 B62 ①② — 날짜 줄 아래 한 줄. 넘치면 말줄임, 누르면 펼친다 */
-.zf-route-line{font-size:12px;color:#8A5A12;background:#FBF0DC;border-radius:8px;padding:4px 10px;margin:-4px 0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
-.zf-route-line.open{white-space:normal}
+/* 🔵 B62 ①② — 날짜 줄 아래 한 줄. 🔵 표시층 B ② 접힌 상태는 두 줄까지(첫 날짜가 보이게) · 펼침 표시 ▾는 말줄임 밖 별도 칸 · 누르면 펼친다 */
+.zf-route-line{font-size:12px;color:#8A5A12;background:#FBF0DC;border-radius:8px;padding:4px 10px;margin:-4px 0 8px;cursor:pointer;display:flex;align-items:flex-start;gap:6px}
+.zf-route-text{flex:1;min-width:0;line-height:1.5;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;word-break:keep-all;overflow-wrap:anywhere}
+.zf-route-line.open .zf-route-text{display:block;-webkit-line-clamp:unset}
+.zf-route-more{flex-shrink:0;line-height:1.5;font-weight:700}
+.zf-route-more::after{content:'▾'}
+.zf-route-line.open .zf-route-more::after{content:'▴'}
+.zf-route-line.zf-fits .zf-route-more{display:none}
 /* 🔵 B62 ⑥ — 대기 예비자(원문 값) */
 .hu-wait-badge{padding:2px 9px;font-size:11px;cursor:help;display:inline-block;margin-left:6px;background:#F6F6F2;color:#6B6B63;border-color:#E8E8E0;font-weight:600}
 .zf-rentlow-head{margin:0 0 6px}
@@ -1363,6 +1372,7 @@ function zfLoadCardSide(){
 // 카드를 그린 뒤 부른다 — 곁 데이터가 이미 있으면 바로 채우고, 없으면 로드를 건다(도착하면 다시 채운다).
 function zfAfterCardsRender(){
   zfFillSideSlots();
+  zfTitleClippedChips();
   zfLoadCardSide();
 }
 
@@ -1457,8 +1467,9 @@ function zfFillSideSlots(){
     el.dataset.filled = '1';
     const v = zfRouteVerdict(zfSide.routesByKey.get(el.getAttribute('data-route-key')));
     if(!v.text) return;
-    // 한 줄을 넘치면 말줄임 · 전문은 툴팁(누르면 펼친다 — 손가락으로는 툴팁을 못 본다)
-    el.innerHTML = `<p class="zf-route-line" title="${zfAttr(v.text)}" onclick="event.stopPropagation();this.classList.toggle('open')">📅 ${escapeHtml(v.text)}</p>`;
+    // 두 줄을 넘치면 말줄임 · 전문은 툴팁(누르면 펼친다 — 손가락으로는 툴팁을 못 본다) · ▾는 말줄임 밖 칸
+    el.innerHTML = `<p class="zf-route-line" title="${zfAttr(v.text)}" onclick="event.stopPropagation();this.classList.toggle('open')"><span class="zf-route-text">📅 ${escapeHtml(v.text)}</span><span class="zf-route-more" aria-hidden="true"></span></p>`;
+    zfMarkRouteFits(el.firstElementChild);
     // 🔴 같은 뜻을 두 번 말하지 않는다 — 이 한 줄이 「단지마다 일정이 달라요」 배지를 대신한다.
     const card = el.closest('.hcard');
     if(card) card.querySelectorAll('.zf-varies').forEach(t => { t.style.display = 'none'; });
@@ -1469,6 +1480,38 @@ function zfFillSideSlots(){
     el.dataset.filled = '1';
     const rows = zfSide.rentLowByKey.get(el.getAttribute('data-rentlow-key'));
     if(rows && rows.length) el.outerHTML = zfRentLowChip(rows[0]);
+  });
+  zfTitleClippedChips();
+}
+// 표시층 B ② — 접힌 상태에서도 첫 날짜(M/D)가 든 줄까지는 보이게 줄 수를 늘린다(최소 두 줄).
+// 접힌 상자에 다 들어가면 펼침 표시를 숨긴다. 그려지지 않은 자리(높이 0)는 재지 않고 두 줄·표시를 둔다.
+function zfMarkRouteFits(p){
+  if(!p) return;
+  requestAnimationFrame(() => {
+    const t = p.querySelector('.zf-route-text');
+    if(!t || !t.clientHeight || p.classList.contains('open')) return;
+    const re = /\d{1,2}\/\d{1,2}/;
+    const node = [...t.childNodes].find(n => n.nodeType === 3 && re.test(n.textContent));
+    if(node){
+      const m = re.exec(node.textContent);
+      const rg = document.createRange();
+      rg.setStart(node, m.index); rg.setEnd(node, m.index + m[0].length);
+      const lh = parseFloat(getComputedStyle(t).lineHeight) || 18;
+      const need = Math.ceil((rg.getBoundingClientRect().bottom - t.getBoundingClientRect().top - 0.5) / lh);
+      if(need > 2) t.style.webkitLineClamp = String(need);
+    }
+    p.classList.toggle('zf-fits', t.scrollHeight <= t.clientHeight + 1);
+  });
+}
+// 표시층 B ① — 카드 폭보다 길어 말줄임이 된 칩에만 전문 툴팁을 단다(이미 툴팁이 있으면 앞에 전문을 붙인다).
+function zfTitleClippedChips(){
+  requestAnimationFrame(() => {
+    document.querySelectorAll('.chip-row > *').forEach(c => {
+      if(c.dataset.zfClipTip || !c.clientWidth || c.scrollWidth <= c.clientWidth + 1) return;
+      const txt = (c.textContent || '').trim();
+      c.dataset.zfClipTip = '1';
+      c.title = c.title && !c.title.includes(txt) ? txt + ' — ' + c.title : txt;
+    });
   });
 }
 // ⑤ 칩 — 비교 기준을 툴팁에 밝힌다. 🔴 권유·예측 문구를 붙이지 않는다.
