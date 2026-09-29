@@ -149,9 +149,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-09-29 | **EF 배포 회차 재개**(번호 미정) — 다운님 허용으로 `fetch-attachment` v8(`/upload/Files/`, 그림·PDF만)·`collect-announcements` v45(probe `dsSbdAhfl` · `last_seen_at` 매퍼) 배포 · LH 이미지 20 + 매입 홍보물 27 연결 · 5공고 「완료」 · `last_seen_at` DDL·RPC 칸·매핑(v146). PR #255 |
 | 2026-09-29 | **EF 배포 회차**(번호 미정) — EF 배포가 자동 모드 분류기에 거부돼 1 `fetch-attachment` `/upload/Files/`·2 LH 단지 이미지·3 probe·4 `last_seen_at`은 ⏸ · 6 불변식 v3.3(V9 `unit_key` · V10 경로 표 — 위반 4, 전부 category 「신청일정」) · 7 매칭 「분석된 공고」 축은 RPC가 필요해 설계만. PR #254 |
 | 2026-09-29 | **B64** — B63 후속(0-1 `batch_label` B61로 되돌림 · 0-2 경로 표 8행 삼척·정선 `…0090`·`…0581` → ②-가 · 0-3 태백장성 ⚠️ 역산 문장 걷음 · 0-4 `…0816` 변경 0) + 공고 분석 1건(대전충남 신혼·신생아Ⅰ 매입 `…20761` 세대 74 · 완료(보조 누락) · Ⅱ(전세형) `…20787`은 105호로 뺌) · 접수 전 분석률 18/16 → 18/17. PR #253 |
-| 2026-09-29 | **코드 회차**(번호 미정) — 카드 요약 가격에 임대조건 둘째 벌 포함(값이 바뀐 카드 43) · 확정 마감이 지난 행 status를 수집이 되돌리지 못하게 보호 트리거 한 조건 · 마지막 확인 시각·단지 섞임은 설계만 · `fetch-attachment` `/upload/Files/`는 배포 권한 막힘으로 ⏸. PR #252 |
 
 ---
 

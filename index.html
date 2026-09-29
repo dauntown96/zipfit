@@ -2146,6 +2146,9 @@ function zfMapNoticeRows(rows){
     //    이 두 줄이 없으면 ③(접수기간 확인 필요)·⑧(원문 확인 일정)이 조용히 안 뜬다(원칙 26).
     'apply_end_confirmed': r.apply_end_confirmed ?? null,
     'apply_period_check': r.apply_period_check ?? null,
+    // 🔵 2026-09-29(EF 회차 4) — 그룹을 수집이 원천에서 마지막으로 다시 본 시각. **매핑만** 한다(표시는 다음 표시층).
+    //    없으면 null 그대로 — SH 행·오래전 마감 그룹은 값이 없고, 「없음」과 「빈 문자열」을 섞지 않는다(원칙 26).
+    'last_seen_at': r.last_seen_at ?? null,
     'contract_start': r.contract_start||'',
     'contract_end': r.contract_end||'',
     'building_name': r.building_name||'',

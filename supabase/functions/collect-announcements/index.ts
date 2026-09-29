@@ -443,6 +443,9 @@ function mapLHRow(item: NoticeItem, sbds: SbdItem[], scdls: SplScdlItem[], ahflI
       url: san(a.AHFL_URL), label: san(a.SL_PAN_AHFL_DS_CD_NM), filename: san(a.CMN_AHFL_NM)
     })) : null,
     updated_at:        new Date().toISOString(),
+    // 🔴 원천(LH·MYHOME)에서 이 행을 다시 받아 쓴 시각(2026-09-29 EF 회차 4). 매퍼만 채운다 —
+    //   upsert 다섯 곳이 전부 이 매퍼를 거치고, markExpired·실패 기록·정정사유 보강은 거치지 않는다.
+    last_seen_at:      new Date().toISOString(),
   }
 }
 
@@ -541,6 +544,9 @@ function mapMyHomeRow(it: MyHomeItem) {
     building_name:     san(it['hsmpNm']),
     precise_address:   san(it['fullAdres']) || null,
     updated_at:        new Date().toISOString(),
+    // 🔴 원천(LH·MYHOME)에서 이 행을 다시 받아 쓴 시각(2026-09-29 EF 회차 4). 매퍼만 채운다 —
+    //   upsert 다섯 곳이 전부 이 매퍼를 거치고, markExpired·실패 기록·정정사유 보강은 거치지 않는다.
+    last_seen_at:      new Date().toISOString(),
   }
 }
 
@@ -1071,6 +1077,9 @@ async function probeDetail(item: NoticeItem): Promise<Record<string, unknown>> {
   const scdl = arrOf('dsSplScdl')
   const etc  = arrOf('dsEtcInfo')
   const ahfl = arrOf('dsAhflInfo')
+  // 🔵 2026-09-29 EF 회차 3 — 단지 이미지(평면도·조감도·배치도) 자동 수집 설계용 표본. 관측만 한다(수집·DB 쓰기 없음).
+  const sbdAhfl   = arrOf('dsSbdAhfl')
+  const sbdAhflNm = arrOf('dsSbdAhflNm')
 
   return {
     ...base,
@@ -1081,6 +1090,10 @@ async function probeDetail(item: NoticeItem): Promise<Record<string, unknown>> {
     ds_spl_scdl: scdl.slice(0, PROBE_MAX_ELEMENTS),
     ds_etc_info_count: etc.length,
     ds_ahfl_info_count: ahfl.length,
+    ds_sbd_ahfl_count: sbdAhfl.length,
+    ds_sbd_ahfl: sbdAhfl.slice(0, PROBE_MAX_ELEMENTS),
+    ds_sbd_ahfl_nm_count: sbdAhflNm.length,
+    ds_sbd_ahfl_nm: sbdAhflNm.slice(0, PROBE_MAX_ELEMENTS),
     // 🔴 C-3 (2026-09-17): 원문 옆에 **새 mapLHRow가 만들 행**을 함께 보여준다. DB에는
     // 쓰지 않는다 — 배포 직후 정기 런 전에 표본을 대조하려고 두는 것이다.
     mapped_row: mapLHRow(
