@@ -2727,11 +2727,35 @@ function zfSummaryLine(s){
 
 // 🔴 「준비 중」처럼 곧 될 것 같은 인상을 주지 않는다 — 언제 정리될지 정해져 있지 않다.
 // 대신 우리가 하는 일이 「공고 원문을 정리하는 것」임과, 지금 당장 어디를 보면 되는지를 적는다.
-function zfNotAnalyzedHtml(url){
+// 🔵 2026-09-29 코드 회차 2 잔여 — 문구만 갈아 끼울 수 있게 text 를 받는다(없으면 종전 문구). 상자·링크는 그대로.
+function zfNotAnalyzedHtml(url, text){
   const link = url
     ? ` <a href="${url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:#0F6E56;font-weight:600;text-decoration:underline">📄 공고 원문 보기</a>`
     : '';
-  return `<div style="font-size:12px;color:#6B6B63;background:#F6F6F2;border:1px solid #E8E8E0;border-radius:8px;padding:6px 10px;margin-bottom:6px">아직 공고 원문을 정리하지 못했어요 · 보증금·면적은 원문에서 확인해 주세요${link}</div>`;
+  return `<div style="font-size:12px;color:#6B6B63;background:#F6F6F2;border:1px solid #E8E8E0;border-radius:8px;padding:6px 10px;margin-bottom:6px">${text || '아직 공고 원문을 정리하지 못했어요 · 보증금·면적은 원문에서 확인해 주세요'}${link}</div>`;
+}
+
+// 🔵 2026-09-29 코드 회차 2 잔여 — 요약·세대가 빈 카드가 「왜」 비었는지를 RPC 두 칸으로 가른다(다운님 확정 문구).
+//    analysis_done   = 카드와 같은 회차(apply_end) 구성원에 완료 계열 분석이 있다 → 원문에 세대별 목록이 없는 것
+//    has_attachments = 그룹 구성원 누구든 첨부 목록이 있다 → 거짓이면 분석할 첨부 자체가 없다(원문 링크뿐)
+//    🔴 칸이 없는 옛 응답·조회 전·실패는 '' — 종전 문구 그대로. B62 ④ 게시물 링크가 붙는 카드도 '' — 링크를 그대로 둔다.
+const ZF_SUM_NO_UNITS   = '이 공고는 원문에 세대별 목록이 없어요 · 자격·일정은 펼쳐서 확인하세요';
+const ZF_SUM_LINK_ONLY  = '이 공고는 원문 링크만 제공해요 · 보증금·면적은 원문에서 확인해 주세요';
+const ZF_SEC_NO_UNITS   = '이 공고는 원문에 세대별 목록이 없어요. 공급 주택은 공고문에서 확인해 주세요.';
+const ZF_SEC_LINK_ONLY  = '이 공고는 원문 링크만 제공해요. 공고 원문에서 확인해 주세요.';
+function zfCardEmptyKind(s, key){
+  if(!s || typeof s.analysis_done !== 'boolean') return '';
+  if(key && zfPostLinkHtml(key)) return '';
+  if(s.analysis_done === true) return 'no_units';
+  if(s.has_attachments === false) return 'link_only';
+  return '';
+}
+// 상세 절(정책·자격·세대)은 카드 요약 자리([data-sum-for])에서 게시물 키를 읽어 같은 판정을 쓴다.
+function zfCardEmptyKindFor(annId){
+  const aid = String(annId ?? '');
+  if(!aid || !zfPriceCache.has(aid)) return '';
+  const el = [...document.querySelectorAll('[data-sum-for]')].find(e => e.getAttribute('data-sum-for') === aid);
+  return zfCardEmptyKind(zfPriceCache.get(aid), el ? el.getAttribute('data-sum-key') : '');
 }
 
 function zfFillSummarySlots(){
@@ -2750,7 +2774,10 @@ function zfFillSummarySlots(){
     // 🔵 B62 ④ — 미분석 MYHOME 카드가 같은 게시물의 LH 카드에 함께 정리돼 있으면 그리로 보낸다.
     el.innerHTML = line
       ? `<div style="${box}">${line}${s ? zfRoundTagHtml(s) : ''}</div>`
-      : (zfPostLinkHtml(el.getAttribute('data-sum-key')) || zfNotAnalyzedHtml(url));
+      : (zfPostLinkHtml(el.getAttribute('data-sum-key')) || (() => {
+          const kind = zfCardEmptyKind(s, el.getAttribute('data-sum-key'));
+          return zfNotAnalyzedHtml(url, kind === 'no_units' ? ZF_SUM_NO_UNITS : kind === 'link_only' ? ZF_SUM_LINK_ONLY : '');
+        })());
   });
 }
 
@@ -4310,7 +4337,10 @@ async function matchHouses(){
     await zfEnsurePriceSummaries(rows.map(r => r.announcement_id));
     rows.forEach(r => {
       const s = zfPriceCache.get(String(r.announcement_id));
-      r._zfAnalyzed = (s === undefined) ? null : !!(s && zfSummaryLine(s));
+      // 🔵 2026-09-29 코드 회차 2 잔여 — analysis_done 칸이 있으면 그 값(같은 회차 완료 계열 분석). 없는 옛 응답이면 종전 판정.
+      r._zfAnalyzed = (s === undefined) ? null
+        : (s && typeof s.analysis_done === 'boolean') ? s.analysis_done
+        : !!(s && zfSummaryLine(s));
     });
 
     lastFiltered = rows;
@@ -5698,7 +5728,7 @@ function loadAnnouncementPolicies(annId, detailEl, id, useGroup){
       otherPol = [];
     }
     if(!Array.isArray(policies) || policies.length === 0){
-      zfEmptySectionNote('policy-slot-'+id, '이 공고의 정책 안내는 아직 정리하지 못했어요. 공고 원문에서 확인해 주세요.');
+      zfEmptySectionNote('policy-slot-'+id, zfCardEmptyKindFor(annId) === 'link_only' ? ZF_SEC_LINK_ONLY : '이 공고의 정책 안내는 아직 정리하지 못했어요. 공고 원문에서 확인해 주세요.');
       return;
     }
     const polItemHtml = p => `
@@ -5831,7 +5861,7 @@ function loadPreciseEligibility(annId, detailEl, id, useGroup){
       });
     }
     if(!Array.isArray(rows) || rows.length === 0){
-      zfEmptySectionNote('elig-slot-'+id, '이 공고의 자격기준은 아직 정리하지 못했어요. 공고 원문에서 확인해 주세요.');
+      zfEmptySectionNote('elig-slot-'+id, zfCardEmptyKindFor(annId) === 'link_only' ? ZF_SEC_LINK_ONLY : '이 공고의 자격기준은 아직 정리하지 못했어요. 공고 원문에서 확인해 주세요.');
       return;
     }
     const wrap = document.createElement('details');
@@ -6143,7 +6173,10 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
       if(fb) initMapForHouse(fb, mid);
       else mapFail(mid, '위치 정보가 없어요', '세대정보도 폴백 주소도 없다(정밀주소·시군구 모두 비어 있음)');
       // 🔴 한 칸 카드 상세 경로에서만 안내를 넣는다 — 블록 본문에는 이미 .blk-empty가 있다(중복 방지).
-      if(!huFetchFailed && !huIsBlock) zfEmptySectionNote('hu-slot-'+id, '이 공고의 세대 정보는 아직 정리하지 못했어요. 공고 원문에서 확인해 주세요.');
+      if(!huFetchFailed && !huIsBlock){
+        const kind = zfCardEmptyKindFor(annId);
+        zfEmptySectionNote('hu-slot-'+id, kind === 'no_units' ? ZF_SEC_NO_UNITS : kind === 'link_only' ? ZF_SEC_LINK_ONLY : '이 공고의 세대 정보는 아직 정리하지 못했어요. 공고 원문에서 확인해 주세요.');
+      }
       return;
     }
     // 🔴 캐시는 접힌 행까지 그대로 담는다 — 지도 소스가 여기서 나오므로(첫 건물 주소),
