@@ -536,6 +536,17 @@ alter table public.housing_units drop constraint housing_units_extracted_pair,
 - **권한**: 칸 추가라 테이블 ACL·RLS 정책은 그대로다.
 - **`zipfit-backup`**: `schema_guard`가 칸 추가를 「추가」 알림으로 통과시킨다.
 
+### 2026-09-29 (B62) — 뷰 `kukmin_rent_per_sqm_rank` 신설 (국민임대 단지별 ㎡당 월임대료 순위)
+
+전문·되돌리기: `supabase/ddl/2026-09-29_b62.sql`.
+
+- **읽는 것**: `housing_units` × `announcements` × `housing_type_map`(`std_type='국민임대'`) — 셋 다 anon이 이미 읽는 표다.
+- **값**: 단지마다 `monthly_rent / area_sqm` 최저값 · 같은 단지가 여러 회차면 `announcement_date` 최댓값 회차. 단지 이름은 세대 머리 키(`building_name` → `address`)에서 끝 괄호 꼬리를 뗀 것(「구미옥계2」 = 「구미옥계2(6개동)」).
+- **비교군**: 주소 앞 두 낱말(시·도 약칭 `경북` 등 4개는 정식 이름으로) · 5곳 이상 · `rank × 3 ≤ 비교군 수`면 `is_low`.
+- **권한**: `security_invoker=true` · `revoke all … from public, anon, authenticated` 뒤 `grant select … to anon, authenticated`. ACL 조회 `{postgres=arwdDxtm,service_role=arwdDxtm,anon=r,authenticated=r}`.
+- **원칙 29**: anon `statement_timeout` 3s 조건 `EXPLAIN ANALYZE` 실행 18ms · 공개 REST(anon 키, `net.http_get`) 200 · `is_low` 39행.
+- **`zipfit-backup`**: `schema_guard`는 표·정책·함수·트리거만 대조한다 — 뷰는 대조 대상이 아니라 영향 없음(코드 변경 0).
+
 ## 함수 본문 변경 이력
 
 권한·DDL과 달리 이쪽은 **파일 diff가 곧 기록**이다. 아래는 그 diff를 어디서 찾는지와
