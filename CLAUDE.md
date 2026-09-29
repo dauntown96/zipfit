@@ -149,7 +149,7 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
-| 2026-09-29 | **코드 회차 2 잔여 + 배포 자동화**(번호 미정) — `get_announcement_price_summary` `analysis_done`·`has_attachments`(SECURITY DEFINER · anon 실호출 가드) · 카드 문구 둘(v148 · PR #257) · 큐 첫 채움 제외·`attachment_reviewed_at` · backup 목록 · Edge Function 배포 워크플로 + 원칙 31. PR #PRNO |
+| 2026-09-29 | **코드 회차 2 잔여 + 배포 자동화**(번호 미정) — `get_announcement_price_summary` `analysis_done`·`has_attachments`(SECURITY DEFINER · anon 실호출 가드) · 카드 문구 둘(v148 · PR #257) · 큐 첫 채움 제외·`attachment_reviewed_at` · backup 목록 · Edge Function 배포 워크플로 + 원칙 31. PR #258 |
 | 2026-09-29 | **코드 회차 2**(번호 미정) — 3 첨부 목록 변경 이력 표·트리거·재분석 큐 갈래 · 4 첫 화면 「분양」 삭제(v147) · 5 목포·보성은 설계만 · 🔴 1 `analysis_done`은 anon 권한으로 죽어 즉시 되돌림 → 정의자 함수 재적용은 분류기 거부로 ⏸(2·6도 ⏸). PR #256 |
 | 2026-09-29 | **EF 배포 회차 재개**(번호 미정) — 다운님 허용으로 `fetch-attachment` v8(`/upload/Files/`, 그림·PDF만)·`collect-announcements` v45(probe `dsSbdAhfl` · `last_seen_at` 매퍼) 배포 · LH 이미지 20 + 매입 홍보물 27 연결 · 5공고 「완료」 · `last_seen_at` DDL·RPC 칸·매핑(v146). PR #255 |
 
