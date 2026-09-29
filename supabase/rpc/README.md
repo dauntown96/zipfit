@@ -936,3 +936,14 @@ git show 3e82cb0:supabase/rpc/get_announcements_deduped.sql
 - **검증(한 트랜잭션 안 전후 비교)**: 카드 906 = 906 · 대표 ID 집합 diff 0 · 기존 62칸 값 변화 0(`to_jsonb(new) - 새 칸 = to_jsonb(old)`) · 판정 true 6. anon `statement_timeout` 3s 조건 `EXPLAIN ANALYZE` 전 148~172ms / 후 150~155ms · 공개 REST(anon 키, pg_net 경유) 200 · 906행.
 - **md5**: 전 `7b61f7e7…` → 후 `bc563416…`(= 이 파일).
 - **되돌리기**: 이 파일의 직전 커밋 정의로 `DROP` → `CREATE` → 세 역할 EXECUTE 재부여. 화면은 새 칸을 읽지 않으므로 되돌려도 화면 영향 0.
+
+### 2026-09-29 (코드 회차 3) — `get_announcements_deduped()` LH 다단지 단지명을 같은 회차 세대 행으로
+
+- **바뀐 것**: CTE 셋(`same_round_units` · `same_round_complex` · `complex_name`) + `building_name` 출력 한 줄(`COALESCE(cn.building_name, …)`) + `LEFT JOIN complex_name`. 반환형·다른 칸은 그대로라 `CREATE OR REPLACE`(ACL 불변 확인).
+- **규칙**: 대표 LH ∧ EF 접미 「 외 N개 단지」 ∧ 대표와 같은 `apply_end` 구성원에 세대 행 → 단지 키(건물 머리 키에서 꼬리 「(N개동)」만 뗌)를 세어 **접미 수와 다르고 2 이상일 때만** 「A 외 N-1개 단지」로 바꾼다. A = 종전 이름이 단지 키와 공백 무시 부분 일치하면 그대로 · 아니면 대표 주소 시군구의 단지 · 아니면 구성원 ID 순 첫 단지.
+  - 🔴 괄호 꼬리를 통째로 떼지 않는다 — 제주 `…0804` 「(H-1BL)」·「(H-2BL)」이 합쳐져 3 → 2가 됐다(설계 중 실측).
+  - ⚠️ 「완료 계열 분석」은 `announcement_analysis`가 anon에 닫혀 있어(INVOKER 함수) 같은 회차 세대 행 존재로 본다 — 접미 카드 중 같은 회차 세대 행이 있는 것은 전부 같은 회차 완료 계열(2026-09-29 실측).
+- **결과**: 바뀐 카드 2 — `…0667` 「보성운곡 국민임대 외 4개 단지」 → 「보성회정 외 3개 단지」 · `…0734` 「영암용앙2 외 6개 단지」 → 「영암용앙2 외 5개 단지」. `region_names`·`block_count`는 손대지 않았다(두 카드 모두 같은 회차 구성원 지역과 이미 같다).
+- **검증(적용 트랜잭션 안 · anon 역할)**: 911 = 911행 · 두 카드 밖 909행 전 칸 md5 불변 · 두 카드의 다른 칸 불변 · 115ms(anon 3s) · 공개 REST(anon 키, pg_net) 200 · 911행.
+- **md5**: 전 `7c2d92c6…` → 후 `107e74df…`(= 이 파일). 적용 2026-09-29 06:11:53 UTC.
+- **되돌리기**: 이 파일의 직전 커밋 정의로 `CREATE OR REPLACE`(반환형 같음 — DROP 불필요).
