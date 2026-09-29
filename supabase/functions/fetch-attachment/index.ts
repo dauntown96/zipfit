@@ -48,8 +48,11 @@ const matchCronSecret = (req: Request): boolean =>
 //   홉에만 걸린다). Drive·OAuth 호출은 아래 코드가 상수 URL로 직접 나가므로
 //   이 목록을 지나가지 않는다. 넣으면 가드가 넓어지기만 한다 —
 //   호출자가 googleapis 임의 URL을 우리를 통해 불러올 수 있게 된다.
+// 🔴 `/upload/Files/`는 LH 공고 페이지의 단지 이미지(평면도·조감도·배치도) 경로다(2026-09-29 EF 회차).
+//   첨부 경로(`/lhapply/`)와 달리 문서가 아니라 그림만 오는 자리라, 최종 응답 형식을
+//   `image/*`·`application/pdf`로 한 번 더 좁힌다(아래 typeReject — 아니면 415).
 const ALLOWED: Record<string, string[] | null> = {
-  'apply.lh.or.kr': ['/lhapply/'],
+  'apply.lh.or.kr': ['/lhapply/', '/upload/Files/'],
   'www.i-sh.co.kr': null,
   'i-sh.co.kr': null,
   'housing.seoul.go.kr': null,
@@ -119,6 +122,16 @@ const rejectReason = (u: URL): string | null => {
     return `허용되지 않은 path: ${u.hostname}${u.pathname}`
   }
   return null
+}
+
+// 이미지 경로의 형식 검사. 최종 URL(리다이렉트를 다 따라간 뒤)이 `/upload/Files/`일 때만 건다.
+// 통과하면 null, 막히면 사유 문자열.
+const IMAGE_ONLY_PREFIX = '/upload/Files/'
+const typeReject = (u: URL, contentType: string | null): string | null => {
+  if (u.hostname !== 'apply.lh.or.kr' || !u.pathname.startsWith(IMAGE_ONLY_PREFIX)) return null
+  const t = (contentType ?? '').split(';')[0].trim().toLowerCase()
+  if (t.startsWith('image/') || t === 'application/pdf') return null
+  return `이미지 경로인데 응답 형식이 그림·PDF가 아니다: ${t || '(없음)'}`
 }
 
 const toBase64 = (bytes: Uint8Array): string => {
@@ -920,6 +933,12 @@ Deno.serve(async (req: Request) => {
     if (!res) {
       clearTimeout(timer)
       return json({ ok: false, error: '응답이 없다' }, 502)
+    }
+    const whyType = typeReject(current, res.headers.get('content-type'))
+    if (whyType) {
+      await res.body?.cancel()
+      clearTimeout(timer)
+      return json({ ok: false, error: whyType, final_url: current.toString(), redirect_hops: hops }, 415)
     }
 
     const declared = res.headers.get('content-length')
