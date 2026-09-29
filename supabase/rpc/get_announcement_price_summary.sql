@@ -1,8 +1,15 @@
 CREATE OR REPLACE FUNCTION public.get_announcement_price_summary(p_ids text[])
- RETURNS TABLE(announcement_id text, deposit_min bigint, deposit_max bigint, rent_min bigint, rent_max bigint, area_min numeric, area_max numeric, round_state text, source_round date)
+ RETURNS TABLE(announcement_id text, deposit_min bigint, deposit_max bigint, rent_min bigint, rent_max bigint, area_min numeric, area_max numeric, round_state text, source_round date, analysis_done boolean, has_attachments boolean)
  LANGUAGE sql
- STABLE
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
 AS $function$
+  -- 🔴 2026-09-29 코드 회차 2 — SECURITY DEFINER 로 바꿨다. analysis_done 이 announcement_analysis 를 읽는데
+  --   그 표는 anon·authenticated 에 SELECT 가 없다(RLS 켜짐 · 정책 0 · 권한 service_role 만). INVOKER 그대로 두면
+  --   anon 호출이 permission denied 로 죽는다(2026-09-29 적용 직후 실측 → 즉시 되돌렸다).
+  --   그 표를 anon 에 열지 않는다(pending_fields 등 내부 기록). 이 함수가 내보내는 것은 공고마다 참/거짓 하나뿐이고,
+  --   나머지 재료(announcements · housing_units)는 SELECT 정책이 이미 `to anon, authenticated : true`라 새로 드러나는 것이 없다
+  --   (get_announcement_group_ids 와 같은 판단). search_path 는 정의자 함수라 고정한다.
   -- 🔴 그룹을 get_announcement_group_ids()로 id마다 부르지 않는다(집합으로 한 번에 편다).
   -- 그 함수는 호출마다 announcements를 두 번 훑고 announcement_dedup_key()를 전 행에 건다.
   -- 목록 1회분(840건)을 그렇게 부르면 17.3초였다(2026-09-14 EXPLAIN ANALYZE 실측).
@@ -34,14 +41,20 @@ AS $function$
                 then a.first_announcement_date
                 else a.announcement_date
            end as round_date,
-           coalesce(a.is_revised, false) as is_revised
+           coalesce(a.is_revised, false) as is_revised,
+           -- 🔵 2026-09-29 코드 회차 2 — 아래 flags 의 재료. 값 계산(보증금·월세·면적·회차)은 이 칸들을 읽지 않는다.
+           a.apply_end,
+           (jsonb_typeof(a.attachment_urls) = 'array' and jsonb_array_length(a.attachment_urls) > 0) as has_att,
+           exists (select 1 from public.announcement_analysis aa
+                   where aa.announcement_id = a.announcement_id
+                     and aa.status in ('완료', '완료(보조 누락)', '완료(판정 대기)', '완료(소급)')) as done
     from public.announcements a
     where a.title is not null
       and a.hidden_from_listing is not true
   ),
   -- 🔴 대상 행에는 hidden 필터를 걸지 않는다 — get_announcement_group_ids의 target CTE와 같다
   target as (
-    select distinct i.aid, public.announcement_dedup_key(a.title) as dedup_key
+    select distinct i.aid, public.announcement_dedup_key(a.title) as dedup_key, a.apply_end
     from ids i
     join public.announcements a on a.announcement_id = i.aid
   ),
@@ -80,13 +93,26 @@ AS $function$
     select c.aid, c.gid, c.gdate from cur c where c.aid in (select aid from cur_has)
     union
     select m.aid, m.gid, m.round_date from meta m where m.aid not in (select aid from cur_has)
-  )
+  ),
+  -- 🔵 2026-09-29 코드 회차 2 — 카드 상태 두 칸. 그룹은 위 meta 와 같은 축(dedup_key · title not null · hidden 아님).
+  --   analysis_done   = 카드(대표)와 **같은 apply_end** 구성원에 완료 계열 분석이 있는가 — get_reanalysis_queue 의
+  --                     「같은 회차 완료분 제외」·⑨ 5장 분석률 분자와 같은 축. 카드 apply_end 가 NULL 이면 거짓.
+  --   has_attachments = 그룹 구성원 누구든 attachment_urls 에 파일이 하나라도 있는가.
+  flags as (
+    select t.aid,
+           coalesce(bool_or(k.done and k.apply_end = t.apply_end), false) as analysis_done,
+           coalesce(bool_or(k.has_att), false)                            as has_attachments
+    from target t
+    join keyed k on k.dedup_key = t.dedup_key
+    group by t.aid
+  ),
+  agg as (
   select p.aid,
          -- 🔵 2026-09-29 코드 회차 — 세대 하나에 임대조건 두 벌(deposit/monthly_rent + deposit_priority1/rent_priority1)이면
          --    둘째 벌도 min~max에 넣는다. least/greatest는 NULL을 건너뛰므로 한 벌만 있는 행(supply_target 두 행 포함)은 값이 그대로다.
-         min(least(h.deposit, h.deposit_priority1))::bigint, max(greatest(h.deposit, h.deposit_priority1))::bigint,
-         min(least(h.monthly_rent, h.rent_priority1))::bigint, max(greatest(h.monthly_rent, h.rent_priority1))::bigint,
-         min(h.area_sqm), max(h.area_sqm),
+         min(least(h.deposit, h.deposit_priority1))::bigint as deposit_min, max(greatest(h.deposit, h.deposit_priority1))::bigint as deposit_max,
+         min(least(h.monthly_rent, h.rent_priority1))::bigint as rent_min, max(greatest(h.monthly_rent, h.rent_priority1))::bigint as rent_max,
+         min(h.area_sqm) as area_min, max(h.area_sqm) as area_max,
          -- 🔴 'unknown' 은 이제 **대표행의 회차 날짜가 없을 때 하나뿐**이다(2026-09-17).
          --    종전의 `any_revised and date_kinds >= 2` 는 「정정이 섞이면 날짜로 못 가린다」였는데,
          --    회차 날짜로는 같은 회차의 정정끼리 하나로 모여 가려진다.
@@ -105,5 +131,17 @@ AS $function$
   join public.housing_units h on h.announcement_id = p.gid
   join own o on o.aid = p.aid
   left join cur_has ch on ch.aid = p.aid
-  group by p.aid, o.own_date, ch.aid;
+  group by p.aid, o.own_date, ch.aid
+  )
+  -- 🔴 2026-09-29 코드 회차 2 — 세대정보가 없는 카드도 한 행을 돌려준다(값 칸은 전부 NULL · round_state NULL).
+  --   그래야 analysis_done·has_attachments 가 그 카드에 닿는다. 세대정보가 있는 카드의 값 칸은 종전과 한 글자도 같다.
+  --   화면은 값 칸이 전부 NULL 인 행을 종전의 「응답에 없음」과 같게 읽는다(zfSummaryLine 이 빈 문자열).
+  select t.aid,
+         g.deposit_min, g.deposit_max, g.rent_min, g.rent_max, g.area_min, g.area_max,
+         g.round_state, g.source_round,
+         coalesce(f.analysis_done, false), coalesce(f.has_attachments, false)
+  from (select distinct aid from target) t
+  left join agg g   on g.aid = t.aid
+  left join flags f on f.aid = t.aid;
 $function$
+
