@@ -22,6 +22,7 @@ on:
         type: choice
         options:
           - collect-announcements
+          - collect-lh-promo
           - collect-rental-stats
           - collect-sh-announcements
           - delete-account
@@ -37,7 +38,7 @@ concurrency:
 
 env:
   PROJECT_REF: khdpjjyspmlqtzperoqg
-  ALLOWED: collect-announcements collect-rental-stats collect-sh-announcements delete-account fetch-attachment save-user-profile
+  ALLOWED: collect-announcements collect-lh-promo collect-rental-stats collect-sh-announcements delete-account fetch-attachment save-user-profile
 
 jobs:
   deploy:
