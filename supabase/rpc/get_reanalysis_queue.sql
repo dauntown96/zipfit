@@ -1,5 +1,5 @@
 CREATE OR REPLACE FUNCTION public.get_reanalysis_queue()
- RETURNS TABLE(announcement_id text, source text, title text, announcement_date date, is_revised boolean, revision_note text, group_child_count bigint, donor_announcement_ids text[])
+ RETURNS TABLE(announcement_id text, source text, title text, announcement_date date, is_revised boolean, revision_note text, group_child_count bigint, donor_announcement_ids text[], queue_reason text)
  LANGUAGE sql
  STABLE
 AS $function$
@@ -42,7 +42,8 @@ grp AS (
 )
 SELECT w.announcement_id, w.source, w.title, w.announcement_date,
        w.is_revised, w.revision_note,
-       g.group_child_count, g.donors
+       g.group_child_count, g.donors,
+       '대표 산물 없음'::text AS queue_reason
 FROM winner w
 JOIN grp g ON g.dedup_key = w.dedup_key
 LEFT JOIN child_counts cw ON cw.announcement_id = w.announcement_id
@@ -61,5 +62,24 @@ WHERE COALESCE(cw.n, 0) = 0
       AND m.apply_end = w.apply_end
       AND aa.status IN ('완료', '완료(보조 누락)', '완료(판정 대기)', '완료(소급)')
   )
-ORDER BY g.group_child_count DESC, w.announcement_id;
+-- 🔵 2026-09-29 코드 회차 2 — 둘째 갈래 「분석 뒤 첨부 변경」: 완료 계열로 닫힌 공고인데 analyzed_at 뒤에
+--   첨부 목록이 바뀐 것(announcement_attachment_history 에 그 뒤 행이 있다). 대표 여부와 무관하게 분석된 그 ID 를 올린다.
+--   🔴 analyzed_at 은 처음 분석한 묶음 시각이다(재확인이 덮지 않는다 — 스킬 v9.3). 그래서 재확인 뒤에도 이 줄은 남는다 —
+--   재확인이 끝난 공고를 걷는 축은 아직 없다(pending_fields 의 날짜 줄로 사람이 가린다).
+--   group_child_count·donor_announcement_ids 는 이 갈래에서 NULL 이다(정렬에서 첫 갈래보다 앞에 온다 — DESC 는 NULL 먼저).
+UNION ALL
+SELECT a.announcement_id, a.source, a.title, a.announcement_date,
+       a.is_revised, a.revision_note,
+       NULL::bigint, NULL::text[],
+       '분석 뒤 첨부 변경'::text
+FROM announcement_analysis aa
+JOIN announcements a ON a.announcement_id = aa.announcement_id
+WHERE aa.status IN ('완료', '완료(보조 누락)', '완료(판정 대기)', '완료(소급)')
+  AND EXISTS (
+    SELECT 1 FROM announcement_attachment_history h
+    WHERE h.announcement_id = aa.announcement_id
+      AND h.seen_at > aa.analyzed_at
+  )
+ORDER BY 7 DESC, 1;
 $function$
+
