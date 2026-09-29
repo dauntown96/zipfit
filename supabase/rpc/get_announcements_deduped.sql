@@ -180,6 +180,49 @@ winner AS (
     CASE b.source WHEN 'LH' THEN 1 WHEN 'MYHOME' THEN 2 ELSE 3 END,
     b.created_at DESC,
     b.id ASC
+),
+-- 🔴 2026-09-29(코드 회차 3) — LH 다단지 카드의 단지명 「A 외 N개 단지」를 **같은 회차 세대 행**으로 다시 센다.
+--   EF 가 붙인 접미(dsSbd 수)는 원문이 모집하지 않는 단지까지 셀 수 있다 — 보성·순천·광양 …0667 은 「보성운곡 국민임대 외 4개 단지」
+--   (5)인데 같은 회차 세대 행은 4단지이고 보성운곡은 그 안에 없다 · 목포·무안·영암·완도 …0734 는 7 대 6.
+--   대상: 대표가 LH ∧ 대표 building_name 에 그 접미가 있음 ∧ 대표와 **같은 apply_end** 의 그룹 구성원에 세대 행이 있음.
+--   🔴 같은 회차만 센다 — 그룹의 옛 회차 세대 행까지 세면 원주무실 …0783 (3 → 7)·구미구평 …0709 (5 → 10)처럼 부푼다.
+--   ⚠️ 「완료 계열 분석이 있다」를 announcement_analysis 로 직접 보지 않는다 — 이 함수는 INVOKER 이고 그 표는 anon 에
+--      SELECT 가 없다(2026-09-29 요약 함수 장애와 같은 자리). 세대 행은 분석 반영으로만 생기므로 그것을 재료로 쓴다
+--      (2026-09-29 실측: 접미 카드 중 같은 회차 세대 행이 있는 것은 전부 같은 회차 완료 계열 분석이 있다).
+--   단지 키 = 건물 머리 키(화면 zfBuildingKeyOf 와 같은 식: building_name, 없으면 address)에서 꼬리 「(N개동)」·「(…, N개동)」만 뗀 것.
+--   🔴 괄호 꼬리를 통째로 떼지 않는다 — 제주 일도·삼도 …0804 의 「(H-1BL)」·「(H-2BL)」은 서로 다른 단지다(떼면 3 → 2).
+--   바꾸는 것은 **센 수가 접미의 수와 다르고 2 이상일 때만**이다 — 같으면 EF 이름을 그대로 둔다(대조군 불변).
+--   대표 이름 A: 종전 이름(접미를 뗀 것)이 같은 회차 단지 키와 공백 무시 부분 일치하면 그대로 · 아니면 대표 주소(region)의
+--   시군구에 있는 단지 · 그래도 없으면 구성원 ID 순 첫 단지. 형식 「A 외 N개 단지」는 종전과 같다.
+--   지역(region_names)·block_count 는 바꾸지 않는다 — 두 카드 모두 같은 회차 세대 행의 구성원 지역과 이미 같다(2026-09-29 대조).
+same_round_units AS (
+  SELECT w.dedup_key, w.building_name AS w_building_name, w.region AS w_region,
+    b.announcement_id AS gid, b.sido_nm, b.sigungu_nm,
+    regexp_replace(COALESCE(NULLIF(btrim(h.building_name), ''), h.address), '\s*\(([^()]*,\s*)?\d+개동\)\s*$', '') AS unit_key
+  FROM winner w
+  JOIN base b ON b.dedup_key = w.dedup_key AND b.apply_end = w.apply_end
+  JOIN public.housing_units h ON h.announcement_id = b.announcement_id
+  WHERE w.source = 'LH'
+    AND w.building_name ~ '\s외\s+\d+개\s*단지\s*$'
+),
+same_round_complex AS (
+  SELECT dedup_key,
+    max(w_building_name) AS w_building_name,
+    regexp_replace(max(w_building_name), '\s외\s+\d+개\s*단지\s*$', '') AS old_lead,
+    count(DISTINCT unit_key) AS n,
+    bool_or(position(regexp_replace(unit_key, '\s', '', 'g') IN regexp_replace(regexp_replace(w_building_name, '\s외\s+\d+개\s*단지\s*$', ''), '\s', '', 'g')) > 0
+         OR position(regexp_replace(regexp_replace(w_building_name, '\s외\s+\d+개\s*단지\s*$', ''), '\s', '', 'g') IN regexp_replace(unit_key, '\s', '', 'g')) > 0) AS lead_found,
+    (array_agg(unit_key ORDER BY (w_region LIKE sido_nm || ' ' || sigungu_nm || ' %') IS NOT TRUE, gid, unit_key))[1] AS fallback_lead
+  FROM same_round_units
+  WHERE unit_key IS NOT NULL AND unit_key <> ''
+  GROUP BY dedup_key
+),
+complex_name AS (
+  SELECT dedup_key,
+    CASE WHEN lead_found THEN old_lead ELSE fallback_lead END || ' 외 ' || (n - 1) || '개 단지' AS building_name
+  FROM same_round_complex
+  WHERE n >= 2
+    AND n <> substring(w_building_name FROM '\s외\s+(\d+)개\s*단지\s*$')::int + 1
 )
 SELECT
   w.id, w.source, w.announcement_id, w.title, w.region,
@@ -214,7 +257,8 @@ SELECT
   COALESCE(w.winner_announce_date, bs.best_winner_announce_date) AS winner_announce_date,
   COALESCE(w.contract_start, bs.best_contract_start) AS contract_start,
   COALESCE(w.contract_end, bs.best_contract_end) AS contract_end,
-  COALESCE(w.building_name, bs.best_building_name) AS building_name,
+  -- 🔴 2026-09-29(코드 회차 3) — 같은 회차 세대 행으로 다시 센 단지명이 있으면 그것(complex_name 주석).
+  COALESCE(cn.building_name, w.building_name, bs.best_building_name) AS building_name,
   w.attachment_urls,
   EXISTS (SELECT 1 FROM cancel_keys ck
           WHERE ck.orig_title_key = w.title_key
@@ -242,6 +286,7 @@ JOIN best_schedule bs ON bs.dedup_key = w.dedup_key
 JOIN first_seen fs ON fs.dedup_key = w.dedup_key
 LEFT JOIN region_set rs ON rs.dedup_key = w.dedup_key
 LEFT JOIN block_count bc ON bc.dedup_key = w.dedup_key
+LEFT JOIN complex_name cn ON cn.dedup_key = w.dedup_key
 LEFT JOIN public.supply_org_period_trust pt ON pt.supply_org = w.supply_org
 WHERE (
     p_region IS NULL
