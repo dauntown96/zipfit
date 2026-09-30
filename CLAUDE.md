@@ -73,6 +73,7 @@
   - 컨테이너에서 `*.supabase.co`는 프록시 403이다 — anon REST 확인(원칙 29)은 DB 안에서 `net.http_post(…)`로 부르고 `net._http_response`를 읽는다(B53).
   - 🔴 **지방공사 게시판 도메인(`gbdc.co.kr`·`gndc.co.kr` 등)도 컨테이너에서 프록시 403이다**(B56) — 게시판 **본문 텍스트**는 `net.http_get(…)`으로 받는다. 첨부 바이너리(hwp·pdf)는 `net._http_response.content`가 `text`라 깨져 받지 못하고, `fetch-attachment` 허용목록에도 없다 — 지방공사 공고 분석을 열 때 허용목록을 함께 연다.
 - ⚠️ **Drive `download_file_content`는 약 14KB 이하 작은 파일을 파일로 떨어뜨리지 않고 대화로 들인다**(B51 원주문막1 평면도) — base64를 되살릴 수 없어 판독 불가다. 서브에이전트에 맡기거나 다른 경로(`fetch-attachment` 등)로 받는다.
+- 🔴 **백업 덤프(`zipfit-backup/dumps/*.dump` — pg_dump 17 형식)를 조사에 쓸 때 컨테이너 `pg_restore` 16은 못 읽는다**(`unsupported version (1.16) in file header` — 2026-09-30 실측). **`pgdumplib`(설치돼 있다)로 읽는다** — `pgdumplib.load(경로)`.
 - **국토부 아파트 전월세 실거래 API** — 컨테이너 환경변수 `MOLIT_RENT_API_KEY`(이름만 적는다) · `https://apis.data.go.kr/1613000/RTMSDataSvcAptRent/getRTMSDataSvcAptRent`(`LAWD_CD` 5자리 · `DEAL_YMD` YYYYMM) · 🔴 **전북은 새 코드 `52xxx`**(군산 `52130` — 2026-08 totalCount 293, B51 실측) · 금액은 만원 단위 쉼표 문자열(`deposit`·`monthlyRent`).
 
 ---
@@ -150,9 +151,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-09-30 | **B71** — 대구경북 3차 신혼·신생아Ⅰ `…0840` 200호 완료(판정 대기 — 천수빌 18호 임대조건 공란 → NULL + ⚠️ 행) · 자격 4 · 정책 74 · 홍보물 16 연결 · 분석률 23/24→24/24 · 컨테이너 메모 `pgdumplib`. PR #278 |
 | 2026-09-30 | **표시층·필터** — LH 대표 카드 `status` 「…마감」이면 닫힘(덤프 43회분 · 풀린 것 0 · 영향 3장) · 「전국」 칩 제거·전국 모집은 모든 지역에(RPC 마이그레이션 02 · EF v46 `sidoOfNationwide` · 15행 정정) · 카드 아코디언 처음엔 접힘 · 맨 위로 버튼 · v150. PR #276 |
 | 2026-09-30 | **운영 — DDL도 PR 병합 = 적용** — `db-migrations.yml`(PR 되돌리기 전용 체크: 지문 전후·불변식·anon 3초·rpc md5·ACL 선언 · 병합 뒤 한 번만 적용·대조 · 실패 `db-apply` 이슈) · 기록 `zipfit_ops.schema_migrations` · 원칙 32 · 첫 시험 `get_announcement_blocks` 설명 — 체크 초록·적용·재실행 적용 0. PR #274 |
-| 2026-09-30 | **B70** — `…0856`·`…0824` 완료(보조 자료 없음 · 다운님 확인) · 대구경북 3차 청년매입 `…0838` 155호 완료(공고문=목록=LH=DB 155 · 자격 3 · 정책 70 · 홍보물 8 = 평면도 6·사진 2) · 분석률 22/24→23/24. PR #273 |
 
 ---
 
