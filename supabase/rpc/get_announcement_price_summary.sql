@@ -144,4 +144,3 @@ AS $function$
   left join agg g   on g.aid = t.aid
   left join flags f on f.aid = t.aid;
 $function$
-
