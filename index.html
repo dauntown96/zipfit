@@ -384,6 +384,14 @@ body.theme-dark .hu-ug-name,body.theme-dark .hu-ug-target,body.theme-dark .hu-ug
 .zf-footer a{font-size:12px;color:#888;text-decoration:none}
 body.theme-dark .zf-footer{border-top-color:#2c2f38}
 body.theme-dark .zf-footer a{color:#9aa0aa}
+/* 🔵 2026-09-30(표시층·필터) — 맨 위로 버튼. 화면 높이만큼 내려가면 나타난다(모든 탭 공통 · 한 개).
+   가로 자리는 .wrap(최대 720px) 오른쪽 안쪽에 맞춘다 — 넓은 화면에서 본문과 떨어져 뜨지 않게.
+   아래 탭 바가 없어 바닥에서 띄우는 것은 안전 영역(홈 인디케이터)뿐이다. 겹칠 수 있는 고정 요소는 사진 보기
+   오버레이(z-index 1000)뿐이라 그 아래(90)에 둔다 — 위쪽 탭 줄(sticky 100)과도 자리가 다르다. */
+.zf-totop{position:fixed;right:max(16px,calc((100vw - 720px) / 2 + 16px));bottom:calc(20px + env(safe-area-inset-bottom, 0px));z-index:90;width:44px;height:44px;border-radius:50%;border:1px solid #d8d8d0;background:#fff;color:#0F6E56;font-size:20px;line-height:1;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.15);display:flex;align-items:center;justify-content:center;opacity:0;visibility:hidden;transform:translateY(8px);transition:opacity .2s,transform .2s,visibility .2s}
+.zf-totop.show{opacity:1;visibility:visible;transform:none}
+.zf-totop:focus-visible{outline:2px solid #5DCAA5;outline-offset:2px}
+body.theme-dark .zf-totop{background:#262932;border-color:#3a3e48;color:#5DCAA5;box-shadow:0 2px 10px rgba(0,0,0,0.5)}
 </style>
 </head>
 <body>
@@ -918,6 +926,8 @@ body.theme-dark .zf-footer a{color:#9aa0aa}
 
 </div> <!-- /wrap -->
 
+<button type="button" id="zfToTop" class="zf-totop" aria-label="맨 위로" title="맨 위로" onclick="zfScrollToTop()">↑</button>
+
 
 <script>
 // ===== 공고 탭: 서버사이드 필터링 구조 =====
@@ -1151,6 +1161,13 @@ function applyWindowState(row){
   //    상시·수시모집은 애초에 winner_announce_date 가 NULL 이라(875건 중 408건) 이 가지를 타지 않는다.
   const w = parseNoticeDate(row['winner_announce_date']||'');
   if(w && startOfLocalDay(w) < today) return 'closed';
+  // 🔴 2026-09-30 — LH 가 대표인 카드는 LH 「…마감」을 날짜보다 먼저 믿는다(조기 마감 · 표시층·필터 회차).
+  //    LH 목록 API 의 PAN_SS 를 수집이 그대로 싣는다. 해당순위 접수가 공급량을 넘으면 후순위 접수일이 남아도
+  //    LH 가 「접수마감」으로 바꾼다(천안쌍용5-2 원문 「…후순위 접수는 받지 아니하며」).
+  //    [VERIFY] 백업 덤프 43회분(2026-08-11~09-29 · LH 1,014건): 마감일 전에 「접수마감」이 붙은 것 9건 —
+  //    7건은 마지막 날 새벽 스냅숏에서 처음 보였고 2건은 태백철암1(시작일 없음 · 취소공고 포함).
+  //    「마감」이 다시 풀린 경우 0건. 🔵 MYHOME 대표 카드는 종전(날짜) 그대로 — MYHOME status 는 늦게 따라온다.
+  if(String(row.source || '') === 'LH' && statusSaysClosed(row)) return 'closed';
   // 🔴 B62 ③ — 공사 공고와 수집 접수기간이 어긋나는 공사의 행(apply_period_check, RPC 판정)은 날짜를 믿지 않는다.
   //    그래서 접수 중·예정·마감 어느 쪽으로도 만들지 않고 'unknown' 으로 둔다. 목록 숨김은 isHiddenAsClosed 가
   //    종전 순서 그대로 가른다 — 마감일이 지났고 기관 status 가 「…마감」이면 여전히 숨는다(지금 참 6장 전부).
@@ -1163,6 +1180,13 @@ function applyWindowState(row){
   if(dS > 0)  return 'before';
   if(dE < 0)  return 'closed';
   return 'open';
+}
+// 🔴 2026-09-30(표시층·필터) — 실제 전국 모집(RPC region_top 「전국」)은 지역 칩이 아니다.
+//    지역 칩 목록에서 빼고, 어느 지역을 골라도 함께 뜬다(RPC get_announcements_deduped WHERE 와 같은 규칙).
+//    카드 표지는 region 「전국」 그대로라 「전국」으로 보인다.
+const ZF_NATIONWIDE = '전국';
+function zfIsNationwide(row){
+  return String((row && (row.region_top ?? row['지역대분류'])) || '') === ZF_NATIONWIDE;
 }
 function isAcceptingNow(row){ return applyWindowState(row) === 'open'; }
 function isUpcomingApply(row){ return applyWindowState(row) === 'before'; }
@@ -1632,7 +1656,7 @@ async function initNoticeFilters(){
     if(!res.ok) throw new Error('HTTP '+res.status);
     const rows = await res.json();
     // region_top, status_normalized는 RPC에서 이미 정규화된 값
-    const regions  = [...new Set(rows.map(r => r.region_top).filter(Boolean))].sort();
+    const regions  = [...new Set(rows.map(r => r.region_top).filter(v => v && v !== ZF_NATIONWIDE))].sort();
     const types    = [...new Set(rows.map(r => classifyNoticeType(r.housing_type||'', r.title||'')))].sort();
     // 🔴 상태 칩은 데이터에서 뽑지 않는다(2026-09-16) — 날짜 판정 네 상태로 고정이다.
     //    종전에는 `status_normalized`의 distinct(업스트림 문자열)였고 `p_status`로 서버가 걸렀다.
@@ -3180,7 +3204,7 @@ async function loadRegionsFromSupabase(){
       // 🔴 RPC가 이미 정규화한 region_top을 그대로 쓴다(2026-09-11). 종전에는 같은 rows에서
       // region을 다시 파싱해 칩을 만들었고, 그 결과가 메인 필터 칩(region_top 기준)과 838행 중
       // 83행에서 어긋났다 — 「서울」과 「서울특별시」가 따로 뜨고 「전라남도」가 통합 전 이름으로 남았다.
-      const seen=new Set(rows.map(r=>r.region_top).filter(Boolean));
+      const seen=new Set(rows.map(r=>r.region_top).filter(v=>v && v!==ZF_NATIONWIDE));
       allRegions=[...seen].sort();
     }
   }catch(e){
@@ -3330,7 +3354,7 @@ function renderPersonalizedRecommendations(){
     if(zfIsCancelRow(n['공고명'])) return false;
     // 🔴 칩이 region_top이 됐으므로 여기도 같은 값을 본다 — noticeData가 이미 담고 있다(1181행).
     // 다시 파싱하면 저장된 「서울특별시」가 region='서울'인 73행을 조용히 걸러낸다.
-    if(savedRegions.length && !savedRegions.includes(n['지역대분류'])) return false;
+    if(savedRegions.length && !savedRegions.includes(n['지역대분류']) && !zfIsNationwide(n)) return false;
     if(savedTypes.length && !savedTypes.some(t=>classifyNoticeType(n['공급유형'],n['공고명'])===t||n['공급유형']?.includes(t))) return false;
     return true;
   });
@@ -4430,7 +4454,7 @@ async function matchHouses(){
     // 🔴 B31 — 짝 없이 남은 [취소공고] 행도 매칭 후보가 아니다. 짝 판정(위)은 배지 링크를 담느라 먼저 돈다.
     rows = rows.filter(r => !zfIsCancelRow(r.title));
     if(regions.length > 0) {
-      rows = rows.filter(r => regions.some(rg => (r.region||'').includes(rg)));
+      rows = rows.filter(r => zfIsNationwide(r) || regions.some(rg => (r.region||'').includes(rg)));
     }
     matchNoTypeFilter = activeTypes.length === 0 && eligibleTypes.length === 0;
     if(activeTypes.length > 0) {
@@ -5702,7 +5726,9 @@ function zfPolicyBodyHtml(rows, cls, id){
   const chipsOf = p => zfPolClassOf(cls, p, 'user').filter(n => cls && cls.userOrder.has(n))
     .sort((a, b) => cls.userOrder.get(a) - cls.userOrder.get(b));
   zfPolState[id] = { rest, chips, chipsOf, pick: null, q: '' };
-  let html = pinned.map(p => zfPolItemHtml(p, { open: true, pinned: true })).join('');
+  // 🔴 2026-09-30(표시층·필터) — 카드 안 아코디언은 처음에 전부 접힌다(다운님 지시). 고정 행(⚠️·정정·모집일정)도
+  //    맨 위 자리는 그대로 두고 펼침만 걷었다. 검색 중 맞은 행 펼침·「모두 펼치기」는 사용자 동작이라 그대로다.
+  let html = pinned.map(p => zfPolItemHtml(p, { pinned: true })).join('');
   if(rows.length >= 10){
     html += `<input type="search" class="pol-search" placeholder="정책 안내에서 찾기" aria-label="정책 안내 검색" data-pol-id="${zfAttr(id)}" oninput="zfPolSearch(this)" onclick="event.stopPropagation()">`;
   }
@@ -6304,14 +6330,16 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
     //    그리는 같은 목록이라 한 자리만 줄 수로 바꾸면 나머지와 갈린다.
     const pastLineCount = countHousingUnitLines(pastUnits);
     const pastHtml = pastUnits.length
-      ? `<details class="hu-past"${pastOnly ? ' open' : ''}><summary class="hu-past-title">🕘 다른 회차 보기 (${pastLineCount}건)</summary>`
+      ? `<details class="hu-past"><summary class="hu-past-title">🕘 다른 회차 보기 (${pastLineCount}건)</summary>`
         + `<div class="hu-past-list">${renderHousingUnitList(pastUnits)}</div></details>`
       : '';
     const huTitle = pastOnly
       ? `🏠 세대별 정보 (다른 회차 ${pastLineCount}건)`
       : `🏠 세대별 정보 (${countHousingUnitLines(units)}건)`;
     wrap.innerHTML = `<summary class="hu-title">${huTitle}</summary>` + staleHtml + `<div class="hu-list" id="hu-list-${id}"></div>` + pastHtml;
-    if(groups.length === 1 || pastOnly) wrap.open = true; // 건물이 1개뿐이거나, 바깥에 안내만 있을 때는 펼쳐서 보여줌
+    // 🔴 2026-09-30(표시층·필터) — 종전에는 건물이 하나이거나 다른 회차만 있으면 펼쳐 두었다. 이제 처음엔 늘 접힌다
+    //    (다운님 지시 — 어떤 카드든). 다른 회차만 있는 카드의 배너는 「아래 「다른 회차 보기」에 있는 것은 …」이라
+    //    접힌 상태와 어긋나지 않는다.
     const slot = document.getElementById('hu-slot-'+id);
     if(slot){
       slot.appendChild(wrap);
@@ -6601,7 +6629,7 @@ function renderHousingUnitGroup(g){
       ${note}
     </div>`;
   }).join('');
-  return `<details class="hu-ug" open>
+  return `<details class="hu-ug">
     <summary><span class="hu-ug-name">${escapeHtml(g.group)}</span><span class="hu-ug-meta">${escapeHtml(headAreas + headCount)}</span>${zfUnitChipSlot(zfUnitTypeKey(g.units[0], g.group))}</summary>
     <div class="hu-ug-list">${body}</div>
   </details>`;
@@ -7961,6 +7989,21 @@ initNoticeFilters();
 </div>
 
 <script>
+// 🔵 2026-09-30(표시층·필터) — 맨 위로 버튼. 스크롤이 화면 높이를 넘으면 보인다. 조건은 스크롤 위치 하나라
+//    탭과 무관하다(모든 탭 공통). 스크롤마다 한 번만(requestAnimationFrame) 판정한다.
+(function(){
+  const btn = document.getElementById('zfToTop');
+  if(!btn) return;
+  let queued = false;
+  const update = () => { queued = false; btn.classList.toggle('show', (window.scrollY || document.documentElement.scrollTop || 0) > window.innerHeight); };
+  window.addEventListener('scroll', () => { if(!queued){ queued = true; requestAnimationFrame(update); } }, { passive: true });
+  window.addEventListener('resize', update, { passive: true });
+  update();
+})();
+function zfScrollToTop(){
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
+}
 if('serviceWorker' in navigator){
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/zipfit/sw.js').catch(e => console.warn('SW 등록 실패:', e));
