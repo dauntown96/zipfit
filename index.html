@@ -1188,6 +1188,26 @@ const ZF_NATIONWIDE = '전국';
 function zfIsNationwide(row){
   return String((row && (row.region_top ?? row['지역대분류'])) || '') === ZF_NATIONWIDE;
 }
+// 🔵 2026-09-30 — 지역 판정 한 벌. 매칭(matchHouses)·맞춤 추천(renderPersonalizedRecommendations)이 함께 부른다(사본 금지).
+//    규칙은 공고 탭의 목록 RPC(get_announcements_deduped WHERE)와 같다 — 대표 시도(region_top) · 걸친 시도
+//    (region_names 「시도 시군구」의 첫 마디) · 실제 전국 모집. 여기에 종전 매칭 규칙(region 문자열에 그 시도가 들어 있음)을
+//    그대로 더해 둔다 — 종전에 걸리던 행이 빠지지 않게(더하기만 한다).
+//    RPC 행(region_top·region_names·region)과 화면 행(지역대분류·region_names·지역) 둘 다 받는다.
+function zfRowSidos(row){
+  const out = new Set();
+  const top = String((row && (row.region_top ?? row['지역대분류'])) || '');
+  if(top) out.add(top);
+  const names = row && Array.isArray(row.region_names) ? row.region_names : [];
+  names.forEach(nm => { const sd = String(nm || '').split(' ')[0]; if(sd) out.add(sd); });
+  return out;
+}
+function zfInRegions(row, regions){
+  const rs = (regions || []).filter(Boolean);
+  if(!rs.length || zfIsNationwide(row)) return true;
+  const sidos = zfRowSidos(row);
+  const text = String((row && (row.region ?? row['지역'])) || '');
+  return rs.some(rg => sidos.has(rg) || text.includes(rg));
+}
 function isAcceptingNow(row){ return applyWindowState(row) === 'open'; }
 function isUpcomingApply(row){ return applyWindowState(row) === 'before'; }
 
@@ -1377,8 +1397,10 @@ function zfLoadCardSide(){
     links.forEach(l => {
       const lh = annById.get(l.lh_announcement_id);
       if(!lh || !l.linked_group_key) return;
-      zfSide.linkByKey.set(zfDedupKey(l.linked_group_key), { lhKey: zfDedupKey(lh.title), lhTitle: lh.title || '', lhUrl: lh.url || '' });
+      zfSide.linkByKey.set(zfDedupKey(l.linked_group_key), { lhKey: zfDedupKey(lh.title), lhTitle: lh.title || '', lhUrl: lh.url || '', lhId: String(l.lh_announcement_id) });
     });
+    // 🔵 2026-09-30 — 링크 문구가 LH 카드의 정리 여부를 보고 갈린다(zfPostLinkOrganized) — LH 카드 요약을 함께 받아 둔다.
+    await zfEnsurePriceSummaries([...new Set(links.map(l => String(l.lh_announcement_id || '')).filter(Boolean))]);
     low.forEach(r => {
       const k = zfDedupKey(r.title);
       if(!zfSide.rentLowByKey.has(k)) zfSide.rentLowByKey.set(k, []);
@@ -1549,14 +1571,26 @@ function zfRentLowSlotHtml(row, title){
 }
 
 // ── ④ 같은 게시물 링크 — MYHOME 카드가 미분석이면 함께 정리된 LH 카드로 보낸다 ──
+// 🔵 2026-09-30 — 링크가 있으면 true/false(LH 카드에 요약 줄이 있는가), 없으면 null.
+//    링크는 이제 수집 뒤 자동으로 생긴다(DB refresh_announcement_post_links) — LH 카드가 아직 미분석일 수 있어서
+//    「함께 정리돼 있어요」는 LH 카드 요약이 실제로 있을 때만 쓴다. 모르면(요약 조회 전·실패) false 쪽 문구다.
+function zfPostLinkOrganized(key){
+  const lk = key ? zfSide.linkByKey.get(key) : null;
+  if(!lk) return null;
+  const s = zfPriceCache.get(lk.lhId);
+  return !!(s && zfSummaryLine(s));
+}
 function zfPostLinkHtml(key){
   const lk = key ? zfSide.linkByKey.get(key) : null;
   if(!lk) return '';
   const lhRow = noticeData.find(n => zfDedupKey(n['공고명']) === lk.lhKey);
   const title = lhRow ? normalizeRevisedTitle(lhRow['공고명']) : lk.lhTitle;
+  const text = zfPostLinkOrganized(key)
+    ? `이 공고는 「${escapeHtml(title)}」 공고에 함께 정리돼 있어요 →`
+    : `이 공고는 「${escapeHtml(title)}」 공고와 같은 게시물에 올라왔어요 →`;
   return `<div style="font-size:12px;color:#1F5E4A;background:#F2F9F6;border:1px solid #DCEDE6;border-radius:8px;padding:6px 10px;margin-bottom:6px">`
     + `<a href="#" role="button" data-open-key="${zfAttr(lk.lhKey)}" onclick="event.preventDefault();event.stopPropagation();zfOpenNoticeByKey(this.dataset.openKey)" style="color:#0F6E56;font-weight:600;text-decoration:underline">`
-    + `이 공고는 「${escapeHtml(title)}」 공고에 함께 정리돼 있어요 →</a></div>`;
+    + `${text}</a></div>`;
 }
 // 제목 키로 공고 탭의 카드를 찾아 펼친다. 가린 필터가 있으면 걷고, 없는 쪽이면 그 쪽으로 넘긴다.
 async function zfOpenNoticeByKey(key){
@@ -2880,7 +2914,7 @@ const ZF_SEC_NO_UNITS   = '이 공고는 원문에 세대별 목록이 없어요
 const ZF_SEC_LINK_ONLY  = '이 공고는 원문 링크만 제공해요. 공고 원문에서 확인해 주세요.';
 function zfCardEmptyKind(s, key){
   if(!s || typeof s.analysis_done !== 'boolean') return '';
-  if(key && zfPostLinkHtml(key)) return '';
+  if(zfPostLinkOrganized(key) === true) return '';
   if(s.analysis_done === true) return 'no_units';
   if(s.has_attachments === false) return 'link_only';
   return '';
@@ -2909,10 +2943,13 @@ function zfFillSummarySlots(){
     // 🔵 B62 ④ — 미분석 MYHOME 카드가 같은 게시물의 LH 카드에 함께 정리돼 있으면 그리로 보낸다.
     el.innerHTML = line
       ? `<div style="${box}">${line}${s ? zfRoundTagHtml(s) : ''}</div>`
-      : (zfPostLinkHtml(el.getAttribute('data-sum-key')) || (() => {
-          const kind = zfCardEmptyKind(s, el.getAttribute('data-sum-key'));
-          return zfNotAnalyzedHtml(url, kind === 'no_units' ? ZF_SUM_NO_UNITS : kind === 'link_only' ? ZF_SUM_LINK_ONLY : '');
-        })());
+      : (zfPostLinkOrganized(el.getAttribute('data-sum-key')) === true
+          ? zfPostLinkHtml(el.getAttribute('data-sum-key'))
+          : zfPostLinkHtml(el.getAttribute('data-sum-key')) + (() => {
+              // 🔵 2026-09-30 — LH 카드도 미분석이면 링크(같은 게시물) 아래에 종전 안내를 그대로 둔다.
+              const kind = zfCardEmptyKind(s, el.getAttribute('data-sum-key'));
+              return zfNotAnalyzedHtml(url, kind === 'no_units' ? ZF_SUM_NO_UNITS : kind === 'link_only' ? ZF_SUM_LINK_ONLY : '');
+            })());
   });
   zfRefreshCovers();   // 🔵 2026-09-30 — 세대 행 지역이 방금 왔을 수 있다(표지 대표·곳 수)
 }
@@ -3354,7 +3391,7 @@ function renderPersonalizedRecommendations(){
     if(zfIsCancelRow(n['공고명'])) return false;
     // 🔴 칩이 region_top이 됐으므로 여기도 같은 값을 본다 — noticeData가 이미 담고 있다(1181행).
     // 다시 파싱하면 저장된 「서울특별시」가 region='서울'인 73행을 조용히 걸러낸다.
-    if(savedRegions.length && !savedRegions.includes(n['지역대분류']) && !zfIsNationwide(n)) return false;
+    if(!zfInRegions(n, savedRegions)) return false;   // 🔵 2026-09-30 — 걸친 시도까지(zfInRegions 한 벌)
     if(savedTypes.length && !savedTypes.some(t=>classifyNoticeType(n['공급유형'],n['공고명'])===t||n['공급유형']?.includes(t))) return false;
     return true;
   });
@@ -4454,7 +4491,7 @@ async function matchHouses(){
     // 🔴 B31 — 짝 없이 남은 [취소공고] 행도 매칭 후보가 아니다. 짝 판정(위)은 배지 링크를 담느라 먼저 돈다.
     rows = rows.filter(r => !zfIsCancelRow(r.title));
     if(regions.length > 0) {
-      rows = rows.filter(r => zfIsNationwide(r) || regions.some(rg => (r.region||'').includes(rg)));
+      rows = rows.filter(r => zfInRegions(r, regions));   // 🔵 2026-09-30 — 공고 탭과 같은 규칙(걸친 시도 · zfInRegions 한 벌)
     }
     matchNoTypeFilter = activeTypes.length === 0 && eligibleTypes.length === 0;
     if(activeTypes.length > 0) {
