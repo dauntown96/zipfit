@@ -8,16 +8,28 @@ AS $function$
 -- 중복이 생기면 LIMIT 1이 둘 중 하나를 조용히 골라 다른 공고의 블록을 돌려준다.
 -- 고르는 대신 일치하는 행들의 키를 전부 모아 받는다 — 중복 0건인 지금은 결과가 종전과 같고,
 -- 중복이 생기면 그룹이 합집합이 된다. ⚠️ 유니크 제약 신설은 영향이 넓어 여기서 하지 않는다.
-WITH target AS (
-  SELECT DISTINCT announcement_dedup_key(title) AS dedup_key
-  FROM announcements
-  WHERE announcement_id = p_announcement_id
+-- 🔴 2026-09-30(코드 — 같은 게시물은 LH 카드 한 장) — 그룹 키 = 링크 표에 있는 MYHOME 행이면 LH 행의 제목 키(get_announcement_group_ids 와 같은 규칙).
+--   LH 카드의 블록 목록에 붙은 공고문의 단지가 함께 선다.
+WITH link_map AS (
+  SELECT DISTINCT ON (l.linked_announcement_id)
+    l.linked_announcement_id AS aid, announcement_dedup_key(lh.title) AS lh_key
+  FROM public.announcement_post_links l
+  JOIN public.announcements lh ON lh.announcement_id = l.lh_announcement_id
+  WHERE lh.title IS NOT NULL AND lh.hidden_from_listing IS NOT TRUE
+  ORDER BY l.linked_announcement_id, l.lh_announcement_id
+),
+target AS (
+  SELECT DISTINCT COALESCE(lm.lh_key, announcement_dedup_key(a.title)) AS dedup_key
+  FROM announcements a
+  LEFT JOIN link_map lm ON lm.aid = a.announcement_id
+  WHERE a.announcement_id = p_announcement_id
 ),
 base AS (
   SELECT a.*,
-    announcement_dedup_key(a.title) AS dedup_key,
+    COALESCE(lm.lh_key, announcement_dedup_key(a.title)) AS dedup_key,
     trim(regexp_replace(a.precise_address, '\s*\([^)]*\)\s*$', '')) AS addr_core
   FROM announcements a
+  LEFT JOIN link_map lm ON lm.aid = a.announcement_id
   WHERE a.title IS NOT NULL
     AND a.hidden_from_listing IS NOT TRUE
 ),

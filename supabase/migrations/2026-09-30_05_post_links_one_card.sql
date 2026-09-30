@@ -1,3 +1,15 @@
+-- 코드 — 같은 게시물은 LH 카드 한 장(2026-09-30) — 같은 게시물 링크 표(announcement_post_links)에 있는 MYHOME 행을
+--   LH 카드 그룹에 붙인다(그룹 키 = LH 행의 제목 키). 목록 · 그룹 ID · 블록 · 가격 요약 네 함수가 같은 규칙을 쓴다.
+--   반환형·권한·SECURITY 그대로. 링크 표에 없는 행(같은 panId 의 다른 회차 — 천안쌍용5-2)은 그대로다.
+-- zipfit:function get_announcements_deduped(text,text,text) acl={=X/postgres,postgres=X/postgres,service_role=X/postgres,anon=X/postgres,authenticated=X/postgres} secdef=false
+-- zipfit:function get_announcement_group_ids(text) acl={=X/postgres,postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres} secdef=true
+-- zipfit:function get_announcement_blocks(text) acl={=X/postgres,postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres} secdef=false
+-- zipfit:function get_announcement_price_summary(text[]) acl={postgres=X/postgres,service_role=X/postgres,anon=X/postgres,authenticated=X/postgres} secdef=true
+-- zipfit:anon select * from get_announcements_deduped()
+-- zipfit:anon select * from get_announcements_deduped('충청남도')
+-- zipfit:anon select * from get_announcement_price_summary(array(select announcement_id from get_announcements_deduped()))
+-- zipfit:anon select * from get_announcement_blocks('2015122300020726')
+-- zipfit:anon select * from get_announcement_group_ids('2015122300020855')
 CREATE OR REPLACE FUNCTION public.get_announcements_deduped(p_region text DEFAULT NULL::text, p_type text DEFAULT NULL::text, p_status text DEFAULT NULL::text)
  RETURNS TABLE(id bigint, source text, announcement_id text, title text, region text, region_top text, sido_nm text, sigungu_nm text, housing_type text, supply_org text, announcement_date date, apply_start date, apply_end date, status text, status_normalized text, url text, is_revised boolean, area_min numeric, area_max numeric, rent_min integer, rent_max integer, deposit_min bigint, deposit_max bigint, total_units integer, move_in_date text, target_type text, heating_type text, created_at timestamp with time zone, updated_at timestamp with time zone, mymy_applicable boolean, supply_form text, application_method text, recruit_multiplier text, pair_announcement_key text, housing_change_allowed boolean, precise_address text, is_relaxed_recruitment boolean, relaxation_detail text, selection_method text, subscription_months_required integer, subscription_payments_required integer, contract_before_verification boolean, rent_exemption_until date, rent_exemption_note text, revision_note text, revised_at timestamp with time zone, special_notes jsonb, revised_at_source text, first_seen_at timestamp with time zone, doc_submit_announce_date date, doc_submit_start date, doc_submit_end date, winner_announce_date date, contract_start date, contract_end date, building_name text, attachment_urls jsonb, has_cancel_notice boolean, region_names text[], block_count integer, first_announcement_date date, schedule_varies boolean, apply_end_confirmed date, apply_period_check boolean, last_seen_at timestamp with time zone)
  LANGUAGE sql
@@ -362,3 +374,358 @@ WHERE (
     OR (p_status <> '정정공고' AND w.status = p_status)
   );
 $function$
+;
+
+CREATE OR REPLACE FUNCTION public.get_announcement_group_ids(p_announcement_id text)
+ RETURNS TABLE(announcement_id text)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+AS $function$
+-- 🔴 STABLE이다(2026-09-12 강등). 본문이 순수 SELECT 하나이고 쓰기·now()·난수·nextval이
+-- 전부 0건이라 VOLATILE이어야 할 이유가 없었다. 같은 계열 get_announcement_blocks·
+-- get_announcements_deduped가 이미 STABLE이라 이 함수만 달랐다.
+--
+-- 🔴 SECURITY DEFINER는 그대로 둔다 — 돌려주는 값이 announcement_id 목록뿐이고
+-- announcements의 SELECT 정책이 이미 `to anon, authenticated : true`라 지금 노출되는 것이 없다.
+-- 바꿀 이유가 없으면 바꾸지 않는다.
+--
+-- 🔴 target에서 LIMIT 1을 걷어냈다(2026-09-12).
+-- announcement_id 단독에는 유니크 제약이 없다 — 제약은 UNIQUE (source, announcement_id)다.
+-- 지금 중복이 0건이라 LIMIT 1이 안 터졌을 뿐, 막고 있던 것은 제약이 아니라 우연이었다.
+-- 중복이 생기면 LIMIT 1은 둘 중 하나를 조용히 골라 다른 공고의 그룹을 돌려준다.
+-- 그래서 고르지 않는다 — 일치하는 행들의 키를 전부 모아 IN으로 받는다.
+--   · 중복 0건인 지금은 결과가 종전과 완전히 같다(키가 언제나 1개다)
+--   · 중복이 생기면 그룹이 합집합이 된다. 더 보여줄지언정 다른 공고를 보여주지는 않는다
+-- ⚠️ 유니크 제약을 새로 거는 것이 근본 처방이나 DDL은 영향이 넓어 여기서 하지 않는다.
+--
+-- 🔴 2026-09-30(코드 — 같은 게시물은 LH 카드 한 장) — 그룹 키 = 링크 표에 있는 MYHOME 행이면 LH 행의 제목 키, 아니면 자기 제목 키.
+--   목록 RPC get_announcements_deduped 의 link_map 과 같은 규칙이다(함께 바꾼다). LH 카드를 열면 붙은 공고문의 산물이 함께 온다.
+WITH link_map AS (
+  SELECT DISTINCT ON (l.linked_announcement_id)
+    l.linked_announcement_id AS aid, announcement_dedup_key(lh.title) AS lh_key
+  FROM public.announcement_post_links l
+  JOIN public.announcements lh ON lh.announcement_id = l.lh_announcement_id
+  WHERE lh.title IS NOT NULL AND lh.hidden_from_listing IS NOT TRUE
+  ORDER BY l.linked_announcement_id, l.lh_announcement_id
+),
+keyed AS (
+  SELECT a.announcement_id, a.title, a.hidden_from_listing,
+    COALESCE(lm.lh_key, announcement_dedup_key(a.title)) AS dedup_key
+  FROM announcements a
+  LEFT JOIN link_map lm ON lm.aid = a.announcement_id
+),
+target AS (
+  SELECT DISTINCT dedup_key
+  FROM keyed
+  WHERE announcement_id = p_announcement_id
+)
+SELECT k.announcement_id
+FROM keyed k
+WHERE k.title IS NOT NULL
+  AND k.hidden_from_listing IS NOT TRUE
+  AND k.dedup_key IN (SELECT dedup_key FROM target);
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.get_announcement_blocks(p_announcement_id text)
+ RETURNS TABLE(precise_address text, total_units integer, announcement_id text, source text)
+ LANGUAGE sql
+ STABLE
+AS $function$
+-- 🔴 target에서 LIMIT 1을 걷어냈다(2026-09-12) — get_announcement_group_ids와 같은 처리다.
+-- announcement_id 단독에는 유니크 제약이 없다(제약은 UNIQUE (source, announcement_id)).
+-- 중복이 생기면 LIMIT 1이 둘 중 하나를 조용히 골라 다른 공고의 블록을 돌려준다.
+-- 고르는 대신 일치하는 행들의 키를 전부 모아 받는다 — 중복 0건인 지금은 결과가 종전과 같고,
+-- 중복이 생기면 그룹이 합집합이 된다. ⚠️ 유니크 제약 신설은 영향이 넓어 여기서 하지 않는다.
+-- 🔴 2026-09-30(코드 — 같은 게시물은 LH 카드 한 장) — 그룹 키 = 링크 표에 있는 MYHOME 행이면 LH 행의 제목 키(get_announcement_group_ids 와 같은 규칙).
+--   LH 카드의 블록 목록에 붙은 공고문의 단지가 함께 선다.
+WITH link_map AS (
+  SELECT DISTINCT ON (l.linked_announcement_id)
+    l.linked_announcement_id AS aid, announcement_dedup_key(lh.title) AS lh_key
+  FROM public.announcement_post_links l
+  JOIN public.announcements lh ON lh.announcement_id = l.lh_announcement_id
+  WHERE lh.title IS NOT NULL AND lh.hidden_from_listing IS NOT TRUE
+  ORDER BY l.linked_announcement_id, l.lh_announcement_id
+),
+target AS (
+  SELECT DISTINCT COALESCE(lm.lh_key, announcement_dedup_key(a.title)) AS dedup_key
+  FROM announcements a
+  LEFT JOIN link_map lm ON lm.aid = a.announcement_id
+  WHERE a.announcement_id = p_announcement_id
+),
+base AS (
+  SELECT a.*,
+    COALESCE(lm.lh_key, announcement_dedup_key(a.title)) AS dedup_key,
+    trim(regexp_replace(a.precise_address, '\s*\([^)]*\)\s*$', '')) AS addr_core
+  FROM announcements a
+  LEFT JOIN link_map lm ON lm.aid = a.announcement_id
+  WHERE a.title IS NOT NULL
+    AND a.hidden_from_listing IS NOT TRUE
+),
+group_rows AS (
+  SELECT b.*
+  FROM base b
+  WHERE b.dedup_key IN (SELECT dedup_key FROM target)
+),
+-- ⭐ 2026-07-17 수정: distinct 주소 카운트를 MYHOME 소스 기준으로만 계산.
+-- LH의 precise_address는 종종 서술형("OO동·OO동 일원")이라 같은 물리적 단지를
+-- MYHOME과 다른 텍스트로 표현하는 경우가 있어(군포대야미 실측 사례), 이를 그대로
+-- 카운트에 포함하면 단일 단지가 가짜로 다단지 처리되는 문제가 있었음.
+-- MYHOME 주소가 하나도 없는 그룹(레거시/일부 LH전용 케이스 대비)에는 기존 방식(전체 소스 카운트)으로 폴백.
+myhome_addr_count AS (
+  SELECT count(DISTINCT addr_core) AS n
+  FROM group_rows
+  WHERE source = 'MYHOME' AND addr_core IS NOT NULL AND addr_core <> ''
+),
+myhome_has_any AS (
+  SELECT count(*) > 0 AS has_any
+  FROM group_rows
+  WHERE source = 'MYHOME' AND addr_core IS NOT NULL AND addr_core <> ''
+),
+distinct_addr_count AS (
+  SELECT CASE
+    WHEN (SELECT has_any FROM myhome_has_any) THEN (SELECT n FROM myhome_addr_count)
+    ELSE (SELECT count(DISTINCT addr_core) FROM group_rows WHERE addr_core IS NOT NULL AND addr_core <> '')
+  END AS n
+),
+multi_blocks AS (
+  SELECT DISTINCT ON (g.addr_core)
+    COALESCE(
+      (SELECT g2.precise_address FROM group_rows g2
+       WHERE g2.addr_core = g.addr_core AND g2.precise_address IS NOT NULL
+       ORDER BY CASE WHEN g2.source='LH' THEN 0 ELSE 1 END, length(g2.precise_address) DESC, g2.created_at DESC, g2.id DESC LIMIT 1),
+      g.precise_address
+    ) AS precise_address,
+    -- 🔴 2026-09-17 — 고른 행 **자신의** 세대수다. 종전에는 같은 addr_core 의 그룹 전체에서
+    --   min(total_units) 을 가져왔는데, group_rows 는 제목 축이라 **지난 회차 행까지 들어온다.**
+    --   그래서 블록 머리의 announcement_id·source(라벨) 는 이 행 것인데 세대수만 다른 행 것이
+    --   될 수 있었다. 실측(2026-09-17, 모수 get_announcements_deduped() · status<>'접수마감' ·
+    --   블록 2개 이상): 블록 154개 중 1개가 그랬다 — 경북서부 김천시 무실7길 38 이 자기 행의
+    --   20 대신 지난 회차(2026-07-15) 행의 5 를 보여 줬다.
+    -- ⚠️ min 을 쓴 의도는 어디에도 기록돼 있지 않다(코드 주석·docs/history.md·git log·⑩ 모두 0).
+    --   짐작되던 「같은 주소의 LH(단지 총세대수)와 MYHOME(모집 세대수) 중 작은 쪽」은 지금 발화하지
+    --   않는다 — 같은 addr_core 에 두 소스가 함께 있는 블록이 **0개**다(같은 실측).
+    g.total_units,
+    g.announcement_id, g.source
+  FROM group_rows g, distinct_addr_count c
+  WHERE c.n >= 2 AND g.addr_core IS NOT NULL AND g.addr_core <> ''
+  ORDER BY g.addr_core,
+    CASE WHEN g.source = 'LH' THEN 0 ELSE 1 END,
+    g.created_at DESC,
+    -- 🔴 2026-09-21 — 결정적 꼬리키. created_at 까지 완전히 같은 행이 실재한다
+    --   (양산 21282_* · 21283_* 가 2026-09-17 02:10:55.247566+00 로 동일).
+    --   그러면 승자가 물리적 행 순서로 갈리고, 수집 크론이 그 행을 UPDATE 할 때마다 바뀐다
+    --   — 같은 호출이 물금5를 21282_4 로 돌려줬다가 21283_4 로 돌려줬다(2026-09-21 실측).
+    --   id 는 PK 라 동률이 없고, DESC 는 앞의 created_at DESC 와 방향이 같다.
+    g.id DESC
+),
+single_repr AS (
+  SELECT
+    COALESCE(
+      (SELECT g2.precise_address FROM group_rows g2
+       WHERE g2.precise_address IS NOT NULL
+       ORDER BY CASE WHEN g2.source='LH' THEN 0 ELSE 1 END, length(g2.precise_address) DESC, g2.created_at DESC, g2.id DESC LIMIT 1),
+      NULL
+    ) AS precise_address,
+    g.total_units,   -- 🔴 위와 같은 이유. 고른 행 자신의 값이다(2026-09-17).
+    g.announcement_id, g.source
+  FROM group_rows g, distinct_addr_count c
+  WHERE c.n < 2
+  ORDER BY CASE WHEN g.source = 'LH' THEN 0 ELSE 1 END, g.created_at DESC, g.id DESC
+  LIMIT 1
+)
+SELECT * FROM multi_blocks
+UNION ALL
+SELECT * FROM single_repr;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.get_announcement_price_summary(p_ids text[])
+ RETURNS TABLE(announcement_id text, deposit_min bigint, deposit_max bigint, rent_min bigint, rent_max bigint, area_min numeric, area_max numeric, round_state text, source_round date, analysis_done boolean, has_attachments boolean, unit_places jsonb)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+  -- 🔴 2026-09-29 코드 회차 2 — SECURITY DEFINER 로 바꿨다. analysis_done 이 announcement_analysis 를 읽는데
+  --   그 표는 anon·authenticated 에 SELECT 가 없다(RLS 켜짐 · 정책 0 · 권한 service_role 만). INVOKER 그대로 두면
+  --   anon 호출이 permission denied 로 죽는다(2026-09-29 적용 직후 실측 → 즉시 되돌렸다).
+  --   그 표를 anon 에 열지 않는다(pending_fields 등 내부 기록). 이 함수가 내보내는 것은 공고마다 참/거짓 하나뿐이고,
+  --   나머지 재료(announcements · housing_units)는 SELECT 정책이 이미 `to anon, authenticated : true`라 새로 드러나는 것이 없다
+  --   (get_announcement_group_ids 와 같은 판단). search_path 는 정의자 함수라 고정한다.
+  -- 🔴 그룹을 get_announcement_group_ids()로 id마다 부르지 않는다(집합으로 한 번에 편다).
+  -- 그 함수는 호출마다 announcements를 두 번 훑고 announcement_dedup_key()를 전 행에 건다.
+  -- 목록 1회분(840건)을 그렇게 부르면 17.3초였다(2026-09-14 EXPLAIN ANALYZE 실측).
+  -- 판정 규칙은 그 함수와 글자 그대로 같다 — dedup_key 일치 · title not null · hidden 아님.
+  --
+  -- 🔴 round_state·source_round 는 2026-09-16에 **더한** 것이다.
+  -- 값(보증금·월세·면적) 계산은 한 글자도 바꾸지 않았다 — 어느 회차에서 온 값인지를
+  -- 화면이 말할 수 있게 **이름표만** 붙인다.
+  --
+  -- 🔴 2026-09-17 개정 — 회차 축을 announcement_date 에서 **회차 날짜**로 옮겼다.
+  --   한 행의 회차 날짜 = is_revised 이고 first_announcement_date 가 있으면 그것, 아니면 announcement_date.
+  --   LH 목록의 PAN_DT(first_announcement_date)가 정정공고에서도 원공고일을 유지하므로,
+  --   같은 회차의 정정끼리는 **하나로 모이고** 회차끼리는 갈린다(2026-09-17 tp=06 300행 실측).
+  -- 🔴 그래서 `any_revised and date_kinds >= 2 -> 'unknown'` 선판정을 걷었다. 그것은 「정정이 섞이면
+  --   날짜로 회차를 가릴 수 없다」는 사실 때문에 있던 것인데, 회차 날짜로는 가려진다.
+  --   실측: 세대정보 있는 활성 그룹에서 'unknown' 15건이 전부 current/past 로 갈렸고
+  --   기존 current·past 는 한 건도 뒤집히지 않았다.
+  -- ⚠️ 'unknown' 은 **대표행의 회차 날짜 자체가 null 일 때만** 남는다(그때는 비교할 축이 없다).
+  -- 🔴 이 규칙은 화면 zfNoticeDate() 와 같은 관문이다. 언어가 달라 코드를 공유할 수 없으므로
+  --   **두 판정을 전 그룹으로 대조하는 것**이 이 사본의 검증 방법이다(회차마다 다시 돌린다).
+  -- 🔴 2026-09-30(코드 — 같은 게시물은 LH 카드 한 장) — 그룹 키 = 링크 표에 있는 MYHOME 행이면 LH 행의 제목 키
+  --   (get_announcement_group_ids 와 같은 규칙). LH 카드 요약에 붙은 공고문의 세대 행이 함께 든다.
+  with ids as (
+    select distinct x as aid from unnest(p_ids) x where x is not null
+  ),
+  link_map as materialized (
+    select distinct on (l.linked_announcement_id)
+      l.linked_announcement_id as aid, public.announcement_dedup_key(lh.title) as lh_key
+    from public.announcement_post_links l
+    join public.announcements lh on lh.announcement_id = l.lh_announcement_id
+    where lh.title is not null and lh.hidden_from_listing is not true
+    order by l.linked_announcement_id, l.lh_announcement_id
+  ),
+  -- 목록에 실릴 수 있는 전 공고의 dedup_key를 한 번만 만든다
+  keyed as materialized (
+    select a.announcement_id as gid,
+           coalesce(lm.lh_key, public.announcement_dedup_key(a.title)) as dedup_key,
+           (lm.aid is not null) as linked_in,
+           case when coalesce(a.is_revised, false) and a.first_announcement_date is not null
+                then a.first_announcement_date
+                else a.announcement_date
+           end as round_date,
+           coalesce(a.is_revised, false) as is_revised,
+           -- 🔵 2026-09-29 코드 회차 2 — 아래 flags 의 재료. 값 계산(보증금·월세·면적·회차)은 이 칸들을 읽지 않는다.
+           a.apply_end,
+           (jsonb_typeof(a.attachment_urls) = 'array' and jsonb_array_length(a.attachment_urls) > 0) as has_att,
+           exists (select 1 from public.announcement_analysis aa
+                   where aa.announcement_id = a.announcement_id
+                     and aa.status in ('완료', '완료(보조 누락)', '완료(판정 대기)', '완료(소급)')) as done
+    from public.announcements a
+    left join link_map lm on lm.aid = a.announcement_id
+    where a.title is not null
+      and a.hidden_from_listing is not true
+  ),
+  -- 🔴 대상 행에는 hidden 필터를 걸지 않는다 — get_announcement_group_ids의 target CTE와 같다
+  target as (
+    select distinct i.aid, coalesce(lm.lh_key, public.announcement_dedup_key(a.title)) as dedup_key, a.apply_end
+    from ids i
+    join public.announcements a on a.announcement_id = i.aid
+    left join link_map lm on lm.aid = a.announcement_id
+  ),
+  meta as (
+    select t.aid, k.gid, k.round_date, k.is_revised
+    from target t
+    join keyed k on k.dedup_key = t.dedup_key
+  ),
+  own as (
+    select m.aid,
+           max(m.round_date) filter (where m.gid = m.aid) as own_date,
+           count(distinct m.round_date)                   as date_kinds
+    from meta m
+    group by m.aid
+  ),
+  -- ① 이번 회차 후보 — roundInfoFor()의 판정과 같다
+  -- 🔵 round_date 를 함께 들고 간다(source_round 재료). gid 가 날짜를 결정하므로
+  --    UNION 의 행 집합은 달라지지 않는다.
+  -- ⚠️ own_date 가 null 이면 `m.round_date = o.own_date` 가 전부 null(거짓)이라 이 CTE 가 비고,
+  --    cur_has 도 비어 아래 ③ 이 그룹 전체를 되돌린다 — 그 상태를 'unknown' 이라 부른다.
+  cur as (
+    select m.aid, m.gid, m.round_date as gdate
+    from meta m
+    join own o on o.aid = m.aid
+    where o.date_kinds < 2
+       or m.round_date = o.own_date
+  ),
+  -- ② 이번 회차에 실제 세대정보가 있는 공고만 추린다
+  cur_has as (
+    select distinct c.aid
+    from cur c
+    join public.housing_units h on h.announcement_id = c.gid
+  ),
+  -- ③ 이번 회차가 비면 그룹 전체로 되돌린다(loadHousingUnits의 거동과 같다)
+  pick as (
+    select c.aid, c.gid, c.gdate from cur c where c.aid in (select aid from cur_has)
+    union
+    select m.aid, m.gid, m.round_date from meta m where m.aid not in (select aid from cur_has)
+  ),
+  -- 🔵 2026-09-29 코드 회차 2 — 카드 상태 두 칸. 그룹은 위 meta 와 같은 축(dedup_key · title not null · hidden 아님).
+  --   analysis_done   = 카드(대표)와 **같은 apply_end** 구성원에 완료 계열 분석이 있는가 — get_reanalysis_queue 의
+  --                     「같은 회차 완료분 제외」·⑨ 5장 분석률 분자와 같은 축. 카드 apply_end 가 NULL 이면 거짓.
+  --   has_attachments = 그룹 구성원 누구든 attachment_urls 에 파일이 하나라도 있는가.
+  flags as (
+    select t.aid,
+           -- 🔵 2026-09-30 — 같은 게시물로 붙은 공고문(linked_in)은 마감일이 달라도 이 카드의 회차다.
+           coalesce(bool_or(k.done and (k.apply_end = t.apply_end or k.linked_in)), false) as analysis_done,
+           coalesce(bool_or(k.has_att), false)                            as has_attachments
+    from target t
+    join keyed k on k.dedup_key = t.dedup_key
+    group by t.aid
+  ),
+  -- 🔵 2026-09-30 코드 회차(카드 첫 줄) — 카드 표지 지역의 재료. **이번 회차에 세대정보가 있는 카드만**
+  --   (cur_has) 그 세대 행의 (시도, 시군구)를 세대 수와 함께 돌려준다 — [[「시도 시군구」, 세대 수], …] 세대 수 내림차순.
+  --   지난 회차로 되돌아간 카드(round_state past·unknown)는 NULL 이다 — 표지는 이번 공고가 어디인지를 말한다.
+  --   값 계산(보증금·월세·면적·회차·flags)은 이 CTE 를 읽지 않는다. 시도 옛 이름(광주광역시 등)은 화면이 맞춘다.
+  --   🔴 시군구는 수집(announcements.sigungu_nm)에 실재하는 이름만 받는다(같거나 「이름 + 공백」으로 시작) — 옛 분석분
+  --      세대 행에 「경기수원시」·「매입다가구(대구수성구)」 같은 값이 있다(2026-09-30 실측 23쌍 중 시도 옛 이름 아닌 것 전부).
+  known_sg as materialized (
+    select distinct btrim(sigungu_nm) as sg
+    from public.announcements
+    where nullif(btrim(sigungu_nm), '') is not null and btrim(sigungu_nm) <> '외'
+  ),
+  places as (
+    select p.aid, btrim(h.sido_nm) as sd, btrim(h.sigungu_nm) as sg, count(*) as n
+    from pick p
+    join cur_has ch on ch.aid = p.aid
+    join public.housing_units h on h.announcement_id = p.gid
+    where nullif(btrim(h.sido_nm), '') is not null
+      and nullif(btrim(h.sigungu_nm), '') is not null
+    group by 1, 2, 3
+  ),
+  places_agg as (
+    select pl.aid, jsonb_agg(jsonb_build_array(pl.sd || ' ' || pl.sg, pl.n) order by pl.n desc, pl.sd || ' ' || pl.sg) as unit_places
+    from places pl
+    where exists (select 1 from known_sg k where k.sg = pl.sg or k.sg like pl.sg || ' %')
+    group by pl.aid
+  ),
+  agg as (
+  select p.aid,
+         -- 🔵 2026-09-29 코드 회차 — 세대 하나에 임대조건 두 벌(deposit/monthly_rent + deposit_priority1/rent_priority1)이면
+         --    둘째 벌도 min~max에 넣는다. least/greatest는 NULL을 건너뛰므로 한 벌만 있는 행(supply_target 두 행 포함)은 값이 그대로다.
+         min(least(h.deposit, h.deposit_priority1))::bigint as deposit_min, max(greatest(h.deposit, h.deposit_priority1))::bigint as deposit_max,
+         min(least(h.monthly_rent, h.rent_priority1))::bigint as rent_min, max(greatest(h.monthly_rent, h.rent_priority1))::bigint as rent_max,
+         min(h.area_sqm) as area_min, max(h.area_sqm) as area_max,
+         -- 🔴 'unknown' 은 이제 **대표행의 회차 날짜가 없을 때 하나뿐**이다(2026-09-17).
+         --    종전의 `any_revised and date_kinds >= 2` 는 「정정이 섞이면 날짜로 못 가린다」였는데,
+         --    회차 날짜로는 같은 회차의 정정끼리 하나로 모여 가려진다.
+         case
+           when o.own_date is null  then 'unknown'
+           when ch.aid is not null  then 'current'
+           else                          'past'
+         end as round_state,
+         -- 🔵 'past' 일 때만 값이 온 회차를 적는다. 여기 살아남은 p 행은 세대정보가 실제로 붙은
+         --    gid 뿐이라(아래 join), 그 최댓값이 곧 「값을 가져온 회차」다.
+         case
+           when o.own_date is null or ch.aid is not null then null
+           else max(p.gdate)
+         end as source_round
+  from pick p
+  join public.housing_units h on h.announcement_id = p.gid
+  join own o on o.aid = p.aid
+  left join cur_has ch on ch.aid = p.aid
+  group by p.aid, o.own_date, ch.aid
+  )
+  -- 🔴 2026-09-29 코드 회차 2 — 세대정보가 없는 카드도 한 행을 돌려준다(값 칸은 전부 NULL · round_state NULL).
+  --   그래야 analysis_done·has_attachments 가 그 카드에 닿는다. 세대정보가 있는 카드의 값 칸은 종전과 한 글자도 같다.
+  --   화면은 값 칸이 전부 NULL 인 행을 종전의 「응답에 없음」과 같게 읽는다(zfSummaryLine 이 빈 문자열).
+  select t.aid,
+         g.deposit_min, g.deposit_max, g.rent_min, g.rent_max, g.area_min, g.area_max,
+         g.round_state, g.source_round,
+         coalesce(f.analysis_done, false), coalesce(f.has_attachments, false),
+         pa.unit_places
+  from (select distinct aid from target) t
+  left join agg g   on g.aid = t.aid
+  left join flags f on f.aid = t.aid
+  left join places_agg pa on pa.aid = t.aid;
+$function$
+;
