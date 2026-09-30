@@ -12,4 +12,3 @@ AS $function$
   GROUP BY "임대종류"
   ORDER BY 총세대수 DESC NULLS LAST;
 $function$
--- 빨강 시험(되돌릴 커밋)
