@@ -51,6 +51,17 @@ anon·authenticated에 주고 있어, **새 함수는 열린 채로 태어난다
 
 기록만 한다. 여기를 고쳐도 DB는 바뀌지 않는다 — 위 「배포 경로가 아니다」와 같다.
 
+### 2026-09-30 — `get_announcement_price_summary` 재생성(`unit_places jsonb` 추가), 권한은 전과 같게 되돌림
+
+카드 표지 지역의 재료 `unit_places`(이번 회차 세대 행의 「시도 시군구」와 세대 수, 세대 수 내림차순)를 **더하느라**
+`RETURNS TABLE`이 바뀌어 한 트랜잭션 안에서 `DROP` → `CREATE` → ACL 복원 → 가드(ACL 문자열 · `SECURITY DEFINER`)로 했다
+(다운님 허용 2026-09-30 · 적용 02:22:45Z · 새 정의 md5 `a2554852…` · 변경 전 정의는 커밋 `69657d8`).
+
+- 재생성 전·후 ACL 같음: `postgres=X/postgres | service_role=X/postgres | anon=X/postgres | authenticated=X/postgres`(PUBLIC 없음) · `SECURITY DEFINER` · `search_path=public, pg_temp` 유지.
+- 적용 전 롤백 전용 시험: 목록 대표 917건 전부에서 종전 11칸이 전후 한 행도 다르지 않음(양방향 EXCEPT 0).
+- 적용 뒤: 공개 REST(anon 키) 200 · 활성 104건 104행 · anon 역할 실행 79~87ms(활성 104) · 53~58ms(한 쪽 20) — 한도 3s.
+- 되돌리기: `69657d8`의 이 파일 정의로 같은 방식(DROP → CREATE → 위 ACL)으로 재생성. 화면은 `unit_places`가 없으면 종전 표지로 돌아간다.
+
 ### 2026-09-16 — `get_announcement_price_summary` 재생성, 권한은 전과 같게 되돌림
 
 `round_state`·`source_round` 두 컬럼을 **더하느라** `RETURNS TABLE`이 바뀌었다.
