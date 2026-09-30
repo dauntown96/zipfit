@@ -88,4 +88,3 @@ WHERE aa.status IN ('완료', '완료(보조 누락)', '완료(판정 대기)', 
   )
 ORDER BY 7 DESC, 1;
 $function$
-
