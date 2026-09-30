@@ -1,5 +1,5 @@
 CREATE OR REPLACE FUNCTION public.get_announcement_price_summary(p_ids text[])
- RETURNS TABLE(announcement_id text, deposit_min bigint, deposit_max bigint, rent_min bigint, rent_max bigint, area_min numeric, area_max numeric, round_state text, source_round date, analysis_done boolean, has_attachments boolean)
+ RETURNS TABLE(announcement_id text, deposit_min bigint, deposit_max bigint, rent_min bigint, rent_max bigint, area_min numeric, area_max numeric, round_state text, source_round date, analysis_done boolean, has_attachments boolean, unit_places jsonb)
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
@@ -106,6 +106,32 @@ AS $function$
     join keyed k on k.dedup_key = t.dedup_key
     group by t.aid
   ),
+  -- 🔵 2026-09-30 코드 회차(카드 첫 줄) — 카드 표지 지역의 재료. **이번 회차에 세대정보가 있는 카드만**
+  --   (cur_has) 그 세대 행의 (시도, 시군구)를 세대 수와 함께 돌려준다 — [[「시도 시군구」, 세대 수], …] 세대 수 내림차순.
+  --   지난 회차로 되돌아간 카드(round_state past·unknown)는 NULL 이다 — 표지는 이번 공고가 어디인지를 말한다.
+  --   값 계산(보증금·월세·면적·회차·flags)은 이 CTE 를 읽지 않는다. 시도 옛 이름(광주광역시 등)은 화면이 맞춘다.
+  --   🔴 시군구는 수집(announcements.sigungu_nm)에 실재하는 이름만 받는다(같거나 「이름 + 공백」으로 시작) — 옛 분석분
+  --      세대 행에 「경기수원시」·「매입다가구(대구수성구)」 같은 값이 있다(2026-09-30 실측 23쌍 중 시도 옛 이름 아닌 것 전부).
+  known_sg as materialized (
+    select distinct btrim(sigungu_nm) as sg
+    from public.announcements
+    where nullif(btrim(sigungu_nm), '') is not null and btrim(sigungu_nm) <> '외'
+  ),
+  places as (
+    select p.aid, btrim(h.sido_nm) as sd, btrim(h.sigungu_nm) as sg, count(*) as n
+    from pick p
+    join cur_has ch on ch.aid = p.aid
+    join public.housing_units h on h.announcement_id = p.gid
+    where nullif(btrim(h.sido_nm), '') is not null
+      and nullif(btrim(h.sigungu_nm), '') is not null
+    group by 1, 2, 3
+  ),
+  places_agg as (
+    select pl.aid, jsonb_agg(jsonb_build_array(pl.sd || ' ' || pl.sg, pl.n) order by pl.n desc, pl.sd || ' ' || pl.sg) as unit_places
+    from places pl
+    where exists (select 1 from known_sg k where k.sg = pl.sg or k.sg like pl.sg || ' %')
+    group by pl.aid
+  ),
   agg as (
   select p.aid,
          -- 🔵 2026-09-29 코드 회차 — 세대 하나에 임대조건 두 벌(deposit/monthly_rent + deposit_priority1/rent_priority1)이면
@@ -139,9 +165,10 @@ AS $function$
   select t.aid,
          g.deposit_min, g.deposit_max, g.rent_min, g.rent_max, g.area_min, g.area_max,
          g.round_state, g.source_round,
-         coalesce(f.analysis_done, false), coalesce(f.has_attachments, false)
+         coalesce(f.analysis_done, false), coalesce(f.has_attachments, false),
+         pa.unit_places
   from (select distinct aid from target) t
   left join agg g   on g.aid = t.aid
-  left join flags f on f.aid = t.aid;
+  left join flags f on f.aid = t.aid
+  left join places_agg pa on pa.aid = t.aid;
 $function$
-
