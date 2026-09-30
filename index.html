@@ -1153,13 +1153,19 @@ function isClosingSoon(row){
 //    (open > before > unknown > closed · applyWindowRank 와 같은 순서). 공고문 하나라도 열려 있으면 카드가 보인다
 //    (아산 신창·인주가 마감돼도 탕정2 때문에 아산 카드는 남는다). 붙은 공고문이 없는 카드는 종전 그대로다(zfWindowStateOne).
 //    붙은 공고문은 목록 RPC 밖(같은 게시물 링크 표 · zfLoadPostNotices)에서 온다 — 오기 전에는 LH 행만으로 판정한다.
+//    🔴 단 LH 가 게시물을 「…마감」이라 하면(조기 마감 · LH 목록 PAN_SS 는 게시물(panId) 전체의 상태다) 붙은 공고문도 마감이다 —
+//    붙은 공고문은 같은 panId 다(링크 규칙 v2). 2026-09-30 보성 `…0667` 이 마지막 날 오후 「접수마감」이 됐는데 보성운곡(MYHOME)이
+//    날짜로 열려 있어 카드가 남았다(배포본 1차 확인에서 발견).
 function applyWindowState(row){
   const st = zfWindowStateOne(row);
   const pn = zfPostNoticeFor(row);
-  if(!pn) return st;
+  if(!pn || zfLhPostClosed(row)) return st;
   let best = st;
   pn.linked.forEach(nt => { const s = zfWindowStateOne(nt.row); if(ZF_WINDOW_RANK[s] < ZF_WINDOW_RANK[best]) best = s; });
   return best;
+}
+function zfLhPostClosed(row){
+  return String((row && row.source) || '') === 'LH' && statusSaysClosed(row);
 }
 const ZF_WINDOW_RANK = { open: 0, before: 1, unknown: 2, closed: 3 };
 function zfWindowStateOne(row){
@@ -1524,7 +1530,8 @@ function zfPostNoticeList(row){
   if(!pn) return null;
   const list = [];
   if(pn.own) list.push({ title: pn.own.title, start: row['apply_start'] || '', end: row['apply_end'] || '', state: zfWindowStateOne(row) });
-  pn.linked.forEach(nt => list.push({ title: nt.title, start: nt.start, end: nt.end, state: zfWindowStateOne(nt.row) }));
+  const postClosed = zfLhPostClosed(row);   // LH 가 게시물 전체를 마감했으면 공고문도 마감(applyWindowState 주석)
+  pn.linked.forEach(nt => list.push({ title: nt.title, start: nt.start, end: nt.end, state: postClosed ? 'closed' : zfWindowStateOne(nt.row) }));
   if(list.length < 2) return null;
   list.sort((a, b) => String(a.start).localeCompare(String(b.start)) || String(a.title).localeCompare(String(b.title), 'ko'));
   // 이름 — MYHOME 제목에서 공고문들이 함께 가진 꼬리 낱말(「국민임대주택 예비입주자 모집공고(2026.09.15)」)만 뗀다. 전문은 툴팁.
@@ -1564,7 +1571,7 @@ function zfFillNoticeSlots(){
     const row = { announcement_id: d.noticesFor, apply_start: d.s || '', apply_end: d.e || '', status: d.st || '', source: d.src || '', winner_announce_date: d.w || '' };
     const list = zfPostNoticeList(row);
     if(!list) return;
-    const same = list.every(x => x.start === list[0].start && x.end === list[0].end);
+    const same = list.every(x => x.start === list[0].start && x.end === list[0].end && x.state === list[0].state);
     const box = 'font-size:12px;color:#444;background:#FAFAF6;border:1px solid #E8E8E0;border-radius:8px;padding:6px 10px;margin:0 0 8px;line-height:1.7';
     const name = x => `<span title="${zfAttr(x.title)}" style="font-weight:600;color:#333">${escapeHtml(x.name || x.title)}</span>`;
     el.innerHTML = same
