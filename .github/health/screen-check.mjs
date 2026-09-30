@@ -15,8 +15,10 @@ const MAX_PAGES = 30
 const CONSOLE_IGNORE = [/dapi\.kakao\.com/, /kakao/i]
 const checks = []
 const add = (id, name, status, value, rule) => checks.push({ id, name, status, value, rule })
+// 🔴 ④ 링크 문구는 두 갈래다(화면 zfPostLinkHtml) — LH 카드에 요약이 있으면 「함께 정리돼 있어요」, 없으면 「같은 게시물에 올라왔어요」.
+//    둘째 갈래를 판정표에 안 둬서 「알수없음」으로 떨어졌다(이슈 #283 · 2026-09-30 대구연호 두 카드). 화면 문구 갈래를 바꾸는 회차는 여기를 같은 PR 에서 고친다.
 const phraseOf = t =>
-  /함께 정리돼 있어요/.test(t) ? '④링크'
+  /함께 정리돼 있어요|같은 게시물에 올라왔어요/.test(t) ? '④링크'
   : /세대별 목록이 없어요/.test(t) ? '목록없음'
   : /링크만 제공/.test(t) ? '링크만'
   : /정리하지 못했어요/.test(t) ? '미정리'

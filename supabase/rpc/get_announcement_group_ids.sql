@@ -19,14 +19,31 @@ AS $function$
 --   · 중복 0건인 지금은 결과가 종전과 완전히 같다(키가 언제나 1개다)
 --   · 중복이 생기면 그룹이 합집합이 된다. 더 보여줄지언정 다른 공고를 보여주지는 않는다
 -- ⚠️ 유니크 제약을 새로 거는 것이 근본 처방이나 DDL은 영향이 넓어 여기서 하지 않는다.
-WITH target AS (
-  SELECT DISTINCT announcement_dedup_key(title) AS dedup_key
-  FROM announcements
+--
+-- 🔴 2026-09-30(코드 — 같은 게시물은 LH 카드 한 장) — 그룹 키 = 링크 표에 있는 MYHOME 행이면 LH 행의 제목 키, 아니면 자기 제목 키.
+--   목록 RPC get_announcements_deduped 의 link_map 과 같은 규칙이다(함께 바꾼다). LH 카드를 열면 붙은 공고문의 산물이 함께 온다.
+WITH link_map AS (
+  SELECT DISTINCT ON (l.linked_announcement_id)
+    l.linked_announcement_id AS aid, announcement_dedup_key(lh.title) AS lh_key
+  FROM public.announcement_post_links l
+  JOIN public.announcements lh ON lh.announcement_id = l.lh_announcement_id
+  WHERE lh.title IS NOT NULL AND lh.hidden_from_listing IS NOT TRUE
+  ORDER BY l.linked_announcement_id, l.lh_announcement_id
+),
+keyed AS (
+  SELECT a.announcement_id, a.title, a.hidden_from_listing,
+    COALESCE(lm.lh_key, announcement_dedup_key(a.title)) AS dedup_key
+  FROM announcements a
+  LEFT JOIN link_map lm ON lm.aid = a.announcement_id
+),
+target AS (
+  SELECT DISTINCT dedup_key
+  FROM keyed
   WHERE announcement_id = p_announcement_id
 )
-SELECT a.announcement_id
-FROM announcements a
-WHERE a.title IS NOT NULL
-  AND a.hidden_from_listing IS NOT TRUE
-  AND announcement_dedup_key(a.title) IN (SELECT dedup_key FROM target);
+SELECT k.announcement_id
+FROM keyed k
+WHERE k.title IS NOT NULL
+  AND k.hidden_from_listing IS NOT TRUE
+  AND k.dedup_key IN (SELECT dedup_key FROM target);
 $function$

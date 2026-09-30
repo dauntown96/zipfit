@@ -1149,7 +1149,20 @@ function isClosingSoon(row){
 // 2026-09-15 표본 12건 실측: 상세가 열리는 9건 중 **5건만** 본문에 접수기간이 있고,
 // 4건은 첨부 PDF에만 있으며, 3건은 상세 페이지 자체가 없다. 상세를 전부 긁어도
 // 44%는 여전히 미상이다 — 그래서 읽어 채우는 대신 '미상'을 화면에 드러낸다.
+// 🔵 2026-09-30(같은 게시물은 LH 카드 한 장) — 카드의 접수 상태는 그 카드에 붙은 **공고문 전부**의 상태 중 가장 열린 쪽이다
+//    (open > before > unknown > closed · applyWindowRank 와 같은 순서). 공고문 하나라도 열려 있으면 카드가 보인다
+//    (아산 신창·인주가 마감돼도 탕정2 때문에 아산 카드는 남는다). 붙은 공고문이 없는 카드는 종전 그대로다(zfWindowStateOne).
+//    붙은 공고문은 목록 RPC 밖(같은 게시물 링크 표 · zfLoadPostNotices)에서 온다 — 오기 전에는 LH 행만으로 판정한다.
 function applyWindowState(row){
+  const st = zfWindowStateOne(row);
+  const pn = zfPostNoticeFor(row);
+  if(!pn) return st;
+  let best = st;
+  pn.linked.forEach(nt => { const s = zfWindowStateOne(nt.row); if(ZF_WINDOW_RANK[s] < ZF_WINDOW_RANK[best]) best = s; });
+  return best;
+}
+const ZF_WINDOW_RANK = { open: 0, before: 1, unknown: 2, closed: 3 };
+function zfWindowStateOne(row){
   const today = startOfLocalDay(new Date());
   // 🔴 당첨발표일이 지났으면 그 공고의 접수는 끝났다 — 업스트림의 상태·마감일보다 이 관계가 우선이다.
   //    계기: MYHOME 이 2025.09.15 울산 정례모집(과 그 정정공고)을 「모집중」으로 돌려주고
@@ -1420,6 +1433,155 @@ function zfAfterCardsRender(){
   zfFillSideSlots();
   zfTitleClippedChips();
   zfLoadCardSide();
+  zfFillNoticeSlots();
+  zfLoadPostNotices();
+}
+
+// ── 같은 게시물은 LH 카드 한 장 — 붙은 공고문(2026-09-30) ──────────────────────────────
+// 🔴 목록 RPC(get_announcements_deduped)가 같은 게시물 링크 표(announcement_post_links)의 MYHOME 행을 LH 카드 그룹에 붙인다 —
+//    그래서 그 MYHOME 행들은 목록에 따로 서지 않는다. 반환형을 바꾸지 않으므로 **공고문별 이름·접수기간**은 여기서 따로 받는다.
+//    받는 것: 링크 표 · LH 행 · 붙은 MYHOME 행(id) · LH 와 같은 공고일의 MYHOME 행(LH 자기 공고문이 MYHOME 에도 올라왔는지 보려고).
+// 🔴 공고문 목록 = (LH 자기 공고문 — LH 제목 키와 같은 MYHOME 행이 같은 공고일에 있을 때만) + 붙은 MYHOME 행을 제목 키로 묶은 것.
+//    LH 자기 제목의 MYHOME 행이 없으면 LH 행은 게시물 전체의 우산이라(아산 · 대구연호) 공고문으로 세지 않는다.
+// 🔴 DB link_map 과 같은 규칙 — LH 행이 hidden·제목 없음이면 붙이지 않는다 · 한 MYHOME 행이 LH 둘에 걸리면 id 가 작은 LH.
+// 🔴 실패는 조용히 끝낸다 — 공고문 목록이 없어도 카드는 LH 행만으로 종전처럼 선다.
+const zfPostNotices = { loaded: false, byLhId: new Map() };   // LH id → { own: {title}|null, linked: [{ key, title, start, end, row }] }
+let zfPostNoticesPromise = null;
+function zfPostNoticeFor(row){
+  if(!row || !zfPostNotices.loaded) return null;
+  return zfPostNotices.byLhId.get(String(row['announcement_id'] || '')) || null;
+}
+function zfLoadPostNotices(){
+  if(zfPostNoticesPromise) return zfPostNoticesPromise;
+  const h = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
+  const get = path => fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers: h })
+    .then(r => r.ok ? r.json() : Promise.reject(new Error(path.split('?')[0] + ' HTTP ' + r.status)))
+    .then(j => Array.isArray(j) ? j : Promise.reject(new Error(path.split('?')[0] + ' 응답 형식')));
+  const cols = 'announcement_id,title,announcement_date,apply_start,apply_end,status,winner_announce_date,hidden_from_listing';
+  zfPostNoticesPromise = (async () => {
+    try{
+      const links = await get('announcement_post_links?select=lh_announcement_id,linked_announcement_id');
+      if(!links.length) return zfPostNotices;
+      const lhIds = [...new Set(links.map(l => String(l.lh_announcement_id || '')).filter(Boolean))];
+      const myIds = [...new Set(links.map(l => String(l.linked_announcement_id || '')).filter(Boolean))];
+      const [lhs, mys] = await Promise.all([
+        get(`announcements?select=announcement_id,title,announcement_date,hidden_from_listing&${idFilterFor(lhIds)}`),
+        get(`announcements?select=${cols}&${idFilterFor(myIds)}`)
+      ]);
+      const live = a => a && a.title && a.hidden_from_listing !== true;
+      const lhById = new Map(lhs.filter(live).map(a => [String(a.announcement_id), a]));
+      const dates = [...new Set([...lhById.values()].map(a => a.announcement_date).filter(Boolean))];
+      const sameDay = dates.length ? await get(`announcements?select=${cols}&source=eq.MYHOME&announcement_date=in.(${dates.join(',')})`) : [];
+      const myById = new Map(mys.filter(live).map(a => [String(a.announcement_id), a]));
+      const lhOf = new Map();   // MYHOME id → LH id (id 가 작은 LH)
+      links.forEach(l => {
+        const m = String(l.linked_announcement_id || ''), lh = String(l.lh_announcement_id || '');
+        if(!myById.has(m) || !lhById.has(lh)) return;
+        if(!lhOf.has(m) || lh < lhOf.get(m)) lhOf.set(m, lh);
+      });
+      const byLh = new Map();
+      lhOf.forEach((lh, m) => {
+        if(!byLh.has(lh)) byLh.set(lh, new Map());
+        const a = myById.get(m), k = zfDedupKey(a.title);
+        const g = byLh.get(lh);
+        if(!g.has(k)) g.set(k, { key: k, title: a.title, rows: [] });
+        g.get(k).rows.push(a);
+      });
+      byLh.forEach((groups, lh) => {
+        const lhRow = lhById.get(lh), lhKey = zfDedupKey(lhRow.title);
+        const ownRow = sameDay.find(a => live(a) && !lhOf.has(String(a.announcement_id))
+          && a.announcement_date === lhRow.announcement_date && zfDedupKey(a.title) === lhKey);
+        const linked = [...groups.values()].map(g => {
+          const starts = g.rows.map(r => r.apply_start).filter(Boolean).sort();
+          const ends = g.rows.map(r => r.apply_end).filter(Boolean).sort();
+          const wins = g.rows.map(r => r.winner_announce_date).filter(Boolean).sort();
+          const start = starts[0] || '', end = ends[ends.length - 1] || '';
+          // 상태 판정용 행 — MYHOME 행이라 날짜로 판정한다(zfWindowStateOne · LH 조기 마감 갈래를 타지 않는다).
+          const row = { source: 'MYHOME', apply_start: start, apply_end: end, status: g.rows[0].status || '', winner_announce_date: wins[wins.length - 1] || '' };
+          return { key: g.key, title: g.title, start, end, row, ids: g.rows.map(r => String(r.announcement_id)) };
+        });
+        zfPostNotices.byLhId.set(lh, { own: ownRow ? { title: ownRow.title } : null, linked });
+      });
+    }catch(err){
+      console.error('ZipFit 같은 게시물 공고문 로드 실패:', err);
+      return zfPostNotices;
+    }
+    // 🔵 붙은 공고문이 카드 상태(숨기기·상태 칩·정렬)를 바꾸거나 검색어가 있으면 목록을 다시 거른다 — 아니면 자리만 채운다.
+    const changedRows = (typeof noticeData !== 'undefined' ? noticeData : []).filter(n => zfPostNotices.byLhId.has(String(n['announcement_id'] || '')));
+    const before = changedRows.map(n => applyWindowState(n));
+    zfPostNotices.loaded = true;
+    const stateChanged = changedRows.some((n, i) => applyWindowState(n) !== before[i]);
+    const q = document.getElementById('noticeSearchInput');
+    if(noticeLoaded && (stateChanged || (q && q.value.trim()))) applyNoticeFiltersAndRender(noticePage);
+    zfFillNoticeSlots();
+    return zfPostNotices;
+  })();
+  return zfPostNoticesPromise;
+}
+// 카드에 보일 공고문 목록 — [{ name, title, start, end, state }] · 2개 미만이면 null(LH 카드 한 장이 곧 공고문 하나다).
+function zfPostNoticeList(row){
+  const pn = zfPostNoticeFor(row);
+  if(!pn) return null;
+  const list = [];
+  if(pn.own) list.push({ title: pn.own.title, start: row['apply_start'] || '', end: row['apply_end'] || '', state: zfWindowStateOne(row) });
+  pn.linked.forEach(nt => list.push({ title: nt.title, start: nt.start, end: nt.end, state: zfWindowStateOne(nt.row) }));
+  if(list.length < 2) return null;
+  list.sort((a, b) => String(a.start).localeCompare(String(b.start)) || String(a.title).localeCompare(String(b.title), 'ko'));
+  // 이름 — MYHOME 제목에서 공고문들이 함께 가진 꼬리 낱말(「국민임대주택 예비입주자 모집공고(2026.09.15)」)만 뗀다. 전문은 툴팁.
+  const words = list.map(x => String(x.title || '').trim().split(/\s+/));
+  let tail = 0;
+  while(words.every(w => w.length - tail > 1) && words.every(w => w[w.length - 1 - tail] === words[0][words[0].length - 1 - tail])) tail++;
+  list.forEach((x, i) => { x.name = words[i].slice(0, words[i].length - tail).join(' '); });
+  return list;
+}
+function zfNoticeStateText(state, end){
+  if(state === 'open'){
+    const e = parseNoticeDate(end || '');
+    return (e && startOfLocalDay(e).getTime() === startOfLocalDay(new Date()).getTime()) ? '오늘 마감' : '접수 중';
+  }
+  return state === 'before' ? '접수 예정' : state === 'closed' ? '마감' : '기간 미상';
+}
+function zfNoticeStateBadge(state, end){
+  const t = zfNoticeStateText(state, end);
+  const c = t === '오늘 마감' ? 'background:#FBF0DC;color:#8A5A12'
+    : t === '접수 중' ? 'background:#E6F4EE;color:#0F6E56'
+    : t === '접수 예정' ? 'background:#EEF2FA;color:#3D5A99'
+    : 'background:#F6F6F2;color:#6B6B63';
+  return `<span style="display:inline-block;white-space:nowrap;margin-left:4px;padding:1px 6px;border-radius:9px;font-size:11px;font-weight:600;${c}">${t}</span>`;
+}
+// 자리는 카드 행의 접수 재료를 함께 싣는다 — 공고 탭·추천·매칭 카드의 행 모양이 달라도 채울 때 같은 판정을 한다.
+function zfNoticesSlotHtml(row){
+  if(!row) return '';
+  const v = k => zfAttr(row[k] == null ? '' : row[k]);
+  return `<div class="zf-notices-slot" data-notices-for="${v('announcement_id')}" data-s="${zfAttr(row['신청시작일'] || row['apply_start'] || '')}" data-e="${zfAttr(row['신청마감일'] || row['apply_end'] || '')}" data-st="${zfAttr(row['status'] || row['처리상태'] || '')}" data-src="${v('source')}" data-w="${v('winner_announce_date')}"></div>`;
+}
+function zfFillNoticeSlots(){
+  if(!zfPostNotices.loaded) return;
+  document.querySelectorAll('.zf-notices-slot[data-notices-for]').forEach(el => {
+    if(el.dataset.filled === '1') return;
+    el.dataset.filled = '1';
+    const d = el.dataset;
+    const row = { announcement_id: d.noticesFor, apply_start: d.s || '', apply_end: d.e || '', status: d.st || '', source: d.src || '', winner_announce_date: d.w || '' };
+    const list = zfPostNoticeList(row);
+    if(!list) return;
+    const same = list.every(x => x.start === list[0].start && x.end === list[0].end);
+    const box = 'font-size:12px;color:#444;background:#FAFAF6;border:1px solid #E8E8E0;border-radius:8px;padding:6px 10px;margin:0 0 8px;line-height:1.7';
+    const name = x => `<span title="${zfAttr(x.title)}" style="font-weight:600;color:#333">${escapeHtml(x.name || x.title)}</span>`;
+    el.innerHTML = same
+      ? `<div style="${box}">📑 공고문 ${list.length}개 · ${list.map(name).join(' · ')}<br><span style="color:#666">접수 ${escapeHtml(zfSpanText(list[0].start, list[0].end))}</span>${zfNoticeStateBadge(list[0].state, list[0].end)}</div>`
+      : `<div style="${box}">📑 공고문 ${list.length}개 · <b style="color:#8A5A12">공고문마다 접수일이 달라요</b>`
+        + list.map(x => `<div>· ${name(x)} <span style="color:#666;white-space:nowrap">${escapeHtml(zfSpanText(x.start, x.end))}</span>${zfNoticeStateBadge(x.state, x.end)}</div>`).join('')
+        + `</div>`;
+    zfHideRouteDupOf(el.closest('.hcard'));
+  });
+}
+// 같은 뜻을 두 번 말하지 않는다 — 공고문마다 접수일이 다른 카드에서는 경로 한 줄 ②-가(「접수일이 나뉘어 있어요」)를 숨긴다.
+//    현장 접수(②-나·②-다)·순위(①) 줄은 공고문 목록에 없는 말이라 그대로 둔다.
+function zfHideRouteDupOf(card){
+  if(!card) return;
+  const notices = card.querySelector('.zf-notices-slot b');
+  const route = card.querySelector('.zf-route-line[data-route-kind="②-가"]');
+  if(notices && route) route.closest('.zf-route-slot').style.display = 'none';
 }
 
 // ── ①② 날짜 줄 아래 한 줄 — 경로 칸(announcement_apply_routes) 판정 ──
@@ -1514,11 +1676,12 @@ function zfFillSideSlots(){
     const v = zfRouteVerdict(zfSide.routesByKey.get(el.getAttribute('data-route-key')));
     if(!v.text) return;
     // 두 줄을 넘치면 말줄임 · 전문은 툴팁(누르면 펼친다 — 손가락으로는 툴팁을 못 본다) · ▾는 말줄임 밖 칸
-    el.innerHTML = `<p class="zf-route-line" title="${zfAttr(v.text)}" onclick="event.stopPropagation();this.classList.toggle('open')"><span class="zf-route-text">📅 ${escapeHtml(v.text)}</span><span class="zf-route-more" aria-hidden="true"></span></p>`;
+    el.innerHTML = `<p class="zf-route-line" data-route-kind="${zfAttr(v.kind)}" title="${zfAttr(v.text)}" onclick="event.stopPropagation();this.classList.toggle('open')"><span class="zf-route-text">📅 ${escapeHtml(v.text)}</span><span class="zf-route-more" aria-hidden="true"></span></p>`;
     zfMarkRouteFits(el.firstElementChild);
     // 🔴 같은 뜻을 두 번 말하지 않는다 — 이 한 줄이 「단지마다 일정이 달라요」 배지를 대신한다.
     const card = el.closest('.hcard');
     if(card) card.querySelectorAll('.zf-varies').forEach(t => { t.style.display = 'none'; });
+    zfHideRouteDupOf(card);
   });
   // ⑤ 단일 단지 카드의 동네 가격 칩
   document.querySelectorAll('.zf-rentlow-slot[data-rentlow-key]').forEach(el => {
@@ -1676,6 +1839,7 @@ function resetNoticeFilters(){
 
 // ── 필터 칩 목록: 첫 로드 시 region_top·status_normalized 사용 (중복 없음) ──
 async function initNoticeFilters(){
+  zfLoadPostNotices();   // 🔵 2026-09-30 — 목록 RPC 와 겹쳐 받는다(카드 상태·숨기기 재료)
   // 🔴 중복 가드 — 추천 탭(첫 화면)과 공고 탭이 둘 다 이 입구를 쓴다.
   //    noticeLoaded 만으로는 모자라다: 로드가 도는 동안에는 아직 false라 탭을 오가면
   //    같은 질의가 두 번 나간다. 「끝났나」와 「도는 중인가」를 따로 본다.
@@ -2127,7 +2291,10 @@ function searchFilterNotices(list, query, scope){
     const title = (n['공고명'] || '').toLowerCase();
     // 단지명(building_name)은 제목과 사실상 같은 성격의 식별정보라 제목 검색에 함께 매칭.
     const buildingName = (n['building_name'] || '').toLowerCase();
-    const titleMatch = title.includes(q) || buildingName.includes(q);
+    // 🔵 2026-09-30 — LH 카드에 붙은 공고문(MYHOME) 제목으로도 찾는다(「아산탕정2」 → 아산 LH 카드).
+    const pn = zfPostNoticeFor(n);
+    const noticeTitles = pn ? pn.linked.map(x => x.title).concat(pn.own ? [pn.own.title] : []).join(' ').toLowerCase() : '';
+    const titleMatch = title.includes(q) || buildingName.includes(q) || noticeTitles.includes(q);
     if(scope === 'title') return titleMatch;
     // 🔴 대표행의 sigungu_nm 하나만 보던 자리다 — 「경기북부 7개 시군」 공고를 「하남시」로 못 찾았다.
     //    region_names 가 그룹 형제 행의 시군구 전부를 담고 있으므로 그것을 잇는다(2026-09-16).
@@ -3130,6 +3297,7 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
       ${isCancelRow?'':`<div data-sum-for="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" data-sum-url="${(n['공고URL']||'').replace(/"/g,'&quot;')}" data-sum-key="${zfAttr(zfDedupKey(n['공고명']))}"></div>`}
       <p style="font-size:12px;color:#888;margin-bottom:8px">${dateLine}</p>
       ${isCancelRow?'':zfRouteSlotHtml(n, n['공고명'])}
+      ${isCancelRow?'':zfNoticesSlotHtml(n)}
       ${detailHTML}
     </div>`;
   });
@@ -3435,6 +3603,7 @@ function renderPersonalizedRecommendations(){
       <div data-sum-for="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" data-sum-url="${(n['공고URL']||n['url']||'').replace(/"/g,'&quot;')}" data-sum-key="${zfAttr(zfDedupKey(n['공고명']||n['name']))}"></div>
       <p style="font-size:12px;color:#888;margin-bottom:8px">${dateLine}</p>
       ${zfRouteSlotHtml(n, n['공고명']||n['name'])}
+      ${zfNoticesSlotHtml(n)}
       ${(n['공고URL']||n['url'])?`<a class="detail-link" href="${n['공고URL']||n['url']}" target="_blank" rel="noopener" style="display:block" onclick="zfLog('recommend_click',{rank:${idx+1}},'${(n['announcement_id']||'').toString().replace(/'/g,'')}')">📄 공고 원문 보기</a>`:''}
     </div>`;
   });
@@ -7139,6 +7308,7 @@ function renderMatchResults(rows){
       <div data-sum-for="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" data-sum-url="${(n.url||'').replace(/"/g,'&quot;')}" data-sum-key="${zfAttr(zfDedupKey(n.title))}"></div>
       <p style="font-size:12px;color:#888;margin-bottom:8px">${dateLine}</p>
       ${zfRouteSlotHtml(n, n.title)}
+      ${zfNoticesSlotHtml(n)}
       ${detailHTML}
     </div>`;
   });

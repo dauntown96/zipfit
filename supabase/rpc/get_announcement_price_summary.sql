@@ -30,13 +30,24 @@ AS $function$
   -- ⚠️ 'unknown' 은 **대표행의 회차 날짜 자체가 null 일 때만** 남는다(그때는 비교할 축이 없다).
   -- 🔴 이 규칙은 화면 zfNoticeDate() 와 같은 관문이다. 언어가 달라 코드를 공유할 수 없으므로
   --   **두 판정을 전 그룹으로 대조하는 것**이 이 사본의 검증 방법이다(회차마다 다시 돌린다).
+  -- 🔴 2026-09-30(코드 — 같은 게시물은 LH 카드 한 장) — 그룹 키 = 링크 표에 있는 MYHOME 행이면 LH 행의 제목 키
+  --   (get_announcement_group_ids 와 같은 규칙). LH 카드 요약에 붙은 공고문의 세대 행이 함께 든다.
   with ids as (
     select distinct x as aid from unnest(p_ids) x where x is not null
+  ),
+  link_map as materialized (
+    select distinct on (l.linked_announcement_id)
+      l.linked_announcement_id as aid, public.announcement_dedup_key(lh.title) as lh_key
+    from public.announcement_post_links l
+    join public.announcements lh on lh.announcement_id = l.lh_announcement_id
+    where lh.title is not null and lh.hidden_from_listing is not true
+    order by l.linked_announcement_id, l.lh_announcement_id
   ),
   -- 목록에 실릴 수 있는 전 공고의 dedup_key를 한 번만 만든다
   keyed as materialized (
     select a.announcement_id as gid,
-           public.announcement_dedup_key(a.title) as dedup_key,
+           coalesce(lm.lh_key, public.announcement_dedup_key(a.title)) as dedup_key,
+           (lm.aid is not null) as linked_in,
            case when coalesce(a.is_revised, false) and a.first_announcement_date is not null
                 then a.first_announcement_date
                 else a.announcement_date
@@ -49,14 +60,16 @@ AS $function$
                    where aa.announcement_id = a.announcement_id
                      and aa.status in ('완료', '완료(보조 누락)', '완료(판정 대기)', '완료(소급)')) as done
     from public.announcements a
+    left join link_map lm on lm.aid = a.announcement_id
     where a.title is not null
       and a.hidden_from_listing is not true
   ),
   -- 🔴 대상 행에는 hidden 필터를 걸지 않는다 — get_announcement_group_ids의 target CTE와 같다
   target as (
-    select distinct i.aid, public.announcement_dedup_key(a.title) as dedup_key, a.apply_end
+    select distinct i.aid, coalesce(lm.lh_key, public.announcement_dedup_key(a.title)) as dedup_key, a.apply_end
     from ids i
     join public.announcements a on a.announcement_id = i.aid
+    left join link_map lm on lm.aid = a.announcement_id
   ),
   meta as (
     select t.aid, k.gid, k.round_date, k.is_revised
@@ -100,7 +113,8 @@ AS $function$
   --   has_attachments = 그룹 구성원 누구든 attachment_urls 에 파일이 하나라도 있는가.
   flags as (
     select t.aid,
-           coalesce(bool_or(k.done and k.apply_end = t.apply_end), false) as analysis_done,
+           -- 🔵 2026-09-30 — 같은 게시물로 붙은 공고문(linked_in)은 마감일이 달라도 이 카드의 회차다.
+           coalesce(bool_or(k.done and (k.apply_end = t.apply_end or k.linked_in)), false) as analysis_done,
            coalesce(bool_or(k.has_att), false)                            as has_attachments
     from target t
     join keyed k on k.dedup_key = t.dedup_key
