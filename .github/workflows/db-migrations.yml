@@ -10,7 +10,7 @@ name: DB migrations
 on:
   # 🔵 2026-09-30 — PR 에는 경로 필터를 두지 않는다. `check` 를 main 필수 체크로 걸 수 있게 모든 PR 에서 결과를 낸다
   #    (경로 필터가 있으면 DB 파일을 안 건드린 PR 에는 check 가 아예 생기지 않아 필수 체크가 영영 기다린다 — PR #278 실측).
-  #    DB 파일(아래 check 잡의 DB_PATHS)을 안 건드린 PR 은 첫 단계가 「해당 없음」으로 끝내 DB 를 부르지 않는다.
+  #    DB 파일(아래 check 잡 「DB 파일을 건드렸나」 단계의 grep 다섯 경로)을 안 건드린 PR 은 첫 단계가 「해당 없음」으로 끝내 DB 를 부르지 않는다.
   pull_request:
   push:
     branches: [main]
