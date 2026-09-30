@@ -6548,12 +6548,17 @@ function renderHousingUnitList(units){
 // 종전 세대 행의 toFixed(1) 로는 두 평면이 같은 글자가 된다.
 const huAreaText = v => v == null ? '' : parseFloat(v).toFixed(2) + '㎡';
 // 금액 글자는 종전 세대 행과 **같은 규칙**이다(toLocaleString + 「원」, 월세 0 은 「월세없음」).
-const huMoneyText = v => v == null ? '-' : Number(v).toLocaleString() + '원';
-const huRentText  = v => (v == null || Number(v) === 0) ? '월세없음' : Number(v).toLocaleString() + '원';
+// 🔴 2026-09-30 — 월세 NULL 은 「없음」이 아니라 「모름」일 수 있다. 같은 벌의 보증금이 있으면(전세형)
+//    종전대로 「월세없음」, 보증금도 NULL 이면 두 칸 다 모르는 값이라 ZF_UNKNOWN_PRICE 로 적는다
+//    (천수빌 18행 — 원문 목록 칸이 공란. 같은 카드의 ⚠️ 정책 행이 「LH에 확인」을 말한다).
+const ZF_UNKNOWN_PRICE = '확인 필요';
+const huMoneyText = (v, rent) => v == null ? (rent == null ? ZF_UNKNOWN_PRICE : '-') : Number(v).toLocaleString() + '원';
+const huRentText  = (v, dep) => v == null ? (dep == null ? ZF_UNKNOWN_PRICE : '월세없음')
+                               : Number(v) === 0 ? '월세없음' : Number(v).toLocaleString() + '원';
 function huPriceText(u){
-  const base = `보증금 ${huMoneyText(u.deposit)} · 월 ${huRentText(u.monthly_rent)}`;
+  const base = `보증금 ${huMoneyText(u.deposit, u.monthly_rent)} · 월 ${huRentText(u.monthly_rent, u.deposit)}`;
   if(u.deposit_priority1 == null && u.rent_priority1 == null) return base;
-  return `${base} 또는 보증금 ${huMoneyText(u.deposit_priority1)} · 월 ${huRentText(u.rent_priority1)}`;
+  return `${base} 또는 보증금 ${huMoneyText(u.deposit_priority1, u.rent_priority1)} · 월 ${huRentText(u.rent_priority1, u.deposit_priority1)}`;
 }
 
 // 🔵 평면 합치기는 **화면에 보이는 값의 완전 일치**로만 한다(계층 라벨·금액 네 칸·동호수·회차).
@@ -6655,8 +6660,8 @@ function zfWaitReserveHtml(units){
 function renderHousingUnitRow(u){
   const addr = u.address || '주소 정보 없음';
   const area = u.area_sqm != null ? parseFloat(u.area_sqm).toFixed(1)+'㎡' : '-';
-  const deposit = u.deposit != null ? Number(u.deposit).toLocaleString()+'원' : '-';
-  const rent = (u.monthly_rent == null || Number(u.monthly_rent) === 0) ? '월세없음' : Number(u.monthly_rent).toLocaleString()+'원';
+  const deposit = huMoneyText(u.deposit, u.monthly_rent);
+  const rent = huRentText(u.monthly_rent, u.deposit);
   // deposit_priority1/rent_priority1은 한 세대에 임대조건이 둘인 공고에서 채워진다
   // (실측 2026-09-11: 30공고 1,127행). 🔴 두 조건이 갈리는 원인은 유형마다 다르고 최소 5개 축이며,
   // 350행은 DB에 단서 자체가 없다. 🔴 그래서 코드가 계층·순위 이름을 붙이지 않는다 —
@@ -6664,8 +6669,8 @@ function renderHousingUnitRow(u){
   // 오히려 비싼 조건이라 이름이 값과 반대였다. 경위는 docs/history.md 2026-09-11 항목에 있다.
   // 원인 라벨은 원문 확인 뒤 별도 컬럼으로 붙인다(2차 소탕 2단계).
   const hasPriority1 = u.deposit_priority1 != null || u.rent_priority1 != null;
-  const depositP1 = u.deposit_priority1 != null ? Number(u.deposit_priority1).toLocaleString()+'원' : '-';
-  const rentP1 = (u.rent_priority1 == null || Number(u.rent_priority1) === 0) ? '월세없음' : Number(u.rent_priority1).toLocaleString()+'원';
+  const depositP1 = huMoneyText(u.deposit_priority1, u.rent_priority1);
+  const rentP1 = huRentText(u.rent_priority1, u.deposit_priority1);
   const depositRent = hasPriority1
     ? `<div class="hu-item hu-item-wide"><span class="hu-label">임대조건</span><span class="hu-value">보증금 ${deposit}·월 ${rent} 또는 보증금 ${depositP1}·월 ${rentP1}<br><span style="font-size:11px;color:#888">어느 조건이 적용되는지는 비고·공고문에서 확인하세요</span></span></div>`
     : `<div class="hu-item"><span class="hu-label">보증금</span><span class="hu-value">${deposit}</span></div>
