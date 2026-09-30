@@ -48,7 +48,7 @@
 |---|---|
 | 프론트엔드 | HTML/CSS/JS 단일 파일 (index.html) |
 | 공고 데이터 | Supabase RPC `get_announcements_deduped()` |
-| 데이터 수집 | **LH·MYHOME**은 Edge Function `collect-announcements`를 pg_cron이 주간(KST 09~18시) 10분 간격 + 아침 워밍 2회 + 야간 1회 부르고, **SH**는 `collect-sh-announcements`를 하루 4회(KST 09·12·15·18시) 부른다. **LH 매입 홍보물 목록**은 `collect-lh-promo`가 KST 09:05~18:35 30분마다 새 공고·첨부 바뀐 공고만 `announcement_promo_files`에 남긴다(목록만 — 받기·Drive·extras 연결은 분석 회차). 스케줄은 UTC로 등록돼 있고 현행 값은 `cron.job` 조회로 본다. 상세: ⑩ 「수집 크론은 언제 도나」 · **자동 점검**: GitHub Actions `health-ops.yml`(운영 · 매시) · `health-screen.yml`(배포본 화면 · 매일·병합 뒤) — 실패하면 라벨 `health-ops`/`health-screen` 이슈가 열리고 회복하면 닫힌다 |
+| 데이터 수집 | **LH·MYHOME**은 Edge Function `collect-announcements`를 pg_cron이 주간(KST 09~18시) 10분 간격 + 아침 워밍 2회 + 야간 1회 부르고, **SH**는 `collect-sh-announcements`를 하루 4회(KST 09·12·15·18시) 부른다. **LH 매입 홍보물 목록**은 `collect-lh-promo`가 KST 09:05~18:35 30분마다 새 공고·첨부 바뀐 공고만 `announcement_promo_files`에 남긴다(목록만 — 받기·Drive·extras 연결은 분석 회차). 스케줄은 UTC로 등록돼 있고 현행 값은 `cron.job` 조회로 본다. 상세: ⑩ 「수집 크론은 언제 도나」 · **자동 점검**: GitHub Actions `health-ops.yml`(운영 · 매시) · `health-screen.yml`(배포본 화면 · 매일·병합 뒤) — 실패하면 라벨 `health-ops`/`health-screen` 이슈가 열리고 회복하면 닫힌다 · **DB 변경**: `db-migrations.yml`(PR 되돌리기 전용 체크 · 병합 뒤 적용 — 실패하면 라벨 `db-apply` 이슈 · 원칙 32) |
 | 사용자 프로필 | Edge Function `save-user-profile` (GET/POST, **`verify_jwt=true`**, 식별자는 JWT의 `auth.uid()` — 이메일 기반 식별은 2026-08-13 폐기, CORS는 `https://dauntown96.github.io` 고정) |
 | 공고 첨부 수신 | Edge Function `fetch-attachment`는 호출자가 준 URL(허용목록 호스트만)의 바이트를 돌려주거나 `mode=upload`로 Google Drive `[임시] <announcement_id>` 폴더에 직접 올린다(폴더는 `mode=ensure_folder`로 먼저 확보해 `folder_id`로 넘긴다 · DB 쓰기 없음). 운반 상한은 기본 6MB이고 `mode=upload&large=resumable`만 200MB이며, 인증은 Vault `cron_secret_v2`의 `x-cron-secret`이다. 상세: ⑩ 「공고 첨부 수집」 |
 | 알림·트리거 | 🔴 **없음 — Make.com은 2026-08-27 미사용 확정**. 검토했고 안 쓰기로 한 것이지 미검토가 아니다(재검토 트리거는 📦 아카이브 「MCP 생태계 보류」에). 알림 경로는 미구현 상태이며 후보는 백로그 「카카오 알림톡」 |
@@ -67,7 +67,7 @@
 ### 🧰 컨테이너 환경 메모 — 세션마다 다시 겪는 것
 
 - 🔴 **`pdfplumber`가 이 컨테이너에 없다**(2026-09-22 실측). `pip install pdfplumber`만 하면 `_cffi_backend` 결손으로 import가 죽으니 **`pip install pdfplumber cffi`**로 함께 올린다. ⚠️ `cryptography`는 debian 패키지라 `--upgrade`가 `RECORD file not found`로 실패하지만 **그대로 동작한다** — 재시도하지 않는다.
-- 🔴 **DB 쓰기의 기본 경로는 관리 API 파일 실행이다**(B51 실측 · B54 판정). `POST https://api.supabase.com/v1/projects/khdpjjyspmlqtzperoqg/database/query`에 `{"query": "<SQL>"}`를 싣는다 — SQL을 파일로 쓰고 `python3 -c 'import json,sys; print(json.dumps({"query": open(sys.argv[1], encoding="utf-8").read()}))' f.sql | curl -sS -X POST <엔드포인트> -H 'Content-Type: application/json' --data-binary @-`. 🔴 **`jq -Rs`로 싣지 않는다**(B57 실측 — 168KB 파일에서 한글 5글자가 깨졌다. 입력을 조각으로 읽다 UTF-8 멀티바이트를 가른다. 가드가 잡아 롤백됐다). 🔴 **인증은 프록시가 주입한다** — 토큰 환경변수는 없고 헤더를 붙이지 않는다. 키·토큰 값을 회신·로그·커밋에 찍지 않는다.
+- 🔴 **DB 쓰기의 기본 경로는 관리 API 파일 실행이다**(B51 실측 · B54 판정). ⚠️ **데이터 쓰기(INSERT·UPDATE·DELETE)만이다 — 스키마·함수 변경(DDL)은 원칙 32**(2026-09-30). `POST https://api.supabase.com/v1/projects/khdpjjyspmlqtzperoqg/database/query`에 `{"query": "<SQL>"}`를 싣는다 — SQL을 파일로 쓰고 `python3 -c 'import json,sys; print(json.dumps({"query": open(sys.argv[1], encoding="utf-8").read()}))' f.sql | curl -sS -X POST <엔드포인트> -H 'Content-Type: application/json' --data-binary @-`. 🔴 **`jq -Rs`로 싣지 않는다**(B57 실측 — 168KB 파일에서 한글 5글자가 깨졌다. 입력을 조각으로 읽다 UTF-8 멀티바이트를 가른다. 가드가 잡아 롤백됐다). 🔴 **인증은 프록시가 주입한다** — 토큰 환경변수는 없고 헤더를 붙이지 않는다. 키·토큰 값을 회신·로그·커밋에 찍지 않는다.
   - 요청 하나 = 트랜잭션 하나(명시 `BEGIN`/`COMMIT`도 된다) · `DO` 가드가 예외를 던지면 **HTTP 400으로 요청 전체가 롤백**된다 · 성공은 201 · **마지막 문장의 결과만** 돌아온다 · 1,025,039B 페이로드 통과 · `statement_timeout` 2분.
   - **롤백 전용 시험**: `DO` 블록 안에서 쓰고 읽은 값을 `raise exception 'RESULT …'`로 내보내면 결과는 400 메시지로 보이고 쓰기는 남지 않는다(B53 트리거 시험).
   - 컨테이너에서 `*.supabase.co`는 프록시 403이다 — anon REST 확인(원칙 29)은 DB 안에서 `net.http_post(…)`로 부르고 `net._http_response`를 읽는다(B53).
@@ -243,7 +243,7 @@ const requireEnv = (key: string): string => {
 - **적용 범위**: Claude Code가 claude.ai에 보내는 **모든 회신**(지시서·요청서·협의서 어느 쪽에 대한 답이든).
 - 🔴 **자리** (2026-09-29 — ⑦ 「운영 구조 재편」): 회신은 📬 우편함 회차 페이지 「## 회신」 절에 쓴다 · 착수 때 상태 「작업중」 · 끝나면 「회신 완료」 + PR 칸.
 - ① **미확인** — 내 축(내가 못 한 것) / 상대 축(구조적으로 불가)
-- ② **범위 밖 발견·제안** — 고쳐야 할 것. 🔴 착수 때 `zipfit`의 열린 `health-ops`·`health-screen` 이슈를 먼저 보고, 있으면 여기 한 줄(다운님은 GitHub 알림을 받지 않는다 — 2026-09-29)
+- ② **범위 밖 발견·제안** — 고쳐야 할 것. 🔴 착수 때 `zipfit`의 열린 `health-ops`·`health-screen`·`db-apply` 이슈를 먼저 보고, 있으면 여기 한 줄(다운님은 GitHub 알림을 받지 않는다 — 2026-09-29)
 - ③ **지시서와 다른 사실** — 전제·식별자·수치가 실물과 달랐던 것. 🔴 요청의 공고 목록·수치·ID는 **참고값**이다 — 착수 때 실측(폴더 파일 수 · 목록 행 수 · LH 페이지)으로 확정하고, 다르면 여기 적는다
 - ④ **실제로 실행한 것** — 수정·배포·push 여부, 브랜치, PR·커밋. 🔴 0도 쓴다(「DB 변경 0 / 코드 변경 0」). 🔴 공고 분석 회차면 🅐 **공고 카드**(스킬 「공고 카드」 · 카드마다 「비교·융합」 칸 — 지난 회차 대비 수치 · 템플릿 형제에 없는 조항 + 정책 행 id · 같은 시군·같은 유형 ㎡당 월임대료, 표본 5 미만이면 쓰지 않음 · 없으면 「없음」)와 🅑 **분석률**(반영 전·후를 ⑨ 5장 산식으로 · 측정 시각 UTC · 「분자 증가분 = 이번에 완료 계열로 닫은 공고 수」 성립 여부 · 분석 없는 회차는 「분자 불변」)을 더한다. 🔴 **「Notion 쓴 곳」 한 줄** — 쓴 페이지·절 이름, 없으면 「없음」(2026-09-30 B67 — 빠지면 보이게)
 - ⑤ **claude.ai에게 요청** — 컨테이너 프록시로 못 여는 외부 파일·CDN·Drive 이미지·게시판 첨부는 ⑤로 claude.ai에 넘긴다 — claude.ai는 다운님 브라우저(Playwright)로 연다(⑦ 「상대 축」 2026-09-28)
@@ -314,6 +314,12 @@ const requireEnv = (key: string): string => {
 - 되돌리기는 이전 커밋으로 되돌린 PR, 또는 `workflow_dispatch`로 함수 하나를 재배포한다.
 - `verify_jwt`의 정본은 `supabase/config.toml`이다(배포 뒤 워크플로가 관리 API 값과 대조해 다르면 실패). 🔴 허용 목록 밖 함수(`fetch-attachment-probe` · `upsert-announcement`)는 배포하지 않는다 — 새 함수를 배포하려면 워크플로 `ALLOWED`·dispatch 선택지·`config.toml`을 같은 PR에서 고친다.
 - 토큰은 Actions Secret `SUPABASE_ACCESS_TOKEN`만 쓴다(저장소 설정은 다운님 몫).
+
+32. **DB 스키마·함수 변경은 적용 SQL 파일 + PR 병합으로만 — 관리 API로 운영 DB에 DDL을 직접 보내지 않는다(데이터 쓰기는 종전대로)** (2026-09-30 신설 — 우편함 「운영 — DB 함수·스키마 변경도 PR 병합 = 적용」)
+- `supabase/migrations/YYYY-MM-DD_NN_이름.sql`에 쓰고 PR을 연다 → `db-migrations.yml` check가 **되돌리기 전용** 트랜잭션으로 실제 DB에서 돌린다(스키마 지문 전후 같음 · 불변식 v3.4 · `anon` 3초 · 함수 정의 md5 = `supabase/rpc/` 사본 · ACL·SECURITY DEFINER = 파일 선언). 🔴 **빨간 체크의 PR은 병합하지 않는다.**
+- 병합하면 apply가 **아직 기록 안 된 파일만** 파일마다 한 트랜잭션으로 적용하고 `zipfit_ops.schema_migrations`에 같은 트랜잭션으로 기록한다. 🔴 병합 뒤 Actions 결과(적용 · 대조)를 회신 ④에 적는다. 실패하면 `db-apply` 이슈.
+- 파일 규칙(트랜잭션 제어 금지 · 함수 선언 줄 · 사본 갱신)은 `supabase/migrations/README.md`가 정본이다. 원칙 20(고치기 전 정의 먼저 커밋)은 그대로다.
+- 🔴 **긴급 되돌리기** — 이전 정의로 되돌리는 새 마이그레이션 PR(적용된 파일은 고치지 않는다). 화면이 멈춘 급한 경우만 다운님 확인 뒤 관리 API로 직접 보내고, 같은 SQL을 곧바로 이 경로로 저장소에 올린다.
 
 ---
 
