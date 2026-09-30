@@ -351,6 +351,31 @@ const sidoSigunguKey = (addr: string | null): string | null => {
 // ⚠️ 수렴하지 않는 공고가 실재한다 — 울산 정례모집이 네 자치구다(2026-09-17 실측).
 // 🔴 목록 CNP_CD_NM 파생은 폴백으로도 두지 않는다. 그것은 지역본부명이라 실측상
 // 「<시도> 외」 하나뿐이었고 진짜 시군구를 만든 적이 한 번도 없다(⑩ 실측 NULL 840 + '외' 70).
+// 🔴 2026-09-30(표시층·필터) — 목록 CNP_CD_NM 이 「전국」인 게시물. 지역본부 칸이 「전국」일 뿐 모집 지역이
+// 따로 있는 공고가 대부분이다(부산 금정 · 제주 · 인천 · 경남 거창 등 고령자·다자녀 매입). 그대로 실으면
+// 공고 탭 지역 칩에 「전국」이 생기고 그 공고는 제 지역 필터에 안 뜬다.
+// 순서: ① 단지 주소(dsSbd LGDN_ADR)의 시도가 하나로 모이면 그것 ② 제목에서 가장 먼저 나오는 시도 낱말
+// ③ 둘 다 없으면 null — 호출부가 「전국」을 그대로 둔다(전세임대 등 실제 전국 모집).
+// ⚠️ 제목에 시도가 둘이면(「대전충남 …(대전서구,중구,충남천안시)」) 먼저 나온 하나다 — 시도 칸이 하나라서다.
+//    같은 모양의 기존 행(「대전광역시 외」)과 같은 처리다.
+const SIDO_FULL_NAMES = [...new Set(Object.values(SIDO_MAP))]
+const SIDO_WORD_RE = new RegExp(
+  '(' + [...SIDO_FULL_NAMES, '전남광주통합특별시', '전라북도', '강원도', ...Object.keys(SIDO_MAP)].join('|') + ')')
+const SIDO_WORD_FIX: Record<string,string> = { '전라북도': '전북특별자치도', '강원도': '강원특별자치도' }
+const sidoOfNationwide = (title: string | null, sbds: SbdItem[]): string | null => {
+  const tops = new Set<string>()
+  for (const x of sbds) {
+    const k = sidoSigunguKey(san(x.LGDN_ADR))
+    if (!k) { tops.clear(); break }
+    tops.add(k.split('|')[0])
+  }
+  if (tops.size === 1) return applySidoMerge(normSido([...tops][0]))
+  const m = (title ?? '').match(SIDO_WORD_RE)
+  if (!m) return null
+  const w = m[1]
+  return applySidoMerge(SIDO_WORD_FIX[w] ?? normSido(w))
+}
+
 const sigunguOf = (sbds: SbdItem[]): string | null => {
   if (sbds.length === 0) return null
   const keys = new Set<string>()
@@ -399,9 +424,12 @@ function mapLHRow(item: NoticeItem, sbds: SbdItem[], scdls: SplScdlItem[], ahflI
   const [areaMin, areaMax] = areaUnion(sbds)
   const regionRaw = san(item.CNP_CD_NM) ?? ''
   const parts   = regionRaw.split(' ')
-  const sido    = applySidoMerge(normSido(parts[0]) || null)
-  const addr    = san(sbds[0]?.LCT_ARA_ADR ?? sbds[0]?.LGDN_ADR)
   const title   = normalizeTitle(san(item.PAN_NM))
+  const sido0   = applySidoMerge(normSido(parts[0]) || null)
+  // 🔴 「전국」이면 모집 지역을 찾아 시도·region 둘 다 그것으로(없으면 「전국」 그대로) — sidoOfNationwide 주석.
+  const natSido = sido0 === '전국' ? sidoOfNationwide(title, sbds) : null
+  const sido    = natSido ?? sido0
+  const addr    = san(sbds[0]?.LCT_ARA_ADR ?? sbds[0]?.LGDN_ADR)
   // 🔴 일정이 여러 벌이면 대표 한 벌을 고르지 않는다 — 어느 단지 것인지 말할 수 없기 때문이다.
   // 접수 시작만 「가장 이른 값」으로 두고(마감은 목록 CLSG_DT가 이미 가장 늦은 값이다),
   // 나머지 scdl 파생은 null로 보내 가드가 기존 값을 지키게 한다.
@@ -412,7 +440,7 @@ function mapLHRow(item: NoticeItem, sbds: SbdItem[], scdls: SplScdlItem[], ahflI
     source:            'LH',
     announcement_id:   san(item.PAN_ID),
     title,
-    region:            addr ?? (regionRaw || null),
+    region:            addr ?? natSido ?? (regionRaw || null),
     sido_nm:           sido,
     sigungu_nm:        sigunguOf(sbds),
     housing_type:      ([san(item.UPP_AIS_TP_NM), san(item.AIS_TP_CD_NM)].filter(Boolean).join(' - ')) || null,
