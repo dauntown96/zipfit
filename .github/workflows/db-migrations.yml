@@ -1,0 +1,75 @@
+# DB 스키마·함수 변경 — PR 병합 = 적용 (2026-09-30 신설 · 우편함 「운영 — DB 함수·스키마 변경도 PR 병합 = 적용」)
+# 🔴 Claude Code는 supabase/migrations/ 에 SQL을 쓰고 PR을 병합할 뿐, 운영 DB에 DDL을 직접 보내지 않는다. 규칙 정본: supabase/migrations/README.md
+# PR   → check: 아직 적용 안 된 파일을 되돌리기 전용 트랜잭션으로 실제 DB에서 돌린다(전·후 스키마 지문이 같아야 초록).
+#        🔴 빨간 체크의 PR은 병합하지 않는다.
+# main → apply: 아직 적용 안 된 파일만 파일마다 한 트랜잭션으로 적용하고 zipfit_ops.schema_migrations 에 같은 트랜잭션으로 기록한다.
+#        같은 커밋을 다시 돌려도(workflow_dispatch) 기록된 파일은 건너뛴다. 실패하면 라벨 db-apply 이슈(통과하면 스스로 닫힌다).
+# 비밀값: 기존 Actions Secret SUPABASE_ACCESS_TOKEN 하나. 새 비밀값 0.
+name: DB migrations
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/rpc/**'
+      - 'supabase/invariants/**'
+      - '.github/db/**'
+      - '.github/workflows/db-migrations.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: db-check-${{ github.head_ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: 되돌리기 전용 체크
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: python3 .github/db/migrate.py check
+      - name: 결과 올리기
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-result
+          path: db-result.json
+          retention-days: 30
+
+  apply:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: db-apply
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: 적용 — 아직 기록 안 된 파일만
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: python3 .github/db/migrate.py apply
+      - name: 결과 올리기
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-result
+          path: db-result.json
+          retention-days: 90
+      - name: 알림(이슈 열기·닫기)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: bash .github/health/issue.sh db-apply "[DB 적용] 병합 뒤 DB 변경 적용 실패"
