@@ -6,6 +6,8 @@
 //   「활성 LH 공고 중 6시간 넘게 상세조회를 시도하지 않은 수」(지금 3)로 잰다.
 // 🔴 첫 주는 넉넉하게 — 오탐이 잦으면 알림이 읽히지 않는다.
 import { sqlRead, anonRpc, report, SITE } from './lib.mjs'
+import { readdirSync, readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 
 const now = new Date()
 const hourUtc = now.getUTCHours()
@@ -84,6 +86,39 @@ try {
   add('promo_fail', '24시간 안 실패한 홍보물 목록 수집(공고)', d.promo_fail_24h < 3 ? 'pass' : 'fail', d.promo_fail_24h, '< 3(첫 런 26공고 오류 0)')
   add('sh_fresh', 'SH 수집 마지막 런 경과(분)', d.sh_last_run_age_min != null && d.sh_last_run_age_min <= 900 ? 'pass' : 'fail',
     d.sh_last_run_age_min == null ? '기록 없음' : Math.round(d.sh_last_run_age_min), '≤ 900분(하루 4회 09·12·15·18시 KST — 18시 → 다음날 09시 = 900분)')
+  // ⑦ 함수 정의 = supabase/rpc/ 사본(2026-09-30 우편함 「운영 — 함수 사본 드리프트」). 읽기만 한다.
+  //   대조 규칙은 .github/db/migrate.py rpc_md5() 와 같다 — 파일 그대로 또는 끝 줄바꿈을 걷은 md5 가 DB md5 와 같으면 통과.
+  //   걸리는 것: 정의가 다름 · 사본 없음(새 함수) · 같은 이름 둘 이상(한 파일로 대조 불가) · 함수 없는 사본(지운 함수의 사본 잔존).
+  //   확장 소유 함수는 뺀다(pg_depend deptype 'e'). README.md · triggers.sql(트리거 바인딩)은 함수 사본이 아니다.
+  {
+    const t0 = Date.now()
+    const [fr] = await sqlRead(`
+      select coalesce(json_agg(json_build_object('name', p.proname, 'sig', p.oid::regprocedure::text, 'md5', md5(pg_get_functiondef(p.oid))) order by p.proname), '[]'::json) j
+      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public' and p.prokind in ('f','p')
+        and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')`)
+    const fns = fr.j || []
+    const RPC_DIR = 'supabase/rpc'
+    const NOT_COPIES = new Set(['README.md', 'triggers.sql'])
+    const copies = new Map(readdirSync(RPC_DIR).filter(f => f.endsWith('.sql') && !NOT_COPIES.has(f)).map(f => {
+      const s = readFileSync(`${RPC_DIR}/${f}`, 'utf8')
+      const md5 = x => createHash('md5').update(x, 'utf8').digest('hex')
+      return [f.slice(0, -4), new Set([md5(s), md5(s.replace(/\n+$/, ''))])]
+    }))
+    const byName = new Map()
+    for (const f of fns) byName.set(f.name, [...(byName.get(f.name) || []), f])
+    const bad = []
+    for (const [name, list] of byName) {
+      if (list.length > 1) { bad.push(`${name}: 같은 이름 ${list.length}개`); continue }
+      const c = copies.get(name)
+      if (!c) bad.push(`${list[0].sig}: 사본 없음`)
+      else if (!c.has(list[0].md5)) bad.push(`${list[0].sig}: DB ${list[0].md5.slice(0, 8)}… ≠ 사본`)
+    }
+    for (const name of copies.keys()) if (!byName.has(name)) bad.push(`${name}.sql: DB에 함수 없음`)
+    add('fn_copy', 'public 함수 정의 = supabase/rpc/ 사본', bad.length === 0 ? 'pass' : 'fail',
+      bad.length ? bad.join(' · ') : `${fns.length}개 모두 같음 · ${Date.now() - t0}ms`,
+      'DB 정의 md5 = 사본 md5(끝 줄바꿈 무시 — migrate.py 와 같은 규칙) · 사본 없는 함수·함수 없는 사본 0 · 확장 함수 제외')
+  }
   // ⑥ 백업 — 🔴 zipfit-backup(비공개) 실행 기록을 이 저장소 토큰으로는 읽을 수 없다(새 토큰 필요 → 요청서 멈춤). 설계만.
   add('backup', '최근 백업 성공', 'skip', '미구현', 'zipfit-backup 은 비공개 — 읽으려면 새 권한이 필요해 멈춤(우편함 회신 참고). 백업 실패는 그 저장소 자체 이슈(backup-failure)로 알린다')
 } catch (e) {
