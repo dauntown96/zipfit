@@ -16,9 +16,9 @@ on:
   workflow_dispatch:
     inputs:
       simulate:
-        description: '알림 경로 시험 — fail 이면 카드 하나의 기대 문구를 없는 문구로 바꾼다'
+        description: '알림 경로 시험 — fail 이면 카드 하나의 기대 문구를 없는 문구로 · notice 면 공고문 기대 마감일을 하루 옮긴다'
         type: choice
-        options: [none, fail]
+        options: [none, fail, notice]
         default: none
 
 permissions:
