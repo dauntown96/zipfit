@@ -1,3 +1,9 @@
+-- 코드 — 분석률 셈 · 재분석 큐에 링크 표(2026-10-01 · 우편함 「코드 — 거짓 「다른 회차」 배너 · … · 블록 칩」 6)
+--   get_reanalysis_queue 의 묶음 = 제목 키 ∪ 같은 게시물 링크 표(announcement_post_links). 링크 표에 있는 MYHOME 행은
+--   LH 행의 제목 키를 쓴다 — get_announcements_deduped · get_announcement_group_ids 의 link_map 과 같은 규칙이다.
+--   붙은 행은 같은 게시물(같은 날짜 ∧ panId)이라 마감일이 달라도 같은 회차로 센다.
+--   반환형·권한·SECURITY 그대로(CREATE OR REPLACE). 분석률 측정 SQL 은 supabase/metrics/analysis_rate.sql(같은 규칙 · 읽기 전용).
+-- zipfit:function get_reanalysis_queue() acl={postgres=X/postgres,service_role=X/postgres} secdef=false
 CREATE OR REPLACE FUNCTION public.get_reanalysis_queue()
  RETURNS TABLE(announcement_id text, source text, title text, announcement_date date, is_revised boolean, revision_note text, group_child_count bigint, donor_announcement_ids text[], queue_reason text)
  LANGUAGE sql
@@ -102,4 +108,4 @@ WHERE aa.status IN ('완료', '완료(보조 누락)', '완료(판정 대기)', 
       AND jsonb_array_length(h.files) > 0
   )
 ORDER BY 7 DESC, 1;
-$function$
+$function$;
