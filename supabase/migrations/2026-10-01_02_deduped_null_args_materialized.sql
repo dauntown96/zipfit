@@ -1,3 +1,12 @@
+-- 운영 — 목록 RPC null 인자 근본(2026-10-01 · 우편함 「운영 — 공고 분석 감지 루틴 발송기」 3)
+--   PostgREST 가 인자를 null 로 명시해 보내면 SQL 함수가 인라인되지 않고 일반 계획이 되어, 마지막 WHERE 의 OR 조건 때문에
+--   대표 행 추정이 1로 떨어지고 complex_name(같은 회차 세대 행 다시 세기)을 대표마다 다시 돌렸다(925회 · 4.6초 → anon 3초 초과 500).
+--   complex_name 을 MATERIALIZED 로 한 번만 계산한다 — 반환형·행·값·권한 그대로(되돌리기 전용 실측: 네 모양 전 행 md5 같음).
+-- zipfit:function get_announcements_deduped(text,text,text) acl={=X/postgres,postgres=X/postgres,service_role=X/postgres,anon=X/postgres,authenticated=X/postgres} secdef=false
+-- zipfit:anon select * from get_announcements_deduped()
+-- zipfit:anon select t.* from json_to_record('{"p_region":null,"p_type":null,"p_status":null}'::json) as x(p_region text, p_type text, p_status text), lateral get_announcements_deduped(x.p_region, x.p_type, x.p_status) t
+-- zipfit:anon select t.* from json_to_record('{"p_region":"경기도"}'::json) as x(p_region text), lateral get_announcements_deduped(x.p_region) t
+-- zipfit:anon select t.* from json_to_record('{"p_type":"국민임대"}'::json) as x(p_type text), lateral get_announcements_deduped(p_type => x.p_type) t
 CREATE OR REPLACE FUNCTION public.get_announcements_deduped(p_region text DEFAULT NULL::text, p_type text DEFAULT NULL::text, p_status text DEFAULT NULL::text)
  RETURNS TABLE(id bigint, source text, announcement_id text, title text, region text, region_top text, sido_nm text, sigungu_nm text, housing_type text, supply_org text, announcement_date date, apply_start date, apply_end date, status text, status_normalized text, url text, is_revised boolean, area_min numeric, area_max numeric, rent_min integer, rent_max integer, deposit_min bigint, deposit_max bigint, total_units integer, move_in_date text, target_type text, heating_type text, created_at timestamp with time zone, updated_at timestamp with time zone, mymy_applicable boolean, supply_form text, application_method text, recruit_multiplier text, pair_announcement_key text, housing_change_allowed boolean, precise_address text, is_relaxed_recruitment boolean, relaxation_detail text, selection_method text, subscription_months_required integer, subscription_payments_required integer, contract_before_verification boolean, rent_exemption_until date, rent_exemption_note text, revision_note text, revised_at timestamp with time zone, special_notes jsonb, revised_at_source text, first_seen_at timestamp with time zone, doc_submit_announce_date date, doc_submit_start date, doc_submit_end date, winner_announce_date date, contract_start date, contract_end date, building_name text, attachment_urls jsonb, has_cancel_notice boolean, region_names text[], block_count integer, first_announcement_date date, schedule_varies boolean, apply_end_confirmed date, apply_period_check boolean, last_seen_at timestamp with time zone)
  LANGUAGE sql
@@ -364,4 +373,4 @@ WHERE (
     OR (p_status = '정정공고' AND w.is_revised = true)
     OR (p_status <> '정정공고' AND w.status = p_status)
   );
-$function$
+$function$;
