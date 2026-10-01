@@ -1618,7 +1618,7 @@ function zfMdDow(d){
   const dt = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
   return `${Number(m[2])}/${Number(m[3])}(${'일월화수목금토'[dt.getDay()]})`;
 }
-// 반환 { kind, text } — kind 는 ① · ②-가 · ②-나 · ②-다 · ②-다(지남) · 없음. text 가 빈 문자열이면 한 줄을 그리지 않는다.
+// 반환 { kind, text } — kind 는 ① · ②-가 · ②-나 · ②-다 · ②-다(지남) · ②-라 · ②-라(지남) · 없음. text 가 빈 문자열이면 한 줄을 그리지 않는다.
 function zfRouteVerdict(rows, today){
   if(!Array.isArray(rows) || !rows.length) return { kind: '없음', text: '' };
   const rs = rows.slice().sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
@@ -1665,6 +1665,22 @@ function zfRouteVerdict(rows, today){
     if(spans.length > 1) return { kind: '②-가', text: '접수일이 나뉘어 있어요 · ' + lineOf(spans) };
     const hsp = merge(groups.filter(g => g.hs || g.he), g => (g.hs || '') + '|' + (g.he || ''), g => zfSpanText(g.hs, g.he));
     if(hsp.length > 1) return { kind: '②-나', text: '현장 접수일이 나뉘어 있어요 · ' + lineOf(hsp) };
+  }
+  // ②-라 — 경로 행이 전부 현장(인터넷 행 없음)이고 위 갈래(순위·단지로 갈림)에 걸리지 않았을 때.
+  //    🔵 2026-10-01 — 종전에는 ②-다가 인터넷 마감과 견주는 갈래라 현장 전용 공고(전주평화1 …0824)가 한 줄을 못 받았다.
+  //    날짜는 경로 행 값 그대로(가장 이른 시작 ~ 가장 늦은 끝) · 마감이 지났으면 ②-다(지남)처럼 그리지 않는다.
+  if(rs.every(r => r.route === '현장')){
+    let os = '', oe = '';
+    rs.forEach(r => {
+      if(r.start_date && (!os || r.start_date < os)) os = r.start_date;
+      if(r.end_date && (!oe || r.end_date > oe)) oe = r.end_date;
+    });
+    const OE = parseNoticeDate(oe);
+    if(!os || !OE) return { kind: '없음', text: '' };
+    if(startOfLocalDay(OE) < startOfLocalDay(today || new Date())) return { kind: '②-라(지남)', text: '' };
+    return { kind: '②-라', text: zfMd(os) === zfMd(oe)
+      ? `현장 접수만 받아요 — ${zfMdDow(os)} 하루`
+      : `현장 접수만 받아요 — ${zfMdDow(os)}~${zfMdDow(oe)}` };
   }
   // ②-다 — 현장 마감이 하나(M)이고 인터넷·모바일 마감보다 이르며 오늘 ≤ M 일 때만
   const hes = [...new Set(groups.map(g => g.he).filter(Boolean))];
@@ -2084,6 +2100,15 @@ function zfUnitPlacesFor(aid){
   const s = zfPriceCache.get(String(aid || ''));
   return s ? zfUnitPlaces(s.unit_places) : [];
 }
+// 그룹 행 시군구 ∪ 세대 행 시군구(시·도 옛 이름은 새 이름으로). 표지와 상세 「주택이 있는 지역」이 같은 재료를 쓴다.
+function zfMergeUnitPlaces(regionNames, units){
+  const merged = [];
+  (Array.isArray(regionNames) ? regionNames : []).concat(units || []).forEach(x => {
+    const k = zfCanonSido(x);
+    if(k && merged.indexOf(k) < 0) merged.push(k);
+  });
+  return merged;
+}
 // 표지 지역 문구 — 세 갈래다. 🔴 대표 한 곳만 적는 종전 문구는 남기지 않는다(「우리 동네가 아니네」로 읽힌다).
 // 🔴 판정은 여기 하나다(2026-09-16). 글자가 필요한 곳(공유 문구 등)은 이 함수를,
 //    HTML 이 필요한 곳은 아래 zfCoverPlace 를 부른다 — 사본을 만들지 않는다.
@@ -2104,12 +2129,7 @@ function zfCoverPlaceText(regionNames, blockCount, sido, sigungu, fallback, unit
     }
     return String(fallback || '');       // 한 곳·한 단지는 종전 그대로
   }
-  const merged = [];
-  (Array.isArray(regionNames) ? regionNames : []).concat(units).forEach(x => {
-    const k = zfCanonSido(x);
-    if(k && merged.indexOf(k) < 0) merged.push(k);
-  });
-  const places = zfPlaceNames(merged);
+  const places = zfPlaceNames(zfMergeUnitPlaces(regionNames, units));
   const lead = places.find(p => p === units[0] || p.indexOf(units[0] + ' ') === 0) || units[0];
   if(places.length >= 2) return zfShortPlace(lead) + ' 외 ' + (places.length - 1) + '곳';
   if(blocks >= 2) return zfShortPlace(lead) + ' · ' + blocks + '개 단지';
@@ -2132,6 +2152,12 @@ function zfRefreshCovers(){
     if(!a) return;
     const t = zfCoverPlaceText(a[0], a[1], a[2], a[3], a[4], zfUnitPlacesFor(aid));
     if(el.textContent !== t) el.textContent = t;
+  });
+  document.querySelectorAll('.zf-places[data-places-for]').forEach(el => {
+    const aid = el.getAttribute('data-places-for');
+    if(!zfPlacesArgs.has(aid)) return;
+    const h = zfPlacesLineInner(zfPlacesArgs.get(aid), zfUnitPlacesFor(aid));
+    if(el.innerHTML !== h) el.innerHTML = h;
   });
 }
 // ===== 카드 유형 표지 =====
@@ -2293,10 +2319,19 @@ function cancelNoticeBadge(title, applyEnd){
 
 // 상세의 전체 시군구 목록 — 표지가 「외 N곳」으로 줄이므로 여기서 전부 펼쳐 보여준다.
 //    한 곳뿐이면 표지가 이미 그 이름을 적었으므로 아무것도 그리지 않는다.
-function zfPlacesLine(regionNames){
-  const places = zfPlaceNames(regionNames);
+// 🔵 2026-10-01 — 세대 행이 있는 카드는 표지와 같이 세대 행 시군구를 합친다(도 단위 MYHOME 행 때문에 전주가 빠지던 것 — …0814).
+//    세대 행 지역(요약 RPC)은 나중에 오므로 aid 를 주면 자리를 감싸 두고 zfRefreshCovers() 가 다시 쓴다. 세대 행이 없으면 종전 그대로.
+function zfPlacesLineInner(regionNames, units){
+  const u = Array.isArray(units) ? units.filter(Boolean) : [];
+  const places = zfPlaceNames(u.length ? zfMergeUnitPlaces(regionNames, u) : regionNames);
   if(places.length < 2) return '';
   return `<p style="font-size:12px;color:#666;margin:8px 0 0;line-height:1.6">📍 <span style="color:#999">이 공고의 주택이 있는 지역</span> ${places.map(x => escapeHtml(zfShortPlace(x))).join(' · ')}</p>`;
+}
+const zfPlacesArgs = new Map();
+function zfPlacesLine(regionNames, aid){
+  if(!aid) return zfPlacesLineInner(regionNames, []);
+  zfPlacesArgs.set(String(aid), regionNames);
+  return `<div class="zf-places" data-places-for="${zfAttr(aid)}">${zfPlacesLineInner(regionNames, zfUnitPlacesFor(aid))}</div>`;
 }
 // 🔴 단지 수 한 벌 (2026-09-17). v43 부터 EF 가 `building_name` 에 「 외 N개 단지」를 **이미**
 //    싣는다. 그래서 표지가 block_count 로 또 붙이면 두 번 나오고, 두 수가 다르면
@@ -3298,7 +3333,7 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
           <div class="detail-grid">
             ${detailRows.map(([k,v])=>`<div style="font-size:12px"><span style="color:#999">${k}</span><br><span style="color:#333;font-weight:500">${v}</span></div>`).join('')}
           </div>
-          ${zfPlacesLine(n['region_names'])}
+          ${zfPlacesLine(n['region_names'], n['announcement_id'])}
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
             ${n['공고URL']?`<a class="detail-link" href="${n['공고URL']}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">📄 공고 원문 보기</a>`:''}
             ${shareBtn}
