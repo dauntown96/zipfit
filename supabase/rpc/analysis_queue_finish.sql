@@ -3,7 +3,7 @@ CREATE OR REPLACE FUNCTION public.analysis_queue_finish(p_run_id bigint, p_done 
  LANGUAGE plpgsql
 AS $function$
 -- 루틴이 끝날 때 부른다(2026-10-01 운영 회차) — p_done(대표 announcement_id)은 「끝」, 나머지 잡은 공고는 대기열로 되돌린다
--- (returned — 도는 회차가 없으면 다음 발송 판정이 유예 없이 가져간다). 회차를 끝내 잠금을 푼다.
+-- (returned — 이 회차가 1건 이상 끝냈으면 다음 발송 판정이 유예 없이 가져가고, 0건이면 되돌린 때부터 유예를 따른다). 회차를 끝내 잠금을 푼다.
 -- 「끝」은 분석 상태와 무관하다(완료 · 보류 · 실패 모두) — 한 번 루틴이 맡아 결론을 낸 공고는 자동으로 다시 보내지 않는다.
 declare
   n_done int; n_back int;

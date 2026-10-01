@@ -5416,9 +5416,29 @@ function roundInfoFor(rawRows, annId, roundMap, cardDate){
 //    🔴 정정 카드는 하나 더 본다 — 행의 출처가 정정 행이거나 정정 게시일 이후의 행일 때만 같다고 본다. 그보다 앞선 행이면
 //    「정정 전 공고 기준」 배너(STALE_SRC_MSG_REVISED)가 맞는 말이라 종전 그대로 둔다.
 //    🔴 하나라도 모르면(회차 조회 실패·출처 행 없음·카드 날짜 없음) 종전 그대로 판정한다 — 모르는 것을 「같다」고 하지 않는다.
-function zfRoundsIfOrphan(rows, annId, ids, useGroup){
+//    🔴 2026-10-01 정정본 분석 — 위 「정정 행이거나 정정 게시일 이후의 행」만으로는 정정본으로 분석한 산물이 규약 29 로
+//    정정 게시 **전에** 수집된 블록 ID 에 사는 공고(춘천·홍천 …0779)에서 거짓 「정정 전」 배너가 켜졌다.
+//    그래서 정정 카드는 RPC get_revision_analysis_done(카드 id)도 묻는다 — 참(같은 마감의 정정 행에 카드 정정 시각 뒤의 완료 계열 분석)이면
+//    행의 수집일·정정 표시를 따지지 않는다. 🔴 회차 축(마감·회차 날짜)은 그대로 본다 — 다른 회차 행(원주 …0783 의 7월 행)의 배너는 남는다.
+//    결과는 roundMap 의 열거되지 않는 속성 revisionAnalyzed 로 싣는다(roundMap 을 공고 id 로 훑는 곳이 키로 보지 않게).
+function zfRoundsIfOrphan(rows, annId, ids, useGroup, id){
   const orphan = !!useGroup && Array.isArray(rows) && rows.length > 0 && !rows.some(r => r && r.announcement_id === annId);
-  return fetchGroupRounds(ids, orphan && Array.isArray(ids) && ids.length >= 2);
+  const need = orphan && Array.isArray(ids) && ids.length >= 2;
+  const cardEl = need && id != null ? cardElFor(id) : null;
+  const revP = (cardEl && cardEl.dataset.revised === '1') ? zfRevisionAnalyzed(annId) : Promise.resolve(false);
+  return Promise.all([fetchGroupRounds(ids, need), revP]).then(([roundMap, rev]) => {
+    if(roundMap && rev === true) Object.defineProperty(roundMap, 'revisionAnalyzed', { value: true });
+    return roundMap;
+  });
+}
+// 실패·모름은 false — 종전 판정(정정 표시·공고일)으로 떨어진다.
+function zfRevisionAnalyzed(annId){
+  if(!annId) return Promise.resolve(false);
+  return fetch(`${SUPABASE_URL}/rest/v1/rpc/get_revision_analysis_done`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_id: String(annId) })
+  }).then(r => r.ok ? r.json() : false).then(v => v === true).catch(() => false);
 }
 function zfRowsSameRoundAsCard(rawRows, roundMap, cardEl){
   if(!roundMap || !cardEl || !Array.isArray(rawRows) || rawRows.length === 0) return false;
@@ -5431,7 +5451,7 @@ function zfRowsSameRoundAsCard(rawRows, roundMap, cardEl){
     if(!a) return false;
     const same = (cEnd && (a.apply_end || '') === cEnd) || (cRound && zfNoticeDate(a) === cRound);
     if(!same) return false;
-    return !cRev || a.is_revised === true || (!!cDate && (a.announcement_date || '') >= cDate);
+    return !cRev || roundMap.revisionAnalyzed === true || a.is_revised === true || (!!cDate && (a.announcement_date || '') >= cDate);
   });
 }
 
@@ -5447,7 +5467,7 @@ function loadAnnouncementExtras(annId, detailEl, id, useGroup){
   const keysP = huKeysReady[id] ? huKeysReady[id].promise : Promise.resolve(null);
   resolveAnnouncementIds(annId, useGroup).then(ids => fetch(`${SUPABASE_URL}/rest/v1/announcement_extras?${idFilterFor(ids)}&order=extra_type,building_address`, {
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
-  }).then(r => r.ok ? r.json() : []).then(rows => zfRoundsIfOrphan(rows, annId, ids, useGroup).then(roundMap => [rows, roundMap])))
+  }).then(r => r.ok ? r.json() : []).then(rows => zfRoundsIfOrphan(rows, annId, ids, useGroup, id).then(roundMap => [rows, roundMap])))
   .then(([rows, roundMap]) => keysP.then(keys => [rows, keys, roundMap])).then(([rows, keys, roundMap]) => {
     if(!zfStillOurs(id, ownerAnn)) return;   // 그 사이 이 자리에 다른 공고가 왔다
     if(!Array.isArray(rows) || rows.length === 0) return;
@@ -6260,7 +6280,7 @@ function loadPreciseEligibility(annId, detailEl, id, useGroup){
   const ownerAnn = zfCardAnn(id);
   resolveAnnouncementIds(annId, useGroup).then(ids => fetch(`${SUPABASE_URL}/rest/v1/eligibility_criteria?${idFilterFor(ids)}&order=supply_form,rank`, {
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
-  }).then(r => r.ok ? r.json() : null).then(rows => zfRoundsIfOrphan(rows, annId, ids, useGroup).then(roundMap => [rows, roundMap])))
+  }).then(r => r.ok ? r.json() : null).then(rows => zfRoundsIfOrphan(rows, annId, ids, useGroup, id).then(roundMap => [rows, roundMap])))
   .then(([rows, roundMap]) => {
     if(!zfStillOurs(id, ownerAnn)) return;
     // 🔴 요청 실패(null)는 여기서 끝낸다 — 정상 0행([])만 아래에서 안내를 받는다.

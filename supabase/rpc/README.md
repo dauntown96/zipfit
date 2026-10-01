@@ -51,6 +51,14 @@ anon·authenticated에 주고 있어, **새 함수는 열린 채로 태어난다
 
 기록만 한다. 여기를 고쳐도 DB는 바뀌지 않는다 — 위 「배포 경로가 아니다」와 같다.
 
+### 2026-10-01 — `get_revision_analysis_done(text)` 신설 · anon·authenticated EXECUTE (마이그레이션 `2026-10-01_05`)
+
+화면의 「정정 전 공고 기준」 배너 판정 재료(카드 하나에 참/거짓 하나). `announcement_analysis`를 읽어 `SECURITY DEFINER`다 —
+그 표는 anon·authenticated에 SELECT가 없고 열지 않는다(`get_announcement_price_summary.analysis_done`과 같은 판단).
+
+- ACL: `postgres=X/postgres | service_role=X/postgres | anon=X/postgres | authenticated=X/postgres`(PUBLIC 없음) · `search_path=public, pg_temp`.
+- 되돌리기: `drop function public.get_revision_analysis_done(text)` 새 마이그레이션 + 사본 삭제(`-- zipfit:dropped`). 화면은 호출이 실패하면 종전 판정으로 떨어진다.
+
 ### 2026-09-30 — `get_announcement_price_summary` 재생성(`unit_places jsonb` 추가), 권한은 전과 같게 되돌림
 
 카드 표지 지역의 재료 `unit_places`(이번 회차 세대 행의 「시도 시군구」와 세대 수, 세대 수 내림차순)를 **더하느라**
