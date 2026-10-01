@@ -151,8 +151,8 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-10-01 | **운영 — 몫 1 수동 발송(첫 실제 분석 · …0814)** — `analysis_dispatch_tick(true)` 한 번 → run 93 `fired manual` 1건(`…0814`) · 루틴 API 200 · 루틴 24초 뒤 잡음 · cron 판정이 run 행 `http_status`·`session_url` 채움 · 같은 판정에 새 공고 `…0843` 진입(대기 9) · 스위치 꺼짐 · 이 세션 분석 0 · 회신 때 진행 중. PR #295 |
 | 2026-10-01 | **코드 — 발송 몫 상한 · 잡힌 뒤 응답 · 목록 RPC 한 번** — `batch_size`(기본 1) · 끝낸 회차 뒤 남은 몫 `next` · 응답 정리를 running·finished까지(run 39 200 채움 · 잡힌 뒤 401 실패) · health-ops 대기 기준 · `zfFetchAllNoticeRows` 로드당 목록 RPC 4→1 · 동시 3 전부 200 · 청년 매입 자녀 가점은 혼인 축·전세형으로 이미 안 붙음(코드 0) · v157. PR #294 |
-| 2026-10-01 | **운영 — 감지 루틴 수동 시험 발송(루틴 첫 실행)** — `analysis_dispatch_tick(true)` 한 번 → run 39 `fired manual` 9건 · 루틴 API HTTP 200(세션 URL 받음) · 루틴이 20초 뒤 9건 잡음(`running`) · 잡기가 cron 판정보다 먼저 와 run 행 `http_status`·`session_url` 빈칸(보고만) · 스위치 꺼짐 그대로 · 이 세션 분석 0 · 회신 때 진행 중. PR #293 |
 | 2026-10-01 | **코드 — 발송기 진전 없는 되돌림 · 거짓 「정정 전」 배너** — 직전 회차가 0건을 끝냈으면 되돌린 공고도 60분 유예 · 0건 끝 3연속이면 `stalled` 멈춤 · health-ops 한 줄 · 새 RPC `get_revision_analysis_done`(정정 행에 정정 뒤 완료 분석 · 소급 제외)으로 `…0779` 자격 칸 배너 끔 · 정정 카드 209장 중 바뀐 것 그 하나 · `…0783` 유지 · v156. PR #292 |
 
 ---
