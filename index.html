@@ -191,6 +191,7 @@ details.pol-item>summary::-webkit-details-marker{display:none}
 details.pol-item>summary::after{content:' ▾';color:#aaa;font-weight:400}
 details.pol-item[open]>summary::after{content:' ▴'}
 details.pol-item>.policy-content{padding:0 12px 10px}
+.pol-site{display:inline-block;margin-right:6px;padding:0 6px;border-radius:9px;background:#EEF2FA;color:#3D5A99;font-size:11px;font-weight:600;vertical-align:1px}
 .pol-empty{font-size:12px;color:#888;padding:6px 2px}
 /* 🔵 B62 ①② — 날짜 줄 아래 한 줄. 🔵 표시층 B ② 접힌 상태는 두 줄까지(첫 날짜가 보이게) · 펼침 표시 ▾는 말줄임 밖 별도 칸 · 누르면 펼친다 */
 .zf-route-line{font-size:12px;color:#8A5A12;background:#FBF0DC;border-radius:8px;padding:4px 10px;margin:-4px 0 8px;cursor:pointer;display:flex;align-items:flex-start;gap:6px}
@@ -1519,6 +1520,8 @@ function zfLoadPostNotices(){
     const stateChanged = changedRows.some((n, i) => applyWindowState(n) !== before[i]);
     const q = document.getElementById('noticeSearchInput');
     if(noticeLoaded && (stateChanged || (q && q.value.trim()))) applyNoticeFiltersAndRender(noticePage);
+    // 🔴 2026-10-01 — 추천 탭도 같은 경로로 다시 그린다(공고 탭과 같은 상태 · 사본 판정 없음). 매칭은 matchHouses 가 이 약속을 기다린 뒤 거른다.
+    if(stateChanged) zfRerenderRecIfVisible();
     zfFillNoticeSlots();
     return zfPostNotices;
   })();
@@ -1554,7 +1557,7 @@ function zfNoticeStateBadge(state, end){
     : t === '접수 중' ? 'background:#E6F4EE;color:#0F6E56'
     : t === '접수 예정' ? 'background:#EEF2FA;color:#3D5A99'
     : 'background:#F6F6F2;color:#6B6B63';
-  return `<span style="display:inline-block;white-space:nowrap;margin-left:4px;padding:1px 6px;border-radius:9px;font-size:11px;font-weight:600;${c}">${t}</span>`;
+  return `<span class="zf-nt-state" style="display:inline-block;white-space:nowrap;margin-left:4px;padding:1px 6px;border-radius:9px;font-size:11px;font-weight:600;${c}">${t}</span>`;
 }
 // 자리는 카드 행의 접수 재료를 함께 싣는다 — 공고 탭·추천·매칭 카드의 행 모양이 달라도 채울 때 같은 판정을 한다.
 function zfNoticesSlotHtml(row){
@@ -1574,12 +1577,17 @@ function zfFillNoticeSlots(){
     const same = list.every(x => x.start === list[0].start && x.end === list[0].end && x.state === list[0].state);
     const box = 'font-size:12px;color:#444;background:#FAFAF6;border:1px solid #E8E8E0;border-radius:8px;padding:6px 10px;margin:0 0 8px;line-height:1.7';
     const name = x => `<span title="${zfAttr(x.title)}" style="font-weight:600;color:#333">${escapeHtml(x.name || x.title)}</span>`;
+    // 🔵 2026-10-01 — class zf-nt-line·zf-nt-span·zf-nt-state 는 화면 점검(health-screen 「공고문 자리 ↔ DB」)이 읽는 표지다. 모양은 그대로다.
     el.innerHTML = same
-      ? `<div style="${box}">📑 공고문 ${list.length}개 · ${list.map(name).join(' · ')}<br><span style="color:#666">접수 ${escapeHtml(zfSpanText(list[0].start, list[0].end))}</span>${zfNoticeStateBadge(list[0].state, list[0].end)}</div>`
+      ? `<div class="zf-nt-line" style="${box}">📑 공고문 ${list.length}개 · ${list.map(name).join(' · ')}<br><span class="zf-nt-span" style="color:#666">접수 ${escapeHtml(zfSpanText(list[0].start, list[0].end))}</span>${zfNoticeStateBadge(list[0].state, list[0].end)}</div>`
       : `<div style="${box}">📑 공고문 ${list.length}개 · <b style="color:#8A5A12">공고문마다 접수일이 달라요</b>`
-        + list.map(x => `<div>· ${name(x)} <span style="color:#666;white-space:nowrap">${escapeHtml(zfSpanText(x.start, x.end))}</span>${zfNoticeStateBadge(x.state, x.end)}</div>`).join('')
+        + list.map(x => `<div class="zf-nt-line">· ${name(x)} <span class="zf-nt-span" style="color:#666;white-space:nowrap">${escapeHtml(zfSpanText(x.start, x.end))}</span>${zfNoticeStateBadge(x.state, x.end)}</div>`).join('')
         + `</div>`;
     zfHideRouteDupOf(el.closest('.hcard'));
+    // 🔴 2026-10-01 — 공고문 목록이 서면 날짜 줄의 「단지마다 일정이 달라요」 배지를 숨긴다 — 목록이 공고문별 일정을 이미 말한다
+    //    (목포권 …0734 에 같은 뜻이 두 번 떴다). 공고문 목록이 없는 카드는 이 자리를 지나지 않아 배지가 그대로다.
+    const card = el.closest('.hcard');
+    if(card) card.querySelectorAll('.zf-varies').forEach(t => { t.style.display = 'none'; });
   });
 }
 // 같은 뜻을 두 번 말하지 않는다 — 공고문마다 접수일이 다른 카드에서는 경로 한 줄 ②-가(「접수일이 나뉘어 있어요」)를 숨긴다.
@@ -1665,7 +1673,10 @@ function zfRouteVerdict(rows, today){
   if(hes.length === 1 && ie && hes[0] < ie){
     const M = parseNoticeDate(hes[0]);
     const t = startOfLocalDay(today || new Date());
-    if(M && startOfLocalDay(M) >= t) return { kind: '②-다', text: `현장 접수는 ${zfMdDow(hes[0])}까지` };
+    // 🔴 2026-10-01 — 현장 접수 시작일 = 마감일이면 「까지」가 아니라 하루다(인천석남 …0858 10/14 하루를 「까지」로 읽혔다).
+    const hss = [...new Set(groups.map(g => g.hs).filter(Boolean))];
+    const oneDay = hss.length === 1 && hss[0] === hes[0];
+    if(M && startOfLocalDay(M) >= t) return { kind: '②-다', text: oneDay ? `현장 접수는 ${zfMdDow(hes[0])} 하루만 받아요` : `현장 접수는 ${zfMdDow(hes[0])}까지` };
     return { kind: '②-다(지남)', text: '' };
   }
   return { kind: '없음', text: '' };
@@ -2508,6 +2519,12 @@ function zfMapNoticeRows(rows){
 
 // ── 핵심: 필터 변경 시 RPC 재호출 ──
 // keepPage — 재질의 뒤 되돌릴 쪽 번호. 안 넘기면 종전대로 1쪽이다.
+// 🔴 2026-10-01 — RPC 인자에서 null·undefined 를 뺀다. 목록 RPC(get_announcements_deduped)를 null 인자로 부르면 PostgREST 가
+//    인자를 상수로 넘기지 못해 SQL 함수가 인라인되지 않고, 전 지역 조회가 DB 안에서 4.7초(anon statement_timeout 3초 초과 → 500)가 됐다.
+//    인자를 빼면 함수 기본값(NULL)으로 인라인돼 0.23초다(2026-10-01 실측 · 지역 하나만 넘기면 어느 쪽이든 0.2초대).
+function zfRpcArgs(o){
+  return Object.fromEntries(Object.entries(o || {}).filter(([, v]) => v != null));
+}
 async function loadNoticeData(keepPage){
   noticeLoading = true;
   const statusEl = document.getElementById('notice-status');
@@ -2523,11 +2540,13 @@ async function loadNoticeData(keepPage){
   // applyNoticeSubFilters() 재질의 없는 안내가 성립한다. 여기서 서버에 넘기면 그게 깨진다.
   const p_status = null;
 
-  const body = JSON.stringify({
+  // 🔴 2026-10-01 — 값이 null 인 인자는 **보내지 않는다**(zfRpcArgs). null 을 명시하면 PostgREST 가 함수를 인라인하지 못해
+  //    DB 안에서 4.7초가 걸리고 anon 한도(3초)에 걸려 500 이 난다(인자를 빼면 0.23초 · 함수 기본값이 NULL 이라 뜻은 같다).
+  const body = JSON.stringify(zfRpcArgs({
     p_region: activeNoticeRegion || null,
     p_type:   activeNoticeType   || null,
     p_status: p_status
-  });
+  }));
 
   try{
     const res = await fetch(
@@ -4636,11 +4655,12 @@ async function matchHouses(){
   r.classList.remove('hidden');
   r.innerHTML = '<div class="rbox warn"><p class="rtitle">⏳ 조건에 맞는 공고를 찾는 중...</p></div>';
 
-  const body = {
+  // 🔴 2026-10-01 — null 인자는 빼고 보낸다(zfRpcArgs · loadNoticeData 주석). 지역을 0개·여러 개 고르면 종전에는 500 이었다.
+  const body = zfRpcArgs({
     p_region: regions.length === 1 ? regions[0] : null,
     p_type: null,
     p_status: null
-  };
+  });
 
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_announcements_deduped`, {
@@ -4659,6 +4679,10 @@ async function matchHouses(){
       throw new Error('Supabase 오류: ' + msg);
     }
 
+    // 🔴 2026-10-01 — 같은 게시물 공고문(zfLoadPostNotices)이 온 뒤에 거른다. 카드 상태(applyWindowState)가 붙은 공고문까지 보므로,
+    //    먼저 거르면 공고 탭과 상태가 어긋난다(아산 …0726 — LH 행은 닫혀도 붙은 공고문이 열려 있으면 카드가 남는다).
+    //    실패해도 약속은 풀린다(zfLoadPostNotices 가 잡는다) — 그때는 종전처럼 LH 행만으로 판정한다.
+    await zfLoadPostNotices();
     rows = rows.filter(r => !isHiddenAsClosed(r));
     // 🔴 공고 탭과 같은 판정 함수를 쓴다(2026-09-16) — 짝 있는 [취소공고] 행은 여기서도 뺀다.
     const dropCancelM = zfPairedCancelIds(rows,
@@ -5083,7 +5107,7 @@ function cardElFor(id){ return document.querySelector(`[data-card-id="${id}"]`);
 // PostgREST의 정렬 기준상 winner 행이 아니라 형제 행이 남을 수 있어, dedup 후에 보면
 // 자식을 들고 있는 winner를 폴백으로 오판한다.
 // rounds는 회차 혼입 판정 결과(roundInfoFor). 넘기지 않으면 종전과 똑같이 orphan만 본다 —
-// policies·extras·eligibility 세 로더는 넘기지 않으므로 동작이 바뀌지 않는다.
+// extras·eligibility 두 로더는 넘기지 않는다 — 대신 부르기 전에 zfRowsSameRoundAsCard 로 같은 회차면 부르지 않는다(2026-10-01).
 // mixedMsg 는 mixed 갈래의 문구를 바꿀 때만 넘긴다(정책 칸). 넘기지 않으면 종전 STALE_SRC_MSG_MIXED 다.
 function staleSourceBannerHtml(rawRows, annId, useGroup, id, rounds, split, mixedMsg){
   if(!annId) return '';
@@ -5383,6 +5407,34 @@ function roundInfoFor(rawRows, annId, roundMap, cardDate){
   return { map: roundMap, current: current, mixed: mixed, staleOnly: staleOnly };
 }
 
+// 🔴 2026-10-01 — 정밀 자격기준·첨부 사진 로더의 거짓 「다른 회차」 배너. 두 로더는 rounds 없이 배너를 불러
+//    **대표 ID 에 자기 행이 없으면(orphan)** 곧 「대표 공고와 다른 회차」라고 말했다. 규약 29(산물은 블록 ID)로 다블록 완료 카드는
+//    대표에 자기 행이 0인 것이 정상이라, 같은 회차인데도 배너가 떴다(2026-09-30 완료 다블록 대표 19장).
+//    그래서 orphan 일 때만 회차(fetchGroupRounds)를 물어 와 **행이 전부 카드와 같은 회차**면 배너를 띄우지 않는다.
+//    같은 회차 = 출처 공고의 apply_end 가 카드와 같다(정책 로더 B46 축) **또는** 회차 날짜(zfNoticeDate)가 같다(세대 로더 축).
+//    둘을 함께 보는 까닭: 블록마다 마감이 다른 공고(목포권 …0734)는 마감 축만으로 갈리고, LH·MYHOME 공고일이 갈리는 공고(태백철암1)는 날짜 축만으로 갈린다.
+//    🔴 정정 카드는 하나 더 본다 — 행의 출처가 정정 행이거나 정정 게시일 이후의 행일 때만 같다고 본다. 그보다 앞선 행이면
+//    「정정 전 공고 기준」 배너(STALE_SRC_MSG_REVISED)가 맞는 말이라 종전 그대로 둔다.
+//    🔴 하나라도 모르면(회차 조회 실패·출처 행 없음·카드 날짜 없음) 종전 그대로 판정한다 — 모르는 것을 「같다」고 하지 않는다.
+function zfRoundsIfOrphan(rows, annId, ids, useGroup){
+  const orphan = !!useGroup && Array.isArray(rows) && rows.length > 0 && !rows.some(r => r && r.announcement_id === annId);
+  return fetchGroupRounds(ids, orphan && Array.isArray(ids) && ids.length >= 2);
+}
+function zfRowsSameRoundAsCard(rawRows, roundMap, cardEl){
+  if(!roundMap || !cardEl || !Array.isArray(rawRows) || rawRows.length === 0) return false;
+  const d = cardEl.dataset;
+  const cEnd = d.applyEnd || '', cRound = d.roundDate || '', cDate = d.announcementDate || '';
+  const cRev = d.revised === '1';
+  if(!cEnd && !cRound) return false;
+  return rawRows.every(r => {
+    const a = r && roundMap[r.announcement_id];
+    if(!a) return false;
+    const same = (cEnd && (a.apply_end || '') === cEnd) || (cRound && zfNoticeDate(a) === cRound);
+    if(!same) return false;
+    return !cRev || a.is_revised === true || (!!cDate && (a.announcement_date || '') >= cDate);
+  });
+}
+
 // 사진·평면도·팸플릿 그룹별 아이템 목록 — 모달의 이전/다음 넘기기가 참조하는 레지스트리
 const extrasGroupsRegistry = {};
 let extrasGroupSeq = 0;
@@ -5395,10 +5447,12 @@ function loadAnnouncementExtras(annId, detailEl, id, useGroup){
   const keysP = huKeysReady[id] ? huKeysReady[id].promise : Promise.resolve(null);
   resolveAnnouncementIds(annId, useGroup).then(ids => fetch(`${SUPABASE_URL}/rest/v1/announcement_extras?${idFilterFor(ids)}&order=extra_type,building_address`, {
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
-  })).then(r => r.ok ? r.json() : []).then(rows => keysP.then(keys => [rows, keys])).then(([rows, keys]) => {
+  }).then(r => r.ok ? r.json() : []).then(rows => zfRoundsIfOrphan(rows, annId, ids, useGroup).then(roundMap => [rows, roundMap])))
+  .then(([rows, roundMap]) => keysP.then(keys => [rows, keys, roundMap])).then(([rows, keys, roundMap]) => {
     if(!zfStillOurs(id, ownerAnn)) return;   // 그 사이 이 자리에 다른 공고가 왔다
     if(!Array.isArray(rows) || rows.length === 0) return;
-    const staleHtml = staleSourceBannerHtml(rows, annId, useGroup, id);
+    // 🔴 2026-10-01 — 같은 회차 행만 왔으면 배너 없음(zfRowsSameRoundAsCard · 규약 29 블록 배치).
+    const staleHtml = zfRowsSameRoundAsCard(rows, roundMap, cardElFor(id)) ? '' : staleSourceBannerHtml(rows, annId, useGroup, id);
     // 같은 건물이 LH·MYHOME 두 파이프라인으로 각각 수집돼 서로 다른 announcement_id를 갖고,
     // 그룹조회(resolveAnnouncementIds)로 양쪽이 함께 잡히면 동일 파일이 중복 노출될 수 있어
     // Drive fileId(못 뽑으면 행 id) 기준으로 먼저 중복을 제거한다.
@@ -5925,9 +5979,34 @@ function zfPolPinRank(cls, p){
 const zfPolState = {};
 function zfPolItemHtml(p, opts){
   const o = opts || {};
+  const site = p._zfSite ? `<span class="pol-site">${escapeHtml(p._zfSite)}</span>` : '';
   return `<details class="policy-item pol-item${o.pinned ? ' pol-pinned' : ''}"${o.open ? ' open' : ''}>`
-    + `<summary>${escapeHtml(p.category || '')}</summary>`
+    + `<summary>${site}${escapeHtml(p.category || '')}</summary>`
     + `<div class="policy-content">${escapeHtml(p.content_raw || '')}</div></details>`;
+}
+// 🔴 2026-10-01 — 블록 ID 정책 행 머리의 단지 칩. 규약 29로 단지마다 다른 조항은 블록 ID 에, 두 공고문 공통 조항은 대표(LH) ID 에 산다
+//    (대구연호 …0855 — LH 58 · A-2BL 23 · A-3BL 26). 칩이 없으면 어느 단지 조항인지 화면에서 알 수 없었다.
+//    이름 = 같은 ID 세대 행의 building_name(하나일 때만). 🔴 붙이는 조건: 대표 밖 ID 가 둘 이상이고 그 이름이 둘 이상 갈린다 —
+//    칩은 단지를 가르는 표시라, 갈리지 않으면(블록 하나 · 정정 전 ID 하나) 붙이지 않는다. 대표 ID 행(공통)에는 붙이지 않는다.
+//    실패·이름 없음은 조용히 칩 없이 그린다(종전 그대로).
+function zfPolicySiteLabels(rows, annId){
+  const other = [...new Set((rows || []).map(p => String((p && p.announcement_id) || '')).filter(x => x && x !== annId))];
+  if(other.length < 2) return Promise.resolve(null);
+  return fetch(`${SUPABASE_URL}/rest/v1/housing_units?select=announcement_id,building_name&${idFilterFor(other)}`, {
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
+  }).then(r => r.ok ? r.json() : null).then(hu => {
+    if(!Array.isArray(hu)) return null;
+    const names = new Map();
+    hu.forEach(u => {
+      const nm = String((u && u.building_name) || '').trim();
+      if(!nm) return;
+      if(!names.has(u.announcement_id)) names.set(u.announcement_id, new Set());
+      names.get(u.announcement_id).add(nm);
+    });
+    const label = new Map();
+    names.forEach((set, aid) => { if(set.size === 1) label.set(aid, [...set][0]); });
+    return new Set(label.values()).size >= 2 ? label : null;
+  }).catch(() => null);
 }
 function zfPolicyBodyHtml(rows, cls, id){
   const ko = (a, b) => String(a.category || '').localeCompare(String(b.category || ''), 'ko');
@@ -6122,8 +6201,9 @@ function loadAnnouncementPolicies(annId, detailEl, id, useGroup){
     }
     // 🔵 B62 ⑦ — 이번 회차 행은 고정 → 검색 → 칩 → 묶은 제목 목록으로 그린다. 「🕘 다른 회차 안내」 접기(B46)는 그대로 뒤에 둔다.
     const curRows = policies;
-    return zfLoadPolicyClasses().then(cls => {
+    return Promise.all([zfLoadPolicyClasses(), zfPolicySiteLabels(curRows, annId)]).then(([cls, siteLabel]) => {
       if(!zfStillOurs(id, ownerAnn)) return;
+      if(siteLabel) curRows.forEach(p => { p._zfSite = siteLabel.get(p.announcement_id) || ''; });
       const wrap = document.createElement('details');
       wrap.className = 'policy-wrap';
       wrap.innerHTML = `<summary class="policy-title">📋 정책 안내 (${curRows.length}건)</summary>` + staleHtml +
@@ -6180,11 +6260,13 @@ function loadPreciseEligibility(annId, detailEl, id, useGroup){
   const ownerAnn = zfCardAnn(id);
   resolveAnnouncementIds(annId, useGroup).then(ids => fetch(`${SUPABASE_URL}/rest/v1/eligibility_criteria?${idFilterFor(ids)}&order=supply_form,rank`, {
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
-  })).then(r => r.ok ? r.json() : null).then(rows => {
+  }).then(r => r.ok ? r.json() : null).then(rows => zfRoundsIfOrphan(rows, annId, ids, useGroup).then(roundMap => [rows, roundMap])))
+  .then(([rows, roundMap]) => {
     if(!zfStillOurs(id, ownerAnn)) return;
     // 🔴 요청 실패(null)는 여기서 끝낸다 — 정상 0행([])만 아래에서 안내를 받는다.
     if(rows === null) return;
-    const staleHtml = staleSourceBannerHtml(rows, annId, useGroup, id);
+    // 🔴 2026-10-01 — 같은 회차 행만 왔으면 배너 없음(zfRowsSameRoundAsCard · 규약 29 블록 배치).
+    const staleHtml = zfRowsSameRoundAsCard(rows, roundMap, cardElFor(id)) ? '' : staleSourceBannerHtml(rows, annId, useGroup, id);
     // 그룹조회로 형제 announcement_id 여러 곳에 동일 자격기준이 중복 백필된 경우를 대비해
     // 중복 행을 하나만 남긴다.
     // 🔴 키 = 「이 아코디언이 화면에 그리는 필드 전부」다(2026-09-11). 화면에서 달라 보이는 두 행은
