@@ -6,11 +6,24 @@ AS $function$
 -- (e) 선별 재분석 큐 — 「winner 자식 0 + 그룹 자식 >0」인 대표행 목록.
 -- 🔴 winner 산출을 재현하지 않는다. get_announcements_deduped()를 그대로 호출해 재사용한다.
 -- 🔴 분류·우선순위 점수를 만들지 않는다(사유 텍스트는 원문 그대로 반환하고, 순서는 호출 측이 정한다).
-WITH winner AS (
+-- 🔴 2026-10-01(코드 — 분석률 셈 · 재분석 큐에 링크 표) — 묶음 = 제목 키 ∪ 같은 게시물 링크 표. 링크 표에 있는 MYHOME 행은
+--   LH 행의 제목 키를 쓴다(get_announcements_deduped · get_announcement_group_ids 의 link_map 과 같은 규칙 — 함께 바꾼다).
+--   붙은 MYHOME 행은 같은 게시물(링크 규칙 v2 = 같은 날짜 ∧ panId)이라 **마감일이 달라도 같은 회차**로 센다
+--   (아산 …0726 · 대구연호 …0855 — 공고문마다 접수일이 다르다). 그래서 붙은 공고문만 완료여도 그 게시물은 큐에 오르지 않는다.
+WITH link_map AS (
+  SELECT DISTINCT ON (l.linked_announcement_id)
+    l.linked_announcement_id AS aid, announcement_dedup_key(lh.title) AS lh_key
+  FROM public.announcement_post_links l
+  JOIN public.announcements lh ON lh.announcement_id = l.lh_announcement_id
+  WHERE lh.title IS NOT NULL AND lh.hidden_from_listing IS NOT TRUE
+  ORDER BY l.linked_announcement_id, l.lh_announcement_id
+),
+winner AS (
   SELECT d.announcement_id, d.source, d.title, d.announcement_date,
          d.is_revised, d.revision_note, d.apply_end,
-         announcement_dedup_key(d.title) AS dedup_key
+         COALESCE(lm.lh_key, announcement_dedup_key(d.title)) AS dedup_key
   FROM get_announcements_deduped(NULL, NULL, NULL) d
+  LEFT JOIN link_map lm ON lm.aid = d.announcement_id
 ),
 child_counts AS (
   SELECT c.announcement_id, sum(c.n)::bigint AS n
@@ -25,9 +38,10 @@ child_counts AS (
 ),
 group_rows AS (
   SELECT a.announcement_id,
-         announcement_dedup_key(a.title) AS dedup_key,
+         COALESCE(lm.lh_key, announcement_dedup_key(a.title)) AS dedup_key,
          COALESCE(cc.n, 0) AS child_count
   FROM announcements a
+  LEFT JOIN link_map lm ON lm.aid = a.announcement_id
   LEFT JOIN child_counts cc ON cc.announcement_id = a.announcement_id
   WHERE a.title IS NOT NULL
     AND a.hidden_from_listing IS NOT TRUE
@@ -56,10 +70,11 @@ WHERE COALESCE(cw.n, 0) = 0
     SELECT 1
     FROM announcements m
     JOIN announcement_analysis aa ON aa.announcement_id = m.announcement_id
+    LEFT JOIN link_map ml ON ml.aid = m.announcement_id
     WHERE m.title IS NOT NULL
       AND m.hidden_from_listing IS NOT TRUE
-      AND announcement_dedup_key(m.title) = w.dedup_key
-      AND m.apply_end = w.apply_end
+      AND COALESCE(ml.lh_key, announcement_dedup_key(m.title)) = w.dedup_key
+      AND (m.apply_end = w.apply_end OR ml.aid IS NOT NULL)
       AND aa.status IN ('완료', '완료(보조 누락)', '완료(판정 대기)', '완료(소급)')
   )
 -- 🔵 2026-09-29 코드 회차 2 — 둘째 갈래 「분석 뒤 첨부 변경」: 완료 계열로 닫힌 공고인데 analyzed_at 뒤에
