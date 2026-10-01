@@ -45,10 +45,14 @@ try {
       'dispatch', (select json_build_object(
          'enabled', c.enabled, 'grace_min', extract(epoch from c.grace)/60, 'max_wait_min', extract(epoch from c.max_wait)/60,
          'waiting', (select count(*) from analysis_dispatch_queue where state = 'waiting'),
-         'overdue', (select count(*) from analysis_dispatch_queue where state = 'waiting' and ready_at < now() - (c.grace + c.max_wait)),
+         'overdue', (select count(*) from analysis_dispatch_queue where state = 'waiting'
+           and (case when returned then greatest(ready_at, state_at) else ready_at end) < now() - (c.grace + c.max_wait)),  -- 되돌린 공고는 되돌린 때부터(2026-10-01 진전 없는 되돌림)
          'not_ready_24h', (select count(*) from analysis_dispatch_queue where state = 'waiting' and ready_at is null and enqueued_at < now() - interval '24 hours'),
          'stale_lock', (select count(*) from analysis_dispatch_runs where state in ('firing','running') and created_at < now() - interval '6 hours'),
-         'fail_streak', (select count(*) = 3 and bool_and(state = 'failed') from (select state from analysis_dispatch_runs order by id desc limit 3) z))
+         'fail_streak', (select count(*) = 3 and bool_and(state = 'failed') from (select state from analysis_dispatch_runs order by id desc limit 3) z),
+         'zero_streak', (select count(*) = 3 and bool_and(state = 'finished' and done = 0) from (select r.state,
+           (select count(*) from analysis_dispatch_queue q where q.run_id = r.id and q.state = 'done') as done
+           from analysis_dispatch_runs r order by r.id desc limit 3) z))
        from analysis_dispatch_config c where c.id = 1)
     ) j`)
   const d = db.j
@@ -110,15 +114,16 @@ try {
     if (!x) {
       add('dispatch', '분석 발송기', 'fail', '설정 행 없음', 'analysis_dispatch_config 한 행')
     } else if (!x.enabled) {
-      add('dispatch', '분석 발송기(스위치 꺼짐)', 'skip', `대기 ${x.waiting}`, '꺼진 동안은 판정하지 않는다 — 켜면 아래 넷을 본다')
+      add('dispatch', '분석 발송기(스위치 꺼짐)', 'skip', `대기 ${x.waiting}`, '꺼진 동안은 판정하지 않는다 — 켜면 아래 다섯을 본다')
     } else {
       const bad = []
       if (x.overdue > 0) bad.push(`유예 ${x.grace_min}분 + 상한 ${x.max_wait_min}분을 넘겨 남은 대기 ${x.overdue}`)
       if (x.not_ready_24h > 0) bad.push(`홍보물 목록을 24시간 넘게 기다리는 매입 ${x.not_ready_24h}`)
       if (x.stale_lock > 0) bad.push(`6시간 넘게 안 풀린 잠금 ${x.stale_lock}`)
       if (x.fail_streak) bad.push('연속 3번 발송 실패(자동 발송 멈춤)')
+      if (x.zero_streak) bad.push('연속 3회차 끝낸 공고 0건(자동 발송 멈춤 — 공통 원인 확인)')
       add('dispatch', '분석 발송기', bad.length ? 'fail' : 'pass', bad.length ? bad.join(' · ') : `대기 ${x.waiting} · 이상 없음`,
-        '켜짐: 실을 수 있게 된 뒤 grace+max_wait 넘은 대기 0 · 홍보물 24시간 대기 0 · 6시간 넘은 잠금 0 · 연속 3실패 아님')
+        '켜짐: 실을 수 있게 된 뒤 grace+max_wait 넘은 대기 0 · 홍보물 24시간 대기 0 · 6시간 넘은 잠금 0 · 연속 3실패 아님 · 연속 3회차 0건 끝 아님')
     }
   }
   // ⑦ 함수 정의 = supabase/rpc/ 사본(2026-09-30 우편함 「운영 — 함수 사본 드리프트」). 읽기만 한다.
