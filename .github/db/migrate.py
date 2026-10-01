@@ -28,7 +28,7 @@ API = f'https://api.supabase.com/v1/projects/{PROJECT_REF}/database/query'
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 MIG_DIR = os.path.join(ROOT, 'supabase', 'migrations')
 RPC_DIR = os.path.join(ROOT, 'supabase', 'rpc')
-INV_FILE = os.path.join(ROOT, 'supabase', 'invariants', 'v3.4.sql')
+INV_FILE = os.path.join(ROOT, 'supabase', 'invariants', 'v3.5.sql')
 FILE_RE = re.compile(r'^\d{4}-\d{2}-\d{2}_\d{2}_[a-z0-9_]+\.sql$')
 LEDGER = 'zipfit_ops.schema_migrations'
 ANON_LIMIT_MS = 3000
@@ -386,9 +386,9 @@ def cmd_check():
         inv_n, inv_b = res['invariants'], res['invariants_before']
         if inv_n > inv_b:
             ok = False
-            lines.append(f'- ❌ 불변식 v3.4 위반 {inv_b} → {inv_n}: `{json.dumps(res["invariants_sample"], ensure_ascii=False)[:400]}`')
+            lines.append(f'- ❌ 불변식 v3.5 위반 {inv_b} → {inv_n}: `{json.dumps(res["invariants_sample"], ensure_ascii=False)[:400]}`')
         else:
-            lines.append(f'- ✅ 불변식 v3.4 위반 {inv_b} → {inv_n}')
+            lines.append(f'- ✅ 불변식 v3.5 위반 {inv_b} → {inv_n}')
         for a in res.get('anon', []):
             good = a['ms'] < ANON_LIMIT_MS
             ok = ok and good
@@ -435,7 +435,7 @@ DO {dq(f'''
 declare n bigint;
 begin
   execute {dq('select count(*) from (' + inv + ') x', 'zz_inv')} into n;
-  if n > {inv_base} then raise exception 'ZIPFIT_APPLY_GUARD 불변식 v3.4 위반 % → %', {inv_base}, n; end if;
+  if n > {inv_base} then raise exception 'ZIPFIT_APPLY_GUARD 불변식 v3.5 위반 % → %', {inv_base}, n; end if;
 end
 ''', 'zz_g')};
 """
