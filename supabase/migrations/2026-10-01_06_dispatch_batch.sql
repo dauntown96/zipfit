@@ -1,3 +1,19 @@
+-- 운영 — 발송 한 회차 몫 상한 · 잡힌 뒤 응답 정리(2026-10-01 · 우편함 「코드 — 발송 한 회차 몫 상한 · 잡힌 뒤 응답 정리 · 목록 RPC 동시 호출 · 청년 매입 자녀 가점」 1·2)
+--   1 config.batch_size(기본 1) — 한 발송에 한 몫만 싣는다 · 순서 = 접수 전 먼저 · 접수 시작 가까운 순 · 마감 가까운 순 · 먼저 들어온 순.
+--     가장 최근 회차가 끝난 회차이고 1건 이상 끝냈으면 그 회차 발송 때 이미 ready 였던 남은 공고를 다음 판정에서 곧바로 보낸다(reason next — 제약에 더한다 ·
+--     가장 최근 회차가 실패면 이어 보내지 않는다).
+--   2 응답 정리를 firing 밖(running · finished 하루 안)으로 넓힌다 — run 행 http_status·session_url · 잡힌 뒤 온 4xx·5xx 는 failed + 대기열 복귀.
+-- zipfit:function analysis_dispatch_tick(boolean) acl={postgres=X/postgres,service_role=X/postgres} secdef=false
+
+alter table public.analysis_dispatch_config
+  add column batch_size integer not null default 1 check (batch_size >= 1);
+comment on column public.analysis_dispatch_config.batch_size is
+  '한 발송에 싣는 공고 수(몫) — 기본 1. 순서는 analysis_dispatch_tick 머리 주석(분석 순서 산식)';
+
+alter table public.analysis_dispatch_runs drop constraint analysis_dispatch_runs_reason_check;
+alter table public.analysis_dispatch_runs
+  add constraint analysis_dispatch_runs_reason_check check (reason in ('grace', 'max_wait', 'returned', 'next', 'manual'));
+
 CREATE OR REPLACE FUNCTION public.analysis_dispatch_tick(p_force boolean DEFAULT false)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -195,4 +211,4 @@ begin
   update public.analysis_dispatch_runs set net_request_id = v_rid where id = v_run;
   return jsonb_build_object('result', 'fired', 'run', v_run, 'reason', v_reason, 'items', n_sent, 'left', n_ready - n_sent, 'new', n_new, 'dropped', n_drop);
 end
-$function$
+$function$;

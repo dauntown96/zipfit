@@ -1855,6 +1855,27 @@ function resetNoticeFilters(){
   loadNoticeData();
 }
 
+// 🔴 2026-10-01 — 인자 없는 목록 RPC(전량)는 한 번 받아 함께 쓴다. 종전에는 한 화면 로드가 같은 질의를 같은 초에 여러 번
+//    보냈다(필터 칩 · 지역 칩 · 배너 · 저장 공고 · 통계) — 동시 접속이 몇 명만 겹쳐도 anon 한도(3초)에 걸려 500 이 났다
+//    (2026-10-01 · 동시 약 8건 중 6건). 받은 행은 ZF_ALL_ROWS_TTL 동안 같은 약속으로 돌려준다 — 행 객체를 고치는 쪽(matchHouses)은
+//    여기를 쓰지 않는다. 실패는 담아 두지 않는다(다음 호출이 다시 묻는다).
+const ZF_ALL_ROWS_TTL = 60000;
+let zfAllRowsP = null, zfAllRowsAt = 0;
+function zfFetchAllNoticeRows(){
+  if(zfAllRowsP && Date.now() - zfAllRowsAt < ZF_ALL_ROWS_TTL) return zfAllRowsP;
+  zfAllRowsAt = Date.now();
+  const p = fetch(`${SUPABASE_URL}/rest/v1/rpc/get_announcements_deduped`,
+      {method:'POST', headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY,'Content-Type':'application/json'}, body:'{}'})
+    .then(res => { if(!res.ok) throw new Error('HTTP '+res.status); return res.json(); })
+    .then(rows => {
+      if(!Array.isArray(rows)) throw new Error('Supabase 오류: ' + (rows?.message || rows?.error || JSON.stringify(rows)));
+      return rows;
+    });
+  zfAllRowsP = p;
+  p.catch(() => { if(zfAllRowsP === p) zfAllRowsP = null; });
+  return p;
+}
+
 // ── 필터 칩 목록: 첫 로드 시 region_top·status_normalized 사용 (중복 없음) ──
 async function initNoticeFilters(){
   zfLoadPostNotices();   // 🔵 2026-09-30 — 목록 RPC 와 겹쳐 받는다(카드 상태·숨기기 재료)
@@ -1865,12 +1886,7 @@ async function initNoticeFilters(){
   noticeInit  = true;
   noticeError = false;
   try{
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/rpc/get_announcements_deduped`,
-      {method:'POST', headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY,'Content-Type':'application/json'}, body:'{}'}
-    );
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    const rows = await res.json();
+    const rows = await zfFetchAllNoticeRows();
     // region_top, status_normalized는 RPC에서 이미 정규화된 값
     const regions  = [...new Set(rows.map(r => r.region_top).filter(v => v && v !== ZF_NATIONWIDE))].sort();
     const types    = [...new Set(rows.map(r => classifyNoticeType(r.housing_type||'', r.title||'')))].sort();
@@ -2549,12 +2565,11 @@ async function loadNoticeData(keepPage){
   }));
 
   try{
-    const res = await fetch(
+    // 인자가 하나도 없으면(지역·유형 칩 해제) 전량 — 함께 쓰는 약속을 탄다(zfFetchAllNoticeRows).
+    const rows = body === '{}' ? await zfFetchAllNoticeRows() : await fetch(
       `${SUPABASE_URL}/rest/v1/rpc/get_announcements_deduped`,
       {method:'POST', headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY,'Content-Type':'application/json'}, body}
-    );
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    const rows = await res.json();
+    ).then(res => { if(!res.ok) throw new Error('HTTP '+res.status); return res.json(); });
     if(!Array.isArray(rows)){
       const msg = rows?.message || rows?.error || JSON.stringify(rows);
       throw new Error('Supabase 오류: ' + msg);
@@ -2739,9 +2754,7 @@ async function zfResolveSavedCards(){
   if(!savedRows.length){ savedCards=[]; return; }
   let rows=[];
   try{
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_announcements_deduped`,
-      {method:'POST', headers: zfAnonHeaders(), body:'{}'});
-    if(res.ok) rows = await res.json();
+    rows = await zfFetchAllNoticeRows();
   }catch(err){ console.warn('ZipFit: 저장 공고 원본 조회 실패', err); }
   if(!Array.isArray(rows)) rows=[];
 
@@ -3426,12 +3439,8 @@ let settingsTypes=new Set();
 
 async function loadRegionsFromSupabase(){
   try{
-    const res=await fetch(
-      `${SUPABASE_URL}/rest/v1/rpc/get_announcements_deduped`,
-      {method:'POST', headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY,'Content-Type':'application/json'}, body:'{}'}
-    );
-    if(res.ok){
-      const rows=await res.json();
+    {
+      const rows=await zfFetchAllNoticeRows();
       // 🔴 RPC가 이미 정규화한 region_top을 그대로 쓴다(2026-09-11). 종전에는 같은 rows에서
       // region을 다시 파싱해 칩을 만들었고, 그 결과가 메인 필터 칩(region_top 기준)과 838행 중
       // 83행에서 어긋났다 — 「서울」과 「서울특별시」가 따로 뜨고 「전라남도」가 통합 전 이름으로 남았다.
@@ -3681,14 +3690,11 @@ async function loadInsightData(){
   if(insightLoaded) return;
   wrap.innerHTML = '<div class="rbox" style="text-align:center;padding:2rem 1rem"><p style="color:#888;font-size:14px">📊 통계 데이터를 불러오는 중...</p></div>';
   try{
-    const [res, statsRes] = await Promise.all([
-      fetch(`${SUPABASE_URL}/rest/v1/rpc/get_announcements_deduped`,
-        {method:'POST', headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY,'Content-Type':'application/json'}, body:'{}'}),
+    const [rows, statsRes] = await Promise.all([
+      zfFetchAllNoticeRows(),
       fetch(`${SUPABASE_URL}/rest/v1/rpc/get_rental_stats_summary`,
         {method:'POST', headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY,'Content-Type':'application/json'}, body:'{}'}).catch(()=>null)
     ]);
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    const rows = await res.json();
     if(!Array.isArray(rows)) throw new Error('응답 형식 오류');
     let statsRows = null;
     try{
@@ -3983,12 +3989,7 @@ function renderInsight(rows, wrap, statsRows){
 
 async function updateBannerFromDB(){
   try{
-    const res=await fetch(
-      `${SUPABASE_URL}/rest/v1/rpc/get_announcements_deduped`,
-      {method:'POST',headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY,'Content-Type':'application/json'},body:'{}'}
-    );
-    if(!res.ok) return;
-    const rows=await res.json();
+    const rows=await zfFetchAllNoticeRows();
     if(!rows||!rows.length) return;
     // 배너에 올릴 1건. status가 아니라 접수기간 날짜로 고른다 — 지금 넣을 수 있는 공고를 앞세운다.
     const active=rows.find(r=>isAcceptingNow(r))||rows[0];
