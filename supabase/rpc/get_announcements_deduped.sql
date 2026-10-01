@@ -247,7 +247,10 @@ same_round_complex AS (
   WHERE unit_key IS NOT NULL AND unit_key <> ''
   GROUP BY dedup_key
 ),
-complex_name AS (
+-- 🔴 2026-10-01(운영 — null 인자 근본) — MATERIALIZED 로 한 번만 계산한다. 인자를 상수로 못 받는 호출(PostgREST 가 null 을 명시해 보낸 경우)은
+--   일반 계획이 되어 마지막 WHERE 의 OR 조건 때문에 대표 행 추정이 1로 떨어지고, 이 CTE(같은 회차 세대 행 다시 세기)를 대표마다
+--   다시 돌렸다(925회 × 4.9ms = anon 3초 초과 500). 행·값은 그대로다 — 계산 횟수만 한 번으로 묶는다.
+complex_name AS MATERIALIZED (
   SELECT dedup_key,
     CASE WHEN lead_found THEN old_lead ELSE fallback_lead END || ' 외 ' || (n - 1) || '개 단지' AS building_name
   FROM same_round_complex
