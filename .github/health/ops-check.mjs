@@ -21,6 +21,7 @@ const EXPECTED_JOBS = [
   'zipfit-collect-sh-announcements', 'zipfit-sh-close-missing', 'zipfit-collect-rental-stats',
   'zipfit-collect-lh-promo', 'zipfit-purge-usage-events', 'zipfit-purge-sh-run-log',
   'zipfit-refresh-post-links',   // 2026-09-30 같은 게시물 링크 자동 채움(마이그레이션 04)
+  'zipfit-analysis-dispatch',    // 2026-10-01 공고 분석 루틴 발송기(마이그레이션 2026-10-01_03)
 ]
 
 try {
@@ -40,7 +41,15 @@ try {
          where start_time > now() - interval '24 hours' and status not in ('succeeded','running','starting') group by jobid) x join cron.job j using (jobid)),
       'promo_last_run_age_min', (select extract(epoch from now() - max(d.start_time))/60 from cron.job_run_details d join cron.job j using (jobid) where j.jobname = 'zipfit-collect-lh-promo'),
       'promo_fail_24h', (select count(*) from announcement_promo_fetch where not ok and fetched_at > now() - interval '24 hours'),
-      'sh_last_run_age_min', (select extract(epoch from now() - max(run_at))/60 from sh_collection_run_log)
+      'sh_last_run_age_min', (select extract(epoch from now() - max(run_at))/60 from sh_collection_run_log),
+      'dispatch', (select json_build_object(
+         'enabled', c.enabled, 'grace_min', extract(epoch from c.grace)/60, 'max_wait_min', extract(epoch from c.max_wait)/60,
+         'waiting', (select count(*) from analysis_dispatch_queue where state = 'waiting'),
+         'overdue', (select count(*) from analysis_dispatch_queue where state = 'waiting' and ready_at < now() - (c.grace + c.max_wait)),
+         'not_ready_24h', (select count(*) from analysis_dispatch_queue where state = 'waiting' and ready_at is null and enqueued_at < now() - interval '24 hours'),
+         'stale_lock', (select count(*) from analysis_dispatch_runs where state in ('firing','running') and created_at < now() - interval '6 hours'),
+         'fail_streak', (select count(*) = 3 and bool_and(state = 'failed') from (select state from analysis_dispatch_runs order by id desc limit 3) z))
+       from analysis_dispatch_config c where c.id = 1)
     ) j`)
   const d = db.j
 
@@ -64,6 +73,14 @@ try {
   add('anon_list', '비로그인 get_announcements_deduped', listOk && list.ms <= 10000 ? 'pass' : 'fail',
     `${list.status} · ${Array.isArray(list.data) ? list.data.length : 0}행 · ${list.ms}ms${list.snippet ? ' · ' + list.snippet : ''}`,
     '200 · 행 > 0 · 왕복 ≤ 10초(서버 한도 3초는 200 여부로 잰다 — 넘으면 500. 왕복은 러너↔싱가포르 1.9MB라 넉넉히)')
+  // ③-2 화면이 실제로 보내는 인자 모양(2026-10-01 — 명시 null 은 함수가 인라인되지 않아 따로 잰다 · 우편함 「운영 — 감지 루틴 발송기」 3)
+  for (const [id, body] of [['anon_list_null', { p_region: null, p_type: null, p_status: null }], ['anon_list_region', { p_region: '경기도' }], ['anon_list_type', { p_type: '국민임대' }]]) {
+    const x = await anonRpc('get_announcements_deduped', body)
+    const ok = x.status === 200 && Array.isArray(x.data) && x.data.length > 0
+    add(id, `비로그인 get_announcements_deduped ${JSON.stringify(body)}`, ok && x.ms <= 10000 ? 'pass' : 'fail',
+      `${x.status} · ${Array.isArray(x.data) ? x.data.length : 0}행 · ${x.ms}ms${x.snippet ? ' · ' + x.snippet : ''}`,
+      '200 · 행 > 0(서버 한도 3초는 200 여부로 잰다) — 명시 null 은 2026-10-01 이전 4.6초 500 이었다')
+  }
   const ids = listOk ? list.data.slice(0, 50).map(r => r.announcement_id) : []
   const sum = ids.length ? await anonRpc('get_announcement_price_summary', { p_ids: ids }) : { status: 0, ms: 0, data: null, snippet: '목록 실패로 건너뜀' }
   const sumOk = sum.status === 200 && Array.isArray(sum.data) && sum.data.length === ids.length
@@ -87,6 +104,23 @@ try {
   add('promo_fail', '24시간 안 실패한 홍보물 목록 수집(공고)', d.promo_fail_24h < 3 ? 'pass' : 'fail', d.promo_fail_24h, '< 3(첫 런 26공고 오류 0)')
   add('sh_fresh', 'SH 수집 마지막 런 경과(분)', d.sh_last_run_age_min != null && d.sh_last_run_age_min <= 900 ? 'pass' : 'fail',
     d.sh_last_run_age_min == null ? '기록 없음' : Math.round(d.sh_last_run_age_min), '≤ 900분(하루 4회 09·12·15·18시 KST — 18시 → 다음날 09시 = 900분)')
+  // ⑧ 공고 분석 루틴 발송기(2026-10-01) — 스위치가 켜져 있을 때만 판정한다(꺼진 동안 대기는 정상).
+  {
+    const x = d.dispatch
+    if (!x) {
+      add('dispatch', '분석 발송기', 'fail', '설정 행 없음', 'analysis_dispatch_config 한 행')
+    } else if (!x.enabled) {
+      add('dispatch', '분석 발송기(스위치 꺼짐)', 'skip', `대기 ${x.waiting}`, '꺼진 동안은 판정하지 않는다 — 켜면 아래 넷을 본다')
+    } else {
+      const bad = []
+      if (x.overdue > 0) bad.push(`유예 ${x.grace_min}분 + 상한 ${x.max_wait_min}분을 넘겨 남은 대기 ${x.overdue}`)
+      if (x.not_ready_24h > 0) bad.push(`홍보물 목록을 24시간 넘게 기다리는 매입 ${x.not_ready_24h}`)
+      if (x.stale_lock > 0) bad.push(`6시간 넘게 안 풀린 잠금 ${x.stale_lock}`)
+      if (x.fail_streak) bad.push('연속 3번 발송 실패(자동 발송 멈춤)')
+      add('dispatch', '분석 발송기', bad.length ? 'fail' : 'pass', bad.length ? bad.join(' · ') : `대기 ${x.waiting} · 이상 없음`,
+        '켜짐: 실을 수 있게 된 뒤 grace+max_wait 넘은 대기 0 · 홍보물 24시간 대기 0 · 6시간 넘은 잠금 0 · 연속 3실패 아님')
+    }
+  }
   // ⑦ 함수 정의 = supabase/rpc/ 사본(2026-09-30 우편함 「운영 — 함수 사본 드리프트」). 읽기만 한다.
   //   대조 규칙은 .github/db/migrate.py rpc_md5() 와 같다 — 파일 그대로 또는 끝 줄바꿈을 걷은 md5 가 DB md5 와 같으면 통과.
   //   걸리는 것: 정의가 다름 · 사본 없음(새 함수) · 같은 이름 둘 이상(한 파일로 대조 불가) · 함수 없는 사본(지운 함수의 사본 잔존).

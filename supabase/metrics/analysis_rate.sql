@@ -2,6 +2,7 @@
 -- 읽기 전용. 마이그레이션이 아니다 — 여기를 고쳐도 DB 는 안 바뀐다(supabase/invariants/ 와 같은 규약).
 -- 🔴 묶음 = 제목 키 ∪ 같은 게시물 링크 표 — 링크 표에 있는 MYHOME 행은 LH 행의 제목 키를 쓴다
 --   (get_announcements_deduped · get_announcement_group_ids · get_reanalysis_queue 의 link_map 과 같은 규칙 — 함께 바꾼다).
+--   🔴 분석 발송기 analysis_dispatch_tick 의 후보(대기열)가 이 분모 ∧ 미분석과 같은 규칙이다(2026-10-01) — 여기를 바꾸면 그 함수도 바꾼다.
 -- 분모 = get_announcements_deduped() 대표 ∧ 묶음 안 attachment_urls 합 > 0 ∧ apply_end ≥ 오늘+3 ∧ 국면(접수 전 apply_start > 오늘 · 접수 중 apply_start ≤ 오늘).
 -- 분자 = 그 묶음 중 대표와 같은 회차 구성원에 완료 계열 announcement_analysis 가 있는 대표.
 --   같은 회차 = apply_end 가 대표와 같다 **또는** 링크 표로 붙은 행이다(같은 게시물 = 같은 날짜 ∧ panId — 공고문마다 마감이 달라도 한 회차다).
