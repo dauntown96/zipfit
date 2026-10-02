@@ -70,7 +70,7 @@
 - 🔴 **DB 쓰기의 기본 경로는 관리 API 파일 실행이다**(B51 실측 · B54 판정). ⚠️ **데이터 쓰기(INSERT·UPDATE·DELETE)만이다 — 스키마·함수 변경(DDL)은 원칙 32**(2026-09-30). `POST https://api.supabase.com/v1/projects/khdpjjyspmlqtzperoqg/database/query`에 `{"query": "<SQL>"}`를 싣는다 — SQL을 파일로 쓰고 `python3 -c 'import json,sys; print(json.dumps({"query": open(sys.argv[1], encoding="utf-8").read()}))' f.sql | curl -sS -X POST <엔드포인트> -H 'Content-Type: application/json' --data-binary @-`. 🔴 **`jq -Rs`로 싣지 않는다**(B57 실측 — 168KB 파일에서 한글 5글자가 깨졌다. 입력을 조각으로 읽다 UTF-8 멀티바이트를 가른다. 가드가 잡아 롤백됐다). 🔴 **인증은 프록시가 주입한다** — 토큰 환경변수는 없고 헤더를 붙이지 않는다. 키·토큰 값을 회신·로그·커밋에 찍지 않는다.
   - 요청 하나 = 트랜잭션 하나(명시 `BEGIN`/`COMMIT`도 된다) · `DO` 가드가 예외를 던지면 **HTTP 400으로 요청 전체가 롤백**된다 · 성공은 201 · **마지막 문장의 결과만** 돌아온다 · 1,025,039B 페이로드 통과 · `statement_timeout` 2분.
   - **롤백 전용 시험**: `DO` 블록 안에서 쓰고 읽은 값을 `raise exception 'RESULT …'`로 내보내면 결과는 400 메시지로 보이고 쓰기는 남지 않는다(B53 트리거 시험).
-  - 컨테이너에서 `*.supabase.co`는 프록시 403이다 — anon REST 확인(원칙 29)은 DB 안에서 `net.http_post(…)`로 부르고 `net._http_response`를 읽는다(B53).
+  - 컨테이너에서 `*.supabase.co` anon REST는 curl로 열린다(2026-10-02 실측 200 — B53 때는 프록시 403이었다) · `apply.lh.or.kr` 공고 페이지도 curl 200(2026-10-02). 🔴 다시 막히면 anon REST 확인(원칙 29)은 DB 안에서 `net.http_post(…)`로 부르고 `net._http_response`를 읽는다(B53).
   - 🔴 **지방공사 게시판 도메인(`gbdc.co.kr`·`gndc.co.kr` 등)도 컨테이너에서 프록시 403이다**(B56) — 게시판 **본문 텍스트**는 `net.http_get(…)`으로 받는다. 첨부 바이너리(hwp·pdf)는 `net._http_response.content`가 `text`라 깨져 받지 못하고, `fetch-attachment` 허용목록에도 없다 — 지방공사 공고 분석을 열 때 허용목록을 함께 연다.
 - ⚠️ **Drive `download_file_content`는 약 14KB 이하 작은 파일을 파일로 떨어뜨리지 않고 대화로 들인다**(B51 원주문막1 평면도) — base64를 되살릴 수 없어 판독 불가다. 서브에이전트에 맡기거나 다른 경로(`fetch-attachment` 등)로 받는다.
 - 🔴 **백업 덤프(`zipfit-backup/dumps/*.dump` — pg_dump 17 형식)를 조사에 쓸 때 컨테이너 `pg_restore` 16은 못 읽는다**(`unsupported version (1.16) in file header` — 2026-09-30 실측). **`pgdumplib`(설치돼 있다)로 읽는다** — `pgdumplib.load(경로)`.
@@ -151,9 +151,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-10-02 | **코드 — 검색어 강조·자동 펼침 · 루틴 잠금·같은 게시물 섞임(조사)** — ①공고 탭·정책 안내 검색어 `<mark class="zf-hl">`(글자 노드만 · 구조 불변) · 정책 안내 맞은 접힌 칸 자동 펼침(`data-zf-auto` — 지우면 닫힘 · 사용자가 연 칸 유지) · 첫 자리로 스크롤 · 공고 카드 펼침은 자동 안 함 · 검색 없을 때 HTML 같음 · sw v160 ②③ 조사만(발송기 잠금 만료 없음 · 대구연호 자격 단지 표시 없음) ④ supabase.co curl 200. PR #315 |
 | 2026-10-02 | **운영 — 자동 예약 · 후속 처리 2장(데이터 쓰기)** — `…19919` 접수기간 확정 5/20~7/19(id 1214·3109 · 수집이 접수마감으로 · 분석 상태는 이미지 탭 행 없어 판정 대기 유지) · `…0802` 상가 extras 5행 삭제·`완료` · `…0453` `완료` · `…0859` 위례 46형 ⚠️ 정책 1행(68→69 · 불변식 0행). 코드·DDL 0 |
 | 2026-10-02 | **코드 — 현장 줄 제외 조각 · LH 단지 이미지 목록 표** — ①카드 현장 줄에 `period_text` 요일·날짜 제외 조각 원문(`…0825` 「· 금요일, 주말, 공휴일 제외」 · 시각 제외는 안 붙임 · 키 25 중 바뀐 줄 1) · sw v159 ② 새 표 `announcement_complex_images`·`_fetch`(RLS · anon 0) + EF `collect-lh-images`(LH 페이지 이미지 탭 파싱 · 받지 않음) + cron 17·47분 · `…0746` 4 = 페이지 4 · `…0692`·`…0825` 0. PR #311·#312·#313 |
-| 2026-10-01 | **분석 — 자동 run 104 · 군산시 국민임대 입주자 선착순 상시모집(경암부향 등 7개 단지) `…0453`** — 세대 10(7단지 블록 · 모집호수 칸 없음 → recruit_count NULL) · 자격 7 · 정책 58(⚠️ 1) · 경로 2 · 이미지 0 · `완료(판정 대기)`(자격 판단 기준일 p.3↔p.8) · 선례 …0825 꼴 · 새 category 7 · md5 왕복 일치 · 🅑 접수 중 13→14/14. 코드·DDL 0 |
 ---
 
 ## 🚫 코딩 원칙
