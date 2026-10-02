@@ -54,14 +54,15 @@ try {
          'waiting', (select count(*) from analysis_dispatch_queue where state = 'waiting'),
          'overdue', (select count(*) from analysis_dispatch_queue where state = 'waiting'
            and (case when returned then greatest(ready_at, state_at) else ready_at end) < now() - (c.grace + c.max_wait)  -- 되돌린 공고는 되돌린 때부터(2026-10-01 진전 없는 되돌림)
-           and coalesce((select max(created_at) from analysis_dispatch_runs), '-infinity') < now() - (c.grace + c.max_wait)),  -- 몫 상한(한 발송 batch_size건)이라 긴 대기열은 정상 — 그동안 발송이 하나도 없을 때만 센다(2026-10-01)
+           and coalesce((select max(created_at) from analysis_dispatch_runs where reason <> 'followup'), '-infinity') < now() - (c.grace + c.max_wait)),  -- 몫 상한(한 발송 batch_size건)이라 긴 대기열은 정상 — 그동안 발송이 하나도 없을 때만 센다(2026-10-01 · 후속 전용 followup 회차는 세지 않는다 2026-10-02)
          'batch_size', c.batch_size,
          'not_ready_24h', (select count(*) from analysis_dispatch_queue where state = 'waiting' and ready_at is null and enqueued_at < now() - interval '24 hours'),
          'stale_lock', (select count(*) from analysis_dispatch_runs where state in ('firing','running') and coalesce(claimed_at, created_at) < now() - interval '90 minutes'),
          'fail_streak', (select count(*) = 3 and bool_and(state = 'failed') from (select state from analysis_dispatch_runs order by id desc limit 3) z),
          'zero_streak', (select count(*) = 3 and bool_and(state = 'finished' and done = 0) from (select r.state,
            (select count(*) from analysis_dispatch_queue q where q.run_id = r.id and q.state = 'done') as done
-           from analysis_dispatch_runs r order by r.id desc limit 3) z))
+           from analysis_dispatch_runs r where r.reason <> 'followup' order by r.id desc limit 3) z),
+         'followup_stuck', (select count(*) from analysis_followup_requests where state = 'waiting' and requested_at < now() - interval '120 minutes'))
        from analysis_dispatch_config c where c.id = 1)
     ) j`)
   const d = db.j
@@ -137,8 +138,10 @@ try {
       if (x.stale_lock > 0) bad.push(`90분 넘게 안 풀린 잠금 ${x.stale_lock} — 세션 확인 뒤 analysis_run_release`)
       if (x.fail_streak) bad.push('연속 3번 발송 실패(자동 발송 멈춤)')
       if (x.zero_streak) bad.push('연속 3회차 끝낸 공고 0건(자동 발송 멈춤 — 공통 원인 확인)')
+      // 🔵 2026-10-02 — 우편함 후속 처리 요청(analysis_followup_request)이 120분 넘게 루틴에 실리지 않음(잠금 · 멈춤 · 스위치).
+      if (x.followup_stuck > 0) bad.push(`120분 넘게 실리지 않은 후속 처리 요청 ${x.followup_stuck}`)
       add('dispatch', '분석 발송기', bad.length ? 'fail' : 'pass', bad.length ? bad.join(' · ') : `대기 ${x.waiting} · 이상 없음`,
-        '켜짐: grace+max_wait 동안 발송 0인데 그보다 오래 기다린 대기 0(몫 상한 — 한 발송 batch_size건) · 홍보물 24시간 대기 0 · 90분 넘은 잠금(잡은 때 기준) 0 · 연속 3실패 아님 · 연속 3회차 0건 끝 아님')
+        '켜짐: grace+max_wait 동안 발송 0인데 그보다 오래 기다린 대기 0(몫 상한 — 한 발송 batch_size건) · 홍보물 24시간 대기 0 · 90분 넘은 잠금(잡은 때 기준) 0 · 연속 3실패 아님 · 연속 3회차 0건 끝 아님(후속 전용 회차 제외) · 120분 넘은 후속 처리 요청 0')
     }
   }
   // ⑦ 함수 정의 = supabase/rpc/ 사본(2026-09-30 우편함 「운영 — 함수 사본 드리프트」). 읽기만 한다.

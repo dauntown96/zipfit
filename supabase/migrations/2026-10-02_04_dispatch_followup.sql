@@ -1,3 +1,62 @@
+-- 우편함 후속 처리 즉시 호출(2026-10-02 · 우편함 「협의 — 원문 키 사이클(분석 유예 0 · 블록 사후 옮기기 · panId 연결) + 후속 처리 즉시 호출」 1).
+--   계기: 「운영 — 데이터 쓰기」 진행 요청 페이지는 루틴이 깨어날 때만 처리된다 — 분석 대기열이 비면 다음 예약(10:07 KST)까지 선다.
+--   발송기는 Notion 을 볼 수 없다(새 비밀값 없이) → 페이지를 쓴 쪽이 analysis_followup_request(페이지) 를 부르고,
+--   발송기가 분석 몫 없이 사유 followup 으로 루틴을 부른다. 루틴은 후속 처리를 먼저 하고 잡기에서 0행을 받는다 — 잡기가 그 회차를 닫는다.
+--   followup 회차는 진전 판정(되돌림 · 이어 보내기 · 연속 0건 멈춤)에서 빠지고, 잠금 · 스위치 · 연속 3실패 멈춤은 그대로 따른다.
+--   🔴 공개 역할(PUBLIC·anon·authenticated) 실행·접근 0 · service_role 만.
+-- zipfit:function analysis_followup_request(text,text) acl={postgres=X/postgres,service_role=X/postgres} secdef=false
+-- zipfit:function analysis_dispatch_tick(boolean) acl={postgres=X/postgres,service_role=X/postgres} secdef=false
+-- zipfit:function analysis_queue_claim() acl={postgres=X/postgres,service_role=X/postgres} secdef=false
+-- zipfit:function analysis_queue_finish(bigint,text[],text) acl={postgres=X/postgres,service_role=X/postgres} secdef=false
+-- zipfit:function analysis_run_release(bigint,text) acl={postgres=X/postgres,service_role=X/postgres} secdef=false
+create table public.analysis_followup_requests (
+  id           bigint generated always as identity primary key,
+  page_ref     text not null,
+  note         text,
+  requested_at timestamptz not null default now(),
+  state        text not null default 'waiting' check (state in ('waiting', 'sent', 'done')),
+  run_id       bigint references public.analysis_dispatch_runs (id),
+  state_at     timestamptz not null default now()
+);
+create unique index analysis_followup_requests_waiting_uq on public.analysis_followup_requests (page_ref) where state = 'waiting';
+alter table public.analysis_followup_requests enable row level security;
+revoke all on table public.analysis_followup_requests from public, anon, authenticated;
+grant select, insert, update, delete on table public.analysis_followup_requests to service_role;
+comment on table public.analysis_followup_requests is '우편함 후속 처리 요청 — analysis_followup_request() 가 넣고 analysis_dispatch_tick 이 루틴 회차에 싣는다(2026-10-02)';
+
+alter table public.analysis_dispatch_runs drop constraint analysis_dispatch_runs_reason_check;
+alter table public.analysis_dispatch_runs add constraint analysis_dispatch_runs_reason_check
+  check (reason in ('grace', 'max_wait', 'returned', 'next', 'manual', 'followup'));
+
+CREATE OR REPLACE FUNCTION public.analysis_followup_request(p_page_ref text, p_note text DEFAULT NULL::text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+AS $function$
+-- 우편함 「진행 요청」 후속 처리 페이지(「운영 — 데이터 쓰기 …」)를 루틴에 바로 맡긴다(2026-10-02 · 우편함 「협의 — 원문 키 사이클 …」 1).
+-- 🔴 service_role(관리 API)·postgres 만 부른다 — 페이지를 쓴 쪽(claude.ai · Claude Code · 다운님)이 페이지를 만든 뒤 한 번 부른다.
+-- 요청을 대기(waiting)로 남길 뿐 루틴을 직접 부르지 않는다 — 다음 발송 판정(cron zipfit-analysis-dispatch · 10분마다)이
+-- 분석 몫이 없어도 사유 followup 으로 루틴을 부른다(도는 회차가 있으면 끝난 뒤 · 스위치·연속 3실패 멈춤은 그대로).
+-- 같은 페이지의 대기 요청이 이미 있으면 새로 만들지 않고 그 요청을 돌려준다.
+-- 루틴은 Notion 우편함에서 진행 요청 페이지를 스스로 찾는다 — p_page_ref 는 기록용(페이지 id 또는 제목)이다.
+declare
+  v_ref text := btrim(coalesce(p_page_ref, ''));
+  v_id bigint;
+begin
+  if v_ref = '' then
+    raise exception '우편함 페이지(p_page_ref)가 필요하다';
+  end if;
+  insert into public.analysis_followup_requests (page_ref, note) values (v_ref, p_note)
+  on conflict (page_ref) where state = 'waiting' do nothing
+  returning id into v_id;
+  if v_id is null then
+    select id into v_id from public.analysis_followup_requests where page_ref = v_ref and state = 'waiting';
+    return jsonb_build_object('request', v_id, 'state', 'waiting', 'duplicate', true);
+  end if;
+  return jsonb_build_object('request', v_id, 'state', 'waiting', 'duplicate', false,
+                            'next', '다음 발송 판정(10분마다 · 매시 6분부터)이 루틴을 부른다 — 도는 회차가 있으면 끝난 뒤');
+end
+$function$;
+
 CREATE OR REPLACE FUNCTION public.analysis_dispatch_tick(p_force boolean DEFAULT false)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -230,4 +289,122 @@ begin
   return jsonb_build_object('result', 'fired', 'run', v_run, 'reason', v_reason, 'items', n_sent, 'left', n_ready - n_sent,
                             'followups', n_fu_sent, 'new', n_new, 'dropped', n_drop);
 end
-$function$
+$function$;
+
+CREATE OR REPLACE FUNCTION public.analysis_queue_claim()
+ RETURNS TABLE(run_id bigint, announcement_id text, title text, group_key text, apply_start date, apply_end date, phase text, needs_promo boolean, enqueued_at timestamp with time zone, was_returned boolean)
+ LANGUAGE plpgsql
+AS $function$
+-- 루틴이 착수 때 부른다 — 도는 발송(firing·running) 한 회차의 실린 공고를 「잡음」으로 바꾸고 돌려준다(2026-10-01 운영 회차).
+-- 도는 발송이 없으면 0행이다(수동 발송 시험도 analysis_dispatch_tick(true) 로 발송을 먼저 만든다).
+-- 같은 회차를 두 번 부르면 이미 잡은 것을 다시 돌려준다(세션이 다시 시작돼도 같은 목록).
+-- 🔵 2026-10-02 — 후속 전용 회차(reason followup · 분석 몫 0)는 잡기에서 닫는다(finished) — 0행을 돌려주고 잠금을 푼다.
+--   루틴은 후속 처리를 먼저 하고 잡기를 부르므로, 후속 처리가 도는 동안은 잠금이 서 있다(분석 회차와 겹치지 않는다).
+#variable_conflict use_column
+declare
+  v_run bigint; v_reason text;
+begin
+  perform pg_advisory_xact_lock(hashtext('zipfit_analysis_dispatch'));
+  select r.id, r.reason into v_run, v_reason from public.analysis_dispatch_runs r where r.state in ('firing', 'running') order by r.id limit 1;
+  if v_run is null then
+    return;
+  end if;
+  if v_reason = 'followup' then
+    update public.analysis_dispatch_runs r
+       set state = 'finished', claimed_at = coalesce(r.claimed_at, now()), finished_at = now(),
+           finish_note = '후속 전용 — 잡기로 닫음(분석 몫 0)'
+     where r.id = v_run;
+    update public.analysis_followup_requests f
+       set state = 'done', state_at = now(), note = 'run ' || v_run || ' 잡기로 닫음'
+     where f.run_id = v_run and f.state = 'sent';
+    return;
+  end if;
+  update public.analysis_dispatch_runs r
+     set state = 'running', claimed_at = coalesce(r.claimed_at, now())
+   where r.id = v_run;
+  return query
+  update public.analysis_dispatch_queue q
+     set state = 'claimed', state_at = now()
+   where q.run_id = v_run and q.state in ('sent', 'claimed')
+  returning q.run_id, q.announcement_id, q.title, q.group_key, q.apply_start, q.apply_end, q.phase, q.needs_promo, q.enqueued_at,
+            coalesce(q.note like '루틴 되돌림%', false) as was_returned;
+end
+$function$;
+
+CREATE OR REPLACE FUNCTION public.analysis_queue_finish(p_run_id bigint, p_done text[], p_note text DEFAULT NULL::text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+AS $function$
+-- 루틴이 끝날 때 부른다(2026-10-01 운영 회차) — p_done(대표 announcement_id)은 「끝」, 나머지 잡은 공고는 대기열로 되돌린다
+-- (returned — 이 회차가 1건 이상 끝냈으면 다음 발송 판정이 유예 없이 가져가고, 0건이면 되돌린 때부터 유예를 따른다). 회차를 끝내 잠금을 푼다.
+-- 「끝」은 분석 상태와 무관하다(완료 · 보류 · 실패 모두) — 한 번 루틴이 맡아 결론을 낸 공고는 자동으로 다시 보내지 않는다.
+-- 🔵 2026-10-02 — 실린 후속 처리 요청(analysis_followup_requests)도 「끝」으로 닫는다. 잡기로 이미 닫힌 후속 전용 회차(followup)를
+--   다시 끝내려 하면 오류 대신 0건을 돌려준다(루틴이 호출 본문의 run 번호로 끝을 불러도 실패로 보이지 않게).
+declare
+  n_done int; n_back int;
+begin
+  perform pg_advisory_xact_lock(hashtext('zipfit_analysis_dispatch'));
+  if exists (select 1 from public.analysis_dispatch_runs where id = p_run_id and reason = 'followup' and state = 'finished') then
+    return jsonb_build_object('run', p_run_id, 'done', 0, 'returned', 0, 'note', '후속 전용 회차 — 이미 닫힘');
+  end if;
+  if not exists (select 1 from public.analysis_dispatch_runs where id = p_run_id and state in ('firing', 'running')) then
+    raise exception '발송 회차 % 가 도는 중이 아니다', p_run_id;
+  end if;
+  update public.analysis_dispatch_queue
+     set state = 'done', state_at = now(), note = coalesce(p_note, '루틴 끝')
+   where run_id = p_run_id and state in ('sent', 'claimed') and announcement_id = any(coalesce(p_done, '{}'::text[]));
+  get diagnostics n_done = row_count;
+  update public.analysis_dispatch_queue
+     set state = 'waiting', returned = true, run_id = null, state_at = now(), note = '루틴 되돌림 run ' || p_run_id
+   where run_id = p_run_id and state in ('sent', 'claimed');
+  get diagnostics n_back = row_count;
+  update public.analysis_followup_requests
+     set state = 'done', state_at = now(), note = 'run ' || p_run_id || ' 끝'
+   where run_id = p_run_id and state = 'sent';
+  update public.analysis_dispatch_runs
+     set state = 'finished', finished_at = now(), finish_note = p_note
+   where id = p_run_id;
+  return jsonb_build_object('run', p_run_id, 'done', n_done, 'returned', n_back);
+end
+$function$;
+
+CREATE OR REPLACE FUNCTION public.analysis_run_release(p_run_id bigint, p_note text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+AS $function$
+-- 끝나지 않는 발송 회차의 잠금을 사람이 푼다(2026-10-02 · 우편함 「코드 — … 잠금 감시 C·D」 3 D).
+-- 🔴 service_role(관리 API)만 부른다. 풀기 전에 루틴 세션이 정말 멈췄는지 확인한다 — 절차는 Notion ⑥ 「발송 회차 잠금 풀기」.
+-- 도는 회차(firing·running)를 released 로 옮긴다 — released 는 claim·finish·tick 어느 쪽도 다시 집지 않는다(다시 running 이 되지 않는다).
+-- 그 회차가 잡고 있던 공고(sent·claimed)는 대기(waiting)로 되돌린다 — 다음 발송 판정이 평소 규칙(유예·상한)대로 다시 보낸다.
+-- ⚠️ 멈췄던 세션이 나중에 재개하면 이미 쓴 분석 행과 새 회차의 쓰기가 겹칠 수 있다 — 쓰기 가드(권고 A) 전까지는 절차로만 막는다.
+declare
+  r_state text; n_back int;
+begin
+  perform pg_advisory_xact_lock(hashtext('zipfit_analysis_dispatch'));
+  if coalesce(btrim(p_note), '') = '' then
+    raise exception '풀기 사유(p_note)가 필요하다';
+  end if;
+  select state into r_state from public.analysis_dispatch_runs where id = p_run_id for update;
+  if not found then
+    raise exception '발송 회차 % 가 없다', p_run_id;
+  end if;
+  if r_state not in ('firing', 'running') then
+    raise exception '발송 회차 % 는 도는 중이 아니다(%)', p_run_id, r_state;
+  end if;
+  update public.analysis_dispatch_queue
+     set state = 'waiting', returned = false, run_id = null, state_at = now(), note = '잠금 풀기 run ' || p_run_id
+   where run_id = p_run_id and state in ('sent', 'claimed');
+  get diagnostics n_back = row_count;
+  -- 🔵 2026-10-02 — 실린 후속 처리 요청도 대기로 되돌린다(다음 판정이 다시 부른다).
+  update public.analysis_followup_requests
+     set state = 'waiting', run_id = null, state_at = now(), note = '잠금 풀기 run ' || p_run_id
+   where run_id = p_run_id and state = 'sent';
+  update public.analysis_dispatch_runs
+     set state = 'released', finished_at = now(), finish_note = '잠금 풀기: ' || p_note
+   where id = p_run_id;
+  return jsonb_build_object('run', p_run_id, 'was', r_state, 'returned', n_back);
+end
+$function$;
+
+revoke execute on function public.analysis_followup_request(text, text) from public, anon, authenticated;
+grant execute on function public.analysis_followup_request(text, text) to service_role;
