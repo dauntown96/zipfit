@@ -48,7 +48,7 @@
 |---|---|
 | 프론트엔드 | HTML/CSS/JS 단일 파일 (index.html) |
 | 공고 데이터 | Supabase RPC `get_announcements_deduped()` |
-| 데이터 수집 | **LH·MYHOME**은 Edge Function `collect-announcements`를 pg_cron이 주간(KST 09~18시) 10분 간격 + 아침 워밍 2회 + 야간 1회 부르고, **SH**는 `collect-sh-announcements`를 하루 4회(KST 09·12·15·18시) 부른다. **LH 매입 홍보물 목록**은 `collect-lh-promo`가 KST 09:05~18:35 30분마다 새 공고·첨부 바뀐 공고만 `announcement_promo_files`에 남긴다(목록만 — 받기·Drive·extras 연결은 분석 회차). **LH 단지형 이미지 탭 목록**(평면도·조감도·배치도 등 — 매입 밖)은 `collect-lh-images`가 KST 09:17~18:47 30분마다 같은 조건으로 `announcement_complex_images`에 남긴다(목록만 · 2026-10-02). 스케줄은 UTC로 등록돼 있고 현행 값은 `cron.job` 조회로 본다. 상세: ⑩ 「수집 크론은 언제 도나」 · **자동 점검**: GitHub Actions `health-ops.yml`(운영 · 매시) · `health-screen.yml`(배포본 화면 · 매일·병합 뒤) — 실패하면 라벨 `health-ops`/`health-screen` 이슈가 열리고 회복하면 닫힌다 · **DB 변경**: `db-migrations.yml`(PR 되돌리기 전용 체크 · 병합 뒤 적용 — 실패하면 라벨 `db-apply` 이슈 · 원칙 32) |
+| 데이터 수집 | **LH·MYHOME**은 Edge Function `collect-announcements`를 pg_cron이 주간(KST 09~18시) 10분 간격 + 아침 워밍 2회 + 야간 1회 부르고, **SH**는 `collect-sh-announcements`를 하루 4회(KST 09·12·15·18시) 부른다. **LH 매입 홍보물 목록**은 `collect-lh-promo`가 KST 09:05~18:35 30분마다 새 공고·첨부 바뀐 공고만 `announcement_promo_files`에 남긴다(목록만 — 받기·Drive·extras 연결은 분석 회차). **LH 단지형 이미지 탭 목록**(평면도·조감도·배치도 등 — 매입 밖)은 `collect-lh-images`가 KST 09:17~18:47 30분마다 같은 조건으로 `announcement_complex_images`에 남긴다(목록만 · 2026-10-02). 스케줄은 UTC로 등록돼 있고 현행 값은 `cron.job` 조회로 본다. 상세: ⑩ 「수집 크론은 언제 도나」 · **자동 점검**: GitHub Actions `health-ops.yml`(운영 · 밤 포함 30분마다 25·55분 UTC — 예약 실행이 빠지면 다음 실행의 `ops_gap`이 알린다) · `health-screen.yml`(배포본 화면 · 매일·병합 뒤) — 실패하면 라벨 `health-ops`/`health-screen` 이슈가 열리고 회복하면 닫힌다 · **DB 변경**: `db-migrations.yml`(PR 되돌리기 전용 체크 · 병합 뒤 적용 — 실패하면 라벨 `db-apply` 이슈 · 원칙 32) |
 | 사용자 프로필 | Edge Function `save-user-profile` (GET/POST, **`verify_jwt=true`**, 식별자는 JWT의 `auth.uid()` — 이메일 기반 식별은 2026-08-13 폐기, CORS는 `https://dauntown96.github.io` 고정) |
 | 공고 첨부 수신 | Edge Function `fetch-attachment`는 호출자가 준 URL(허용목록 호스트만)의 바이트를 돌려주거나 `mode=upload`로 Google Drive `[임시] <announcement_id>` 폴더에 직접 올린다(폴더는 `mode=ensure_folder`로 먼저 확보해 `folder_id`로 넘긴다 · DB 쓰기 없음). 운반 상한은 기본 6MB이고 `mode=upload&large=resumable`만 200MB이며, 인증은 Vault `cron_secret_v2`의 `x-cron-secret`이다. 상세: ⑩ 「공고 첨부 수집」 |
 | 알림·트리거 | 🔴 **없음 — Make.com은 2026-08-27 미사용 확정**. 검토했고 안 쓰기로 한 것이지 미검토가 아니다(재검토 트리거는 📦 아카이브 「MCP 생태계 보류」에). 알림 경로는 미구현 상태이며 후보는 백로그 「카카오 알림톡」 |
@@ -151,9 +151,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-10-02 | **코드·운영 — 아산 블록 세대 폴백 · 묶인 카드 단지 칩 · 잠금 풀기 · health-ops 30분** — ①블록 세대 0 ∧ 대표 세대 > 0 → 「단지 구분 전 전체」(아산 37) ②묶인 카드만 자격 단지 칩·정책 「공통」·블록 단지명 ③`analysis_run_release` · `released` · stale_lock 90분 ④health-ops 25·55분 + `ops_gap` ⑤SH 4장 접수 끝남(조사) ⑥리허설 🟢 34표 일치 · sw v162. PR #316·#317 |
 | 2026-10-02 | **코드 — 검색어 강조·자동 펼침 · 루틴 잠금·같은 게시물 섞임(조사)** — ①공고 탭·정책 안내 검색어 `<mark class="zf-hl">`(글자 노드만 · 구조 불변) · 정책 안내 맞은 접힌 칸 자동 펼침(`data-zf-auto` — 지우면 닫힘 · 사용자가 연 칸 유지) · 첫 자리로 스크롤 · 공고 카드 펼침은 자동 안 함 · 검색 없을 때 HTML 같음 · sw v160 ②③ 조사만(발송기 잠금 만료 없음 · 대구연호 자격 단지 표시 없음) ④ supabase.co curl 200. PR #315 |
 | 2026-10-02 | **운영 — 자동 예약 · 후속 처리 2장(데이터 쓰기)** — `…19919` 접수기간 확정 5/20~7/19(id 1214·3109 · 수집이 접수마감으로 · 분석 상태는 이미지 탭 행 없어 판정 대기 유지) · `…0802` 상가 extras 5행 삭제·`완료` · `…0453` `완료` · `…0859` 위례 46형 ⚠️ 정책 1행(68→69 · 불변식 0행). 코드·DDL 0 |
-| 2026-10-02 | **코드 — 현장 줄 제외 조각 · LH 단지 이미지 목록 표** — ①카드 현장 줄에 `period_text` 요일·날짜 제외 조각 원문(`…0825` 「· 금요일, 주말, 공휴일 제외」 · 시각 제외는 안 붙임 · 키 25 중 바뀐 줄 1) · sw v159 ② 새 표 `announcement_complex_images`·`_fetch`(RLS · anon 0) + EF `collect-lh-images`(LH 페이지 이미지 탭 파싱 · 받지 않음) + cron 17·47분 · `…0746` 4 = 페이지 4 · `…0692`·`…0825` 0. PR #311·#312·#313 |
 ---
 
 ## 🚫 코딩 원칙
@@ -279,7 +279,7 @@ const requireEnv = (key: string): string => {
 - 🔴 **RPC가 돌려주는 것과 화면이 보는 것은 같지 않다.** 그 사이에 RPC 행을 화면 행으로 옮기는 매핑이 있고, **거기에 키를 더하지 않으면 화면은 그 컬럼을 영영 못 본다.**
 - 🔴 **검증에 RPC 행을 그대로 렌더 함수에 넣으면 그 매핑을 건너뛴다** — 통과하지만 배포본은 안 된다. 2026-09-17에 실제로 그랬다(`first_announcement_date`·`schedule_varies`가 `zfMapNoticeRows`에 없어 v112 배포본의 `zfNoticeDate`가 늘 `announcement_date`로 떨어졌는데, 회신의 「렌더 실측」은 RPC 행을 직접 넣은 대역이라 통과했다). PR #137도 같은 자리였다.
 - **그래서 이렇게 한다**: ① 매핑 함수를 **배포 코드에서 그대로 떠내고** ② 대역은 **fetch/RPC 응답까지만** 두고 ③ 그 응답을 매핑에 넣은 **결과 행**으로 렌더를 돌린다.
-- 🔴 **응답을 손으로 옮겨 적었으면 봉합한다** — DB가 계산한 `md5(json_agg(...)::text)`와 파일 md5를 대조한다. 컨테이너에서 Supabase 도메인이 프록시 403이라 `curl`이 막혀 있어 옮겨 적는 것을 피할 수 없다.
+- 🔴 **응답을 손으로 옮겨 적었으면 봉합한다** — DB가 계산한 `md5(json_agg(...)::text)`와 파일 md5를 대조한다. 2026-10-02부터 컨테이너에서 Supabase anon REST가 curl로 열려(200) 실 응답을 그대로 중계할 수 있다 — 관리 API로 받은 행을 대역에 옮겨 쓸 때만 봉합이 필요하다.
 - 🔴 **봉합 축은 「전 행」이 아니라 「렌더가 읽는 필드」다** (2026-09-17 추가) — RPC 행 전체의 md5는 `updated_at` 처럼 **수집이 매 런 바꾸는 필드**를 품고 있어 회차 사이에 그대로 낡는다(같은 네 공고가 `530e8b8b…` → `b2c21417…`). 그래서 렌더가 실제로 읽는 필드만 골라 **canonical md5**(`string_agg(…, E'\n' order by …)`)로 DB와 대조한다 — 그 축에서는 같은 재료가 `276ab3a8…`로 그대로였다. ⚠️ **필드를 고르는 것은 검증을 느슨하게 하는 것이 아니다** — 렌더가 안 보는 칸이 달라진 것은 이 검증이 답할 물음이 아니고, 전 행 md5는 그 물음을 섞어 **매번 깨지는 축**이 된다.
 - ⚠️ **회신에 「어느 경로를 거친 행인가」를 적는다.** 적지 않으면 대역과 실물이 구분되지 않는다.
 
@@ -305,7 +305,7 @@ const requireEnv = (key: string): string => {
 
 30. **Claude Code도 ZipFit의 총괄이다 — 요청받은 것 너머를 보되, 사실과 제안을 섞지 않고 승인 없이 구현하지 않는다** (2026-09-28 신설 — B52, 다운님 확정. claude.ai 쪽 정본은 Notion L0 절대원칙 14)
 - **총괄로 본다** — 총괄·데이터·개발·디자인·마케팅·CS·운영을 함께 생각한다. 작업을 마칠 때 **그 결과로 무엇을 얻었고, 무엇과 이을 수 있고, 어떤 기능·화면으로 이어지는지**를 한 번 더 본다. 그 결과는 회신 ⑦ 「확장 제안」에 담는다(원칙 22).
-- 🔴 **사실과 제안을 섞지 않는다** — DB에는 원문에 있는 것만 넣는다(공고 분석 스킬 그대로). 제안은 회신 ⑦·백로그 후보에만 산다. 제안을 정책 행·`extra_note`·`verification_requirements`·코드 주석에 쓰지 않는다.
+- 🔴 **사실과 제안을 섞지 않는다** — DB에는 원문에 있는 것만 넣는다(공고 분석 스킬 그대로). **원문 = 공고문 + 같은 공고의 LH 공고 페이지** · LH 페이지 값은 출처를 밝혀 쓴다(다운님 2026-10-02 · L0 원칙 3). 제안은 회신 ⑦·백로그 후보에만 산다. 제안을 정책 행·`extra_note`·`verification_requirements`·코드 주석에 쓰지 않는다.
 - 🔴 **제안은 승인 없이 구현하지 않는다** — 지시서·요청서가 명시한 것만 만든다. 「작아서」·「명백해서」는 예외 사유가 아니다(원칙 23의 두 시험은 **잘못된 것을 고치는** 자리에만 선다).
 - 🔴 **우회로를 짜기 전에 「도구가 있으면 끝나는가」를 먼저 묻는다** — 스킬·MCP·에이전트·연동이 필요하면 다운님께 말한다(설치·연결은 다운님 몫). 찾을 때는 GitHub의 별 많은 저장소부터 본다. 요청할 때는 **무엇이 · 왜 · 없으면 무엇을 대신 하는지**를 한 줄씩 적는다.
 - ⚠️ 이 원칙은 권한을 넓히지 않는다 — 되돌리기 어려운 것(원칙 13 예외·원칙 23)은 그대로 멈추고 확인받는다.
