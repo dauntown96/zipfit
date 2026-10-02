@@ -25,6 +25,10 @@ begin
      set state = 'waiting', returned = false, run_id = null, state_at = now(), note = '잠금 풀기 run ' || p_run_id
    where run_id = p_run_id and state in ('sent', 'claimed');
   get diagnostics n_back = row_count;
+  -- 🔵 2026-10-02 — 실린 후속 처리 요청도 대기로 되돌린다(다음 판정이 다시 부른다).
+  update public.analysis_followup_requests
+     set state = 'waiting', run_id = null, state_at = now(), note = '잠금 풀기 run ' || p_run_id
+   where run_id = p_run_id and state = 'sent';
   update public.analysis_dispatch_runs
      set state = 'released', finished_at = now(), finish_note = '잠금 풀기: ' || p_note
    where id = p_run_id;
