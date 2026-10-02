@@ -48,7 +48,7 @@
 |---|---|
 | 프론트엔드 | HTML/CSS/JS 단일 파일 (index.html) |
 | 공고 데이터 | Supabase RPC `get_announcements_deduped()` |
-| 데이터 수집 | **LH·MYHOME**은 Edge Function `collect-announcements`를 pg_cron이 주간(KST 09~18시) 10분 간격 + 아침 워밍 2회 + 야간 1회 부르고, **SH**는 `collect-sh-announcements`를 하루 4회(KST 09·12·15·18시) 부른다. **LH 매입 홍보물 목록**은 `collect-lh-promo`가 KST 09:05~18:35 30분마다 새 공고·첨부 바뀐 공고만 `announcement_promo_files`에 남긴다(목록만 — 받기·Drive·extras 연결은 분석 회차). 스케줄은 UTC로 등록돼 있고 현행 값은 `cron.job` 조회로 본다. 상세: ⑩ 「수집 크론은 언제 도나」 · **자동 점검**: GitHub Actions `health-ops.yml`(운영 · 매시) · `health-screen.yml`(배포본 화면 · 매일·병합 뒤) — 실패하면 라벨 `health-ops`/`health-screen` 이슈가 열리고 회복하면 닫힌다 · **DB 변경**: `db-migrations.yml`(PR 되돌리기 전용 체크 · 병합 뒤 적용 — 실패하면 라벨 `db-apply` 이슈 · 원칙 32) |
+| 데이터 수집 | **LH·MYHOME**은 Edge Function `collect-announcements`를 pg_cron이 주간(KST 09~18시) 10분 간격 + 아침 워밍 2회 + 야간 1회 부르고, **SH**는 `collect-sh-announcements`를 하루 4회(KST 09·12·15·18시) 부른다. **LH 매입 홍보물 목록**은 `collect-lh-promo`가 KST 09:05~18:35 30분마다 새 공고·첨부 바뀐 공고만 `announcement_promo_files`에 남긴다(목록만 — 받기·Drive·extras 연결은 분석 회차). **LH 단지형 이미지 탭 목록**(평면도·조감도·배치도 등 — 매입 밖)은 `collect-lh-images`가 KST 09:17~18:47 30분마다 같은 조건으로 `announcement_complex_images`에 남긴다(목록만 · 2026-10-02). 스케줄은 UTC로 등록돼 있고 현행 값은 `cron.job` 조회로 본다. 상세: ⑩ 「수집 크론은 언제 도나」 · **자동 점검**: GitHub Actions `health-ops.yml`(운영 · 매시) · `health-screen.yml`(배포본 화면 · 매일·병합 뒤) — 실패하면 라벨 `health-ops`/`health-screen` 이슈가 열리고 회복하면 닫힌다 · **DB 변경**: `db-migrations.yml`(PR 되돌리기 전용 체크 · 병합 뒤 적용 — 실패하면 라벨 `db-apply` 이슈 · 원칙 32) |
 | 사용자 프로필 | Edge Function `save-user-profile` (GET/POST, **`verify_jwt=true`**, 식별자는 JWT의 `auth.uid()` — 이메일 기반 식별은 2026-08-13 폐기, CORS는 `https://dauntown96.github.io` 고정) |
 | 공고 첨부 수신 | Edge Function `fetch-attachment`는 호출자가 준 URL(허용목록 호스트만)의 바이트를 돌려주거나 `mode=upload`로 Google Drive `[임시] <announcement_id>` 폴더에 직접 올린다(폴더는 `mode=ensure_folder`로 먼저 확보해 `folder_id`로 넘긴다 · DB 쓰기 없음). 운반 상한은 기본 6MB이고 `mode=upload&large=resumable`만 200MB이며, 인증은 Vault `cron_secret_v2`의 `x-cron-secret`이다. 상세: ⑩ 「공고 첨부 수집」 |
 | 알림·트리거 | 🔴 **없음 — Make.com은 2026-08-27 미사용 확정**. 검토했고 안 쓰기로 한 것이지 미검토가 아니다(재검토 트리거는 📦 아카이브 「MCP 생태계 보류」에). 알림 경로는 미구현 상태이며 후보는 백로그 「카카오 알림톡」 |
@@ -151,9 +151,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-10-02 | **코드 — 현장 줄 제외 조각 · LH 단지 이미지 목록 표** — ①카드 현장 줄에 `period_text` 요일·날짜 제외 조각 원문(`…0825` 「· 금요일, 주말, 공휴일 제외」 · 시각 제외는 안 붙임 · 키 25 중 바뀐 줄 1) · sw v159 ② 새 표 `announcement_complex_images`·`_fetch`(RLS · anon 0) + EF `collect-lh-images`(LH 페이지 이미지 탭 파싱 · 받지 않음) + cron 17·47분 · `…0746` 4 = 페이지 4 · `…0692`·`…0825` 0. PR #311·#312·#313 |
 | 2026-10-01 | **분석 — 자동 run 104 · 군산시 국민임대 입주자 선착순 상시모집(경암부향 등 7개 단지) `…0453`** — 세대 10(7단지 블록 · 모집호수 칸 없음 → recruit_count NULL) · 자격 7 · 정책 58(⚠️ 1) · 경로 2 · 이미지 0 · `완료(판정 대기)`(자격 판단 기준일 p.3↔p.8) · 선례 …0825 꼴 · 새 category 7 · md5 왕복 일치 · 🅑 접수 중 13→14/14. 코드·DDL 0 |
 | 2026-10-01 | **분석 — 자동 run 103 · 경남 청년·신혼부부 매입임대리츠 예비입주자 상시모집 `…19919`** — 세대 1(양산 우남퍼스트빌 106동 1104호 · 모집 예비 10) · 자격 1 · 정책 127(⚠️ 3) · 경로 0 · 이미지 0 · `완료(판정 대기)`(🔴 LH 페이지 접수마감 7/19 ↔ 카드 접수중 11/30 · 서류제출 방법 3곳 · 신청자격 기준 날짜) · 이 유형 첫 분석 · 새 category 18 · md5 왕복 일치 · 🅑 접수 중 12→13/14. 코드·DDL 0 |
-| 2026-10-01 | **분석 — 자동 run 102 · 경기남부 든든전세 비분양전환 예비입주자 `…0802`** — 세대 227(건물 46곳 · 8개 시) · 자격 1 · 정책 66(Q&A 15 · ⚠️ 1) · 경로 0 · 이미지 47(LH 홍보물 49행 연결 · 팸플릿 34·평면도 8·사진 5) · `완료(보조 누락)`(이미지 없는 건물 10곳) · 총 227호 = 목록 227행 = DB 227 · 전환 재료 없음(순수 전세) · 목록 공급형 구간 3행이 공고문 면적 구분과 어긋남(⚠️) · md5 왕복 일치 · 🅑 접수 전 36→37/37. 코드·DDL 0 |
 ---
 
 ## 🚫 코딩 원칙
