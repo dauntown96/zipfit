@@ -1399,7 +1399,7 @@ function zfLoadCardSide(){
     .then(j => Array.isArray(j) ? j : Promise.reject(new Error(path.split('?')[0] + ' 응답 형식')))
     .catch(err => { console.error('ZipFit 곁 데이터 로드 실패:', err); return null; });
   zfSidePromise = Promise.all([
-    get('announcement_apply_routes?select=announcement_id,route,site_text,phase_text,start_date,end_date,sort_order&order=announcement_id,sort_order'),
+    get('announcement_apply_routes?select=announcement_id,route,site_text,phase_text,start_date,end_date,sort_order,period_text&order=announcement_id,sort_order'),
     get('announcement_post_links?select=lh_announcement_id,linked_announcement_id,linked_group_key'),
     get('kukmin_rent_per_sqm_rank?is_low=eq.true&select=announcement_id,title,complex_key,area_label,area_complexes')
   ]).then(async ([routes, links, low]) => {
@@ -1618,7 +1618,25 @@ function zfMdDow(d){
   const dt = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
   return `${Number(m[2])}/${Number(m[3])}(${'일월화수목금토'[dt.getDay()]})`;
 }
-// 반환 { kind, text } — kind 는 ① · ②-가 · ②-나 · ②-다 · ②-다(지남) · ②-라 · ②-라(지남) · 없음. text 가 빈 문자열이면 한 줄을 그리지 않는다.
+// 현장 행 period_text 의 요일·날짜 제외 조각 — 「★금요일, 주말, 공휴일 제외★」(양산 …0825)를 **원문 그대로** 한 조각 돌려준다(장식 ★만 걷는다).
+// 🔴 2026-10-02 — 괄호·★로 둘러싸인 조각만 본다 · 「제외」와 요일·날짜 말이 함께 있어야 한다 · 시각 제외(점심시간 12:00~13:00 제외)는 접수일이 아니라 넣지 않는다.
+//    조각이 없거나 서로 다른 조각이 둘 이상이면 빈 문자열(틀린 조각보다 없는 편).
+function zfRouteExcludeOf(rows){
+  const found = [];
+  (rows || []).forEach(r => {
+    if(r.route !== '현장' || !r.period_text) return;
+    const re = /★([^★]*)★|\(([^()]*)\)|\[([^\[\]]*)\]/g;
+    let m;
+    while((m = re.exec(String(r.period_text)))){
+      const f = (m[1] || m[2] || m[3] || '').trim();
+      if(!/제외/.test(f) || !/(요일|주말|공휴일|휴일|\d{1,2}\s*[.\/월]\s*\d{1,2})/.test(f)) continue;
+      if(/(점심|시간|\d{1,2}\s*:\s*\d{2}|\d{1,2}\s*시)/.test(f)) continue;
+      if(found.indexOf(f) === -1) found.push(f);
+    }
+  });
+  return found.length === 1 ? found[0] : '';
+}
+// 반환 { kind, text, ex? } — ex 는 text 끝에 붙은 제외 조각(zfRouteExcludeOf) · kind 는 ① · ②-가 · ②-나 · ②-다 · ②-다(지남) · ②-라 · ②-라(지남) · 없음. text 가 빈 문자열이면 한 줄을 그리지 않는다.
 function zfRouteVerdict(rows, today){
   if(!Array.isArray(rows) || !rows.length) return { kind: '없음', text: '' };
   const rs = rows.slice().sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
@@ -1678,9 +1696,11 @@ function zfRouteVerdict(rows, today){
     const OE = parseNoticeDate(oe);
     if(!os || !OE) return { kind: '없음', text: '' };
     if(startOfLocalDay(OE) < startOfLocalDay(today || new Date())) return { kind: '②-라(지남)', text: '' };
-    return { kind: '②-라', text: zfMd(os) === zfMd(oe)
+    // 🔵 2026-10-02 — 요일·날짜 제외 조각이 있으면 날짜 뒤에 원문 그대로 덧붙인다(…0825 금요일 허탕).
+    const ex = zfRouteExcludeOf(rs);
+    return { kind: '②-라', ex, text: (zfMd(os) === zfMd(oe)
       ? `현장 접수만 받아요 — ${zfMdDow(os)} 하루`
-      : `현장 접수만 받아요 — ${zfMdDow(os)}~${zfMdDow(oe)}` };
+      : `현장 접수만 받아요 — ${zfMdDow(os)}~${zfMdDow(oe)}`) + (ex ? ` · ${ex}` : '') };
   }
   // ②-다 — 현장 마감이 하나(M)이고 인터넷·모바일 마감보다 이르며 오늘 ≤ M 일 때만
   const hes = [...new Set(groups.map(g => g.he).filter(Boolean))];
@@ -1692,7 +1712,8 @@ function zfRouteVerdict(rows, today){
     // 🔴 2026-10-01 — 현장 접수 시작일 = 마감일이면 「까지」가 아니라 하루다(인천석남 …0858 10/14 하루를 「까지」로 읽혔다).
     const hss = [...new Set(groups.map(g => g.hs).filter(Boolean))];
     const oneDay = hss.length === 1 && hss[0] === hes[0];
-    if(M && startOfLocalDay(M) >= t) return { kind: '②-다', text: oneDay ? `현장 접수는 ${zfMdDow(hes[0])} 하루만 받아요` : `현장 접수는 ${zfMdDow(hes[0])}까지` };
+    const ex = zfRouteExcludeOf(rs);
+    if(M && startOfLocalDay(M) >= t) return { kind: '②-다', ex, text: (oneDay ? `현장 접수는 ${zfMdDow(hes[0])} 하루만 받아요` : `현장 접수는 ${zfMdDow(hes[0])}까지`) + (ex ? ` · ${ex}` : '') };
     return { kind: '②-다(지남)', text: '' };
   }
   return { kind: '없음', text: '' };
@@ -1710,7 +1731,7 @@ function zfFillSideSlots(){
     const v = zfRouteVerdict(zfSide.routesByKey.get(el.getAttribute('data-route-key')));
     if(!v.text) return;
     // 두 줄을 넘치면 말줄임 · 전문은 툴팁(누르면 펼친다 — 손가락으로는 툴팁을 못 본다) · ▾는 말줄임 밖 칸
-    el.innerHTML = `<p class="zf-route-line" data-route-kind="${zfAttr(v.kind)}" title="${zfAttr(v.text)}" onclick="event.stopPropagation();this.classList.toggle('open')"><span class="zf-route-text">📅 ${escapeHtml(v.text)}</span><span class="zf-route-more" aria-hidden="true"></span></p>`;
+    el.innerHTML = `<p class="zf-route-line" data-route-kind="${zfAttr(v.kind)}" title="${zfAttr(v.text)}" onclick="event.stopPropagation();this.classList.toggle('open')"><span class="zf-route-text">📅 ${v.ex ? escapeHtml(v.text.slice(0, -(v.ex.length + 3))) + `<span class="zf-route-ex"> · ${escapeHtml(v.ex)}</span>` : escapeHtml(v.text)}</span><span class="zf-route-more" aria-hidden="true"></span></p>`;
     zfMarkRouteFits(el.firstElementChild);
     // 🔴 같은 뜻을 두 번 말하지 않는다 — 이 한 줄이 「단지마다 일정이 달라요」 배지를 대신한다.
     const card = el.closest('.hcard');
@@ -1727,6 +1748,7 @@ function zfFillSideSlots(){
   zfTitleClippedChips();
 }
 // 표시층 B ② — 접힌 상태에서도 첫 날짜(M/D)가 든 줄까지는 보이게 줄 수를 늘린다(최소 두 줄).
+// 🔵 2026-10-02 — 제외 조각(.zf-route-ex · 「금요일, 주말, 공휴일 제외」)도 접힌 상태에서 끝까지 보이게 줄 수를 늘린다.
 // 접힌 상자에 다 들어가면 펼침 표시를 숨긴다. 그려지지 않은 자리(높이 0)는 재지 않고 두 줄·표시를 둔다.
 function zfMarkRouteFits(p){
   if(!p) return;
@@ -1740,7 +1762,9 @@ function zfMarkRouteFits(p){
       const rg = document.createRange();
       rg.setStart(node, m.index); rg.setEnd(node, m.index + m[0].length);
       const lh = parseFloat(getComputedStyle(t).lineHeight) || 18;
-      const need = Math.ceil((rg.getBoundingClientRect().bottom - t.getBoundingClientRect().top - 0.5) / lh);
+      let need = Math.ceil((rg.getBoundingClientRect().bottom - t.getBoundingClientRect().top - 0.5) / lh);
+      const ex = t.querySelector('.zf-route-ex');
+      if(ex) need = Math.max(need, Math.ceil((ex.getBoundingClientRect().bottom - t.getBoundingClientRect().top - 0.5) / lh));
       if(need > 2) t.style.webkitLineClamp = String(need);
     }
     p.classList.toggle('zf-fits', t.scrollHeight <= t.clientHeight + 1);
