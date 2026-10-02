@@ -11,6 +11,10 @@ verify_jwt = false
 [functions.collect-lh-promo]
 verify_jwt = false
 
+# 2026-10-02 신설 — LH 단지형 공고 이미지 탭 목록 수집. collect-lh-promo 와 같이 x-cron-secret 으로 막는다(JWT 없음).
+[functions.collect-lh-images]
+verify_jwt = false
+
 [functions.collect-rental-stats]
 verify_jwt = false
 
