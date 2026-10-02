@@ -6,11 +6,12 @@
 name: Health — Ops (B)
 
 on:
+  # 🔵 2026-10-03(#328) — 30분 주기 정본은 GitHub 밖이다: Supabase pg_cron `zipfit-health-ops-dispatch`(25·55분)가
+  #    ops_health_dispatch() 로 이 워크플로를 workflow_dispatch 로 부른다(마이그레이션 2026-10-02_05 · Vault github_actions_dispatch_token).
+  #    GitHub schedule 은 하루 몇 번만 돌았다(25·55분 설정 · 10-02 08:39Z 뒤 14:5xZ까지 0회) — 그래서 예비로만 2시간마다 40분에 둔다
+  #    (pg_cron 경로가 죽었을 때 ops_dispatch 점검이 실패로 알리게 하는 자리).
   schedule:
-    # 🔵 2026-10-02 — 밤 포함 30분마다(25·55분). 종전 「UTC 0~10시 매시 + 20:25」는 run 101(밤 잠금 3시간 53분) 동안 두 번만 돌았고,
-    #    GitHub 가 예약 실행을 건너뛰었다(10-02 00:25Z·01:25Z). 건너뛴 것은 다음 실행의 ops_gap(직전 실행 뒤 90분 초과)이 알린다.
-    # 25·55분 — 수집(10분 주기)·홍보물(5·35분)·이미지(17·47분) 런이 끝난 뒤다.
-    - cron: '25,55 * * * *'
+    - cron: '40 */2 * * *'
   workflow_dispatch:
     inputs:
       simulate:
