@@ -48,24 +48,28 @@ export async function anonRpc(fn, body, timeoutMs = 30000) {
 // ② 작업 요약(사람이 보는 표) ③ 로그 한 줄(HEALTH_RESULT_JSON= — 로그만 읽을 때).
 export function report(kind, title, checks, extra = {}) {
   const failed = checks.filter(c => c.status === 'fail')
+  // 🔵 2026-10-03 — warn(⚠️)은 알리기만 한다: 결과 파일·요약에 남고 ok 를 깨지 않는다(이슈를 열지 않는다).
+  const warned = checks.filter(c => c.status === 'warn')
   const result = {
     kind, title, at: new Date().toISOString(),
     ok: failed.length === 0,
     failed: failed.map(c => c.id),
+    warned: warned.map(c => c.id),
     checks, ...extra,
     run_url: process.env.GITHUB_SERVER_URL && process.env.GITHUB_RUN_ID
       ? `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}` : null,
   }
   writeFileSync('health-result.json', JSON.stringify(result, null, 2))
   const cell = v => String(v ?? '').replace(/\u001b\[[0-9;]*m/g, '').replace(/\s*\n\s*/g, ' ').replace(/\|/g, '/').slice(0, 400)
-  const icon = s => (s === 'pass' ? '✅' : s === 'fail' ? '❌' : s === 'skip' ? '⏭' : 'ℹ️')
-  const lines = [`## ${title} — ${result.ok ? '통과' : `실패 ${failed.length}`}`, '',
+  const icon = s => (s === 'pass' ? '✅' : s === 'fail' ? '❌' : s === 'skip' ? '⏭' : s === 'warn' ? '⚠️' : 'ℹ️')
+  const head = (result.ok ? '통과' : `실패 ${failed.length}`) + (warned.length ? ` · 경고 ${warned.length}` : '')
+  const lines = [`## ${title} — ${head}`, '',
     '| | 점검 | 값 | 기준 |', '|---|---|---|---|',
     ...checks.map(c => `| ${icon(c.status)} | ${c.name} | ${cell(c.value)} | ${cell(c.rule)} |`)]
   const md = lines.join('\n') + '\n'
   writeFileSync('health-summary.md', md)
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, md)
   console.log(md)
-  console.log('HEALTH_RESULT_JSON=' + JSON.stringify({ kind, ok: result.ok, failed: result.failed, at: result.at }))
+  console.log('HEALTH_RESULT_JSON=' + JSON.stringify({ kind, ok: result.ok, failed: result.failed, warned: result.warned, at: result.at }))
   return result
 }

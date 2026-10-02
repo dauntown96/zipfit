@@ -27,7 +27,11 @@ const EXPECTED_JOBS = [
   'zipfit-refresh-post-links',   // 2026-09-30 같은 게시물 링크 자동 채움(마이그레이션 04)
   'zipfit-analysis-dispatch',    // 2026-10-01 공고 분석 루틴 발송기(마이그레이션 2026-10-01_03)
   'zipfit-collect-lh-images',    // 2026-10-02 LH 단지 이미지 탭 목록(마이그레이션 2026-10-02_02)
+  'zipfit-health-ops-dispatch',  // 2026-10-03 운영 점검 예약을 GitHub 밖으로 — pg_cron → workflow_dispatch(마이그레이션 2026-10-02_05)
 ]
+// 🔵 2026-10-03 — workflow_dispatch 토큰(Vault github_actions_dispatch_token · fine-grained · zipfit 하나 · Actions 읽기·쓰기) 만료일.
+//    토큰을 갈면 이 날짜도 함께 고친다(다운님이 알려 준 값 · 값 자체는 Vault 에만 있다).
+const DISPATCH_TOKEN_EXPIRES = '2027-10-03'
 
 try {
   const [db] = await sqlRead(`
@@ -49,6 +53,10 @@ try {
       'images_last_run_age_min', (select extract(epoch from now() - max(d.start_time))/60 from cron.job_run_details d join cron.job j using (jobid) where j.jobname = 'zipfit-collect-lh-images'),
       'images_fail_24h', (select count(*) from announcement_complex_image_fetch where not ok and fetched_at > now() - interval '24 hours'),
       'sh_last_run_age_min', (select extract(epoch from now() - max(run_at))/60 from sh_collection_run_log),
+      'ops_dispatch', (select json_build_object('age_min', extract(epoch from now() - l.at)/60, 'status', r.status_code, 'pending', r.id is null,
+                              'err', left(coalesce(r.error_msg, case when r.status_code >= 300 then r.content end), 200))
+                         from ops_dispatch_log l left join net._http_response r on r.id = l.net_request_id
+                        order by l.id desc limit 1),
       'dispatch', (select json_build_object(
          'enabled', c.enabled, 'grace_min', extract(epoch from c.grace)/60, 'max_wait_min', extract(epoch from c.max_wait)/60,
          'waiting', (select count(*) from analysis_dispatch_queue where state = 'waiting'),
@@ -179,7 +187,10 @@ try {
   }
   // ⑨ 점검 자체가 도는가(2026-10-02 · 우편함 「… health-ops 정기 실행」 4) — GitHub 가 예약 실행을 건너뛴다(10-02 00:25Z·01:25Z).
   //    이 워크플로의 직전 실행(main · 이번 실행 제외) 시작 뒤 경과를 내장 토큰(actions: read)으로 읽는다 — 새 비밀값 0.
-  //    30분 주기라 한 번 빠지면 60분 · 두 번 연속 빠지면 90분을 넘는다 → 다음에 도는 점검이 실패로 이슈를 연다.
+  //    30분 주기라 한 번 빠지면 60분 · 두 번 연속 빠지면 90분을 넘는다.
+  //    🔵 2026-10-03(#328) — 실패가 아니라 ⚠️ 경고다. GitHub 예약 실행이 하루 몇 번뿐이라(10-02 08:39Z → 14:5xZ 없음) 예약 실행마다
+  //    이 항목이 실패해 이슈가 닫히지 않았고, 루틴은 열린 이슈가 있으면 착수하지 않는다. 점검 예약은 pg_cron(25·55분)이 부른다 —
+  //    그 경로가 죽었는지는 아래 ⑩ ops_dispatch 가 실패로 잡는다. 실패로 다시 올릴지는 1주 실측 뒤 판단.
   {
     const tok = process.env.GH_API_TOKEN, repo = process.env.GITHUB_REPOSITORY
     if (!tok || !repo) {
@@ -194,17 +205,34 @@ try {
           .map(x => Date.parse(x.run_started_at || x.created_at)).filter(Number.isFinite)
           .sort((a, b) => b - a)[0]
         if (!res.ok || !prev) {
-          add('ops_gap', '직전 운영 점검 뒤 경과(분)', 'fail', `GitHub API ${res.status} · 직전 실행 ${prev ? '있음' : '없음'}`, '직전 실행을 읽는다')
+          add('ops_gap', '직전 운영 점검 뒤 경과(분)', 'warn', `GitHub API ${res.status} · 직전 실행 ${prev ? '있음' : '없음'}`, '직전 실행을 읽는다(경고만)')
         } else {
           let gap = (now.getTime() - prev) / 60000
           if (process.env.SIMULATE === 'gap') gap += 180   // 알림 경로 시험 — 점검이 빠진 것처럼
-          add('ops_gap', '직전 운영 점검 뒤 경과(분)', gap <= 90 ? 'pass' : 'fail', Math.round(gap) + (process.env.SIMULATE === 'gap' ? '(시험 +180)' : ''),
-            '≤ 90분(25·55분 30분 주기 — 두 번 연속 빠지면 실패 · GitHub 예약 실행 누락을 알아챈다)')
+          add('ops_gap', '직전 운영 점검 뒤 경과(분)', gap <= 90 ? 'pass' : 'warn', Math.round(gap) + (process.env.SIMULATE === 'gap' ? '(시험 +180)' : ''),
+            '≤ 90분(pg_cron 25·55분 30분 주기 — 넘으면 ⚠️ 경고만 · 이슈를 열지 않는다)')
         }
       } catch (e) {
-        add('ops_gap', '직전 운영 점검 뒤 경과(분)', 'fail', String(e).slice(0, 120), '직전 실행을 읽는다')
+        add('ops_gap', '직전 운영 점검 뒤 경과(분)', 'warn', String(e).slice(0, 120), '직전 실행을 읽는다(경고만)')
       }
     }
+  }
+  // ⑩ 운영 점검 예약 경로(2026-10-03 · 우편함 「코드 — #328 해소 · 운영 점검 예약을 GitHub 밖으로」) — pg_cron 이 30분마다
+  //    ops_health_dispatch() 로 이 워크플로를 workflow_dispatch 로 부른다. 그 경로가 죽으면 이 점검은 GitHub 예비 schedule 실행에서만 돈다
+  //    → 그때 「마지막 발송 40분 넘음」 또는 「응답 204 아님(토큰 만료·권한)」이면 실패.
+  {
+    const x = d.ops_dispatch
+    if (!x) {
+      add('ops_dispatch', '운영 점검 발송(pg_cron → workflow_dispatch) 마지막', 'fail', '기록 없음', 'ops_dispatch_log 마지막 행 ≤ 40분 · 응답 204')
+    } else {
+      const okAge = x.age_min <= 40
+      const okResp = x.pending ? x.age_min <= 5 : x.status === 204
+      add('ops_dispatch', '운영 점검 발송(pg_cron → workflow_dispatch) 마지막', okAge && okResp ? 'pass' : 'fail',
+        `${Math.round(x.age_min)}분 전 · ${x.pending ? '응답 대기' : `HTTP ${x.status}`}${x.err ? ' · ' + x.err : ''}`, '≤ 40분(25·55분) · 응답 204(GitHub workflow_dispatch)')
+    }
+    const daysLeft = (Date.parse(DISPATCH_TOKEN_EXPIRES + 'T00:00:00Z') - now.getTime()) / 86400000
+    add('ops_dispatch_token', '발송 토큰 만료까지(일)', daysLeft > 30 ? 'pass' : daysLeft > 0 ? 'warn' : 'fail', Math.floor(daysLeft),
+      `> 30일(만료 ${DISPATCH_TOKEN_EXPIRES} · 30일 안이면 ⚠️ · 지나면 실패 — 토큰을 갈면 Vault github_actions_dispatch_token 과 이 날짜를 함께)`)
   }
   // ⑥ 백업 — 🔴 zipfit-backup(비공개) 실행 기록을 이 저장소 토큰으로는 읽을 수 없다(새 토큰 필요 → 요청서 멈춤). 설계만.
   add('backup', '최근 백업 성공', 'skip', '미구현', 'zipfit-backup 은 비공개 — 읽으려면 새 권한이 필요해 멈춤(우편함 회신 참고). 백업 실패는 그 저장소 자체 이슈(backup-failure)로 알린다')
