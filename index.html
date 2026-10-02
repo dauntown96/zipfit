@@ -193,6 +193,9 @@ details.pol-item[open]>summary::after{content:' ▴'}
 details.pol-item>.policy-content{padding:0 12px 10px}
 .pol-site{display:inline-block;margin-right:6px;padding:0 6px;border-radius:9px;background:#EEF2FA;color:#3D5A99;font-size:11px;font-weight:600;vertical-align:1px}
 .pol-empty{font-size:12px;color:#888;padding:6px 2px}
+/* 🔵 2026-10-02 — 검색어 강조(공고 탭 검색 · 정책 안내 검색). 글자 모양은 그대로 두고 바탕만 칠한다 */
+mark.zf-hl{background:#FFE27A;color:inherit;font-weight:700;padding:0;border-radius:2px}
+body.theme-dark mark.zf-hl{background:#7A5F00;color:#fff}
 /* 🔵 B62 ①② — 날짜 줄 아래 한 줄. 🔵 표시층 B ② 접힌 상태는 두 줄까지(첫 날짜가 보이게) · 펼침 표시 ▾는 말줄임 밖 별도 칸 · 누르면 펼친다 */
 .zf-route-line{font-size:12px;color:#8A5A12;background:#FBF0DC;border-radius:8px;padding:4px 10px;margin:-4px 0 8px;cursor:pointer;display:flex;align-items:flex-start;gap:6px}
 .zf-route-text{flex:1;min-width:0;line-height:1.5;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;word-break:keep-all;overflow-wrap:anywhere}
@@ -1756,7 +1759,10 @@ function zfMarkRouteFits(p){
     const t = p.querySelector('.zf-route-text');
     if(!t || !t.clientHeight || p.classList.contains('open')) return;
     const re = /\d{1,2}\/\d{1,2}/;
-    const node = [...t.childNodes].find(n => n.nodeType === 3 && re.test(n.textContent));
+    // 🔵 2026-10-02 — 자식 글자 노드만이 아니라 아래 글자 노드 전부에서 찾는다(검색어 강조 <mark> 안에 날짜가 들어가도 잰다).
+    const tw = document.createTreeWalker(t, NodeFilter.SHOW_TEXT);
+    let node = null;
+    for(let n = tw.nextNode(); n; n = tw.nextNode()){ if(re.test(n.textContent)){ node = n; break; } }
     if(node){
       const m = re.exec(node.textContent);
       const rg = document.createRange();
@@ -2401,6 +2407,102 @@ function searchFilterNotices(list, query, scope){
       .filter(Boolean).join(' ').toLowerCase();
     return titleMatch || regionText.includes(q) || otherText.includes(q);
   });
+}
+
+// ── 검색어 강조 · 맞은 칸 자동 펼침 (2026-10-02 — 다운님 승인 · 백로그 「검색어 강조」) ──
+// 🔴 보이는 방법만 바꾼다 — 어떤 공고·안내가 걸리는가(searchFilterNotices · zfPolListHtml 의 hit)는 그대로다.
+// 🔴 글자 노드만 쪼개 <mark class="zf-hl"> 로 감싼다 — innerHTML 을 다시 쓰지 않으므로 링크·칩·버튼 구조가 그대로이고,
+//    textContent 도 같다(툴팁·말줄임·화면 점검이 읽는 글자). 입력칸·스크립트·SVG 안은 건너뛴다.
+// 🔴 자동으로 연 <details> 에는 data-zf-auto 표지를 단다 — 검색어를 지우면 그것만 닫는다(사용자가 직접 연 칸은 그대로).
+const ZF_HL_SKIP = /^(SCRIPT|STYLE|TEXTAREA|INPUT|SELECT|OPTION|NOSCRIPT|svg|MARK)$/;
+function zfHlClear(root){
+  if(!root) return;
+  root.querySelectorAll('mark.zf-hl').forEach(m => {
+    const par = m.parentNode;
+    if(!par) return;
+    par.replaceChild(document.createTextNode(m.textContent), m);
+    par.normalize();
+  });
+}
+// root 아래 글자 노드에서 q(대소문자 무시)를 찾아 감싼다. 감싼 mark 목록을 돌려준다.
+function zfHlApply(root, q){
+  const out = [];
+  const needle = String(q || '').trim().toLowerCase();
+  if(!root || !needle) return out;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(n){
+      for(let e = n.parentNode; e && e !== root.parentNode; e = e.parentNode){
+        if(e.nodeType === 1 && ZF_HL_SKIP.test(e.nodeName)) return NodeFilter.FILTER_REJECT;
+      }
+      return n.nodeValue && n.nodeValue.toLowerCase().indexOf(needle) !== -1 ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+    }
+  });
+  const nodes = [];
+  for(let n = walker.nextNode(); n; n = walker.nextNode()) nodes.push(n);
+  nodes.forEach(node => {
+    const text = node.nodeValue;
+    const low = text.toLowerCase();
+    if(low.length !== text.length) return;   // 소문자화로 길이가 바뀌는 글자(드묾)는 자리를 못 맞춘다 — 강조를 건너뛴다
+    const frag = document.createDocumentFragment();
+    let at = 0, i;
+    while((i = low.indexOf(needle, at)) !== -1){
+      if(i > at) frag.appendChild(document.createTextNode(text.slice(at, i)));
+      const m = document.createElement('mark');
+      m.className = 'zf-hl';
+      m.textContent = text.slice(i, i + needle.length);
+      frag.appendChild(m);
+      out.push(m);
+      at = i + needle.length;
+    }
+    if(at < text.length) frag.appendChild(document.createTextNode(text.slice(at)));
+    node.parentNode.replaceChild(frag, node);
+  });
+  return out;
+}
+// 맞은 글자를 품은 접힌 <details> 를 연다(표지를 단다). 표지 단 칸 중 이제 맞은 글자가 없는 것은 닫는다.
+function zfHlAutoOpen(root, marks){
+  if(!root) return;
+  const want = new Set();
+  (marks || []).forEach(m => {
+    for(let e = m.parentElement; e && e !== root.parentElement; e = e.parentElement){
+      if(e.nodeName === 'DETAILS') want.add(e);
+    }
+  });
+  root.querySelectorAll('details[data-zf-auto]').forEach(d => {
+    if(!want.has(d)){ d.open = false; delete d.dataset.zfAuto; }
+  });
+  want.forEach(d => { if(!d.open){ d.open = true; d.dataset.zfAuto = '1'; } });
+}
+// 공고 탭 — 카드에서 강조하는 자리. 🔴 카드 펼침(상세)은 자동으로 열지 않는다: 펼치면 정책·세대·지도를 불러오고
+//    notice_open 사용 기록이 남는다(한 쪽 20장이 한꺼번에 열린다). 상세 안 표(공급기관 등)는 강조만 해 둔다 — 펼치면 보인다.
+const ZF_NOTICE_HL_SEL = '.hname, .haddr, .chip-row, .zf-route-slot, .zf-notices-slot, .detail-grid, .zf-places';
+let zfNoticeHlObs = null;
+function zfNoticeHlCard(card, q){
+  card.querySelectorAll(ZF_NOTICE_HL_SEL).forEach(el => {
+    if(el.parentElement && el.parentElement.closest(ZF_NOTICE_HL_SEL)) return;   // 겹친 자리는 바깥 하나만
+    zfHlClear(el);
+    zfHlApply(el, q);
+  });
+}
+function zfNoticeHighlight(cards){
+  const listEl = document.getElementById('notice-list');
+  if(!listEl) return;
+  const q = (document.getElementById('noticeSearchInput')?.value || '').trim();
+  if(zfNoticeHlObs) zfNoticeHlObs.disconnect();
+  (cards || listEl.querySelectorAll('.hcard')).forEach(c => zfNoticeHlCard(c, q));
+  // 곁 데이터(경로 한 줄 · 공고문 목록 · 동네 가격)는 카드보다 늦게 채워진다 — 채워지면 그 카드만 다시 강조한다.
+  //    🔴 검색어가 없으면 관찰자는 아무것도 하지 않는다(검색이 없을 때 화면은 종전 그대로).
+  if(!zfNoticeHlObs){
+    let pending = null;
+    zfNoticeHlObs = new MutationObserver(recs => {
+      if(!(document.getElementById('noticeSearchInput')?.value || '').trim()) return;
+      const first = !pending;
+      pending = pending || new Set();
+      recs.forEach(r => { const c = r.target.nodeType === 1 && r.target.closest('.hcard'); if(c) pending.add(c); });
+      if(first) requestAnimationFrame(() => { const set = pending; pending = null; if(set && set.size) zfNoticeHighlight([...set]); });
+    });
+  }
+  zfNoticeHlObs.observe(listEl, { childList: true, subtree: true });
 }
 
 // 이미 로드된 noticeData에 클라이언트 사이드 필터(마감숨기기/대상계층/검색어)와 정렬을 적용해 다시 그린다.
@@ -3406,6 +3508,7 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
   zfFillSummarySlots();
   zfEnsurePriceSummaries(shown.map(n => n['announcement_id'])).then(ok => { if(ok) zfFillSummarySlots(); });
   zfAfterCardsRender();   // 🔵 B62 — 경로 한 줄 · 동네 가격 칩 · 같은 게시물 링크
+  zfNoticeHighlight();    // 🔵 2026-10-02 — 검색어 강조(검색어가 없으면 아무것도 감싸지 않는다)
 }
 
 // 페이저 — 「‹ 이전 · 1 … 4 5 6 … 12 · 다음 ›」. 현재 쪽 좌우 1칸과 양 끝을 늘 보여주고
@@ -6060,7 +6163,7 @@ const zfPolState = {};
 function zfPolItemHtml(p, opts){
   const o = opts || {};
   const site = p._zfSite ? `<span class="pol-site">${escapeHtml(p._zfSite)}</span>` : '';
-  return `<details class="policy-item pol-item${o.pinned ? ' pol-pinned' : ''}"${o.open ? ' open' : ''}>`
+  return `<details class="policy-item pol-item${o.pinned ? ' pol-pinned' : ''}" data-pid="${zfAttr(p.id)}"${o.open ? ' open data-zf-auto="1"' : ''}>`
     + `<summary>${site}${escapeHtml(p.category || '')}</summary>`
     + `<div class="policy-content">${escapeHtml(p.content_raw || '')}</div></details>`;
 }
@@ -6143,9 +6246,46 @@ function zfPolListHtml(id){
 }
 function zfPolRerender(id){
   const el = document.querySelector(`[data-pol-list="${CSS.escape(id)}"]`);
+  const st = zfPolState[id];
+  // 🔵 2026-10-02 — 사용자가 직접 연 칸을 기억했다가 다시 그린 뒤 되살린다(검색어를 지워도 그대로).
+  //    자동으로 연 칸(data-zf-auto — 검색 중 맞은 행)은 기억하지 않는다.
+  if(el && st){
+    st.userOpen = st.userOpen || new Set();
+    el.querySelectorAll('details.pol-item[data-pid]').forEach(d => {
+      if(d.dataset.zfAuto) return;
+      if(d.open) st.userOpen.add(d.dataset.pid); else st.userOpen.delete(d.dataset.pid);
+    });
+  }
   if(el) el.innerHTML = zfPolListHtml(id);
+  if(el && st && st.userOpen) el.querySelectorAll('details.pol-item[data-pid]').forEach(d => {
+    if(st.userOpen.has(d.dataset.pid)){ d.open = true; delete d.dataset.zfAuto; }
+  });
   const t = document.querySelector(`.pol-toggle-all[data-pol-id="${CSS.escape(id)}"]`);
   if(t) t.textContent = '모두 펼치기';
+  zfPolHighlight(id);
+}
+// 정책 안내 검색어 강조 — 고정 행(⚠️·정정·모집 일정)과 목록 모두. 맞은 글자를 품은 접힌 칸은 연다.
+//    🔴 고정 행은 종전처럼 거르지 않는다(무엇이 걸리는가는 그대로) — 맞은 글자가 있으면 강조하고 펼칠 뿐이다.
+function zfPolHighlight(id){
+  const input = document.querySelector(`.pol-search[data-pol-id="${CSS.escape(id)}"]`);
+  const body = input && input.parentElement;
+  const st = zfPolState[id];
+  if(!body || !st) return;
+  const q = (st.q || '').trim();
+  const zones = [...body.querySelectorAll(':scope > details.pol-pinned')];
+  const list = body.querySelector(`[data-pol-list="${CSS.escape(id)}"]`);
+  if(list) zones.push(list);
+  let marks = [];
+  zones.forEach(z => { zfHlClear(z); marks = marks.concat(zfHlApply(z, q)); });
+  zfHlAutoOpen(body, marks);
+  // 첫 맞은 자리로 — 입력이 멈춘 뒤 한 번만(글자마다 화면이 움직이지 않게).
+  clearTimeout(st.scrollT);
+  if(q && marks.length){
+    st.scrollT = setTimeout(() => {
+      const m = marks.find(x => x.isConnected && x.getClientRects().length);
+      if(m && m.scrollIntoView) m.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }, 400);
+  }
 }
 function zfPolPick(btn){
   const box = btn.closest('.pol-chips');
