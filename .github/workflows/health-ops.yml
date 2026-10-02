@@ -7,21 +7,22 @@ name: Health — Ops (B)
 
 on:
   schedule:
-    # 수집이 도는 시간대(UTC 0~10시 = KST 09~19시) 매시 25분 + 새벽 1회(UTC 20:25 = KST 05:25).
-    # 25분 — 수집(10분 주기)·홍보물(5·35분) 런이 끝난 뒤다. GitHub 예약 실행은 몇 분 밀릴 수 있다.
-    - cron: '25 0-10 * * *'
-    - cron: '25 20 * * *'
+    # 🔵 2026-10-02 — 밤 포함 30분마다(25·55분). 종전 「UTC 0~10시 매시 + 20:25」는 run 101(밤 잠금 3시간 53분) 동안 두 번만 돌았고,
+    #    GitHub 가 예약 실행을 건너뛰었다(10-02 00:25Z·01:25Z). 건너뛴 것은 다음 실행의 ops_gap(직전 실행 뒤 90분 초과)이 알린다.
+    # 25·55분 — 수집(10분 주기)·홍보물(5·35분)·이미지(17·47분) 런이 끝난 뒤다.
+    - cron: '25,55 * * * *'
   workflow_dispatch:
     inputs:
       simulate:
-        description: '알림 경로 시험 — fail 이면 실패 점검 하나를 일부러 더한다'
+        description: '알림 경로 시험 — fail 이면 실패 점검 하나를 일부러 더한다 · gap 이면 직전 점검 뒤 경과에 180분을 더한다'
         type: choice
-        options: [none, fail]
+        options: [none, fail, gap]
         default: none
 
 permissions:
   contents: read
   issues: write
+  actions: read   # ops_gap — 이 워크플로의 직전 실행 시각을 읽는다(2026-10-02)
 
 concurrency:
   group: health-ops
@@ -40,6 +41,7 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SIMULATE: ${{ inputs.simulate || 'none' }}
+          GH_API_TOKEN: ${{ github.token }}
         run: node .github/health/ops-check.mjs
       - name: 결과 올리기
         if: always()

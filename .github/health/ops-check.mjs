@@ -13,6 +13,10 @@ const now = new Date()
 const hourUtc = now.getUTCHours()
 const DAYTIME = hourUtc >= 0 && hourUtc <= 10           // 수집 cron */10 0-9 UTC(+10시대 마지막 09:50 런)
 const PROMO_DAYTIME = hourUtc >= 0 && hourUtc <= 9      // 홍보물 cron 5,35 0-9 UTC — 10시대에는 09:35 가 마지막(40분을 넘는다)
+// 🔵 2026-10-02 — 점검이 밤에도 30분마다 돈다(25·55분). 하루 첫 런(홍보물 00:05 · 이미지 00:17) 전에는 전날 마지막 런을 보므로
+//    UTC 0시 40분 전은 밤 문턱(900분)으로 잰다 — 23:55 점검이 00시 넘어 밀려 돌 때의 오탐을 막는다.
+const minuteUtc = now.getUTCMinutes()
+const FIRST_RUN_DONE = PROMO_DAYTIME && !(hourUtc === 0 && minuteUtc < 40)
 const checks = []
 const add = (id, name, status, value, rule) => checks.push({ id, name, status, value, rule })
 
@@ -53,7 +57,7 @@ try {
            and coalesce((select max(created_at) from analysis_dispatch_runs), '-infinity') < now() - (c.grace + c.max_wait)),  -- 몫 상한(한 발송 batch_size건)이라 긴 대기열은 정상 — 그동안 발송이 하나도 없을 때만 센다(2026-10-01)
          'batch_size', c.batch_size,
          'not_ready_24h', (select count(*) from analysis_dispatch_queue where state = 'waiting' and ready_at is null and enqueued_at < now() - interval '24 hours'),
-         'stale_lock', (select count(*) from analysis_dispatch_runs where state in ('firing','running') and created_at < now() - interval '6 hours'),
+         'stale_lock', (select count(*) from analysis_dispatch_runs where state in ('firing','running') and coalesce(claimed_at, created_at) < now() - interval '90 minutes'),
          'fail_streak', (select count(*) = 3 and bool_and(state = 'failed') from (select state from analysis_dispatch_runs order by id desc limit 3) z),
          'zero_streak', (select count(*) = 3 and bool_and(state = 'finished' and done = 0) from (select r.state,
            (select count(*) from analysis_dispatch_queue q where q.run_id = r.id and q.state = 'done') as done
@@ -107,16 +111,16 @@ try {
   add('cron_active', 'cron 잡 활성', missing.length === 0 ? 'pass' : 'fail', missing.length ? `비활성·없음: ${missing.join(', ')}` : `${EXPECTED_JOBS.length}개 모두 활성`, '기대 목록 전부 active')
   const jf = (d.job_fail_24h || [])
   add('cron_fail', '24시간 안 실패한 cron 실행', jf.length === 0 ? 'pass' : 'fail', jf.map(x => `${x.name} ${x.n}`).join(', ') || 0, '0(7일 0)')
-  const promoLimit = PROMO_DAYTIME ? 40 : 900
+  const promoLimit = FIRST_RUN_DONE ? 40 : 900
   add('promo_fresh', '매입 홍보물 수집 마지막 cron 실행 경과(분)', d.promo_last_run_age_min != null && d.promo_last_run_age_min <= promoLimit ? 'pass' : 'fail',
-    d.promo_last_run_age_min == null ? '실행 기록 없음' : Math.round(d.promo_last_run_age_min), 'UTC 0~9시 ≤ 40분(30분 주기) · 그 밖 ≤ 900분(09:35 → 다음날 00:05 = 870분 · 새벽 점검 20:25 는 650분 — 예약 지연 여유)')
+    d.promo_last_run_age_min == null ? '실행 기록 없음' : Math.round(d.promo_last_run_age_min), 'UTC 00:40~9시 ≤ 40분(30분 주기) · 그 밖 ≤ 900분(09:35 → 다음날 00:05 = 870분 — 예약 지연 여유)')
   add('promo_fail', '24시간 안 실패한 홍보물 목록 수집(공고)', d.promo_fail_24h < 3 ? 'pass' : 'fail', d.promo_fail_24h, '< 3(첫 런 26공고 오류 0)')
   // 2026-10-02 LH 단지 이미지 탭 목록 — 홍보물과 같은 주기(30분 · UTC 0~9시)라 같은 문턱을 쓴다.
   add('images_fresh', '단지 이미지 목록 수집 마지막 cron 실행 경과(분)', d.images_last_run_age_min != null && d.images_last_run_age_min <= promoLimit ? 'pass' : 'fail',
-    d.images_last_run_age_min == null ? '실행 기록 없음' : Math.round(d.images_last_run_age_min), 'UTC 0~9시 ≤ 40분(30분 주기 17·47분) · 그 밖 ≤ 900분')
+    d.images_last_run_age_min == null ? '실행 기록 없음' : Math.round(d.images_last_run_age_min), 'UTC 00:40~9시 ≤ 40분(30분 주기 17·47분) · 그 밖 ≤ 900분')
   add('images_fail', '24시간 안 실패한 단지 이미지 목록 수집(공고)', d.images_fail_24h < 3 ? 'pass' : 'fail', d.images_fail_24h, '< 3(2026-10-02 시험 38쪽 파싱 실패 0)')
-  add('sh_fresh', 'SH 수집 마지막 런 경과(분)', d.sh_last_run_age_min != null && d.sh_last_run_age_min <= 900 ? 'pass' : 'fail',
-    d.sh_last_run_age_min == null ? '기록 없음' : Math.round(d.sh_last_run_age_min), '≤ 900분(하루 4회 09·12·15·18시 KST — 18시 → 다음날 09시 = 900분)')
+  add('sh_fresh', 'SH 수집 마지막 런 경과(분)', d.sh_last_run_age_min != null && d.sh_last_run_age_min <= 960 ? 'pass' : 'fail',
+    d.sh_last_run_age_min == null ? '기록 없음' : Math.round(d.sh_last_run_age_min), '≤ 960분(하루 4회 09·12·15·18시 KST — 18시 → 다음날 09시 = 900분 · 밤 점검(23:55)이 밀려 00시 첫 런 직전에 돌 여유 60분)')
   // ⑧ 공고 분석 루틴 발송기(2026-10-01) — 스위치가 켜져 있을 때만 판정한다(꺼진 동안 대기는 정상).
   {
     const x = d.dispatch
@@ -128,11 +132,13 @@ try {
       const bad = []
       if (x.overdue > 0) bad.push(`유예 ${x.grace_min}분 + 상한 ${x.max_wait_min}분 동안 발송 0인데 그보다 오래 기다린 대기 ${x.overdue}`)
       if (x.not_ready_24h > 0) bad.push(`홍보물 목록을 24시간 넘게 기다리는 매입 ${x.not_ready_24h}`)
-      if (x.stale_lock > 0) bad.push(`6시간 넘게 안 풀린 잠금 ${x.stale_lock}`)
+      // 🔵 2026-10-02 — 6시간 → 90분 · 기준 coalesce(claimed_at, created_at)(정상 회차 15~34분 · run 101 은 3시간 53분이었다).
+      //    걸리면 Notion ⑥ 「발송 회차 잠금 풀기」 절차로 analysis_run_release(run_id, 사유)를 부른다.
+      if (x.stale_lock > 0) bad.push(`90분 넘게 안 풀린 잠금 ${x.stale_lock} — 세션 확인 뒤 analysis_run_release`)
       if (x.fail_streak) bad.push('연속 3번 발송 실패(자동 발송 멈춤)')
       if (x.zero_streak) bad.push('연속 3회차 끝낸 공고 0건(자동 발송 멈춤 — 공통 원인 확인)')
       add('dispatch', '분석 발송기', bad.length ? 'fail' : 'pass', bad.length ? bad.join(' · ') : `대기 ${x.waiting} · 이상 없음`,
-        '켜짐: grace+max_wait 동안 발송 0인데 그보다 오래 기다린 대기 0(몫 상한 — 한 발송 batch_size건) · 홍보물 24시간 대기 0 · 6시간 넘은 잠금 0 · 연속 3실패 아님 · 연속 3회차 0건 끝 아님')
+        '켜짐: grace+max_wait 동안 발송 0인데 그보다 오래 기다린 대기 0(몫 상한 — 한 발송 batch_size건) · 홍보물 24시간 대기 0 · 90분 넘은 잠금(잡은 때 기준) 0 · 연속 3실패 아님 · 연속 3회차 0건 끝 아님')
     }
   }
   // ⑦ 함수 정의 = supabase/rpc/ 사본(2026-09-30 우편함 「운영 — 함수 사본 드리프트」). 읽기만 한다.
@@ -167,6 +173,35 @@ try {
     add('fn_copy', 'public 함수 정의 = supabase/rpc/ 사본', bad.length === 0 ? 'pass' : 'fail',
       bad.length ? bad.join(' · ') : `${fns.length}개 모두 같음 · ${Date.now() - t0}ms`,
       'DB 정의 md5 = 사본 md5(끝 줄바꿈 무시 — migrate.py 와 같은 규칙) · 사본 없는 함수·함수 없는 사본 0 · 확장 함수 제외')
+  }
+  // ⑨ 점검 자체가 도는가(2026-10-02 · 우편함 「… health-ops 정기 실행」 4) — GitHub 가 예약 실행을 건너뛴다(10-02 00:25Z·01:25Z).
+  //    이 워크플로의 직전 실행(main · 이번 실행 제외) 시작 뒤 경과를 내장 토큰(actions: read)으로 읽는다 — 새 비밀값 0.
+  //    30분 주기라 한 번 빠지면 60분 · 두 번 연속 빠지면 90분을 넘는다 → 다음에 도는 점검이 실패로 이슈를 연다.
+  {
+    const tok = process.env.GH_API_TOKEN, repo = process.env.GITHUB_REPOSITORY
+    if (!tok || !repo) {
+      add('ops_gap', '직전 운영 점검 뒤 경과(분)', 'skip', '토큰 없음(로컬 실행)', 'Actions 에서만 잰다')
+    } else {
+      try {
+        const res = await fetch(`https://api.github.com/repos/${repo}/actions/workflows/health-ops.yml/runs?branch=main&per_page=20`,
+          { headers: { Authorization: `Bearer ${tok}`, Accept: 'application/vnd.github+json' } })
+        const j = await res.json()
+        const prev = (j.workflow_runs || [])
+          .filter(x => String(x.id) !== String(process.env.GITHUB_RUN_ID))
+          .map(x => Date.parse(x.run_started_at || x.created_at)).filter(Number.isFinite)
+          .sort((a, b) => b - a)[0]
+        if (!res.ok || !prev) {
+          add('ops_gap', '직전 운영 점검 뒤 경과(분)', 'fail', `GitHub API ${res.status} · 직전 실행 ${prev ? '있음' : '없음'}`, '직전 실행을 읽는다')
+        } else {
+          let gap = (now.getTime() - prev) / 60000
+          if (process.env.SIMULATE === 'gap') gap += 180   // 알림 경로 시험 — 점검이 빠진 것처럼
+          add('ops_gap', '직전 운영 점검 뒤 경과(분)', gap <= 90 ? 'pass' : 'fail', Math.round(gap) + (process.env.SIMULATE === 'gap' ? '(시험 +180)' : ''),
+            '≤ 90분(25·55분 30분 주기 — 두 번 연속 빠지면 실패 · GitHub 예약 실행 누락을 알아챈다)')
+        }
+      } catch (e) {
+        add('ops_gap', '직전 운영 점검 뒤 경과(분)', 'fail', String(e).slice(0, 120), '직전 실행을 읽는다')
+      }
+    }
   }
   // ⑥ 백업 — 🔴 zipfit-backup(비공개) 실행 기록을 이 저장소 토큰으로는 읽을 수 없다(새 토큰 필요 → 요청서 멈춤). 설계만.
   add('backup', '최근 백업 성공', 'skip', '미구현', 'zipfit-backup 은 비공개 — 읽으려면 새 권한이 필요해 멈춤(우편함 회신 참고). 백업 실패는 그 저장소 자체 이슈(backup-failure)로 알린다')

@@ -193,6 +193,7 @@ details.pol-item[open]>summary::after{content:' ▴'}
 details.pol-item>.policy-content{padding:0 12px 10px}
 .pol-site{display:inline-block;margin-right:6px;padding:0 6px;border-radius:9px;background:#EEF2FA;color:#3D5A99;font-size:11px;font-weight:600;vertical-align:1px}
 .pol-empty{font-size:12px;color:#888;padding:6px 2px}
+.pol-site.pol-common{background:#F1F1EC;color:#5F5F57}
 /* 🔵 2026-10-02 — 검색어 강조(공고 탭 검색 · 정책 안내 검색). 글자 모양은 그대로 두고 바탕만 칠한다 */
 mark.zf-hl{background:#FFE27A;color:inherit;font-weight:700;padding:0;border-radius:2px}
 body.theme-dark mark.zf-hl{background:#7A5F00;color:#fff}
@@ -1457,6 +1458,11 @@ function zfAfterCardsRender(){
 // 🔴 실패는 조용히 끝낸다 — 공고문 목록이 없어도 카드는 LH 행만으로 종전처럼 선다.
 const zfPostNotices = { loaded: false, byLhId: new Map() };   // LH id → { own: {title}|null, linked: [{ key, title, start, end, row }] }
 let zfPostNoticesPromise = null;
+// 🔵 2026-10-02 — 같은 게시물로 묶인 카드인가(LH 대표 id 기준). 묶인 카드에서만 단지 칩·「공통」·블록 단지명을 단다 —
+//    묶이지 않은 카드 화면은 그대로 둔다. 링크를 아직 못 받았으면 false(종전 화면).
+function zfIsPostMerged(annId){
+  return !!(zfPostNotices.loaded && zfPostNotices.byLhId.has(String(annId || '')));
+}
 function zfPostNoticeFor(row){
   if(!row || !zfPostNotices.loaded) return null;
   return zfPostNotices.byLhId.get(String(row['announcement_id'] || '')) || null;
@@ -5917,6 +5923,20 @@ const blockInfo = {};
 // 🔴 2026-10-02 — 블록 ID 에 세대 행이 하나도 없고 같은 그룹의 블록 밖 ID(LH 대표)에만 세대 행이 있는 카드(아산 …0726 — 블록 4 · 세대 37행이 LH ID).
 //    그 카드는 블록마다 「아직 없어요」가 떠 있는 세대가 안 보였다. true 면 카드 전체 세대 영역을 「단지 구분 전 전체」로 그린다.
 const blockHuFallback = {};
+// 🔵 2026-10-02 — 묶인 카드의 블록 머리 단지명. 같은 블록 ID 세대 행의 building_name 이 하나일 때만(정책 칩과 같은 규칙).
+function zfBlockSiteNames(blkIds){
+  return fetch(`${SUPABASE_URL}/rest/v1/housing_units?select=announcement_id,building_name&${idFilterFor(blkIds)}&limit=5000`, {
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
+  }).then(r => r.ok ? r.json() : null).then(rows => {
+    if(!Array.isArray(rows)) return null;
+    const sets = new Map();
+    rows.forEach(u => { const nm = String((u && u.building_name) || '').trim(); if(!nm) return;
+      if(!sets.has(u.announcement_id)) sets.set(u.announcement_id, new Set()); sets.get(u.announcement_id).add(nm); });
+    const out = new Map();
+    sets.forEach((set, aid) => { if(set.size === 1) out.set(aid, [...set][0]); });
+    return out.size ? out : null;
+  }).catch(() => null);
+}
 // 블록 ID 세대 0 ∧ 블록 밖 그룹 ID 세대 > 0 인가. 조회 실패는 false — 종전 화면 그대로다.
 function zfBlockHuFallback(annId, blkIds){
   return resolveAnnouncementIds(annId, true).then(ids => {
@@ -5972,9 +5992,11 @@ function loadAnnouncementBlocks(annId, id, detailEl){
     return Promise.all([
       fetchGroupRounds(blkIds, true),
       fetchBlockRecruitSums(blkIds),
-      zfBlockHuFallback(annId, blkIds)
-    ]).then(([roundMap, recruitSums, huFallback]) => {
+      zfBlockHuFallback(annId, blkIds),
+      zfIsPostMerged(annId) ? zfBlockSiteNames(blkIds) : Promise.resolve(null)
+    ]).then(([roundMap, recruitSums, huFallback, siteNames]) => {
       blockHuFallback[id] = huFallback === true;
+      if(siteNames) blocks.forEach(b => { b._zfSite = siteNames.get(b.announcement_id) || ''; });
       renderAnnouncementBlocks(blocks, id, roundMap, recruitSums);
       // 🔵 2026-10-02 — 블록이 세대를 하나도 못 가진 카드만 카드 전체 세대 영역을 그린다(그룹 조회 — 블록 ID 는 0행이라 대표 ID 행뿐).
       //    어느 블록 것인지 가를 근거가 행에 없으므로 블록에 나눠 붙이지 않고 「단지 구분 전 전체」로 사실대로 둔다.
@@ -6017,6 +6039,8 @@ function renderAnnouncementBlocks(blocks, id, roundMap, recruitSums){
 
   const blkHtml = (it, badge) => {
     const label = it.b.precise_address || `블록 ${it.idx + 1}`;
+    // 🔵 2026-10-02 — 묶인 카드는 주소 앞에 단지명 칩(정책·자격 칩과 같은 이름 · 같은 모양).
+    const siteChip = it.b._zfSite ? `<span class="pol-site">${escapeHtml(it.b._zfSite)}</span>` : '';
     // 🔴 상세 정보표의 세대수 행과 **같은 값**이다(announcements.total_units).
     //    여기는 라벨이 없는 자리라 값 앞에 뜻을 붙인다.
     // 🔵 블록 행은 **자기 source 를 안다**(get_announcement_blocks 가 `source` 를 반환한다).
@@ -6030,7 +6054,7 @@ function renderAnnouncementBlocks(blocks, id, roundMap, recruitSums){
       : (it.b.total_units ? `${zfUnitsPrefix(it.b.source)}${it.b.total_units}세대` : '');
     return `<div class="hu-group">
       <div class="hu-group-head" id="blk-group-head-${id}-${it.idx}" onclick="event.stopPropagation();toggleBlockGroup('${id}',${it.idx})">
-        <span class="hu-group-name">${escapeHtml(label)}${badge || ''}</span>
+        <span class="hu-group-name">${siteChip}${escapeHtml(label)}${badge || ''}</span>
         <span class="hu-group-count">${unitsStr} ▾</span>
       </div>
       <div class="hu-group-body" id="blk-group-body-${id}-${it.idx}" style="display:none"></div>
@@ -6188,7 +6212,8 @@ function zfPolPinRank(cls, p){
 const zfPolState = {};
 function zfPolItemHtml(p, opts){
   const o = opts || {};
-  const site = p._zfSite ? `<span class="pol-site">${escapeHtml(p._zfSite)}</span>` : '';
+  const site = p._zfSite ? `<span class="pol-site">${escapeHtml(p._zfSite)}</span>`
+    : (p._zfCommon ? `<span class="pol-site pol-common">공통</span>` : '');
   return `<details class="policy-item pol-item${o.pinned ? ' pol-pinned' : ''}" data-pid="${zfAttr(p.id)}"${o.open ? ' open data-zf-auto="1"' : ''}>`
     + `<summary>${site}${escapeHtml(p.category || '')}</summary>`
     + `<div class="policy-content">${escapeHtml(p.content_raw || '')}</div></details>`;
@@ -6226,7 +6251,7 @@ function zfPolicyBodyHtml(rows, cls, id){
   // 한 행의 칩을 칩 순서로 — 첫 칩이 그 행이 사는 묶음이다.
   const chipsOf = p => zfPolClassOf(cls, p, 'user').filter(n => cls && cls.userOrder.has(n))
     .sort((a, b) => cls.userOrder.get(a) - cls.userOrder.get(b));
-  zfPolState[id] = { rest, chips, chipsOf, pick: null, q: '' };
+  zfPolState[id] = { rest, pinned, chips, chipsOf, pick: null, q: '' };
   // 🔴 2026-09-30(표시층·필터) — 카드 안 아코디언은 처음에 전부 접힌다(다운님 지시). 고정 행(⚠️·정정·모집일정)도
   //    맨 위 자리는 그대로 두고 펼침만 걷었다. 검색 중 맞은 행 펼침·「모두 펼치기」는 사용자 동작이라 그대로다.
   let html = pinned.map(p => zfPolItemHtml(p, { pinned: true })).join('');
@@ -6254,7 +6279,8 @@ function zfPolListHtml(id){
   const hit = p => !q || (String(p.category || '') + ' ' + String(p.content_raw || '')).toLowerCase().indexOf(q) !== -1;
   const open = !!q;   // 찾는 중이면 맞은 행을 펼쳐 보인다
   const rows = st.rest.filter(hit);
-  if(!rows.length) return `<p class="pol-empty">${q ? '찾는 말이 들어간 안내가 없어요.' : ''}</p>`;
+  // 🔵 2026-10-02 — 맞은 글자가 위 고정 행에만 있으면 「없어요」라고 하지 않는다(고정 행은 펼쳐져 강조돼 있다).
+  if(!rows.length) return `<p class="pol-empty">${q ? ((st.pinned || []).some(hit) ? '위 고정 안내에서 찾았어요.' : '찾는 말이 들어간 안내가 없어요.') : ''}</p>`;
   if(st.pick){
     const list = rows.filter(p => st.chipsOf(p).indexOf(st.pick) !== -1);
     return list.length
@@ -6450,6 +6476,8 @@ function loadAnnouncementPolicies(annId, detailEl, id, useGroup){
     return Promise.all([zfLoadPolicyClasses(), zfPolicySiteLabels(curRows, annId)]).then(([cls, siteLabel]) => {
       if(!zfStillOurs(id, ownerAnn)) return;
       if(siteLabel) curRows.forEach(p => { p._zfSite = siteLabel.get(p.announcement_id) || ''; });
+      // 🔵 2026-10-02 — 묶인 카드의 대표(LH) ID 행은 두 공고문 공통 조항이다(규약 29) — 「공통」 칩으로 밝힌다.
+      if(siteLabel && zfIsPostMerged(annId)) curRows.forEach(p => { p._zfCommon = !p._zfSite && String(p.announcement_id || '') === String(annId); });
       const wrap = document.createElement('details');
       wrap.className = 'policy-wrap';
       wrap.innerHTML = `<summary class="policy-title">📋 정책 안내 (${curRows.length}건)</summary>` + staleHtml +
@@ -6506,8 +6534,12 @@ function loadPreciseEligibility(annId, detailEl, id, useGroup){
   const ownerAnn = zfCardAnn(id);
   resolveAnnouncementIds(annId, useGroup).then(ids => fetch(`${SUPABASE_URL}/rest/v1/eligibility_criteria?${idFilterFor(ids)}&order=supply_form,rank`, {
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
-  }).then(r => r.ok ? r.json() : null).then(rows => zfRoundsIfOrphan(rows, annId, ids, useGroup, id).then(roundMap => [rows, roundMap])))
-  .then(([rows, roundMap]) => {
+  }).then(r => r.ok ? r.json() : null).then(rows => Promise.all([
+    zfRoundsIfOrphan(rows, annId, ids, useGroup, id),
+    // 🔵 2026-10-02 — 묶인 카드만 ID → 단지명(정책 칩과 같은 함수). 아니면 null — 종전 화면 그대로다.
+    (Array.isArray(rows) && zfIsPostMerged(annId)) ? zfPolicySiteLabels(rows, annId) : Promise.resolve(null)
+  ]).then(([roundMap, siteLabel]) => [rows, roundMap, siteLabel])))
+  .then(([rows, roundMap, siteLabel]) => {
     if(!zfStillOurs(id, ownerAnn)) return;
     // 🔴 요청 실패(null)는 여기서 끝낸다 — 정상 0행([])만 아래에서 안내를 받는다.
     if(rows === null) return;
@@ -6534,7 +6566,8 @@ function loadPreciseEligibility(annId, detailEl, id, useGroup){
     if(Array.isArray(rows) && rows.length > 0){
       const seenElig = new Set();
       rows = rows.filter(r => {
-        const key = ELIG_RENDER_FIELDS.map(f => JSON.stringify(r[f] ?? null)).join('|');
+        // 🔵 단지 칩을 그리는 카드는 칩도 화면에 그리는 필드다 — 단지가 다르면 둘 다 남는다.
+        const key = ELIG_RENDER_FIELDS.map(f => JSON.stringify(r[f] ?? null)).join('|') + (siteLabel ? '|' + (siteLabel.get(r.announcement_id) || '') : '');
         if(seenElig.has(key)) return false;
         seenElig.add(key);
         return true;
@@ -6574,8 +6607,11 @@ function loadPreciseEligibility(annId, detailEl, id, useGroup){
             `<div class="elig-row"><span class="elig-key">${escapeHtml(prettifyEligKey(k))}</span>${renderEligValue(v)}</div>`
           ).join('');
         }
+        const siteNm = siteLabel ? (siteLabel.get(r.announcement_id) || '') : '';
+        const siteChip = siteNm ? `<span class="pol-site">${escapeHtml(siteNm)}</span>`
+          : (siteLabel && String(r.announcement_id || '') === String(annId) ? `<span class="pol-site pol-common">공통</span>` : '');
         return `<div class="elig-item">
-          <div class="elig-head">${sf}${rk ? ' · '+rk : ''}</div>
+          <div class="elig-head">${siteChip}${sf}${rk ? ' · '+rk : ''}</div>
           ${income ? `<div class="elig-row"><span>소득기준</span><span>${income}${dual}</span></div>` : ''}
           ${asset ? `<div class="elig-row"><span>자산기준</span><span>${asset}</span></div>` : ''}
           ${car ? `<div class="elig-row"><span>차량가액</span><span>${car}</span></div>` : ''}
