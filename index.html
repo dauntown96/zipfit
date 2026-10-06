@@ -13,7 +13,7 @@
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="ZipFit — 집 공고, 핏하게 골라보기">
 <meta name="twitter:description" content="전국 공공임대주택 공고를 한곳에서 보고, 내 조건으로 자격진단까지. LH·마이홈·SH 공고를 모아 보여줍니다.">
-<link rel="manifest" href="/zipfit/manifest.json">
+<link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1D9E75">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -3147,7 +3147,8 @@ async function shareNotice(btn, title, region, type, url){
   const cv = card && card.querySelector('.zf-cover'), ct = card && card.querySelector('.zf-type');
   if(cv) region = cv.textContent;
   if(ct) type = ct.textContent;
-  const shareUrl = url || 'https://dauntown96.github.io/zipfit';
+  // 기본값은 실행 위치(배포 루트) — 2026-10-06 도메인 전환 ①: 전환 전엔 옛 주소, 전환 뒤엔 zipfit.kr
+  const shareUrl = url || ZF_REDIRECT_TO;
   const text = [region, type].filter(Boolean).join(' · ') + ' | ZipFit';
   if(navigator.share){
     try{ await navigator.share({ title, text, url: shareUrl }); }catch(e){ if(e.name!=='AbortError') console.warn('공유 실패:', e); }
@@ -7928,6 +7929,7 @@ let zfProfileLoaded = false;
 // 배포 루트는 하드코딩하지 않고 현재 경로에서 산출한다.
 //   /zipfit/           → /zipfit/
 //   /zipfit/index.html → /zipfit/
+//   / (zipfit.kr)      → /
 const ZF_REDIRECT_TO = location.origin + location.pathname.replace(/[^/]*$/, '');
 
 let zfAuth = null;          // Supabase 클라이언트 (SDK 로드 실패 시 null 유지)
@@ -8592,7 +8594,7 @@ function zfScrollToTop(){
 }
 if('serviceWorker' in navigator){
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/zipfit/sw.js').catch(e => console.warn('SW 등록 실패:', e));
+    navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW 등록 실패:', e));
   });
 }
 </script>

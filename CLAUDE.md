@@ -49,7 +49,7 @@
 | 프론트엔드 | HTML/CSS/JS 단일 파일 (index.html) |
 | 공고 데이터 | Supabase RPC `get_announcements_deduped()` |
 | 데이터 수집 | **LH·MYHOME**은 Edge Function `collect-announcements`를 pg_cron이 주간(KST 09~18시) 10분 간격 + 아침 워밍 2회 + 야간 1회 부르고, **SH**는 `collect-sh-announcements`를 하루 4회(KST 09·12·15·18시) 부른다. **LH 매입 홍보물 목록**은 `collect-lh-promo`가 KST 09:05~18:35 30분마다 새 공고·첨부 바뀐 공고만 `announcement_promo_files`에 남긴다(목록만 — 받기·Drive·extras 연결은 분석 회차). **LH 단지형 이미지 탭 목록**(평면도·조감도·배치도 등 — 매입 밖)은 `collect-lh-images`가 KST 09:17~18:47 30분마다 같은 조건으로 `announcement_complex_images`에 남긴다(목록만 · 2026-10-02). 스케줄은 UTC로 등록돼 있고 현행 값은 `cron.job` 조회로 본다. 상세: ⑩ 「수집 크론은 언제 도나」 · **자동 점검**: GitHub Actions `health-ops.yml`(운영 · 30분마다 25·55분 UTC — 🔴 GitHub schedule이 아니라 Supabase pg_cron `zipfit-health-ops-dispatch`가 `ops_health_dispatch()`로 workflow_dispatch를 부른다 · GitHub schedule은 2시간마다 예비 · `ops_gap`은 ⚠️ 경고만 — 2026-10-03 #328) · `health-screen.yml`(배포본 화면 · 매일·병합 뒤) — 실패하면 라벨 `health-ops`/`health-screen` 이슈가 열리고 회복하면 닫힌다 · **DB 변경**: `db-migrations.yml`(PR 되돌리기 전용 체크 · 병합 뒤 적용 — 실패하면 라벨 `db-apply` 이슈 · 원칙 32) |
-| 사용자 프로필 | Edge Function `save-user-profile` (GET/POST, **`verify_jwt=true`**, 식별자는 JWT의 `auth.uid()` — 이메일 기반 식별은 2026-08-13 폐기, CORS는 `https://dauntown96.github.io` 고정) |
+| 사용자 프로필 | Edge Function `save-user-profile` (GET/POST, **`verify_jwt=true`**, 식별자는 JWT의 `auth.uid()` — 이메일 기반 식별은 2026-08-13 폐기, CORS는 EF 상수 `ALLOWED_ORIGINS` 허용 목록 — `https://dauntown96.github.io` · `https://zipfit.kr` · `https://www.zipfit.kr` 중 요청 Origin과 완전히 같은 것만 돌려준다 · `delete-account`도 같다 · 2026-10-06) |
 | 공고 첨부 수신 | Edge Function `fetch-attachment`는 호출자가 준 URL(허용목록 호스트만)의 바이트를 돌려주거나 `mode=upload`로 Google Drive `[임시] <announcement_id>` 폴더에 직접 올린다(폴더는 `mode=ensure_folder`로 먼저 확보해 `folder_id`로 넘긴다 · DB 쓰기 없음). 운반 상한은 기본 6MB이고 `mode=upload&large=resumable`만 200MB이며, 인증은 Vault `cron_secret_v2`의 `x-cron-secret`이다. 상세: ⑩ 「공고 첨부 수집」 |
 | 알림·트리거 | 🔴 **없음 — Make.com은 2026-08-27 미사용 확정**. 검토했고 안 쓰기로 한 것이지 미검토가 아니다(재검토 트리거는 📦 아카이브 「MCP 생태계 보류」에). 알림 경로는 미구현 상태이며 후보는 백로그 「카카오 알림톡」 |
 | 외부 API | LH 분양임대공고 API, 마이홈포털 API, 카카오맵 API |
@@ -151,9 +151,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-10-06 | **코드 — 도메인 zipfit.kr 전환 ① 준비(켜지 않음)** — 전수 조사(EF 2곳 오리진 고정 → 멈춤 · 판정) · manifest·SW·공유 기본값을 실행 위치 기준으로 · sw v163 · EF 2곳 CORS 허용 목록 3개(완전 일치 반사) · Auth Redirect URLs에 zipfit.kr·www 추가(Site URL 그대로). PR #336 |
 | 2026-10-06 | **운영 — 데이터 쓰기: 고령다산2 정정공고 `…20809` 반영(run 119)** — 정정본↔원 PDF 차이 1줄(기준일) · 신청자격 정책 행 1 신규 → ⚠️ 기준일 행 삭제(정책 34 · ⚠️ 3→2) · 분석 행 `…20809` 신설 → 정정 전 배너 판정 참 · 분석률 불변 · 코드·DDL 0. |
 | 2026-10-03 | **코드 — #328 해소 · 운영 점검 예약을 GitHub 밖으로** — `ops_gap` ⚠️ 경고(이슈 안 엶) · pg_cron `zipfit-health-ops-dispatch` 25·55분 → workflow_dispatch(Vault 토큰 · 만료 2027-10-03) · GitHub schedule 2시간 예비 · 첫 발송 204 → #328 회복 닫힘 · gap·fail 시험 판정 그대로. PR #330 |
-| 2026-10-02 | **협의 2 — 안 Z · 원문 키 대기열 통합 설계 + followup 신호** — 0(a) 판정 대기 3건 + …19919 `완료` · …0871 현장 장소(14:45Z) 0(c) 남해창선 LH 평면도 탭 26A 칸 = `_26B` 파일 · 카드 이상 없음(자격 긴 이름 넘침 1) 1~3 조사·설계안만(run 118 = #328로 멈춤 · 블록 ID 산물 109공고 · 시군구를 MYHOME에 기대는 카드 28). 코드·DDL 0 |
 ---
 
 ## 🚫 코딩 원칙
