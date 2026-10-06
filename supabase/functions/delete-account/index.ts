@@ -11,11 +11,16 @@ const SUPABASE_URL = requireEnv('SUPABASE_URL')
 // 🔴 service role 키는 여기(EF 환경변수)에만 있다. 프론트로 나가는 경로를 만들지 않는다.
 const SUPABASE_SERVICE_ROLE_KEY = requireEnv('SUPABASE_SERVICE_ROLE_KEY')
 
-// CORS는 배포 오리진으로 고정한다('*' 금지 — 이 함수는 계정을 지운다).
-const ALLOWED_ORIGIN = 'https://dauntown96.github.io'
+// CORS는 배포 오리진 허용 목록으로 묶는다('*' 금지 — 이 함수는 계정을 지운다).
+// 요청 Origin이 목록과 문자열로 완전히 같을 때만 그 값을 돌려주고, 목록 밖이면 허용 헤더를 주지 않는다.
+// 2026-10-06 커스텀 도메인 전환 ① — 옛 주소(github.io)와 새 주소(zipfit.kr · www)를 함께 연다.
+const ALLOWED_ORIGINS = new Set([
+  'https://dauntown96.github.io',
+  'https://zipfit.kr',
+  'https://www.zipfit.kr',
+])
 
 const CORS = {
-  'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey',
   'Access-Control-Max-Age': '86400',
@@ -28,7 +33,7 @@ const json = (body: unknown, status = 200) =>
     headers: { 'Content-Type': 'application/json', ...CORS },
   })
 
-Deno.serve(async (req: Request) => {
+const handle = async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS })
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
 
@@ -96,4 +101,11 @@ Deno.serve(async (req: Request) => {
     usage_events_deleted: usageEventsDeleted,
     account_deleted: 1,
   })
+}
+
+Deno.serve(async (req: Request) => {
+  const res = await handle(req)
+  const origin = req.headers.get('Origin') ?? ''
+  if (ALLOWED_ORIGINS.has(origin)) res.headers.set('Access-Control-Allow-Origin', origin)
+  return res
 })
