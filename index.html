@@ -6413,7 +6413,7 @@ function loadAnnouncementPolicies(annId, detailEl, id, useGroup){
   //    뜨지 않았다. 세대별 정보가 쓰는 fetchGroupRounds·roundInfoFor 를 그대로 재사용한다.
   //    조건에 huIsBlock 에 해당하는 항이 없는 것은 정책 로더에 블록 경로가 없기 때문이다.
   resolveAnnouncementIds(annId, useGroup).then(ids => Promise.all([
-    fetch(`${SUPABASE_URL}/rest/v1/announcement_policies?${idFilterFor(ids)}&order=category`, {
+    fetch(`${SUPABASE_URL}/rest/v1/announcement_policies?${idFilterFor(ids)}&order=category,seq`, {
       headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
     }).then(r => r.ok ? r.json() : null),
     fetchGroupRounds(ids, useGroup && Array.isArray(ids) && ids.length >= 2)
@@ -6575,7 +6575,7 @@ function loadDocumentTemplates(housingType, id){
 function loadPreciseEligibility(annId, detailEl, id, useGroup){
   if(!annId) return;
   const ownerAnn = zfCardAnn(id);
-  resolveAnnouncementIds(annId, useGroup).then(ids => fetch(`${SUPABASE_URL}/rest/v1/eligibility_criteria?${idFilterFor(ids)}&order=supply_form,rank`, {
+  resolveAnnouncementIds(annId, useGroup).then(ids => fetch(`${SUPABASE_URL}/rest/v1/eligibility_criteria?${idFilterFor(ids)}&order=supply_form,rank,seq`, {
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
   }).then(r => r.ok ? r.json() : null).then(rows => Promise.all([
     zfRoundsIfOrphan(rows, annId, ids, useGroup, id),
