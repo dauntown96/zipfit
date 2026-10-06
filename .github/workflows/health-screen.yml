@@ -44,7 +44,7 @@ jobs:
           set -euo pipefail
           want=$(grep -o "CACHE_NAME *= *'[^']*'" sw.js | head -1)
           for i in $(seq 1 30); do
-            got=$(curl -fsS "https://dauntown96.github.io/zipfit/sw.js?t=$(date +%s)" | grep -o "CACHE_NAME *= *'[^']*'" | head -1 || true)
+            got=$(curl -fsSL "https://dauntown96.github.io/zipfit/sw.js?t=$(date +%s)" | grep -o "CACHE_NAME *= *'[^']*'" | head -1 || true)
             if [ "$got" = "$want" ]; then echo "배포본 반영 확인: $got"; exit 0; fi
             echo "기다림 $i/30 — 배포본 ${got:-?} · 저장소 $want"; sleep 20
           done
