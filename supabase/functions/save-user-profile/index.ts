@@ -12,11 +12,11 @@ const SUPABASE_SERVICE_ROLE_KEY = requireEnv('SUPABASE_SERVICE_ROLE_KEY')
 
 // CORS는 배포 오리진 허용 목록으로 묶는다('*' 금지 — 이 함수는 개인정보를 다룬다).
 // 요청 Origin이 목록과 문자열로 완전히 같을 때만 그 값을 돌려주고, 목록 밖이면 허용 헤더를 주지 않는다.
-// 2026-10-06 커스텀 도메인 전환 ① — 옛 주소(github.io)와 새 주소(zipfit.kr · www)를 함께 연다.
+// 2026-10-06 커스텀 도메인 전환 ① — 옛 주소(github.io)와 새 주소(kkokzip.com · www)를 함께 연다.
 const ALLOWED_ORIGINS = new Set([
   'https://dauntown96.github.io',
-  'https://zipfit.kr',
-  'https://www.zipfit.kr',
+  'https://kkokzip.com',
+  'https://www.kkokzip.com',
 ])
 
 const CORS = {
