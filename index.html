@@ -4,20 +4,20 @@
 <meta charset="UTF-8">
 <link rel="icon" href="data:,">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ZipFit — 집 공고, 핏하게 골라보기</title>
+<title>꼭집 — 꼭 맞는 집만 꼭 집어서</title>
 <meta name="description" content="전국 공공임대주택 공고를 한곳에서 보고, 내 조건으로 자격진단까지. LH·마이홈·SH 공고를 모아 보여줍니다.">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="ZipFit">
-<meta property="og:title" content="ZipFit — 집 공고, 핏하게 골라보기">
+<meta property="og:site_name" content="꼭집">
+<meta property="og:title" content="꼭집 — 꼭 맞는 집만 꼭 집어서">
 <meta property="og:description" content="전국 공공임대주택 공고를 한곳에서 보고, 내 조건으로 자격진단까지. LH·마이홈·SH 공고를 모아 보여줍니다.">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="ZipFit — 집 공고, 핏하게 골라보기">
+<meta name="twitter:title" content="꼭집 — 꼭 맞는 집만 꼭 집어서">
 <meta name="twitter:description" content="전국 공공임대주택 공고를 한곳에서 보고, 내 조건으로 자격진단까지. LH·마이홈·SH 공고를 모아 보여줍니다.">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1D9E75">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="ZipFit">
+<meta name="apple-mobile-web-app-title" content="꼭집">
 <script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=58c490c9bded159ee35575e80345d783&amp;libraries=services&amp;autoload=false"></script>
 <!-- Supabase Auth SDK — 코딩원칙 17번 3조건 준수(버전 완전고정 + SRI + sw.js PRECACHE) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/dist/umd/supabase.js"
@@ -402,7 +402,7 @@ body.theme-dark .zf-totop{background:#262932;border-color:#3a3e48;color:#5DCAA5;
 <body>
 <div class="wrap">
   <div class="hero">
-    <div class="logo">🏠 <span>Zip</span>Fit</div>
+    <div class="logo">🏠 <span>꼭</span>집</div>
     <p class="sub">전국 공공임대 공고 맞춤 매칭 서비스<br>전국 공공기관 공고를 한 곳에서. 내 조건에 맞는 집을 빠르게 찾아드립니다.</p>
     <span class="badge">📢 2026년 경기북부 2차 공고 · 신청기간 6.30~7.2</span>
   </div>
@@ -626,7 +626,7 @@ body.theme-dark .zf-totop{background:#262932;border-color:#3a3e48;color:#5DCAA5;
   <!-- STEP 4: 전체 공고 (실시간 DB 연동) -->
   <div id="panel4" class="panel">
     <p class="panel-title">전국 공공임대 공고 전체 목록</p>
-    <p class="sub" style="margin-bottom:1rem">매일 자동 수집되는 LH 전국 공고예요. ZipFit이 신혼·신생아·청년 타깃과 수도권 여부를 자동으로 표시해드려요.</p>
+    <p class="sub" style="margin-bottom:1rem">매일 자동 수집되는 LH 전국 공고예요. 꼭집이 신혼·신생아·청년 타깃과 수도권 여부를 자동으로 표시해드려요.</p>
 
     <!-- 공고 검색 -->
     <div style="display:flex;gap:8px;margin-bottom:0.75rem">
@@ -3147,9 +3147,9 @@ async function shareNotice(btn, title, region, type, url){
   const cv = card && card.querySelector('.zf-cover'), ct = card && card.querySelector('.zf-type');
   if(cv) region = cv.textContent;
   if(ct) type = ct.textContent;
-  // 기본값은 실행 위치(배포 루트) — 2026-10-06 도메인 전환 ①: 전환 전엔 옛 주소, 전환 뒤엔 zipfit.kr
+  // 기본값은 실행 위치(배포 루트) — 2026-10-06 도메인 전환 ①: 전환 전엔 옛 주소, 전환 뒤엔 kkokzip.com
   const shareUrl = url || ZF_REDIRECT_TO;
-  const text = [region, type].filter(Boolean).join(' · ') + ' | ZipFit';
+  const text = [region, type].filter(Boolean).join(' · ') + ' | 꼭집';
   if(navigator.share){
     try{ await navigator.share({ title, text, url: shareUrl }); }catch(e){ if(e.name!=='AbortError') console.warn('공유 실패:', e); }
   } else {
@@ -4748,14 +4748,14 @@ async function diagnose(){
     // 축 이름에는 사용자가 실제로 입력한 것만 넣는다(자동차는 「모름」이면 판정에 쓰이지 않았다).
     const axisLabel = carValue>0 ? '소득·자산·자동차' : '소득·자산';
     html = ageCheckEntries.length
-      ? `<div class="rbox warn"><p class="rtitle">🎂 나이 확인이 필요해요</p><p class="rdesc">ZipFit이 판정하는 요건은 통과했지만, 남은 유형이 모두 나이 요건에 걸려 있어요.<br>출생연도를 입력하거나 공고문의 기준일로 확인해주세요.</p></div>`
+      ? `<div class="rbox warn"><p class="rtitle">🎂 나이 확인이 필요해요</p><p class="rdesc">꼭집이 판정하는 요건은 통과했지만, 남은 유형이 모두 나이 요건에 걸려 있어요.<br>출생연도를 입력하거나 공고문의 기준일로 확인해주세요.</p></div>`
       : (ageExceptionEntries.length
         ? `<div class="rbox warn"><p class="rtitle">🎂 나이 요건 확인이 필요해요</p><p class="rdesc">나이 구간을 벗어났지만, 그 유형은 나이가 단독 요건이 아니에요.<br>아래 예외에 해당하는지 공고문에서 확인해주세요.</p></div>`
         : (checkNoteEntries.length
           // 🔴 📄에 근거 없는 행만 남았으면 「통과한 유형이 남아 있다」고 말하지 않는다(B22) — 그 행은 판정한 적이 없다.
           ? (checkNoteEntries.every(noBasis)
-            ? `<div class="rbox warn"><p class="rtitle">📄 요건 확인이 필요해요</p><p class="rdesc">ZipFit이 판정한 유형 중에는 입력하신 조건으로 신청 가능한 유형이 없어요.<br>아래 유형은 기준을 아직 공고 원문으로 확인하지 못해 판정하지 않았어요. 공고문에서 직접 확인해주세요.</p></div>`
-            : `<div class="rbox warn"><p class="rtitle">📄 요건 확인이 필요해요</p><p class="rdesc">ZipFit이 판정하는 요건은 통과한 유형이 남아 있지만, 묻지 않는 요건이 있어 통과로 안내하지 않아요.<br>아래 항목을 공고문에서 직접 확인해주세요.</p></div>`)
+            ? `<div class="rbox warn"><p class="rtitle">📄 요건 확인이 필요해요</p><p class="rdesc">꼭집이 판정한 유형 중에는 입력하신 조건으로 신청 가능한 유형이 없어요.<br>아래 유형은 기준을 아직 공고 원문으로 확인하지 못해 판정하지 않았어요. 공고문에서 직접 확인해주세요.</p></div>`
+            : `<div class="rbox warn"><p class="rtitle">📄 요건 확인이 필요해요</p><p class="rdesc">꼭집이 판정하는 요건은 통과한 유형이 남아 있지만, 묻지 않는 요건이 있어 통과로 안내하지 않아요.<br>아래 항목을 공고문에서 직접 확인해주세요.</p></div>`)
           : (maritalExclEntries.length
             ? `<div class="rbox err"><p class="rtitle">❌ 신청 가능한 유형 없음</p><p class="rdesc">${axisLabel} 기준을 충족한 유형이 있지만, 혼인 상태 때문에 신청할 수 없어요.<br>아래 사유를 확인해주세요.</p></div>`
             : `<div class="rbox err"><p class="rtitle">❌ 신청 가능한 유형 없음</p><p class="rdesc">입력하신 ${axisLabel} 조건으로는 신청 가능한 유형이 없어요.<br>${axisLabel} 기준을 다시 확인해보세요.</p></div>`)));
@@ -4807,7 +4807,7 @@ async function diagnose(){
     if(isChildScoreApplicable(window.eligibleTypes, marital)){
       let gp=0;
       if(children>=3)gp+=4;else if(children===2)gp+=3;else if(children===1)gp+=2;
-      if(gp) html+=`<div class="rbox warn" style="margin-top:6px"><p class="rtitle">📊 예상 가점: ${gp}점 (자녀 항목 · 신혼신생아매입임대 기준)</p><p class="rdesc">청약저축 납입횟수·거주기간·장애인 항목 등은 ZipFit이 계산하지 않아요. 공고문에서 확인하세요.</p></div>`;
+      if(gp) html+=`<div class="rbox warn" style="margin-top:6px"><p class="rtitle">📊 예상 가점: ${gp}점 (자녀 항목 · 신혼신생아매입임대 기준)</p><p class="rdesc">청약저축 납입횟수·거주기간·장애인 항목 등은 꼭집이 계산하지 않아요. 공고문에서 확인하세요.</p></div>`;
     }
 
     html+=`<button class="btn btn-primary" onclick="goStep(2);matchHouses()" style="margin-top:0.5rem">주택 매칭하러 가기 →</button>`;

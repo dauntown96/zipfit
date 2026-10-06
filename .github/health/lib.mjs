@@ -8,7 +8,7 @@ export const PROJECT_REF = 'khdpjjyspmlqtzperoqg'
 export const SUPABASE_URL = `https://${PROJECT_REF}.supabase.co`
 // 공개 anon 키 — index.html 과 CLAUDE.md 에 이미 공개된 값이다(비밀 아님).
 export const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtoZHBqanlzcG1scXR6cGVyb3FnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxMTYyNDUsImV4cCI6MjA5NzY5MjI0NX0.XwSOuOk2UJiR8vTnwwqDZayJWOUstzD2DeB1COG4azs'
-export const SITE = 'https://dauntown96.github.io/zipfit/'
+export const SITE = 'https://kkokzip.com/'
 
 export async function sqlRead(query) {
   const token = process.env.SUPABASE_ACCESS_TOKEN

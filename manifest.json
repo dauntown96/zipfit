@@ -1,6 +1,6 @@
 {
-  "name": "ZipFit — 집 공고, 핏하게 골라보기",
-  "short_name": "ZipFit",
+  "name": "꼭집 — 꼭 맞는 집만 꼭 집어서",
+  "short_name": "꼭집",
   "description": "전국 공공임대주택 공고 조회·자격진단 서비스",
   "start_url": "./",
   "scope": "./",
