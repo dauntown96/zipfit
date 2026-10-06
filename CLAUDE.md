@@ -152,9 +152,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-10-06 | **코드 — 꼭집 전환 ②** — 보이는 「ZipFit」 → 꼭집(제목 「꼭집 — 꼭 맞는 집만 꼭 집어서」·머리·문장·공유·privacy·manifest) · console 38곳 그대로 · 점검 SITE·대기 URL → kkokzip.com · paths에 CNAME · ops-check 본문 표식 꼭집 · 봇 UA 연락 주소 · Auth Site URL → kkokzip.com · sw v165. PR #341 |
 | 2026-10-06 | **운영 — 데이터 쓰기: 강릉입암3 `…20865` 완료(보조 누락) → 완료** — LH 페이지 이미지 0 · 홍보물 0 확인(claude.ai) → `announcement_analysis` 상태·`pending_fields` 한 줄만 교체 · 다른 공고·산물 md5 전후 동일 · 코드·DDL 0. |
 | 2026-10-06 | **코드 — kkokzip.com 연결: CNAME 파일을 PR로 + health-screen curl -L** — Pages 설정이 보호 브랜치라 CNAME 커밋 거부 → 루트 `CNAME`(kkokzip.com)을 PR로 · 배포본 sw.js 대기 curl에 `-L` · DNS(A 4 · www CNAME)는 DB `net.http_get`으로 dns.google 조회. SITE·Site URL·서비스명은 ② PR. PR #339 |
-| 2026-10-06 | **분석 — 자동 run 120 · 강릉입암3 영구임대 예비입주자 `…0865`** — 세대 4(26.37·31.32형 × 가군·나군 · group 50) · 자격 6 · 정책 32 · 경로 1(현장) · 이미지 0 → `완료(보조 누락)` · 건설 596 · 금회 100 = LH 페이지 · 계약금 5% 일치 · 🅑 접수 전 35/36 → 36/36 · 코드·DDL 0. |
 ---
 
 ## 🚫 코딩 원칙
