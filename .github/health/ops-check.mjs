@@ -36,7 +36,41 @@ const EXPECTED_JOBS = [
 //    토큰을 갈면 이 날짜도 함께 고친다(다운님이 알려 준 값 · 값 자체는 Vault 에만 있다).
 const DISPATCH_TOKEN_EXPIRES = '2027-10-03'
 
+// ③④ 관리 API 가 필요 없는 점검(비로그인 목록·요약 · 배포 사이트)은 DB 점검과 다른 try 로 먼저 돈다
+//    (2026-10-06 · 우편함 「코드 — 1-C …」 2) — 관리 API 가 죽어 DB 점검이 「점검 실행」(runner) 하나로 끝나도 화면 쪽 결과는 남는다.
 try {
+  // ③ 비로그인 목록·요약 함수
+  const list = await anonRpc('get_announcements_deduped', {})
+  const listOk = list.status === 200 && Array.isArray(list.data) && list.data.length > 0
+  add('anon_list', '비로그인 get_announcements_deduped', listOk && list.ms <= 10000 ? 'pass' : 'fail',
+    `${list.status} · ${Array.isArray(list.data) ? list.data.length : 0}행 · ${list.ms}ms${list.snippet ? ' · ' + list.snippet : ''}`,
+    '200 · 행 > 0 · 왕복 ≤ 10초(서버 한도 3초는 200 여부로 잰다 — 넘으면 500. 왕복은 러너↔싱가포르 1.9MB라 넉넉히)')
+  // ③-2 화면이 실제로 보내는 인자 모양(2026-10-01 — 명시 null 은 함수가 인라인되지 않아 따로 잰다 · 우편함 「운영 — 감지 루틴 발송기」 3)
+  for (const [id, body] of [['anon_list_null', { p_region: null, p_type: null, p_status: null }], ['anon_list_region', { p_region: '경기도' }], ['anon_list_type', { p_type: '국민임대' }]]) {
+    const x = await anonRpc('get_announcements_deduped', body)
+    const ok = x.status === 200 && Array.isArray(x.data) && x.data.length > 0
+    add(id, `비로그인 get_announcements_deduped ${JSON.stringify(body)}`, ok && x.ms <= 10000 ? 'pass' : 'fail',
+      `${x.status} · ${Array.isArray(x.data) ? x.data.length : 0}행 · ${x.ms}ms${x.snippet ? ' · ' + x.snippet : ''}`,
+      '200 · 행 > 0(서버 한도 3초는 200 여부로 잰다) — 명시 null 은 2026-10-01 이전 4.6초 500 이었다')
+  }
+  const ids = listOk ? list.data.slice(0, 50).map(r => r.announcement_id) : []
+  const sum = ids.length ? await anonRpc('get_announcement_price_summary', { p_ids: ids }) : { status: 0, ms: 0, data: null, snippet: '목록 실패로 건너뜀' }
+  const sumOk = sum.status === 200 && Array.isArray(sum.data) && sum.data.length === ids.length
+  add('anon_summary', '비로그인 get_announcement_price_summary(50건)', sumOk && sum.ms <= 10000 ? 'pass' : 'fail',
+    `${sum.status} · ${Array.isArray(sum.data) ? sum.data.length : 0}/${ids.length}행 · ${sum.ms}ms${sum.snippet ? ' · ' + sum.snippet : ''}`, '200 · 요청 수 = 응답 행 수 · 왕복 ≤ 10초')
+  // ④ 배포 사이트
+  for (const [id, url] of [['site_index', SITE], ['site_sw', SITE + 'sw.js']]) {
+    let st = 0, ok = false
+    try { const r = await fetch(url, { cache: 'no-store' }); st = r.status; const t = await r.text(); ok = r.ok && (id === 'site_sw' ? t.includes('CACHE_NAME') : t.includes('꼭집')) } catch (e) { st = String(e).slice(0, 80) }
+    add(id, `배포 사이트 ${id === 'site_sw' ? 'sw.js' : 'index'}`, ok ? 'pass' : 'fail', st, '200 · 본문 표식')
+  }
+} catch (e) {
+  add('runner_web', '점검 실행(관리 API 밖 — 목록·사이트)', 'fail', String(e).slice(0, 300), '목록·사이트 점검이 끝까지 돈다')
+}
+
+try {
+  // 🔵 2026-10-06 1-C — simulate=runner: 관리 API 예외처럼 DB 점검을 처음에 끊는다(점검 불능 라벨 health-ops-blind 시험).
+  if (process.env.SIMULATE === 'runner') throw new Error('점검 불능 흉내(수동 입력 simulate=runner) — 관리 API 예외처럼')
   const [db] = await sqlRead(`
     select json_build_object(
       'last_run_age_min', (select extract(epoch from now() - max(run_at))/60 from collection_run_log),
@@ -108,31 +142,6 @@ try {
     add('portal_detail', '활성 LH 공고 중 6시간 넘게 상세조회 안 된 수', d.detail_stale <= 5 ? 'pass' : 'fail', d.detail_stale, '≤ 5(백로그 기준 · 2026-09-29 3)')
   } else {
     add('portal_detail', '활성 LH 공고 중 6시간 넘게 상세조회 안 된 수', 'skip', d.detail_stale, '주간(UTC 1~10시)에만 판정 — 밤에는 상세조회가 쉰다')
-  }
-  // ③ 비로그인 목록·요약 함수
-  const list = await anonRpc('get_announcements_deduped', {})
-  const listOk = list.status === 200 && Array.isArray(list.data) && list.data.length > 0
-  add('anon_list', '비로그인 get_announcements_deduped', listOk && list.ms <= 10000 ? 'pass' : 'fail',
-    `${list.status} · ${Array.isArray(list.data) ? list.data.length : 0}행 · ${list.ms}ms${list.snippet ? ' · ' + list.snippet : ''}`,
-    '200 · 행 > 0 · 왕복 ≤ 10초(서버 한도 3초는 200 여부로 잰다 — 넘으면 500. 왕복은 러너↔싱가포르 1.9MB라 넉넉히)')
-  // ③-2 화면이 실제로 보내는 인자 모양(2026-10-01 — 명시 null 은 함수가 인라인되지 않아 따로 잰다 · 우편함 「운영 — 감지 루틴 발송기」 3)
-  for (const [id, body] of [['anon_list_null', { p_region: null, p_type: null, p_status: null }], ['anon_list_region', { p_region: '경기도' }], ['anon_list_type', { p_type: '국민임대' }]]) {
-    const x = await anonRpc('get_announcements_deduped', body)
-    const ok = x.status === 200 && Array.isArray(x.data) && x.data.length > 0
-    add(id, `비로그인 get_announcements_deduped ${JSON.stringify(body)}`, ok && x.ms <= 10000 ? 'pass' : 'fail',
-      `${x.status} · ${Array.isArray(x.data) ? x.data.length : 0}행 · ${x.ms}ms${x.snippet ? ' · ' + x.snippet : ''}`,
-      '200 · 행 > 0(서버 한도 3초는 200 여부로 잰다) — 명시 null 은 2026-10-01 이전 4.6초 500 이었다')
-  }
-  const ids = listOk ? list.data.slice(0, 50).map(r => r.announcement_id) : []
-  const sum = ids.length ? await anonRpc('get_announcement_price_summary', { p_ids: ids }) : { status: 0, ms: 0, data: null, snippet: '목록 실패로 건너뜀' }
-  const sumOk = sum.status === 200 && Array.isArray(sum.data) && sum.data.length === ids.length
-  add('anon_summary', '비로그인 get_announcement_price_summary(50건)', sumOk && sum.ms <= 10000 ? 'pass' : 'fail',
-    `${sum.status} · ${Array.isArray(sum.data) ? sum.data.length : 0}/${ids.length}행 · ${sum.ms}ms${sum.snippet ? ' · ' + sum.snippet : ''}`, '200 · 요청 수 = 응답 행 수 · 왕복 ≤ 10초')
-  // ④ 배포 사이트
-  for (const [id, url] of [['site_index', SITE], ['site_sw', SITE + 'sw.js']]) {
-    let st = 0, ok = false
-    try { const r = await fetch(url, { cache: 'no-store' }); st = r.status; const t = await r.text(); ok = r.ok && (id === 'site_sw' ? t.includes('CACHE_NAME') : t.includes('꼭집')) } catch (e) { st = String(e).slice(0, 80) }
-    add(id, `배포 사이트 ${id === 'site_sw' ? 'sw.js' : 'index'}`, ok ? 'pass' : 'fail', st, '200 · 본문 표식')
   }
   // ⑤ cron 잡 · 매입 홍보물 수집
   const jobs = new Map((d.jobs || []).map(j => [j.name, j.active]))
@@ -290,15 +299,16 @@ try {
 if (process.env.SIMULATE === 'fail') add('simulate', '실패 흉내(수동 입력 simulate=fail)', 'fail', '시험', '알림 경로 확인용 — 평소에는 없다')
 
 // ⑪ 경고·실패 DB 기록(2026-10-06 · 우편함 「코드 — 1-B …」 6) — public.ops_health_findings 에 실행 1회당 항목 1행(30일 보관).
-//    claude.ai 가 SQL 한 줄로 본다: select * from ops_health_findings order by run_at desc, id;
+//    + 실행 요약 1행(통과 포함) public.ops_health_runs(1-C 3) — 발송(ops_dispatch_log)했는데 요약이 없으면 그 실행은 관리 API를 못 썼다.
+//    claude.ai 가 SQL 한 줄로 본다: select * from ops_health_findings order by run_at desc, id; · select * from ops_health_runs order by run_at desc;
 //    기록이 실패하면 ⚠️ 경고 하나를 더한다(판정은 결과 파일·이슈가 그대로 낸다 — DB 를 못 읽은 실행이면 기록도 못 한다).
 {
   const run_url = process.env.GITHUB_SERVER_URL && process.env.GITHUB_RUN_ID
     ? `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}` : null
-  const found = checks.filter(c => c.status === 'warn' || c.status === 'fail')
-    .map(c => ({ id: c.id, name: c.name, status: c.status, value: String(c.value ?? '') }))
+  // 🔵 2026-10-06 1-C 3 — 전 항목을 넘긴다: 함수가 경고·실패는 ops_health_findings 에, 실행 요약(통과 포함)은 ops_health_runs 에 1행.
+  const all = checks.map(c => ({ id: c.id, name: c.name, status: c.status, value: String(c.value ?? '') }))
   try {
-    const n = await recordFindings({ at: now.toISOString(), run_url, checks: found })
+    const n = await recordFindings({ at: now.toISOString(), run_url, ref: process.env.GITHUB_REF_NAME || null, checks: all })
     console.log(`경고·실패 기록 ${n}행`)
   } catch (e) {
     add('findings_log', '경고·실패 DB 기록(ops_health_findings)', 'warn', String(e).slice(0, 200), '기록 실패는 ⚠️ 경고만 — 판정은 결과 파일·이슈가 낸다')
