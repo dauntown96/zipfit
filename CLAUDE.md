@@ -152,9 +152,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-10-06 | **코드 — Z-1 PR-B ①②** — `site_label` 4표 · `get_announcement_sites`(블록 모양 그대로 · 단지 모양 = 단지명마다 한 행) · 불변식 v3.7(V13 꺼 둠) · 화면 7자리 (ID, 단지명) 축 · `block_count` 거울 · README 「공공임대」 · health-screen 이슈 main 한정 · sw v166 · 열린 6장 화면 같음. PR #344 |
 | 2026-10-06 | **코드 — Z-1 0장(PR-A)** — 정정본 후보(`#정정` 대기열 키 · 10-02 재현 1행) · 수집 경과 주간 0~9시 · 정정본 감시 ⚠️ · 화면 「ZipFit」 0 점검 · 화면 점검 pg_cron(23:50 UTC) · CLAUDE.md 원칙 30·23 · README. PR #343 |
 | 2026-10-06 | **운영 — 데이터 쓰기: DB 문장 「ZipFit」 → 「꼭집」** — 자격 판정 안내 50행·정책 ⚠️ 3행 칸 단위 replace · 가드 통과(다른 칸·분석 메모 불변) · 코드·DDL 0. |
-| 2026-10-06 | **코드 — 꼭집 전환 ②** — 보이는 「ZipFit」 → 꼭집(제목 「꼭집 — 꼭 맞는 집만 꼭 집어서」·머리·문장·공유·privacy·manifest) · console 38곳 그대로 · 점검 SITE·대기 URL → kkokzip.com · paths에 CNAME · ops-check 본문 표식 꼭집 · 봇 UA 연락 주소 · Auth Site URL → kkokzip.com · sw v165. PR #341 |
 ---
 
 ## 🚫 코딩 원칙
