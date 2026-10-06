@@ -1,6 +1,7 @@
 # B. 운영 건강 점검 — 사람 손 없이 도는가(2026-09-29 신설 · 우편함 「화면 점검·운영 건강 점검 자동화」)
 # ⑦ 함수 정의 = supabase/rpc/ 사본(2026-09-30 · 우편함 「운영 — 함수 사본 드리프트」) — 체크아웃한 사본과 DB md5 를 읽기만 해서 대조한다.
 # 🔴 읽기·알림만 한다. DB 는 관리 API 로 읽되 모든 SQL 이 `set transaction read only` 안에서 돈다(.github/health/lib.mjs).
+#    예외 하나(2026-10-06 · 1-B 6): 경고·실패를 public.ops_health_record(jsonb) 한 함수로 ops_health_findings 에 남긴다(30일).
 # 비밀값: 기존 Actions Secret SUPABASE_ACCESS_TOKEN 하나 · 공개 anon 키. 새 비밀값 0.
 # 알림: 실패면 라벨 health-ops 이슈를 하나 열고(열려 있으면 댓글), 통과하면 스스로 닫는다(.github/health/issue.sh).
 name: Health — Ops (B)
