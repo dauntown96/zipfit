@@ -151,9 +151,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-10-06 | **운영 — 데이터 쓰기: 강릉입암3 `…20865` 완료(보조 누락) → 완료** — LH 페이지 이미지 0 · 홍보물 0 확인(claude.ai) → `announcement_analysis` 상태·`pending_fields` 한 줄만 교체 · 다른 공고·산물 md5 전후 동일 · 코드·DDL 0. |
 | 2026-10-06 | **코드 — kkokzip.com 연결: CNAME 파일을 PR로 + health-screen curl -L** — Pages 설정이 보호 브랜치라 CNAME 커밋 거부 → 루트 `CNAME`(kkokzip.com)을 PR로 · 배포본 sw.js 대기 curl에 `-L` · DNS(A 4 · www CNAME)는 DB `net.http_get`으로 dns.google 조회. SITE·Site URL·서비스명은 ② PR. PR #339 |
 | 2026-10-06 | **분석 — 자동 run 120 · 강릉입암3 영구임대 예비입주자 `…0865`** — 세대 4(26.37·31.32형 × 가군·나군 · group 50) · 자격 6 · 정책 32 · 경로 1(현장) · 이미지 0 → `완료(보조 누락)` · 건설 596 · 금회 100 = LH 페이지 · 계약금 5% 일치 · 🅑 접수 전 35/36 → 36/36 · 코드·DDL 0. |
-| 2026-10-06 | **🔴 코드 — 취소한 옛 도메인 제거 · kkokzip.com으로 교체** — Auth Redirect URLs에서 옛 새주소 2개 삭제 · kkokzip.com·www 추가(github.io 2개·Site URL 그대로) · EF 2곳 `ALLOWED_ORIGINS` 교체(완전 일치 그대로) · 주석 예시·CLAUDE.md:52 · sw v164. 도메인은 켜지 않음. PR #337 |
 ---
 
 ## 🚫 코딩 원칙
