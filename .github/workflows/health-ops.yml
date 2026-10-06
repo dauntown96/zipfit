@@ -16,9 +16,9 @@ on:
   workflow_dispatch:
     inputs:
       simulate:
-        description: '알림 경로 시험 — fail 이면 실패 점검 하나를 일부러 더한다 · gap 이면 직전 점검 뒤 경과에 180분을 더한다'
+        description: '알림 경로 시험 — fail 이면 실패 점검 하나를 일부러 더한다 · gap 이면 직전 점검 뒤 경과에 180분을 더한다 · runner 면 DB 점검을 처음에 끊는다(점검 불능 — health-ops-blind)'
         type: choice
-        options: [none, fail, gap]
+        options: [none, fail, gap, runner]
         default: none
 
 permissions:
@@ -54,8 +54,11 @@ jobs:
           retention-days: 14
       - name: 알림(이슈 열기·닫기)
         # 🔵 2026-09-30 — main 에서만 이슈를 연다·닫는다. 가지에서 수동 실행(검사 시험)은 결과만 남긴다.
-        if: always() && github.ref == 'refs/heads/main'
+        # 🔵 2026-10-06(1-C 2) — 가지에서는 DRY_RUN=1 로 판정·라벨 계산만 찍는다(GitHub 에 쓰지 않는다).
+        #    「점검 실행」(runner)만 실패 = 점검 불능 → 라벨 health-ops-blind(루틴은 막지 않음) · 6시간 넘으면 health-ops 라벨을 더해 승격.
+        if: always()
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: bash .github/health/issue.sh health-ops "[자동 점검 B] 운영 건강 점검 실패"
+          DRY_RUN: ${{ github.ref != 'refs/heads/main' && '1' || '' }}
+        run: bash .github/health/issue.sh health-ops "[자동 점검 B] 운영 건강 점검 실패" health-ops-blind "[자동 점검 B] 점검 불능 — 점검 도구가 못 돌았다(루틴은 막지 않음)"

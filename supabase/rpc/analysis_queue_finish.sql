@@ -10,8 +10,16 @@ AS $function$
 --   후속 처리 요청에 result 로 남긴다(result_note = p_note · reported_at = 지금). 빼고 부르면 종전처럼 닫기만 한다(result 빈 채).
 --   후속 전용 회차(followup)는 이제 잡기가 닫지 않으므로 이 함수가 닫는다. 이미 닫힌 후속 전용 회차(발송기 60분 자동 닫기 ·
 --   2026-10-06 이전 잡기 닫기)를 끝내려 하면 오류 대신 0건을 돌려주고, 결과 인자가 있으면 결과 빈 요청에 결과만 늦게 남긴다.
+-- 🔵 2026-10-06(우편함 「코드 — 1-C …」 1 · 다운님 (가)) — 회차를 닫은 직후 발송 판정(analysis_dispatch_tick(false))을 한 번 부른다
+--   (끝 → 다음 발송이 cron 눈금(10분)을 기다리지 않게 — 10-06 실측 1.5~7.4분 × 4회). 같은 트랜잭션이다:
+--   잠금 = 같은 advisory xact 잠금을 같은 세션이 다시 잡는다(재진입) · 재귀 없음(tick 은 finish 를 부르지 않는다) ·
+--   스위치 꺼짐 · 연속 실패·0건 멈춤 · 대기 0 은 tick 이 그대로 지킨다 · 발송 요청(pg_net)은 이 트랜잭션이 커밋돼야 나간다.
+--   tick 이 예외를 내도 끝은 남는다(하위 트랜잭션으로 감싼다) — 결과는 반환 next 에 싣는다. 이미 닫힌 후속 회차(위 갈래)는 부르지 않는다.
+--   🔴 바로 부르는 것은 진전이 있을 때만이다 — 이 회차가 공고를 1건 이상 끝냈거나(n_done > 0) 후속 전용 회차일 때.
+--   0건 끝(열린 이슈 미착수 · 인증 오류 등 공통 원인)은 종전대로 cron 눈금을 기다린다 — 바로 부르면 되돌린 몫이 곧바로 다시 나가
+--   몇 분 안에 0건 회차 셋이 쌓여 stalled 로 멈춘다(2026-10-01 진전 없는 되돌림 규칙과 같은 뜻).
 declare
-  n_done int; n_back int; n_fu int;
+  n_done int; n_back int; n_fu int; v_next jsonb;
 begin
   perform pg_advisory_xact_lock(hashtext('zipfit_analysis_dispatch'));
   if p_followup_result is not null and p_followup_result not in ('처리', '미착수', '실패') then
@@ -46,6 +54,16 @@ begin
   update public.analysis_dispatch_runs
      set state = 'finished', finished_at = now(), finish_note = p_note
    where id = p_run_id;
-  return jsonb_build_object('run', p_run_id, 'done', n_done, 'returned', n_back, 'followups', n_fu, 'followup_result', p_followup_result);
+  if n_done > 0 or exists (select 1 from public.analysis_dispatch_runs where id = p_run_id and reason = 'followup') then
+    begin
+      v_next := public.analysis_dispatch_tick(false);
+    exception when others then
+      v_next := jsonb_build_object('result', 'error', 'error', left(sqlerrm, 300));
+    end;
+  else
+    v_next := jsonb_build_object('result', 'skipped', 'why', '끝낸 공고 0건 — cron 눈금을 기다린다');
+  end if;
+  return jsonb_build_object('run', p_run_id, 'done', n_done, 'returned', n_back, 'followups', n_fu, 'followup_result', p_followup_result,
+                            'next', v_next);
 end
 $function$
