@@ -214,6 +214,12 @@ try {
   add('chips', '깨진 칩(높이 > 30px 또는 줄바꿈 조각 2개 이상)', brokenChips.length === 0 ? 'pass' : 'fail', brokenChips.length ? `${brokenChips.length}: ${brokenChips.slice(0, 3).join(' / ')}` : 0, '0(표시층 B 뒤 0)')
   add('route_date', '접힌 경로 줄 첫 날짜가 보이는가', hiddenDates.length === 0 ? 'pass' : 'fail', hiddenDates.length ? `${hiddenDates.length}: ${hiddenDates.slice(0, 3).join(' / ')}` : 0, '가려진 첫 날짜 0')
   add('overflow', '가로 넘침(390px)', overflow.length === 0 ? 'pass' : 'fail', overflow.length ? overflow.join(' / ') : 0, 'scrollWidth ≤ 390')
+  // ④ 보이는 글자에 옛 서비스명 0(2026-10-06 · 우편함 「코드 — Z-1 …」 PR-A A4 · 이름 규칙 — 사용자에게 보이는 곳 = 「꼭집」).
+  //    body.innerText(화면에 그려진 글자만 · 숨은 요소·주석·콘솔 제외) 안의 「ZipFit」(대소문자 그대로)을 센다 — 지금 열린 쪽 기준.
+  //    SIMULATE=zipfit 이면 보이는 글자 하나를 넣고 센다(알림 경로 시험 — 실패해야 맞다).
+  if (process.env.SIMULATE === 'zipfit') await page.evaluate(() => { const p = document.createElement('p'); p.textContent = 'ZipFit(시험)'; document.body.prepend(p) })
+  const oldName = await page.evaluate(() => (document.body.innerText.match(/ZipFit/g) || []).length)
+  add('old_name', '보이는 글자에 「ZipFit」', oldName === 0 ? 'pass' : 'fail', oldName, '0(body.innerText · 대소문자 그대로 — 이름 규칙: 보이는 곳은 「꼭집」)')
   await page.screenshot({ path: 'health-screen.png' })
 } catch (e) {
   add('runner', '점검 실행', 'fail', String(e).slice(0, 300), '점검 스크립트가 끝까지 돈다')
