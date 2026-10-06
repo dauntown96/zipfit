@@ -11,7 +11,9 @@ import { createHash } from 'node:crypto'
 
 const now = new Date()
 const hourUtc = now.getUTCHours()
-const DAYTIME = hourUtc >= 0 && hourUtc <= 10           // 수집 cron */10 0-9 UTC(+10시대 마지막 09:50 런)
+// 🔵 2026-10-06 — 10시대를 주간에서 뺐다: 마지막 주간 런이 09:50 이라 10:xxZ 점검은 최대 69분을 보고 40분 문턱에 걸렸다
+//    (매일 19:55 KST 거짓 실패 #332~#334). 수집 cron */10 0-9 UTC 와 같은 범위다 — 10시대는 야간 문턱(720분)으로 잰다.
+const DAYTIME = hourUtc >= 0 && hourUtc <= 9            // 수집 cron */10 0-9 UTC
 const PROMO_DAYTIME = hourUtc >= 0 && hourUtc <= 9      // 홍보물 cron 5,35 0-9 UTC — 10시대에는 09:35 가 마지막(40분을 넘는다)
 // 🔵 2026-10-02 — 점검이 밤에도 30분마다 돈다(25·55분). 하루 첫 런(홍보물 00:05 · 이미지 00:17) 전에는 전날 마지막 런을 보므로
 //    UTC 0시 40분 전은 밤 문턱(900분)으로 잰다 — 23:55 점검이 00시 넘어 밀려 돌 때의 오탐을 막는다.
@@ -28,6 +30,7 @@ const EXPECTED_JOBS = [
   'zipfit-analysis-dispatch',    // 2026-10-01 공고 분석 루틴 발송기(마이그레이션 2026-10-01_03)
   'zipfit-collect-lh-images',    // 2026-10-02 LH 단지 이미지 탭 목록(마이그레이션 2026-10-02_02)
   'zipfit-health-ops-dispatch',  // 2026-10-03 운영 점검 예약을 GitHub 밖으로 — pg_cron → workflow_dispatch(마이그레이션 2026-10-02_05)
+  'zipfit-health-screen-dispatch', // 2026-10-06 화면 점검 예약도 GitHub 밖으로(마이그레이션 2026-10-06_02)
 ]
 // 🔵 2026-10-03 — workflow_dispatch 토큰(Vault github_actions_dispatch_token · fine-grained · zipfit 하나 · Actions 읽기·쓰기) 만료일.
 //    토큰을 갈면 이 날짜도 함께 고친다(다운님이 알려 준 값 · 값 자체는 Vault 에만 있다).
@@ -56,7 +59,11 @@ try {
       'ops_dispatch', (select json_build_object('age_min', extract(epoch from now() - l.at)/60, 'status', r.status_code, 'pending', r.id is null,
                               'err', left(coalesce(r.error_msg, case when r.status_code >= 300 then r.content end), 200))
                          from ops_dispatch_log l left join net._http_response r on r.id = l.net_request_id
-                        order by l.id desc limit 1),
+                        where l.target = 'health-ops.yml' order by l.id desc limit 1),
+      'screen_dispatch', (select json_build_object('age_min', extract(epoch from now() - l.at)/60, 'status', r.status_code, 'pending', r.id is null,
+                              'err', left(coalesce(r.error_msg, case when r.status_code >= 300 then r.content end), 200))
+                         from ops_dispatch_log l left join net._http_response r on r.id = l.net_request_id
+                        where l.target = 'health-screen.yml' order by l.id desc limit 1),
       'dispatch', (select json_build_object(
          'enabled', c.enabled, 'grace_min', extract(epoch from c.grace)/60, 'max_wait_min', extract(epoch from c.max_wait)/60,
          'waiting', (select count(*) from analysis_dispatch_queue where state = 'waiting'),
@@ -71,14 +78,20 @@ try {
            (select count(*) from analysis_dispatch_queue q where q.run_id = r.id and q.state = 'done') as done
            from analysis_dispatch_runs r where r.reason <> 'followup' order by r.id desc limit 3) z),
          'followup_stuck', (select count(*) from analysis_followup_requests where state = 'waiting' and requested_at < now() - interval '120 minutes'))
-       from analysis_dispatch_config c where c.id = 1)
+       from analysis_dispatch_config c where c.id = 1),
+      -- 🔵 2026-10-06 정정본 분석 없음(A3) — 열린 대표 중 정정 행이 정정된 지 60분 넘었는데 정정본 분석이 없고, 같은 묶음에 정정 전 분석이 있는 것.
+      'revision_gap', (with rv as materialized (select d.announcement_id from get_announcements_deduped() d join announcements a using (announcement_id)
+           where a.is_revised and a.revised_at < now() - interval '60 minutes' and d.apply_end >= current_date)
+         select coalesce(json_agg(rv.announcement_id), '[]'::json) from rv where not get_revision_analysis_done(rv.announcement_id)
+           and exists (select 1 from announcement_analysis aa where aa.announcement_id in (select g.announcement_id from get_announcement_group_ids(rv.announcement_id) g)
+                       and aa.status in ('완료', '완료(보조 누락)', '완료(판정 대기)', '완료(소급)')))
     ) j`)
   const d = db.j
 
   // ① 수집 런 신선도 · 실패 런
   const ageLimit = DAYTIME ? 40 : 720
   add('collect_fresh', '마지막 LH·MYHOME 수집 런 경과(분)', d.last_run_age_min <= ageLimit ? 'pass' : 'fail',
-    Math.round(d.last_run_age_min), `주간(UTC 0~10시) ≤ 40분(10분 주기 · p99 간격 10.2분 → 3회 연속 빠짐) · 야간 ≤ 720분(최대 간격 490분)`)
+    Math.round(d.last_run_age_min), `주간(UTC 0~9시) ≤ 40분(10분 주기 · p99 간격 10.2분 → 3회 연속 빠짐) · 야간(10시대 포함) ≤ 720분(최대 간격 490분)`)
   add('collect_slow', '24시간 안 140초 넘은 수집 런', d.slow_runs_24h === 0 ? 'pass' : 'fail', d.slow_runs_24h, '0(7일 최대 97.2초 · 150초에서 함수가 죽는다)')
   add('collect_write_err', '24시간 안 DB 쓰기 오류가 적힌 수집 런', d.write_err_runs_24h === 0 ? 'pass' : 'fail', d.write_err_runs_24h, '0(upsert·insert·예상치 못한 오류·MYHOME 예외 — 7일 0)')
   // ② 공공데이터포털 관찰 기준(백로그 「공공데이터포털 간헐 응답 장애」)
@@ -151,6 +164,16 @@ try {
       add('dispatch', '분석 발송기', bad.length ? 'fail' : 'pass', bad.length ? bad.join(' · ') : `대기 ${x.waiting} · 이상 없음`,
         '켜짐: grace+max_wait 동안 발송 0인데 그보다 오래 기다린 대기 0(몫 상한 — 한 발송 batch_size건) · 홍보물 24시간 대기 0 · 90분 넘은 잠금(잡은 때 기준) 0 · 연속 3실패 아님 · 연속 3회차 0건 끝 아님(후속 전용 회차 제외) · 120분 넘은 후속 처리 요청 0')
     }
+  }
+  // ⑧-2 정정본 분석 없음(2026-10-06 · 우편함 「코드 — Z-1 …」 PR-A A3 · run 119 고령다산2 …20809) — 감시 SQL 첫 항목.
+  //    🔴 실패(❌)가 아니라 ⚠️ 경고다 — 루틴은 열린 health-ops 이슈가 있으면 착수하지 않는데, 이 항목이 걸렸다는 것은 루틴이 정정본을
+  //    분석해야 한다는 뜻이라 착수를 막으면 스스로 풀리지 않는다(#328 ops_gap 과 같은 처리). 결과 파일·요약 표에 ⚠️ 로 남는다.
+  //    발송기(analysis_dispatch_tick)가 같은 정정본을 후보로 올리므로, 스위치가 켜져 있으면 다음 발송에서 풀린다.
+  {
+    const ids = d.revision_gap || []
+    add('revision_gap', '열린 정정공고 중 정정본 분석 없음(정정 60분 넘음)', ids.length === 0 ? 'pass' : 'warn',
+      ids.length ? `${ids.length}: ${ids.slice(0, 5).join(', ')}` : 0,
+      '0 — 대표 ∧ is_revised ∧ 정정 60분 넘음 ∧ 열림(apply_end ≥ 오늘) ∧ 정정 전 분석 있음 ∧ get_revision_analysis_done 거짓 · 넘으면 ⚠️ 경고만(이슈를 열지 않는다 — 루틴 착수를 막지 않게)')
   }
   // ⑦ 함수 정의 = supabase/rpc/ 사본(2026-09-30 우편함 「운영 — 함수 사본 드리프트」). 읽기만 한다.
   //   대조 규칙은 .github/db/migrate.py rpc_md5() 와 같다 — 파일 그대로 또는 끝 줄바꿈을 걷은 md5 가 DB md5 와 같으면 통과.
@@ -229,6 +252,15 @@ try {
       const okResp = x.pending ? x.age_min <= 5 : x.status === 204
       add('ops_dispatch', '운영 점검 발송(pg_cron → workflow_dispatch) 마지막', okAge && okResp ? 'pass' : 'fail',
         `${Math.round(x.age_min)}분 전 · ${x.pending ? '응답 대기' : `HTTP ${x.status}`}${x.err ? ' · ' + x.err : ''}`, '≤ 40분(25·55분) · 응답 204(GitHub workflow_dispatch)')
+    }
+    // 🔵 2026-10-06 화면 점검 발송(하루 1번 23:50 UTC) — 첫 발송 전(기록 없음)은 건너뛴다.
+    const y = d.screen_dispatch
+    if (!y) {
+      add('screen_dispatch', '화면 점검 발송(pg_cron → workflow_dispatch) 마지막', 'skip', '기록 없음(첫 발송 전)', '≤ 25시간(매일 23:50 UTC) · 응답 204')
+    } else {
+      const ok = y.age_min <= 25 * 60 && (y.pending ? y.age_min <= 5 : y.status === 204)
+      add('screen_dispatch', '화면 점검 발송(pg_cron → workflow_dispatch) 마지막', ok ? 'pass' : 'fail',
+        `${Math.round(y.age_min)}분 전 · ${y.pending ? '응답 대기' : `HTTP ${y.status}`}${y.err ? ' · ' + y.err : ''}`, '≤ 25시간(매일 23:50 UTC) · 응답 204(GitHub workflow_dispatch)')
     }
     const daysLeft = (Date.parse(DISPATCH_TOKEN_EXPIRES + 'T00:00:00Z') - now.getTime()) / 86400000
     add('ops_dispatch_token', '발송 토큰 만료까지(일)', daysLeft > 30 ? 'pass' : daysLeft > 0 ? 'warn' : 'fail', Math.floor(daysLeft),

@@ -1,3 +1,10 @@
+-- 정정본 후보(2026-10-06 · 우편함 「코드 — Z-1 원문 키 사이클(DB) …」 PR-A A1 · run 119 회신 ② 고령다산2 …20809).
+--   계기: analysis_dispatch_tick ② 후보의 not exists(같은 제목 키·마감 구성원의 완료 계열 분석)가 정정본 새 ID를 뺐다 —
+--   정정 전 분석(…20746)이 있으면 정정본(…20809)은 대기열에 오르지 않았다.
+--   바꿈: 정정 행(is_revised)이면서 정정본 분석이 없고(get_revision_analysis_done 거짓) 열린(apply_end ≥ 오늘+3) 대표를 따로 후보로 올린다.
+--   대기열 키 = 묶음 키 || ' #정정 ' || 정정 시각(KST 분) — 원공고의 끝난 행과 겹치지 않는다. note = 「정정본 — reverify 스킬 「정정공고」 갈래」.
+--   정정 아닌 같은 제목 키 중복은 종전대로 빠진다. 표·권한 변경 0.
+-- zipfit:function analysis_dispatch_tick(boolean) acl={postgres=X/postgres,service_role=X/postgres} secdef=false
 CREATE OR REPLACE FUNCTION public.analysis_dispatch_tick(p_force boolean DEFAULT false)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -255,4 +262,4 @@ begin
   return jsonb_build_object('result', 'fired', 'run', v_run, 'reason', v_reason, 'items', n_sent, 'left', n_ready - n_sent,
                             'followups', n_fu_sent, 'new', n_new, 'dropped', n_drop);
 end
-$function$
+$function$;
