@@ -43,7 +43,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
 const BASE = 'https://housing.seoul.go.kr'
 const LIST_PATH = '/site/main/sh/publicLease/list'
-const UA = 'Mozilla/5.0 (compatible; ZipFitBot/1.0; +https://dauntown96.github.io/zipfit)'
+const UA = 'Mozilla/5.0 (compatible; ZipFitBot/1.0; +https://kkokzip.com)'
 const MAX_PAGES_HARD_CAP = 50   // 파싱 실패로 페이지 수가 폭주해도 무한 순회하지 않도록
 const PAGE_DELAY_MS = 1000      // 요청 간 최소 간격. 동시 요청하지 않는다.
 

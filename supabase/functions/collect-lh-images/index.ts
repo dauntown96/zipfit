@@ -29,7 +29,7 @@ const CRON_SECRET               = requireEnv('CRON_SECRET_V2')
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-const UA = 'Mozilla/5.0 (compatible; ZipFitBot/1.0; +https://dauntown96.github.io/zipfit)'
+const UA = 'Mozilla/5.0 (compatible; ZipFitBot/1.0; +https://kkokzip.com)'
 const EXCLUDED_HOUSING_TYPE = '주거복지 - 매입임대'
 const PAGE_TIMEOUT_MS = 30000
 const PAGE_DELAY_MS = 500          // 페이지 호출 사이 간격 — 동시 호출하지 않는다

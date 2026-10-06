@@ -34,8 +34,9 @@
 
 ## 📍 프로젝트 개요
 
-- **서비스명**: ZipFit — 전국 공공임대·분양 공고 맞춤 매칭 서비스
-- **배포 URL**: https://dauntown96.github.io/zipfit
+- **서비스명**: 꼭집 — 꼭 맞는 집만 꼭 집어서(전국 공공임대·분양 공고 맞춤 매칭 서비스 · 2026-10-06 ZipFit에서 바꿈)
+- 🔴 **이름 규칙**: 사용자에게 보이는 곳 = 「꼭집」 / 기계가 이름으로 찾는 곳(저장소 · 스킬 · cron · Vault · `localStorage` 키 · `CACHE_NAME` 접두 · 함수·CSS 이름 `zf*` · 봇 UA `ZipFitBot` · Drive 폴더 `ZipFit 자동수집`) = 코드명 `zipfit` 그대로
+- **배포 URL**: https://kkokzip.com (옛 `https://dauntown96.github.io/zipfit`은 301로 넘어온다)
 - **GitHub**: https://github.com/dauntown96/zipfit (main 브랜치 push → 자동 배포)
 - **구조**: 단일 파일 (`index.html`) — 빌드 없음, 정적 배포
 - **대상**: 한국 공공주택 청약·임대 신청자, 모바일 우선 (max-width: 720px)
@@ -334,7 +335,7 @@ const requireEnv = (key: string): string => {
 
 | 항목 | URL |
 |---|---|
-| 배포 | https://dauntown96.github.io/zipfit |
+| 배포 | https://kkokzip.com |
 | GitHub | https://github.com/dauntown96/zipfit |
 | Supabase | https://supabase.com/dashboard/project/khdpjjyspmlqtzperoqg |
 | 노션 시작점 | 🏠 L0 — https://www.notion.so/3b48aaa7e15581f88981d0c636de780c |

@@ -111,7 +111,7 @@ try {
   // ④ 배포 사이트
   for (const [id, url] of [['site_index', SITE], ['site_sw', SITE + 'sw.js']]) {
     let st = 0, ok = false
-    try { const r = await fetch(url, { cache: 'no-store' }); st = r.status; const t = await r.text(); ok = r.ok && (id === 'site_sw' ? t.includes('CACHE_NAME') : t.includes('ZipFit')) } catch (e) { st = String(e).slice(0, 80) }
+    try { const r = await fetch(url, { cache: 'no-store' }); st = r.status; const t = await r.text(); ok = r.ok && (id === 'site_sw' ? t.includes('CACHE_NAME') : t.includes('꼭집')) } catch (e) { st = String(e).slice(0, 80) }
     add(id, `배포 사이트 ${id === 'site_sw' ? 'sw.js' : 'index'}`, ok ? 'pass' : 'fail', st, '200 · 본문 표식')
   }
   // ⑤ cron 잡 · 매입 홍보물 수집
