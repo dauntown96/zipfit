@@ -151,7 +151,7 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
-| 2026-10-06 | **🔴 코드 — 취소한 옛 도메인 제거 · kkokzip.com으로 교체** — Auth Redirect URLs에서 옛 새주소 2개 삭제 · kkokzip.com·www 추가(github.io 2개·Site URL 그대로) · EF 2곳 `ALLOWED_ORIGINS` 교체(완전 일치 그대로) · 주석 예시·CLAUDE.md:52 · sw v164. 도메인은 켜지 않음. PR #__PR__ |
+| 2026-10-06 | **🔴 코드 — 취소한 옛 도메인 제거 · kkokzip.com으로 교체** — Auth Redirect URLs에서 옛 새주소 2개 삭제 · kkokzip.com·www 추가(github.io 2개·Site URL 그대로) · EF 2곳 `ALLOWED_ORIGINS` 교체(완전 일치 그대로) · 주석 예시·CLAUDE.md:52 · sw v164. 도메인은 켜지 않음. PR #337 |
 | 2026-10-06 | **코드 — 도메인 zipfit.kr 전환 ① 준비(켜지 않음)** — 전수 조사(EF 2곳 오리진 고정 → 멈춤 · 판정) · manifest·SW·공유 기본값을 실행 위치 기준으로 · sw v163 · EF 2곳 CORS 허용 목록 3개(완전 일치 반사) · Auth Redirect URLs에 zipfit.kr·www 추가(Site URL 그대로). PR #336 |
 | 2026-10-06 | **운영 — 데이터 쓰기: 고령다산2 정정공고 `…20809` 반영(run 119)** — 정정본↔원 PDF 차이 1줄(기준일) · 신청자격 정책 행 1 신규 → ⚠️ 기준일 행 삭제(정책 34 · ⚠️ 3→2) · 분석 행 `…20809` 신설 → 정정 전 배너 판정 참 · 분석률 불변 · 코드·DDL 0. |
 ---
