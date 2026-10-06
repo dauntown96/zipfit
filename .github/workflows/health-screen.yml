@@ -76,7 +76,8 @@ jobs:
             health-screen.png
           retention-days: 14
       - name: 알림(이슈 열기·닫기)
-        if: always()
+        # 🔵 2026-10-06 — health-ops 와 같이 main 에서만 이슈를 연다·닫는다. 가지에서 수동 실행(모의 simulate 포함)은 결과만 남긴다.
+        if: always() && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

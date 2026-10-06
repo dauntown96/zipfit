@@ -1,3 +1,10 @@
+-- Z-1 PR-B ② — 카드 1층 단지 수(block_count)를 get_announcement_sites 의 「단지 모양」에 맞춘다(2026-10-06 · 우편함 「코드 — Z-1 원문 키 사이클(DB) …」 (나) 두 번째 걸음).
+--   단지 모양(블록 ≥ 2 ∧ 블록 행·MYHOME 행 세대 0 ∧ 그룹 세대 단지명 ≥ 2)이면 block_count = 단지명 수. 아니면 종전 주소 코어 수 그대로.
+--   지금(이전 전) 전 카드 939장 block_count 불변 · 블록 카드 117장 = get_announcement_sites 행 수(되돌리기 전용 대조 · 2026-10-06).
+--   되돌리기: git show <앞 커밋>:supabase/rpc/get_announcements_deduped.sql 로 되돌리는 새 마이그레이션.
+-- zipfit:function get_announcements_deduped(text,text,text) acl={=X/postgres,postgres=X/postgres,service_role=X/postgres,anon=X/postgres,authenticated=X/postgres} secdef=false
+-- zipfit:anon select * from get_announcements_deduped()
+-- zipfit:anon select * from get_announcements_deduped('경기도')
 CREATE OR REPLACE FUNCTION public.get_announcements_deduped(p_region text DEFAULT NULL::text, p_type text DEFAULT NULL::text, p_status text DEFAULT NULL::text)
  RETURNS TABLE(id bigint, source text, announcement_id text, title text, region text, region_top text, sido_nm text, sigungu_nm text, housing_type text, supply_org text, announcement_date date, apply_start date, apply_end date, status text, status_normalized text, url text, is_revised boolean, area_min numeric, area_max numeric, rent_min integer, rent_max integer, deposit_min bigint, deposit_max bigint, total_units integer, move_in_date text, target_type text, heating_type text, created_at timestamp with time zone, updated_at timestamp with time zone, mymy_applicable boolean, supply_form text, application_method text, recruit_multiplier text, pair_announcement_key text, housing_change_allowed boolean, precise_address text, is_relaxed_recruitment boolean, relaxation_detail text, selection_method text, subscription_months_required integer, subscription_payments_required integer, contract_before_verification boolean, rent_exemption_until date, rent_exemption_note text, revision_note text, revised_at timestamp with time zone, special_notes jsonb, revised_at_source text, first_seen_at timestamp with time zone, doc_submit_announce_date date, doc_submit_start date, doc_submit_end date, winner_announce_date date, contract_start date, contract_end date, building_name text, attachment_urls jsonb, has_cancel_notice boolean, region_names text[], block_count integer, first_announcement_date date, schedule_varies boolean, apply_end_confirmed date, apply_period_check boolean, last_seen_at timestamp with time zone)
  LANGUAGE sql
@@ -397,3 +404,4 @@ WHERE (
     OR (p_status <> '정정공고' AND w.status = p_status)
   );
 $function$
+;
