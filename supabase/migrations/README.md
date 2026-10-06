@@ -16,7 +16,7 @@
 1. 파일 규칙(아래) 위반 0.
 2. 적용 SQL이 끝까지 돈다 — 맨 끝에서 결과를 담은 예외(`ZIPFIT_CHECK_RESULT`)를 일부러 던져 요청 전체를 롤백시킨다(관리 API는 요청 하나 = 트랜잭션 하나, 예외면 400으로 전체 롤백).
 3. 🔴 **되돌리기 전용 증명** — 실행 전·후 스키마 지문(`public`·`zipfit_ops`의 함수 정의 md5·ACL·SECURITY DEFINER·설정·설명, 표·열·정책·트리거)이 같다. 다르면 빨강 — 병합하지 말고 먼저 확인한다.
-4. 불변식 v3.6(`supabase/invariants/v3.6.sql`) 위반 수가 적용 전보다 늘지 않는다.
+4. 불변식 v3.7(`supabase/invariants/v3.7.sql`) 위반 수가 적용 전보다 늘지 않는다.
 5. `-- zipfit:anon` 줄마다 `anon` 역할 · `statement_timeout = 3s`로 돌려 3초 안에 끝난다.
 6. 파일이 건드린 함수마다: DB 정의 md5 = `supabase/rpc/<이름>.sql` 사본 · ACL·SECURITY DEFINER = 파일 머리의 선언 · 같은 이름 함수 1개.
 

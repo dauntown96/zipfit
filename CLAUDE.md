@@ -152,9 +152,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-10-06 | **코드 — Z-1 PR-B ①②** — `site_label` 4표 · `get_announcement_sites`(블록 모양 그대로 · 단지 모양 = 단지명마다 한 행) · 불변식 v3.7(V13 꺼 둠) · 화면 7자리 (ID, 단지명) 축 · `block_count` 거울 · README 「공공임대」 · health-screen 이슈 main 한정 · sw v166 · 열린 6장 화면 같음. PR #344 |
 | 2026-10-06 | **코드 — Z-1 0장(PR-A)** — 정정본 후보(`#정정` 대기열 키 · 10-02 재현 1행) · 수집 경과 주간 0~9시 · 정정본 감시 ⚠️ · 화면 「ZipFit」 0 점검 · 화면 점검 pg_cron(23:50 UTC) · CLAUDE.md 원칙 30·23 · README. PR #343 |
 | 2026-10-06 | **운영 — 데이터 쓰기: DB 문장 「ZipFit」 → 「꼭집」** — 자격 판정 안내 50행·정책 ⚠️ 3행 칸 단위 replace · 가드 통과(다른 칸·분석 메모 불변) · 코드·DDL 0. |
-| 2026-10-06 | **코드 — 꼭집 전환 ②** — 보이는 「ZipFit」 → 꼭집(제목 「꼭집 — 꼭 맞는 집만 꼭 집어서」·머리·문장·공유·privacy·manifest) · console 38곳 그대로 · 점검 SITE·대기 URL → kkokzip.com · paths에 CNAME · ops-check 본문 표식 꼭집 · 봇 UA 연락 주소 · Auth Site URL → kkokzip.com · sw v165. PR #341 |
 ---
 
 ## 🚫 코딩 원칙
@@ -319,7 +319,7 @@ const requireEnv = (key: string): string => {
 - 토큰은 Actions Secret `SUPABASE_ACCESS_TOKEN`만 쓴다(저장소 설정은 다운님 몫).
 
 32. **DB 스키마·함수 변경은 적용 SQL 파일 + PR 병합으로만 — 관리 API로 운영 DB에 DDL을 직접 보내지 않는다(데이터 쓰기는 종전대로)** (2026-09-30 신설 — 우편함 「운영 — DB 함수·스키마 변경도 PR 병합 = 적용」)
-- `supabase/migrations/YYYY-MM-DD_NN_이름.sql`에 쓰고 PR을 연다 → `db-migrations.yml` check가 **되돌리기 전용** 트랜잭션으로 실제 DB에서 돌린다(스키마 지문 전후 같음 · 불변식 v3.6 · `anon` 3초 · 함수 정의 md5 = `supabase/rpc/` 사본 · ACL·SECURITY DEFINER = 파일 선언). 🔴 **빨간 체크의 PR은 병합하지 않는다.**
+- `supabase/migrations/YYYY-MM-DD_NN_이름.sql`에 쓰고 PR을 연다 → `db-migrations.yml` check가 **되돌리기 전용** 트랜잭션으로 실제 DB에서 돌린다(스키마 지문 전후 같음 · 불변식 v3.7 · `anon` 3초 · 함수 정의 md5 = `supabase/rpc/` 사본 · ACL·SECURITY DEFINER = 파일 선언). 🔴 **빨간 체크의 PR은 병합하지 않는다.**
 - 병합하면 apply가 **아직 기록 안 된 파일만** 파일마다 한 트랜잭션으로 적용하고 `zipfit_ops.schema_migrations`에 같은 트랜잭션으로 기록한다. 🔴 병합 뒤 Actions 결과(적용 · 대조)를 회신 ④에 적는다. 실패하면 `db-apply` 이슈.
 - 파일 규칙(트랜잭션 제어 금지 · 함수 선언 줄 · 사본 갱신)은 `supabase/migrations/README.md`가 정본이다. 원칙 20(고치기 전 정의 먼저 커밋)은 그대로다.
 - 🔵 **`check`는 모든 PR에서 결과를 낸다**(2026-09-30 · PR #281) — DB 파일(다섯 경로)을 안 건드린 PR은 「해당 없음」으로 즉시 통과(DB 호출 0). `main` 필수 체크는 **다운님 저장소 설정 뒤** 켜진다 — 그 전에는 결과만 나고 병합을 막지 않으니 원칙대로 초록을 보고 병합한다.

@@ -5503,28 +5503,33 @@ function fetchGroupRounds(ids, need){
 //    그래서 `unit_group` 당 `group_recruit_count` 를 한 번 더하고, 거기에 **`unit_group` 이 비어
 //    있는 행의 `recruit_count`** 를 더한다. 🔵 판정 축은 그대로다 — `group_recruit_count` 를 가진
 //    행이 하나도 없는 블록은 여전히 합을 내지 않는다(그 블록들의 회귀 0).
-function fetchBlockRecruitSums(ids){
+// 🔵 2026-10-06(Z-1 PR-B ②) — siteIds(단지 모양 블록의 원문 ID 집합)에 든 ID 의 행은 **(ID, 단지명)** 으로 따로 더한다(zfBlockKey).
+//    블록 모양 ID 는 종전대로 ID 하나가 한 칸이다 — 그 블록들의 값은 바뀌지 않는다.
+function fetchBlockRecruitSums(ids, siteIds){
   if(!Array.isArray(ids) || ids.length === 0) return Promise.resolve(null);
-  return fetch(`${SUPABASE_URL}/rest/v1/housing_units?select=announcement_id,unit_group,group_recruit_count,recruit_count&${idFilterFor(ids)}`, {
+  return fetch(`${SUPABASE_URL}/rest/v1/housing_units?select=announcement_id,building_name,unit_group,group_recruit_count,recruit_count&${idFilterFor(ids)}`, {
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
   }).then(r => r.ok ? r.json() : null).then(rows => {
     if(!Array.isArray(rows) || rows.length === 0) return null;
+    const keyOf = r => (siteIds && siteIds.has(r.announcement_id)) ? zfBlockKey(r.announcement_id, String(r.building_name || '').trim()) : r.announcement_id;
     // 🔴 먼저 「계층 행을 가진 블록」만 추린다. 이 관문이 없으면 `recruit_count` 만 있는 블록까지
     //    합이 생겨, 계층 행마다 같은 수를 되풀이해 둔 옛 회차 데이터가 그대로 부풀려진다.
     const hasGroup = new Set();
-    rows.forEach(r => { if(r && r.announcement_id && r.group_recruit_count != null) hasGroup.add(r.announcement_id); });
+    rows.forEach(r => { if(r && r.announcement_id && r.group_recruit_count != null) hasGroup.add(keyOf(r)); });
     if(hasGroup.size === 0) return null;
     const seen = new Set(), sum = {};
     rows.forEach(r => {
-      if(!r || !r.announcement_id || !hasGroup.has(r.announcement_id)) return;
+      if(!r || !r.announcement_id) return;
+      const bk = keyOf(r);
+      if(!hasGroup.has(bk)) return;
       if(r.unit_group){
         if(r.group_recruit_count == null) return;
-        const k = r.announcement_id + '|' + r.unit_group;
+        const k = bk + '|' + r.unit_group;
         if(seen.has(k)) return;
         seen.add(k);
-        sum[r.announcement_id] = (sum[r.announcement_id] || 0) + Number(r.group_recruit_count);
+        sum[bk] = (sum[bk] || 0) + Number(r.group_recruit_count);
       } else if(r.recruit_count != null){
-        sum[r.announcement_id] = (sum[r.announcement_id] || 0) + Number(r.recruit_count);
+        sum[bk] = (sum[bk] || 0) + Number(r.recruit_count);
       }
     });
     return Object.keys(sum).length ? sum : null;
@@ -5640,6 +5645,8 @@ function loadAnnouncementExtras(annId, detailEl, id, useGroup){
   }).then(r => r.ok ? r.json() : []).then(rows => zfRoundsIfOrphan(rows, annId, ids, useGroup, id).then(roundMap => [rows, roundMap])))
   .then(([rows, roundMap]) => keysP.then(keys => [rows, keys, roundMap])).then(([rows, keys, roundMap]) => {
     if(!zfStillOurs(id, ownerAnn)) return;   // 그 사이 이 자리에 다른 공고가 왔다
+    // 🔵 2026-10-06(Z-1 PR-B ②) — 단지 모양 블록 본문은 그 단지 이미지만(site_label · unit_key 머리 — zfExtraInSite).
+    if(zfSiteFilter[id] && Array.isArray(rows)) rows = rows.filter(r => zfExtraInSite(r, zfSiteFilter[id]));
     if(!Array.isArray(rows) || rows.length === 0) return;
     // 🔴 2026-10-01 — 같은 회차 행만 왔으면 배너 없음(zfRowsSameRoundAsCard · 규약 29 블록 배치).
     const staleHtml = zfRowsSameRoundAsCard(rows, roundMap, cardElFor(id)) ? '' : staleSourceBannerHtml(rows, annId, useGroup, id);
@@ -5924,6 +5931,18 @@ const blockInfo = {};
 // 🔴 2026-10-02 — 블록 ID 에 세대 행이 하나도 없고 같은 그룹의 블록 밖 ID(LH 대표)에만 세대 행이 있는 카드(아산 …0726 — 블록 4 · 세대 37행이 LH ID).
 //    그 카드는 블록마다 「아직 없어요」가 떠 있는 세대가 안 보였다. true 면 카드 전체 세대 영역을 「단지 구분 전 전체」로 그린다.
 const blockHuFallback = {};
+// 🔵 2026-10-06(Z-1 PR-B ②) — 블록 자리의 단지명(get_announcement_sites 의 site_label). 빈 문자열 = 블록 모양(종전 — 블록 ID 하나가 블록).
+//    단지 모양에서는 여러 블록이 같은 원문 ID 를 갖고 단지명으로 갈린다 — 세대·이미지·모집 합·칩이 (ID, 단지명)을 축으로 쓴다.
+const blockSites = {};
+// 블록 자리 키 — 블록 모양은 ID 그대로(종전 키와 같다), 단지 모양은 ID + 단지명.
+function zfBlockKey(aid, site){ return site ? aid + '\u0001' + site : aid; }
+// 블록 본문 로더가 읽는 단지 거르개(하위 슬롯 id → 단지명). 없으면 종전대로 그 ID 의 행 전부다.
+const zfSiteFilter = {};
+// 이미지 행이 단지에 닿는가 — site_label 이 그 단지 · 또는 unit_key 머리(건물 머리 키 = building_name)가 그 단지.
+function zfExtraInSite(r, site){
+  const k = String((r && r.unit_key) || '');
+  return String((r && r.site_label) || '').trim() === site || k === site || k.indexOf(site + '::') === 0;
+}
 // 🔵 2026-10-02 — 묶인 카드의 블록 머리 단지명. 같은 블록 ID 세대 행의 building_name 이 하나일 때만(정책 칩과 같은 규칙).
 function zfBlockSiteNames(blkIds){
   return fetch(`${SUPABASE_URL}/rest/v1/housing_units?select=announcement_id,building_name&${idFilterFor(blkIds)}&limit=5000`, {
@@ -5969,17 +5988,23 @@ function zfBlockHuFallback(annId, blkIds){
 // 블록이 2개 이상이면 카드 전체 섹션은 생략(블록별 섹션에서만 표시), 1개(일반적인 경우)면 그대로 표시.
 function loadAnnouncementBlocks(annId, id, detailEl){
   if(!annId){ loadHousingUnits(annId, detailEl, id, true); loadAnnouncementExtras(annId, detailEl, id, true); return; }
-  fetch(`${SUPABASE_URL}/rest/v1/rpc/get_announcement_blocks`, {
+  // 🔵 2026-10-06(Z-1 PR-B ②) — 블록 목록은 get_announcement_sites 가 준다(블록 모양이면 get_announcement_blocks 행 그대로 + site_label NULL).
+  //    그 RPC 가 실패하면 종전 get_announcement_blocks 로 한 번 더 묻는다 — 보이던 블록을 잃지 않는다.
+  const blkReq = fn => fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
     method: 'POST',
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ p_announcement_id: annId })
-  }).then(r => r.ok ? r.json() : []).then(blocks => {
+  });
+  blkReq('get_announcement_sites')
+    .then(r => r.ok ? r : blkReq('get_announcement_blocks'))
+    .then(r => r.ok ? r.json() : []).then(blocks => {
     if(!Array.isArray(blocks) || blocks.length < 2){
       loadHousingUnits(annId, detailEl, id, true);
       loadAnnouncementExtras(annId, detailEl, id, true);
       return;
     }
     blockAnnIds[id] = blocks.map(b => b.announcement_id);
+    blockSites[id] = blocks.map(b => String(b.site_label || ''));
     blockInfo[id] = blocks;
     blockHuFallback[id] = false;
     // 🔴 2026-09-17 — 블록 머리도 회차로 가른다. 종전에는 그룹 전체(제목 축)의 블록이 전부
@@ -5987,17 +6012,21 @@ function loadAnnouncementBlocks(annId, id, detailEl){
     //    (원주 …020783 — 6개 중 3개가 2026-07-15 회차의 주소였다).
     // 🔵 회차 재료는 **이미 있는 fetchGroupRounds 한 벌**로 받고 판정은 **zfNoticeDate 한 벌**이 한다.
     //    사본을 늘리지 않으려고 SQL 에는 회차 규칙을 적지 않았다 — 그래서 주소 집합 판정
-    //    (addr_core·MYHOME 우선 distinct)도 그대로이고 get_announcements_deduped 의
-    //    block_count 거울은 손댈 것이 없다.
-    const blkIds = blocks.map(b => b.announcement_id);
+    //    (addr_core·MYHOME 우선 distinct)도 그대로다. ⚠️ 2026-10-06 — get_announcements_deduped 의
+    //    block_count 는 get_announcement_sites 의 「단지 모양」도 거울로 따른다(단지명 수 · 마이그레이션 2026-10-06_04).
+    // 🔵 단지 모양이면 여러 블록이 같은 원문 ID 다 — 조회용 ID 는 겹치지 않게 한 번씩만 싣는다(블록 모양은 종전과 같은 목록).
+    const blkIds = [...new Set(blocks.map(b => b.announcement_id))];
+    const blkSiteIds = new Set(blocks.filter(b => b.site_label).map(b => b.announcement_id));
     return Promise.all([
       fetchGroupRounds(blkIds, true),
-      fetchBlockRecruitSums(blkIds),
+      fetchBlockRecruitSums(blkIds, blkSiteIds),
       zfBlockHuFallback(annId, blkIds),
       zfIsPostMerged(annId) ? zfBlockSiteNames(blkIds) : Promise.resolve(null)
     ]).then(([roundMap, recruitSums, huFallback, siteNames]) => {
       blockHuFallback[id] = huFallback === true;
       if(siteNames) blocks.forEach(b => { b._zfSite = siteNames.get(b.announcement_id) || ''; });
+      // 단지 모양 블록의 단지명 칩은 site_label 그대로다(블록 모양의 「블록 ID 세대 building_name 하나」와 같은 이름 · 같은 조건 — 묶인 카드만).
+      if(zfIsPostMerged(annId)) blocks.forEach(b => { if(b.site_label) b._zfSite = b.site_label; });
       renderAnnouncementBlocks(blocks, id, roundMap, recruitSums);
       // 🔵 2026-10-02 — 블록이 세대를 하나도 못 가진 카드만 카드 전체 세대 영역을 그린다(그룹 조회 — 블록 ID 는 0행이라 대표 ID 행뿐).
       //    어느 블록 것인지 가를 근거가 행에 없으므로 블록에 나눠 붙이지 않고 「단지 구분 전 전체」로 사실대로 둔다.
@@ -6049,7 +6078,7 @@ function renderAnnouncementBlocks(blocks, id, roundMap, recruitSums){
     // 🔴 2026-09-17 부터 세대수도 **그 행 자신의 값**이다(RPC 에서 min 을 걷었다).
     // 🔴 원문 공급호수를 읽어 둔 블록에서는 그 합이 이긴다(fetchBlockRecruitSums 주석 참고).
     //    그 값은 뜻이 하나뿐이라 소스별 접두어(zfUnitsPrefix)를 거치지 않고 「모집」으로 적는다.
-    const grSum = recruitSums && recruitSums[it.b.announcement_id];
+    const grSum = recruitSums && recruitSums[zfBlockKey(it.b.announcement_id, it.b.site_label)];
     const unitsStr = grSum
       ? `모집 ${Number(grSum).toLocaleString()}세대`
       : (it.b.total_units ? `${zfUnitsPrefix(it.b.source)}${it.b.total_units}세대` : '');
@@ -6112,8 +6141,10 @@ function toggleBlockGroup(id, idx){
   }
   const subId = id+'-blk'+idx;
   const annIdForBlock = (blockAnnIds[id]||[])[idx] || '';
+  const siteForBlock = (blockSites[id]||[])[idx] || '';
+  const blkKey = zfBlockKey(annIdForBlock, siteForBlock);
   // 🔴 이 본문이 **지금 이 공고의 이 블록으로** 채워졌을 때만 재사용한다(원소 자신이 든 표시).
-  if(bodyEl.dataset.blkLoadedFor && bodyEl.dataset.blkLoadedFor === annIdForBlock){
+  if(bodyEl.dataset.blkLoadedFor && bodyEl.dataset.blkLoadedFor === blkKey){
     // 이미 데이터를 불러온 블록을 다시 여는 경우 — Supabase 재조회는 불필요하지만
     // 지도는 이 블록의 위치로 다시 옮겨야 하므로, 캐시해둔 세대정보에서 주소를 꺼내 재이동시킨다.
     const groups = huGroupsCache[subId];
@@ -6125,7 +6156,7 @@ function toggleBlockGroup(id, idx){
     return;
   }
   if(!annIdForBlock) return;
-  bodyEl.dataset.blkLoadedFor = annIdForBlock;
+  bodyEl.dataset.blkLoadedFor = blkKey;
   // 🔵 세대정보가 아직 없는 블록은 본문이 통째로 비었다(원주 09-15 회차 3블록이 그렇다).
   //    빈 상자를 남기지 않고 문구를 먼저 깔아 둔다 — 세대정보가 도착하면 그 위에 얹힌다.
   // 🔴 2026-10-02 — 블록 밖(대표 ID)에 이 공고 세대가 있으면 「아직 없어요」는 거짓이다 — 아래 전체 세대로 보낸다.
@@ -6133,6 +6164,8 @@ function toggleBlockGroup(id, idx){
       ? `<p class="blk-empty">이 단지만 따로 나눈 세대 정보는 없어요. 아래 「세대별 정보 — 단지 구분 전 전체」에 이 공고의 세대가 모두 있어요.</p>`
       : `<p class="blk-empty">이 단지의 세대 정보는 아직 없어요.</p>`)
     + `<div id="hu-slot-${subId}"></div><div id="extras-slot-${subId}"></div>`;
+  // 🔵 2026-10-06 — 단지 모양 블록은 원문 ID 의 행 중 이 단지 것만(세대 building_name · 이미지 site_label/unit_key 머리).
+  if(siteForBlock) zfSiteFilter[subId] = siteForBlock; else delete zfSiteFilter[subId];
   loadHousingUnits(annIdForBlock, null, subId, false, id);
   loadAnnouncementExtras(annIdForBlock, null, subId);
 }
@@ -6224,9 +6257,13 @@ function zfPolItemHtml(p, opts){
 //    이름 = 같은 ID 세대 행의 building_name(하나일 때만). 🔴 붙이는 조건: 대표 밖 ID 가 둘 이상이고 그 이름이 둘 이상 갈린다 —
 //    칩은 단지를 가르는 표시라, 갈리지 않으면(블록 하나 · 정정 전 ID 하나) 붙이지 않는다. 대표 ID 행(공통)에는 붙이지 않는다.
 //    실패·이름 없음은 조용히 칩 없이 그린다(종전 그대로).
+//    🔵 2026-10-06(Z-1 PR-B ②) — 원문 ID 에 사는 단지 전용 행은 site_label 칸이 단지명이다(Z). 칩 이름은 zfRowSite 가 고른다 —
+//    행의 site_label 이 먼저 · 없으면 블록 ID → 단지명(종전). 「갈린다」 판정은 두 이름을 합쳐 센다. site_label 이 없는 카드는 종전 그대로다.
 function zfPolicySiteLabels(rows, annId){
   const other = [...new Set((rows || []).map(p => String((p && p.announcement_id) || '')).filter(x => x && x !== annId))];
-  if(other.length < 2) return Promise.resolve(null);
+  const own = new Set((rows || []).map(p => String((p && p.site_label) || '').trim()).filter(Boolean));
+  if(other.length < 2 && own.size < 2) return Promise.resolve(null);
+  if(other.length < 2) return Promise.resolve(new Map());   // 칩 이름은 전부 행의 site_label 이다
   return fetch(`${SUPABASE_URL}/rest/v1/housing_units?select=announcement_id,building_name&${idFilterFor(other)}`, {
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
   }).then(r => r.ok ? r.json() : null).then(hu => {
@@ -6240,8 +6277,13 @@ function zfPolicySiteLabels(rows, annId){
     });
     const label = new Map();
     names.forEach((set, aid) => { if(set.size === 1) label.set(aid, [...set][0]); });
-    return new Set(label.values()).size >= 2 ? label : null;
+    return new Set([...label.values(), ...own]).size >= 2 ? label : null;
   }).catch(() => null);
+}
+// 행의 단지명 — site_label 칸이 먼저(원문 ID 의 단지 전용 행) · 없으면 블록 ID → 단지명. siteLabel 이 null 이면 칩을 달지 않는 카드다.
+function zfRowSite(siteLabel, r){
+  if(!siteLabel || !r) return '';
+  return String(r.site_label || '').trim() || siteLabel.get(r.announcement_id) || '';
 }
 function zfPolicyBodyHtml(rows, cls, id){
   const ko = (a, b) => String(a.category || '').localeCompare(String(b.category || ''), 'ko');
@@ -6476,7 +6518,7 @@ function loadAnnouncementPolicies(annId, detailEl, id, useGroup){
     const curRows = policies;
     return Promise.all([zfLoadPolicyClasses(), zfPolicySiteLabels(curRows, annId)]).then(([cls, siteLabel]) => {
       if(!zfStillOurs(id, ownerAnn)) return;
-      if(siteLabel) curRows.forEach(p => { p._zfSite = siteLabel.get(p.announcement_id) || ''; });
+      if(siteLabel) curRows.forEach(p => { p._zfSite = zfRowSite(siteLabel, p); });
       // 🔵 2026-10-02 — 묶인 카드의 대표(LH) ID 행은 두 공고문 공통 조항이다(규약 29) — 「공통」 칩으로 밝힌다.
       if(siteLabel && zfIsPostMerged(annId)) curRows.forEach(p => { p._zfCommon = !p._zfSite && String(p.announcement_id || '') === String(annId); });
       const wrap = document.createElement('details');
@@ -6568,7 +6610,7 @@ function loadPreciseEligibility(annId, detailEl, id, useGroup){
       const seenElig = new Set();
       rows = rows.filter(r => {
         // 🔵 단지 칩을 그리는 카드는 칩도 화면에 그리는 필드다 — 단지가 다르면 둘 다 남는다.
-        const key = ELIG_RENDER_FIELDS.map(f => JSON.stringify(r[f] ?? null)).join('|') + (siteLabel ? '|' + (siteLabel.get(r.announcement_id) || '') : '');
+        const key = ELIG_RENDER_FIELDS.map(f => JSON.stringify(r[f] ?? null)).join('|') + (siteLabel ? '|' + zfRowSite(siteLabel, r) : '');
         if(seenElig.has(key)) return false;
         seenElig.add(key);
         return true;
@@ -6608,7 +6650,7 @@ function loadPreciseEligibility(annId, detailEl, id, useGroup){
             `<div class="elig-row"><span class="elig-key">${escapeHtml(prettifyEligKey(k))}</span>${renderEligValue(v)}</div>`
           ).join('');
         }
-        const siteNm = siteLabel ? (siteLabel.get(r.announcement_id) || '') : '';
+        const siteNm = zfRowSite(siteLabel, r);
         const siteChip = siteNm ? `<span class="pol-site">${escapeHtml(siteNm)}</span>`
           : (siteLabel && String(r.announcement_id || '') === String(annId) ? `<span class="pol-site pol-common">공통</span>` : '');
         return `<div class="elig-item">
@@ -6729,7 +6771,7 @@ function zfPruneCardCaches(){
   const live = new Set();
   document.querySelectorAll('[data-card-id]').forEach(el => live.add(el.dataset.cardId));
   [huUnitsCache, huGroupsCache, huActiveGroup, huRegionFallback, huMapTargetId, huMapState,
-   blockAnnIds, blockInfo].forEach(cache => {
+   blockAnnIds, blockInfo, blockSites, zfSiteFilter].forEach(cache => {
     Object.keys(cache).forEach(k => { if(!live.has(k.split('-blk')[0])) delete cache[k]; });
   });
 }
@@ -6814,6 +6856,8 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
     //    하므로 여기서 끝내지 않고 []로 바꾼 뒤, 아래 빈 분기에서 안내만 넣지 않는다.
     const huFetchFailed = (units === null);
     if(huFetchFailed) units = [];
+    // 🔵 2026-10-06(Z-1 PR-B ②) — 단지 모양 블록 본문은 그 단지(building_name) 행만(toggleBlockGroup 이 거르개를 건다).
+    if(zfSiteFilter[id]) units = units.filter(u => String((u && u.building_name) || '').trim() === zfSiteFilter[id]);
     // 🔴 이 공고 자신의 회차는 카드가 들고 있다. 2026-09-17부터 축이 **회차 날짜**라
     //    data-round-date 를 읽는다(값은 카드를 그릴 때 zfNoticeDate 가 만든 것이다).
     //    ⚠️ data-announcement-date 로 떨어지는 폴백을 남긴다 — 옛 캐시의 카드 HTML 이 남아 있으면
