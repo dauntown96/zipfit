@@ -5,7 +5,7 @@
 //   「상세조회 마감 … 미시도」 오류는 441런 중 193런(하루 최대 59런)이라 런 단위로는 기준이 되지 않는다 →
 //   「활성 LH 공고 중 6시간 넘게 상세조회를 시도하지 않은 수」(지금 3)로 잰다.
 // 🔴 첫 주는 넉넉하게 — 오탐이 잦으면 알림이 읽히지 않는다.
-import { sqlRead, anonRpc, report, SITE } from './lib.mjs'
+import { sqlRead, anonRpc, report, recordFindings, SITE } from './lib.mjs'
 import { readdirSync, readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 
@@ -79,6 +79,13 @@ try {
            from analysis_dispatch_runs r where r.reason <> 'followup' order by r.id desc limit 3) z),
          'followup_stuck', (select count(*) from analysis_followup_requests where state = 'waiting' and requested_at < now() - interval '120 minutes'))
        from analysis_dispatch_config c where c.id = 1),
+      -- 🔵 2026-10-06 후속 처리 결과(1-B 4·5) — 실린 지 30분 넘었는데 결과 없음 · 또는 결과 미착수·실패. 실린 때 = 회차 created_at · 24시간 안 회차만.
+      --    이 기능이 적용된 뒤 들어온 요청만 본다(기준 = 마이그레이션 2026-10-06_06 적용 시각 — 그 전 done 행은 소급하지 않는다).
+      'followup_unreported', (select coalesce(json_agg(json_build_object('id', f.id, 'run', f.run_id, 'result', f.result) order by f.id), '[]'::json)
+         from analysis_followup_requests f join analysis_dispatch_runs r on r.id = f.run_id
+        where f.requested_at >= coalesce((select min(applied_at) from zipfit_ops.schema_migrations where filename = '2026-10-06_06_followup_result_health_findings.sql'), 'infinity')
+          and r.created_at > now() - interval '24 hours'
+          and ((f.result is null and r.created_at < now() - interval '30 minutes') or f.result in ('미착수', '실패'))),
       -- 🔵 2026-10-06 정정본 분석 없음(A3) — 열린 대표 중 정정 행이 정정된 지 60분 넘었는데 정정본 분석이 없고, 같은 묶음에 정정 전 분석이 있는 것.
       'revision_gap', (with rv as materialized (select d.announcement_id from get_announcements_deduped() d join announcements a using (announcement_id)
            where a.is_revised and a.revised_at < now() - interval '60 minutes' and d.apply_end >= current_date)
@@ -174,6 +181,14 @@ try {
     add('revision_gap', '열린 정정공고 중 정정본 분석 없음(정정 60분 넘음)', ids.length === 0 ? 'pass' : 'warn',
       ids.length ? `${ids.length}: ${ids.slice(0, 5).join(', ')}` : 0,
       '0 — 대표 ∧ is_revised ∧ 정정 60분 넘음 ∧ 열림(apply_end ≥ 오늘) ∧ 정정 전 분석 있음 ∧ get_revision_analysis_done 거짓 · 넘으면 ⚠️ 경고만(이슈를 열지 않는다 — 루틴 착수를 막지 않게)')
+  }
+  // ⑧-3 후속 처리 결과(2026-10-06 · 우편함 「코드 — 1-B 후속 처리가 실제로 일했는가」 4) — 루틴이 analysis_queue_finish 넷째 인자로 남긴 결과.
+  //    🔴 실패가 아니라 ⚠️ 경고다 — 이슈를 열면 루틴이 착수하지 않아(열린 health-ops 이슈) 스스로 풀리지 않는다(#328 · revision_gap 과 같은 처리).
+  {
+    const xs = d.followup_unreported || []
+    add('followup_unreported', '후속 처리 요청 결과 없음(실린 지 30분 넘음) · 미착수 · 실패', xs.length === 0 ? 'pass' : 'warn',
+      xs.length ? xs.slice(0, 5).map(x => `#${x.id} run ${x.run} ${x.result || '결과 없음'}`).join(', ') : 0,
+      '0 — 24시간 안 실린 요청 중 (결과 빈 채 실린 지 30분 넘음 ∨ 결과 미착수·실패) · 2026-10-06_06 적용 뒤 요청만 · 넘으면 ⚠️ 경고만(이슈를 열지 않는다)')
   }
   // ⑦ 함수 정의 = supabase/rpc/ 사본(2026-09-30 우편함 「운영 — 함수 사본 드리프트」). 읽기만 한다.
   //   대조 규칙은 .github/db/migrate.py rpc_md5() 와 같다 — 파일 그대로 또는 끝 줄바꿈을 걷은 md5 가 DB md5 와 같으면 통과.
@@ -273,6 +288,22 @@ try {
 }
 
 if (process.env.SIMULATE === 'fail') add('simulate', '실패 흉내(수동 입력 simulate=fail)', 'fail', '시험', '알림 경로 확인용 — 평소에는 없다')
+
+// ⑪ 경고·실패 DB 기록(2026-10-06 · 우편함 「코드 — 1-B …」 6) — public.ops_health_findings 에 실행 1회당 항목 1행(30일 보관).
+//    claude.ai 가 SQL 한 줄로 본다: select * from ops_health_findings order by run_at desc, id;
+//    기록이 실패하면 ⚠️ 경고 하나를 더한다(판정은 결과 파일·이슈가 그대로 낸다 — DB 를 못 읽은 실행이면 기록도 못 한다).
+{
+  const run_url = process.env.GITHUB_SERVER_URL && process.env.GITHUB_RUN_ID
+    ? `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}` : null
+  const found = checks.filter(c => c.status === 'warn' || c.status === 'fail')
+    .map(c => ({ id: c.id, name: c.name, status: c.status, value: String(c.value ?? '') }))
+  try {
+    const n = await recordFindings({ at: now.toISOString(), run_url, checks: found })
+    console.log(`경고·실패 기록 ${n}행`)
+  } catch (e) {
+    add('findings_log', '경고·실패 DB 기록(ops_health_findings)', 'warn', String(e).slice(0, 200), '기록 실패는 ⚠️ 경고만 — 판정은 결과 파일·이슈가 낸다')
+  }
+}
 
 const r = report('ops', 'B. 운영 건강 점검', checks, { daytime: DAYTIME })
 process.exitCode = 0     // 판정은 결과 파일로 넘긴다 — 이슈 단계가 그것을 읽는다

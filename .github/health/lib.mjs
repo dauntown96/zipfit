@@ -1,6 +1,7 @@
 // 자동 점검(A 화면 · B 운영) 공통 — Node 20 내장 fetch 만 쓴다(의존성 없음).
 // 🔴 DB 는 **읽기만** 한다: 관리 API 로 보내는 모든 SQL 앞에 `set transaction read only;` 를 붙인다
 //    (요청 하나 = 트랜잭션 하나라 그 안의 쓰기는 전부 25006 으로 거부된다 — 2026-09-29 실측).
+//    🔵 예외 하나(2026-10-06 · 우편함 「코드 — 1-B …」 6): recordFindings 가 경고·실패를 public.ops_health_record(jsonb) 한 함수로만 넘긴다.
 // 🔴 비밀값은 SUPABASE_ACCESS_TOKEN(기존 Actions Secret) 하나 · 공개 anon 키. 어떤 값도 출력하지 않는다.
 import { writeFileSync, appendFileSync } from 'node:fs'
 
@@ -21,6 +22,24 @@ export async function sqlRead(query) {
   const text = await res.text()
   if (!res.ok) throw new Error(`관리 API ${res.status}: ${text.slice(0, 300)}`)
   return JSON.parse(text)
+}
+
+// 점검 스크립트의 유일한 쓰기 — public.ops_health_record(jsonb) 한 함수만 부른다(경고·실패 1행씩 · 30일 보관 · 2026-10-06 1-B 6).
+// payload = { at, run_url, checks:[{id, name, status, value}] } · 넣은 행 수를 돌려준다. 실패하면 던진다(부르는 쪽이 ⚠️ 로 남긴다).
+export async function recordFindings(payload) {
+  const token = process.env.SUPABASE_ACCESS_TOKEN
+  if (!token) throw new Error('SUPABASE_ACCESS_TOKEN 이 없다')
+  const json = JSON.stringify(payload)
+  let tag = 'zfrec'
+  while (json.includes(`$${tag}$`)) tag += 'x'
+  const res = await fetch(`https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: `select public.ops_health_record($${tag}$${json}$${tag}$::jsonb) as n;` }),
+  })
+  const text = await res.text()
+  if (!res.ok) throw new Error(`관리 API ${res.status}: ${text.slice(0, 300)}`)
+  return JSON.parse(text)[0].n
 }
 
 export async function anonRpc(fn, body, timeoutMs = 30000) {
