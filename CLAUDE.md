@@ -152,9 +152,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-10-06 | **운영 — 데이터 쓰기: DB 문장 「ZipFit」 → 「꼭집」** — 자격 판정 안내 50행·정책 ⚠️ 3행 칸 단위 replace · 가드 통과(다른 칸·분석 메모 불변) · 코드·DDL 0. |
 | 2026-10-06 | **코드 — 꼭집 전환 ②** — 보이는 「ZipFit」 → 꼭집(제목 「꼭집 — 꼭 맞는 집만 꼭 집어서」·머리·문장·공유·privacy·manifest) · console 38곳 그대로 · 점검 SITE·대기 URL → kkokzip.com · paths에 CNAME · ops-check 본문 표식 꼭집 · 봇 UA 연락 주소 · Auth Site URL → kkokzip.com · sw v165. PR #341 |
 | 2026-10-06 | **운영 — 데이터 쓰기: 강릉입암3 `…20865` 완료(보조 누락) → 완료** — LH 페이지 이미지 0 · 홍보물 0 확인(claude.ai) → `announcement_analysis` 상태·`pending_fields` 한 줄만 교체 · 다른 공고·산물 md5 전후 동일 · 코드·DDL 0. |
-| 2026-10-06 | **코드 — kkokzip.com 연결: CNAME 파일을 PR로 + health-screen curl -L** — Pages 설정이 보호 브랜치라 CNAME 커밋 거부 → 루트 `CNAME`(kkokzip.com)을 PR로 · 배포본 sw.js 대기 curl에 `-L` · DNS(A 4 · www CNAME)는 DB `net.http_get`으로 dns.google 조회. SITE·Site URL·서비스명은 ② PR. PR #339 |
 ---
 
 ## 🚫 코딩 원칙
