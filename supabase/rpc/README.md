@@ -23,6 +23,8 @@ DB가 바뀐 줄 알게 된다 — 안 바뀐다.
 ## 파일 구성
 
 - `<함수명>.sql` — `public` 스키마 함수 하나씩(`pg_proc` 한 행 = 한 파일).
+- `zipfit_ops/<함수명>.sql` — `zipfit_ops` 스키마 함수(화면 밖 · 관리 API 전용). 🔴 **자동 대조 밖이다** — `migrate.py` 의 함수 대조와
+  `health-ops` 「public 함수 정의 = 사본」은 `public` 만 본다. 바꾼 회차가 적용 뒤 `md5(pg_get_functiondef(…))` 를 손으로 대조해 회신에 적는다.
 - `triggers.sql` — 트리거 **바인딩** 5건. 바인딩은 테이블에 걸리는 것이라 함수 파일에 넣지 않는다
   (`update_updated_at`은 두 테이블에 걸려 있다).
 
@@ -50,6 +52,13 @@ anon·authenticated에 주고 있어, **새 함수는 열린 채로 태어난다
 ## 권한 변경 이력
 
 기록만 한다. 여기를 고쳐도 DB는 바뀌지 않는다 — 위 「배포 경로가 아니다」와 같다.
+
+### 2026-10-07 — `zipfit_ops.original_lh_id(text)` 신설 · PUBLIC EXECUTE 회수 (마이그레이션 `2026-10-07_03`)
+
+원문 ID 한 정의(Z-2 ① PR-A) — 분석 스킬 규약 29 · 루틴 · 재확인 · 이전 회차가 관리 API(postgres)로 부른다. 화면은 부르지 않는다.
+
+- ACL: `postgres=X/postgres` 뿐(`revoke all … from public`). `zipfit_ops` 스키마 자체가 anon·authenticated 에 USAGE 가 없다.
+- 되돌리기: `drop function zipfit_ops.original_lh_id(text)` 새 마이그레이션 + 사본 `zipfit_ops/original_lh_id.sql` 삭제.
 
 ### 2026-10-01 — `get_revision_analysis_done(text)` 신설 · anon·authenticated EXECUTE (마이그레이션 `2026-10-01_05`)
 
