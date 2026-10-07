@@ -320,7 +320,7 @@ const requireEnv = (key: string): string => {
 - 토큰은 Actions Secret `SUPABASE_ACCESS_TOKEN`만 쓴다(저장소 설정은 다운님 몫).
 
 32. **DB 스키마·함수 변경은 적용 SQL 파일 + PR 병합으로만 — 관리 API로 운영 DB에 DDL을 직접 보내지 않는다(데이터 쓰기는 종전대로)** (2026-09-30 신설 — 우편함 「운영 — DB 함수·스키마 변경도 PR 병합 = 적용」)
-- `supabase/migrations/YYYY-MM-DD_NN_이름.sql`에 쓰고 PR을 연다 → `db-migrations.yml` check가 **되돌리기 전용** 트랜잭션으로 실제 DB에서 돌린다(스키마 지문 전후 같음 · 불변식 v3.7 · `anon` 3초 · 함수 정의 md5 = `supabase/rpc/` 사본 · ACL·SECURITY DEFINER = 파일 선언). 🔴 **빨간 체크의 PR은 병합하지 않는다.**
+- `supabase/migrations/YYYY-MM-DD_NN_이름.sql`에 쓰고 PR을 연다 → `db-migrations.yml` check가 **되돌리기 전용** 트랜잭션으로 실제 DB에서 돌린다(스키마 지문 전후 같음 · 불변식 v3.8 · `anon` 3초 · 함수 정의 md5 = `supabase/rpc/` 사본 · ACL·SECURITY DEFINER = 파일 선언). 🔴 **빨간 체크의 PR은 병합하지 않는다.**
 - 병합하면 apply가 **아직 기록 안 된 파일만** 파일마다 한 트랜잭션으로 적용하고 `zipfit_ops.schema_migrations`에 같은 트랜잭션으로 기록한다. 🔴 병합 뒤 Actions 결과(적용 · 대조)를 회신 ④에 적는다. 실패하면 `db-apply` 이슈.
 - 파일 규칙(트랜잭션 제어 금지 · 함수 선언 줄 · 사본 갱신)은 `supabase/migrations/README.md`가 정본이다. 원칙 20(고치기 전 정의 먼저 커밋)은 그대로다.
 - 🔵 **`check`는 모든 PR에서 결과를 낸다**(2026-09-30 · PR #281) — DB 파일(다섯 경로)을 안 건드린 PR은 「해당 없음」으로 즉시 통과(DB 호출 0). `main` 필수 체크는 **다운님 저장소 설정 뒤** 켜진다 — 그 전에는 결과만 나고 병합을 막지 않으니 원칙대로 초록을 보고 병합한다.
