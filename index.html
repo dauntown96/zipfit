@@ -6845,7 +6845,8 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
   // 🔴 회차는 announcements를 한 번 더 조회해 얻는다(그룹함수 미접촉). 세대정보 조회와 나란히
   // 보내므로 왕복이 늘지 않고, 그룹이 아니거나 형제가 하나면 요청 자체를 보내지 않는다.
   resolveAnnouncementIds(annId, useGroup).then(ids => Promise.all([
-    fetch(`${SUPABASE_URL}/rest/v1/housing_units?${idFilterFor(ids)}&order=deposit.asc`, {
+    // 🔵 2026-10-07 — 둘째 키 seq(들어간 순서 · 마이그레이션 2026-10-07_02). 보증금이 같은 행끼리의 순서를 DB 물리 위치에 맡기지 않는다(Z-1 ③ 이전 UPDATE가 그것을 흔들었다).
+    fetch(`${SUPABASE_URL}/rest/v1/housing_units?${idFilterFor(ids)}&order=deposit.asc,seq`, {
       headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
     }).then(r => r.ok ? r.json() : null),
     // 회차를 물어야 하는 경우는 둘이다 — ① 그룹조회로 형제가 여럿 온다(종전 조건 그대로)
