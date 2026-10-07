@@ -23,8 +23,9 @@ DB가 바뀐 줄 알게 된다 — 안 바뀐다.
 ## 파일 구성
 
 - `<함수명>.sql` — `public` 스키마 함수 하나씩(`pg_proc` 한 행 = 한 파일).
-- `zipfit_ops/<함수명>.sql` — `zipfit_ops` 스키마 함수(화면 밖 · 관리 API 전용). 🔴 **자동 대조 밖이다** — `migrate.py` 의 함수 대조와
-  `health-ops` 「public 함수 정의 = 사본」은 `public` 만 본다. 바꾼 회차가 적용 뒤 `md5(pg_get_functiondef(…))` 를 손으로 대조해 회신에 적는다.
+- `zipfit_ops/<함수명>.sql` — `zipfit_ops` 스키마 함수(화면 밖 · 관리 API 전용). 이름 키는 `zipfit_ops.<함수명>` 이다 — 마이그레이션 머리 선언도
+  `-- zipfit:function zipfit_ops.<함수명>(인자) acl=… secdef=…` 로 쓴다. `migrate.py` 함수 대조와 `health-ops` 「public·zipfit_ops 함수 정의 = 사본」이
+  둘 다 본다(2026-10-07 Z-2 9 — 그 전에는 `public` 만 봤다).
 - `triggers.sql` — 트리거 **바인딩** 5건. 바인딩은 테이블에 걸리는 것이라 함수 파일에 넣지 않는다
   (`update_updated_at`은 두 테이블에 걸려 있다).
 

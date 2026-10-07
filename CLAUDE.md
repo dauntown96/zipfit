@@ -22,7 +22,7 @@
 |---|---|
 | 세션 시작 — 지금 상황·절대원칙 | [🏠 L0 시작](https://www.notion.so/3b48aaa7e15581f88981d0c636de780c) |
 | 구현 사실 — 판정 조건·게이트·데이터 흐름·캡 | [⑩ 시스템 구조](https://www.notion.so/3ce8aaa7e155813ca69ff94e71a82277) |
-| 할 일·미결·보류 (**유일한 정본**) | [📋 백로그 DB](https://www.notion.so/7786386dbb054269bdff55033aafe19e) |
+| 할 일·미결·보류 (**유일한 정본**) | [📋 백로그 DB](https://www.notion.so/7786386dbb054269bdff55033aafe19e) — 등재 때 「런칭」과 함께 「쓸 시점」(S0 런칭 전 ~ S5 사업화 · 여러 개)도 채운다 · 런칭선 앞이면 S0(⑦ 「외부 도구를 들일 때」 · ⑨ 2026-10-07) |
 | 판단이 뒤집힌 경위 | [⑧ 판례집](https://www.notion.so/3b48aaa7e15581c0bcd7d3c8868df713) |
 | 3자 분장·git·지시서·병합 규약 | [⑦ 협업 규약](https://www.notion.so/3b48aaa7e155816ea873d4c3f006510a) |
 | 어디를 봐야 할지 모를 때 | [⑨ 라우팅 규약](https://www.notion.so/3b98aaa7e155812686b6ff3d11ea43fa) — 5장 검색 키워드 사전 |
@@ -325,7 +325,7 @@ const requireEnv = (key: string): string => {
 - 병합하면 apply가 **아직 기록 안 된 파일만** 파일마다 한 트랜잭션으로 적용하고 `zipfit_ops.schema_migrations`에 같은 트랜잭션으로 기록한다. 🔴 병합 뒤 Actions 결과(적용 · 대조)를 회신 ④에 적는다. 실패하면 `db-apply` 이슈.
 - 파일 규칙(트랜잭션 제어 금지 · 함수 선언 줄 · 사본 갱신)은 `supabase/migrations/README.md`가 정본이다. 원칙 20(고치기 전 정의 먼저 커밋)은 그대로다.
 - 🔵 **`check`는 모든 PR에서 결과를 낸다**(2026-09-30 · PR #281) — DB 파일(다섯 경로)을 안 건드린 PR은 「해당 없음」으로 즉시 통과(DB 호출 0). `main` 필수 체크는 **다운님 저장소 설정 뒤** 켜진다 — 그 전에는 결과만 나고 병합을 막지 않으니 원칙대로 초록을 보고 병합한다.
-- 🔵 **사본 = DB는 매시 검사된다**(2026-09-30) — `health-ops`가 public 함수 전수 「DB 정의 md5 = `supabase/rpc/` 사본」을 읽기만 해서 대조한다(`migrate.py`와 같은 규칙 · 끝 줄바꿈 무시). 사본 없는 새 함수·함수 없는 사본도 실패 → `health-ops` 이슈.
+- 🔵 **사본 = DB는 매시 검사된다**(2026-09-30) — `health-ops`가 public·`zipfit_ops` 함수 전수 「DB 정의 md5 = `supabase/rpc/` 사본(`zipfit_ops`는 `supabase/rpc/zipfit_ops/`)」을 읽기만 해서 대조한다(`migrate.py`와 같은 규칙 · 끝 줄바꿈 무시). 사본 없는 새 함수·함수 없는 사본도 실패 → `health-ops` 이슈.
 - 🔴 **긴급 되돌리기** — 이전 정의로 되돌리는 새 마이그레이션 PR(적용된 파일은 고치지 않는다). 화면이 멈춘 급한 경우만 다운님 확인 뒤 관리 API로 직접 보내고, 같은 SQL을 곧바로 이 경로로 저장소에 올린다.
 
 33. **화면 문구 갈래를 바꾸는 회차는 `health-screen` 판정표를 같은 PR에서 고친다** (2026-09-30 신설 — 이슈 #283)

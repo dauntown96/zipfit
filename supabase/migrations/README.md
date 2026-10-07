@@ -18,7 +18,7 @@
 3. 🔴 **되돌리기 전용 증명** — 실행 전·후 스키마 지문(`public`·`zipfit_ops`의 함수 정의 md5·ACL·SECURITY DEFINER·설정·설명, 표·열·정책·트리거)이 같다. 다르면 빨강 — 병합하지 말고 먼저 확인한다.
 4. 불변식 v3.8(`supabase/invariants/v3.8.sql`) 위반 수가 적용 전보다 늘지 않는다.
 5. `-- zipfit:anon` 줄마다 `anon` 역할 · `statement_timeout = 3s`로 돌려 3초 안에 끝난다.
-6. 파일이 건드린 함수마다: DB 정의 md5 = `supabase/rpc/<이름>.sql` 사본 · ACL·SECURITY DEFINER = 파일 머리의 선언 · 같은 이름 함수 1개.
+6. 파일이 건드린 함수마다: DB 정의 md5 = `supabase/rpc/<이름>.sql` 사본(`zipfit_ops` 함수는 `supabase/rpc/zipfit_ops/<이름>.sql` · 선언은 `zipfit_ops.<이름>(인자)`) · ACL·SECURITY DEFINER = 파일 머리의 선언 · 같은 이름 함수 1개.
 
 ### apply 가 보는 것
 - 적용 기록 `zipfit_ops.schema_migrations`(파일명 · sha256 · 적용 시각 · 커밋 · 실행 URL)에 있는 파일은 건너뛴다 — **같은 커밋을 다시 돌려도 다시 적용되지 않는다.**
