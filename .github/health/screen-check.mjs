@@ -67,7 +67,7 @@ try {
       const vis = e => e.offsetParent !== null
       const cardRows = [...document.querySelectorAll('.hcard')].filter(vis).map(c => {
         const s = c.querySelector('[data-sum-for]')
-        return s ? [s.getAttribute('data-sum-for'), (s.innerText || '').replace(/\s+/g, ' ').slice(0, 60)] : null
+        return s ? [s.getAttribute('data-sum-for'), (s.innerText || '').replace(/\s+/g, ' ')] : null   // 전문 — 자르기는 아래 결과 표 보이기용만(#360)
       }).filter(Boolean)
       const chips = [...document.querySelectorAll('.hcard .chip')].filter(vis)
         .filter(e => e.getBoundingClientRect().height > 30 || e.getClientRects().length > 1)
@@ -102,7 +102,9 @@ try {
       }
       return { cardRows, chips, dates, nts, overflow: sw > window.innerWidth + 1 ? sw : 0 }
     })
-    for (const [aid, t] of got.cardRows) cards.push([aid, phraseOf(t), t])
+    // 🔴 갈래는 자르기 전 전문으로 정한다(이슈 #360 · 2026-10-07) — 60자로 자른 뒤 판정하면 긴 ④ 링크 문구
+    //    (「…[정정공고] … 공고에 함께 정리돼 있어요 →」 65자)의 「있어요」가 잘려 「알수없음」으로 떨어졌다. 60자는 결과 표에 보일 때만.
+    for (const [aid, t] of got.cardRows) cards.push([aid, phraseOf(t), t.slice(0, 60)])
     notices.push(...got.nts)
     brokenChips.push(...got.chips)
     hiddenDates.push(...got.dates)
