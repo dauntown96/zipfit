@@ -27,6 +27,32 @@ const phraseOf = t =>
   : /(보증금|월세|월 |전용)/.test(t) ? '요약'
   : t.trim() === '' ? '빈칸' : '알수없음'
 
+// 고정 글자 속 지난 날짜(⑤) — page.evaluate 로 넘긴다(브라우저 안에서 돈다 · 바깥 변수를 쓰지 않는다).
+const STALE_DATE_FN = () => {
+  const kst = new Date(Date.now() + 9 * 3600 * 1000)
+  const today = Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), kst.getUTCDate())
+  const zones = [...document.querySelectorAll('.hero, .maintabs, .zf-footer')].filter(e => e.offsetParent !== null || e.getClientRects().length)
+  const out = []
+  for (const z of zones) {
+    for (const line of (z.innerText || '').split('\n')) {
+      const ym = /(20\d{2})\s*년/.exec(line)
+      const year = ym ? +ym[1] : kst.getUTCFullYear()
+      const ds = []
+      const full = /(20\d{2})\s*[.\-\/]\s*(\d{1,2})\s*[.\-\/]\s*(\d{1,2})/g
+      let m, rest = line
+      while ((m = full.exec(line))) ds.push(Date.UTC(+m[1], +m[2] - 1, +m[3]))
+      rest = line.replace(full, ' ')
+      const md = /(?<![\d.])(\d{1,2})\s*(?:월\s*(\d{1,2})\s*일|[.\/](\d{1,2}))(?![\d])/g
+      while ((m = md.exec(rest))) {
+        const mo = +m[1], d = +(m[2] || m[3])
+        if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) ds.push(Date.UTC(year, mo - 1, d))
+      }
+      if (ds.length && Math.max(...ds) < today) out.push(line.trim().slice(0, 60))
+    }
+  }
+  return out
+}
+
 const consoleErrors = []
 const browser = await chromium.launch()
 const extra = {}
@@ -222,6 +248,14 @@ try {
   if (process.env.SIMULATE === 'zipfit') await page.evaluate(() => { const p = document.createElement('p'); p.textContent = 'ZipFit(시험)'; document.body.prepend(p) })
   const oldName = await page.evaluate(() => (document.body.innerText.match(/ZipFit/g) || []).length)
   add('old_name', '보이는 글자에 「ZipFit」', oldName === 0 ? 'pass' : 'fail', oldName, '0(body.innerText · 대소문자 그대로 — 이름 규칙: 보이는 곳은 「꼭집」)')
+  // ⑤ 고정 글자 속 지난 날짜(2026-10-07 · 우편함 「코드 — Z-2 …」 ③ 6 · 첫 화면 히어로에 석 달 지난 「경기북부 2차 공고 · 신청기간 6.30~7.2」가 하드코딩된 채 보였다).
+  //    히어로·메인 탭·푸터(데이터가 아니라 손으로 적는 글자)의 줄마다 날짜를 찾아 가장 늦은 날짜가 오늘(KST)보다 과거면 실패.
+  //    날짜 꼴: 2026-07-02 · 2026.7.2 · 7월 2일 · 6.30 · 7/2(연도가 없으면 그 줄의 「YYYY년」 · 없으면 올해). 카드 안 날짜는 보지 않는다(마감 공고는 과거가 정상).
+  //    SIMULATE=stale_date 이면 옛 배지 글자를 히어로에 넣고 잰다(실패해야 맞다).
+  if (process.env.SIMULATE === 'stale_date') await page.evaluate(() => { const h = document.querySelector('.hero') || document.body; const b = document.createElement('span'); b.className = 'badge'; b.textContent = '📢 2026년 경기북부 2차 공고 · 신청기간 6.30~7.2'; h.appendChild(b) })
+  const staleDates = await page.evaluate(STALE_DATE_FN)
+  extra.stale_dates = staleDates
+  add('stale_date', '고정 글자(히어로·메인 탭·푸터) 속 지난 날짜', staleDates.length === 0 ? 'pass' : 'fail', staleDates.length ? `${staleDates.length}: ${staleDates.slice(0, 3).join(' / ')}` : 0, '0 — 줄마다 가장 늦은 날짜 ≥ 오늘(KST)')
   await page.screenshot({ path: 'health-screen.png' })
 } catch (e) {
   add('runner', '점검 실행', 'fail', String(e).slice(0, 300), '점검 스크립트가 끝까지 돈다')
