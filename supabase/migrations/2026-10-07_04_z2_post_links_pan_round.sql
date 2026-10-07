@@ -1,3 +1,19 @@
+-- Z-2 ① PR-B — 같은 게시물 링크 규칙 Z2-link-v3: 첨부 파일명 증거가 없어도 url panId + 같은 회차(공고일 · LH 정정이면 첫 공고일)면 잇는다
+--   (2026-10-07 · 우편함 「코드 — Z-2 원문 ID 한 정의 · …」 8 · 다운님 승인 1).
+--   1) announcement_post_links.evidence_kind 에 'url_pan_id' 를 허용한다(CHECK 넓힘).
+--   2) refresh_announcement_post_links() 에 규칙 v3 INSERT 를 더한다(v2 는 그대로 · cron zipfit-refresh-post-links 10분마다).
+--   3) 한 번 채운다 — 롤백 시험(2026-10-07): 새 링크 26행(대표 MYHOME 16 · 대표 아닌 10) · 목록 942 → 930.
+--      목록에서 빠지는 MYHOME 카드 13(공주 3 · 광명 1 · 영암 2 · 부천 2 · 군산 2 · 제주 2 · 대구 1) · 숨은 LH …20198(당진·예산 3)은 숨김 그대로라 접히지 않는다.
+--      ➕ 광명 원공고 LH …20143 이 대표로 선다(그 그룹의 대표였던 MYHOME 20574_1 이 정정 …20175 로 이어져 빠짐).
+--      21197_* 은 …20344(앞 회차)에 이어지지 않는다.
+--   되돌리기: delete from announcement_post_links where rule_version = 'Z2-link-v3' + 함수 이전 정의 새 마이그레이션.
+-- zipfit:function refresh_announcement_post_links() acl={postgres=X/postgres,service_role=X/postgres} secdef=false
+-- zipfit:anon select * from get_announcements_deduped()
+-- zipfit:anon select * from get_announcements_deduped('경기도')
+-- zipfit:anon select * from get_announcement_sites('2015122300020393')
+alter table public.announcement_post_links drop constraint announcement_post_links_evidence_kind_check;
+alter table public.announcement_post_links add constraint announcement_post_links_evidence_kind_check
+  check (evidence_kind in ('attachment_filename', 'url_pan_id'));
 CREATE OR REPLACE FUNCTION public.refresh_announcement_post_links()
  RETURNS integer
  LANGUAGE plpgsql
@@ -61,4 +77,8 @@ begin
   get diagnostics k = row_count;
   return n + k;
 end
-$function$
+$function$;
+comment on function public.refresh_announcement_post_links() is
+  '같은 게시물 링크(announcement_post_links) 자동 채움 — 규칙 B57-link-v2(첨부 파일명 ∧ panId ∧ 같은 공고일) + Z2-link-v3(panId ∧ 같은 회차 · 2026-10-07). cron zipfit-refresh-post-links 10분마다. 정의 사본: supabase/rpc/refresh_announcement_post_links.sql';
+-- 첫 채움(2026-10-07 롤백 시험 기대: 새 26행 · 기존 8행 그대로)
+select public.refresh_announcement_post_links();
