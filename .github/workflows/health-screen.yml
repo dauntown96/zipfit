@@ -2,6 +2,10 @@
 # 🔴 읽기·알림만 한다. 배포본(GitHub Pages)을 390px Chromium 으로 열고, 카드 문구 기대값은 DB 에서 따로 계산한다
 #    (관리 API · `set transaction read only`). 비밀값: 기존 SUPABASE_ACCESS_TOKEN 하나 · 공개 anon 키.
 # 언제: index.html·sw.js 가 바뀐 main 병합 뒤(Pages 반영을 기다린다) · 매일 1회 · 수동.
+#   🔵 매일 1회는 GitHub schedule 이 아니라 Supabase pg_cron `zipfit-health-screen-dispatch`(23:50 UTC = KST 08:50)가
+#      ops_screen_dispatch() 로 workflow_dispatch 를 부른다(2026-10-06 PR #343 · 첫 발송 2026-10-06 23:50Z 204).
+#      예비로 두던 GitHub schedule 줄은 2026-10-07 걷었다(우편함 「코드 — Z-1 ③ …」 6) — schedule 은 몇 시간씩 늦게 돌아
+#      (2026-10-05 23:50Z 몫이 10-06 03:21Z 에 돈 run 29) 예비로도 쓸모가 적고, 남겨 두면 pg_cron 발송분과 하루 두 번 돈다.
 # 알림: 실패면 라벨 health-screen 이슈를 하나 열고(열려 있으면 댓글), 통과하면 스스로 닫는다.
 name: Health — Screen (A)
 
@@ -12,8 +16,6 @@ on:
       - 'index.html'
       - 'sw.js'
       - 'CNAME'
-  schedule:
-    - cron: '50 23 * * *'   # KST 08:50 — 아침 워밍 수집(23:40·23:50 UTC) 뒤
   workflow_dispatch:
     inputs:
       simulate:
