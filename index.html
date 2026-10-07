@@ -236,7 +236,7 @@ body.theme-dark mark.zf-hl{background:#7A5F00;color:#fff}
 .elig-fold-body{margin-top:4px}
 body.theme-dark .elig-fold>summary{color:#5DCAA5}
 .elig-subrow{display:flex;justify-content:space-between;gap:8px;padding:2px 0 2px 10px;border-left:2px solid #e8e8e0;font-size:11.5px}
-.elig-subrow>:first-child{min-width:0;overflow-wrap:anywhere}   /* 🔵 2026-10-07(표시층 긴급 6) — 중첩 자격 줄(자동차가액 → 1인 …)이 390px 상자 밖으로 밀렸다 */
+.elig-subrow>*{min-width:0;overflow-wrap:anywhere}   /* 🔵 2026-10-07(표시층 긴급 6·7) — 중첩 자격 줄(자동차가액 → 1인 … 금액)이 390px 상자 밖으로 밀렸다 · 첫 칸만으로는 14→12, 모든 칸 14→4 */
 .elig-subrow span:first-child{color:#777}
 body.theme-dark .elig-key{color:#e8e8e8}
 body.theme-dark .elig-subrow{border-left-color:#3a3d47}
@@ -1334,6 +1334,19 @@ function noticeStateLabel(row){
   return '접수기간 미상';
 }
 
+// 🔴 2026-10-07(표시층 긴급 1) — 카드 머리 상태 칩. 종전에는 수집 `status` 글자를 그대로 적어, 날짜 줄이 「접수 중」인데
+//    칩은 「공고중」인 카드가 열린 카드 77장 중 19장이었다(상시·수시 모집 대부분). 칩은 날짜 줄과 **같은 판정**(applyWindowState —
+//    목록 RPC 의 apply_start·apply_end = 확정값·best_schedule)을 따른다. 판정과 어긋나는 글자만 바꾸고, 어긋나지 않으면 수집 글자 그대로다.
+//    기간을 모르면(unknown) 수집 글자 그대로 — 새 글자를 지어내지 않는다.
+function zfStatusTag(row){
+  const raw = String((row && (row['처리상태'] ?? row.status)) || '').trim();
+  const st = applyWindowState(row);
+  let text = raw;
+  if(st === 'open') text = '접수중';
+  else if(st === 'closed') text = /마감$/.test(raw) ? raw : '접수마감';
+  else if(st === 'before') text = (!raw || raw === '접수중' || /마감$/.test(raw)) ? '공고중' : raw;
+  return { text: text || '-', closed: /마감$/.test(text) };
+}
 // 🔴 문구는 「없음」이 아니라 「미상」이다 — 「접수기간 없음」은 상시모집으로 읽힌다.
 const APPLY_UNKNOWN_LABEL = '접수기간 미상';
 // 기존 칩 체계(.chip)에 회색 변종을 얹는다. 새 디자인 언어를 만들지 않는다 —
@@ -1539,8 +1552,10 @@ function zfLoadPostNotices(){
     // 🔵 붙은 공고문이 카드 상태(숨기기·상태 칩·정렬)를 바꾸거나 검색어가 있으면 목록을 다시 거른다 — 아니면 자리만 채운다.
     const changedRows = (typeof noticeData !== 'undefined' ? noticeData : []).filter(n => zfPostNotices.byLhId.has(String(n['announcement_id'] || '')));
     const before = changedRows.map(n => applyWindowState(n));
+    const beforeEnd = changedRows.map(n => zfSoonestOpenEnd(n));
     zfPostNotices.loaded = true;
-    const stateChanged = changedRows.some((n, i) => applyWindowState(n) !== before[i]);
+    // 🔵 2026-10-07(표시층 긴급 5) — 가장 이른 열린 공고문 마감이 바뀐 카드도 다시 그린다(1층 날짜 줄 · 마감임박 · 마감 임박순).
+    const stateChanged = changedRows.some((n, i) => applyWindowState(n) !== before[i] || zfSoonestOpenEnd(n) !== beforeEnd[i]);
     const q = document.getElementById('noticeSearchInput');
     if(noticeLoaded && (stateChanged || (q && q.value.trim()))) applyNoticeFiltersAndRender(noticePage);
     // 🔴 2026-10-01 — 추천 탭도 같은 경로로 다시 그린다(공고 탭과 같은 상태 · 사본 판정 없음). 매칭은 matchHouses 가 이 약속을 기다린 뒤 거른다.
@@ -1566,6 +1581,22 @@ function zfPostNoticeList(row){
   while(words.every(w => w.length - tail > 1) && words.every(w => w[w.length - 1 - tail] === words[0][words[0].length - 1 - tail])) tail++;
   list.forEach((x, i) => { x.name = words[i].slice(0, words[i].length - tail).join(' '); });
   return list;
+}
+// 🔵 2026-10-07(표시층 긴급 5 · 화면안) — 같은 게시물로 묶인 카드의 「마감」은 공고문 중 **아직 닫히지 않은 것의 가장 이른 마감**이다.
+//    카드 행 apply_end(목록 RPC 대표 = LH 행)는 공고문 중 가장 늦은 마감이라, 열린 카드에서 이른 공고문 마감을 가린다.
+//    공고문 목록(zfPostNoticeList)이 없거나 열린 공고문이 없으면 카드 행 apply_end 그대로다. 🔴 apply_end 칸 자체는 바꾸지 않는다
+//    (필터·인사이트 모수·카드 상태는 종전 값). 1층 날짜 줄 · 「마감임박」 · 「마감 임박순」만 이 값을 본다.
+function zfSoonestOpenEnd(row){
+  const own = (row && (row['신청마감일'] || row['apply_end'])) || '';
+  const list = zfPostNoticeList(row);
+  if(!list) return own;
+  const ends = list.filter(x => x.state === 'open' || x.state === 'before').map(x => x.end).filter(Boolean).sort();
+  return ends[0] || own;
+}
+function zfWithSoonestEnd(row){
+  const e = zfSoonestOpenEnd(row);
+  const own = (row && (row['신청마감일'] || row['apply_end'])) || '';
+  return e === own ? row : Object.assign({}, row, { '신청마감일': e, 'apply_end': e });
 }
 function zfNoticeStateText(state, end){
   if(state === 'open'){
@@ -2590,9 +2621,10 @@ function applyNoticeFiltersAndRender(keepPage){
     // 🔴 이미 지난 마감일은 뒤로 보낸다 — 「마감 임박순」인데 맨 위가 지난 공고면 이름이 거짓말이다.
     //    앞: 마감일 ≥ 오늘 오름차순 / 뒤: 지난 마감일(역시 오름차순) / 맨 뒤: 마감일 없음.
     if(sortVal==='end-asc'){
-      const ga = applyDateGroup(a,'신청마감일','apply_end'), gb = applyDateGroup(b,'신청마감일','apply_end');
+      // 🔵 2026-10-07(표시층 긴급 5) — 묶인 카드는 가장 이른 열린 공고문 마감(zfSoonestOpenEnd)으로 선다.
+      const ga = applyDateGroup(zfWithSoonestEnd(a),'신청마감일','apply_end'), gb = applyDateGroup(zfWithSoonestEnd(b),'신청마감일','apply_end');
       if(ga !== gb) return ga - gb;
-      return nullLast(a,b,n=>n['apply_end'],false);
+      return nullLast(a,b,n=>zfSoonestOpenEnd(n),false);
     }
     // 🔴 접수 시작순도 같은 3분기를 탄다(2026-09-16) — 종전에는 맨 위가 작년 시작일 공고였다
     //    (apply_start 가 있는 594건 중 518건이 이미 지난 날짜, 최솟값 2025-07-28).
@@ -3437,12 +3469,12 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
     const isAmended  = (n['공고명']||'').includes('[정정공고]') || n['is_revised'];
     const demoTags   = classifyDemographics(n['공급유형'], n['공고명']);
     const isNew      = !isClosed && isNewNotice(n);
-    const closingSoon = !isClosed && isClosingSoon(n);
+    const closingSoon = !isClosed && isClosingSoon(zfWithSoonestEnd(n));
     const convBadges = buildConvBadges(n['mymy_applicable'], n['supply_form'], n['application_method'], n['recruit_multiplier'], n['is_relaxed_recruitment'], n['selection_method']);
     const pairKey    = n['pair_announcement_key']||'';
     const revisionNoteEsc = (n['revision_note']||'').replace(/"/g,'&quot;');
     const applyStart = n['신청시작일']||n['apply_start']||'';
-    const applyEnd   = n['신청마감일']||n['apply_end']||'';
+    const applyEnd   = zfSoonestOpenEnd(n);
     const annDate    = n['announcement_date']||'';
     // 모집공고일 = 접수시작일이면 중복 제거. unknown이면 '미상'+원문 링크(applyDateLine).
     // 🔴 B31 — 취소공고 행은 모집공고일과 원문 링크만 적는다. 취소 대상 회차는 추정해서 적지 않는다(원문으로 보낸다).
@@ -3497,7 +3529,7 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
     html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n['지역']||'').replace(/"/g,'&quot;')}" data-sido="${(n['sido_nm']||'').replace(/"/g,'&quot;')}" data-sigungu="${(n['sigungu_nm']||'').replace(/"/g,'&quot;')}" data-title="${(n['공고명']||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" data-housing-type="${(n['공급유형']||'').replace(/"/g,'&quot;')}" data-precise-address="${(n['precise_address']||'').replace(/"/g,'&quot;')}" data-relaxed="${n['is_relaxed_recruitment']===true?'1':''}" data-relaxation-detail="${(n['relaxation_detail']||'').replace(/"/g,'&quot;')}" data-contract-verify="${n['contract_before_verification']===true?'1':''}" data-rent-exempt-until="${(n['rent_exemption_until']||'').replace(/"/g,'&quot;')}" data-rent-exempt-note="${(n['rent_exemption_note']||'').replace(/"/g,'&quot;')}" data-revised="${isAmended?'1':''}" data-revision-note-full="${revisionNoteEsc}" data-special-notes="${n['special_notes']?JSON.stringify(n['special_notes']).replace(/"/g,'&quot;'):''}" data-apply-start="${(n['apply_start']||'').replace(/"/g,'&quot;')}" data-apply-end="${(n['apply_end']||'').replace(/"/g,'&quot;')}" data-announcement-date="${(n['announcement_date']||'').replace(/"/g,'&quot;')}" data-round-date="${zfNoticeDate(n).replace(/"/g,'&quot;')}" data-complex-count="${zfComplexCount(n)}" data-doc-submit-announce="${(n['doc_submit_announce_date']||'').replace(/"/g,'&quot;')}" data-doc-submit-start="${(n['doc_submit_start']||'').replace(/"/g,'&quot;')}" data-doc-submit-end="${(n['doc_submit_end']||'').replace(/"/g,'&quot;')}" data-winner-announce="${(n['winner_announce_date']||'').replace(/"/g,'&quot;')}" data-contract-start="${(n['contract_start']||'').replace(/"/g,'&quot;')}" data-contract-end="${(n['contract_end']||'').replace(/"/g,'&quot;')}" data-attachment-urls="${n['attachment_urls']?JSON.stringify(n['attachment_urls']).replace(/"/g,'&quot;'):''}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this,'notice')" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
       <div class="htop">
         <p class="hname">${normalizeRevisedTitle(n['공고명'])||'(공고명 없음)'}</p>
-        ${isCancelRow?'':`<span class="htag ${isClosed?'tag-mix':'tag-apt'}">${n['처리상태']||'-'}</span>`}
+        ${isCancelRow?'':(t => `<span class="htag ${t.closed?'tag-mix':'tag-apt'}">${escapeHtml(t.text)}</span>`)(zfStatusTag(n))}
       </div>
       <!-- 🔴 유형은 **한 번만** 적는다(2026-09-16). 종전에는 classifyNoticeType() 결과와 housing_type
            원문이 나란히 붙어 「국민임대 · 임대주택 - 국민임대」처럼 같은 말이 두 번 나왔다.
@@ -3806,14 +3838,14 @@ function renderPersonalizedRecommendations(){
   shown.forEach((n,idx)=>{
     const announcementDate=n['모집공고일']||n['announcement_date']||'';
     const applyStart=n['신청시작일']||n['apply_start']||'';
-    const applyEnd=n['신청마감일']||n['apply_end']||'';
+    const applyEnd=zfSoonestOpenEnd(n);
     const dateLine=applyDateLine(n, announcementDate, applyStart, applyEnd, n['공고URL']||n['url']||'');
-    const closingSoon=isClosingSoon(n);
+    const closingSoon=isClosingSoon(zfWithSoonestEnd(n));
     const hasCancel=n['has_cancel_notice']===true;
     html+=`<div class="hcard">
       <div class="htop">
         <p class="hname">${n['공고명']||n['name']||'(공고명 없음)'}</p>
-        <span class="htag tag-apt">${n['처리상태']||'-'}</span>
+        ${(t => `<span class="htag ${t.closed?'tag-mix':'tag-apt'}">${escapeHtml(t.text)}</span>`)(zfStatusTag(n))}
       </div>
       <p class="haddr">${zfCoverPlace(n['region_names'], zfComplexCount(n), n['sido_nm'], n['sigungu_nm'], n['지역'], n['announcement_id'])} · ${zfTypeHtml(n['source'], n['공급유형'], n['공고명']||n['name'])}</p>
       <div class="chip-row" style="margin:6px 0;gap:5px">
@@ -3825,6 +3857,7 @@ function renderPersonalizedRecommendations(){
       </div>
       <div data-sum-for="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" data-sum-url="${(n['공고URL']||n['url']||'').replace(/"/g,'&quot;')}" data-sum-key="${zfAttr(zfDedupKey(n['공고명']||n['name']))}"></div>
       <p style="font-size:12px;color:#888;margin-bottom:8px">${dateLine}</p>
+      ${zfCheckNoteHtml(zfSupplyCheckLabels(n['공고명']||n['name'], zfProfileFacts()), '')}
       ${zfRouteSlotHtml(n, n['공고명']||n['name'])}
       ${zfNoticesSlotHtml(n)}
       ${(n['공고URL']||n['url'])?`<a class="detail-link" href="${n['공고URL']||n['url']}" target="_blank" rel="noopener" style="display:block" onclick="zfLog('recommend_click',{rank:${idx+1}},'${(n['announcement_id']||'').toString().replace(/'/g,'')}')">AI 정리 · 원문 보기 →</a>`:''}
@@ -3922,7 +3955,7 @@ function renderInsight(rows, wrap, statsRows){
     const d = parseNoticeDate(r.announcement_date);
     return d && d >= d7ago;
   }).length;
-  const kpiClosing = rows.filter(r=>isClosingSoon(r)).length;
+  const kpiClosing = rows.filter(r=>isClosingSoon(zfWithSoonestEnd(r))).length;
 
   // ② 마감 임박 타임라인 (오늘~14일 후)
   const timelineMap = {};
@@ -4834,6 +4867,46 @@ async function diagnose(){
   r.innerHTML=html;
 }
 
+// 🔵 2026-10-07(표시층 긴급 7 · 4-1) — 공급 대상 표지 「요건 확인 필요」. 카드를 빼지 않고 📄 한 줄만 단다(빼는 판정은 4-2 — 데이터 뒤).
+//    근거는 **카드 제목 글자**뿐이다. 자격 행(eligibility_criteria.supply_form)은 한 공고에 일반 갈래와 대상 갈래가 함께 있어
+//    (장애인·계층 갈래 카드 전부) 그 표지로 「대상 모집」이라 할 수 없다.
+//    ⑴ 입력으로 가를 수 있는 표지(다자녀·신혼·신생아·한부모·고령자·청년)는 **하나라도 맞으면** 알리지 않는다(갈래 중 하나로 신청할 수 있다).
+//       하나도 맞지 않거나 그 입력이 없으면 알린다. ⑵ 입력이 없는 요건(창업·장애인·계층)은 있으면 늘 알린다.
+//    표지 글자는 제목에서 찾은 글자 그대로 쓴다. facts = { marital, children, birthYear } — 매칭은 진단 입력, 추천은 저장 조건.
+const ZF_SUPPLY_DEMO = [
+  { re: /다자녀/, ok: f => f.children >= 2 },
+  { re: /신혼|신생아/, ok: f => ['married_7','newborn','pre','married_child6'].includes(f.marital) },
+  { re: /한부모/, ok: f => f.marital === 'single_parent' },
+  { re: /고령자|어르신/, ok: f => f.birthYear > 0 && (new Date().getFullYear() - f.birthYear) >= 65 },
+  { re: /청년/, ok: f => { const a = new Date().getFullYear() - f.birthYear; return f.birthYear > 0 && a >= 19 && a <= 39; } },
+];
+const ZF_SUPPLY_ASK = [/창업/, /장애인/, /수급자|차상위|주거급여|기초생활/];
+function zfSupplyCheckLabels(title, facts){
+  const t = String(title || '');
+  const f = facts || {};
+  const hit = ZF_SUPPLY_DEMO.map(d => ({ d, m: d.re.exec(t) })).filter(x => x.m);
+  const out = [];
+  if(hit.length && !hit.some(x => x.d.ok(f))) hit.forEach(x => out.push(x.m[0]));
+  ZF_SUPPLY_ASK.forEach(re => { const m = re.exec(t); if(m) out.push(m[0]); });
+  return [...new Set(out)];
+}
+// 자격 진단 기준(eligibility_criteria 기본기준)이 있는 유형 — 이 밖의 유형은 진단으로 판정할 근거가 없다(②⑵).
+const ZF_DIAG_TYPES = ['매입임대','행복주택','국민임대','영구임대','통합공공임대','분양','기숙사형','장기전세'];
+function zfCheckNoteHtml(labels, typeNote){
+  const lines = [];
+  if(labels && labels.length) lines.push(`이 공고는 ${escapeHtml(labels.join('·'))} 대상 모집이에요 — 신청할 수 있는지 공고문에서 확인해 주세요`);
+  if(typeNote) lines.push(`자격 진단에 이 유형(${escapeHtml(typeNote)}) 기준이 없어요 — 신청할 수 있는지 공고문에서 확인해 주세요`);
+  return lines.map(l => `<p class="zf-check-note" style="font-size:12px;color:#8A5A12;background:#FBF0DC;border-radius:8px;padding:6px 10px;margin:0 0 8px">📄 ${l}</p>`).join('');
+}
+function zfDiagFacts(){
+  const by = parseInt(document.getElementById('birthYear')?.value) || 0;
+  return { marital: diagMarital || document.getElementById('marital')?.value || '', children: parseInt(document.getElementById('children')?.value) || 0, birthYear: by };
+}
+function zfProfileFacts(){
+  const u = currentUser || {};
+  return { marital: u.marital || '', children: parseInt(u.children) || 0, birthYear: parseInt(u.birth_year || u.birthYear) || 0 };
+}
+
 async function matchHouses(){
   const minRooms = parseInt(document.getElementById('minRooms')?.value)||0;
   const regions = [...selectedRegions];
@@ -4883,10 +4956,20 @@ async function matchHouses(){
       rows = rows.filter(r => zfInRegions(r, regions));   // 🔵 2026-09-30 — 공고 탭과 같은 규칙(걸친 시도 · zfInRegions 한 벌)
     }
     matchNoTypeFilter = activeTypes.length === 0 && eligibleTypes.length === 0;
+    // 🔵 2026-10-07(표시층 긴급 7 · ②⑵) — 진단 기준이 없는 유형(전세임대 · 임대주택 - 공공임대 · 국민공공임대주택 · 도시형생활주택 …)은
+    //    조용히 빼지 않고 남겨 📄 「기준이 없어요」를 단다. 유형 칩도 진단 유형(HOUSING_TYPES)뿐이라 이 카드들은 칩으로 고를 수 없다 —
+    //    그래서 칩 경로(진단 뒤 eligibleTypes 가 칩으로 들어간다)와 진단 경로 둘 다 같은 규칙이다.
+    const typeKeep = types => r => {
+      const ht = r.housing_type || '';
+      if(types.some(t => ht.includes(t))) return true;
+      if(ZF_DIAG_TYPES.some(t => ht.includes(t))) return false;
+      r._zfTypeCheck = ht || '유형 미상';
+      return true;
+    };
     if(activeTypes.length > 0) {
-      rows = rows.filter(r => activeTypes.some(t => (r.housing_type||'').includes(t)));
+      rows = rows.filter(typeKeep(activeTypes));
     } else if(eligibleTypes.length > 0) {
-      rows = rows.filter(r => eligibleTypes.some(t => (r.housing_type||'').includes(t)));
+      rows = rows.filter(typeKeep(eligibleTypes));
     }
     if(minRooms > 0) {
       rows = rows.filter(r => !r.min_rooms || parseInt(r.min_rooms) >= minRooms);
@@ -4905,6 +4988,22 @@ async function matchHouses(){
         : (s && typeof s.analysis_done === 'boolean') ? s.analysis_done
         : !!(s && zfSummaryLine(s));
     });
+    // 🔵 2026-10-07(표시층 긴급 7 · ②⑴) — 보증금 범위 입력(만원)을 쓴다. 비교 재료는 카드 가격 요약(세대 행 보증금 · 원)이다
+    //    (목록 RPC deposit_min 은 분석분이 비어 있다). 가격을 모르는 카드는 빼지 않는다.
+    const minDep = parseInt(document.getElementById('minDeposit')?.value) || 0;
+    const maxDep = parseInt(document.getElementById('maxDeposit')?.value) || 0;
+    if(minDep > 0 || maxDep > 0){
+      rows = rows.filter(r => {
+        const s = zfPriceCache.get(String(r.announcement_id));
+        const lo = (s && s.deposit_min != null) ? Number(s.deposit_min) : null;
+        const hi = (s && s.deposit_max != null) ? Number(s.deposit_max) : lo;
+        if(maxDep > 0 && lo != null && lo > maxDep * 10000) return false;
+        if(minDep > 0 && hi != null && hi < minDep * 10000) return false;
+        return true;
+      });
+    }
+    const facts = zfDiagFacts();
+    rows.forEach(r => { r._zfSupplyCheck = zfSupplyCheckLabels(r.title, facts); });
 
     lastFiltered = rows;
     visibleCount = 5;
@@ -4932,7 +5031,7 @@ function sortMatchRows(rows, sortVal){
     if(sortVal==='date-desc')     return nullLast(a,b,n=>zfSortDate(n),true)
       || nullLast(a,b,n=>n.apply_start,true)
       || nullLast(a,b,n=>n.first_seen_at,true);
-    if(sortVal==='end-asc')       return nullLast(a,b,n=>n.apply_end,false);
+    if(sortVal==='end-asc')       return nullLast(a,b,n=>zfSoonestOpenEnd(n),false);   // 🔵 2026-10-07(표시층 긴급 5) — 묶인 카드는 가장 이른 열린 공고문 마감
     if(sortVal==='start-asc')     return nullLast(a,b,n=>n.apply_start,false);
     // 🔵 공고 탭과 **같은 zfNumOrNull** 을 부른다 — 사본을 두지 않는다.
     if(sortVal==='units-desc')    return nullLast(a,b,n=>zfNumOrNull(n.total_units),true);
@@ -7699,12 +7798,12 @@ function renderMatchResults(rows){
     const isAmended   = (n.title||'').includes('[정정공고]') || n.is_revised;
     const demoTags    = classifyDemographics(n.housing_type||'', n.title||'');
     const isNew       = !isClosed && isNewNotice({'created_at': n.created_at||'', 'apply_end': n.apply_end||''});
-    const closingSoon = !isClosed && isClosingSoon({'apply_end': n.apply_end||'', 'apply_period_check': n.apply_period_check});
+    const closingSoon = !isClosed && isClosingSoon({'apply_end': zfSoonestOpenEnd(n), 'apply_period_check': n.apply_period_check});
     const convBadgesM = buildConvBadges(n.mymy_applicable, n.supply_form, n.application_method, n.recruit_multiplier, n.is_relaxed_recruitment, n.selection_method);
     const pairKeyM    = n.pair_announcement_key||'';
     const revisionNoteEscM = (n.revision_note||'').replace(/"/g,'&quot;');
     const applyStart  = n.apply_start||'';
-    const applyEnd    = n.apply_end||'';
+    const applyEnd    = zfSoonestOpenEnd(n);
     const annDate     = n.announcement_date||'';
     const dateLine    = applyDateLine(n, annDate, applyStart, applyEnd, n.url||'');
     const cardId = 'mcard-' + zfCardKey(n.announcement_id || idx);
@@ -7749,7 +7848,7 @@ function renderMatchResults(rows){
     html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n.region||'').replace(/"/g,'&quot;')}" data-sido="${(n.sido_nm||'').replace(/"/g,'&quot;')}" data-sigungu="${(n.sigungu_nm||'').replace(/"/g,'&quot;')}" data-title="${(n.title||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" data-housing-type="${(n.housing_type||'').replace(/"/g,'&quot;')}" data-precise-address="${(n.precise_address||'').replace(/"/g,'&quot;')}" data-relaxed="${n.is_relaxed_recruitment===true?'1':''}" data-relaxation-detail="${(n.relaxation_detail||'').replace(/"/g,'&quot;')}" data-contract-verify="${n.contract_before_verification===true?'1':''}" data-rent-exempt-until="${(n.rent_exemption_until||'').replace(/"/g,'&quot;')}" data-rent-exempt-note="${(n.rent_exemption_note||'').replace(/"/g,'&quot;')}" data-revised="${isAmended?'1':''}" data-revision-note-full="${revisionNoteEscM}" data-special-notes="${n.special_notes?JSON.stringify(n.special_notes).replace(/"/g,'&quot;'):''}" data-apply-start="${(n.apply_start||'').replace(/"/g,'&quot;')}" data-apply-end="${(n.apply_end||'').replace(/"/g,'&quot;')}" data-announcement-date="${(n.announcement_date||'').replace(/"/g,'&quot;')}" data-round-date="${zfNoticeDate(n).replace(/"/g,'&quot;')}" data-complex-count="${zfComplexCount(n)}" data-doc-submit-announce="${(n.doc_submit_announce_date||'').replace(/"/g,'&quot;')}" data-doc-submit-start="${(n.doc_submit_start||'').replace(/"/g,'&quot;')}" data-doc-submit-end="${(n.doc_submit_end||'').replace(/"/g,'&quot;')}" data-winner-announce="${(n.winner_announce_date||'').replace(/"/g,'&quot;')}" data-contract-start="${(n.contract_start||'').replace(/"/g,'&quot;')}" data-contract-end="${(n.contract_end||'').replace(/"/g,'&quot;')}" data-attachment-urls="${n.attachment_urls?JSON.stringify(n.attachment_urls).replace(/"/g,'&quot;'):''}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this,'match')" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
       <div class="htop">
         <p class="hname">${normalizeRevisedTitle(n.title)||'(공고명 없음)'}</p>
-        <span class="htag ${isClosed?'tag-mix':'tag-apt'}">${n.status||'-'}</span>
+        ${(t => `<span class="htag ${t.closed?'tag-mix':'tag-apt'}">${escapeHtml(t.text)}</span>`)(zfStatusTag(n))}
       </div>
       <!-- 🔴 공고 탭과 같은 규칙 — 유형은 원문 한 번만(2026-09-16). -->
       <p class="haddr">${zfCoverPlace(n.region_names, zfComplexCount(n), n.sido_nm, n.sigungu_nm, n.region, n.announcement_id)} · ${zfTypeHtml(n.source, n.housing_type, n.title)}</p>
@@ -7769,6 +7868,7 @@ function renderMatchResults(rows){
       ${pairKeyM?`<div style="font-size:11px;color:#A32D2D;background:#FFF3F3;border:1px solid #F5C2C2;border-radius:8px;padding:5px 10px;margin-bottom:6px">⚠️ 동일 회차 짝공고와 <b>중복 신청 시 자동 탈락</b>될 수 있어요. 공고문을 반드시 확인하세요.</div>`:''}
       <div data-sum-for="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" data-sum-url="${(n.url||'').replace(/"/g,'&quot;')}" data-sum-key="${zfAttr(zfDedupKey(n.title))}"></div>
       <p style="font-size:12px;color:#888;margin-bottom:8px">${dateLine}</p>
+      ${zfCheckNoteHtml(n._zfSupplyCheck, n._zfTypeCheck)}
       ${zfRouteSlotHtml(n, n.title)}
       ${zfNoticesSlotHtml(n)}
       ${detailHTML}
