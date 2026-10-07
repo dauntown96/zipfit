@@ -93,9 +93,11 @@ FORBIDDEN = [
     (re.compile(r'\b(set|reset)\s+(local\s+|session\s+)?(role|session\s+authorization)\b', re.I), '역할 바꾸기 — 검사가 쓰는 자리다'),
     (re.compile(r'\bzipfit\.check\b|\bzipfit_ops\.schema_migrations\b', re.I), '적용 기록·검사 자리를 직접 건드림'),
 ]
-TOUCH_RE = re.compile(r'(?<!execute\s)\b(?:function|procedure)\s+(?:if\s+exists\s+)?(?:public\.)?"?([a-z_][a-z0-9_]*)"?\s*\(', re.I)
-DIRECTIVE_FN_RE = re.compile(r'^--\s*zipfit:function\s+(?:public\.)?([a-z_][a-z0-9_]*\([^)]*\))\s+acl=(\{[^}]*\}|null)\s+secdef=(true|false)\s*$', re.I | re.M)
-DIRECTIVE_DROP_RE = re.compile(r'^--\s*zipfit:dropped\s+(?:public\.)?([a-z_][a-z0-9_]*\([^)]*\))\s*$', re.I | re.M)
+# 🔵 2026-10-07(Z-2 9) — 함수 이름 키: public 은 이름 그대로 · zipfit_ops 는 「zipfit_ops.이름」(사본 supabase/rpc/zipfit_ops/<이름>.sql).
+TOUCH_RE = re.compile(r'(?<!execute\s)\b(?:function|procedure)\s+(?:if\s+exists\s+)?(?:(public|zipfit_ops)\.)?"?([a-z_][a-z0-9_]*)"?\s*\(', re.I)
+DIRECTIVE_FN_RE = re.compile(r'^--\s*zipfit:function\s+(?:public\.)?((?:zipfit_ops\.)?[a-z_][a-z0-9_]*\([^)]*\))\s+acl=(\{[^}]*\}|null)\s+secdef=(true|false)\s*$', re.I | re.M)
+DIRECTIVE_DROP_RE = re.compile(r'^--\s*zipfit:dropped\s+(?:public\.)?((?:zipfit_ops\.)?[a-z_][a-z0-9_]*\([^)]*\))\s*$', re.I | re.M)
+QNAME_SQL = "case when ns.nspname = 'public' then p.proname else ns.nspname || '.' || p.proname end"   # 위 키와 같은 꼴
 DIRECTIVE_ANON_RE = re.compile(r'^--\s*zipfit:anon\s+(.+?)\s*$', re.I | re.M)
 
 
@@ -118,23 +120,34 @@ def parse(path):
             errs.append(f'{name}: {why}')
     if not code.strip().rstrip().endswith(';'):
         errs.append(f'{name}: 마지막 문장이 ; 로 끝나지 않는다')
-    touched = sorted({m.group(1).lower() for m in TOUCH_RE.finditer(code)})
+    touched = sorted({(m.group(1).lower() + '.' if (m.group(1) or '').lower() == 'zipfit_ops' else '') + m.group(2).lower() for m in TOUCH_RE.finditer(code)})
     fns = {}
     for sig, acl, sd in DIRECTIVE_FN_RE.findall(raw):
         sig = re.sub(r'\s+', '', sig).lower()
         fns[sig] = {'acl': None if acl.lower() == 'null' else acl, 'secdef': sd.lower() == 'true'}
     dropped = {re.sub(r'\s+', '', s).lower() for s in DIRECTIVE_DROP_RE.findall(raw)}
     declared = {s.split('(')[0] for s in list(fns) + list(dropped)}
-    for t in touched:
-        if t not in declared:
-            errs.append(f'{name}: 함수 {t} 를 건드리는데 머리에 「-- zipfit:function {t}(인자) acl={{…}} secdef=true|false」 선언이 없다')
+    # 🔵 2026-10-07 — 선언 없는 함수 손대기는 **아직 적용 안 된 파일**에서만 위반이다(split_pending 뒤 pending_errors 가 더한다).
+    #   적용된 파일은 고칠 수 없다(sha256) — zipfit_ops 를 키로 세기 전에 적용된 2026-10-07_03 이 선언 없이 zipfit_ops 함수를 만들었다.
+    undeclared = [f'{name}: 함수 {t} 를 건드리는데 머리에 「-- zipfit:function {t}(인자) acl={{…}} secdef=true|false」 선언이 없다'
+                  for t in touched if t not in declared]
     anon = DIRECTIVE_ANON_RE.findall(raw)
     return {'name': name, 'path': path, 'sql': raw, 'sha256': hashlib.sha256(raw.encode('utf-8')).hexdigest(),
-            'touched': touched, 'functions': fns, 'dropped': sorted(dropped), 'anon': anon, 'errors': errs}
+            'touched': touched, 'functions': fns, 'dropped': sorted(dropped), 'anon': anon, 'errors': errs, 'undeclared': undeclared}
+
+
+def pending_errors(pending):
+    return [e for f in pending for e in f['undeclared']]
+
+
+def rpc_path(fname):
+    if fname.startswith('zipfit_ops.'):
+        return os.path.join(RPC_DIR, 'zipfit_ops', fname.split('.', 1)[1] + '.sql')
+    return os.path.join(RPC_DIR, fname + '.sql')
 
 
 def rpc_md5(fname):
-    p = os.path.join(RPC_DIR, fname + '.sql')
+    p = rpc_path(fname)
     if not os.path.exists(p):
         return None
     s = open(p, encoding='utf-8').read()
@@ -205,10 +218,10 @@ def functions_info(names):
     if not names:
         return {}
     arr = 'array[' + ','.join(lit(n) for n in names) + ']::text[]'
-    rows = read(f"""select p.proname as name, p.oid::regprocedure::text as sig, md5(pg_get_functiondef(p.oid)) as md5,
+    rows = read(f"""select {QNAME_SQL} as name, p.oid::regprocedure::text as sig, md5(pg_get_functiondef(p.oid)) as md5,
         p.proacl::text as acl, p.prosecdef as secdef
-      from pg_proc p join pg_namespace n on n.oid=p.pronamespace
-      where n.nspname='public' and p.proname = any({arr}) order by 2""")
+      from pg_proc p join pg_namespace ns on ns.oid=p.pronamespace
+      where ns.nspname in ('public','zipfit_ops') and {QNAME_SQL} = any({arr}) order by 2""")
     out = {}
     for r in rows:
         out.setdefault(r['name'], []).append(r)
@@ -244,7 +257,7 @@ def compare_functions(files, info):
         sig = re.sub(r'\s+', '', g['sig']).lower().replace('public.', '')
         problems = []
         if rp is None:
-            problems.append(f'supabase/rpc/{n}.sql 이 없다(새 함수면 적용 뒤 정의를 사본으로 둔다)')
+            problems.append(f'{os.path.relpath(rpc_path(n), ROOT)} 이 없다(새 함수면 적용 뒤 정의를 사본으로 둔다)')
         elif g['md5'] not in rp:
             problems.append(f'DB 정의 md5 {g["md5"][:8]}… ≠ rpc 사본')
         w = want.get(sig)
@@ -313,11 +326,11 @@ declare n bigint; smp jsonb; fns jsonb;
 begin
   execute {dq('select count(*) from (' + inv + ') x', 'zz_inv')} into n;
   execute {dq('select coalesce(jsonb_agg(to_jsonb(y)), ' + "'[]'::jsonb" + ') from (select * from (' + inv + ') x limit 3) y', 'zz_inv2')} into smp;
-  select coalesce(jsonb_agg(jsonb_build_object('name',p.proname,'sig',p.oid::regprocedure::text,'md5',md5(pg_get_functiondef(p.oid)),
+  select coalesce(jsonb_agg(jsonb_build_object('name',{QNAME_SQL},'sig',p.oid::regprocedure::text,'md5',md5(pg_get_functiondef(p.oid)),
            'acl',p.proacl::text,'secdef',p.prosecdef) order by p.oid::regprocedure::text),'[]'::jsonb)
     into fns
     from pg_proc p join pg_namespace ns on ns.oid=p.pronamespace
-   where ns.nspname='public' and p.proname = any({arr});
+   where ns.nspname in ('public','zipfit_ops') and {QNAME_SQL} = any({arr});
   perform set_config('zipfit.check', jsonb_build_object('invariants', n, 'invariants_before', {inv_base}, 'invariants_sample', smp, 'functions', fns, 'anon', '[]'::jsonb)::text, true);
 end
 ''', 'zz_pg')};
@@ -346,7 +359,7 @@ def cmd_check():
     errs = [e for f in files for e in f['errors']]
     led = ledger_safe()
     pending, e2 = split_pending(files, led)
-    errs += e2
+    errs += e2 + pending_errors(pending)
     data['pending'] = [f['name'] for f in pending]
     lines.append(f'- 변경 파일 {len(files)}개 · 적용 기록 {len(led)}개 · **이번에 적용될 것 {len(pending)}개**: ' + (', '.join(f'`{f["name"]}`' for f in pending) or '없음'))
     if errs:
@@ -413,7 +426,7 @@ def cmd_apply():
     errs = [e for f in files for e in f['errors']]
     led = ledger_safe()
     pending, e2 = split_pending(files, led)
-    errs += e2
+    errs += e2 + pending_errors(pending)
     data['skipped'] = [n for n in led if n in {f['name'] for f in files}]
     lines.append(f'- 변경 파일 {len(files)}개 · 이미 적용 {len(data["skipped"])}개(건너뜀) · **적용할 것 {len(pending)}개**')
     if errs:

@@ -203,21 +203,22 @@ try {
   //   대조 규칙은 .github/db/migrate.py rpc_md5() 와 같다 — 파일 그대로 또는 끝 줄바꿈을 걷은 md5 가 DB md5 와 같으면 통과.
   //   걸리는 것: 정의가 다름 · 사본 없음(새 함수) · 같은 이름 둘 이상(한 파일로 대조 불가) · 함수 없는 사본(지운 함수의 사본 잔존).
   //   확장 소유 함수는 뺀다(pg_depend deptype 'e'). README.md · triggers.sql(트리거 바인딩)은 함수 사본이 아니다.
+  //   🔵 2026-10-07(Z-2 9) — zipfit_ops 함수도 본다: 이름 키 「zipfit_ops.이름」 ↔ 사본 supabase/rpc/zipfit_ops/<이름>.sql(migrate.py 와 같은 키).
   {
     const t0 = Date.now()
     const [fr] = await sqlRead(`
-      select coalesce(json_agg(json_build_object('name', p.proname, 'sig', p.oid::regprocedure::text, 'md5', md5(pg_get_functiondef(p.oid))) order by p.proname), '[]'::json) j
+      select coalesce(json_agg(json_build_object('name', case when n.nspname = 'public' then p.proname else n.nspname || '.' || p.proname end,
+               'sig', p.oid::regprocedure::text, 'md5', md5(pg_get_functiondef(p.oid))) order by n.nspname, p.proname), '[]'::json) j
       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-      where n.nspname = 'public' and p.prokind in ('f','p')
+      where n.nspname in ('public', 'zipfit_ops') and p.prokind in ('f','p')
         and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')`)
     const fns = fr.j || []
     const RPC_DIR = 'supabase/rpc'
     const NOT_COPIES = new Set(['README.md', 'triggers.sql'])
-    const copies = new Map(readdirSync(RPC_DIR).filter(f => f.endsWith('.sql') && !NOT_COPIES.has(f)).map(f => {
-      const s = readFileSync(`${RPC_DIR}/${f}`, 'utf8')
-      const md5 = x => createHash('md5').update(x, 'utf8').digest('hex')
-      return [f.slice(0, -4), new Set([md5(s), md5(s.replace(/\n+$/, ''))])]
-    }))
+    const md5 = x => createHash('md5').update(x, 'utf8').digest('hex')
+    const copyOf = path => { const s = readFileSync(path, 'utf8'); return new Set([md5(s), md5(s.replace(/\n+$/, ''))]) }
+    const copies = new Map(readdirSync(RPC_DIR).filter(f => f.endsWith('.sql') && !NOT_COPIES.has(f)).map(f => [f.slice(0, -4), copyOf(`${RPC_DIR}/${f}`)]))
+    for (const f of readdirSync(`${RPC_DIR}/zipfit_ops`).filter(f => f.endsWith('.sql'))) copies.set(`zipfit_ops.${f.slice(0, -4)}`, copyOf(`${RPC_DIR}/zipfit_ops/${f}`))
     const byName = new Map()
     for (const f of fns) byName.set(f.name, [...(byName.get(f.name) || []), f])
     const bad = []
@@ -227,8 +228,8 @@ try {
       if (!c) bad.push(`${list[0].sig}: 사본 없음`)
       else if (!c.has(list[0].md5)) bad.push(`${list[0].sig}: DB ${list[0].md5.slice(0, 8)}… ≠ 사본`)
     }
-    for (const name of copies.keys()) if (!byName.has(name)) bad.push(`${name}.sql: DB에 함수 없음`)
-    add('fn_copy', 'public 함수 정의 = supabase/rpc/ 사본', bad.length === 0 ? 'pass' : 'fail',
+    for (const name of copies.keys()) if (!byName.has(name)) bad.push(`${name.replace('.', '/')}.sql: DB에 함수 없음`)
+    add('fn_copy', 'public·zipfit_ops 함수 정의 = supabase/rpc/ 사본', bad.length === 0 ? 'pass' : 'fail',
       bad.length ? bad.join(' · ') : `${fns.length}개 모두 같음 · ${Date.now() - t0}ms`,
       'DB 정의 md5 = 사본 md5(끝 줄바꿈 무시 — migrate.py 와 같은 규칙) · 사본 없는 함수·함수 없는 사본 0 · 확장 함수 제외')
   }
