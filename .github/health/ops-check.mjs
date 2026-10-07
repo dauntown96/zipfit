@@ -90,13 +90,15 @@ try {
       'images_last_run_age_min', (select extract(epoch from now() - max(d.start_time))/60 from cron.job_run_details d join cron.job j using (jobid) where j.jobname = 'zipfit-collect-lh-images'),
       'images_fail_24h', (select count(*) from announcement_complex_image_fetch where not ok and fetched_at > now() - interval '24 hours'),
       'sh_last_run_age_min', (select extract(epoch from now() - max(run_at))/60 from sh_collection_run_log),
-      'ops_dispatch', (select json_build_object('age_min', extract(epoch from now() - l.at)/60, 'status', r.status_code, 'pending', r.id is null,
-                              'err', left(coalesce(r.error_msg, case when r.status_code >= 300 then r.content end), 200))
-                         from ops_dispatch_log l left join net._http_response r on r.id = l.net_request_id
+      'ops_dispatch', (select json_build_object('age_min', extract(epoch from now() - l.at)/60, 'status', coalesce(l.status_code, r.status_code), 'pending', l.status_note is null and r.id is null,
+                              'err', left(coalesce(l.error_msg, r.error_msg, case when r.status_code >= 300 then r.content end), 200))
+                         from ops_dispatch_log l left join net._http_response r on r.id = l.net_request_id and r.created >= l.at - interval '1 minute' and r.created < l.at + interval '10 minutes'
                         where l.target = 'health-ops.yml' order by l.id desc limit 1),
-      'screen_dispatch', (select json_build_object('age_min', extract(epoch from now() - l.at)/60, 'status', r.status_code, 'pending', r.id is null,
-                              'err', left(coalesce(r.error_msg, case when r.status_code >= 300 then r.content end), 200))
-                         from ops_dispatch_log l left join net._http_response r on r.id = l.net_request_id
+      -- 🔵 2026-10-07(#372) — 응답은 ops_dispatch_log 칸(ops_dispatch_log_fill 이 발송 전에 옮김)이 먼저 · 없으면 net._http_response(발송 시각 언저리만 — 요청 번호 재사용).
+      --    응답 행은 몇 시간 안에 사라진다 — 하루 한 번 발송(화면 점검)을 응답 행으로만 보면 몇 시간 뒤부터 「응답 대기」 오탐이었다.
+      'screen_dispatch', (select json_build_object('age_min', extract(epoch from now() - l.at)/60, 'status', coalesce(l.status_code, r.status_code), 'pending', l.status_note is null and r.id is null,
+                              'err', left(coalesce(l.error_msg, r.error_msg, case when r.status_code >= 300 then r.content end), 200))
+                         from ops_dispatch_log l left join net._http_response r on r.id = l.net_request_id and r.created >= l.at - interval '1 minute' and r.created < l.at + interval '10 minutes'
                         where l.target = 'health-screen.yml' order by l.id desc limit 1),
       'dispatch', (select json_build_object(
          'enabled', c.enabled, 'grace_min', extract(epoch from c.grace)/60, 'max_wait_min', extract(epoch from c.max_wait)/60,

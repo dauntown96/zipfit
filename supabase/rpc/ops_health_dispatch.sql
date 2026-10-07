@@ -9,6 +9,7 @@ AS $function$
 declare
   v_tok text; v_id bigint;
 begin
+  perform public.ops_dispatch_log_fill();   -- 앞선 발송의 응답을 옮겨 적는다(2026-10-07 · 응답 행은 몇 시간 안에 사라진다 — ops_dispatch_log_fill 주석)
   select decrypted_secret into v_tok from vault.decrypted_secrets where name = 'github_actions_dispatch_token';
   if coalesce(v_tok, '') = '' then
     raise exception 'Vault github_actions_dispatch_token 없음';
