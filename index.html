@@ -3647,6 +3647,8 @@ let zfRecChipsRestored=false;
 let zfSettingsFormApplied=false;
 let visibleCount=3;
 let lastFiltered=[];
+let lastTargetOut=[];
+const zfRecPriceAsked = new Set();   // 🔵 추천 패널 「최대 보증금」 — 가격 요약을 이미 부른 카드(되풀이 호출 막기)   // 🔵 매칭 2단계 — 공급대상 키로 「대상이 달라 뺀」 공고(👥 상자)
 // 🔴 자격진단에서 신청 가능한 유형이 비고 유형 칩도 고르지 않아 유형 필터 없이 그린 목록인지(2026-09-23 B22).
 //    그때 목록이 「맞춤 결과」처럼 보이지 않게 renderMatchResults 가 한 줄 안내를 얹는다. 목록 자체는 바꾸지 않는다.
 let matchNoTypeFilter=false;
@@ -3833,17 +3835,45 @@ function renderPersonalizedRecommendations(){
   });
 
   const desc=document.getElementById('personalizedDesc');
+  // 🔵 2026-10-08(매칭 2단계 · 시안) — 저장 조건(혼인·자녀·출생연도)으로 공급대상 키를 판정한다. 키 행을 아직 안 받았으면 받은 뒤 다시 그린다.
+  if(!zfTargetRowsP){ zfLoadTargetRows().then(ok => { if(ok) renderPersonalizedRecommendations(); }); }
+  const recTf = zfTargetProfileFacts();
+  const recOut = [];
+  // 🔵 2026-10-08(매칭 2단계 · 다운님 승인 2) — 설정 탭 「최대 보증금」(max_deposit · 만원)을 추천에도 쓴다. 규칙은 매칭 탭과 같다
+  //    (카드 가격 요약의 가장 낮은 보증금이 한도보다 크면 뺀다 · 가격을 모르는 카드는 빼지 않는다). 요약을 아직 안 받은 카드가 있으면
+  //    받은 뒤 한 번 다시 그린다(같은 카드를 두 번 부르지 않는다).
+  const recMaxDep = parseInt(currentUser.max_deposit) || 0;
+  if(recMaxDep > 0){
+    const need = noticeData.map(n => String(n['announcement_id'] || '')).filter(id => id && zfPriceCache.get(id) === undefined && !zfRecPriceAsked.has(id));
+    if(need.length){ need.forEach(id => zfRecPriceAsked.add(id)); zfEnsurePriceSummaries(need).then(ok => { if(ok) renderPersonalizedRecommendations(); }); }
+  }
+  const recDepOk = n => {
+    if(!(recMaxDep > 0)) return true;
+    const s = zfPriceCache.get(String(n['announcement_id']));
+    const lo = (s && s.deposit_min != null) ? Number(s.deposit_min) : null;
+    return !(lo != null && lo > recMaxDep * 10000);
+  };
+  const recKeep = n => {
+    if(!recDepOk(n)) return false;
+    const v = zfTargetVerdictFor(n['announcement_id'], recTf);
+    n._zfTarget = v;
+    if(v && v.state === 'no'){ recOut.push({ id: n['announcement_id'], title: n['공고명'] || n['name'], v }); return false; }
+    return true;
+  };
+  filtered = filtered.filter(recKeep);
   if(!hasConditions){
-    filtered=noticeData.filter(n=>!isHiddenAsClosed(n) && !zfIsCancelRow(n['공고명'])).slice(0,5);
+    recOut.length = 0;   // 위 거름을 버리고 전체에서 다시 거른다 — 뺀 목록이 두 번 쌓이지 않게
+    filtered=noticeData.filter(n=>!isHiddenAsClosed(n) && !zfIsCancelRow(n['공고명'])).filter(recKeep).slice(0,5);
     // 조건 저장 안내는 위 안내 박스(noCond)가 맡는다 — 여기서 되풀이하지 않는다.
-    desc.textContent='저장된 조건이 없어 전체 공고를 표시해요.';
+    // 🔵 2026-10-08(매칭 2단계 · 함께 고칠 것 ①) — 지역·유형 조건이 없을 뿐 자격(공급 대상)·보증금으로는 거른다 — 문장의 범위를 바로잡는다.
+    desc.textContent='저장된 지역·유형 조건이 없어 전체 공고를 표시해요.';
   } else {
     desc.textContent=`저장된 조건 기준 ${filtered.length}건 매칭됐어요.`;
   }
 
   const shown=filtered.slice(0,5);
   if(!shown.length){
-    document.getElementById('personalizedList').innerHTML='<div class="rbox warn"><p class="rtitle">⚠ 조건에 맞는 공고가 없어요</p><p class="rdesc">설정에서 조건을 조정해보세요.</p></div>';
+    document.getElementById('personalizedList').innerHTML='<div class="rbox warn"><p class="rtitle">⚠ 조건에 맞는 공고가 없어요</p><p class="rdesc">설정에서 조건을 조정해보세요.</p></div>' + zfTargetExcludedHtml(recOut);
     return;
   }
 
@@ -3870,13 +3900,14 @@ function renderPersonalizedRecommendations(){
       </div>
       <div data-sum-for="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" data-sum-url="${(n['공고URL']||n['url']||'').replace(/"/g,'&quot;')}" data-sum-key="${zfAttr(zfDedupKey(n['공고명']||n['name']))}"></div>
       <p style="font-size:12px;color:#888;margin-bottom:8px">${dateLine}</p>
-      ${zfCheckNoteHtml(zfSupplyCheckLabels(n['공고명']||n['name'], zfProfileFacts()), '')}
+      ${n._zfTarget ? zfTargetNoteHtml(n._zfTarget) : zfCheckNoteHtml(zfSupplyCheckLabels(n['공고명']||n['name'], zfProfileFacts()), '')}
       ${zfRouteSlotHtml(n, n['공고명']||n['name'])}
       ${zfNoticesSlotHtml(n)}
       ${(n['공고URL']||n['url'])?`<a class="detail-link" href="${n['공고URL']||n['url']}" target="_blank" rel="noopener" style="display:block" onclick="zfLog('recommend_click',{rank:${idx+1}},'${(n['announcement_id']||'').toString().replace(/'/g,'')}')">AI 정리 · 원문 보기 →</a>`:''}
     </div>`;
   });
   if(filtered.length>5) html+=`<p style="font-size:12px;color:#888;text-align:center;margin-top:8px">외 ${filtered.length-5}건 더 — 공고 탭에서 전체 확인</p>`;
+  html += zfTargetExcludedHtml(recOut);
   document.getElementById('personalizedList').innerHTML=html;
   // 🔴 공고 탭·매칭 탭과 같은 두 줄이다(2026-09-17). 새 문구·새 함수를 만들지 않고
   //    zfNotAnalyzedHtml 을 그대로 쓴다 — 채우는 주체는 zfFillSummarySlots 한 벌이다.
@@ -4920,6 +4951,111 @@ function zfProfileFacts(){
   return { marital: u.marital || '', children: parseInt(u.children) || 0, birthYear: parseInt(u.birth_year || u.birthYear) || 0 };
 }
 
+// 🔵 2026-10-08(매칭 2단계 · 시안) — 자격 행 verification_requirements.공급대상 키로 공급 대상을 ok/no/check 로 가른다.
+//    키 꼴(분석 스킬 v9.8): { 원문, 갈래: [{대상, 조건:{나이_최소·나이_최대·미성년자녀_최소}} | {대상, 확인필요}] } —
+//    갈래는 「하나라도 맞으면」 그 행 대상이다. 대상 이름은 여덟 값(다자녀 · 신혼·신생아 · 한부모 · 고령자 · 청년 · 창업 · 장애인 · 계층).
+//    🔴 근거 없이 빼지 않는다 — 카드 자신의 자격 행이 **모두** 키를 가졌고 **모두** no 일 때만 「대상이 달라 뺌」이다.
+//       키 없는 행이 하나라도 있으면(일반 공급 · 주거약자용 행 등) 판정하지 않고 1단계(제목 📄) 그대로 둔다.
+//    입력이 없는 축(대학생·직업·수급·장애·창업 — 확인필요 갈래)과 입력이 비어 있는 축은 check 다.
+//    facts = { marital, children(null = 모름), birthYear(0 = 모름) } — 매칭은 진단 입력(zfTargetDiagFacts), 추천은 저장 조건(zfTargetProfileFacts).
+//    D-1(상세 「내 조건에 맞는 세대」)이 다시 쓰게 판정은 zfTargetBranchState·zfTargetRowState·zfTargetVerdict 세 함수뿐이다.
+const ZF_TARGET_MARRIED = ['married_7','newborn','pre','married_child6'];
+function zfTargetBranchState(b, f){
+  if(!b || typeof b !== 'object' || b['확인필요']) return 'check';
+  const c = (b['조건'] && typeof b['조건'] === 'object') ? b['조건'] : {};
+  switch(b['대상']){
+    case '다자녀': {
+      const n = Number(c['미성년자녀_최소']);
+      if(!n || f.children == null) return 'check';
+      return f.children >= n ? 'ok' : 'no';
+    }
+    case '신혼·신생아': return !f.marital ? 'check' : (ZF_TARGET_MARRIED.includes(f.marital) ? 'ok' : 'no');
+    case '한부모':     return !f.marital ? 'check' : (f.marital === 'single_parent' ? 'ok' : 'no');
+    case '고령자':
+    case '청년': {
+      if(c['나이_최소'] == null && c['나이_최대'] == null) return 'check';
+      return ageStateFor({ age_min: c['나이_최소'] ?? null, age_max: c['나이_최대'] ?? null }, f.birthYear);
+    }
+    default: return 'check';   // 창업 · 장애인 · 계층 · 모르는 값
+  }
+}
+function zfTargetRowState(g, f){
+  const br = (g && Array.isArray(g['갈래'])) ? g['갈래'] : [];
+  if(!br.length) return 'check';
+  const st = br.map(b => zfTargetBranchState(b, f));
+  return st.includes('ok') ? 'ok' : (st.every(s => s === 'no') ? 'no' : 'check');
+}
+// rows = 그 카드 자신의 자격 행 공급대상 칸 배열(객체가 아니면 「키 없음」). 판정하지 않으면 null.
+function zfTargetVerdict(rows, f){
+  if(!Array.isArray(rows) || !rows.length) return null;
+  if(rows.some(g => !g || typeof g !== 'object' || Array.isArray(g))) return null;
+  const st = rows.map(g => zfTargetRowState(g, f));
+  const names = s => [...new Set(rows.filter((g, i) => st[i] === s || s === '*')
+    .flatMap(g => (g['갈래'] || []).map(b => b && b['대상']).filter(Boolean)))];
+  const quotes = [...new Set(rows.map(g => g['원문']).filter(Boolean))];
+  if(st.every(s => s === 'no')) return { state: 'no', names: names('*'), quotes };
+  if(st.includes('ok')) return { state: 'ok', names: names('ok'), quotes };
+  const checks = [...new Set(rows.flatMap(g => (g['갈래'] || []).map(b => b && b['확인필요']).filter(Boolean)))];
+  return { state: 'check', names: names('*'), checks, quotes };
+}
+function zfTargetDiagFacts(){
+  const by = parseInt(document.getElementById('birthYear')?.value) || 0;
+  const ch = document.getElementById('children')?.value;
+  return { marital: diagMarital || document.getElementById('marital')?.value || '', children: (ch == null || ch === '') ? null : (parseInt(ch) || 0), birthYear: by };
+}
+function zfTargetProfileFacts(){
+  const u = currentUser || {};
+  const ch = u.children;
+  return { marital: u.marital || '', children: (ch == null || ch === '') ? null : (parseInt(ch) || 0), birthYear: parseInt(u.birth_year || u.birthYear) || 0 };
+}
+// 공급대상 키를 가진 공고의 자격 행(공급대상 칸만)을 한 번 받아 둔다 — 키 있는 공고는 수십 장이라 목록 전체를 부르지 않는다.
+// 🔵 키 행은 대표 카드 ID 자신에 있다(2026-10-08 실측 19공고 전부). 그래서 카드 ID 하나로 찾는다.
+let zfTargetRowsP = null;
+const zfTargetRowsByAnn = new Map();
+function zfLoadTargetRows(){
+  if(zfTargetRowsP) return zfTargetRowsP;
+  const h = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
+  zfTargetRowsP = fetch(`${SUPABASE_URL}/rest/v1/eligibility_criteria?select=announcement_id,gk:verification_requirements->공급대상&verification_requirements->공급대상=not.is.null&limit=10000`, { headers: h })
+    .then(r => r.ok ? r.json() : [])
+    .then(rows => {
+      const ids = [...new Set((rows || []).filter(r => r && r.gk && typeof r.gk === 'object' && !Array.isArray(r.gk)).map(r => r.announcement_id))];
+      if(!ids.length) return true;
+      return fetch(`${SUPABASE_URL}/rest/v1/eligibility_criteria?select=announcement_id,gk:verification_requirements->공급대상&${idFilterFor(ids)}&limit=10000`, { headers: h })
+        .then(r => r.ok ? r.json() : [])
+        .then(all => { (all || []).forEach(r => { const a = String(r.announcement_id); if(!zfTargetRowsByAnn.has(a)) zfTargetRowsByAnn.set(a, []); zfTargetRowsByAnn.get(a).push(r.gk ?? null); }); return true; });
+    })
+    .catch(() => { zfTargetRowsP = null; return false; });
+  return zfTargetRowsP;
+}
+function zfTargetVerdictFor(annId, f){ return zfTargetVerdict(zfTargetRowsByAnn.get(String(annId)), f); }
+// 문구 — 다운님 승인 2026-10-08(우편함 「표시층 — 추천 매칭 2단계」 「## 승인」). 맞음 줄은 공급 대상만 본 판정이라
+//    「신청 자격 전체가 맞다」로 읽히지 않게 「대상 조건」이라고 쓴다.
+function zfTargetNoteHtml(v){
+  if(!v) return '';
+  const nm = escapeHtml((v.names || []).join('·'));
+  if(v.state === 'ok') return `<p class="zf-target-ok" style="font-size:12px;color:#0F6E56;background:#E6F4EE;border-radius:8px;padding:6px 10px;margin:0 0 8px">👥 ${nm} 대상 모집 — 입력하신 정보로는 대상 조건에 맞아요</p>`;
+  if(v.state === 'check'){
+    const why = (v.checks || []).length ? ` (${escapeHtml(v.checks.join(' · '))})` : '';
+    return `<p class="zf-check-note" style="font-size:12px;color:#8A5A12;background:#FBF0DC;border-radius:8px;padding:6px 10px;margin:0 0 8px">📄 이 공고는 ${nm} 대상 모집이에요${why} — 신청할 수 있는지 공고문에서 확인해 주세요</p>`;
+  }
+  return '';
+}
+function zfTargetExcludedHtml(list){
+  if(!list || !list.length) return '';
+  const items = list.map(x => {
+    const t = escapeHtml(x.title || '(공고명 없음)');
+    const nm = escapeHtml((x.v.names || []).join('·'));
+    const q = (x.v.quotes || [])[0];
+    // 🔵 원문은 두 줄로 접는다 — 7건이면 390px에서 상자가 화면 세 장이었다(다운님 승인 때 함께 고칠 것 ②). 「더 보기」로 편다.
+    const qh = q ? `<br><span class="zf-tq" style="color:#999;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden">원문: ${escapeHtml(q)}</span><button type="button" class="zf-tq-more" style="border:0;background:none;color:#0F6E56;font-size:12px;padding:2px 0;cursor:pointer" onclick="event.stopPropagation();const p=this.previousElementSibling;p.style.webkitLineClamp='unset';p.style.display='block';this.remove()">더 보기</button>` : '';
+    return `<li style="margin:0 0 8px"><span style="font-weight:600">${t}</span><br><span style="color:#666">${nm} 대상 모집</span>${qh}</li>`;
+  }).join('');
+  return `<details class="zf-target-out" style="margin-top:10px;background:#f6f6f2;border-radius:10px;padding:8px 12px;font-size:12px">
+    <summary style="cursor:pointer;font-weight:600;color:#555">👥 공급 대상이 달라 뺀 공고 ${list.length}</summary>
+    <ul style="margin:8px 0 0;padding-left:16px">${items}</ul>
+  </details>`;
+}
+
 async function matchHouses(){
   const minRooms = parseInt(document.getElementById('minRooms')?.value)||0;
   const regions = [...selectedRegions];
@@ -5017,6 +5153,16 @@ async function matchHouses(){
     }
     const facts = zfDiagFacts();
     rows.forEach(r => { r._zfSupplyCheck = zfSupplyCheckLabels(r.title, facts); });
+    // 🔵 2026-10-08(매칭 2단계 · 시안) — 공급대상 키가 판정한 카드는 제목 📄 대신 키 판정을 쓴다 · 모두 no 면 👥 상자로 뺀다.
+    await zfLoadTargetRows();
+    const tf = zfTargetDiagFacts();
+    lastTargetOut = [];
+    rows = rows.filter(r => {
+      const v = zfTargetVerdictFor(r.announcement_id, tf);
+      r._zfTarget = v;
+      if(v && v.state === 'no'){ lastTargetOut.push({ id: r.announcement_id, title: r.title, v }); return false; }
+      return true;
+    });
 
     lastFiltered = rows;
     visibleCount = 5;
@@ -7845,7 +7991,7 @@ function renderMatchResults(rows){
     // 🔴 2026-09-15: 축이 status 문자열에서 날짜(applyWindowState)로 옮겨졌다. 미상은 남는다.
     // 문구가 「접수중」이라 축이 어긋나 있었다. 필터가 아니라 문구를 맞춘다 — 필터를 접수중으로
     // 좁히면 접수 시작 전 공고와 접수기간 미상(SH) 공고가 추천에서 통째로 빠져 보여주던 것이 줄어든다.
-    r.innerHTML='<div class="rbox warn"><p class="rtitle">⚠ 조건에 맞는 공고가 없어요</p><p class="rdesc">접수마감된 공고는 제외했어요. 공고 탭에서 전체 공고를 확인해보세요.</p></div>';
+    r.innerHTML='<div class="rbox warn"><p class="rtitle">⚠ 조건에 맞는 공고가 없어요</p><p class="rdesc">접수마감된 공고는 제외했어요. 공고 탭에서 전체 공고를 확인해보세요.</p></div>' + zfTargetExcludedHtml(lastTargetOut);
     return;
   }
 
@@ -7931,7 +8077,7 @@ function renderMatchResults(rows){
       ${pairKeyM?`<div style="font-size:11px;color:#A32D2D;background:#FFF3F3;border:1px solid #F5C2C2;border-radius:8px;padding:5px 10px;margin-bottom:6px">⚠️ 동일 회차 짝공고와 <b>중복 신청 시 자동 탈락</b>될 수 있어요. 공고문을 반드시 확인하세요.</div>`:''}
       <div data-sum-for="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" data-sum-url="${(n.url||'').replace(/"/g,'&quot;')}" data-sum-key="${zfAttr(zfDedupKey(n.title))}"></div>
       <p style="font-size:12px;color:#888;margin-bottom:8px">${dateLine}</p>
-      ${zfCheckNoteHtml(n._zfSupplyCheck, n._zfTypeCheck)}
+      ${n._zfTarget ? zfTargetNoteHtml(n._zfTarget) + zfCheckNoteHtml([], n._zfTypeCheck) : zfCheckNoteHtml(n._zfSupplyCheck, n._zfTypeCheck)}
       ${zfRouteSlotHtml(n, n.title)}
       ${zfNoticesSlotHtml(n)}
       ${detailHTML}
@@ -7941,6 +8087,7 @@ function renderMatchResults(rows){
   if(visibleCount < rows.length){
     html += `<button class="more-btn" onclick="showMore()">더 보기 (${rows.length-visibleCount}개 더 있음) ↓</button>`;
   }
+  html += zfTargetExcludedHtml(lastTargetOut);
 
   html += `<div class="alert-signup-box" id="alertSignupBox">
     <p style="font-size:14px;font-weight:600;color:#111;margin-bottom:6px">💾 이 검색 조건을 저장할까요?</p>

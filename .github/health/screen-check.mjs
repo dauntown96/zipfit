@@ -283,6 +283,68 @@ try {
   extra.stale_dates = staleDates
   add('stale_date', '고정 글자(히어로·메인 탭·푸터) 속 지난 날짜', staleDates.length === 0 ? 'pass' : 'fail', staleDates.length ? `${staleDates.length}: ${staleDates.slice(0, 3).join(' / ')}` : 0, '0 — 줄마다 가장 늦은 날짜 ≥ 오늘(KST)')
   await page.screenshot({ path: 'health-screen.png' })
+  // ⑥ 매칭 2단계 — 공급 대상이 달라 뺀 공고(2026-10-08 · 우편함 「표시층 — 추천 매칭 2단계」 · 원칙 33).
+  //    시험 사용자 (가)(미혼 · 자녀 0 · 1인 · 1996년생 · 소득 250 · 자산 9,000 · 무주택 · 청약통장)로 진단 → 매칭을 돌리고
+  //    ⓐ 뺀 공고마다 DB 에서 **따로** 같은 판정을 SQL 로 계산한다 — 카드 자신의 자격 행이 모두 공급대상 키(객체)를 갖고
+  //       모든 행의 모든 갈래가 이 입력으로 「아님」이어야 한다(확인필요 갈래 · 모르는 대상은 아님이 아니다). 하나라도 어긋나면 실패 = 근거 없이 뺐다.
+  //    ⓑ 매칭 표시 문구는 네 갈래(맞음 · 확인필요 · 유형 기준 없음 · 👥 상자 제목) 중 하나여야 하고, 상자 수 = 뺀 공고 수.
+  //    SIMULATE=target_out 이면 키 없는 남은 카드 하나를 뺀 목록에 끼워 넣는다(실패해야 맞다).
+  const tgt = await page.evaluate(async sim => {
+    if (typeof diagnose !== 'function' || typeof matchHouses !== 'function') return { err: '화면 함수 없음' }
+    goMain(1)
+    const u = { marital: 'single', children: '0', members: '1', income: '250', assets: '9000', owned: 'no', hasSavings: 'yes', birthYear: '1996' }
+    for (const [k, v] of Object.entries(u)) { const el = document.getElementById(k); if (el) el.value = v }
+    await diagnose(); await matchHouses()
+    if (typeof lastTargetOut === 'undefined') return { err: 'lastTargetOut 없음' }
+    if (sim) { const r = lastFiltered.find(x => !x._zfTarget); if (r) lastTargetOut.push({ id: r.announcement_id, title: r.title, v: { names: ['시험'] } }) }
+    visibleCount = lastFiltered.length; renderMatchResults(lastFiltered)   // 문구는 결과 전부를 펼쳐 잰다(처음 5장만 그리면 줄이 비기도 한다)
+    const root = document.getElementById('match-result')
+    const lines = [...root.querySelectorAll('.zf-target-ok, .zf-check-note')].map(e => e.textContent.replace(/\s+/g, ' ').trim())
+    const box = root.querySelector('details.zf-target-out > summary')
+    return { out: lastTargetOut.map(x => String(x.id)), lines, box: box ? box.textContent.replace(/\s+/g, ' ').trim() : null, year: new Date().getFullYear() }
+  }, process.env.SIMULATE === 'target_out')
+  {
+    const PH = [
+      /^👥 .+ 대상 모집 — 입력하신 정보로는 대상 조건에 맞아요$/,
+      /^📄 이 공고는 .+ 대상 모집이에요( \(.+\))? — 신청할 수 있는지 공고문에서 확인해 주세요$/,
+      /^📄 자격 진단에 이 유형\(.+\) 기준이 없어요 — 신청할 수 있는지 공고문에서 확인해 주세요$/,
+    ]
+    let ok = !tgt.err, value = '', bad = []
+    if (!tgt.err) {
+      const unknown = tgt.lines.filter(l => !PH.some(re => re.test(l)))
+      const boxOk = tgt.out.length === 0 ? tgt.box === null : tgt.box === `👥 공급 대상이 달라 뺀 공고 ${tgt.out.length}`
+      if (tgt.out.length) {
+        const ids = tgt.out.map(i => `'${i.replace(/'/g, "''")}'`).join(',')
+        const by = 1996, y = tgt.year
+        const rows = await sqlRead(`
+          with ids(aid) as (select unnest(array[${ids}]::text[])),
+          r as (select i.aid, e.id, e.verification_requirements->'공급대상' g
+                  from ids i left join public.eligibility_criteria e on e.announcement_id = i.aid),
+          b as (select r.aid, r.id, x.b from r left join lateral jsonb_array_elements(
+                  case when jsonb_typeof(r.g) = 'object' and jsonb_typeof(r.g->'갈래') = 'array' then r.g->'갈래' else '[]'::jsonb end) x(b) on true),
+          bs as (select aid, id, b,
+                  (b is not null and not (b ? '확인필요') and (
+                    (b->>'대상' = '다자녀' and coalesce((b->'조건'->>'미성년자녀_최소')::int, 0) > 0)
+                    or b->>'대상' in ('신혼·신생아', '한부모')
+                    or (b->>'대상' in ('고령자', '청년') and ((b->'조건') ? '나이_최소' or (b->'조건') ? '나이_최대')
+                        and (${y} - ${by} < coalesce((b->'조건'->>'나이_최소')::int, -999) or ${y} - ${by} - 1 > coalesce((b->'조건'->>'나이_최대')::int, 999)))
+                  )) as no
+                from b),
+          rs as (select aid, id, count(b) nb, bool_and(no) all_no from bs group by aid, id)
+          select i.aid,
+                 (select count(*) from r where r.aid = i.aid and r.id is not null) n_rows,
+                 (select count(*) from r where r.aid = i.aid and jsonb_typeof(r.g) = 'object') n_key,
+                 (select count(*) from rs where rs.aid = i.aid and rs.id is not null and rs.nb > 0 and rs.all_no) n_no
+          from ids i`)
+        bad = rows.filter(x => !(Number(x.n_rows) > 0 && Number(x.n_rows) === Number(x.n_key) && Number(x.n_key) === Number(x.n_no))).map(x => x.aid)
+      }
+      ok = bad.length === 0 && unknown.length === 0 && boxOk
+      value = `뺀 ${tgt.out.length} · 근거 없음 ${bad.length}${bad.length ? ': ' + bad.slice(0, 5).join(', ') : ''} · 문구 ${tgt.lines.length}줄 중 모르는 갈래 ${unknown.length}${unknown.length ? ': ' + unknown.slice(0, 2).join(' / ') : ''} · 상자 ${boxOk ? '맞음' : '어긋남(' + (tgt.box || '없음') + ')'}`
+      extra.target_out = { out: tgt.out, bad, unknown }
+    } else value = `못 잼(${tgt.err})`
+    add('target_out', '매칭 2단계 — 공급 대상이 달라 뺀 공고 근거 · 표시 문구 갈래', ok ? 'pass' : 'fail', value,
+      '시험 사용자 (가) — 뺀 공고 전부 DB 로 따로 계산한 「모든 행 키 · 모든 갈래 아님」 · 문구 네 갈래 · 상자 수 = 뺀 수')
+  }
 } catch (e) {
   add('runner', '점검 실행', 'fail', String(e).slice(0, 300), '점검 스크립트가 끝까지 돈다')
 } finally {
