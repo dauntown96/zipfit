@@ -1,0 +1,290 @@
+{
+ "_": "Supabase 보안 권고(관리 API advisors/security) 허용 목록 — health-ops sec_advisor 가 이 밖의 지적을 ⚠️ 로 알린다. 키 = cache_key 에서 끝 32자리 해시를 뗀 것. intended = 의도 확인됨 · known = 알려진 미결(고치면 지운다). 2026-10-08 운영 기반 묶음 2.",
+ "entries": [
+  {
+   "key": "anon_security_definer_function_executable_public_get_announcement_group_ids_p_announcement_id text",
+   "kind": "intended",
+   "why": "화면이 카드 열 때 부른다(index.html fetch rpc/get_announcement_group_ids) · 돌려주는 값은 announcement_id 목록뿐"
+  },
+  {
+   "key": "anon_security_definer_function_executable_public_get_announcement_price_summary_p_ids text[]",
+   "kind": "intended",
+   "why": "화면 카드 요약(rpc/get_announcement_price_summary) · announcement_analysis(클라이언트 권한 0)를 읽어 analysis_done 을 내야 해 정의자 · 개인정보 없음 · search_path 고정"
+  },
+  {
+   "key": "anon_security_definer_function_executable_public_get_revision_analysis_done_p_id text",
+   "kind": "intended",
+   "why": "화면 「정정 전 공고 기준」 배너(rpc/get_revision_analysis_done) · announcement_analysis 를 읽어 참/거짓 하나만 돌려준다 · search_path 고정"
+  },
+  {
+   "key": "authenticated_security_definer_function_executable_public_get_announcement_group_ids_p_announcement_id text",
+   "kind": "intended",
+   "why": "화면이 카드 열 때 부른다(index.html fetch rpc/get_announcement_group_ids) · 돌려주는 값은 announcement_id 목록뿐 · 로그인 사용자도 같은 화면을 본다"
+  },
+  {
+   "key": "authenticated_security_definer_function_executable_public_get_announcement_price_summary_p_ids text[]",
+   "kind": "intended",
+   "why": "화면 카드 요약(rpc/get_announcement_price_summary) · announcement_analysis(클라이언트 권한 0)를 읽어 analysis_done 을 내야 해 정의자 · 개인정보 없음 · search_path 고정 · 로그인 사용자도 같은 화면을 본다"
+  },
+  {
+   "key": "authenticated_security_definer_function_executable_public_get_revision_analysis_done_p_id text",
+   "kind": "intended",
+   "why": "화면 「정정 전 공고 기준」 배너(rpc/get_revision_analysis_done) · announcement_analysis 를 읽어 참/거짓 하나만 돌려준다 · search_path 고정 · 로그인 사용자도 같은 화면을 본다"
+  },
+  {
+   "key": "rls_enabled_no_policy_public_analysis_dispatch_config",
+   "kind": "intended",
+   "why": "내부 표 — anon·authenticated 권한 0 · 화면(index.html) 참조 0 · DB 함수·pg_cron·운영 점검(postgres)만 쓰고 읽는다. 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15)"
+  },
+  {
+   "key": "rls_enabled_no_policy_public_analysis_dispatch_queue",
+   "kind": "intended",
+   "why": "내부 표 — anon·authenticated 권한 0 · 화면(index.html) 참조 0 · DB 함수·pg_cron·운영 점검(postgres)만 쓰고 읽는다. 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15)"
+  },
+  {
+   "key": "rls_enabled_no_policy_public_analysis_dispatch_runs",
+   "kind": "intended",
+   "why": "내부 표 — anon·authenticated 권한 0 · 화면(index.html) 참조 0 · DB 함수·pg_cron·운영 점검(postgres)만 쓰고 읽는다. 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15)"
+  },
+  {
+   "key": "rls_enabled_no_policy_public_analysis_followup_requests",
+   "kind": "intended",
+   "why": "내부 표 — anon·authenticated 권한 0 · 화면(index.html) 참조 0 · DB 함수·pg_cron·운영 점검(postgres)만 쓰고 읽는다. 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15)"
+  },
+  {
+   "key": "rls_enabled_no_policy_public_announcement_analysis",
+   "kind": "intended",
+   "why": "내부 표 — anon·authenticated 권한 0 · 화면(index.html) 참조 0 · DB 함수·pg_cron·운영 점검(postgres)만 쓰고 읽는다. 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15)"
+  },
+  {
+   "key": "rls_enabled_no_policy_public_announcement_attachment_history",
+   "kind": "intended",
+   "why": "내부 표 — anon·authenticated 권한 0 · 화면(index.html) 참조 0 · 수집 EF collect-lh-promo·collect-lh-images(service_role). 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15)"
+  },
+  {
+   "key": "rls_enabled_no_policy_public_announcement_complex_image_fetch",
+   "kind": "intended",
+   "why": "내부 표 — anon·authenticated 권한 0 · 화면(index.html) 참조 0 · 수집 EF collect-lh-images(service_role). 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15)"
+  },
+  {
+   "key": "rls_enabled_no_policy_public_announcement_complex_images",
+   "kind": "intended",
+   "why": "내부 표 — anon·authenticated 권한 0 · 화면(index.html) 참조 0 · 수집 EF collect-lh-images(service_role). 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15)"
+  },
+  {
+   "key": "rls_enabled_no_policy_public_announcement_promo_fetch",
+   "kind": "intended",
+   "why": "내부 표 — anon·authenticated 권한 0 · 화면(index.html) 참조 0 · 수집 EF collect-lh-promo(service_role). 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15)"
+  },
+  {
+   "key": "rls_enabled_no_policy_public_announcement_promo_files",
+   "kind": "intended",
+   "why": "내부 표 — anon·authenticated 권한 0 · 화면(index.html) 참조 0 · 수집 EF collect-lh-promo(service_role). 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15)"
+  },
+  {
+   "key": "rls_enabled_no_policy_public_collection_run_log",
+   "kind": "intended",
+   "why": "내부 표 — anon·authenticated 권한 0 · 화면(index.html) 참조 0 · 수집 EF collect-announcements·collect-sh-announcements(service_role) · 운영 점검이 읽는다. 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15)"
+  },
+  {
+   "key": "rls_enabled_no_policy_public_ops_dispatch_log",
+   "kind": "intended",
+   "why": "내부 표 — anon·authenticated 권한 0 · 화면(index.html) 참조 0 · DB 함수·pg_cron·운영 점검(postgres)만 쓰고 읽는다. 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15)"
+  },
+  {
+   "key": "rls_enabled_no_policy_public_ops_health_findings",
+   "kind": "intended",
+   "why": "내부 표 — anon·authenticated 권한 0 · 화면(index.html) 참조 0 · DB 함수·pg_cron·운영 점검(postgres)만 쓰고 읽는다. 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15)"
+  },
+  {
+   "key": "rls_enabled_no_policy_public_ops_health_runs",
+   "kind": "intended",
+   "why": "내부 표 — anon·authenticated 권한 0 · 화면(index.html) 참조 0 · DB 함수·pg_cron·운영 점검(postgres)만 쓰고 읽는다. 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15)"
+  },
+  {
+   "key": "rls_enabled_no_policy_public_ops_uptime_log",
+   "kind": "intended",
+   "why": "내부 표 — anon·authenticated 권한 0 · 화면 참조 0 · ops_uptime_ping()(pg_cron)이 쓰고 health-ops 가 읽는다. 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15 · 2026-10-08 바깥 감시 1단계)"
+  },
+  {
+   "key": "rls_enabled_no_policy_public_sh_auto_close_log",
+   "kind": "intended",
+   "why": "내부 표 — anon·authenticated 권한 0 · 화면(index.html) 참조 0 · DB 함수·pg_cron·운영 점검(postgres)만 쓰고 읽는다. 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15)"
+  },
+  {
+   "key": "rls_enabled_no_policy_public_sh_collection_run_log",
+   "kind": "intended",
+   "why": "내부 표 — anon·authenticated 권한 0 · 화면(index.html) 참조 0 · 수집 EF collect-sh-announcements(service_role). 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15)"
+  },
+  {
+   "key": "rls_enabled_no_policy_public_source_page_check_runs",
+   "kind": "intended",
+   "why": "내부 표 — anon·authenticated 권한 0 · 화면(index.html) 참조 0 · 원문 키 대조 EF check-source-pages(service_role). 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15)"
+  },
+  {
+   "key": "rls_enabled_no_policy_public_source_page_checks",
+   "kind": "intended",
+   "why": "내부 표 — anon·authenticated 권한 0 · 화면(index.html) 참조 0 · 원문 키 대조 EF check-source-pages(service_role). 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15)"
+  },
+  {
+   "key": "rls_enabled_no_policy_zipfit_ops_schema_migrations",
+   "kind": "intended",
+   "why": "내부 표 — anon·authenticated 권한 0 · 화면(index.html) 참조 0 · DB 함수·pg_cron·운영 점검(postgres)만 쓰고 읽는다. 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15)"
+  },
+  {
+   "key": "auth_leaked_password_protection",
+   "kind": "known",
+   "why": "유출 비밀번호 보호(HIBP) 꺼짐 — 화면은 비밀번호를 쓰지 않는다(카카오·매직링크) · 다만 이메일 공급자가 켜져 있어 API 로 비밀번호 가입은 열려 있다(메일 확인 필요 · 최소 6자) · 켜면 그 경로의 유출 비밀번호만 거부 · 켜기는 다운님 대시보드 몫"
+  },
+  {
+   "key": "extension_in_public_pg_net",
+   "kind": "known",
+   "why": "pg_net 이 public 에 있다 — 옮기면 net.http_* 호출처 전부를 함께 고쳐야 한다 · 미결"
+  },
+  {
+   "key": "function_search_path_mutable_public_analysis_dispatch_tick",
+   "kind": "known",
+   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
+  },
+  {
+   "key": "function_search_path_mutable_public_analysis_followup_request",
+   "kind": "known",
+   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
+  },
+  {
+   "key": "function_search_path_mutable_public_analysis_queue_claim",
+   "kind": "known",
+   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
+  },
+  {
+   "key": "function_search_path_mutable_public_analysis_queue_finish",
+   "kind": "known",
+   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
+  },
+  {
+   "key": "function_search_path_mutable_public_analysis_run_release",
+   "kind": "known",
+   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
+  },
+  {
+   "key": "function_search_path_mutable_public_announcement_dedup_key",
+   "kind": "known",
+   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
+  },
+  {
+   "key": "function_search_path_mutable_public_bulk_set_revision_note",
+   "kind": "known",
+   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
+  },
+  {
+   "key": "function_search_path_mutable_public_bump_detail_fetch_fail",
+   "kind": "known",
+   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
+  },
+  {
+   "key": "function_search_path_mutable_public_compute_announcement_flags",
+   "kind": "known",
+   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
+  },
+  {
+   "key": "function_search_path_mutable_public_get_announcement_blocks",
+   "kind": "known",
+   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
+  },
+  {
+   "key": "function_search_path_mutable_public_get_announcement_group_ids",
+   "kind": "known",
+   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
+  },
+  {
+   "key": "function_search_path_mutable_public_get_announcement_sites",
+   "kind": "known",
+   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
+  },
+  {
+   "key": "function_search_path_mutable_public_get_announcements_deduped",
+   "kind": "known",
+   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
+  },
+  {
+   "key": "function_search_path_mutable_public_get_document_templates_for",
+   "kind": "known",
+   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
+  },
+  {
+   "key": "function_search_path_mutable_public_get_reanalysis_queue",
+   "kind": "known",
+   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
+  },
+  {
+   "key": "function_search_path_mutable_public_get_rental_stats_summary",
+   "kind": "known",
+   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
+  },
+  {
+   "key": "function_search_path_mutable_public_ops_dispatch_log_fill",
+   "kind": "known",
+   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
+  },
+  {
+   "key": "function_search_path_mutable_public_ops_health_dispatch",
+   "kind": "known",
+   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
+  },
+  {
+   "key": "function_search_path_mutable_public_ops_health_record",
+   "kind": "known",
+   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
+  },
+  {
+   "key": "function_search_path_mutable_public_ops_screen_dispatch",
+   "kind": "known",
+   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
+  },
+  {
+   "key": "function_search_path_mutable_public_protect_created_at",
+   "kind": "known",
+   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
+  },
+  {
+   "key": "function_search_path_mutable_public_protect_detail_columns",
+   "kind": "known",
+   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
+  },
+  {
+   "key": "function_search_path_mutable_public_refresh_announcement_post_links",
+   "kind": "known",
+   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
+  },
+  {
+   "key": "function_search_path_mutable_public_set_revised_at",
+   "kind": "known",
+   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
+  },
+  {
+   "key": "function_search_path_mutable_public_sh_close_missing",
+   "kind": "known",
+   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
+  },
+  {
+   "key": "function_search_path_mutable_public_sh_run_log_fill_started_at",
+   "kind": "known",
+   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
+  },
+  {
+   "key": "function_search_path_mutable_public_track_attachment_history",
+   "kind": "known",
+   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
+  },
+  {
+   "key": "function_search_path_mutable_public_update_updated_at",
+   "kind": "known",
+   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
+  },
+  {
+   "key": "function_search_path_mutable_zipfit_ops_original_lh_id",
+   "kind": "known",
+   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
+  }
+ ]
+}

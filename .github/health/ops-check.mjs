@@ -5,7 +5,7 @@
 //   「상세조회 마감 … 미시도」 오류는 441런 중 193런(하루 최대 59런)이라 런 단위로는 기준이 되지 않는다 →
 //   「활성 LH 공고 중 6시간 넘게 상세조회를 시도하지 않은 수」(지금 3)로 잰다.
 // 🔴 첫 주는 넉넉하게 — 오탐이 잦으면 알림이 읽히지 않는다.
-import { sqlRead, anonRpc, report, recordFindings, SITE } from './lib.mjs'
+import { sqlRead, anonRpc, report, recordFindings, SITE, PROJECT_REF } from './lib.mjs'
 import { readdirSync, readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 
@@ -19,8 +19,20 @@ const PROMO_DAYTIME = hourUtc >= 0 && hourUtc <= 9      // 홍보물 cron 5,35 0
 //    UTC 0시 40분 전은 밤 문턱(900분)으로 잰다 — 23:55 점검이 00시 넘어 밀려 돌 때의 오탐을 막는다.
 const minuteUtc = now.getUTCMinutes()
 const FIRST_RUN_DONE = PROMO_DAYTIME && !(hourUtc === 0 && minuteUtc < 40)
+// ⑬ 바깥 감시 기록 — 부른 지 12분 지난(다음 회차가 응답을 옮긴 뒤) 24시간 안 기록 · 새것부터. 미응답(옮기지 못함)도 실패로 센다.
+//    롤백 시험이 이 문자열을 그대로 떠서 쓴다(가짜 실패 행을 넣고 같은 판정이 나오는지) — 바꾸면 시험도 다시 돈다.
+const UPTIME_SQL = `
+select jsonb_build_object(
+  'applied_min', (select extract(epoch from now() - applied_at) / 60 from zipfit_ops.schema_migrations where filename = '2026-10-08_05_uptime_monitor.sql'),
+  'last_at_min', (select jsonb_object_agg(target, extract(epoch from now() - m) / 60) from (select target, max(at) m from public.ops_uptime_log group by target) s),
+  'rows', coalesce((select jsonb_agg(jsonb_build_object('target', target, 'ok', ok, 'code', status_code, 'err', error_msg) order by target, at desc)
+     from (select target, at, status_code, error_msg,
+                  coalesce(status_code between 200 and 399 and body_ok, false) as ok
+             from public.ops_uptime_log
+            where at < now() - interval '12 minutes' and at > now() - interval '24 hours') r), '[]'::jsonb)
+) as j;`
 const checks = []
-const add = (id, name, status, value, rule) => checks.push({ id, name, status, value, rule })
+const add =(id, name, status, value, rule) => checks.push({ id, name, status, value, rule })
 
 const EXPECTED_JOBS = [
   'zipfit-collect-announcements', 'zipfit-collect-announcements-warmup', 'zipfit-collect-announcements-night',
@@ -32,6 +44,7 @@ const EXPECTED_JOBS = [
   'zipfit-health-ops-dispatch',  // 2026-10-03 운영 점검 예약을 GitHub 밖으로 — pg_cron → workflow_dispatch(마이그레이션 2026-10-02_05)
   'zipfit-health-screen-dispatch', // 2026-10-06 화면 점검 예약도 GitHub 밖으로(마이그레이션 2026-10-06_02)
   'zipfit-check-source-pages',   // 2026-10-08 열린 원문 키 정기 대조(3-B ③ 1단계 · 마이그레이션 2026-10-08_02)
+  'zipfit-uptime-ping',          // 2026-10-08 바깥 감시 1단계(마이그레이션 2026-10-08_05)
 ]
 // 🔵 2026-10-03 — workflow_dispatch 토큰(Vault github_actions_dispatch_token · fine-grained · zipfit 하나 · Actions 읽기·쓰기) 만료일.
 //    토큰을 갈면 이 날짜도 함께 고친다(다운님이 알려 준 값 · 값 자체는 Vault 에만 있다).
@@ -322,13 +335,70 @@ try {
     add('ops_dispatch_token', '발송 토큰 만료까지(일)', daysLeft > 30 ? 'pass' : daysLeft > 0 ? 'warn' : 'fail', Math.floor(daysLeft),
       `> 30일(만료 ${DISPATCH_TOKEN_EXPIRES} · 30일 안이면 ⚠️ · 지나면 실패 — 토큰을 갈면 Vault github_actions_dispatch_token 과 이 날짜를 함께)`)
   }
+  // ⑬ 바깥 감시 1단계(2026-10-08 · 우편함 「운영 기반 묶음」 5) — cron zipfit-uptime-ping 이 10분마다 배포 사이트·공개 REST 를 부르고
+  //    응답은 다음 회차가 ops_uptime_log 로 옮긴다. 대상마다 부른 지 12분 지난 최근 기록을 새것부터 보아
+  //    연속 실패 3회(30분) = 실패 · 1~2회 = ⚠️ · 마지막 기록 25분 넘음 = 실패(감시 멈춤). 성공 = HTTP 2xx·3xx + 본문 표식.
+  //    적용 뒤 30분까지는 기록이 없어도 건너뛴다(첫 회차 전). 🔴 DB 가 죽으면 이 감시도 함께 죽는다(바깥 서비스는 2단계).
+  try {
+    const [u] = await sqlRead(UPTIME_SQL)
+    const x = u.j
+    if (!x.applied_min || (x.applied_min < 30 && !(x.rows ?? []).length)) {
+      add('uptime', '바깥 감시(사이트·공개 REST) 연속 실패', 'skip', x.applied_min ? `첫 기록 전(적용 ${Math.round(x.applied_min)}분)` : '마이그레이션 적용 전', '적용 뒤 30분까지는 판정하지 않는다')
+    } else {
+      const bad = [], warn = [], parts = []
+      for (const t of ['site', 'rest']) {
+        const rs = (x.rows ?? []).filter(r => r.target === t)       // 새것부터
+        let streak = 0
+        for (const r of rs) { if (r.ok) break; streak++ }
+        const fails = rs.filter(r => !r.ok).length
+        const last = x.last_at_min?.[t]
+        if (last == null || last > 25) bad.push(`${t} 감시 멈춤(마지막 ${last == null ? '없음' : Math.round(last) + '분 전'})`)
+        else if (streak >= 3) bad.push(`${t} 연속 ${streak}회 실패(${rs[0]?.code ?? rs[0]?.err ?? '응답 없음'})`)
+        else if (streak >= 1) warn.push(`${t} 연속 ${streak}회 실패(${rs[0]?.code ?? rs[0]?.err ?? '응답 없음'})`)
+        parts.push(`${t} 24시간 ${rs.length - fails}/${rs.length}`)
+      }
+      add('uptime', '바깥 감시(사이트·공개 REST) 연속 실패', bad.length ? 'fail' : warn.length ? 'warn' : 'pass',
+        [...bad, ...warn, parts.join(' · ')].join(' · '), '대상마다 연속 실패 3회(30분) = 실패 · 1~2회 = ⚠️ · 마지막 기록 ≤ 25분')
+    }
+  } catch (e) {
+    add('uptime', '바깥 감시(사이트·공개 REST) 연속 실패', 'fail', String(e).slice(0, 200), 'ops_uptime_log 를 읽는다')
+  }
   // ⑥ 백업 — 🔴 zipfit-backup(비공개) 실행 기록을 이 저장소 토큰으로는 읽을 수 없다(새 토큰 필요 → 요청서 멈춤). 설계만.
   add('backup', '최근 백업 성공', 'skip', '미구현', 'zipfit-backup 은 비공개 — 읽으려면 새 권한이 필요해 멈춤(우편함 회신 참고). 백업 실패는 그 저장소 자체 이슈(backup-failure)로 알린다')
 } catch (e) {
   add('runner', '점검 실행', 'fail', String(e).slice(0, 300), '점검 스크립트가 끝까지 돈다')
 }
 
+// ⑫ Supabase 보안 권고(2026-10-08 · 우편함 「운영 기반 묶음」 2) — 관리 API advisors/security 를 읽어 허용 목록
+//    (.github/health/security-allowlist.json · intended = 의도 확인 · known = 알려진 미결) 밖의 새 지적이 있으면 ⚠️.
+//    키 = cache_key 에서 끝 32자리 해시를 뗀 것(함수 지적의 해시가 정의를 따라 바뀌어도 같은 함수는 같은 키).
+//    🔴 경고만 한다 — 새 표·새 정의자 함수가 생기면 의도를 확인해 허용 목록에 이유와 함께 넣는다(원칙 15).
+try {
+  const token = process.env.SUPABASE_ACCESS_TOKEN
+  if (!token) throw new Error('SUPABASE_ACCESS_TOKEN 이 없다')
+  const res = await fetch(`https://api.supabase.com/v1/projects/${PROJECT_REF}/advisors/security`, { headers: { Authorization: `Bearer ${token}` } })
+  const text = await res.text()
+  if (!res.ok) throw new Error(`관리 API ${res.status}: ${text.slice(0, 200)}`)
+  const lints = JSON.parse(text).lints ?? []
+  const allow = new Map(JSON.parse(readFileSync(new URL('./security-allowlist.json', import.meta.url), 'utf8')).entries.map(e => [e.key, e.kind]))
+  if (process.env.SIMULATE === 'sec') allow.delete([...allow.keys()][0])   // 경고 경로 시험 — 허용 목록에서 한 줄을 뺀 것처럼
+  const keyOf = l => String(l.cache_key ?? l.name).replace(/_[0-9a-f]{32}$/, '')
+  const seen = new Set(lints.map(keyOf))
+  const fresh = lints.filter(l => !allow.has(keyOf(l)))
+  const n = k => lints.filter(l => allow.get(keyOf(l)) === k).length
+  const gone = [...allow.keys()].filter(k => !seen.has(k)).length
+  add('sec_advisor', 'Supabase 보안 권고 — 허용 목록 밖 새 지적', fresh.length === 0 ? 'pass' : 'warn',
+    fresh.length
+      ? `${fresh.length}: ${fresh.slice(0, 5).map(l => `${l.level} ${keyOf(l)}`).join(', ')}${process.env.SIMULATE === 'sec' ? '(시험)' : ''}`
+      : `지적 ${lints.length} · 의도 ${n('intended')} · 미결 ${n('known')} · 해소 ${gone}`,
+    '0(.github/health/security-allowlist.json 밖 · 있으면 ⚠️ — 의도를 확인해 목록에 넣거나 고친다)')
+} catch (e) {
+  add('sec_advisor', 'Supabase 보안 권고 — 허용 목록 밖 새 지적', 'warn', String(e).slice(0, 200), '관리 API advisors/security 를 읽는다(경고만)')
+}
+
 if (process.env.SIMULATE === 'fail') add('simulate', '실패 흉내(수동 입력 simulate=fail)', 'fail', '시험', '알림 경로 확인용 — 평소에는 없다')
+// 🔵 2026-10-08(우편함 「운영 기반 묶음」 4) — notify: 실제 장치와 같은 경로(github-actions 봇 · 라벨 health-ops)로 시험 이슈를 연다 · 다음 통과 실행이 닫는다.
+if (process.env.SIMULATE === 'notify') add('simulate', '시험 — 알림 확인(수동 입력 simulate=notify)', 'fail', '다운님 휴대폰 알림 확인용', '알림 경로 확인용 — 다음 통과 실행이 이 이슈를 닫는다')
 
 // ⑪ 경고·실패 DB 기록(2026-10-06 · 우편함 「코드 — 1-B …」 6) — public.ops_health_findings 에 실행 1회당 항목 1행(30일 보관).
 //    + 실행 요약 1행(통과 포함) public.ops_health_runs(1-C 3) — 발송(ops_dispatch_log)했는데 요약이 없으면 그 실행은 관리 API를 못 썼다.

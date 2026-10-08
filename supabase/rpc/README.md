@@ -54,6 +54,14 @@ anon·authenticated에 주고 있어, **새 함수는 열린 채로 태어난다
 
 기록만 한다. 여기를 고쳐도 DB는 바뀌지 않는다 — 위 「배포 경로가 아니다」와 같다.
 
+### 2026-10-08 — 바깥 감시 `ops_uptime_ping()` · `ops_uptime_fill()` · 표 `ops_uptime_log` 신설 (마이그레이션 `2026-10-08_05`)
+
+pg_cron `zipfit-uptime-ping`(10분마다)이 부른다 — 배포 사이트·공개 REST 응답을 `ops_uptime_log` 에 남기고 health-ops `uptime` 이 읽는다. 화면은 부르지 않는다.
+
+- 함수 ACL: `postgres=X/postgres,service_role=X/postgres`(public·anon·authenticated 회수) · `SET search_path TO 'public', 'pg_temp'`(보안 권고 search_path 지적을 새로 만들지 않는다).
+- 표: RLS 켬 · 정책 없음 · anon·authenticated 권한 0 · service_role 쓰기 — 보안 권고 「정책 없는 RLS」는 의도(`.github/health/security-allowlist.json`).
+- 되돌리기: `select cron.unschedule('zipfit-uptime-ping')` · 두 함수 drop · 표 drop 새 마이그레이션 + 사본 2개 삭제.
+
 ### 2026-10-07 — `zipfit_ops.original_lh_id(text)` 신설 · PUBLIC EXECUTE 회수 (마이그레이션 `2026-10-07_03`)
 
 원문 ID 한 정의(Z-2 ① PR-A) — 분석 스킬 규약 29 · 루틴 · 재확인 · 이전 회차가 관리 API(postgres)로 부른다. 화면은 부르지 않는다.

@@ -1,0 +1,20 @@
+# Dependabot — 워크플로의 GitHub Actions 버전(2026-10-08 · 우편함 「운영 기반 묶음」 3)
+# 대상은 github-actions 하나다 — 이 저장소에 Dependabot이 읽는 매니페스트(package.json·requirements 등)가 없다.
+#   index.html 의 CDN 스크립트(원칙 17) · health-screen 의 `playwright@1.55.0`(run 줄) · deploy-functions 의
+#   supabase CLI `version: 2.118.0` 은 Dependabot이 보지 않는다 — 손으로 올린다.
+# 🔴 자동 병합은 걸지 않는다 — PR은 체크 통과를 보고 Claude Code가 병합한다(원칙 13).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '09:00'
+      timezone: Asia/Seoul
+    open-pull-requests-limit: 3
+    groups:
+      actions:
+        patterns: ['*']
+    commit-message:
+      prefix: 'Actions'
