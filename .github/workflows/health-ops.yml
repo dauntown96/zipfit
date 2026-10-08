@@ -16,9 +16,9 @@ on:
   workflow_dispatch:
     inputs:
       simulate:
-        description: '알림 경로 시험 — fail 이면 실패 점검 하나를 일부러 더한다 · gap 이면 직전 점검 뒤 경과에 180분을 더한다 · runner 면 DB 점검을 처음에 끊는다(점검 불능 — health-ops-blind)'
+        description: '알림 경로 시험 — fail 이면 실패 점검 하나를 일부러 더한다 · gap 이면 직전 점검 뒤 경과에 180분을 더한다 · runner 면 DB 점검을 처음에 끊는다(점검 불능 — health-ops-blind) · sec 면 보안 권고 허용 목록에서 한 줄을 뺀다(⚠️ 시험) · notify 면 제목 「시험 — 알림 확인」 이슈를 연다(휴대폰 알림 시험)'
         type: choice
-        options: [none, fail, gap, runner]
+        options: [none, fail, gap, runner, sec, notify]
         default: none
 
 permissions:
@@ -61,4 +61,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           DRY_RUN: ${{ github.ref != 'refs/heads/main' && '1' || '' }}
-        run: bash .github/health/issue.sh health-ops "[자동 점검 B] 운영 건강 점검 실패" health-ops-blind "[자동 점검 B] 점검 불능 — 점검 도구가 못 돌았다(루틴은 막지 않음)"
+          ISSUE_TITLE: ${{ inputs.simulate == 'notify' && '[자동 점검 B] 시험 — 알림 확인' || '[자동 점검 B] 운영 건강 점검 실패' }}
+        run: bash .github/health/issue.sh health-ops "$ISSUE_TITLE" health-ops-blind "[자동 점검 B] 점검 불능 — 점검 도구가 못 돌았다(루틴은 막지 않음)"
