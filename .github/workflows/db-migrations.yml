@@ -42,6 +42,16 @@ jobs:
           # DB 파일 = 종전 pull_request.paths 다섯 경로
           changed=$(git diff --name-only "$BASE_SHA"...HEAD)
           hits=$(printf '%s\n' "$changed" | grep -E '^(supabase/migrations/|supabase/rpc/|supabase/invariants/|\.github/db/|\.github/workflows/db-migrations\.yml$)' || true)
+          # 🔵 2026-10-08(우편함 「코드 — 운영 기반 후속」 4 · 판정 ⓑ) — 이 워크플로 파일이 바뀌었어도 바뀐 줄이 전부 액션 판 올림(`uses:` 줄)이면
+          #    DB 를 부르지 않는다. Dependabot 이 연 PR 의 실행에는 Actions 비밀값이 실리지 않아 DB 체크가 401 로 빨갛게 됐다(#406).
+          #    DB 파일(마이그레이션·사본·불변식·스크립트)이 함께 바뀌었으면 종전대로 해당 있음이다.
+          if printf '%s\n' "$hits" | grep -qx '\.github/workflows/db-migrations\.yml'; then
+            other=$(git diff -U0 "$BASE_SHA"...HEAD -- .github/workflows/db-migrations.yml | grep -E '^[-+]' | grep -vE '^(\+\+\+|---) ' | grep -vE '^[-+][[:space:]]*(-[[:space:]]+)?uses:[[:space:]]' || true)
+            if [ -z "$other" ]; then
+              hits=$(printf '%s\n' "$hits" | grep -vx '\.github/workflows/db-migrations\.yml' || true)
+              echo "이 워크플로의 바뀐 줄이 전부 uses: 판 올림이다 — DB 파일 변경으로 세지 않는다"
+            fi
+          fi
           if [ -n "$hits" ]; then
             echo "relevant=true" >> "$GITHUB_OUTPUT"
             printf 'DB 파일 변경:\n%s\n' "$hits"

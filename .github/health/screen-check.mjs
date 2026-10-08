@@ -345,6 +345,43 @@ try {
     add('target_out', '매칭 2단계 — 공급 대상이 달라 뺀 공고 근거 · 표시 문구 갈래', ok ? 'pass' : 'fail', value,
       '시험 사용자 (가) — 뺀 공고 전부 DB 로 따로 계산한 「모든 행 키 · 모든 갈래 아님」 · 문구 네 갈래 · 상자 수 = 뺀 수')
   }
+  // ⑦ 숫자가 말하는 「지금」(2026-10-08 · 우편함 「표시층 — 숫자가 말하는 「지금」」 · 원칙 33).
+  //    공고 탭 머리(기본 거름 — 신청할 수 없는 공고 숨기기)와 인사이트 머리의 「지금 열린 공고 M건」이 화면 정의(zfOpenNotices) 한 값과 같은가 ·
+  //    「마감 포함 누적 T건(YYYY년 M월부터)」의 T·기간이 DB(get_announcements_deduped 전량 · 가장 이른 공고일)와 같은가.
+  //    ⚠️ 「열린 공고」 M 자체는 DB SQL 로 따로 세지 않는다 — 화면 정의가 붙은 공고문 상태·LH 조기 마감·당첨발표일을 함께 보아 SQL 한 벌로 옮기면 사본이 생긴다.
+  //    SIMULATE=open_count 이면 공고 탭 머리의 수에 1을 더해 잰다(실패해야 맞다).
+  const oc = await page.evaluate(async sim => {
+    if (typeof zfOpenNotices !== 'function') return { err: 'zfOpenNotices 없음' }
+    goMain(2)
+    activeNoticeRegion = null; activeNoticeType = null; activeNoticeStatus = null; activeNoticeTarget = null
+    const q = document.getElementById('noticeSearchInput'); if (q) q.value = ''
+    const chk = document.getElementById('hideClosedChk'); if (chk) chk.checked = true
+    applyNoticeFiltersAndRender()
+    const M = zfOpenNotices(noticeData).length, T = noticeData.length, since = zfCumulativeSince(noticeData)
+    let tab = (document.querySelector('#notice-status .rtitle') || {}).innerText || ''
+    if (sim) tab = tab.replace(/(\d[\d,]*)건/, (m, d) => (Number(d.replace(/,/g, '')) + 1).toLocaleString() + '건')
+    goMain(3)
+    insightLoaded = false
+    await loadInsightData()
+    const ins = ((document.querySelector('#insightContent') || {}).innerText || '').split('\n').find(l => l.includes('지금 열린 공고')) || ''
+    goMain(2)
+    return { M, T, since, tab: tab.trim(), ins: ins.trim() }
+  }, process.env.SIMULATE === 'open_count')
+  {
+    let ok = false, value
+    if (!oc.err) {
+      const [db] = await sqlRead(`select count(*)::int as t, to_char(min(announcement_date), 'YYYY"년 "FMMM"월부터"') as since from get_announcements_deduped()`)
+      const want = `지금 열린 공고 ${oc.M.toLocaleString('ko-KR')}건`
+      const tabOk = oc.tab === '✅ ' + want
+      const insOk = oc.ins.startsWith(want + ' · 마감 포함 누적 ' + oc.T.toLocaleString('ko-KR') + '건(' + oc.since + ')')
+      const dbOk = db.t === oc.T && db.since === oc.since
+      ok = tabOk && insOk && dbOk && oc.M > 0 && oc.M <= oc.T
+      value = `열린 ${oc.M} · 누적 ${oc.T}(${oc.since}) · 공고 탭 「${oc.tab}」${tabOk ? '' : ' ✗'} · 인사이트 「${oc.ins.slice(0, 60)}」${insOk ? '' : ' ✗'} · DB 누적 ${db.t}(${db.since})${dbOk ? '' : ' ✗'}`
+      extra.open_count = { ...oc, db }
+    } else value = `못 잼(${oc.err})`
+    add('open_count', '숫자가 말하는 「지금」 — 열린 공고 수 한 정의 · 누적 표기', ok ? 'pass' : 'fail', value,
+      '공고 탭 기본 머리 = 「지금 열린 공고 M건」 = 인사이트 머리 · M = zfOpenNotices(noticeData) · 누적 T·기간 = DB')
+  }
 } catch (e) {
   add('runner', '점검 실행', 'fail', String(e).slice(0, 300), '점검 스크립트가 끝까지 돈다')
 } finally {

@@ -2,6 +2,7 @@ CREATE OR REPLACE FUNCTION public.bump_detail_fetch_fail(p_ids text[])
  RETURNS void
  LANGUAGE sql
  SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
 AS $function$
   UPDATE announcements
   SET detail_fetch_fail_count = COALESCE(detail_fetch_fail_count, 0) + 1,

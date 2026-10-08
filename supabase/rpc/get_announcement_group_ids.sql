@@ -2,6 +2,7 @@ CREATE OR REPLACE FUNCTION public.get_announcement_group_ids(p_announcement_id t
  RETURNS TABLE(announcement_id text)
  LANGUAGE sql
  STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
 AS $function$
 -- 🔴 STABLE이다(2026-09-12 강등). 본문이 순수 SELECT 하나이고 쓰기·now()·난수·nextval이
 -- 전부 0건이라 VOLATILE이어야 할 이유가 없었다. 같은 계열 get_announcement_blocks·

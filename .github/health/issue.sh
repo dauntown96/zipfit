@@ -43,31 +43,35 @@ fi
   echo
   echo "결과 파일은 이 실행의 아티팩트 \`health-result\`(health-result.json)에 있다."
 } > /tmp/issue_body.md
+# 🔵 2026-10-08(우편함 「코드 — 운영 기반 후속」 3) — 열 때·실패 재발 댓글에는 다운님 직접 언급을 맨 앞에 둔다.
+#    봇이 연 이슈의 Watching 알림은 휴대폰에 오지 않았다(#407) — 언급 알림은 앱 푸시 기본값이 켜져 있다. 회복 닫힘 댓글에는 넣지 않는다(알림 피로).
+MENTION="${ISSUE_MENTION-@dauntown96}"
+{ [ -n "$MENTION" ] && { echo "$MENTION 자동 점검 알림"; echo; }; cat /tmp/issue_body.md; } > /tmp/issue_alert.md
 echo "판정: ok=$OK · runner만=$RUNNER_ONLY · 열린 $LABEL=#${OPEN:-없음} · 열린 ${BLIND_LABEL:-(불능 라벨 없음)}=#${OPEN_BLIND:-없음}(경과 ${BLIND_AGE_H}시간 · 승격=$BLIND_ESCALATED)"
 if [ "$OK" = "false" ] && [ "$RUNNER_ONLY" = "true" ] && [ -n "$BLIND_LABEL" ] && [ -z "$OPEN" -o "$OPEN" = "$OPEN_BLIND" ]; then
   # 점검 불능 — 실제 실패 이슈가 따로 열려 있지 않을 때만(열려 있으면 아래 일반 갈래가 그 이슈에 댓글).
   if [ -n "$OPEN_BLIND" ]; then
-    gh_write issue comment "$OPEN_BLIND" --body-file /tmp/issue_body.md
+    gh_write issue comment "$OPEN_BLIND" --body-file /tmp/issue_alert.md
     echo "라벨 $BLIND_LABEL · 기존 이슈 #$OPEN_BLIND 에 댓글"
     if [ "$BLIND_ESCALATED" = "false" ] && python3 -c "import sys; sys.exit(0 if float('$BLIND_AGE_H') > $BLIND_HOURS else 1)"; then
       gh_write issue edit "$OPEN_BLIND" --add-label "$LABEL"
-      { echo "### ⬆️ 승격 — 점검 불능이 ${BLIND_HOURS}시간 넘게 이어졌다(${BLIND_AGE_H}시간). 라벨 \`$LABEL\`을 더한다 — 이제 루틴 착수를 막는다."; } > /tmp/issue_up.md
+      { [ -n "$MENTION" ] && echo "$MENTION"; echo "### ⬆️ 승격 — 점검 불능이 ${BLIND_HOURS}시간 넘게 이어졌다(${BLIND_AGE_H}시간). 라벨 \`$LABEL\`을 더한다 — 이제 루틴 착수를 막는다."; } > /tmp/issue_up.md
       gh_write issue comment "$OPEN_BLIND" --body-file /tmp/issue_up.md
       echo "승격: #$OPEN_BLIND 에 $LABEL 라벨"
     fi
   else
     if [ -n "$DRY" ]; then echo "[DRY_RUN] gh issue create --title \"$BLIND_TITLE\" --label $BLIND_LABEL"; else
-      URL=$(gh issue create --title "$BLIND_TITLE" --label "$BLIND_LABEL" --body-file /tmp/issue_body.md)
+      URL=$(gh issue create --title "$BLIND_TITLE" --label "$BLIND_LABEL" --body-file /tmp/issue_alert.md)
       echo "새 이슈(점검 불능): $URL"
     fi
   fi
 elif [ "$OK" = "false" ]; then
   if [ -n "$OPEN" ]; then
-    gh_write issue comment "$OPEN" --body-file /tmp/issue_body.md
+    gh_write issue comment "$OPEN" --body-file /tmp/issue_alert.md
     echo "기존 이슈 #$OPEN 에 댓글"
   else
     if [ -n "$DRY" ]; then echo "[DRY_RUN] gh issue create --title \"$TITLE\" --label $LABEL"; else
-      URL=$(gh issue create --title "$TITLE" --label "$LABEL" --body-file /tmp/issue_body.md)
+      URL=$(gh issue create --title "$TITLE" --label "$LABEL" --body-file /tmp/issue_alert.md)
       echo "새 이슈: $URL"
     fi
   fi
