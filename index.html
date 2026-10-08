@@ -5667,8 +5667,9 @@ function fetchBlockRecruitSums(ids, siteIds){
       if(!r || !r.announcement_id) return;
       const bk = keyOf(r);
       if(!hasGroup.has(bk)) return;
-      if(r.unit_group){
-        if(r.group_recruit_count == null) return;
+      // 🔵 2026-10-08(표시층 긴급 3) — unit_group 은 있고 group_recruit_count 가 빈 행(한 형 안 따로 칸 계층)은
+      //    unit_group 이 빈 행과 같이 recruit_count 를 더한다. 종전에는 그런 행이 없었다(값 불변).
+      if(r.unit_group && r.group_recruit_count != null){
         const k = bk + '|' + r.unit_group;
         if(seen.has(k)) return;
         seen.add(k);
@@ -7307,23 +7308,56 @@ function renderExtraNoteHtml(note){
 //    물리 행 수는 우리 저장 사정이고(정읍첨단 22행), 사용자가 세는 것은 줄이다(19줄).
 //    그래서 세는 쪽이 렌더를 흉내 내지 않고 **렌더와 같은 구성 함수**를 쓴다 —
 //    흉내 내면 한쪽만 고쳐졌을 때 두 수가 조용히 갈린다.
+// 🔵 2026-10-08(표시층 긴급 3) — 두 갈래를 더했다. 둘 다 그 전에는 없던 행 꼴이라 종전 행의 묶음은 그대로다.
+//    ① 원문 한 주택형 안에서 모집 칸이 따로인 계층(창녕영산 25A 주거급여수급자 10 — 대학생·청년은 병합 칸 30)은
+//       unit_group 은 있고 group_recruit_count 는 비어 있다. 같은 회차·같은 unit_group 묶음에 넣고, 그 행의
+//       recruit_count 를 묶음 모집에 더한다(머리 = 병합 칸 + 따로 칸 = 그 형 모집 합). 같은 형 묶음이 없으면 혼자 묶음이 된다.
+//    ② 묶음이 있는 목록에서 unit_group 이 NULL 인 행(원문에서 따로 선 주택형)은 그 행의 unit_type 을 이름으로 한 묶음이 된다
+//       — 한 목록에 아코디언과 펼친 카드가 섞여 같은 층위의 주택형이 다른 꼴로 보이지 않게. 묶음이 하나도 없는 목록은 종전 그대로다.
+//    묶음 순서와 묶음 안 줄 순서는 넘겨받은 목록 순서다(종전 묶음과 같은 규칙 — 펼친 카드가 맨 뒤로 몰리던 것만 사라진다).
 function buildHousingUnitList(units){
   const byKey = new Map();
-  const groups = [];
-  const plain = [];
+  let groups = [];
+  let plain = [];
   if(!Array.isArray(units)) return { groups, plain };
-  units.forEach(u => {
-    if(!u || !u.unit_group){ if(u) plain.push(u); return; }
-    const key = [u.zfRoundDate || '', u.unit_group, u.group_recruit_count == null ? '' : u.group_recruit_count].join('|');
+  const order = new Map();
+  units.forEach((u, i) => { if(u) order.set(u, i); });
+  const add = (key, mk, u) => {
     let g = byKey.get(key);
-    if(!g){
-      g = { group: u.unit_group, recruit: u.group_recruit_count, units: [] };
-      byKey.set(key, g);
-      groups.push(g);
-    }
+    if(!g){ g = Object.assign({ units: [], extra: 0, extraN: 0 }, mk()); byKey.set(key, g); groups.push(g); }
     g.units.push(u);
+    return g;
+  };
+  const sep = [];
+  units.forEach(u => {
+    if(!u) return;
+    if(!u.unit_group){ plain.push(u); return; }
+    if(u.group_recruit_count == null){ sep.push(u); return; }
+    const key = [u.zfRoundDate || '', u.unit_group, u.group_recruit_count].join('|');
+    add(key, () => ({ group: u.unit_group, recruit: u.group_recruit_count }), u);
   });
-  groups.forEach(g => { g.lines = buildUnitGroupLines(g); });
+  sep.forEach(u => {
+    const r = u.zfRoundDate || '';
+    const g = groups.find(x => x.units[0].unit_group === u.unit_group && (x.units[0].zfRoundDate || '') === r)
+           || add([r, u.unit_group, ''].join('|'), () => ({ group: u.unit_group, recruit: null }), u);
+    if(g.units.indexOf(u) === -1) g.units.push(u);
+    if(u.recruit_count != null){ g.extra += Number(u.recruit_count); g.extraN++; }
+  });
+  if(groups.length){
+    const rest = [];
+    plain.forEach(u => {
+      if(!u.unit_type){ rest.push(u); return; }
+      const g = add(['', u.zfRoundDate || '', u.unit_type].join('|'), () => ({ group: u.unit_type, recruit: null }), u);
+      if(u.recruit_count != null){ g.extra += Number(u.recruit_count); g.extraN++; }
+    });
+    plain = rest;
+  }
+  groups.forEach(g => { g.units.sort((a, b) => order.get(a) - order.get(b)); });
+  groups.sort((a, b) => order.get(a.units[0]) - order.get(b.units[0]));
+  groups.forEach(g => {
+    g.total = (g.recruit != null || g.extraN) ? (g.recruit != null ? Number(g.recruit) : 0) + g.extra : null;
+    g.lines = buildUnitGroupLines(g);
+  });
   return { groups, plain };
 }
 // unit_group 이 NULL 인 행은 묶이지 않으므로 종전대로 **행 수**가 곧 줄 수다.
@@ -7393,7 +7427,9 @@ function renderHousingUnitGroup(g){
   const lines = g.lines || buildUnitGroupLines(g);
   const allAreas = g.allAreas || [];
   const headAreas = allAreas.length ? ` · 전용 ${allAreas.join('·')}` : '';
-  const headCount = g.recruit != null ? ` · 모집 ${Number(g.recruit).toLocaleString()}세대` : '';
+  // 🔵 2026-10-08(표시층 긴급 3) — 머리 모집 = g.total(병합 칸 + 같은 형의 따로 칸). 종전 행만 있는 묶음은 g.recruit 와 같다.
+  const headTotal = g.total !== undefined ? g.total : g.recruit;
+  const headCount = headTotal != null ? ` · 모집 ${Number(headTotal).toLocaleString()}세대` : '';
   const body = lines.map(ln => {
     const u = ln.u;
     // 줄 면적은 **그룹 안에 면적이 둘 이상이고 이 줄이 그 전부를 덮지 않을 때만** 적는다.
@@ -7401,7 +7437,7 @@ function renderHousingUnitGroup(g){
     const needArea = allAreas.length > 1 && ln.areas.length < allAreas.length;
     const area = needArea && ln.areas.length ? `<span class="hu-ug-area">${ln.areas.join('·')}</span>` : '';
     // 행별 모집호수는 머리줄의 그룹 모집호수와 **다를 때만** 적는다(같으면 같은 수를 두 번 말한다).
-    const recruitBadge = (u.recruit_count != null && Number(u.recruit_count) !== Number(g.recruit))
+    const recruitBadge = (u.recruit_count != null && Number(u.recruit_count) !== Number(headTotal))
       ? `<span class="chip hu-recruit-badge">모집 ${u.recruit_count}세대</span>` : '';
     const roundBadge = u.zfRoundLabel
       ? `<span class="chip hu-round-badge${u.zfRoundCurrent ? '' : ' hu-round-old'}">${escapeHtml(u.zfRoundLabel)}</span>`
