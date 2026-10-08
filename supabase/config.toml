@@ -4,6 +4,10 @@
 # 🔴 여기 없는 함수(fetch-attachment-probe · upsert-announcement 등)는 배포하지 않는다 — 워크플로 허용 목록과 같다.
 project_id = "khdpjjyspmlqtzperoqg"
 
+# 2026-10-08 신설 — 열린 원문 키 정기 대조(3-B ③ 1단계 · 기록만). 다른 수집 함수와 같이 x-cron-secret 으로 막는다(JWT 없음).
+[functions.check-source-pages]
+verify_jwt = false
+
 [functions.collect-announcements]
 verify_jwt = false
 
