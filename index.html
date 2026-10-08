@@ -1282,6 +1282,22 @@ function isHiddenAsClosed(row){
   if(e && startOfLocalDay(e) >= startOfLocalDay(new Date())) return false;
   return statusSaysClosed(row);
 }
+// 🔵 2026-10-08(표시층 — 숫자가 말하는 「지금」) — 사용자가 「지금 신청할 수 있는 것」으로 읽는 수의 모수는 「지금 열린 공고」 한 정의다:
+//    목록 기본 거름(신청할 수 없는 공고 숨기기)·상태 칩과 **같은 술어**(isHiddenAsClosed)를 쓴다. 공고 탭 머리 · 인사이트 머리·지역·타임라인이 이 한 벌을 부른다.
+//    누적이 뜻이 있는 자리는 「마감 포함 누적 N건(YYYY년 M월부터)」로 밝힌다 — 기간은 모수 안 가장 이른 공고일에서 센다(하드코딩 아님).
+function zfOpenNotices(rows){ return (rows || []).filter(n => !isHiddenAsClosed(n)); }
+function zfCumulativeSince(rows){
+  let min = null;
+  (rows || []).forEach(n => {
+    const d = parseNoticeDate(n['모집공고일'] || n['announcement_date'] || '');
+    if(d && (!min || d < min)) min = d;
+  });
+  return min ? `${min.getFullYear()}년 ${min.getMonth() + 1}월부터` : '';
+}
+function zfCumulativeText(rows){
+  const since = zfCumulativeSince(rows);
+  return `마감 포함 누적 ${(rows || []).length.toLocaleString()}건${since ? `(${since})` : ''}`;
+}
 // 정렬 그룹: open(0) → before(1) → unknown(2) → closed(3).
 // 🔴 'unknown'을 closed 위에 둔다 — 날짜를 모르는 것이 마감된 것보다 앞이다.
 function applyWindowRank(row){
@@ -3459,10 +3475,18 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
     return;
   }
 
-  const isFiltered = totalCount && totalCount !== filtered.length;
-  const countText = isFiltered
-    ? '조건에 맞는 공고 '+filtered.length+'건 (전체 '+totalCount+'건 중)'
-    : '전체 공고 '+filtered.length+'건';
+  // 🔵 2026-10-08(표시층 — 숫자가 말하는 「지금」 · 다운님 「가」) — 분모는 「전체(마감 포함)」가 아니라 「지금 열린 공고」다.
+  //    종전 「조건에 맞는 공고 74건 (전체 931건 중)」은 931 이 마감 포함 누적이라 지금 신청할 수 있는 공고가 931건인 것처럼 읽혔다.
+  //    마감을 함께 보는 경우(숨기기 끔 · 상태 칩 「마감」)에만 분모가 「마감 포함 누적」이고, 그때는 글자로 밝힌다.
+  //    totalCount 는 noticeData 길이(마감 포함 누적)다 — 부르는 쪽 세 곳을 바꾸지 않는다.
+  const chkEl = document.getElementById('hideClosedChk');
+  const closedExcluded = activeNoticeStatus ? activeNoticeStatus !== '마감' : !!(chkEl ? chkEl.checked : true);
+  const openCount = zfOpenNotices(noticeData).length;
+  const denom = closedExcluded ? `지금 열린 공고 ${openCount.toLocaleString()}건` : zfCumulativeText(noticeData);
+  const whole = closedExcluded ? openCount : (totalCount || noticeData.length);
+  const countText = filtered.length === whole
+    ? denom
+    : `조건에 맞는 공고 ${filtered.length.toLocaleString()}건 · ${denom} 중`;
   statusEl.className = 'rbox ok';
   statusEl.innerHTML = '<p class="rtitle">✅ '+countText+'</p><p class="rdesc">수시로 자동 업데이트</p>';
 
@@ -3955,8 +3979,11 @@ async function loadInsightData(){
   if(insightLoaded) return;
   wrap.innerHTML = '<div class="rbox" style="text-align:center;padding:2rem 1rem"><p style="color:#888;font-size:14px">📊 통계 데이터를 불러오는 중...</p></div>';
   try{
-    const [rows, statsRes] = await Promise.all([
+    // 🔵 2026-10-08(숫자가 말하는 「지금」) — 같은 게시물 공고문(zfLoadPostNotices)이 온 뒤에 센다. 공고 탭·매칭 탭이 그렇게 하므로
+    //    여기만 먼저 세면 「지금 열린 공고」 수가 탭마다 갈린다(isHiddenAsClosed 가 붙은 공고문 상태를 본다). 실패해도 약속은 풀린다.
+    const [rows, , statsRes] = await Promise.all([
       zfFetchAllNoticeRows(),
+      zfLoadPostNotices(),
       fetch(`${SUPABASE_URL}/rest/v1/rpc/get_rental_stats_summary`,
         {method:'POST', headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY,'Content-Type':'application/json'}, body:'{}'}).catch(()=>null)
     ]);
@@ -3992,14 +4019,17 @@ function renderInsight(rows, wrap, statsRows){
 
   // ① KPI
   // 접수기간 날짜 기준이다(applyWindowState). status 문자열은 지금 접수 가능한지를 말해주지 않는다.
-  const kpiActive = rows.filter(r=>isAcceptingNow(r)).length;
+  // 🔵 2026-10-08(숫자가 말하는 「지금」) — 「주요 현황」 세 칸은 지금 상태를 말하는 자리다. 셋 다 「지금 열린 공고」(zfOpenNotices)에서 센다.
+  //    종전에는 「이번주 신규」·「마감임박」이 마감 포함 전량에서 세어 신청할 수 없는 공고(LH 조기 마감 등)가 섞였다(2026-10-08 실측 신규 19 중 1 · 마감임박 10 중 3).
+  const openRows = zfOpenNotices(rows);
+  const kpiActive = openRows.filter(r=>isAcceptingNow(r)).length;
   const d7ago = new Date(today); d7ago.setDate(d7ago.getDate()-7);
-  const kpiNew = rows.filter(r=>{
+  const kpiNew = openRows.filter(r=>{
     if(!r.announcement_date) return false;
     const d = parseNoticeDate(r.announcement_date);
     return d && d >= d7ago;
   }).length;
-  const kpiClosing = rows.filter(r=>isClosingSoon(zfWithSoonestEnd(r))).length;
+  const kpiClosing = openRows.filter(r=>isClosingSoon(zfWithSoonestEnd(r))).length;
 
   // ② 마감 임박 타임라인 (오늘~14일 후)
   const timelineMap = {};
@@ -4007,7 +4037,8 @@ function renderInsight(rows, wrap, statsRows){
     const d = new Date(today); d.setDate(d.getDate()+i);
     timelineMap[dateKey(d)] = 0;
   }
-  rows.forEach(r=>{
+  // 🔵 2026-10-08(숫자가 말하는 「지금」) — 「마감 임박」은 지금 열린 공고만 센다. 마감일이 남아도 기관이 먼저 마감한 공고(LH 조기 마감)는 뺀다.
+  openRows.forEach(r=>{
     const raw = r.apply_end||'';
     if(!raw) return;
     const d = parseNoticeDate(raw);
@@ -4031,11 +4062,11 @@ function renderInsight(rows, wrap, statsRows){
   // 🔴 예외 — apply_end가 오늘 이후면 status보다 날짜를 믿고 남긴다(실측 1건).
   // status 마감 판정은 접미사로 본다. '접수마감'·'모집마감'은 걸리고 '마감임박'은 안 걸린다.
   // ⚠️ status를 보는 것은 이 술어 한 곳뿐이다. 정렬·카드·필터로 넓히지 않는다.
-  // 갈림은 이 술어뿐이다. 나중에 누적 토글을 붙이면 REGION_SCOPE만 바꾼다.
+  // 갈림은 이 술어뿐이다(zfOpenNotices).
   // 🔴 술어를 여기 복제하지 않는다 — isHiddenAsClosed가 정확히 이 갈래이고,
   // 사본을 두면 목록 필터와 지역 분포가 조용히 갈린다(2026-09-15 단일화).
-  const REGION_SCOPE = r => !isHiddenAsClosed(r);
-  const regionRows = rows.filter(REGION_SCOPE);
+  // 🔵 2026-10-08 — 「지금 열린 공고」 한 벌(zfOpenNotices — 같은 술어 isHiddenAsClosed)을 부른다. 인사이트 머리의 수도 이 값이다.
+  const regionRows = openRows;
   const regionMap = {};
   regionRows.forEach(r=>{
     const k = r.sido_nm||r.region||'기타';
@@ -4084,7 +4115,7 @@ function renderInsight(rows, wrap, statsRows){
   wrap.innerHTML = `
     <div style="${S}">
       <p style="${T}">📊 공고 통계 인사이트</p>
-      <p style="font-size:13px;color:#888;margin:0">전국 <strong style="color:#5a7af7">${rows.length.toLocaleString()}개</strong> 공고 · 수시로 자동 업데이트</p>
+      <p style="font-size:13px;color:#888;margin:0">지금 열린 공고 <strong style="color:#5a7af7">${regionRows.length.toLocaleString()}건</strong> · ${zfCumulativeText(rows)} · 수시로 자동 업데이트</p>
     </div>
 
     <div style="${S}">
@@ -4142,7 +4173,8 @@ function renderInsight(rows, wrap, statsRows){
     </div>
 
     <div style="${S}">
-      <p style="${T}">📈 최근 30일 공고 추이</p>
+      <p style="${T};margin-bottom:4px">📈 최근 30일 공고 추이</p>
+      <p style="font-size:12px;color:#888;margin:0 0 12px">공고일 기준 · 마감 포함</p>
       ${trendEntries.length===0
         ? '<p style="font-size:13px;color:#aaa;text-align:center;padding:20px 0">최근 30일 데이터가 없어요</p>'
         : `<div style="display:flex;align-items:flex-end;gap:4px;overflow-x:auto;padding-bottom:4px;min-height:84px">
@@ -4184,7 +4216,7 @@ function renderInsight(rows, wrap, statsRows){
       const gapRows = TYPES.map(({label, keyword})=>{
         const stat = statsByType[label]||{};
         const stock = Number(stat['총세대수'])||0;
-        const ofType = rows.filter(r=>(r.housing_type||'').includes(keyword));
+        const ofType = openRows.filter(r=>(r.housing_type||'').includes(keyword));   // 🔵 2026-10-08 — 같은 모수(지금 열린 공고) · 값은 종전과 같다(실측 접수중·예정 안 마감 0)
         const noticeCnt = ofType.filter(r=>isAcceptingNow(r)).length;
         // 🔴 예전 주석은 「공고중·정정공고중 = 게시됐으나 접수 시작 전」이라고 적혀 있었는데 사실이 아니다.
         // 그 두 상태에도 이미 접수가 시작된 공고가 섞여 있다(2026-09-09 실측 30건). 그래서 여기도
