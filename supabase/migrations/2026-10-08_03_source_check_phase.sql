@@ -1,3 +1,13 @@
+-- zipfit:function source_check_targets() acl={postgres=X/postgres,service_role=X/postgres} secdef=true
+-- 표시층 긴급 2 · 3 — 원문 키 대조의 「차수 일치」(2026-10-08 · 우편함 「표시층 긴급 2 …」 3).
+--   매입 셋(…20737 · …20875 · …20882)의 페이지 접수기간 = 경로 표 첫 차수 「1순위 (우선)」 창 · 카드 확정값 = 공고 전체 창 — 카드가 맞다(분석 스킬 확정값 규칙).
+--   ① source_check_targets() 가 원문 키·대표 카드의 경로 표 차수 창 card_phases 를 함께 낸다(반환 칸이 늘어 drop → create).
+--   ② source_page_checks.phase_match — 페이지 시작·끝이 한 차수 창과 같으면 그 차수 이름(phase_text). 이때 end_diff·start_diff 는 거짓(기록 칸에는 남김).
+-- 되돌리기: 이전 정의(git show 6f515b4:supabase/rpc/source_check_targets.sql)로 drop → create + alter table public.source_page_checks drop column phase_match.
+alter table public.source_page_checks add column phase_match text;
+comment on column public.source_page_checks.phase_match is '페이지 시작·끝이 같은 공고 경로 표의 한 차수 창(phase_text 있는 행)과 같으면 그 차수 이름 — 이때 end_diff·start_diff 는 거짓(2026-10-08 표시층 긴급 2)';
+
+drop function public.source_check_targets();
 CREATE OR REPLACE FUNCTION public.source_check_targets()
  RETURNS TABLE(source text, source_key text, card_id text, page_url text, title text, announcement_date date, card_status text, card_apply_start date, card_apply_end date, card_apply_end_confirmed date, card_notice_ends jsonb, card_soonest_open_end date, card_phases jsonb)
  LANGUAGE sql
@@ -37,3 +47,6 @@ AS $function$
       WHERE r.announcement_id IN (u.skey, u.cid) AND r.phase_text IS NOT NULL AND r.start_date IS NOT NULL AND r.end_date IS NOT NULL)
   FROM u JOIN public.announcements a ON a.announcement_id = u.skey
 $function$
+;
+revoke all on function public.source_check_targets() from public, anon, authenticated;
+grant execute on function public.source_check_targets() to service_role;

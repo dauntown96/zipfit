@@ -19,9 +19,9 @@ on:
   workflow_dispatch:
     inputs:
       simulate:
-        description: '알림 경로 시험 — fail 이면 카드 하나의 기대 문구를 없는 문구로 · notice 면 공고문 기대 마감일을 하루 옮긴다 · zipfit 이면 보이는 글자에 「ZipFit」을 하나 넣는다 · stale_date 면 히어로에 지난 날짜가 든 옛 배지를 넣는다'
+        description: '알림 경로 시험 — fail 이면 카드 하나의 기대 문구를 없는 문구로 · notice 면 공고문 기대 마감일을 하루 옮긴다 · zipfit 이면 보이는 글자에 「ZipFit」을 하나 넣는다 · stale_date 면 히어로에 지난 날짜가 든 옛 배지를 넣는다 · objobj 면 보이는 글자에 「[object Object]」를 하나 넣는다'
         type: choice
-        options: [none, fail, notice, zipfit, stale_date]
+        options: [none, fail, notice, zipfit, stale_date, objobj]
         default: none
 
 permissions:

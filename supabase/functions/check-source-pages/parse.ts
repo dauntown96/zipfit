@@ -151,10 +151,17 @@ export function matchFollowups(annTitle: string, annDate: string | null, posts: 
 }
 
 // 비교 규칙(check-source-pages 가 쓴다 · 재현 시험도 이 함수로) — 대상은 열린 카드뿐이라 「페이지 접수마감」이면 곧 어긋남이다.
-export function compareLh(p: LhPage, card: { apply_start: string | null; apply_end: string | null }) {
+// 🔵 2026-10-08(표시층 긴급 2 · 3) — 「차수 일치」: 페이지 시작·끝이 그 공고 경로 표의 한 차수 창(phase_text 있는 행)과 같으면
+//   다름에서 뺀다(기록 칸 phase_match 에 차수 이름을 남긴다). 매입 공고는 페이지가 첫 차수(1순위 (우선)) 창만 주고
+//   카드 확정값은 공고 전체 창이다 — 카드가 맞다(…20737 · …20875 · …20882 · 2026-10-08 경로 표 대조).
+export type Phase = { phase: string | null; start: string | null; end: string | null }
+export function compareLh(p: LhPage, card: { apply_start: string | null; apply_end: string | null }, phases: Phase[] = []) {
+  const ph = (p.applyStart && p.applyEnd) ? phases.find(x => x.start === p.applyStart && x.end === p.applyEnd) : undefined
+  if (ph) return { closed_mismatch: p.status === '접수마감', end_diff: false, start_diff: false, phase_match: ph.phase ?? '' }
   return {
     closed_mismatch: p.status === '접수마감',
     end_diff: !!p.applyEnd && p.applyEnd !== card.apply_end,
     start_diff: !!p.applyStart && p.applyStart !== card.apply_start,
+    phase_match: null,
   }
 }

@@ -9,10 +9,10 @@
 //   두 함수의 시간 예산을 잠식하지 않는다. 한 실행은 시간 예산 안에서 「최근 6시간 안에 대조하지 않은 키」를 앞에서부터 처리하고,
 //   남은 것은 같은 회차의 다음 cron 호출(5분 간격)이 이어 받는다.
 //
-// 모드: collect(기본) · probe(DB 미기록 — ?id=<원문 키> 한 건의 파싱 결과) · authcheck.
+// 모드: collect(기본 · ?force=1 이면 6시간 건너뛰기 없이 열린 키 전부) · probe(DB 미기록 — ?id=<원문 키> 한 건의 파싱 결과) · authcheck.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2.116.0'
-import { parseLhPage, compareLh, parseShList, parseShBoard, matchFollowups, type ShPost } from './parse.ts'
+import { parseLhPage, compareLh, parseShList, parseShBoard, matchFollowups, type ShPost, type Phase } from './parse.ts'
 
 const requireEnv = (key: string): string => {
   const v = Deno.env.get(key)
@@ -45,6 +45,7 @@ type Target = {
   source: 'LH' | 'SH'; source_key: string; card_id: string; page_url: string | null; title: string | null
   announcement_date: string | null; card_status: string | null; card_apply_start: string | null; card_apply_end: string | null
   card_apply_end_confirmed: string | null; card_notice_ends: unknown; card_soonest_open_end: string | null
+  card_phases?: Phase[] | null
 }
 
 async function getText(url: string): Promise<{ status: number; text: string }> {
@@ -83,7 +84,7 @@ async function checkLh(t: Target, runId: number) {
   return {
     ...baseRow(t, runId), page_url: url, http_status: r.status, page_form: p.form, page_status: p.status,
     page_apply_start: p.applyStart, page_apply_end: p.applyEnd, page_schedules: p.schedules,
-    ...compareLh(p, { apply_start: t.card_apply_start, apply_end: t.card_apply_end }),
+    ...compareLh(p, { apply_start: t.card_apply_start, apply_end: t.card_apply_end }, t.card_phases ?? []),
   }
 }
 
@@ -120,9 +121,9 @@ function checkSh(t: Target, runId: number, ctx: { status: Map<string, string>; p
   }
 }
 
-async function collect() {
+async function collect(force: boolean) {
   const startedAt = Date.now()
-  const { data: run, error: re } = await supabase.from('source_page_check_runs').insert({ mode: 'collect' }).select('id').single()
+  const { data: run, error: re } = await supabase.from('source_page_check_runs').insert({ mode: force ? 'collect-force' : 'collect' }).select('id').single()
   if (re) throw new Error(`실행 기록: ${re.message}`)
   const runId = run.id as number
   const finish = async (patch: Record<string, unknown>) => {
@@ -135,7 +136,8 @@ async function collect() {
     const { data: done, error: de } = await supabase.from('source_page_checks')
       .select('source_key').gte('checked_at', since).is('error', null)
     if (de) throw new Error(`대조 이력 조회: ${de.message}`)
-    const doneKeys = new Set((done ?? []).map(d => d.source_key as string))
+    // force(?force=1 · 손으로 다시 대조할 때만) 면 6시간 건너뛰기를 쓰지 않는다 — cron 은 넘기지 않는다.
+    const doneKeys = new Set(force ? [] : (done ?? []).map(d => d.source_key as string))
     const todo = ((tg ?? []) as Target[]).filter(t => !doneKeys.has(t.source_key))
       .sort((a, b) => (a.source === b.source ? a.source_key.localeCompare(b.source_key) : a.source === 'SH' ? 1 : -1))
     let checked = 0, failed = 0, closed = 0, ends = 0, streak = 0
@@ -197,7 +199,7 @@ Deno.serve(async (req: Request) => {
       if (!/^(\d{10,20}|SH_\d+)$/.test(id)) return json({ error: 'probe 는 ?id=<panId 또는 SH_seq> 하나' }, 400)
       return json({ mode, ...(await probe(id)) })
     }
-    if (mode === 'collect') return json({ mode, ...(await collect()) })
+    if (mode === 'collect') return json({ mode, ...(await collect(params.get('force') === '1')) })
     return json({ error: `미구현 mode: ${mode}` }, 400)
   } catch (e) {
     return json({ mode, error: String(e) }, 500)
