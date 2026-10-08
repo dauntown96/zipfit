@@ -7314,7 +7314,7 @@ function renderExtraNoteHtml(note){
 //       recruit_count 를 묶음 모집에 더한다(머리 = 병합 칸 + 따로 칸 = 그 형 모집 합). 같은 형 묶음이 없으면 혼자 묶음이 된다.
 //    ② 묶음이 있는 목록에서 unit_group 이 NULL 인 행(원문에서 따로 선 주택형)은 그 행의 unit_type 을 이름으로 한 묶음이 된다
 //       — 한 목록에 아코디언과 펼친 카드가 섞여 같은 층위의 주택형이 다른 꼴로 보이지 않게. 묶음이 하나도 없는 목록은 종전 그대로다.
-//    묶음 순서는 그 묶음 첫 행의 목록 순서(seq)다.
+//    묶음 순서와 묶음 안 줄 순서는 넘겨받은 목록 순서다(종전 묶음과 같은 규칙 — 펼친 카드가 맨 뒤로 몰리던 것만 사라진다).
 function buildHousingUnitList(units){
   const byKey = new Map();
   let groups = [];
