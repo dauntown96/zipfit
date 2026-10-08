@@ -21,6 +21,7 @@ on:
         required: true
         type: choice
         options:
+          - check-source-pages
           - collect-announcements
           - collect-lh-images
           - collect-lh-promo
@@ -39,7 +40,7 @@ concurrency:
 
 env:
   PROJECT_REF: khdpjjyspmlqtzperoqg
-  ALLOWED: collect-announcements collect-lh-images collect-lh-promo collect-rental-stats collect-sh-announcements delete-account fetch-attachment save-user-profile
+  ALLOWED: check-source-pages collect-announcements collect-lh-images collect-lh-promo collect-rental-stats collect-sh-announcements delete-account fetch-attachment save-user-profile
 
 jobs:
   deploy:
