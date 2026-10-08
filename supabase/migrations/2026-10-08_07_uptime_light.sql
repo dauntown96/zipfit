@@ -1,3 +1,8 @@
+-- 바깥 감시 경량화(2026-10-08 · 우편함 「코드 — 운영 기반 후속」 5) — site 대상이 첫 화면 전체(599KB)를 10분마다 받던 것을 앞 4KB(Range: bytes=0-4095 → 206)로.
+--   2026-10-08 실측: https://kkokzip.com/ Range 0-4095 → 206 · content-range bytes 0-4095/602658 · 앞 4KB 에 <title>꼭집 — 꼭 맞는 집만 꼭 집어서 · 「꼭집」 5회.
+--   판정은 그대로다: 성공 = HTTP 2xx·3xx(206 포함) ∧ 본문 표식 「꼭집」(ops_uptime_fill 변경 0). rest 대상 변경 0.
+--   되돌리기: 사본 ops_uptime_ping.sql 의 이전 정의(커밋 84d5324)로 되돌리는 새 마이그레이션.
+-- zipfit:function ops_uptime_ping() acl={postgres=X/postgres,service_role=X/postgres} secdef=false
 CREATE OR REPLACE FUNCTION public.ops_uptime_ping()
  RETURNS integer
  LANGUAGE plpgsql
@@ -29,4 +34,4 @@ begin
   delete from public.ops_uptime_log where at < now() - interval '90 days';
   return 2;
 end
-$function$
+$function$;

@@ -74,6 +74,7 @@
   - **롤백 전용 시험**: `DO` 블록 안에서 쓰고 읽은 값을 `raise exception 'RESULT …'`로 내보내면 결과는 400 메시지로 보이고 쓰기는 남지 않는다(B53 트리거 시험).
   - 컨테이너에서 `*.supabase.co` anon REST는 curl로 열린다(2026-10-02 실측 200 — B53 때는 프록시 403이었다) · `apply.lh.or.kr` 공고 페이지도 curl 200(2026-10-02). 🔴 다시 막히면 anon REST 확인(원칙 29)은 DB 안에서 `net.http_post(…)`로 부르고 `net._http_response`를 읽는다(B53).
   - 🔴 **지방공사 게시판 도메인(`gbdc.co.kr`·`gndc.co.kr` 등)도 컨테이너에서 프록시 403이다**(B56) — 게시판 **본문 텍스트**는 `net.http_get(…)`으로 받는다. 첨부 바이너리(hwp·pdf)는 `net._http_response.content`가 `text`라 깨져 받지 못하고, `fetch-attachment` 허용목록에도 없다 — 지방공사 공고 분석을 열 때 허용목록을 함께 연다.
+- 🔴 **인증·비밀 설정은 필요한 키만 골라 조회·출력한다**(2026-10-08 — 운영 기반 묶음 ② 사고: 관리 API `config/auth` 조회의 출력 필터가 넓어 카카오 OAuth 비밀값이 도구 출력에 한 번 찍혔다 · 같은 날 다운님 재발급) — 전체 설정 덤프 금지. 비밀값이 도구 출력에 찍히면 회신 ②에 사고 보고 + 다운님께 재발급 권고.
 - ⚠️ **Drive `download_file_content`는 약 14KB 이하 작은 파일을 파일로 떨어뜨리지 않고 대화로 들인다**(B51 원주문막1 평면도) — base64를 되살릴 수 없어 판독 불가다. 서브에이전트에 맡기거나 다른 경로(`fetch-attachment` 등)로 받는다.
 - 🔵 **Notion 파일 업로드가 된다**(2026-10-08 실측 18/18 — 환경 네트워크 허용에 `api.notion.com` 추가 뒤 · 그 전 세션은 프록시 403이었다): `notion-create-file-upload`로 받은 업로드 URL에 multipart POST · 🔴 mp4는 `video/mp4`를 명시한다 · 업로드 URL은 약 23분 산다.
 - 🔴 **Node `fetch`는 프록시 환경변수를 저절로 쓰지 않는다**(2026-10-08 · 점검기 로컬 시험에서 `TypeError: fetch failed`) — `NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt`를 붙이고, 로컬 서버를 함께 쓰면 `NO_PROXY=127.0.0.1,localhost`. curl·Playwright(Chromium)는 그대로 된다.

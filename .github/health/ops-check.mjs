@@ -45,8 +45,9 @@ const EXPECTED_JOBS = [
   'zipfit-health-screen-dispatch', // 2026-10-06 화면 점검 예약도 GitHub 밖으로(마이그레이션 2026-10-06_02)
   'zipfit-check-source-pages',   // 2026-10-08 열린 원문 키 정기 대조(3-B ③ 1단계 · 마이그레이션 2026-10-08_02)
   'zipfit-uptime-ping',          // 2026-10-08 바깥 감시 1단계(마이그레이션 2026-10-08_05)
+  'zipfit-backup-dispatch', 'zipfit-heartbeat-dispatch',   // 2026-10-08 백업·생존 신호 예약도 GitHub 밖으로(마이그레이션 2026-10-08_06)
 ]
-// 🔵 2026-10-03 — workflow_dispatch 토큰(Vault github_actions_dispatch_token · fine-grained · zipfit 하나 · Actions 읽기·쓰기) 만료일.
+// 🔵 2026-10-03 — workflow_dispatch 토큰(Vault github_actions_dispatch_token · fine-grained · zipfit · zipfit-backup(2026-10-08 더함) · Actions 읽기·쓰기) 만료일.
 //    토큰을 갈면 이 날짜도 함께 고친다(다운님이 알려 준 값 · 값 자체는 Vault 에만 있다).
 const DISPATCH_TOKEN_EXPIRES = '2027-10-03'
 
@@ -114,6 +115,12 @@ try {
                               'err', left(coalesce(l.error_msg, r.error_msg, case when r.status_code >= 300 then r.content end), 200))
                          from ops_dispatch_log l left join net._http_response r on r.id = l.net_request_id and r.created >= l.at - interval '1 minute' and r.created < l.at + interval '10 minutes'
                         where l.target = 'health-screen.yml' order by l.id desc limit 1),
+      -- 🔵 2026-10-08(운영 기반 후속 1) — zipfit-backup 백업·생존 신호 발송(하루 한 번) · 화면 점검 발송과 같은 꼴.
+      'backup_dispatch', (select json_object_agg(t.target, (select json_build_object('age_min', extract(epoch from now() - l.at)/60, 'status', coalesce(l.status_code, r.status_code), 'pending', l.status_note is null and r.id is null,
+                              'err', left(coalesce(l.error_msg, r.error_msg, case when r.status_code >= 300 then r.content end), 200))
+                         from ops_dispatch_log l left join net._http_response r on r.id = l.net_request_id and r.created >= l.at - interval '1 minute' and r.created < l.at + interval '10 minutes'
+                        where l.target = t.target order by l.id desc limit 1))
+                         from (values ('zipfit-backup/backup.yml'), ('zipfit-backup/heartbeat.yml')) t(target)),
       'dispatch', (select json_build_object(
          'enabled', c.enabled, 'grace_min', extract(epoch from c.grace)/60, 'max_wait_min', extract(epoch from c.max_wait)/60,
          'waiting', (select count(*) from analysis_dispatch_queue where state = 'waiting'),
@@ -144,7 +151,12 @@ try {
          'closed', (select coalesce(json_agg(z.source_key || ' ' || coalesce(z.page_status, '')), '[]'::json) from (select distinct on (c.source_key) c.* from source_page_checks c
              where c.checked_at > now() - interval '26 hours' and c.error is null order by c.source_key, c.checked_at desc) z
              join announcements a on a.announcement_id = z.card_id where z.closed_mismatch and a.status <> '접수마감'),
-         'enddiff', (select coalesce(json_agg(z.source_key || ' 카드 ' || coalesce(z.card_apply_end::text, '-') || ' ↔ 페이지 ' || coalesce(z.page_apply_end::text, '-')), '[]'::json) from (select distinct on (c.source_key) c.* from source_page_checks c
+         -- 🔵 2026-10-08(운영 기반 후속 6) — 같은 공고 묶음에 접수 끝 갈림을 알리는 ⚠️ 정책 행(분류 「⚠️ … 기간 끝 날짜 …」)이 이미 있으면 known(알고 있음).
+         --    화면이 사용자에게 이미 알리고 있는 갈림이다 — 경고 대신 정보로 세고 개수는 남긴다. ⚠️ 행이 없는 갈림만 경고다.
+         'enddiff', (select coalesce(json_agg(json_build_object('t', z.source_key || ' 카드 ' || coalesce(z.card_apply_end::text, '-') || ' ↔ 페이지 ' || coalesce(z.page_apply_end::text, '-'),
+                'known', exists (select 1 from announcement_policies p
+                                  where p.announcement_id in (select g.announcement_id from get_announcement_group_ids(z.card_id) g)
+                                    and p.category like '⚠️%' and p.category like '%기간 끝 날짜%'))), '[]'::json) from (select distinct on (c.source_key) c.* from source_page_checks c
              where c.checked_at > now() - interval '26 hours' and c.error is null order by c.source_key, c.checked_at desc) z
              join announcements a on a.announcement_id = z.card_id where z.end_diff and a.status <> '접수마감'))),
       -- 🔵 2026-10-06 정정본 분석 없음(A3) — 열린 대표 중 정정 행이 정정된 지 60분 넘었는데 정정본 분석이 없고, 같은 묶음에 정정 전 분석이 있는 것.
@@ -237,11 +249,13 @@ try {
       add('source_check_fresh', '원문 키 대조 마지막 실행 경과(분)', x.last_ok_age_min != null && x.last_ok_age_min <= 1560 ? 'pass' : 'fail',
         x.last_ok_age_min == null ? '끝까지 돈 실행 없음' : Math.round(x.last_ok_age_min), '≤ 1560분(하루 두 회차 UTC 11:30·21:30 — 하루 넘게 안 돌면 실패 · 여유 2시간)')
     }
-    const cl = x.closed || [], ed = x.enddiff || []
+    const cl = x.closed || [], edAll = x.enddiff || []
+    const ed = edAll.filter(e => !e.known).map(e => e.t), edKnown = edAll.filter(e => e.known).map(e => e.t)
     add('source_closed', '열린 카드인데 공급기관 페이지가 접수마감', cl.length === 0 ? 'pass' : 'warn', cl.length ? `${cl.length}: ${cl.slice(0, 5).join(', ')}` : 0,
       '0 — 키마다 26시간 안 마지막 대조 · 카드가 아직 열림 · 넘으면 ⚠️ 경고만(값 반영은 2단계)')
-    add('source_end_diff', '열린 카드 접수 끝 ≠ 공급기관 페이지', ed.length === 0 ? 'pass' : 'warn', ed.length ? `${ed.length}: ${ed.slice(0, 5).join(', ')}` : 0,
-      '0 — 페이지 일정 중 가장 늦은 접수 끝 ≠ 카드 apply_end · 넘으면 ⚠️ 경고만(값 반영은 2단계)')
+    add('source_end_diff', '열린 카드 접수 끝 ≠ 공급기관 페이지', ed.length === 0 ? 'pass' : 'warn',
+      (ed.length ? `${ed.length}: ${ed.slice(0, 5).join(', ')}` : '0') + (edKnown.length ? ` · 알고 있음 ${edKnown.length}(⚠️ 정책 행 있음): ${edKnown.slice(0, 5).join(', ')}` : ''),
+      '0 — 페이지 일정 중 가장 늦은 접수 끝 ≠ 카드 apply_end · 넘으면 ⚠️ 경고만(값 반영은 2단계) · 같은 공고 묶음에 「⚠️ … 기간 끝 날짜 …」 정책 행이 있으면 알고 있음(정보)')
   }
   // ⑦ 함수 정의 = supabase/rpc/ 사본(2026-09-30 우편함 「운영 — 함수 사본 드리프트」). 읽기만 한다.
   //   대조 규칙은 .github/db/migrate.py rpc_md5() 와 같다 — 파일 그대로 또는 끝 줄바꿈을 걷은 md5 가 DB md5 와 같으면 통과.
@@ -330,6 +344,14 @@ try {
       const ok = y.age_min <= 25 * 60 && (y.pending ? y.age_min <= 5 : y.status === 204)
       add('screen_dispatch', '화면 점검 발송(pg_cron → workflow_dispatch) 마지막', ok ? 'pass' : 'fail',
         `${Math.round(y.age_min)}분 전 · ${y.pending ? '응답 대기' : `HTTP ${y.status}`}${y.err ? ' · ' + y.err : ''}`, '≤ 25시간(매일 23:50 UTC) · 응답 204(GitHub workflow_dispatch)')
+    }
+    // 🔵 2026-10-08(운영 기반 후속 1) — 백업(18:00 UTC)·생존 신호(18:40 UTC) 발송 — 첫 발송 전(기록 없음)은 건너뛴다.
+    for (const [key, id, name, when] of [['zipfit-backup/backup.yml', 'backup_dispatch', '백업 발송(pg_cron → zipfit-backup workflow_dispatch) 마지막', '매일 18:00 UTC'],
+                                         ['zipfit-backup/heartbeat.yml', 'heartbeat_dispatch', '생존 신호 발송(pg_cron → zipfit-backup workflow_dispatch) 마지막', '매일 18:40 UTC']]) {
+      const b = (d.backup_dispatch || {})[key]
+      if (!b) { add(id, name, 'skip', '기록 없음(첫 발송 전)', `≤ 25시간(${when}) · 응답 204`); continue }
+      const ok = b.age_min <= 25 * 60 && (b.pending ? b.age_min <= 5 : b.status === 204)
+      add(id, name, ok ? 'pass' : 'fail', `${Math.round(b.age_min)}분 전 · ${b.pending ? '응답 대기' : `HTTP ${b.status}`}${b.err ? ' · ' + b.err : ''}`, `≤ 25시간(${when}) · 응답 204(GitHub workflow_dispatch)`)
     }
     const daysLeft = (Date.parse(DISPATCH_TOKEN_EXPIRES + 'T00:00:00Z') - now.getTime()) / 86400000
     add('ops_dispatch_token', '발송 토큰 만료까지(일)', daysLeft > 30 ? 'pass' : daysLeft > 0 ? 'warn' : 'fail', Math.floor(daysLeft),
