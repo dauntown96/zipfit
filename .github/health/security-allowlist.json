@@ -172,27 +172,12 @@
    "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
   },
   {
-   "key": "function_search_path_mutable_public_bulk_set_revision_note",
-   "kind": "known",
-   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
-  },
-  {
-   "key": "function_search_path_mutable_public_bump_detail_fetch_fail",
-   "kind": "known",
-   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
-  },
-  {
    "key": "function_search_path_mutable_public_compute_announcement_flags",
    "kind": "known",
    "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
   },
   {
    "key": "function_search_path_mutable_public_get_announcement_blocks",
-   "kind": "known",
-   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
-  },
-  {
-   "key": "function_search_path_mutable_public_get_announcement_group_ids",
    "kind": "known",
    "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
   },

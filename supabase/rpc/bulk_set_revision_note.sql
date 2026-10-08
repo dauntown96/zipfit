@@ -2,6 +2,7 @@ CREATE OR REPLACE FUNCTION public.bulk_set_revision_note(p_ids text[], p_notes t
  RETURNS void
  LANGUAGE sql
  SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
 AS $function$
   UPDATE announcements a
   SET revision_note = v.note
