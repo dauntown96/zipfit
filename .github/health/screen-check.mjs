@@ -296,7 +296,8 @@ try {
     for (const [k, v] of Object.entries(u)) { const el = document.getElementById(k); if (el) el.value = v }
     await diagnose(); await matchHouses()
     if (typeof lastTargetOut === 'undefined') return { err: 'lastTargetOut 없음' }
-    if (sim) { const r = lastFiltered.find(x => !x._zfTarget); if (r) { lastTargetOut.push({ id: r.announcement_id, title: r.title, v: { names: ['시험'] } }); renderMatchResults(lastFiltered) } }
+    if (sim) { const r = lastFiltered.find(x => !x._zfTarget); if (r) lastTargetOut.push({ id: r.announcement_id, title: r.title, v: { names: ['시험'] } }) }
+    visibleCount = lastFiltered.length; renderMatchResults(lastFiltered)   // 문구는 결과 전부를 펼쳐 잰다(처음 5장만 그리면 줄이 비기도 한다)
     const root = document.getElementById('match-result')
     const lines = [...root.querySelectorAll('.zf-target-ok, .zf-check-note')].map(e => e.textContent.replace(/\s+/g, ' ').trim())
     const box = root.querySelector('details.zf-target-out > summary')
