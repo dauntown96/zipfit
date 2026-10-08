@@ -1,3 +1,8 @@
+-- zipfit:function analysis_dispatch_tick(boolean) acl={postgres=X/postgres,service_role=X/postgres} secdef=false
+-- 표시층 긴급 2 · 4 — 매입 홍보물 즉시 수집(2026-10-08 · 우편함 「표시층 긴급 2 …」 4 · 다운님 결정 처방 ⑴ · 3-B ③ 회신 ⓓ).
+--   analysis_dispatch_tick() ② 단계 끝에, 이 실행에서 새로 대기열에 든 needs_promo 공고만 collect-lh-promo?mode=collect&soft=1&id=… 를 한 번 부른다.
+--   soft=1 은 실패해도 announcement_promo_fetch 에 쓰지 않는다(EF 쪽 같은 PR) — 정기 cron 이 종전처럼 「새 공고」로 집는다.
+-- 되돌리기: 이전 정의(git show 63159c9:supabase/rpc/analysis_dispatch_tick.sql)로 create or replace.
 CREATE OR REPLACE FUNCTION public.analysis_dispatch_tick(p_force boolean DEFAULT false)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -275,3 +280,4 @@ begin
                             'followups', n_fu_sent, 'new', n_new, 'dropped', n_drop);
 end
 $function$
+;

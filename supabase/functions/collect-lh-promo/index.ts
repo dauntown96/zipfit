@@ -14,6 +14,7 @@
 //
 // 모드: collect(기본) · probe(DB 미기록 — ?id=<PAN_ID> 한 건의 파싱·목록 결과를 돌려준다) · authcheck.
 //   collect 에 ?id=<PAN_ID>(여러 개는 쉼표)를 주면 대상 조건을 건너뛰고 그 공고만 다시 수집한다(역전파·재시도용).
+//   &soft=1 을 더하면 실패를 기록하지 않는다(발송기 analysis_dispatch_tick 의 즉시 호출 — 2026-10-08).
 
 import { createClient } from 'jsr:@supabase/supabase-js@2.116.0'
 import { parseButtons, fetchButtonFiles, type PromoFile } from './parse.ts'
@@ -156,7 +157,7 @@ async function saveFail(aid: string, msg: string, ms: number) {
   }, { onConflict: 'announcement_id' })
 }
 
-async function collect(forceIds: string[]) {
+async function collect(forceIds: string[], soft = false) {
   const startedAt = Date.now()
   const targets = await pickTargets(forceIds)
   let listErrorCount = 0
@@ -169,7 +170,7 @@ async function collect(forceIds: string[]) {
       const r = await fetchOne(t, () => ++listErrorCount >= RUN_ERROR_LIMIT)
       const ms = Date.now() - t0
       if (r.listErrors.length) {
-        await saveFail(t.announcement_id, r.listErrors.join(' · '), ms)
+        if (!soft) await saveFail(t.announcement_id, r.listErrors.join(' · '), ms)
         done.push({ id: t.announcement_id, ok: false, list_errors: r.listErrors.length })
       } else {
         await saveOne(t.announcement_id, r, new Date().toISOString(), ms)
@@ -177,7 +178,7 @@ async function collect(forceIds: string[]) {
       }
     } catch (e) {
       const ms = Date.now() - t0
-      await saveFail(t.announcement_id, String(e), ms)
+      if (!soft) await saveFail(t.announcement_id, String(e), ms)
       done.push({ id: t.announcement_id, ok: false, error: String(e).slice(0, 200) })
     }
     if (listErrorCount >= RUN_ERROR_LIMIT) { stoppedBy = 'list_errors'; break }
@@ -202,7 +203,9 @@ Deno.serve(async (req: Request) => {
       if (ids.length !== 1) return json({ error: 'probe 는 ?id= 하나' }, 400)
       return json({ mode, ...(await probe(ids[0])) })
     }
-    if (mode === 'collect') return json({ mode, ...(await collect(ids)) })
+    // 🔵 2026-10-08(표시층 긴급 2 · 4) — soft=1(발송기 즉시 호출 · ?id= 와 함께만): 실패를 announcement_promo_fetch 에 남기지 않는다 —
+    //    정기 cron 이 그 공고를 「새 공고」로 다시 집게(실패 6시간 재시도 문턱 밖). 성공은 종전대로 저장한다.
+    if (mode === 'collect') return json({ mode, ...(await collect(ids, ids.length > 0 && params.get('soft') === '1')) })
     return json({ error: `미구현 mode: ${mode}` }, 400)
   } catch (e) {
     return json({ mode, error: String(e) }, 500)

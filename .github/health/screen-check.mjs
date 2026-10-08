@@ -248,6 +248,32 @@ try {
   if (process.env.SIMULATE === 'zipfit') await page.evaluate(() => { const p = document.createElement('p'); p.textContent = 'ZipFit(시험)'; document.body.prepend(p) })
   const oldName = await page.evaluate(() => (document.body.innerText.match(/ZipFit/g) || []).length)
   add('old_name', '보이는 글자에 「ZipFit」', oldName === 0 ? 'pass' : 'fail', oldName, '0(body.innerText · 대소문자 그대로 — 이름 규칙: 보이는 곳은 「꼭집」)')
+  // ⑨-2 깨진 객체 글자(2026-10-08 · 우편함 「표시층 긴급 2」 1) — 부산문현2 …20806 상세 자격 절에 「공급대상 | 갈래 | [object Object]」가 나갔다.
+  //    ⓐ 지금 보이는 글자(body.innerText) ⓑ 자격 행 verification_requirements 전부(anon REST)를 화면과 같은 함수(zfEligVrEntries ·
+  //    prettifyEligKey · renderEligValue)로 그린 글자 — 카드 상세를 펼치지 않아도 상세 자격 절의 글자를 잰다. 둘 다 0이어야 통과.
+  //    SIMULATE=objobj 이면 보이는 자리에 그 글자를 넣고 잰다(실패해야 맞다).
+  if (process.env.SIMULATE === 'objobj') await page.evaluate(() => { const p = document.createElement('p'); p.textContent = '[object Object]'; document.body.prepend(p) })
+  const objVisible = await page.evaluate(() => (document.body.innerText.match(/\[object Object\]/g) || []).length)
+  const objRender = await page.evaluate(async () => {
+    if (typeof zfEligVrEntries !== 'function' || typeof renderEligValue !== 'function') return { err: '화면 함수 없음' }
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/eligibility_criteria?select=id,announcement_id,verification_requirements&verification_requirements=not.is.null&limit=10000`,
+      { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } })
+    if (!r.ok) return { err: `REST ${r.status}` }
+    const rows = await r.json(), bad = []
+    for (const x of rows) {
+      const d = document.createElement('div')
+      d.innerHTML = zfEligVrEntries(x.verification_requirements).map(([k, v]) => `<span>${prettifyEligKey(k)}</span>${renderEligValue(v)}`).join('')
+      if (/\[object Object\]/.test(d.textContent)) bad.push(x.announcement_id || x.id)
+    }
+    return { n: rows.length, bad }
+  })
+  {
+    const bad = objRender.bad || []
+    const ok = objVisible === 0 && !objRender.err && bad.length === 0
+    add('obj_text', '보이는 글자·자격 행 렌더 속 「[object Object]」', ok ? 'pass' : 'fail',
+      objRender.err ? `보이는 ${objVisible} · 자격 행 렌더 못 잼(${objRender.err})` : `보이는 ${objVisible} · 자격 행 ${objRender.n}개 중 ${bad.length}${bad.length ? ': ' + [...new Set(bad)].slice(0, 5).join(', ') : ''}`,
+      '0 — body.innerText · 자격 행 verification_requirements 전부를 화면 함수로 그린 글자')
+  }
   // ⑤ 고정 글자 속 지난 날짜(2026-10-07 · 우편함 「코드 — Z-2 …」 ③ 6 · 첫 화면 히어로에 석 달 지난 「경기북부 2차 공고 · 신청기간 6.30~7.2」가 하드코딩된 채 보였다).
   //    히어로·메인 탭·푸터(데이터가 아니라 손으로 적는 글자)의 줄마다 날짜를 찾아 가장 늦은 날짜가 오늘(KST)보다 과거면 실패.
   //    날짜 꼴: 2026-07-02 · 2026.7.2 · 7월 2일 · 6.30 · 7/2(연도가 없으면 그 줄의 「YYYY년」 · 없으면 올해). 카드 안 날짜는 보지 않는다(마감 공고는 과거가 정상).

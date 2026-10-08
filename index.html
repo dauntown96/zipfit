@@ -1175,11 +1175,24 @@ function isClosingSoon(row){
 //    🔴 단 LH 가 게시물을 「…마감」이라 하면(조기 마감 · LH 목록 PAN_SS 는 게시물(panId) 전체의 상태다) 붙은 공고문도 마감이다 —
 //    붙은 공고문은 같은 panId 다(링크 규칙 v2). 2026-09-30 보성 `…0667` 이 마지막 날 오후 「접수마감」이 됐는데 보성운곡(MYHOME)이
 //    날짜로 열려 있어 카드가 남았다(배포본 1차 확인에서 발견).
+// 🔴 2026-10-08(표시층 긴급 2 · 2) — LH 행 기간이 붙은 공고문 창들의 합(시작 ≥ 가장 이른 공고문 시작 · 끝 ≤ 가장 늦은 공고문 끝)이면
+//    LH 행은 공고문 하나가 아니라 그 창들을 한 줄로 이은 값이다 — 창 사이(앞 창 닫힘 · 다음 창 아직)에 LH 행만 날짜로 열려
+//    「접수중」이 섰다(아산 …20726 · 10-08 · 공고문 09-28~09-30 / 10-12~10-14 · LH 09-28~10-14). 그때는 LH 행 판정을 빼고 공고문으로만 정한다.
+//    공고문 창이 LH 기간을 덮지 못하면(LH 행이 따로 선 공고문 — 영암 …20393 LH 08-03~08-04 ↔ 공고문 07-29·07-30) 종전 그대로 LH 행도 센다.
+function zfLhSpanIsUnion(row, pn){
+  const s = parseNoticeDate(row['신청시작일'] || row['apply_start'] || ''), e = parseNoticeDate(row['신청마감일'] || row['apply_end'] || '');
+  if(!s || !e || !pn || !pn.linked.length) return false;
+  const ss = pn.linked.map(nt => parseNoticeDate(nt.start || '')), es = pn.linked.map(nt => parseNoticeDate(nt.end || ''));
+  if(ss.some(x => !x) || es.some(x => !x)) return false;
+  const minS = Math.min(...ss.map(x => startOfLocalDay(x).getTime())), maxE = Math.max(...es.map(x => startOfLocalDay(x).getTime()));
+  return startOfLocalDay(s).getTime() >= minS && startOfLocalDay(e).getTime() <= maxE;
+}
 function applyWindowState(row){
   const st = zfWindowStateOne(row);
   const pn = zfPostNoticeFor(row);
   if(!pn || zfLhPostClosed(row)) return st;
-  let best = st;
+  // 당첨발표가 지났거나 기간 확인 대상이면(zfWindowStateOne 의 날짜 앞 판정) LH 행 판정을 그대로 센다 — 날짜로 연 「open」만 공고문에 맡긴다.
+  let best = (st === 'open' && zfLhSpanIsUnion(row, pn)) ? 'closed' : st;
   pn.linked.forEach(nt => { const s = zfWindowStateOne(nt.row); if(ZF_WINDOW_RANK[s] < ZF_WINDOW_RANK[best]) best = s; });
   return best;
 }
@@ -5266,11 +5279,25 @@ const ELIG_FOLD_ARR = 12;
 const eligFold = (summary, inner) =>
   `<details class="elig-fold"><summary>${escapeHtml(summary)}</summary><div class="elig-fold-body">${inner}</div></details>`;
 
+// 🔴 2026-10-08(표시층 긴급 2 · 1) — 자격 행 verification_requirements 중 화면에 그릴 키·값. 값이 객체인 「공급대상」은
+//    매칭 판정 전용 데이터라 그리지 않는다(분석 스킬 v9.8 규약). 값이 문자열인 옛 「공급대상」(…20386 주거약자용 —
+//    사람이 읽는 원문 문장)은 종전처럼 그린다. 화면 점검기(health-screen `obj_text`)가 같은 함수로 DB 전 행을 그려 본다.
+function zfEligVrEntries(vr){
+  if(!vr || typeof vr !== 'object') return [];
+  return Object.entries(vr).filter(([k,v]) => !(k === '공급대상' && v !== null && typeof v === 'object'));
+}
+
 function renderEligValue(v, inFold){
   if(v === null || v === undefined) return '<span></span>';
   if(typeof v === 'number') return `<span>${manwonText(v)}</span>`;
   if(typeof v === 'string') return `<span>${escapeHtml(v)}</span>`;
   if(Array.isArray(v)){
+    // 🔴 2026-10-08(표시층 긴급 2 · 1) — 원소가 객체·배열이면 String(x) 가 「[object Object]」를 찍는다(부산문현2 …20806).
+    //    그런 배열은 원소마다 이 함수로 다시 그린다(객체 갈래 · 줄 단위). 글자·숫자 원소만인 배열은 종전 그대로 쉼표로 잇는다.
+    if(v.some(x => x !== null && typeof x === 'object')){
+      const body = `<div class="elig-subrows">` + v.map(x => `<div class="elig-subrow">${renderEligValue(x, true)}</div>`).join('') + `</div>`;
+      return (!inFold && v.length >= ELIG_FOLD_ARR) ? eligFold(`${v.length}개 — 펼쳐 보기`, body) : body;
+    }
     const items = v.map(x => typeof x==='number' ? manwonText(x) : escapeHtml(String(x)));
     const body = `<span>${items.join(', ')}</span>`;
     return (!inFold && items.length >= ELIG_FOLD_ARR) ? eligFold(`${items.length}개 — 펼쳐 보기`, body) : body;
@@ -6787,7 +6814,7 @@ function loadPreciseEligibility(annId, detailEl, id, useGroup){
         // 중첩 객체(예: 자녀수별 자산기준표)는 raw JSON 대신 들여쓴 하위 목록으로, 숫자는 만원 단위로 변환.
         let vr = '';
         if(r.verification_requirements && typeof r.verification_requirements === 'object'){
-          vr = Object.entries(r.verification_requirements).map(([k,v]) =>
+          vr = zfEligVrEntries(r.verification_requirements).map(([k,v]) =>
             `<div class="elig-row"><span class="elig-key">${escapeHtml(prettifyEligKey(k))}</span>${renderEligValue(v)}</div>`
           ).join('');
         }
