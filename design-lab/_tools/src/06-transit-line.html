@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>꼭집 시안 06 · 노선도</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nanum+Gothic+Coding:wght@700&display=swap">
+<style>
+:root{--bg:#FFFFFF;--ink:#16181D;--mute:#7A808C;--line:#E4E6EB;--panel:#F4F5F7;--led:#FFB21A;--board:#17181C;--spring:cubic-bezier(.34,1.45,.64,1);--ease:cubic-bezier(.65,0,.35,1);--out:cubic-bezier(.16,1,.3,1)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#DADDE3;display:flex;justify-content:center;font-family:'Pretendard Variable',Pretendard,system-ui,sans-serif;color:var(--ink);word-break:keep-all;-webkit-font-smoothing:antialiased}
+.phone{position:relative;width:100%;max-width:390px;height:100dvh;max-height:844px;overflow:hidden;background:var(--bg)}
+.screen{position:absolute;inset:0;overflow-y:auto;display:none;scrollbar-width:none;padding:0 16px 96px}
+.screen.on{display:block}.screen::-webkit-scrollbar{display:none}
+.n{font-variant-numeric:tabular-nums}
+.badge{width:26px;height:26px;border-radius:50%;background:var(--c);color:#fff;display:inline-grid;place-items:center;font-size:12.5px;font-weight:800;flex:none}
+/* 머리 */
+.top{display:flex;justify-content:space-between;align-items:center;padding:16px 0 12px}
+.logo{display:flex;align-items:center;gap:8px;font-weight:800;font-size:20px;letter-spacing:-.04em}
+.logo .badge{--c:var(--ink);width:28px;height:28px}
+.top .d{font-size:12px;color:var(--mute)}
+/* 안내 전광판 */
+.board{background:var(--board);border-radius:16px;padding:12px 14px 10px;color:#fff}
+.board .h{display:flex;justify-content:space-between;font-size:11px;color:#9AA0AA;margin-bottom:6px}
+.board .h b{color:#fff;font-weight:700}
+.brow{display:grid;grid-template-columns:22px 1fr auto;gap:8px;align-items:center;padding:7px 0;border-top:1px solid #2B2D33}
+.brow .badge{width:20px;height:20px;font-size:10px}
+.brow .nm{font-family:'Nanum Gothic Coding',monospace;color:var(--led);font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.flap{display:flex;gap:2px;perspective:300px}
+.flap span{font-family:'Nanum Gothic Coding',monospace;color:var(--led);background:#25272D;border-radius:3px;min-width:15px;text-align:center;font-size:14px;padding:2px 1px;position:relative;transform-origin:50% 50%;backface-visibility:hidden}
+.flap span::after{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:#101114}
+.ready .screen.on .flap span{animation:flip .5s var(--out) both;animation-delay:calc(.5s + var(--k)*70ms)}
+@keyframes flip{0%{transform:rotateX(90deg);opacity:.2}60%{transform:rotateX(-12deg);opacity:1}100%{transform:none}}
+.brow .lab{font-size:10.5px;color:#9AA0AA;text-align:right}
+.sec{display:flex;justify-content:space-between;align-items:baseline;margin:20px 0 10px}
+.sec h2{font-size:18px;font-weight:800;letter-spacing:-.03em}.sec span{font-size:12px;color:var(--mute)}
+/* 노선 카드 */
+.route{border:1.5px solid var(--line);border-radius:18px;padding:14px 14px 12px;margin-bottom:12px;cursor:pointer;position:relative;overflow:hidden}
+.route::before{content:"";position:absolute;left:0;top:0;bottom:0;width:6px;background:var(--c)}
+.ready .screen.on .route{animation:arr .7s var(--out) both;animation-delay:calc(var(--i)*110ms)}
+@keyframes arr{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:none}}
+.route .hd{display:flex;gap:9px;align-items:center}
+.route .ty{font-size:11.5px;font-weight:700;color:var(--c)}
+.route h3{font-size:17px;font-weight:800;letter-spacing:-.035em;line-height:1.25}
+.route .px{font-size:12px;color:var(--mute);margin:8px 0 2px}
+.route .px b{color:var(--ink);font-weight:700}
+.track{position:relative;height:50px;margin:8px 2px 0}
+.track .ln{position:absolute;left:6px;right:6px;top:12px;height:5px;border-radius:5px;background:var(--line)}
+.track .ln i{position:absolute;inset:0;border-radius:5px;background:var(--c);transform-origin:left;transform:scaleX(var(--p))}
+.ready .screen.on .track .ln i{animation:fill 1.2s var(--ease) both;animation-delay:calc(.3s + var(--i)*110ms)}
+@keyframes fill{from{transform:scaleX(0)}}
+.st{position:absolute;top:7px;width:15px;height:15px;margin-left:-7.5px;border-radius:50%;background:#fff;border:3px solid var(--c)}
+.st.past{background:var(--c)}
+.st b{position:absolute;top:19px;left:50%;transform:translateX(-50%);font-size:10.5px;font-weight:700;white-space:nowrap;color:var(--ink)}
+.st em{position:absolute;top:32px;left:50%;transform:translateX(-50%);font-size:10px;font-style:normal;color:var(--mute);white-space:nowrap}
+.train{position:absolute;top:1px;width:28px;height:15px;margin-left:-14px;border-radius:8px 8px 4px 4px;background:var(--ink);transform:translateX(0)}
+.train::after{content:"";position:absolute;right:4px;top:4px;width:6px;height:4px;border-radius:1px;background:#fff}
+.dd{position:absolute;right:12px;top:12px;font-size:12px;font-weight:800;color:var(--c);background:color-mix(in srgb,var(--c) 12%,#fff);padding:4px 8px;border-radius:999px}
+.star{position:absolute;right:12px;top:44px;background:none;border:0;cursor:pointer;width:28px;height:28px;display:grid;place-items:center}
+.star svg{width:20px;height:20px;fill:none;stroke:var(--mute);stroke-width:1.8;transition:transform .5s var(--spring)}
+.star.is-on svg{fill:#FFB21A;stroke:#E59A00;transform:rotate(72deg) scale(1.15)}
+/* 하단 탭 */
+.tabs{position:absolute;left:0;right:0;bottom:0;height:72px;background:#fff;border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,1fr);z-index:5;transition:transform .5s var(--ease)}
+.tabs a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;text-decoration:none;color:var(--mute);font-size:11px;font-weight:700}
+.tabs a i{width:14px;height:14px;border-radius:50%;border:3px solid currentColor}
+.tabs a.on{color:var(--ink)}.tabs a.on i{background:var(--ink)}
+html[data-route=detail] .tabs{transform:translateY(100%)}
+/* 상세 — 역 이름판 */
+.dtop{display:flex;align-items:center;gap:10px;padding:14px 0 10px}
+.dtop button{width:38px;height:38px;border-radius:50%;border:1.5px solid var(--line);background:#fff;cursor:pointer;display:grid;place-items:center}
+.dtop button svg{width:18px;height:18px;stroke:var(--ink);fill:none;stroke-width:2.4}
+.dtop .ty{font-size:12px;font-weight:700;color:var(--c);display:flex;gap:6px;align-items:center}
+.sign{border-radius:16px;overflow:hidden;border:1.5px solid var(--line)}
+.sign .main{padding:16px 16px 12px;text-align:center}
+.sign .st2{display:inline-block;font-size:11px;font-weight:800;color:#fff;background:var(--c);padding:3px 9px;border-radius:999px}
+.sign h1{font-size:25px;font-weight:900;letter-spacing:-.05em;margin:8px 0 2px;line-height:1.25}
+.sign .sub{font-size:12px;color:var(--mute)}
+.sign .bar{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;background:var(--c);color:#fff;font-size:12px;font-weight:700;padding:9px 12px}
+.sign .bar>div{display:flex;flex-direction:column;gap:1px}.sign .bar .nx{text-align:right;align-items:flex-end}.sign .bar .now{background:#fff;color:var(--c);padding:3px 10px;border-radius:999px;font-weight:800}
+.sign .bar small{display:block;font-size:10.5px;font-weight:500;opacity:.85}
+.fare{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.fare>div{background:var(--panel);border-radius:14px;padding:11px 12px}
+.fare .k{font-size:11px;color:var(--mute);font-weight:600}
+.fare .v{font-size:17px;font-weight:800;margin-top:3px;letter-spacing:-.03em}
+.fare .t{font-size:11px;color:var(--mute)}
+.vmap{position:relative;margin-top:14px;padding-left:44px}
+.vmap .vl{position:absolute;left:17px;top:10px;bottom:10px;width:6px;border-radius:6px;background:var(--line)}
+.vmap .vl i{position:absolute;left:0;right:0;top:0;height:100%;border-radius:6px;background:var(--c);transform-origin:top;transform:scaleY(0)}
+.ready .screen.on .vmap .vl i{animation:vfill 1.4s var(--ease) forwards .2s}
+@keyframes vfill{to{transform:scaleY(1)}}
+.vs{position:relative;display:flex;justify-content:space-between;align-items:center;min-height:34px}
+.vs::before{content:"";position:absolute;left:-34px;top:50%;width:14px;height:14px;margin-top:-7px;border-radius:50%;background:#fff;border:3px solid var(--c);z-index:1}
+.vs.past::before{background:var(--c)}
+.vs.now{min-height:30px}
+.vs.now::before{display:none}
+.vs b{font-size:13.5px;font-weight:700}
+.vs span{font-size:12.5px;color:var(--mute)}
+.vs.hot b,.vs.hot span{color:var(--c);font-weight:800}
+.here{position:absolute;left:-41px;top:50%;margin-top:-10px;width:20px;height:20px;border-radius:50%;background:var(--ink);border:3px solid #fff;box-shadow:0 0 0 2px var(--ink);z-index:2}
+.here::after{content:"";position:absolute;inset:-8px;border-radius:50%;border:2px solid var(--ink);opacity:0}
+.ready .screen.on .here{animation:ride 1.3s var(--out) both .5s}
+.ready .screen.on .here::after{animation:ring 1.8s ease-out infinite 1.9s}
+@keyframes ride{from{transform:translateY(-36px)}}
+@keyframes ring{0%{transform:scale(.6);opacity:.7}100%{transform:scale(1.6);opacity:0}}
+.vs.now b{font-size:12px;background:var(--ink);color:#fff;padding:3px 8px;border-radius:999px}
+.group{margin-top:12px;border:1.5px solid var(--line);border-radius:16px;overflow:hidden}
+.group .gh{width:100%;display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--panel);border:0;font:inherit;color:inherit;cursor:pointer;text-align:left}
+.group .gh b{font-size:15px;font-weight:800}
+.group .gh .cnt{font-size:12px;font-weight:800;color:#fff;background:var(--c);padding:3px 9px;border-radius:999px}
+.group .gh svg{width:16px;height:16px;stroke:var(--ink);fill:none;stroke-width:2.6;margin-left:6px;transition:transform .45s var(--spring)}
+.group.is-open .gh svg{transform:rotate(180deg)}
+.rows{display:grid;grid-template-rows:0fr;transition:grid-template-rows .5s var(--ease)}
+.group.is-open .rows{grid-template-rows:1fr}.rows>div{overflow:hidden}
+.r{display:grid;grid-template-columns:1fr auto;padding:10px 14px;border-top:1px solid var(--line);font-size:13px;gap:2px 8px}
+.r .p{grid-column:1/-1;font-size:11.5px;color:var(--mute)}
+.r .c{font-weight:800;font-size:12px}
+.note{font-size:11px;color:var(--mute);padding:8px 14px 10px;border-top:1px solid var(--line)}
+.map{margin-top:12px;height:140px;border-radius:16px;background:var(--panel);position:relative;overflow:hidden}
+.map svg{position:absolute;inset:0;width:100%;height:100%}
+.map span{position:absolute;left:12px;bottom:10px;font-size:11.5px;color:var(--mute);background:#fff;padding:4px 8px;border-radius:8px}
+/* 화면 이동 — 열차가 들어오듯 옆으로 */
+::view-transition-old(root){animation:.5s var(--ease) both outL}::view-transition-new(root){animation:.6s var(--out) both inR}
+html[data-dir=back]::view-transition-old(root){animation-name:outR}html[data-dir=back]::view-transition-new(root){animation-name:inL}
+@keyframes outL{to{transform:translateX(-30%);opacity:0}}@keyframes inR{from{transform:translateX(100%)}}
+@keyframes outR{to{transform:translateX(30%);opacity:0}}@keyframes inL{from{transform:translateX(-100%)}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}.vmap .vl i{transform:none}}
+</style>
+</head>
+<body>
+<div class="phone">
+  <section class="screen" data-screen="home" aria-label="추천">
+    <header class="top"><div class="logo"><span class="badge">꼭</span>꼭집</div><div class="d" id="asof"></div></header>
+    <div class="board" aria-label="다음 일정 안내판">
+      <div class="h"><span>다음 일정 안내</span><span>열린 공고 <b id="bOpen"></b> · 접수중 <b id="bRecv"></b></span></div>
+      <div id="board"></div>
+    </div>
+    <div class="sec"><h2>추천 노선</h2><span>3건</span></div>
+    <div id="routes"></div>
+  </section>
+  <section class="screen" data-screen="detail" aria-label="공고 상세">
+    <div id="detail"></div>
+  </section>
+  <nav class="tabs" id="tabs" aria-label="하단 탭"></nav>
+</div>
+<script id="zf-data" type="application/json">__ZF_DATA__</script>
+<script>
+/*__CORE__*/
+// 유형마다 노선 색 하나(행복주택·국민임대·공공임대) — 실제 반영 때는 유형 표 전체로 늘린다
+const LINE = { '행복주택': ['#00A651', '행'], '국민임대': ['#0067B3', '국'], '10년 분양전환 공공임대': ['#8B50A4', '공'] };
+function stations(c) {
+  return [['공고', c.annDate], ['접수', c.applyStart], ['마감', c.applyEnd], ['발표', c.winner]].filter(s => s[1]);
+}
+function render() {
+  $('#asof').textContent = ymd(ZF.asOf) + ' 기준';
+  $('#bOpen').textContent = ZF.openCount; $('#bRecv').textContent = ZF.receivingCount;
+  $('#tabs').innerHTML = TABS.map(([t], i) => `<a href="#" class="${i ? '' : 'on'}"><i></i>${t}</a>`).join('');
+  const ord = ZF.cards.map((c, i) => ({ c, i, p: phase(c) })).sort((a, b) => a.p.d - b.p.d);
+  $('#board').innerHTML = ord.map(({ c, p }, j) => {
+    const [col, ch] = LINE[c.type];
+    const txt = (p.key === 'open' ? '마감' : '접수') + String(p.d).padStart(2, ' ') + '일';
+    return `<div class="brow"><span class="badge" style="--c:${col}">${ch}</span><span class="nm">${c.name}</span><span class="flap">${[...txt].map((ch2, k) => `<span style="--k:${j * 5 + k}">${ch2 === ' ' ? '&nbsp;' : ch2}</span>`).join('')}</span></div>`;
+  }).join('');
+  $('#routes').innerHTML = ZF.cards.map((c, i) => {
+    const [col, ch] = LINE[c.type], p = phase(c), ss = stations(c);
+    const t0 = d8(ss[0][1]), t1 = d8(ss[ss.length - 1][1]);
+    // 역 간격은 날짜에 비례하되, 너무 붙지 않게 순서 간격과 반씩 섞는다
+    const pos = ss.map(([, v], k) => 50 * ((d8(v) - t0) / (t1 - t0)) + 50 * (k / (ss.length - 1)));
+    const now = d8(ZF.asOf); let tp = 0;
+    for (let k = 0; k < ss.length - 1; k++) { const a = d8(ss[k][1]), b = d8(ss[k + 1][1]); if (now >= a && now <= b) tp = pos[k] + (pos[k + 1] - pos[k]) * ((now - a) / (b - a || 1)); }
+    return `<article class="route" style="--c:${col};--i:${i}" ${i === 0 ? 'data-open' : ''}>
+      <div class="hd"><span class="badge">${ch}</span><div><div class="ty">${c.type} · ${c.sido} ${c.sigungu}</div><h3>${c.name}</h3></div></div>
+      <span class="dd">${p.dLabel} ${dd(p.d)}</span>
+      <button class="star" data-fav aria-pressed="false" aria-label="즐겨찾기"><svg viewBox="0 0 24 24"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg></button>
+      <div class="px">보증금 <b>${won(c.depMin)}</b>~ · 월 <b>${won(c.rentMin)}</b>~</div>
+      <div class="track"><div class="ln" style="--p:${tp / 100}"><i></i></div>
+        ${ss.map(([k, v], j) => `<span class="st ${v <= ZF.asOf ? 'past' : ''}" style="left:calc(6px + (100% - 12px) * ${pos[j] / 100})"><b>${k}</b><em>${md(v)}</em></span>`).join('')}
+        <span class="train" style="left:calc(6px + (100% - 12px) * ${tp / 100})"></span></div>
+    </article>`;
+  }).join('');
+  const d = ZF.detail, p = phase(d), g = d.group, [col, ch] = LINE[d.type];
+  const vs = [['공고', ymd(d.annDate), d.annDate], ['NOW'], ['청약 접수', `${mdw(d.applyStart)} ~ ${mdw(d.applyEnd)}`, d.applyStart, 1], ['서류 제출', `${md(d.docStart)} ~ ${md(d.docEnd)}`, d.docStart], ['당첨 발표', ymd(d.winner), d.winner], ['계약', ymd(d.contractStart), d.contractStart], ['입주', d.moveIn, '9999']];
+  $('#detail').innerHTML = `
+    <div class="dtop" style="--c:${col}"><button data-back aria-label="뒤로"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><span class="ty"><span class="badge" style="width:20px;height:20px;font-size:10px">${ch}</span>${d.type} · ${d.org}</span></div>
+    <div class="sign" style="--c:${col}">
+      <div class="main"><span class="st2">${p.label}</span><h1>${d.name}</h1><div class="sub">${d.address} · 총 ${d.totalUnits}세대</div></div>
+      <div class="bar"><div><span>← 공고</span><small>${mdw(d.annDate)}</small></div><span class="now">지금</span><div class="nx"><span>접수 →</span><small>${mdw(d.applyStart)} · ${dd(p.d)}</small></div></div>
+    </div>
+    <div class="fare"><div><div class="k">임대보증금</div><div class="v n">${won(d.depMin)}</div><div class="t n">~ ${won(d.depMax)}</div></div><div><div class="k">월 임대료</div><div class="v n">${won(d.rentMin)}</div><div class="t n">~ ${won(d.rentMax)}</div></div></div>
+    <div class="group is-open" data-group style="--c:${col}"><button class="gh" data-toggle aria-expanded="true"><span><b>${g.type}</b> <span style="font-size:12px;color:var(--mute)">전용 ${area(g.area)}㎡</span></span><span style="display:flex;align-items:center"><span class="cnt">${g.total}세대</span><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span></button>
+      <div class="rows"><div>${g.rows.map(r => `<div class="r"><span>${r.target}</span><span class="c">${r.count != null ? r.count + '세대' : '함께 ' + g.shared}</span><span class="p n">보증금 ${won(r.dep)} · 월 ${won(r.rent)}</span></div>`).join('')}
+      <div class="note">대학생·청년(소득無)과 청년(소득有)은 ${g.shared}세대를 함께 모집</div></div></div></div>
+    <div class="vmap" style="--c:${col}"><div class="vl"><i></i></div>
+      ${vs.map(v => v[0] === 'NOW' ? `<div class="vs now"><span class="here"></span><b>지금 ${md(ZF.asOf)} · 접수까지 ${p.d}일</b></div>` : `<div class="vs ${v[2] <= ZF.asOf ? 'past' : ''} ${v[3] ? 'hot' : ''}"><b>${v[0]}</b><span class="n">${v[1]}</span></div>`).join('')}</div>
+    <div class="map"><svg viewBox="0 0 360 140" preserveAspectRatio="none"><path d="M-10 100C80 90 120 40 200 52S320 20 380 30" stroke="${col}" stroke-width="7" fill="none" stroke-linecap="round" opacity=".85"/><circle cx="200" cy="52" r="9" fill="#fff" stroke="${col}" stroke-width="4"/></svg><span>지도 자리 · ${d.address}</span></div>`;
+}
+function customSwap(run, name) { document.documentElement.dataset.dir = name === 'home' ? 'back' : 'fwd'; swap(run); }
+function onRoute(name) {
+  $$(`.screen[data-screen="${name}"] .route, .screen[data-screen="${name}"] .flap span, .screen[data-screen="${name}"] .ln i, .screen[data-screen="${name}"] .vl i, .screen[data-screen="${name}"] .here`).forEach(el => { el.style.animation = 'none'; el.offsetWidth; el.style.animation = ''; });
+}
+boot();
+</script>
+</body>
+</html>

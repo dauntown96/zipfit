@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>꼭집 시안 01 · 소프트 벤토</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+:root{
+  --bg:#F5F1EA; --ink:#1A1916; --sub:#6B665D; --line:#E6DFD3; --card:#FFFDF9;
+  --butter:#FBE6A2; --mint:#CDEBD8; --sky:#D7E3FF; --peach:#FFD8C6; --lilac:#E6DDFF;
+  --accent:#FF6A3D; --ok:#1F9D63;
+  --r:22px; --spring:cubic-bezier(.34,1.56,.64,1); --ease:cubic-bezier(.22,1,.36,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:#E9E3D8;font-family:'Pretendard Variable',Pretendard,system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased;display:flex;justify-content:center;word-break:keep-all}
+.phone{position:relative;width:100%;max-width:390px;height:100dvh;max-height:844px;background:var(--bg);overflow:hidden}
+.screen{position:absolute;inset:0;overflow-y:auto;padding:0 16px 110px;display:none;scrollbar-width:none}
+.screen.on{display:block}
+.screen::-webkit-scrollbar{display:none}
+.num{font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+/* 머리 */
+.top{display:flex;align-items:center;justify-content:space-between;padding:18px 2px 14px}
+.logo{display:flex;align-items:center;gap:8px;font-weight:800;font-size:21px;letter-spacing:-.04em}
+.logo i{width:26px;height:26px;border-radius:9px;background:var(--ink);display:grid;place-items:center;color:var(--butter);font-style:normal;font-size:15px}
+.asof{font-size:12px;color:var(--sub);background:var(--card);border:1px solid var(--line);padding:6px 10px;border-radius:999px}
+/* 요약 벤토 */
+.bento{display:grid;grid-template-columns:1.25fr 1fr;gap:10px;margin-bottom:22px}
+.tile{background:var(--card);border-radius:var(--r);padding:16px;border:1px solid var(--line);position:relative;overflow:hidden}
+.tile.big{grid-row:span 2;background:var(--ink);color:#FFF8EA;border:0}
+.tile .k{font-size:12.5px;color:var(--sub);font-weight:600}
+.tile.big .k{color:#BDB6A8}
+.tile .v{font-size:44px;font-weight:800;line-height:1.05;margin-top:6px}
+.tile.big .v{font-size:64px;color:var(--butter)}
+.tile .u{font-size:13px;font-weight:600;margin-left:2px}
+.tile.big .foot{position:absolute;left:16px;bottom:14px;font-size:12px;color:#BDB6A8}
+.tile.mint{background:var(--mint);border:0}.tile.sky{background:var(--sky);border:0}
+.tile .v.s{font-size:30px}
+/* 섹션 */
+.sec{display:flex;align-items:baseline;justify-content:space-between;margin:4px 2px 12px}
+.sec h2{font-size:19px;font-weight:800;letter-spacing:-.03em}
+.sec span{font-size:12.5px;color:var(--sub)}
+/* 카드 */
+.card{background:var(--card);border-radius:26px;padding:12px;border:1px solid var(--line);margin-bottom:12px;cursor:pointer;display:grid;grid-template-columns:1fr 92px;gap:8px}
+.card .main{padding:6px 6px 4px}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;padding:5px 9px;border-radius:999px;background:var(--bg)}
+.chip.t1{background:var(--mint)}.chip.t2{background:var(--sky)}.chip.t3{background:var(--lilac)}
+.card h3{font-size:17.5px;font-weight:800;letter-spacing:-.035em;margin:9px 0 3px;line-height:1.3}
+.card .where{font-size:12.5px;color:var(--sub)}
+.card .price{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
+.card .price b{font-size:13px;font-weight:700;background:var(--bg);padding:6px 9px;border-radius:12px}
+.card .price b em{font-style:normal;color:var(--sub);font-weight:600;margin-right:4px}
+.dbox{border-radius:20px;background:var(--butter);display:flex;flex-direction:column;justify-content:space-between;padding:12px 10px;text-align:center}
+.dbox.open{background:var(--accent);color:#fff}
+.dbox .lab{font-size:11px;font-weight:700;opacity:.8}
+.dbox .dd{font-size:26px;font-weight:900;letter-spacing:-.04em}
+.dbox .per{font-size:11px;font-weight:600;opacity:.85}
+.fav{position:absolute;right:20px;top:-2px}
+.card{position:relative}
+.heart{width:34px;height:34px;border-radius:12px;border:0;background:rgba(255,255,255,.65);display:grid;place-items:center;cursor:pointer;position:absolute;right:108px;top:12px}
+.heart svg{width:18px;height:18px;fill:none;stroke:var(--ink);stroke-width:2;transition:transform .5s var(--spring)}
+.heart.is-on svg{fill:var(--accent);stroke:var(--accent);transform:scale(1.15)}
+/* 하단 탭 */
+.tabs{position:absolute;left:12px;right:12px;bottom:14px;height:66px;background:rgba(26,25,22,.94);border-radius:24px;display:grid;grid-template-columns:repeat(5,1fr);align-items:center;z-index:5;backdrop-filter:blur(8px)}
+.tabs a{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;color:#9C968A;text-decoration:none;font-weight:600}
+.tabs a i{width:22px;height:22px;border-radius:8px;border:2px solid currentColor;display:block}
+.tabs a.on{color:var(--butter)}
+.tabs a.on i{background:var(--butter);border-color:var(--butter)}
+html[data-route=detail] .tabs{transform:translateY(120%)}
+.tabs{transition:transform .45s var(--ease)}
+/* 상세 */
+.dtop{display:flex;align-items:center;justify-content:space-between;padding:14px 0 10px}
+.icon{width:42px;height:42px;border-radius:15px;background:var(--card);border:1px solid var(--line);display:grid;place-items:center;cursor:pointer}
+.icon svg{width:20px;height:20px;stroke:var(--ink);fill:none;stroke-width:2.2}
+.dgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.hero{grid-column:1/-1;background:var(--ink);color:#FFF8EA;border:0;padding:18px 18px 16px;view-transition-name:hero}
+.hero .chips{display:flex;gap:6px}
+.hero .chip{background:rgba(255,255,255,.12);color:#FFF8EA}
+.hero .chip.st{background:var(--butter);color:var(--ink)}
+.hero h1{font-size:23px;line-height:1.28;letter-spacing:-.04em;font-weight:800;margin:12px 0 6px}
+.hero p{font-size:12.5px;color:#BDB6A8}
+.tile.dday{background:var(--butter);border:0}
+.tile.dday .v{font-size:46px;font-weight:900}
+.tile.per .v{font-size:19px;font-weight:800;line-height:1.35;margin-top:8px}
+.tile.per .s2{font-size:12px;color:var(--sub);margin-top:6px}
+.tile.wide{grid-column:1/-1}
+.tile.dep{background:var(--sky);border:0}.tile.rent{background:var(--peach);border:0}
+.tile .money{font-size:20px;font-weight:800;margin-top:8px;letter-spacing:-.03em;line-height:1.3}
+.tile .money small{display:block;font-size:12px;font-weight:600;color:var(--sub);margin-top:2px}
+.group .gh{display:flex;align-items:center;justify-content:space-between;cursor:pointer;background:none;border:0;width:100%;font:inherit;color:inherit;text-align:left}
+.group .gh b{font-size:17px;font-weight:800}
+.group .gh .cnt{font-size:12.5px;font-weight:700;background:var(--mint);padding:5px 10px;border-radius:999px}
+.group .gh svg{width:18px;height:18px;stroke:var(--ink);fill:none;stroke-width:2.4;transition:transform .45s var(--spring)}
+.group.is-open .gh svg{transform:rotate(180deg)}
+.group .meta{font-size:12px;color:var(--sub);margin-top:4px}
+.rows{display:grid;grid-template-rows:0fr;transition:grid-template-rows .5s var(--ease)}
+.group.is-open .rows{grid-template-rows:1fr}
+.rows>div{overflow:hidden}
+.row{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:11px 12px;background:var(--bg);border-radius:16px;margin-top:8px}
+.row .tg{font-size:13.5px;font-weight:700}
+.row .ct{font-size:12px;font-weight:700;color:var(--ok);text-align:right}
+.row .pr{grid-column:1/-1;font-size:12.5px;color:var(--sub)}
+.shared{font-size:11.5px;color:var(--sub);margin-top:8px}
+.map{grid-column:1/-1;height:150px;background:
+  radial-gradient(circle at 62% 46%,var(--accent) 0 7px,transparent 8px),
+  radial-gradient(circle at 62% 46%,rgba(255,106,61,.22) 0 30px,transparent 31px),
+  repeating-linear-gradient(0deg,transparent 0 23px,var(--line) 23px 24px),
+  repeating-linear-gradient(90deg,transparent 0 23px,var(--line) 23px 24px),var(--card);display:flex;align-items:flex-end}
+.map span{font-size:12px;font-weight:700;background:var(--card);padding:6px 10px;border-radius:12px;border:1px solid var(--line)}
+.cta{grid-column:1/-1;display:block;text-align:center;background:var(--accent);color:#fff;font-weight:800;padding:17px;border-radius:20px;text-decoration:none;font-size:15px}
+/* 모션 ① 첫 등장 — 스프링으로 튀어 오르며 차례로 */
+.ready .screen.on [data-in]{animation:pop .7s var(--spring) both;animation-delay:calc(var(--i,0) * 70ms)}
+@keyframes pop{from{opacity:0;transform:translateY(18px) scale(.94)}to{opacity:1;transform:none}}
+/* 모션 ③ 화면 이동 — 카드가 상세 머리로 늘어난다(View Transitions) */
+::view-transition-old(root),::view-transition-new(root){animation-duration:.42s;animation-timing-function:var(--ease)}
+::view-transition-group(hero){animation-duration:.55s;animation-timing-function:var(--spring)}
+.card.vt{view-transition-name:hero}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+<div class="phone">
+  <section class="screen" data-screen="home" aria-label="추천">
+    <header class="top" data-in style="--i:0">
+      <div class="logo"><i>꼭</i>꼭집</div>
+      <div class="asof" id="asof"></div>
+    </header>
+    <div class="bento">
+      <div class="tile big" data-in style="--i:1"><div class="k">오늘 열린 공고</div><div class="v num"><span id="cntOpen">0</span><span class="u">건</span></div><div class="foot">전국 · 공고중+접수중</div></div>
+      <div class="tile mint" data-in style="--i:2"><div class="k">지금 접수중</div><div class="v s num"><span id="cntRecv">0</span><span class="u">건</span></div></div>
+      <div class="tile sky" data-in style="--i:3"><div class="k">가장 가까운 마감</div><div class="v s num" id="nearest"></div></div>
+    </div>
+    <div class="sec" data-in style="--i:4"><h2>추천 공고</h2><span>3건</span></div>
+    <div id="cards"></div>
+  </section>
+
+  <section class="screen" data-screen="detail" aria-label="공고 상세">
+    <div class="dtop" data-in style="--i:0">
+      <button class="icon" data-back aria-label="뒤로"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <button class="icon heart-d" data-fav aria-pressed="false" aria-label="관심"><svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg></button>
+    </div>
+    <div class="dgrid" id="detail"></div>
+  </section>
+
+  <nav class="tabs" id="tabs" aria-label="하단 탭"></nav>
+</div>
+<script id="zf-data" type="application/json">__ZF_DATA__</script>
+<script>
+/*__CORE__*/
+const tcls = ['t1', 't2', 't3'];
+function render() {
+  $('#asof').textContent = ymd(ZF.asOf) + ' 기준';
+  $('#tabs').innerHTML = TABS.map(([t], i) => `<a href="#" class="${i ? '' : 'on'}"><i></i>${t}</a>`).join('');
+  const near = ZF.cards.map(c => ({ c, p: phase(c) })).filter(x => x.p.key === 'open').sort((a, b) => a.p.d - b.p.d)[0];
+  $('#nearest').innerHTML = near ? `${dd(near.p.d)}` : '—';
+  $('#cards').innerHTML = ZF.cards.map((c, i) => {
+    const p = phase(c);
+    return `<article class="card ${i === 0 ? 'vt' : ''}" ${i === 0 ? 'data-open' : ''} data-in style="--i:${5 + i}">
+      <div class="main">
+        <span class="chip ${tcls[i]}">${c.type}</span>
+        <h3>${c.name}</h3>
+        <div class="where">${c.sido} ${c.sigungu} · ${area(c.areaMin)}~${area(c.areaMax)}㎡</div>
+        <div class="price"><b><em>보증금</em>${won(c.depMin)}~</b><b><em>월</em>${won(c.rentMin)}~</b></div>
+      </div>
+      <button class="heart" data-fav aria-pressed="false" aria-label="관심"><svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg></button>
+      <div class="dbox ${p.key}"><span class="lab">${p.dLabel}</span><span class="dd num">${dd(p.d)}</span><span class="per">${md(c.applyStart)}~${md(c.applyEnd)}</span></div>
+    </article>`;
+  }).join('');
+  const d = ZF.detail, p = phase(d), g = d.group;
+  $('#detail').innerHTML = `
+    <div class="tile hero" data-in style="--i:1">
+      <div class="chips"><span class="chip st">${p.label}</span><span class="chip">${d.type}</span><span class="chip">${d.org}</span></div>
+      <h1>${d.title}</h1><p>${d.address}</p>
+    </div>
+    <div class="tile dday" data-in style="--i:2"><div class="k">${p.dLabel}</div><div class="v num" id="ddv">${dd(p.d)}</div></div>
+    <div class="tile per" data-in style="--i:3"><div class="k">접수기간</div><div class="v num">${mdw(d.applyStart)}<br>~ ${mdw(d.applyEnd)}</div><div class="s2">당첨 발표 ${ymd(d.winner)}</div></div>
+    <div class="tile dep" data-in style="--i:4"><div class="k">임대보증금</div><div class="money num">${won(d.depMin)}<small>~ ${won(d.depMax)}</small></div></div>
+    <div class="tile rent" data-in style="--i:5"><div class="k">월 임대료</div><div class="money num">${won(d.rentMin)}<small>~ ${won(d.rentMax)}</small></div></div>
+    <div class="tile wide group is-open" data-group data-in style="--i:6">
+      <button class="gh" data-toggle aria-expanded="true"><span><b>${g.type}</b> · 전용 ${area(g.area)}㎡</span><span style="display:flex;gap:8px;align-items:center"><span class="cnt">${g.total}세대</span><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span></button>
+      <div class="meta">총 ${d.totalUnits}세대 중 · 공급 대상 ${g.rows.length}갈래</div>
+      <div class="rows"><div>
+        ${g.rows.map(r => `<div class="row"><span class="tg">${r.target}</span><span class="ct">${r.count != null ? r.count + '세대' : '함께 ' + g.shared + '세대'}</span><span class="pr num">보증금 ${won(r.dep)} · 월 ${won(r.rent)}</span></div>`).join('')}
+        <div class="shared">대학생·청년(소득無)과 청년(소득有)은 ${g.shared}세대를 함께 모집해요</div>
+      </div></div>
+    </div>
+    <div class="tile map" data-in style="--i:7"><span>지도 자리 · ${d.address}</span></div>
+    <a class="cta" data-in style="--i:8" href="${d.url}" target="_blank" rel="noopener">LH 공고 원문 보기</a>`;
+}
+function onRoute(name) {
+  if (name === 'home') { countUp($('#cntOpen'), ZF.openCount); countUp($('#cntRecv'), ZF.receivingCount, 600); }
+  // 다시 들어올 때 등장 모션을 새로 건다
+  $$(`.screen[data-screen="${name}"] [data-in]`).forEach(el => { el.style.animation = 'none'; el.offsetWidth; el.style.animation = ''; });
+}
+boot();
+</script>
+</body>
+</html>

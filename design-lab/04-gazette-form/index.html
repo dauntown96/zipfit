@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>꼭집 시안 04 · 공고문 서식</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&family=Nanum+Gothic:wght@400;700;800&family=Nanum+Gothic+Coding:wght@400;700&display=swap">
+<style>
+:root{--paper:#F6F1E4;--paper2:#EFE8D6;--ink:#1F1D1A;--mute:#6E685C;--seal:#C8302A;--rule:#2A2723;--hl:#F7E07A;--blue:#22314F;--ease:cubic-bezier(.22,1,.36,1);--press:cubic-bezier(.2,1.6,.4,1)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#D8D0BE;display:flex;justify-content:center;font-family:'Nanum Gothic',system-ui,sans-serif;color:var(--ink);word-break:keep-all;-webkit-font-smoothing:antialiased}
+.phone{position:relative;width:100%;max-width:390px;height:100dvh;max-height:844px;overflow:hidden;background:var(--paper2)}
+.screen{position:absolute;inset:0;overflow-y:auto;display:none;scrollbar-width:none;padding:0 0 92px}
+.screen.on{display:block}.screen::-webkit-scrollbar{display:none}
+.sheet{margin:10px 10px 0;background:var(--paper) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .45  0 0 0 0 .4  0 0 0 0 .3  0 0 0 .09 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");min-height:calc(100% - 10px);padding:18px 18px 24px;box-shadow:0 1px 0 #CFC6B2,0 10px 30px rgba(60,50,30,.12);position:relative}
+.my{font-family:'Nanum Myeongjo',serif}.code{font-family:'Nanum Gothic Coding',monospace;font-variant-numeric:tabular-nums}
+/* 문서 머리 */
+.docno{display:flex;justify-content:space-between;font-size:11px;color:var(--mute)}
+.ttl{text-align:center;margin:16px 0 6px;font-family:'Nanum Myeongjo',serif;font-weight:800;font-size:25px;letter-spacing:.32em;padding-left:.32em}
+.dbl{height:5px;border-top:2px solid var(--rule);border-bottom:1px solid var(--rule);transform-origin:center}
+.ready .screen.on .dbl{animation:draw .8s var(--ease) both .1s}
+@keyframes draw{from{transform:scaleX(0)}to{transform:none}}
+.memo{margin:12px 0 4px;font-size:12.5px;line-height:1.85}
+.memo b{display:inline-block;width:42px;letter-spacing:.3em;font-weight:800}
+.memo .code{font-weight:700}
+.lead{font-size:12.5px;line-height:1.75;margin:10px 0 2px;color:#3A362F}
+/* 공고 한 건 = 괘선 서식 */
+.form{margin-top:18px;position:relative;cursor:pointer}
+.ready .screen.on .form{animation:paper .7s var(--ease) both;animation-delay:calc(.25s + var(--i)*.18s)}
+@keyframes paper{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.form h3{font-family:'Nanum Myeongjo',serif;font-weight:800;font-size:17px;letter-spacing:-.02em;padding-right:86px;line-height:1.4}
+.form h3 .no{font-family:'Nanum Gothic Coding';font-weight:700;margin-right:4px}
+table{width:100%;border-collapse:collapse;margin-top:8px;font-size:12.5px;border-top:2px solid var(--rule);border-bottom:1px solid var(--rule)}
+th{width:72px;background:rgba(42,39,35,.06);font-weight:800;text-align:center;padding:7px 4px;border-right:1px solid var(--rule);border-bottom:1px solid #B9B1A0;letter-spacing:.06em;font-size:11.5px}
+td{padding:7px 9px;border-bottom:1px solid #B9B1A0}
+tr:last-child th,tr:last-child td{border-bottom:0}
+.ref{font-size:11.5px;color:var(--mute);margin-top:6px}
+.ref::before{content:"※ "}
+/* 직인 — 상태 */
+.seal{position:absolute;right:2px;top:-8px;width:78px;height:78px;border-radius:50%;border:2.5px solid var(--seal);color:var(--seal);display:grid;place-items:center;text-align:center;transform:rotate(-9deg);font-family:'Nanum Myeongjo',serif;font-weight:800;mix-blend-mode:multiply;opacity:.9}
+.seal::before{content:"";position:absolute;inset:4px;border-radius:50%;border:1px solid var(--seal)}
+.seal span{font-size:11.5px;letter-spacing:.12em;line-height:1.2}
+.seal b{display:block;font-size:19px;letter-spacing:0;font-family:'Nanum Gothic Coding';font-weight:700}
+.seal.sq{border-radius:6px}.seal.sq::before{border-radius:3px}
+.ready .screen.on .seal{animation:stamp .55s var(--press) both;animation-delay:calc(.75s + var(--i)*.18s)}
+@keyframes stamp{0%{opacity:0;transform:rotate(-24deg) scale(2.2)}60%{opacity:.95;transform:rotate(-8deg) scale(.94)}100%{opacity:.9;transform:rotate(-9deg) scale(1)}}
+/* 관심 — 체크 칸 */
+.chk{display:inline-flex;align-items:center;gap:6px;background:none;border:0;font:700 12px 'Nanum Gothic';color:var(--ink);margin-top:8px;cursor:pointer}
+.chk svg{width:18px;height:18px}
+.chk rect{fill:none;stroke:var(--ink);stroke-width:1.6}
+.chk path{fill:none;stroke:var(--seal);stroke-width:3;stroke-linecap:round;stroke-dasharray:30;stroke-dashoffset:30;transition:stroke-dashoffset .45s var(--ease)}
+.chk.is-on path{stroke-dashoffset:0}
+/* 하단 — 색인 탭 */
+.tabs{position:absolute;left:0;right:0;bottom:0;height:68px;display:grid;grid-template-columns:repeat(5,1fr);gap:3px;padding:0 6px;background:var(--paper2);z-index:5;transition:transform .5s var(--ease);border-top:1px solid #CFC6B2}
+.tabs a{margin-top:-1px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;text-decoration:none;color:var(--mute);font-size:12px;font-weight:700;border:1px solid #CFC6B2;border-top:0;border-radius:0 0 10px 10px;background:#E8E0CC}
+.tabs a .code{font-size:10px}
+.tabs a.on{background:var(--paper);color:var(--ink);border-color:var(--rule);box-shadow:inset 0 3px 0 var(--seal)}
+html[data-route=detail] .tabs{transform:translateY(100%)}
+/* 상세 */
+.dnav{display:flex;justify-content:space-between;align-items:center;font-size:12px}
+.dnav button{background:none;border:1px solid var(--rule);padding:6px 10px;font:700 12px 'Nanum Gothic';cursor:pointer;color:var(--ink)}
+.dnav .code{color:var(--mute);font-size:10.5px;text-align:right;line-height:1.5}
+.dt{text-align:center;font-family:'Nanum Myeongjo',serif;font-weight:800;font-size:23px;line-height:1.45;margin:22px 0 10px;letter-spacing:-.01em}
+.dsub{text-align:center;font-size:12px;color:var(--mute);margin-top:8px}
+.bigseal{right:-4px;top:150px;width:84px;height:84px}
+.sec{margin-top:18px}
+.sec h4{font-family:'Nanum Myeongjo',serif;font-weight:800;font-size:15.5px}
+.sec h4 .code{margin-right:4px}
+.hl{background:linear-gradient(transparent 55%,var(--hl) 55%) no-repeat;background-size:0 100%;transition:background-size .9s var(--ease) .9s}
+.ready .screen.on .hl{background-size:100% 100%}
+.group .gh{width:100%;display:flex;justify-content:space-between;align-items:center;background:none;border:0;font:inherit;color:inherit;cursor:pointer;text-align:left}
+.group .gh .t{font-size:11.5px;font-weight:700;border:1px solid var(--rule);padding:3px 7px}
+.rows{display:grid;grid-template-rows:0fr;transition:grid-template-rows .55s var(--ease)}
+.group.is-open .rows{grid-template-rows:1fr}.rows>div{overflow:hidden}
+.u th{width:auto;text-align:center}
+.u{font-size:11.5px}.u th{padding:6px 3px}.u td{text-align:right;white-space:nowrap;padding:7px 5px}.u td:first-child{text-align:left;white-space:normal}
+.loc{margin-top:8px;height:130px;border:1px solid var(--rule);position:relative;background:repeating-linear-gradient(45deg,transparent 0 9px,rgba(42,39,35,.07) 9px 10px)}
+.loc::before,.loc::after{content:"";position:absolute;background:var(--seal)}
+.loc::before{left:58%;top:18%;bottom:18%;width:1px}.loc::after{top:50%;left:30%;right:14%;height:1px}
+.loc span{position:absolute;left:8px;bottom:6px;font-size:11px;color:var(--mute);background:var(--paper);padding:2px 5px}
+.loc i{position:absolute;left:58%;top:50%;width:14px;height:14px;margin:-7px;border:2px solid var(--seal);border-radius:50%}
+/* 화면 이동 — 새 문서가 위에 놓인다 */
+::view-transition-old(root){animation:.5s var(--ease) both sink}
+::view-transition-new(root){animation:.55s var(--ease) both place}
+html[data-dir=back]::view-transition-new(root){animation:none}
+html[data-dir=back]::view-transition-old(root){animation:.5s var(--ease) both lift;z-index:2}
+@keyframes sink{to{transform:scale(.94);opacity:.5}}
+@keyframes place{from{transform:translateY(100%) rotate(2deg)}}
+@keyframes lift{to{transform:translateY(100%) rotate(-2deg)}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}.hl{background-size:100% 100%}}
+</style>
+</head>
+<body>
+<div class="phone">
+  <section class="screen" data-screen="home" aria-label="추천">
+    <div class="sheet">
+      <div class="docno"><span class="code" id="docno"></span><span class="code" id="docdate"></span></div>
+      <h1 class="ttl">추천 공고</h1>
+      <div class="dbl"></div>
+      <div class="memo"><div><b>수신</b>나(관심 조건 등록자)</div><div><b>발신</b>꼭집</div><div><b>제목</b>열린 공고 <span class="code" id="mOpen"></span>건 중 추천 <span class="code">3</span>건 알림</div></div>
+      <p class="lead" id="lead"></p>
+      <div id="forms"></div>
+    </div>
+  </section>
+  <section class="screen" data-screen="detail" aria-label="공고 상세">
+    <div class="sheet" id="dsheet"></div>
+  </section>
+  <nav class="tabs" id="tabs" aria-label="하단 탭"></nav>
+</div>
+<script id="zf-data" type="application/json">{
+ "asOf": "2026-10-08",
+ "source": "https://kkokzip.com 배포본 공개 REST(anon) · 2026-10-08 KST 조회",
+ "openCount": 74,
+ "receivingCount": 3,
+ "statusCounts": {
+  "접수마감": 857,
+  "공고중": 70,
+  "정정공고중": 1,
+  "접수중": 3
+ },
+ "cards": [
+  {
+   "aid": "2015122300020858",
+   "rpcRowId": 4876988,
+   "title": "인천석남 어울림센터 행복주택 입주자 최초모집",
+   "name": "인천석남 어울림센터",
+   "type": "행복주택",
+   "sido": "인천광역시",
+   "sigungu": "서해구",
+   "status": "공고중",
+   "annDate": "2026-09-30",
+   "applyStart": "2026-10-13",
+   "applyEnd": "2026-10-15",
+   "depMin": 28860000,
+   "depMax": 81560000,
+   "rentMin": 146700,
+   "rentMax": 414590,
+   "areaMin": 21.52,
+   "areaMax": 44.68,
+   "url": "https://apply.lh.or.kr/lhapply/apply/wt/wrtanc/selectWrtancInfo.do?panId=2015122300020858&ccrCnntSysDsCd=03&uppAisTpCd=06&aisTpCd=10&mi=1026",
+   "recruit": 110,
+   "recruitNote": "세대 정보 합(21A 56+6 · 26A 5 · 26AS 10 · 26B 2 · 44A 31) = 공고 total_units 110"
+  },
+  {
+   "aid": "2015122300020726",
+   "rpcRowId": 3868139,
+   "title": "아산지역 국민임대주택 예비입주자 모집공고(2026.09.15)",
+   "name": "아산지역 국민임대",
+   "type": "국민임대",
+   "sido": "충청남도",
+   "sigungu": "아산시",
+   "status": "접수중",
+   "annDate": "2026-09-15",
+   "applyStart": "2026-09-28",
+   "applyEnd": "2026-10-14",
+   "depMin": 10199000,
+   "depMax": 31664000,
+   "rentMin": 87650,
+   "rentMax": 311400,
+   "areaMin": 26.5,
+   "areaMax": 51.59,
+   "url": "https://apply.lh.or.kr/lhapply/apply/wt/wrtanc/selectWrtancInfo.do?panId=2015122300020726&ccrCnntSysDsCd=03&uppAisTpCd=06&aisTpCd=07&mi=1026",
+   "sites": 4,
+   "siteNames": [
+    "아산배방LH15단지",
+    "아산신창소화마을",
+    "아산인주휴먼시아",
+    "아산탕정LH7단지"
+   ]
+  },
+  {
+   "aid": "0000061176",
+   "rpcRowId": 4798679,
+   "title": "대전천동3 5블록 10년 분양전환공공임대주택 예비입주자 모집공고('26.09.29)",
+   "name": "대전천동3 5블록",
+   "type": "10년 분양전환 공공임대",
+   "sido": "대전광역시",
+   "sigungu": "동구",
+   "status": "공고중",
+   "annDate": "2026-09-29",
+   "applyStart": "2026-10-14",
+   "applyEnd": "2026-10-16",
+   "depMin": 30300000,
+   "depMax": 60800000,
+   "rentMin": 346000,
+   "rentMax": 494000,
+   "areaMin": 39.98,
+   "areaMax": 59.98,
+   "url": "https://apply.lh.or.kr/lhapply/apply/wt/wrtanc/selectWrtancInfo.do?panId=0000061176&ccrCnntSysDsCd=02&uppAisTpCd=06&aisTpCd=08&mi=1026",
+   "recruit": 210,
+   "complexUnits": 2135,
+   "recruitNote": "세대 정보 39A 80 · 51A 50 · 59D 80"
+  }
+ ],
+ "detail": {
+  "aid": "2015122300020858",
+  "rpcRowId": 4876988,
+  "title": "인천석남 어울림센터 행복주택 입주자 최초모집",
+  "name": "인천석남 어울림센터 행복주택",
+  "type": "행복주택",
+  "status": "공고중",
+  "org": "LH",
+  "address": "인천광역시 서해구 석남동 481-1",
+  "annDate": "2026-09-30",
+  "applyStart": "2026-10-13",
+  "applyEnd": "2026-10-15",
+  "docStart": "2026-10-27",
+  "docEnd": "2026-10-30",
+  "winner": "2027-03-18",
+  "contractStart": "2027-03-30",
+  "moveIn": "2028.03",
+  "heating": "개별난방",
+  "totalUnits": 110,
+  "url": "https://apply.lh.or.kr/lhapply/apply/wt/wrtanc/selectWrtancInfo.do?panId=2015122300020858&ccrCnntSysDsCd=03&uppAisTpCd=06&aisTpCd=10&mi=1026",
+  "depMin": 28860000,
+  "depMax": 81560000,
+  "rentMin": 146700,
+  "rentMax": 414590,
+  "areaMin": 21.52,
+  "areaMax": 44.68,
+  "group": {
+   "type": "21A",
+   "area": 21.52,
+   "shared": 56,
+   "total": 62,
+   "rows": [
+    {
+     "unitId": "f87e9872-e414-46a7-b563-7345fa236fa7",
+     "target": "대학생·청년(소득無)",
+     "dep": 32708000,
+     "rent": 166260,
+     "count": null,
+     "inShared": true
+    },
+    {
+     "unitId": "03b6e7e2-7552-44cd-bd4e-aad4c13095ff",
+     "target": "청년(소득有)",
+     "dep": 34632000,
+     "rent": 176040,
+     "count": null,
+     "inShared": true
+    },
+    {
+     "unitId": "d09bc4c1-1496-44a1-9ba5-38eb13d96e18",
+     "target": "주거급여수급자",
+     "dep": 28860000,
+     "rent": 146700,
+     "count": 6,
+     "inShared": false
+    }
+   ]
+  },
+  "others": [
+   {
+    "unitId": "e0ca84e0-0ebe-4981-a86d-992b2a5643b3",
+    "type": "26A",
+    "area": 26.95,
+    "target": "주거급여수급자",
+    "dep": 36150000,
+    "rent": 183760,
+    "count": 5
+   },
+   {
+    "unitId": "91666bd4-1187-4908-b697-71a286d0b182",
+    "type": "26AS",
+    "area": 26.95,
+    "target": "고령자(주거약자용)",
+    "dep": 45790000,
+    "rent": 232760,
+    "count": 10
+   },
+   {
+    "unitId": "f8d627d6-d43e-4420-86f6-1e935ef37982",
+    "type": "26B",
+    "area": 26.95,
+    "target": "고령자(주거약자용外)",
+    "dep": 45790000,
+    "rent": 232760,
+    "count": 2
+   },
+   {
+    "unitId": "dc964608-b402-4d7e-b55f-c91dca918bb9",
+    "type": "44A",
+    "area": 44.68,
+    "target": "신혼부부·한부모가족",
+    "dep": 81560000,
+    "rent": 414590,
+    "count": 31
+   }
+  ]
+ }
+}</script>
+<script>
+/* 꼭집 디자인 실험실 — 시안 공통 도우미(빌드 때 각 index.html 안으로 들어간다).
+   값은 전부 #zf-data(배포본 공개 REST 2026-10-08 KST 응답)에서만 읽는다. */
+const ZF = JSON.parse(document.getElementById('zf-data').textContent);
+const RM = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const WD = ['일', '월', '화', '수', '목', '금', '토'];
+const d8 = s => { const [y, m, d] = s.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)); };
+const dayDiff = (a, b) => Math.round((d8(b) - d8(a)) / 864e5);
+// 2,886만원 · 3,270만 8,000원 · 1억 7,480만원 · 14만 6,700원 — 반올림 없이 그대로 쓴다
+function won(w) {
+  if (w == null) return '—';
+  const eok = Math.floor(w / 1e8), man = Math.floor((w % 1e8) / 1e4), rest = w % 1e4;
+  const p = [];
+  if (eok) p.push(eok + '억');
+  if (man) p.push(man.toLocaleString('ko-KR') + '만');
+  if (rest) p.push(rest.toLocaleString('ko-KR'));
+  return p.join(' ') + '원';
+}
+const md = s => { if (!s) return '—'; const d = d8(s); return `${d.getUTCMonth() + 1}.${d.getUTCDate()}`; };
+const mdw = s => { if (!s) return '—'; const d = d8(s); return `${d.getUTCMonth() + 1}.${d.getUTCDate()}(${WD[d.getUTCDay()]})`; };
+const ymd = s => s ? s.replace(/-/g, '.') : '—';
+const area = n => (Math.round(n * 100) / 100).toString();
+// 오늘(ZF.asOf) 기준 접수 상태 — 시작 전 / 접수 중 / 끝
+function phase(c) {
+  const t = ZF.asOf;
+  if (t < c.applyStart) return { key: 'soon', label: '접수 예정', short: '예정', d: dayDiff(t, c.applyStart), dLabel: '접수까지' };
+  if (t <= c.applyEnd) return { key: 'open', label: '접수중', short: '접수중', d: dayDiff(t, c.applyEnd), dLabel: '마감까지' };
+  return { key: 'closed', label: '접수 마감', short: '마감', d: 0, dLabel: '' };
+}
+const dd = n => n === 0 ? 'D-DAY' : `D-${n}`;
+const TABS = [['추천', 'rec'], ['공고', 'list'], ['인사이트', 'ins'], ['관리', 'mng'], ['설정', 'set']];
+// 화면 전환 — View Transitions가 있으면 쓰고, 없거나 동작 줄이기면 바로 바꾼다
+function swap(fn) {
+  if (!RM && document.startViewTransition) document.startViewTransition(fn); else fn();
+}
+function route(name, opts = {}) {
+  const run = () => {
+    $$('.screen').forEach(s => s.classList.toggle('on', s.dataset.screen === name));
+    document.documentElement.dataset.route = name;
+    const sc = $(`.screen[data-screen="${name}"]`); if (sc) sc.scrollTop = 0;
+    if (typeof onRoute === 'function') onRoute(name);
+  };
+  if (opts.instant) run(); else (typeof customSwap === 'function' ? customSwap(run, name) : swap(run));
+  if (!opts.noHash) history.replaceState(null, '', name === 'detail' ? '#detail' : '#home');
+}
+function boot() {
+  if (typeof render === 'function') render();
+  $$('[data-open]').forEach(el => el.addEventListener('click', e => { if (e.target.closest('[data-fav]')) return; route('detail'); }));
+  $$('[data-back]').forEach(el => el.addEventListener('click', () => route('home')));
+  $$('[data-fav]').forEach(el => el.addEventListener('click', e => { e.stopPropagation(); el.classList.toggle('is-on'); el.setAttribute('aria-pressed', el.classList.contains('is-on')); }));
+  $$('[data-toggle]').forEach(el => el.addEventListener('click', () => { const g = el.closest('[data-group]'); g.classList.toggle('is-open'); el.setAttribute('aria-expanded', g.classList.contains('is-open')); }));
+  route(location.hash === '#detail' ? 'detail' : 'home', { instant: true, noHash: true });
+  requestAnimationFrame(() => document.documentElement.classList.add('ready'));
+}
+// 숫자 올라가기(동작 줄이기면 바로 끝값)
+function countUp(el, to, ms = 900) {
+  if (RM) { el.textContent = to.toLocaleString('ko-KR'); return; }
+  const t0 = performance.now();
+  const step = now => { const k = Math.min(1, (now - t0) / ms); const e = 1 - Math.pow(1 - k, 3); el.textContent = Math.round(to * e).toLocaleString('ko-KR'); if (k < 1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
+
+const t0 = d8(ZF.asOf);
+function sealHTML(p, cls = '') { return `<div class="seal ${p.key === 'open' ? 'sq' : ''} ${cls}"><span>${p.label}<b>${dd(p.d)}</b></span></div>`; }
+function render() {
+  $('#docno').textContent = `꼭집 제${ZF.asOf.slice(0, 4)}-${ZF.asOf.slice(5, 7)}${ZF.asOf.slice(8)}호`;
+  $('#docdate').textContent = `${t0.getUTCFullYear()}. ${t0.getUTCMonth() + 1}. ${t0.getUTCDate()}.(${WD[t0.getUTCDay()]})`;
+  $('#mOpen').textContent = ZF.openCount;
+  $('#lead').textContent = `1. 귀하의 관심 지역·유형과 관련하여 아래와 같이 알려 드립니다. 2. 접수 중인 공고는 전국 ${ZF.receivingCount}건입니다.`;
+  $('#tabs').innerHTML = TABS.map(([t], i) => `<a href="#" class="${i ? '' : 'on'}"><span class="code">${['가', '나', '다', '라', '마'][i]}</span>${t}</a>`).join('');
+  $('#forms').innerHTML = ZF.cards.map((c, i) => {
+    const p = phase(c);
+    return `<div class="form" style="--i:${i}" ${i === 0 ? 'data-open' : ''}>
+      <h3><span class="no">${i + 1}.</span>${c.name}${c.name.includes(c.type) ? '' : ' ' + c.type}</h3>
+      ${sealHTML(p)}
+      <table><tr><th>소 재 지</th><td>${c.sido} ${c.sigungu}</td></tr>
+      <tr><th>청약 접수</th><td class="code">${mdw(c.applyStart)} ~ ${mdw(c.applyEnd)}</td></tr>
+      <tr><th>임대보증금</th><td class="code">${won(c.depMin)}부터</td></tr>
+      <tr><th>월 임대료</th><td class="code">${won(c.rentMin)}부터</td></tr></table>
+      <div class="ref">전용 ${area(c.areaMin)}~${area(c.areaMax)}㎡ · ${ymd(c.annDate)} 공고</div>
+      <button class="chk" data-fav aria-pressed="false"><svg viewBox="0 0 20 20"><rect x="1.5" y="1.5" width="17" height="17"/><path d="M4 10l4 4 9-11"/></svg>관심 표시</button>
+    </div>`;
+  }).join('');
+  const d = ZF.detail, p = phase(d), g = d.group;
+  $('#dsheet').innerHTML = `
+    <div class="dnav"><button data-back>← 목록</button><span class="code">LH 공고번호<br>${d.aid}</span></div>
+    <h1 class="dt">${d.name}<br>입주자 최초모집 공고</h1>
+    <div class="dbl"></div>
+    <p class="dsub">${d.org} · ${d.type} · ${ymd(d.annDate)} 공고 · 총 ${d.totalUnits}세대</p>
+    <div style="--i:0">${sealHTML(p, 'bigseal')}</div>
+    <div class="sec"><h4><span class="code">1.</span>임대조건</h4>
+      <table><tr><th>임대보증금</th><td class="code">${won(d.depMin)} ~ ${won(d.depMax)}</td></tr><tr><th>월 임대료</th><td class="code">${won(d.rentMin)} ~ ${won(d.rentMax)}</td></tr><tr><th>소 재 지</th><td>${d.address}</td></tr></table></div>
+    <div class="sec"><h4><span class="code">2.</span>신청일정</h4>
+      <table><tr><th>청약 접수</th><td class="code"><span class="hl">${mdw(d.applyStart)} ~ ${mdw(d.applyEnd)}</span></td></tr><tr><th>서류 제출</th><td class="code">${mdw(d.docStart)} ~ ${mdw(d.docEnd)}</td></tr><tr><th>당첨 발표</th><td class="code">${ymd(d.winner)}</td></tr><tr><th>입주 예정</th><td class="code">${d.moveIn}</td></tr></table></div>
+    <div class="sec group is-open" data-group><button class="gh" data-toggle aria-expanded="true"><h4><span class="code">3.</span>공급세대 — ${g.type}(전용 ${area(g.area)}㎡)</h4><span class="t code">${g.total}세대</span></button>
+      <div class="rows"><div><table class="u"><tr><th>공급대상</th><th>보증금</th><th>월 임대료</th><th>세대</th></tr>
+      ${g.rows.map(r => `<tr><td>${r.target}</td><td class="code">${won(r.dep)}</td><td class="code">${won(r.rent)}</td><td class="code">${r.count != null ? r.count : '㉠'}</td></tr>`).join('')}</table>
+      <div class="ref">㉠ 대학생·청년(소득無)과 청년(소득有)은 ${g.shared}세대를 함께 모집</div></div></div></div>
+    <div class="sec"><h4><span class="code">4.</span>위치도</h4><div class="loc"><i></i><span>지도 자리 · ${d.address}</span></div></div>`;
+}
+function customSwap(run, name) {
+  document.documentElement.dataset.dir = name === 'home' ? 'back' : 'fwd';
+  swap(run);
+}
+function onRoute(name) {
+  $$(`.screen[data-screen="${name}"] .form, .screen[data-screen="${name}"] .seal, .screen[data-screen="${name}"] .dbl`).forEach(el => { el.style.animation = 'none'; el.offsetWidth; el.style.animation = ''; });
+  const h = $(`.screen[data-screen="${name}"] .hl`); if (h && !RM) { h.style.transition = 'none'; h.style.backgroundSize = '0 100%'; h.offsetWidth; h.style.transition = ''; h.style.backgroundSize = ''; }
+}
+boot();
+</script>
+</body>
+</html>

@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>꼭집 시안 02 · 키네틱 에디토리얼</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700;900&family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+:root{--paper:#F1EEE6;--ink:#0D0D0D;--mute:#77736A;--rule:#0D0D0D;--red:#E5361C;--ease:cubic-bezier(.77,0,.18,1);--out:cubic-bezier(.16,1,.3,1)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#D9D5CB;display:flex;justify-content:center;font-family:'IBM Plex Sans KR',system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased;word-break:keep-all}
+.phone{position:relative;width:100%;max-width:390px;height:100dvh;max-height:844px;background:var(--paper);overflow:hidden}
+.screen{position:absolute;inset:0;overflow-y:auto;padding:0 18px 96px;display:none;scrollbar-width:none}
+.screen.on{display:block}.screen::-webkit-scrollbar{display:none}
+.serif{font-family:'Noto Serif KR',serif}.mono{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
+/* 줄 단위 가림막 — 아래에서 올라온다 */
+.ln{display:block;overflow:hidden}
+.ln>span{display:block}
+.ready .screen.on .ln>span{animation:rise .9s var(--out) both;animation-delay:calc(var(--i,0)*80ms)}
+@keyframes rise{from{transform:translateY(105%)}to{transform:none}}
+.ready .screen.on .fade{animation:fade .8s ease both;animation-delay:calc(var(--i,0)*80ms)}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.rule{height:2px;background:var(--rule);transform-origin:left}
+.rule.thin{height:1px}
+.ready .screen.on .rule{animation:draw .9s var(--ease) both;animation-delay:calc(var(--i,0)*80ms)}
+@keyframes draw{from{transform:scaleX(0)}to{transform:none}}
+/* 제호 */
+.mast{padding:16px 0 10px;display:flex;justify-content:space-between;align-items:flex-end}
+.mast .logo{font-family:'Noto Serif KR',serif;font-weight:900;font-size:40px;letter-spacing:-.06em;line-height:1}
+.mast .logo b{color:var(--red)}
+.mast .ed{text-align:right;font-size:11px;line-height:1.5;color:var(--mute)}
+.mast .ed .mono{color:var(--ink);font-size:12px}
+/* 흐르는 띠 — 마감 소식 */
+.ticker{margin:10px -18px 0;background:var(--ink);color:var(--paper);height:34px;overflow:hidden;display:flex;align-items:center}
+.ticker .track{display:flex;gap:28px;white-space:nowrap;padding-left:18px;font-size:12.5px;font-weight:500;will-change:transform}
+.ready .ticker .track{animation:tick 18s linear infinite}
+@keyframes tick{to{transform:translateX(-50%)}}
+.ticker .track b{color:#FF7A5C;font-family:'IBM Plex Mono',monospace;font-weight:600;margin-right:6px}
+.lede{padding:18px 0 14px}
+.lede h1{font-family:'Noto Serif KR',serif;font-weight:900;font-size:38px;line-height:1.12;letter-spacing:-.05em}
+.lede h1 em{font-style:normal;color:var(--red)}
+.lede p{margin-top:10px;font-size:13px;color:var(--mute);line-height:1.6}
+/* 기사 목록 */
+.item{display:grid;grid-template-columns:34px 1fr auto;gap:2px 12px;padding:16px 0 18px;cursor:pointer;position:relative}
+.item .no{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;padding-top:6px}
+.item .kick{font-size:11.5px;font-weight:700;letter-spacing:.02em;color:var(--red)}
+.item h3{font-family:'Noto Serif KR',serif;font-size:22px;font-weight:700;letter-spacing:-.04em;line-height:1.25;margin:4px 0 6px}
+.item .dek{grid-column:2/3;font-size:12.5px;color:var(--mute);line-height:1.55}
+.item .dek b{color:var(--ink);font-weight:700}
+.item .big{grid-row:1/4;grid-column:3;text-align:right;font-family:'Noto Serif KR',serif;font-weight:900;font-size:46px;line-height:.95;letter-spacing:-.06em}
+.item .big small{display:block;font-family:'IBM Plex Sans KR';font-size:10.5px;font-weight:700;letter-spacing:.04em;color:var(--mute);margin-top:6px}
+.item .big.open{color:var(--red)}
+.mark{grid-column:2/3;justify-self:start;margin-top:10px;background:none;border:1px solid var(--ink);font:600 11.5px 'IBM Plex Sans KR';padding:6px 11px;border-radius:999px;cursor:pointer;display:inline-flex;gap:6px;align-items:center;position:relative;overflow:hidden;color:var(--ink)}
+.mark::before{content:"";position:absolute;inset:0;background:var(--ink);transform:scaleX(0);transform-origin:left;transition:transform .45s var(--ease);z-index:0}
+.mark span{position:relative;z-index:1;transition:color .3s}
+.mark.is-on::before{transform:none}.mark.is-on span{color:var(--paper)}
+/* 하단 탭 — 신문 색인처럼 */
+.tabs{position:absolute;left:0;right:0;bottom:0;height:70px;background:var(--paper);border-top:2px solid var(--ink);display:grid;grid-template-columns:repeat(5,1fr);z-index:5;transition:transform .5s var(--ease)}
+.tabs a{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:3px;text-decoration:none;color:var(--mute);font-size:12px;font-weight:700;border-right:1px solid #CFCBC1}
+.tabs a:last-child{border-right:0}
+.tabs a .mono{font-size:10px;font-weight:600}
+.tabs a.on{color:var(--paper);background:var(--ink)}
+html[data-route=detail] .tabs{transform:translateY(100%)}
+/* 상세 */
+.dbar{display:flex;justify-content:space-between;align-items:center;padding:14px 0 12px}
+.dbar button{background:none;border:0;font:700 13px 'IBM Plex Sans KR';display:flex;gap:6px;align-items:center;cursor:pointer;color:var(--ink)}
+.dbar .sec{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--mute)}
+.kicker{display:flex;gap:10px;align-items:center;font-size:12px;font-weight:700;margin:14px 0 8px}
+.kicker .st{background:var(--red);color:#fff;padding:4px 8px}
+.dh1{font-family:'Noto Serif KR',serif;font-weight:900;font-size:40px;line-height:1.1;letter-spacing:-.055em}
+.byline{font-size:12px;color:var(--mute);margin:12px 0 14px;line-height:1.6}
+.pull{display:grid;grid-template-columns:1fr 1fr;border-top:2px solid var(--ink);border-bottom:1px solid var(--ink)}
+.pull>div{padding:12px 0 14px}
+.pull>div+div{border-left:1px solid var(--ink);padding-left:14px}
+.pull .lab{font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--mute)}
+.pull .val{font-family:'Noto Serif KR',serif;font-weight:900;font-size:24px;letter-spacing:-.04em;margin-top:4px;line-height:1.2}
+.pull .to{font-size:11.5px;color:var(--mute);margin-top:2px}
+.dates{padding:14px 0 16px;border-bottom:1px solid var(--ink);display:flex;align-items:flex-end;justify-content:space-between}
+.dates .range{font-family:'Noto Serif KR',serif;font-weight:900;font-size:44px;letter-spacing:-.06em;line-height:1}
+.dates .range i{font-style:normal;color:var(--red)}
+.dates .side{text-align:right;font-size:11.5px;color:var(--mute);line-height:1.5}
+.dates .side b{display:block;font-family:'IBM Plex Mono',monospace;color:var(--red);font-size:20px}
+.group{padding:14px 0 4px}
+.group .gh{display:flex;justify-content:space-between;align-items:baseline;width:100%;background:none;border:0;font:inherit;color:inherit;cursor:pointer;text-align:left}
+.group .gh h4{font-family:'Noto Serif KR',serif;font-size:20px;font-weight:900;letter-spacing:-.04em}
+.group .gh span{font-size:12px;font-weight:700}
+.group .gh span i{font-style:normal;display:inline-block;transition:transform .5s var(--ease)}
+.group.is-open .gh span i{transform:rotate(45deg)}
+.rows{display:grid;grid-template-rows:0fr;transition:grid-template-rows .6s var(--ease)}
+.group.is-open .rows{grid-template-rows:1fr}.rows>div{overflow:hidden}
+table{width:100%;border-collapse:collapse;margin-top:10px;font-size:12.5px}
+th{text-align:left;font-size:10.5px;letter-spacing:.06em;color:var(--mute);font-weight:700;padding:6px 0;border-bottom:1px solid var(--ink)}
+td{padding:9px 0;border-bottom:1px solid #CFCBC1;vertical-align:top}
+td.n{font-family:'IBM Plex Mono',monospace;text-align:right;font-size:12px}
+.note{font-size:11.5px;color:var(--mute);margin:8px 0 2px}
+.fig{margin-top:16px;height:150px;background:
+  radial-gradient(circle,var(--ink) 1.1px,transparent 1.4px) 0 0/7px 7px,
+  var(--paper);position:relative;filter:contrast(1.1)}
+.fig::after{content:"";position:absolute;left:58%;top:40%;width:16px;height:16px;background:var(--red);border-radius:50%;box-shadow:0 0 0 6px var(--paper)}
+.cap{font-size:11px;color:var(--mute);margin-top:6px}
+/* 화면 이동 — 빨간 띠가 훑고 지나간다 */
+.wipe{position:absolute;inset:0;background:var(--red);z-index:20;transform:scaleY(0);pointer-events:none}
+.wipe.go{animation:wipe .9s var(--ease) both}
+@keyframes wipe{0%{transform:scaleY(0);transform-origin:bottom}45%{transform:scaleY(1);transform-origin:bottom}55%{transform:scaleY(1);transform-origin:top}100%{transform:scaleY(0);transform-origin:top}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="phone">
+  <section class="screen" data-screen="home" aria-label="추천">
+    <header class="mast">
+      <div class="logo ln"><span>꼭<b>집</b></span></div>
+      <div class="ed fade" style="--i:2"><div class="mono" id="edDate"></div>공공임대·분양 공고 일간</div>
+    </header>
+    <div class="rule" style="--i:1"></div>
+    <div class="ticker" aria-label="마감 소식"><div class="track" id="ticker"></div></div>
+    <div class="lede">
+      <h1><span class="ln" style="--i:3"><span>오늘 열린 공고</span></span><span class="ln" style="--i:4"><span><em id="lcount"></em>건, 그중</span></span><span class="ln" style="--i:5"><span>세 건을 골랐다.</span></span></h1>
+      <p class="fade" style="--i:6" id="ledeP"></p>
+    </div>
+    <div class="rule thin" style="--i:6"></div>
+    <div id="items"></div>
+  </section>
+
+  <section class="screen" data-screen="detail" aria-label="공고 상세">
+    <div class="dbar"><button data-back aria-label="뒤로">← 1면으로</button><span class="sec" id="dsec"></span></div>
+    <div class="rule" style="--i:0"></div>
+    <div id="dbody"></div>
+  </section>
+
+  <nav class="tabs" id="tabs" aria-label="하단 탭"></nav>
+  <div class="wipe" id="wipe"></div>
+</div>
+<script id="zf-data" type="application/json">__ZF_DATA__</script>
+<script>
+/*__CORE__*/
+function render() {
+  const t = d8(ZF.asOf);
+  $('#edDate').textContent = `${ymd(ZF.asOf)} (${WD[t.getUTCDay()]})`;
+  $('#lcount').textContent = ZF.openCount;
+  $('#ledeP').textContent = `전국 공고중·접수중 ${ZF.openCount}건 · 지금 접수중 ${ZF.receivingCount}건. ${ymd(ZF.asOf)} 기준.`;
+  const news = ZF.cards.map(c => { const p = phase(c); return `<span><b>${dd(p.d)}</b>${c.name} ${p.key === 'open' ? '접수 마감' : '접수 시작'} ${md(p.key === 'open' ? c.applyEnd : c.applyStart)}</span>`; }).join('');
+  $('#ticker').innerHTML = news + news;
+  $('#tabs').innerHTML = TABS.map(([t], i) => `<a href="#" class="${i ? '' : 'on'}"><span class="mono">0${i + 1}</span>${t}</a>`).join('');
+  $('#items').innerHTML = ZF.cards.map((c, i) => {
+    const p = phase(c);
+    return `<article class="item" ${i === 0 ? 'data-open' : ''}>
+      <span class="no fade" style="--i:${7 + i}">0${i + 1}</span>
+      <div><div class="kick fade" style="--i:${7 + i}">${c.type} · ${c.sido} ${c.sigungu}</div>
+      <h3 class="ln" style="--i:${7 + i}"><span>${c.name}</span></h3></div>
+      <div class="big ${p.key} fade" style="--i:${8 + i}">${dd(p.d)}<small>${p.dLabel}</small></div>
+      <p class="dek fade" style="--i:${8 + i}">보증금 <b>${won(c.depMin)}</b>부터 · 월 <b>${won(c.rentMin)}</b>부터<br>접수 ${mdw(c.applyStart)} — ${mdw(c.applyEnd)} · ${area(c.areaMin)}~${area(c.areaMax)}㎡</p>
+      <button class="mark" data-fav aria-pressed="false"><span>＋ 스크랩</span></button>
+    </article><div class="rule thin" style="--i:${9 + i}"></div>`;
+  }).join('');
+  const d = ZF.detail, p = phase(d), g = d.group;
+  $('#dsec').textContent = `${d.type} · ${d.org}`;
+  $('#dbody').innerHTML = `
+    <div class="kicker fade" style="--i:1"><span class="st">${p.label}</span><span>${d.type}</span><span class="mono">${ymd(d.annDate)} 공고</span></div>
+    <h1 class="dh1"><span class="ln" style="--i:2"><span>인천석남</span></span><span class="ln" style="--i:3"><span>어울림센터</span></span><span class="ln" style="--i:4"><span>행복주택, 첫 모집</span></span></h1>
+    <p class="byline fade" style="--i:5">${d.title}<br>${d.address} · 총 ${d.totalUnits}세대 · ${d.heating} · 입주 ${d.moveIn}</p>
+    <div class="pull fade" style="--i:6">
+      <div><div class="lab">임대보증금</div><div class="val">${won(d.depMin)}</div><div class="to">~ ${won(d.depMax)}</div></div>
+      <div><div class="lab">월 임대료</div><div class="val">${won(d.rentMin)}</div><div class="to">~ ${won(d.rentMax)}</div></div>
+    </div>
+    <div class="dates"><div class="range"><span class="ln" style="--i:7"><span>${md(d.applyStart)}<i>—</i>${md(d.applyEnd)}</span></span></div>
+      <div class="side fade" style="--i:8"><b>${dd(p.d)}</b>${p.dLabel}<br>당첨 발표 ${ymd(d.winner)}</div></div>
+    <div class="group is-open" data-group>
+      <button class="gh" data-toggle aria-expanded="true"><h4>${g.type} · 전용 ${area(g.area)}㎡</h4><span>${g.total}세대 <i>＋</i></span></button>
+      <div class="rows"><div>
+        <table><thead><tr><th>공급 대상</th><th style="text-align:right">보증금</th><th style="text-align:right">월 임대료</th><th style="text-align:right">세대</th></tr></thead>
+        <tbody>${g.rows.map(r => `<tr><td>${r.target}</td><td class="n">${won(r.dep)}</td><td class="n">${won(r.rent)}</td><td class="n">${r.count != null ? r.count : '↓'}</td></tr>`).join('')}</tbody></table>
+        <p class="note">↓ 대학생·청년(소득無)과 청년(소득有)은 ${g.shared}세대를 함께 모집</p>
+      </div></div>
+    </div>
+    <div class="fig fade" style="--i:9" role="img" aria-label="지도 자리"></div>
+    <p class="cap">지도 자리 — ${d.address}</p>`;
+}
+function customSwap(run) {
+  if (RM) return run();
+  const w = $('#wipe'); w.classList.remove('go'); w.offsetWidth; w.classList.add('go');
+  setTimeout(run, 420);
+}
+function onRoute(name) {
+  $$(`.screen[data-screen="${name}"] .ln>span, .screen[data-screen="${name}"] .fade, .screen[data-screen="${name}"] .rule`).forEach(el => { el.style.animation = 'none'; el.offsetWidth; el.style.animation = ''; });
+}
+boot();
+</script>
+</body>
+</html>

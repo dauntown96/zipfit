@@ -1,0 +1,183 @@
+{
+ "asOf": "2026-10-08",
+ "source": "https://kkokzip.com 배포본 공개 REST(anon) · 2026-10-08 KST 조회",
+ "openCount": 74,
+ "receivingCount": 3,
+ "statusCounts": {
+  "접수마감": 857,
+  "공고중": 70,
+  "정정공고중": 1,
+  "접수중": 3
+ },
+ "cards": [
+  {
+   "aid": "2015122300020858",
+   "rpcRowId": 4876988,
+   "title": "인천석남 어울림센터 행복주택 입주자 최초모집",
+   "name": "인천석남 어울림센터",
+   "type": "행복주택",
+   "sido": "인천광역시",
+   "sigungu": "서해구",
+   "status": "공고중",
+   "annDate": "2026-09-30",
+   "applyStart": "2026-10-13",
+   "applyEnd": "2026-10-15",
+   "depMin": 28860000,
+   "depMax": 81560000,
+   "rentMin": 146700,
+   "rentMax": 414590,
+   "areaMin": 21.52,
+   "areaMax": 44.68,
+   "url": "https://apply.lh.or.kr/lhapply/apply/wt/wrtanc/selectWrtancInfo.do?panId=2015122300020858&ccrCnntSysDsCd=03&uppAisTpCd=06&aisTpCd=10&mi=1026",
+   "recruit": 110,
+   "recruitNote": "세대 정보 합(21A 56+6 · 26A 5 · 26AS 10 · 26B 2 · 44A 31) = 공고 total_units 110"
+  },
+  {
+   "aid": "2015122300020726",
+   "rpcRowId": 3868139,
+   "title": "아산지역 국민임대주택 예비입주자 모집공고(2026.09.15)",
+   "name": "아산지역 국민임대",
+   "type": "국민임대",
+   "sido": "충청남도",
+   "sigungu": "아산시",
+   "status": "접수중",
+   "annDate": "2026-09-15",
+   "applyStart": "2026-09-28",
+   "applyEnd": "2026-10-14",
+   "depMin": 10199000,
+   "depMax": 31664000,
+   "rentMin": 87650,
+   "rentMax": 311400,
+   "areaMin": 26.5,
+   "areaMax": 51.59,
+   "url": "https://apply.lh.or.kr/lhapply/apply/wt/wrtanc/selectWrtancInfo.do?panId=2015122300020726&ccrCnntSysDsCd=03&uppAisTpCd=06&aisTpCd=07&mi=1026",
+   "sites": 4,
+   "siteNames": [
+    "아산배방LH15단지",
+    "아산신창소화마을",
+    "아산인주휴먼시아",
+    "아산탕정LH7단지"
+   ]
+  },
+  {
+   "aid": "0000061176",
+   "rpcRowId": 4798679,
+   "title": "대전천동3 5블록 10년 분양전환공공임대주택 예비입주자 모집공고('26.09.29)",
+   "name": "대전천동3 5블록",
+   "type": "10년 분양전환 공공임대",
+   "sido": "대전광역시",
+   "sigungu": "동구",
+   "status": "공고중",
+   "annDate": "2026-09-29",
+   "applyStart": "2026-10-14",
+   "applyEnd": "2026-10-16",
+   "depMin": 30300000,
+   "depMax": 60800000,
+   "rentMin": 346000,
+   "rentMax": 494000,
+   "areaMin": 39.98,
+   "areaMax": 59.98,
+   "url": "https://apply.lh.or.kr/lhapply/apply/wt/wrtanc/selectWrtancInfo.do?panId=0000061176&ccrCnntSysDsCd=02&uppAisTpCd=06&aisTpCd=08&mi=1026",
+   "recruit": 210,
+   "complexUnits": 2135,
+   "recruitNote": "세대 정보 39A 80 · 51A 50 · 59D 80"
+  }
+ ],
+ "detail": {
+  "aid": "2015122300020858",
+  "rpcRowId": 4876988,
+  "title": "인천석남 어울림센터 행복주택 입주자 최초모집",
+  "name": "인천석남 어울림센터 행복주택",
+  "type": "행복주택",
+  "status": "공고중",
+  "org": "LH",
+  "address": "인천광역시 서해구 석남동 481-1",
+  "annDate": "2026-09-30",
+  "applyStart": "2026-10-13",
+  "applyEnd": "2026-10-15",
+  "docStart": "2026-10-27",
+  "docEnd": "2026-10-30",
+  "winner": "2027-03-18",
+  "contractStart": "2027-03-30",
+  "moveIn": "2028.03",
+  "heating": "개별난방",
+  "totalUnits": 110,
+  "url": "https://apply.lh.or.kr/lhapply/apply/wt/wrtanc/selectWrtancInfo.do?panId=2015122300020858&ccrCnntSysDsCd=03&uppAisTpCd=06&aisTpCd=10&mi=1026",
+  "depMin": 28860000,
+  "depMax": 81560000,
+  "rentMin": 146700,
+  "rentMax": 414590,
+  "areaMin": 21.52,
+  "areaMax": 44.68,
+  "group": {
+   "type": "21A",
+   "area": 21.52,
+   "shared": 56,
+   "total": 62,
+   "rows": [
+    {
+     "unitId": "f87e9872-e414-46a7-b563-7345fa236fa7",
+     "target": "대학생·청년(소득無)",
+     "dep": 32708000,
+     "rent": 166260,
+     "count": null,
+     "inShared": true
+    },
+    {
+     "unitId": "03b6e7e2-7552-44cd-bd4e-aad4c13095ff",
+     "target": "청년(소득有)",
+     "dep": 34632000,
+     "rent": 176040,
+     "count": null,
+     "inShared": true
+    },
+    {
+     "unitId": "d09bc4c1-1496-44a1-9ba5-38eb13d96e18",
+     "target": "주거급여수급자",
+     "dep": 28860000,
+     "rent": 146700,
+     "count": 6,
+     "inShared": false
+    }
+   ]
+  },
+  "others": [
+   {
+    "unitId": "e0ca84e0-0ebe-4981-a86d-992b2a5643b3",
+    "type": "26A",
+    "area": 26.95,
+    "target": "주거급여수급자",
+    "dep": 36150000,
+    "rent": 183760,
+    "count": 5
+   },
+   {
+    "unitId": "91666bd4-1187-4908-b697-71a286d0b182",
+    "type": "26AS",
+    "area": 26.95,
+    "target": "고령자(주거약자용)",
+    "dep": 45790000,
+    "rent": 232760,
+    "count": 10
+   },
+   {
+    "unitId": "f8d627d6-d43e-4420-86f6-1e935ef37982",
+    "type": "26B",
+    "area": 26.95,
+    "target": "고령자(주거약자용外)",
+    "dep": 45790000,
+    "rent": 232760,
+    "count": 2
+   },
+   {
+    "unitId": "dc964608-b402-4d7e-b55f-c91dca918bb9",
+    "type": "44A",
+    "area": 44.68,
+    "target": "신혼부부·한부모가족",
+    "dep": 81560000,
+    "rent": 414590,
+    "count": 31
+   }
+  ]
+ }
+}

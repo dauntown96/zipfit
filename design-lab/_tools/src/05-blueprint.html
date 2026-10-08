@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>꼭집 시안 05 · 도면</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{--paper:#F2F5F8;--grid:#DCE4EC;--grid2:#C9D5E1;--ink:#1B2B4B;--mute:#6A7890;--red:#E0483E;--cyan:#2A8DD8;--ease:cubic-bezier(.65,0,.35,1);--out:cubic-bezier(.16,1,.3,1)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#CBD5E0;display:flex;justify-content:center;font-family:'IBM Plex Sans KR',system-ui,sans-serif;color:var(--ink);word-break:keep-all;-webkit-font-smoothing:antialiased}
+.phone{position:relative;width:100%;max-width:390px;height:100dvh;max-height:844px;overflow:hidden;background:
+  linear-gradient(var(--grid2) 1px,transparent 1px) 0 0/40px 40px,linear-gradient(90deg,var(--grid2) 1px,transparent 1px) 0 0/40px 40px,
+  linear-gradient(var(--grid) 1px,transparent 1px) 0 0/8px 8px,linear-gradient(90deg,var(--grid) 1px,transparent 1px) 0 0/8px 8px,var(--paper)}
+.screen{position:absolute;inset:0;overflow-y:auto;display:none;scrollbar-width:none;padding:0 14px 92px}
+.screen.on{display:block}.screen::-webkit-scrollbar{display:none}
+.mono{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
+/* 선 그리기 — pathLength=1 */
+.dr{stroke-dasharray:1;stroke-dashoffset:1}
+.ready .screen.on .dr{animation:ink 1.1s var(--ease) forwards;animation-delay:calc(var(--d,0)*1ms)}
+@keyframes ink{to{stroke-dashoffset:0}}
+.lb{opacity:0}
+.ready .screen.on .lb{animation:lb .5s ease forwards;animation-delay:calc(var(--d,0)*1ms)}
+@keyframes lb{to{opacity:1}}
+/* 머리 */
+.top{display:flex;justify-content:space-between;align-items:center;padding:16px 2px 10px;border-bottom:1.5px solid var(--ink)}
+.logo{display:flex;align-items:center;gap:8px;font-weight:700;font-size:19px;letter-spacing:-.03em}
+.logo svg{width:24px;height:24px}
+.top .r{font-size:10.5px;text-align:right;color:var(--mute);line-height:1.5}
+.sum{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--ink)}
+.sum div{padding:9px 6px;border-right:1px solid var(--grid2)}
+.sum div:last-child{border-right:0}
+.sum .k{font-size:10px;color:var(--mute);letter-spacing:.04em}
+.sum .v{font-size:20px;font-weight:600}
+.sum .v.red{color:var(--red)}
+.cap{font-size:10.5px;letter-spacing:.12em;color:var(--mute);margin:16px 2px 8px;display:flex;justify-content:space-between}
+/* 도면 시트 카드 */
+.sheet{background:rgba(255,255,255,.72);border:1.5px solid var(--ink);margin-bottom:12px;cursor:pointer;position:relative}
+.sheet .body{display:grid;grid-template-columns:118px 1fr;min-height:132px}
+.sheet .plan{border-right:1px solid var(--ink);display:grid;place-items:center;padding:6px}
+.sheet .plan svg{width:106px;height:118px;overflow:visible}
+.sheet .info{padding:10px 12px}
+.sheet .ty{font-size:10.5px;font-weight:700;color:var(--cyan);letter-spacing:.04em}
+.sheet h3{font-size:17px;font-weight:700;letter-spacing:-.035em;margin:4px 0 2px;line-height:1.3}
+.sheet .where{font-size:11.5px;color:var(--mute)}
+.sheet .money{margin-top:8px;font-size:12px;line-height:1.6}
+.sheet .money b{font-weight:700}
+.tb{display:grid;grid-template-columns:1fr 1fr 74px;border-top:1px solid var(--ink);font-size:10.5px}
+.tb>div{padding:5px 8px;border-right:1px solid var(--ink)}.tb>div:last-child{border-right:0}
+.tb .k{color:var(--mute);font-size:9.5px;letter-spacing:.06em}
+.tb .v{font-weight:600;font-size:11.5px}
+.tb .dd{background:var(--ink);color:#fff;text-align:center}
+.tb .dd.open{background:var(--red)}
+.tb .dd .k{color:rgba(255,255,255,.75)}
+.tb .dd .v{font-size:15px}
+.pin{position:absolute;right:8px;top:8px;width:28px;height:28px;border:1px solid var(--ink);background:var(--paper);display:grid;place-items:center;cursor:pointer}
+.pin svg{width:16px;height:16px}
+.pin path{fill:none;stroke:var(--ink);stroke-width:1.6;transition:fill .3s}
+.pin.is-on{background:var(--red);border-color:var(--red)}.pin.is-on path{stroke:#fff;fill:#fff}
+.ready .screen.on .sheet{animation:sh .6s var(--out) both;animation-delay:calc(var(--i)*120ms)}
+@keyframes sh{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+/* 하단 탭 */
+.tabs{position:absolute;left:0;right:0;bottom:0;height:66px;background:var(--paper);border-top:1.5px solid var(--ink);display:grid;grid-template-columns:repeat(5,1fr);z-index:5;transition:transform .5s var(--ease)}
+.tabs a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;text-decoration:none;color:var(--mute);font-size:11.5px;font-weight:600;border-right:1px solid var(--grid2)}
+.tabs a:last-child{border-right:0}
+.tabs a .mono{font-size:9.5px}
+.tabs a.on{color:var(--ink);background:rgba(42,141,216,.1);box-shadow:inset 0 2px 0 var(--cyan)}
+html[data-route=detail] .tabs{transform:translateY(100%)}
+/* 상세 */
+.dtop{display:flex;justify-content:space-between;align-items:center;padding:14px 0 10px;border-bottom:1.5px solid var(--ink)}
+.dtop button{background:var(--paper);border:1px solid var(--ink);font:600 12px 'IBM Plex Sans KR';padding:6px 10px;cursor:pointer;color:var(--ink)}
+.dtop .no{font-size:10.5px;color:var(--mute);text-align:right}
+.dtitle{padding:14px 2px 10px}
+.dtitle .ty{font-size:11px;font-weight:700;color:var(--cyan);display:flex;gap:8px;align-items:center}
+.dtitle .st{border:1px solid var(--ink);padding:2px 6px;color:var(--ink)}
+.dtitle h1{font-size:23px;line-height:1.3;letter-spacing:-.04em;margin-top:6px}
+.dtitle p{font-size:11.5px;color:var(--mute);margin-top:4px}
+.drawing{background:rgba(255,255,255,.72);border:1.5px solid var(--ink);position:relative}
+.drawing .lab{position:absolute;left:8px;top:6px;font-size:9.5px;letter-spacing:.1em;color:var(--mute)}
+.drawing svg{display:block;width:100%;height:auto}
+.legend{display:flex;flex-wrap:wrap;gap:4px 10px;padding:6px 8px;border-top:1px solid var(--ink);font-size:10.5px}
+.legend span{display:flex;align-items:center;gap:4px}
+.legend i{width:12px;height:2px;background:var(--ink)}
+.legend .on i{background:var(--red);height:3px}
+.legend .on{color:var(--red);font-weight:700}
+.chain{margin-top:10px;background:rgba(255,255,255,.72);border:1.5px solid var(--ink);padding:8px 6px 4px}
+.chain .lab2{font-size:9.5px;letter-spacing:.1em;color:var(--mute);padding-left:2px}
+.money2{display:grid;grid-template-columns:1fr 1fr;border:1.5px solid var(--ink);border-top:0;background:rgba(255,255,255,.72)}
+.money2>div{padding:9px 10px}.money2>div+div{border-left:1px solid var(--ink)}
+.money2 .k{font-size:10px;color:var(--mute);letter-spacing:.06em}
+.money2 .v{font-size:16px;font-weight:700;margin-top:2px}
+.money2 .t{font-size:11px;color:var(--mute)}
+.group{margin-top:10px;border:1.5px solid var(--ink);background:rgba(255,255,255,.72)}
+.group .gh{width:100%;display:flex;justify-content:space-between;align-items:center;padding:9px 10px;background:none;border:0;font:inherit;color:inherit;cursor:pointer;text-align:left}
+.group .gh b{font-size:15px}.group .gh .n{font-size:12px;font-weight:600;color:var(--red)}
+.group .gh .pm{display:inline-block;width:18px;text-align:center;font-family:'IBM Plex Mono';transition:transform .4s var(--ease)}
+.group.is-open .gh .pm{transform:rotate(45deg)}
+.rows{display:grid;grid-template-rows:0fr;transition:grid-template-rows .5s var(--ease)}
+.group.is-open .rows{grid-template-rows:1fr}.rows>div{overflow:hidden}
+.r{display:grid;grid-template-columns:1fr auto;gap:2px 8px;padding:7px 10px;border-top:1px dashed var(--grid2);font-size:12.5px}
+.r .p{grid-column:1/-1;font-size:11px;color:var(--mute)}
+.r .c{font-weight:600;font-size:11.5px}
+.note{font-size:10.5px;color:var(--mute);padding:6px 10px 8px;border-top:1px dashed var(--grid2)}
+.site{margin-top:10px;height:150px;border:1.5px solid var(--ink);background:rgba(255,255,255,.72);position:relative}
+.site span{position:absolute;left:8px;bottom:6px;font-size:10.5px;color:var(--mute)}
+::view-transition-group(plan){animation-duration:.6s;animation-timing-function:var(--out)}
+::view-transition-old(root){animation:.45s var(--ease) both zo}::view-transition-new(root){animation:.5s var(--out) both zi}
+@keyframes zo{to{opacity:0;transform:scale(1.06)}}@keyframes zi{from{opacity:0;transform:scale(.97)}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}.dr{stroke-dashoffset:0}.lb{opacity:1}}
+</style>
+</head>
+<body>
+<div class="phone">
+  <section class="screen" data-screen="home" aria-label="추천">
+    <header class="top"><div class="logo"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10.5" fill="none" stroke="#1B2B4B" stroke-width="1.4"/><path d="M12 3l4 14-4-3-4 3z" fill="#1B2B4B"/><text x="12" y="23.5" font-size="5" text-anchor="middle" fill="#1B2B4B" font-family="IBM Plex Mono">N</text></svg>꼭집</div><div class="r mono" id="asof"></div></header>
+    <div class="sum"><div><div class="k">열린 공고</div><div class="v mono" id="sOpen"></div></div><div><div class="k">접수중</div><div class="v mono red" id="sRecv"></div></div><div><div class="k">추천</div><div class="v mono">3</div></div></div>
+    <div class="cap"><span>추천 도면 목록</span><span class="mono">SHEET 01–03</span></div>
+    <div id="cards"></div>
+  </section>
+  <section class="screen" data-screen="detail" aria-label="공고 상세">
+    <div class="dtop"><button data-back>← 도면 목록</button><div class="no mono" id="dno"></div></div>
+    <div id="detail"></div>
+  </section>
+  <nav class="tabs" id="tabs" aria-label="하단 탭"></nav>
+</div>
+<script id="zf-data" type="application/json">__ZF_DATA__</script>
+<script>
+/*__CORE__*/
+// 평면 비교 — 한 변을 √면적에 비례시킨다(모양은 정사각형 가정: 원문 평면이 아니라 크기 비교용)
+const maxA = Math.max(...ZF.cards.map(c => c.areaMax));
+function miniPlan(c, i) {
+  const s = a => 84 * Math.sqrt(a / maxA);
+  const big = s(c.areaMax), sm = s(c.areaMin), x0 = 10, y0 = 112;
+  return `<svg viewBox="0 0 106 124" ${i === 0 ? 'style="view-transition-name:plan"' : ''}>
+    <rect class="dr" pathLength="1" x="${x0}" y="${y0 - big}" width="${big}" height="${big}" fill="none" stroke="#1B2B4B" stroke-width="1.6" style="--d:${300 + i * 120}"/>
+    <rect class="dr" pathLength="1" x="${x0}" y="${y0 - sm}" width="${sm}" height="${sm}" fill="rgba(224,72,62,.08)" stroke="#E0483E" stroke-width="1.6" style="--d:${700 + i * 120}"/>
+    <path class="dr" pathLength="1" d="M${x0} ${y0 + 6}H${x0 + big}M${x0} ${y0 + 3}v6M${x0 + big} ${y0 + 3}v6" stroke="#1B2B4B" stroke-width=".8" fill="none" style="--d:${900 + i * 120}"/>
+    <text class="lb mono" x="${x0 + big / 2}" y="${y0 - big - 4}" font-size="8" text-anchor="middle" fill="#1B2B4B" style="--d:${1200 + i * 120}">${area(c.areaMax)}㎡</text>
+    <text class="lb mono" x="${x0 + sm / 2}" y="${y0 - sm / 2 + 3}" font-size="8" text-anchor="middle" fill="#E0483E" style="--d:${1300 + i * 120}">${area(c.areaMin)}</text>
+  </svg>`;
+}
+function render() {
+  $('#asof').innerHTML = `${ymd(ZF.asOf)}<br>단위 원 · ㎡`;
+  $('#sOpen').textContent = ZF.openCount; $('#sRecv').textContent = ZF.receivingCount;
+  $('#tabs').innerHTML = TABS.map(([t], i) => `<a href="#" class="${i ? '' : 'on'}"><span class="mono">A-0${i + 1}</span>${t}</a>`).join('');
+  $('#cards').innerHTML = ZF.cards.map((c, i) => {
+    const p = phase(c);
+    return `<article class="sheet" style="--i:${i}" ${i === 0 ? 'data-open' : ''}>
+      <button class="pin" data-fav aria-pressed="false" aria-label="관심"><svg viewBox="0 0 16 16"><path d="M8 14.5S2 10.8 2 6.3A3.2 3.2 0 0 1 8 4.6a3.2 3.2 0 0 1 6 1.7c0 4.5-6 8.2-6 8.2z"/></svg></button>
+      <div class="body"><div class="plan">${miniPlan(c, i)}</div>
+      <div class="info"><div class="ty">${c.type.toUpperCase()}</div><h3>${c.name}</h3><div class="where">${c.sido} ${c.sigungu}</div>
+      <div class="money mono">보증금 <b>${won(c.depMin)}</b>~<br>월 <b>${won(c.rentMin)}</b>~</div></div></div>
+      <div class="tb"><div><div class="k">접수 시작</div><div class="v mono">${mdw(c.applyStart)}</div></div><div><div class="k">접수 마감</div><div class="v mono">${mdw(c.applyEnd)}</div></div><div class="dd ${p.key}"><div class="k">${p.dLabel}</div><div class="v mono">${dd(p.d)}</div></div></div>
+    </article>`;
+  }).join('');
+  const d = ZF.detail, p = phase(d), g = d.group;
+  $('#dno').innerHTML = `SHEET A-01<br>${d.aid}`;
+  // 평형 겹쳐 보기 — 세대 정보 행의 형(type)마다 한 변 ∝ √전용면적
+  const types = [{ type: g.type, area: g.area, on: true }, ...d.others.map(o => ({ type: o.type, area: o.area }))]
+    .filter((t, i, a) => a.findIndex(u => u.type === t.type) === i).sort((a, b) => b.area - a.area);
+  const W = 362, base = 196, mx = Math.max(...types.map(t => t.area)), side = a => 150 * Math.sqrt(a / mx);
+  const plan = types.map((t, i) => { const s = side(t.area); return `<rect class="dr" pathLength="1" x="24" y="${base - s}" width="${s}" height="${s}" fill="${t.on ? 'rgba(224,72,62,.10)' : 'none'}" stroke="${t.on ? '#E0483E' : '#1B2B4B'}" stroke-width="${t.on ? 2.2 : 1}" ${t.on ? '' : 'stroke-dasharray="1"'} style="--d:${200 + i * 150}"/>`; }).join('');
+  const sOn = side(g.area), sMax = side(mx);
+  const dims = `<path class="dr" pathLength="1" d="M24 ${base + 10}H${24 + sMax}M24 ${base + 5}v10M${24 + sMax} ${base + 5}v10" stroke="#1B2B4B" stroke-width=".9" fill="none" style="--d:1100"/>
+    <text class="lb mono" x="${24 + sMax / 2}" y="${base + 24}" font-size="10" text-anchor="middle" fill="#1B2B4B" style="--d:1400">최대 ${area(mx)}㎡</text>
+    <path class="dr" pathLength="1" d="M${24 + sOn} ${base - sOn / 2}L${206} ${base - 118}H${W - 10}" stroke="#E0483E" stroke-width="1" fill="none" style="--d:1300"/>
+    <circle cx="${24 + sOn}" cy="${base - sOn / 2}" r="2.6" fill="#E0483E" class="lb" style="--d:1300"/>
+    <text class="lb" x="${210}" y="${base - 124}" font-size="13" font-weight="700" fill="#E0483E" style="--d:1500">${g.type} · 전용 ${area(g.area)}㎡</text>
+    <text class="lb" x="${210}" y="${base - 102}" font-size="11" fill="#1B2B4B" style="--d:1600">이 형 ${g.total}세대 / 총 ${d.totalUnits}세대</text>
+    <text class="lb mono" x="${210}" y="${base - 72}" font-size="10" fill="#6A7890" style="--d:1700">한 변 ∝ √면적</text>
+    <text class="lb mono" x="${210}" y="${base - 58}" font-size="10" fill="#6A7890" style="--d:1700">평면 모양은 원문 참조</text>`;
+  // 일정 치수선 — 날짜 사이 실제 일수
+  const pts = [['공고', d.annDate], ['접수', d.applyStart], ['마감', d.applyEnd], ['서류', d.docStart], ['발표', d.winner]];
+  const xs = [14, 96, 150, 222, 326];
+  const chain = pts.map(([k, v], i) => `<line class="dr" pathLength="1" x1="${xs[i]}" y1="22" x2="${xs[i]}" y2="44" stroke="${k === '접수' || k === '마감' ? '#E0483E' : '#1B2B4B'}" stroke-width="1.2" style="--d:${300 + i * 120}"/>
+      <text class="lb" x="${xs[i]}" y="58" font-size="10.5" font-weight="700" text-anchor="middle" fill="#1B2B4B" style="--d:${600 + i * 120}">${k}</text>
+      <text class="lb mono" x="${xs[i]}" y="71" font-size="9.5" text-anchor="middle" fill="#6A7890" style="--d:${600 + i * 120}">${k === '발표' ? ymd(v).slice(2) : md(v)}</text>`).join('') +
+    pts.slice(1).map(([k, v], i) => `<text class="lb mono" x="${(xs[i] + xs[i + 1]) / 2}" y="28" font-size="9.5" text-anchor="middle" fill="${i === 1 ? '#E0483E' : '#1B2B4B'}" style="--d:${900 + i * 100}">${dayDiff(pts[i][1], v)}일</text>`).join('') +
+    `<path class="dr" pathLength="1" d="M14 33H326" stroke="#1B2B4B" stroke-width=".9" fill="none" style="--d:150"/>
+     <path d="M${14 + (96 - 14) * (dayDiff(d.annDate, ZF.asOf) / dayDiff(d.annDate, d.applyStart))} 14l-5 -8h10z" fill="#2A8DD8" class="lb" style="--d:1500"/>
+     <text class="lb" x="${14 + (96 - 14) * (dayDiff(d.annDate, ZF.asOf) / dayDiff(d.annDate, d.applyStart))}" y="5" font-size="0"></text>`;
+  $('#detail').innerHTML = `
+    <div class="dtitle"><div class="ty">${d.type} · ${d.org} <span class="st">${p.label} ${dd(p.d)}</span></div><h1>${d.title}</h1><p>${d.address} · ${d.heating} · 입주 ${d.moveIn}</p></div>
+    <div class="drawing"><span class="lab mono">PLAN · 평형 겹쳐 보기</span><svg viewBox="0 0 ${W} 228" style="view-transition-name:plan">${plan}${dims}</svg>
+      <div class="legend">${types.map(t => `<span class="${t.on ? 'on' : ''}"><i></i>${t.type} ${area(t.area)}㎡</span>`).join('')}</div></div>
+    <div class="money2"><div><div class="k">임대보증금</div><div class="v mono">${won(d.depMin)}</div><div class="t mono">~ ${won(d.depMax)}</div></div><div><div class="k">월 임대료</div><div class="v mono">${won(d.rentMin)}</div><div class="t mono">~ ${won(d.rentMax)}</div></div></div>
+    <div class="chain"><div class="lab2 mono">SCHEDULE · 일정 치수선 (▼ 오늘)</div><svg viewBox="0 0 354 78" style="width:100%;height:auto;display:block;overflow:visible">${chain}</svg></div>
+    <div class="group is-open" data-group><button class="gh" data-toggle aria-expanded="true"><span><b>${g.type}</b> <span style="font-size:12px;color:var(--mute)">전용 ${area(g.area)}㎡</span></span><span><span class="n mono">${g.total}세대</span> <span class="pm">＋</span></span></button>
+      <div class="rows"><div>${g.rows.map(r => `<div class="r"><span>${r.target}</span><span class="c mono">${r.count != null ? r.count + '세대' : '공동'}</span><span class="p mono">보증금 ${won(r.dep)} · 월 ${won(r.rent)}</span></div>`).join('')}<div class="note">공동 = 대학생·청년(소득無)과 청년(소득有)이 ${g.shared}세대를 함께 모집</div></div></div></div>
+    <div class="site"><svg viewBox="0 0 360 150" style="width:100%;height:100%"><circle cx="320" cy="32" r="16" fill="none" stroke="#1B2B4B"/><path d="M320 18l5 18-5-4-5 4z" fill="#1B2B4B"/><rect class="dr" pathLength="1" x="150" y="50" width="70" height="44" fill="rgba(224,72,62,.08)" stroke="#E0483E" stroke-width="1.6" style="--d:300"/></svg><span>지도 자리 · ${d.address}</span></div>`;
+}
+function onRoute(name) {
+  $$(`.screen[data-screen="${name}"] .dr, .screen[data-screen="${name}"] .lb, .screen[data-screen="${name}"] .sheet`).forEach(el => { el.style.animation = 'none'; el.getBoundingClientRect(); el.style.animation = ''; });
+}
+boot();
+</script>
+</body>
+</html>
