@@ -31,7 +31,7 @@ jobs:
       group: db-check-${{ github.head_ref }}
       cancel-in-progress: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: DB 파일을 건드렸나
@@ -58,7 +58,7 @@ jobs:
         run: python3 .github/db/migrate.py check
       - name: 결과 올리기
         if: always() && steps.scope.outputs.relevant == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: db-result
           path: db-result.json
@@ -72,14 +72,14 @@ jobs:
       group: db-apply
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: 적용 — 아직 기록 안 된 파일만
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: python3 .github/db/migrate.py apply
       - name: 결과 올리기
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: db-result
           path: db-result.json
