@@ -31,6 +31,7 @@ const EXPECTED_JOBS = [
   'zipfit-collect-lh-images',    // 2026-10-02 LH 단지 이미지 탭 목록(마이그레이션 2026-10-02_02)
   'zipfit-health-ops-dispatch',  // 2026-10-03 운영 점검 예약을 GitHub 밖으로 — pg_cron → workflow_dispatch(마이그레이션 2026-10-02_05)
   'zipfit-health-screen-dispatch', // 2026-10-06 화면 점검 예약도 GitHub 밖으로(마이그레이션 2026-10-06_02)
+  'zipfit-check-source-pages',   // 2026-10-08 열린 원문 키 정기 대조(3-B ③ 1단계 · 마이그레이션 2026-10-08_02)
 ]
 // 🔵 2026-10-03 — workflow_dispatch 토큰(Vault github_actions_dispatch_token · fine-grained · zipfit 하나 · Actions 읽기·쓰기) 만료일.
 //    토큰을 갈면 이 날짜도 함께 고친다(다운님이 알려 준 값 · 값 자체는 Vault 에만 있다).
@@ -122,6 +123,17 @@ try {
         where f.requested_at >= coalesce((select min(applied_at) from zipfit_ops.schema_migrations where filename = '2026-10-06_06_followup_result_health_findings.sql'), 'infinity')
           and r.created_at > now() - interval '24 hours'
           and ((f.result is null and r.created_at < now() - interval '30 minutes') or f.result in ('미착수', '실패'))),
+      -- 🔵 2026-10-08 원문 키 정기 대조(3-B ③ 1단계) — 마지막으로 끝까지 돈 실행(오류 없음) · 키마다 26시간 안 마지막 대조 중 아직 열린 카드의 어긋남.
+      'source_check', (select json_build_object(
+         'runs', (select count(*) from source_page_check_runs),
+         'last_ok_age_min', (select extract(epoch from now() - max(finished_at))/60 from source_page_check_runs where finished_at is not null and error is null),
+         'since_cron_min', (select extract(epoch from now() - min(applied_at))/60 from zipfit_ops.schema_migrations where filename = '2026-10-08_02_source_page_checks_cron.sql'),
+         'closed', (select coalesce(json_agg(z.source_key || ' ' || coalesce(z.page_status, '')), '[]'::json) from (select distinct on (c.source_key) c.* from source_page_checks c
+             where c.checked_at > now() - interval '26 hours' and c.error is null order by c.source_key, c.checked_at desc) z
+             join announcements a on a.announcement_id = z.card_id where z.closed_mismatch and a.status <> '접수마감'),
+         'enddiff', (select coalesce(json_agg(z.source_key || ' 카드 ' || coalesce(z.card_apply_end::text, '-') || ' ↔ 페이지 ' || coalesce(z.page_apply_end::text, '-')), '[]'::json) from (select distinct on (c.source_key) c.* from source_page_checks c
+             where c.checked_at > now() - interval '26 hours' and c.error is null order by c.source_key, c.checked_at desc) z
+             join announcements a on a.announcement_id = z.card_id where z.end_diff and a.status <> '접수마감'))),
       -- 🔵 2026-10-06 정정본 분석 없음(A3) — 열린 대표 중 정정 행이 정정된 지 60분 넘었는데 정정본 분석이 없고, 같은 묶음에 정정 전 분석이 있는 것.
       'revision_gap', (with rv as materialized (select d.announcement_id from get_announcements_deduped() d join announcements a using (announcement_id)
            where a.is_revised and a.revised_at < now() - interval '60 minutes' and d.apply_end >= current_date)
@@ -200,6 +212,23 @@ try {
     add('followup_unreported', '후속 처리 요청 결과 없음(실린 지 30분 넘음) · 미착수 · 실패', xs.length === 0 ? 'pass' : 'warn',
       xs.length ? xs.slice(0, 5).map(x => `#${x.id} run ${x.run} ${x.result || '결과 없음'}`).join(', ') : 0,
       '0 — 24시간 안 실린 요청 중 (결과 빈 채 실린 지 30분 넘음 ∨ 결과 미착수·실패) · 2026-10-06_06 적용 뒤 요청만 · 넘으면 ⚠️ 경고만(이슈를 열지 않는다)')
+  }
+  // ⑧-4 원문 키 정기 대조(2026-10-08 · 우편함 「코드 — 3-B ③ …」 3) — 하루 두 회차(UTC 11:30 · 21:30 · 5분 간격 다섯 번).
+  //    🔴 cron 이 26시간 넘게 끝까지 돈 실행이 없으면 실패 · 어긋남 둘은 ⚠️ 경고만(이슈를 열지 않는다 — 루틴 착수를 막지 않게 · revision_gap 과 같은 처리).
+  //    cron 등록(2026-10-08_02) 뒤 첫 26시간 안에 실행이 하나도 없으면 「첫 회차 전」으로 건너뛴다.
+  {
+    const x = d.source_check || {}
+    if (!x.runs && (x.since_cron_min == null || x.since_cron_min < 1560)) {
+      add('source_check_fresh', '원문 키 대조 마지막 실행 경과(분)', 'skip', x.since_cron_min == null ? 'cron 등록 전' : '첫 회차 전', 'cron 등록 뒤 첫 26시간은 판정하지 않는다')
+    } else {
+      add('source_check_fresh', '원문 키 대조 마지막 실행 경과(분)', x.last_ok_age_min != null && x.last_ok_age_min <= 1560 ? 'pass' : 'fail',
+        x.last_ok_age_min == null ? '끝까지 돈 실행 없음' : Math.round(x.last_ok_age_min), '≤ 1560분(하루 두 회차 UTC 11:30·21:30 — 하루 넘게 안 돌면 실패 · 여유 2시간)')
+    }
+    const cl = x.closed || [], ed = x.enddiff || []
+    add('source_closed', '열린 카드인데 공급기관 페이지가 접수마감', cl.length === 0 ? 'pass' : 'warn', cl.length ? `${cl.length}: ${cl.slice(0, 5).join(', ')}` : 0,
+      '0 — 키마다 26시간 안 마지막 대조 · 카드가 아직 열림 · 넘으면 ⚠️ 경고만(값 반영은 2단계)')
+    add('source_end_diff', '열린 카드 접수 끝 ≠ 공급기관 페이지', ed.length === 0 ? 'pass' : 'warn', ed.length ? `${ed.length}: ${ed.slice(0, 5).join(', ')}` : 0,
+      '0 — 페이지 일정 중 가장 늦은 접수 끝 ≠ 카드 apply_end · 넘으면 ⚠️ 경고만(값 반영은 2단계)')
   }
   // ⑦ 함수 정의 = supabase/rpc/ 사본(2026-09-30 우편함 「운영 — 함수 사본 드리프트」). 읽기만 한다.
   //   대조 규칙은 .github/db/migrate.py rpc_md5() 와 같다 — 파일 그대로 또는 끝 줄바꿈을 걷은 md5 가 DB md5 와 같으면 통과.
