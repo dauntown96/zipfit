@@ -49,6 +49,9 @@ const pw = await loadPlaywright()
 const chromium = pw.chromium || (pw.default && pw.default.chromium)   // 경로로 불러온 CJS 는 default 아래에 있다
 const browser = await chromium.launch()
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block', locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+// 🔴 2026-10-09(고지 회차 1 · 6) — 운영 이용 기록(usage_events)에 쓰지 않는다. 2026-10-07~08 이 도구의 카드 펼치기가
+//    notice_open(from=test) 1,866행을 남겼다. 송신을 여기서 받아 201 로 끝낸다(화면 동작은 그대로).
+await ctx.route(/\/rest\/v1\/usage_events(\?|$)/, r => r.fulfill({ status: 201, body: '' }))
 const page = await ctx.newPage()
 const errs = []
 page.on('pageerror', e => errs.push(String(e.message).slice(0, 200)))

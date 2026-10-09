@@ -448,6 +448,7 @@ body.theme-dark .zf-totop{background:#262932;border-color:#3a3e48;color:#5DCAA5;
   <!-- STEP 1 -->
   <div id="panel1" class="panel">
     <p class="panel-title">내 신청 자격을 확인해요</p>
+    <p id="zfMatchPrefillNote" class="hidden" style="font-size:12px;color:#0F6E56;margin:-0.25rem 0 0.75rem">✅ 저장한 조건으로 채웠어요</p>
     <div class="row">
       <div class="field">
         <label class="label">혼인 상태</label>
@@ -1286,6 +1287,18 @@ function isHiddenAsClosed(row){
 //    목록 기본 거름(신청할 수 없는 공고 숨기기)·상태 칩과 **같은 술어**(isHiddenAsClosed)를 쓴다. 공고 탭 머리 · 인사이트 머리·지역·타임라인이 이 한 벌을 부른다.
 //    누적이 뜻이 있는 자리는 「마감 포함 누적 N건(YYYY년 M월부터)」로 밝힌다 — 기간은 모수 안 가장 이른 공고일에서 센다(하드코딩 아님).
 function zfOpenNotices(rows){ return (rows || []).filter(n => !isHiddenAsClosed(n)); }
+// 🔵 2026-10-09(고지 회차 1 · 5 · 다운님 승인 2026-10-08) — 「지금 열린 공고」를 같은 한 벌 안에서 접수 중 · 예정 · 미상(접수기간 없음)으로 가른다.
+//    접수 중은 인사이트 「🟢 접수중」 KPI(isAcceptingNow)와 같은 술어다 — 셋의 합은 늘 zfOpenNotices 길이다(닫힌 것은 이미 빠졌다).
+function zfOpenBreakdown(rows){
+  const open = zfOpenNotices(rows);
+  let a = 0, b = 0, k = 0;
+  open.forEach(r => { const s = applyWindowState(r); if(s === 'open') a++; else if(s === 'before') b++; else k++; });
+  return { n: open.length, a, b, k };
+}
+function zfOpenHeadText(rows){
+  const o = zfOpenBreakdown(rows);
+  return `지금 열린 공고 ${o.n.toLocaleString()}건(접수 중 ${o.a.toLocaleString()} · 예정 ${o.b.toLocaleString()}${o.k ? ` · 미상 ${o.k.toLocaleString()}` : ''})`;
+}
 function zfCumulativeSince(rows){
   let min = null;
   (rows || []).forEach(n => {
@@ -1458,10 +1471,21 @@ function zfLoadCardSide(){
     .then(r => r.ok ? r.json() : Promise.reject(new Error(path.split('?')[0] + ' HTTP ' + r.status)))
     .then(j => Array.isArray(j) ? j : Promise.reject(new Error(path.split('?')[0] + ' 응답 형식')))
     .catch(err => { console.error('ZipFit 곁 데이터 로드 실패:', err); return null; });
+  // 🔵 2026-10-09(고지 회차 1 · 8 ⑤) — 세 표를 쪽(1,000행)으로 받는다. 한 번에 받으면 REST 응답 상한(1,000행)에 닿는 날 조용히 잘린다
+  //    (지금 77 · 34 · 42행 — 동작은 같다). 꼴은 zfLoadPolicyClasses 의 paged 와 같다 · 실패는 종전대로 null(그 표 없이 그린다).
+  const paged = async (path, order) => {
+    const out = [];
+    for(let off = 0; ; off += 1000){
+      const j = await get(`${path}&order=${order}&limit=1000&offset=${off}`);
+      if(!j) return null;
+      out.push(...j);
+      if(j.length < 1000) return out;
+    }
+  };
   zfSidePromise = Promise.all([
-    get('announcement_apply_routes?select=announcement_id,route,site_text,phase_text,start_date,end_date,sort_order,period_text,place_text&order=announcement_id,sort_order'),
-    get('announcement_post_links?select=lh_announcement_id,linked_announcement_id,linked_group_key'),
-    get('kukmin_rent_per_sqm_rank?is_low=eq.true&select=announcement_id,title,complex_key,area_label,area_complexes')
+    paged('announcement_apply_routes?select=announcement_id,route,site_text,phase_text,start_date,end_date,sort_order,period_text,place_text', 'announcement_id,sort_order,route'),
+    paged('announcement_post_links?select=lh_announcement_id,linked_announcement_id,linked_group_key', 'lh_announcement_id,linked_announcement_id'),
+    paged('kukmin_rent_per_sqm_rank?is_low=eq.true&select=announcement_id,title,complex_key,area_label,area_complexes', 'announcement_id,complex_key,area_label')
   ]).then(async ([routes, links, low]) => {
     routes = routes || []; links = links || []; low = low || [];
     const ids = [...new Set(routes.map(r => r.announcement_id).concat(links.map(l => l.lh_announcement_id)))].filter(Boolean);
@@ -2920,7 +2944,9 @@ function zfLog(event, props, announcementId){
     // 🔴 동의 갈래는 "어느 키로 보내느냐"로 갈린다.
     //    user_id 는 DB 기본값 auth.uid() 가 채우고 화면에는 그 컬럼 INSERT 권한이 없다.
     //    그래서 비동의면 anon 키로 보내 auth.uid() 를 NULL 로 만든다 — 비로그인과 같아진다.
-    const consented = !!(currentUser && (currentUser.usage_log_consent===true || currentUser.usage_log_consent==='Y'));
+    // 🔴 2026-10-09(고지 회차 1 · 다운님 결정) — 검색(search)은 동의와 무관하게 계정을 붙이지 않는다. 검색어 원문은
+    //    이름·주소가 섞일 수 있어 회원 식별자와 함께 두지 않는다(원문은 90일 뒤 cron 이 걷는다). 다른 사건은 동의 규칙 그대로.
+    const consented = event !== 'search' && !!(currentUser && (currentUser.usage_log_consent===true || currentUser.usage_log_consent==='Y'));
     const send = (headers) => {
       // 🔴 Prefer: return=minimal — SELECT 권한이 없어 응답 본문을 요구하면 조용히 실패한다.
       const h = Object.assign({}, headers, {'Prefer':'return=minimal'});
@@ -3163,6 +3189,7 @@ function updateSaveBtn(id){
 // 다시 로그인하면 복원된다.
 function zfForgetLocalUser(){
   zfClearUserLocalData();
+  zfClearMatchPrefill();   // 저장 조건으로 채운 매칭 탭 입력칸(그대로인 것만)도 되돌린다
   savedIds=new Set(); savedRows=[]; savedCards=[];
   updateSaveBadge();
   refreshAllSaveBtns();
@@ -3484,8 +3511,9 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
   const openCount = zfOpenNotices(noticeData).length;
   const denom = closedExcluded ? `지금 열린 공고 ${openCount.toLocaleString()}건` : zfCumulativeText(noticeData);
   const whole = closedExcluded ? openCount : (totalCount || noticeData.length);
+  // 🔵 2026-10-09 — 기본 머리(거름 없음 · 마감 숨김)는 「지금 열린 공고 N건(접수 중 a · 예정 b · 미상 k)」 — 미상은 있을 때만.
   const countText = filtered.length === whole
-    ? denom
+    ? (closedExcluded ? zfOpenHeadText(noticeData) : denom)
     : `조건에 맞는 공고 ${filtered.length.toLocaleString()}건 · ${denom} 중`;
   statusEl.className = 'rbox ok';
   statusEl.innerHTML = '<p class="rtitle">✅ '+countText+'</p><p class="rdesc">수시로 자동 업데이트</p>';
@@ -3669,6 +3697,47 @@ let zfRecChipsRestored=false;
 //    🔴 프로필 조회가 **성공한 뒤에만** 올린다 — 첫 조회가 실패해 빈 값으로 채운 폼은 다음 성공 때 다시 채운다.
 //    로그아웃에서 false 로 내린다.
 let zfSettingsFormApplied=false;
+// 🔵 2026-10-09(고지 회차 1 · 4 · 다운님 결정 「저장한 조건을 쓰게 고친다」) — 추천 탭 ① 자격 진단 · ② 주택 매칭 입력칸을
+//    저장 조건(user_profiles)으로 채운다. 세션 진입당 한 번 · 사용자가 이미 만진 칸은 덮지 않는다 · 로그아웃 때 채운 그대로인 칸은 되돌린다(공용 기기).
+// 🔴 최소 방 수(min_rooms)는 채우지 않는다 — 공고 데이터에 방 수 칸이 없어(get_announcements_deduped 반환에도 없음) matchHouses 의
+//    방 수 거름이 아무것도 거르지 않는다. 다운님께 다시 여쭌다(2026-10-09 조사 결론).
+let zfMatchPrefilled=false;
+const zfMatchTouched=new Set();
+let zfMatchFilledVals={};   // 입력칸 id → 채운 값
+const ZF_MATCH_PREFILL=[['birthYear','birth_year'],['marital','marital'],['children','children'],['members','members'],
+                        ['income','income'],['assets','assets'],['maxDeposit','max_deposit']];
+ZF_MATCH_PREFILL.forEach(([id])=>{
+  const el=document.getElementById(id);
+  if(el){ const mark=()=>zfMatchTouched.add(id); el.addEventListener('input',mark); el.addEventListener('change',mark); }
+});
+function zfPrefillMatchFromProfile(p){
+  if(zfMatchPrefilled || !zfProfileLoaded || !p) return;
+  zfMatchPrefilled=true;
+  let n=0;
+  ZF_MATCH_PREFILL.forEach(([id,col])=>{
+    const el=document.getElementById(id);
+    if(!el || zfMatchTouched.has(id)) return;
+    let v=p[col];
+    if(v==null || String(v).trim()==='') return;
+    v=String(v).trim();
+    if(id==='children'){ const k=parseInt(v); if(!(k>=0)) return; v=String(Math.min(k,3)); }   // 선택지 「3명 이상」
+    if(id==='members'){ const k=parseInt(v); if(!(k>=1)) return; v=String(Math.min(k,8)); }    // 선택지 「8인 이상」
+    if(el.tagName==='SELECT' && ![...el.options].some(o=>o.value===v)) return;
+    el.value=v; zfMatchFilledVals[id]=v; n++;
+  });
+  const note=document.getElementById('zfMatchPrefillNote');
+  if(note) note.classList.toggle('hidden', n===0);
+}
+function zfClearMatchPrefill(){
+  Object.entries(zfMatchFilledVals).forEach(([id,v])=>{
+    const el=document.getElementById(id);
+    if(!el || zfMatchTouched.has(id) || el.value!==v) return;
+    el.value = el.tagName==='SELECT' ? ([...el.options].find(o=>o.defaultSelected)||el.options[0]).value : '';
+  });
+  zfMatchFilledVals={}; zfMatchPrefilled=false; zfMatchTouched.clear();
+  const note=document.getElementById('zfMatchPrefillNote');
+  if(note) note.classList.add('hidden');
+}
 let visibleCount=3;
 let lastFiltered=[];
 let lastTargetOut=[];
@@ -8836,6 +8905,8 @@ function applySettingsToUI(p){
     renderChipState('typeChips',selectedTypes);
     zfRerenderRecIfVisible();   // 이미 그려져 있으면 갱신한다(기존 함수를 쓴다)
   }
+  // 🔵 2026-10-09 — 매칭 탭 입력칸도 같은 저장값으로(한 번만 · 이유는 zfMatchPrefilled 선언부에).
+  if(zfProfileLoaded) zfPrefillMatchFromProfile(p);
 }
 
 async function saveSettings(){

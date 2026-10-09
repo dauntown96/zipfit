@@ -26,7 +26,7 @@ DB가 바뀐 줄 알게 된다 — 안 바뀐다.
 - `zipfit_ops/<함수명>.sql` — `zipfit_ops` 스키마 함수(화면 밖 · 관리 API 전용). 이름 키는 `zipfit_ops.<함수명>` 이다 — 마이그레이션 머리 선언도
   `-- zipfit:function zipfit_ops.<함수명>(인자) acl=… secdef=…` 로 쓴다. `migrate.py` 함수 대조와 `health-ops` 「public·zipfit_ops 함수 정의 = 사본」이
   둘 다 본다(2026-10-07 Z-2 9 — 그 전에는 `public` 만 봤다).
-- `triggers.sql` — 트리거 **바인딩** 5건. 바인딩은 테이블에 걸리는 것이라 함수 파일에 넣지 않는다
+- `triggers.sql` — 트리거 **바인딩** 8건(2026-10-09 `pg_trigger` 실측 · public · 내부 트리거 제외). 바인딩은 테이블에 걸리는 것이라 함수 파일에 넣지 않는다
   (`update_updated_at`은 두 테이블에 걸려 있다).
 
 ## ⚠️ 이 덤프는 권한(GRANT)을 담지 않는다
@@ -47,8 +47,9 @@ where n.nspname = 'public' order by p.proname;
 ```
 
 ⚠️ `proacl`이 NULL이면 「권한 없음」이 아니라 **기본 권한을 그대로 쓴다**는 뜻이다.
-`pg_default_acl`에서 `postgres`·`supabase_admin` 두 역할이 `public` 스키마 함수 기본 EXECUTE를
-anon·authenticated에 주고 있어, **새 함수는 열린 채로 태어난다.**
+**새 함수는 열린 채로 태어난다** — PostgreSQL 전역 기본이 PUBLIC에 EXECUTE를 주기 때문이다(스키마 단위 기본 권한으로는 덜어내지 못한다 · `CLAUDE.md` 원칙 15).
+`pg_default_acl`의 `public` 스키마 함수 몫은 2026-10-09 실측으로 `postgres` = `postgres=X · service_role=X`(anon·authenticated는 2026-09-11에 걷음) ·
+`supabase_admin` = anon·authenticated에도 `X`(바꿀 수 없다 — `postgres`가 그 역할의 멤버가 아니다). 그래서 만든 자리에서 손으로 `revoke … from public, anon, authenticated` 한다.
 
 ## 권한 변경 이력
 

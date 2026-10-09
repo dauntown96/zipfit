@@ -3,7 +3,7 @@ CREATE OR REPLACE FUNCTION public.ops_screen_dispatch()
  LANGUAGE plpgsql
 AS $function$
 -- 화면 점검(GitHub Actions health-screen.yml)을 workflow_dispatch 로 부른다(2026-10-06 · 우편함 「코드 — Z-1 …」 PR-A A5 · 백로그 「남은 GitHub 예약 실행 의존」).
--- cron zipfit-health-screen-dispatch 가 매일 23:50 UTC(KST 08:50 — 아침 워밍 수집 뒤)에 부른다. GitHub schedule(같은 시각)은 예비로 남는다.
+-- cron zipfit-health-screen-dispatch 가 매일 23:50 UTC(KST 08:50 — 아침 워밍 수집 뒤)에 부른다. GitHub schedule 예비 줄은 2026-10-07 걷었다(health-screen.yml — 병합 뒤 실행 · 수동 실행은 그대로).
 -- 비밀값: Vault github_actions_dispatch_token(ops_health_dispatch 와 같은 토큰) — 값은 표·반환에 싣지 않는다.
 -- 요청 id 를 ops_dispatch_log(target health-screen.yml)에 남긴다 — health-ops 가 마지막 발송 응답(204)을 읽는다.
 declare

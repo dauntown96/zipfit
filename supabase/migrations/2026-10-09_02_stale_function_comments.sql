@@ -1,3 +1,93 @@
+-- 함수 안 낡은 주석 넷 — 동작 변화 0(본문 코드 그대로 · 주석 줄만) (2026-10-09 · 우편함 「코드 — 고지 회차 1」 8 ⑥ · 백로그 「문서 현행화 회차가 찾은 코드·권한 정리 거리」).
+--   ops_health_dispatch: 발송 토큰 대상에 zipfit-backup(2026-10-08 더함) · ops_screen_dispatch: GitHub schedule 예비는 2026-10-07 걷음
+--   analysis_followup_request: claude.ai 는 DB 를 쓰지 않는다 · protect_detail_columns: EF 행 번호(움직인다) → 자리 이름
+-- 🔴 CREATE OR REPLACE 는 권한을 바꾸지 않는다 — 아래 선언은 지금 값 그대로다(2026-10-09 proacl 실측).
+-- 되돌리기: 이전 정의(git show <이 PR 앞 커밋>:supabase/rpc/<이름>.sql)로 새 파일.
+-- zipfit:function ops_health_dispatch() acl={postgres=X/postgres,service_role=X/postgres} secdef=false
+-- zipfit:function ops_screen_dispatch() acl={postgres=X/postgres,service_role=X/postgres} secdef=false
+-- zipfit:function analysis_followup_request(text,text) acl={postgres=X/postgres,service_role=X/postgres} secdef=false
+-- zipfit:function protect_detail_columns() acl={=X/postgres,postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres} secdef=false
+CREATE OR REPLACE FUNCTION public.ops_health_dispatch()
+ RETURNS bigint
+ LANGUAGE plpgsql
+AS $function$
+-- 운영 건강 점검(GitHub Actions health-ops.yml)을 workflow_dispatch 로 부른다(2026-10-03 · 우편함 「코드 — #328 해소 · 운영 점검 예약을 GitHub 밖으로」).
+-- cron zipfit-health-ops-dispatch 가 25·55분에 부른다 — GitHub schedule 은 하루 몇 번만 돌았다(10-02 08:39Z 뒤 14:5xZ까지 0회).
+-- 비밀값: Vault github_actions_dispatch_token(fine-grained · dauntown96/zipfit · zipfit-backup(2026-10-08 더함) · Actions 읽기·쓰기 · 만료 2027-10-03) — 값은 표·반환에 싣지 않는다.
+-- 요청 id 를 ops_dispatch_log 에 남긴다 — health-ops 가 마지막 발송의 응답(204)을 net._http_response 에서 읽는다. 7일 지난 기록은 지운다.
+declare
+  v_tok text; v_id bigint;
+begin
+  perform public.ops_dispatch_log_fill();   -- 앞선 발송의 응답을 옮겨 적는다(2026-10-07 · 응답 행은 몇 시간 안에 사라진다 — ops_dispatch_log_fill 주석)
+  select decrypted_secret into v_tok from vault.decrypted_secrets where name = 'github_actions_dispatch_token';
+  if coalesce(v_tok, '') = '' then
+    raise exception 'Vault github_actions_dispatch_token 없음';
+  end if;
+  v_id := net.http_post(
+    url := 'https://api.github.com/repos/dauntown96/zipfit/actions/workflows/health-ops.yml/dispatches',
+    body := jsonb_build_object('ref', 'main'),
+    headers := jsonb_build_object('Authorization', 'Bearer ' || v_tok, 'Accept', 'application/vnd.github+json',
+                                  'X-GitHub-Api-Version', '2022-11-28', 'User-Agent', 'zipfit-pg-cron', 'Content-Type', 'application/json'),
+    timeout_milliseconds := 30000);
+  insert into public.ops_dispatch_log (target, net_request_id) values ('health-ops.yml', v_id);
+  delete from public.ops_dispatch_log where at < now() - interval '7 days';
+  return v_id;
+end
+$function$;
+CREATE OR REPLACE FUNCTION public.ops_screen_dispatch()
+ RETURNS bigint
+ LANGUAGE plpgsql
+AS $function$
+-- 화면 점검(GitHub Actions health-screen.yml)을 workflow_dispatch 로 부른다(2026-10-06 · 우편함 「코드 — Z-1 …」 PR-A A5 · 백로그 「남은 GitHub 예약 실행 의존」).
+-- cron zipfit-health-screen-dispatch 가 매일 23:50 UTC(KST 08:50 — 아침 워밍 수집 뒤)에 부른다. GitHub schedule 예비 줄은 2026-10-07 걷었다(health-screen.yml — 병합 뒤 실행 · 수동 실행은 그대로).
+-- 비밀값: Vault github_actions_dispatch_token(ops_health_dispatch 와 같은 토큰) — 값은 표·반환에 싣지 않는다.
+-- 요청 id 를 ops_dispatch_log(target health-screen.yml)에 남긴다 — health-ops 가 마지막 발송 응답(204)을 읽는다.
+declare
+  v_tok text; v_id bigint;
+begin
+  perform public.ops_dispatch_log_fill();   -- 앞선 발송의 응답을 옮겨 적는다(2026-10-07 · 응답 행은 몇 시간 안에 사라진다 — ops_dispatch_log_fill 주석)
+  select decrypted_secret into v_tok from vault.decrypted_secrets where name = 'github_actions_dispatch_token';
+  if coalesce(v_tok, '') = '' then
+    raise exception 'Vault github_actions_dispatch_token 없음';
+  end if;
+  v_id := net.http_post(
+    url := 'https://api.github.com/repos/dauntown96/zipfit/actions/workflows/health-screen.yml/dispatches',
+    body := jsonb_build_object('ref', 'main'),
+    headers := jsonb_build_object('Authorization', 'Bearer ' || v_tok, 'Accept', 'application/vnd.github+json',
+                                  'X-GitHub-Api-Version', '2022-11-28', 'User-Agent', 'zipfit-pg-cron', 'Content-Type', 'application/json'),
+    timeout_milliseconds := 30000);
+  insert into public.ops_dispatch_log (target, net_request_id) values ('health-screen.yml', v_id);
+  return v_id;
+end
+$function$;
+CREATE OR REPLACE FUNCTION public.analysis_followup_request(p_page_ref text, p_note text DEFAULT NULL::text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+AS $function$
+-- 우편함 「진행 요청」 후속 처리 페이지(「운영 — 데이터 쓰기 …」)를 루틴에 바로 맡긴다(2026-10-02 · 우편함 「협의 — 원문 키 사이클 …」 1).
+-- 🔴 service_role(관리 API)·postgres 만 부른다 — 페이지를 만든 뒤 Claude Code(관리 API)나 다운님이 한 번 부른다(claude.ai 는 DB 를 쓰지 않는다 — 분석 스킬).
+-- 요청을 대기(waiting)로 남길 뿐 루틴을 직접 부르지 않는다 — 다음 발송 판정(cron zipfit-analysis-dispatch · 10분마다)이
+-- 분석 몫이 없어도 사유 followup 으로 루틴을 부른다(도는 회차가 있으면 끝난 뒤 · 스위치·연속 3실패 멈춤은 그대로).
+-- 같은 페이지의 대기 요청이 이미 있으면 새로 만들지 않고 그 요청을 돌려준다.
+-- 루틴은 Notion 우편함에서 진행 요청 페이지를 스스로 찾는다 — p_page_ref 는 기록용(페이지 id 또는 제목)이다.
+declare
+  v_ref text := btrim(coalesce(p_page_ref, ''));
+  v_id bigint;
+begin
+  if v_ref = '' then
+    raise exception '우편함 페이지(p_page_ref)가 필요하다';
+  end if;
+  insert into public.analysis_followup_requests (page_ref, note) values (v_ref, p_note)
+  on conflict (page_ref) where state = 'waiting' do nothing
+  returning id into v_id;
+  if v_id is null then
+    select id into v_id from public.analysis_followup_requests where page_ref = v_ref and state = 'waiting';
+    return jsonb_build_object('request', v_id, 'state', 'waiting', 'duplicate', true);
+  end if;
+  return jsonb_build_object('request', v_id, 'state', 'waiting', 'duplicate', false,
+                            'next', '다음 발송 판정(10분마다 · 매시 6분부터)이 루틴을 부른다 — 도는 회차가 있으면 끝난 뒤');
+end
+$function$;
 CREATE OR REPLACE FUNCTION public.protect_detail_columns()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -137,4 +227,4 @@ BEGIN
 
   RETURN NEW;
 END;
-$function$
+$function$;
