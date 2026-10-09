@@ -4,7 +4,7 @@ CREATE OR REPLACE FUNCTION public.ops_health_dispatch()
 AS $function$
 -- 운영 건강 점검(GitHub Actions health-ops.yml)을 workflow_dispatch 로 부른다(2026-10-03 · 우편함 「코드 — #328 해소 · 운영 점검 예약을 GitHub 밖으로」).
 -- cron zipfit-health-ops-dispatch 가 25·55분에 부른다 — GitHub schedule 은 하루 몇 번만 돌았다(10-02 08:39Z 뒤 14:5xZ까지 0회).
--- 비밀값: Vault github_actions_dispatch_token(fine-grained · dauntown96/zipfit 하나 · Actions 읽기·쓰기 · 만료 2027-10-03) — 값은 표·반환에 싣지 않는다.
+-- 비밀값: Vault github_actions_dispatch_token(fine-grained · dauntown96/zipfit · zipfit-backup(2026-10-08 더함) · Actions 읽기·쓰기 · 만료 2027-10-03) — 값은 표·반환에 싣지 않는다.
 -- 요청 id 를 ops_dispatch_log 에 남긴다 — health-ops 가 마지막 발송의 응답(204)을 net._http_response 에서 읽는다. 7일 지난 기록은 지운다.
 declare
   v_tok text; v_id bigint;
