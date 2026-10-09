@@ -57,7 +57,7 @@
 | 알림·트리거 | 🔴 **없음 — Make.com은 2026-08-27 미사용 확정**. 검토했고 안 쓰기로 한 것이지 미검토가 아니다(재검토 트리거는 📦 아카이브 「MCP 생태계 보류」에). 알림 경로는 미구현 상태이며 후보는 백로그 「카카오 알림톡」 |
 | 외부 API | LH 분양임대공고 API, 마이홈포털 API, 카카오맵 API |
 | DB | Supabase PostgreSQL (프로젝트 ID: `khdpjjyspmlqtzperoqg`, 싱가포르) |
-| 인증 | **Supabase Auth** (카카오 OAuth + 이메일 매직링크 — 코드 입력 방식 아님, 아래 제약 참고). 신원은 JWT(`auth.uid()`), 프로필 API는 `verify_jwt=true`. 이메일+쿠키(`zipfit_email`) 경로는 2026-08-13 **완전 제거**. `user_profiles`에 RLS 정책 3종(본인 행 select/update/insert) 적용 |
+| 인증 | **Supabase Auth** (카카오 OAuth 하나 — 이메일 매직링크 화면·코드는 2026-09-18 걷음(PR #173) · Supabase 이메일 provider 끄기는 다운님 대시보드 몫으로 남음). 신원은 JWT(`auth.uid()`), 프로필 API는 `verify_jwt=true`. 이메일+쿠키(`zipfit_email`) 경로는 2026-08-13 **완전 제거**. `user_profiles`에 RLS 정책 3종(본인 행 select/update/insert) 적용 |
 
 ### Supabase 설정
 - **URL**: `https://khdpjjyspmlqtzperoqg.supabase.co`
@@ -135,7 +135,7 @@ loadNoticeData()                       // 필터 변경 시 RPC 재호출
 renderNoticeList(filtered, total)
 loadRegionsFromSupabase()              // 전국 지역 동적 로드
 renderPersonalizedRecommendations()    // 맞춤 추천 — currentUser 의존
-zfSignInKakao() / zfSendLoginLink()     // 로그인(카카오·이메일 매직링크)
+zfSignInKakao()                        // 로그인(카카오 — 이메일 매직링크는 2026-09-18 걷음)
 zfApplySession(session)                // 세션 진입 → 프로필 로드 → 화면 전환
 zfAccessToken()                        // 세션 토큰(없으면 null → EF 호출 안 함)
 zfFetchProfile() / zfPostProfile(p)    // EF 호출 공통(Authorization 필수)
@@ -329,7 +329,7 @@ const requireEnv = (key: string): string => {
 - `supabase/migrations/YYYY-MM-DD_NN_이름.sql`에 쓰고 PR을 연다 → `db-migrations.yml` check가 **되돌리기 전용** 트랜잭션으로 실제 DB에서 돌린다(스키마 지문 전후 같음 · 불변식 v3.9 · `anon` 3초 · 함수 정의 md5 = `supabase/rpc/` 사본 · ACL·SECURITY DEFINER = 파일 선언). 🔴 **빨간 체크의 PR은 병합하지 않는다.**
 - 병합하면 apply가 **아직 기록 안 된 파일만** 파일마다 한 트랜잭션으로 적용하고 `zipfit_ops.schema_migrations`에 같은 트랜잭션으로 기록한다. 🔴 병합 뒤 Actions 결과(적용 · 대조)를 회신 ④에 적는다. 실패하면 `db-apply` 이슈.
 - 파일 규칙(트랜잭션 제어 금지 · 함수 선언 줄 · 사본 갱신)은 `supabase/migrations/README.md`가 정본이다. 원칙 20(고치기 전 정의 먼저 커밋)은 그대로다.
-- 🔵 **`check`는 모든 PR에서 결과를 낸다**(2026-09-30 · PR #281) — DB 파일(다섯 경로)을 안 건드린 PR은 「해당 없음」으로 즉시 통과(DB 호출 0). `main` 필수 체크는 **다운님 저장소 설정 뒤** 켜진다 — 그 전에는 결과만 나고 병합을 막지 않으니 원칙대로 초록을 보고 병합한다.
+- 🔵 **`check`는 모든 PR에서 결과를 낸다**(2026-09-30 · PR #281) — DB 파일(다섯 경로)을 안 건드린 PR은 「해당 없음」으로 즉시 통과(DB 호출 0). `main` 필수 체크다(룰셋 `main-db-check` — `check`가 초록이어야 병합된다).
 - 🔵 **사본 = DB는 매시 검사된다**(2026-09-30) — `health-ops`가 public·`zipfit_ops` 함수 전수 「DB 정의 md5 = `supabase/rpc/` 사본(`zipfit_ops`는 `supabase/rpc/zipfit_ops/`)」을 읽기만 해서 대조한다(`migrate.py`와 같은 규칙 · 끝 줄바꿈 무시). 사본 없는 새 함수·함수 없는 사본도 실패 → `health-ops` 이슈.
 - 🔴 **긴급 되돌리기** — 이전 정의로 되돌리는 새 마이그레이션 PR(적용된 파일은 고치지 않는다). 화면이 멈춘 급한 경우만 다운님 확인 뒤 관리 API로 직접 보내고, 같은 SQL을 곧바로 이 경로로 저장소에 올린다.
 
