@@ -58,6 +58,9 @@ const browser = await chromium.launch()
 const extra = {}
 try {
   const ctx = await browser.newContext({ viewport: VIEWPORT, serviceWorkers: 'block', locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  // 🔴 2026-10-09(고지 회차 1 · 6) — 점검은 운영 이용 기록(usage_events)에 쓰지 않는다. 화면의 송신(page_view · notice_open · search …)을
+  //    여기서 받아 201 로 끝낸다 — 화면 동작은 그대로(송신은 fire-and-forget) · 처리방침 「이용 기록」 목적 밖의 행이 집계를 부풀리지 않게.
+  await ctx.route(/\/rest\/v1\/usage_events(\?|$)/, r => r.fulfill({ status: 201, body: '' }))
   const page = await ctx.newPage()
   page.on('console', m => {
     if (m.type() !== 'error') return
@@ -358,29 +361,39 @@ try {
     const chk = document.getElementById('hideClosedChk'); if (chk) chk.checked = true
     applyNoticeFiltersAndRender()
     const M = zfOpenNotices(noticeData).length, T = noticeData.length, since = zfCumulativeSince(noticeData)
+    // 🔵 2026-10-09(고지 회차 1 · 5) — 머리의 접수 중 · 예정 · 미상을 화면 술어(applyWindowState)로 따로 센다(zfOpenBreakdown 을 부르지 않는다 — 같은 함수로 재면 대조가 아니다).
+    let A = 0, B = 0, K = 0
+    zfOpenNotices(noticeData).forEach(r => { const s = applyWindowState(r); if (s === 'open') A++; else if (s === 'before') B++; else K++ })
     let tab = (document.querySelector('#notice-status .rtitle') || {}).innerText || ''
     if (sim) tab = tab.replace(/(\d[\d,]*)건/, (m, d) => (Number(d.replace(/,/g, '')) + 1).toLocaleString() + '건')
     goMain(3)
     insightLoaded = false
     await loadInsightData()
-    const ins = ((document.querySelector('#insightContent') || {}).innerText || '').split('\n').find(l => l.includes('지금 열린 공고')) || ''
+    const insLines = ((document.querySelector('#insightContent') || {}).innerText || '').split('\n').map(l => l.trim())
+    const ins = insLines.find(l => l.includes('지금 열린 공고')) || ''
+    const kIdx = insLines.findIndex(l => l === '🟢 접수중')
+    const kpi = kIdx > 0 ? Number((insLines.slice(0, kIdx).reverse().find(l => /^[\d,]+$/.test(l)) || '').replace(/,/g, '')) : NaN
     goMain(2)
-    return { M, T, since, tab: tab.trim(), ins: ins.trim() }
+    return { M, T, since, A, B, K, kpi, tab: tab.trim(), ins: ins.trim() }
   }, process.env.SIMULATE === 'open_count')
   {
     let ok = false, value
     if (!oc.err) {
       const [db] = await sqlRead(`select count(*)::int as t, to_char(min(announcement_date), 'YYYY"년 "FMMM"월부터"') as since from get_announcements_deduped()`)
       const want = `지금 열린 공고 ${oc.M.toLocaleString('ko-KR')}건`
-      const tabOk = oc.tab === '✅ ' + want
+      const fmt = n => n.toLocaleString('ko-KR')
+      const wantTab = `${want}(접수 중 ${fmt(oc.A)} · 예정 ${fmt(oc.B)}${oc.K ? ` · 미상 ${fmt(oc.K)}` : ''})`
+      const tabOk = oc.tab === '✅ ' + wantTab
       const insOk = oc.ins.startsWith(want + ' · 마감 포함 누적 ' + oc.T.toLocaleString('ko-KR') + '건(' + oc.since + ')')
+      const kpiOk = oc.kpi === oc.A   // 공고 탭 「접수 중 a」 = 인사이트 「🟢 접수중」 KPI
+      const sumOk = oc.A + oc.B + oc.K === oc.M
       const dbOk = db.t === oc.T && db.since === oc.since
-      ok = tabOk && insOk && dbOk && oc.M > 0 && oc.M <= oc.T
-      value = `열린 ${oc.M} · 누적 ${oc.T}(${oc.since}) · 공고 탭 「${oc.tab}」${tabOk ? '' : ' ✗'} · 인사이트 「${oc.ins.slice(0, 60)}」${insOk ? '' : ' ✗'} · DB 누적 ${db.t}(${db.since})${dbOk ? '' : ' ✗'}`
+      ok = tabOk && insOk && kpiOk && sumOk && dbOk && oc.M > 0 && oc.M <= oc.T
+      value = `열린 ${oc.M}(접수 중 ${oc.A} · 예정 ${oc.B} · 미상 ${oc.K})${sumOk ? '' : ' ✗합'} · 인사이트 접수중 KPI ${oc.kpi}${kpiOk ? '' : ' ✗'} · 누적 ${oc.T}(${oc.since}) · 공고 탭 「${oc.tab}」${tabOk ? '' : ' ✗'} · 인사이트 「${oc.ins.slice(0, 60)}」${insOk ? '' : ' ✗'} · DB 누적 ${db.t}(${db.since})${dbOk ? '' : ' ✗'}`
       extra.open_count = { ...oc, db }
     } else value = `못 잼(${oc.err})`
     add('open_count', '숫자가 말하는 「지금」 — 열린 공고 수 한 정의 · 누적 표기', ok ? 'pass' : 'fail', value,
-      '공고 탭 기본 머리 = 「지금 열린 공고 M건」 = 인사이트 머리 · M = zfOpenNotices(noticeData) · 누적 T·기간 = DB')
+      '공고 탭 기본 머리 = 「지금 열린 공고 M건(접수 중 a · 예정 b[ · 미상 k])」 · a+b+k = M · a = 인사이트 접수중 KPI · 인사이트 머리 「지금 열린 공고 M건」 · M = zfOpenNotices(noticeData) · 누적 T·기간 = DB')
   }
 } catch (e) {
   add('runner', '점검 실행', 'fail', String(e).slice(0, 300), '점검 스크립트가 끝까지 돈다')
