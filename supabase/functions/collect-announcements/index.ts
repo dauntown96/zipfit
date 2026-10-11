@@ -1022,17 +1022,25 @@ const probeListRow = (i: NoticeItem) => ({
 
 // 목록 1쪽. 🔴 fetchNoticeList를 부르지 않는다 — 그 함수는 카테고리를 끝까지 페이징해서
 // 상한(1쪽)을 넘긴다. 윈도우 산출은 그 함수와 같은 식을 쓰되 **읽기만** 한다.
-async function probeList(tp: string, page: number, sampleN: number, panIds: string[]) {
+// 🔵 2026-10-11(우편함 「코드 — 3-B ①」 조사) — win=long 은 「게시 91~365일 전 ∧ 마감이 오늘 이후」 창을 읽는다.
+//    정기 수집 창(게시 90일 안)에 안 걸리는 상시·수시모집(접수 끝 12-31)이 LH 목록 API 에 있는지 보려는 관측이다.
+//    수집(collect)은 이 인자를 보지 않는다 — 창을 넓히는 것은 관측 결과를 본 뒤 따로 정한다.
+async function probeList(tp: string, page: number, sampleN: number, panIds: string[], win = 'main') {
   const today  = new Date()
   const past   = new Date(today); past.setDate(today.getDate() - 90)
   const future = new Date(today); future.setDate(today.getDate() + 365)
   const fmt    = (d: Date) =>
     `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`
+  const longPanSt = new Date(today); longPanSt.setDate(today.getDate() - 365)
+  const longPanEd = new Date(today); longPanEd.setDate(today.getDate() - 91)
+  const w = win === 'long'
+    ? { PAN_ST_DT: fmt(longPanSt), PAN_ED_DT: fmt(longPanEd), CLSG_ST_DT: fmt(today), CLSG_ED_DT: fmt(future) }
+    : { PAN_ST_DT: fmt(past), PAN_ED_DT: fmt(today), CLSG_ST_DT: fmt(past), CLSG_ED_DT: fmt(future) }
 
   const url = `https://apis.data.go.kr/B552555/lhLeaseNoticeInfo1/lhLeaseNoticeInfo1` +
     `?ServiceKey=${LH_API_KEY}&PG_SZ=100&PAGE=${page}&UPP_AIS_TP_CD=${tp}` +
-    `&PAN_ST_DT=${fmt(past)}&PAN_ED_DT=${fmt(today)}` +
-    `&CLSG_ST_DT=${fmt(past)}&CLSG_ED_DT=${fmt(future)}`
+    `&PAN_ST_DT=${w.PAN_ST_DT}&PAN_ED_DT=${w.PAN_ED_DT}` +
+    `&CLSG_ST_DT=${w.CLSG_ST_DT}&CLSG_ED_DT=${w.CLSG_ED_DT}`
 
   const items = await fetchListPage(url, PROBE_LIST_TIMEOUT_MS)
 
@@ -1053,7 +1061,7 @@ async function probeList(tp: string, page: number, sampleN: number, panIds: stri
   return {
     summary: {
       upp_ais_tp_cd: tp, page,
-      window: { PAN_ST_DT: fmt(past), PAN_ED_DT: fmt(today), CLSG_ED_DT: fmt(future) },
+      window: { win, ...w },
       count: items.length,
       // 🔴 A-1의 핵심 관측 — 목록이 PAN_DT와 PAN_NT_ST_DT를 실제로 다르게 주는가.
       date_compare: { same, differ, pan_dt_missing: panDtMissing, pan_nt_st_dt_missing: panNtMissing },
@@ -1191,15 +1199,16 @@ async function probe(params: URLSearchParams): Promise<Record<string, unknown>> 
     .map(s => s.trim()).filter(Boolean).slice(0, PROBE_MAX_DETAIL)
   const wantMyHome = params.get('myhome') !== '0'
   const mhPage  = Math.min(Math.max(parseInt(params.get('mh_page') ?? '1', 10) || 1, 1), 20)
+  const win     = params.get('win') === 'long' ? 'long' : 'main'
 
   const out: Record<string, unknown> = {
-    params: { tp, page, n: sampleN, pan_ids: panIds, myhome: wantMyHome, mh_page: mhPage },
+    params: { tp, page, n: sampleN, pan_ids: panIds, myhome: wantMyHome, mh_page: mhPage, win },
     limits: { list_pages: 1, detail_max: PROBE_MAX_DETAIL, myhome_pages: wantMyHome ? 1 : 0 },
   }
 
   let listItems: NoticeItem[] = []
   try {
-    const l = await probeList(tp, page, sampleN, panIds)
+    const l = await probeList(tp, page, sampleN, panIds, win)
     listItems = l._items
     const { _items, ...rest } = l
     out.lh_list = rest
