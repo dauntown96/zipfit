@@ -80,6 +80,8 @@ type SplScdlItem = {
   SBSC_ACP_ST_DT?: string; SBSC_ACP_CLSG_DT?: string
   PPR_SBM_OPE_ANC_DT?: string; PPR_ACP_ST_DT?: string; PPR_ACP_CLSG_DT?: string
   PZWR_ANC_DT?: string; CTRT_ST_DT?: string; CTRT_ED_DT?: string
+  // 🔵 2026-10-11(3-B ①) — 전세임대(13/17) 상세는 접수 기간을 이 두 칸에 「2026-03-24 10:00」 꼴로 준다(SBSC_ACP_* 없음 · probe 실측 4건).
+  UST_ACP_ST_DTTM?: string; UST_ACP_CLSG_DTTM?: string
 }
 type EtcInfoItem = { ETC_CTS?: string; CRC_RSN?: string }
 type AhflInfoItem = { AHFL_URL?: string; SL_PAN_AHFL_DS_CD_NM?: string; CMN_AHFL_NM?: string }
@@ -173,14 +175,26 @@ async function fetchListPage(url: string, timeoutMs: number): Promise<NoticeItem
 // 상한 자체는 여유를 남긴다.
 const LIST_TIMEOUT_MS = 12000
 
-// 카테고리를 인자로 받는다 — 후반 재시도에서 실패한 카테고리만 다시 부르기 위해서다.
-// 반환의 failedTps가 그 대상이 된다.
-async function fetchNoticeList(tps: string[]): Promise<{ items: NoticeItem[]; failures: string[]; failedTps: string[] }> {
+// 🔵 2026-10-11(우편함 「코드 — 3-B ①」) — 목록 창 둘.
+//   main = 게시 90일 안 ∧ 마감이 90일 전 이후(종전 그대로).
+//   long = 게시 91~365일 전 ∧ 마감이 오늘 이후 — 정기 창에 안 걸리던 상시·수시모집(접수 끝 12-31)이 여기서 잡힌다.
+//          2026-10-11 probe 실측: 06 7건 · 13 4건(MYHOME 으로만 알던 LH 8건이 전부 이 창에 있다 · 상세가 첨부를 준다).
+type ListWin = 'main' | 'long'
+function listWindow(win: ListWin) {
   const today  = new Date()
-  const past   = new Date(today); past.setDate(today.getDate() - 90)
-  const future = new Date(today); future.setDate(today.getDate() + 365)
   const fmt    = (d: Date) =>
     `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`
+  const ago    = (n: number) => { const d = new Date(today); d.setDate(today.getDate() - n); return fmt(d) }
+  const future = new Date(today); future.setDate(today.getDate() + 365)
+  return win === 'long'
+    ? { PAN_ST_DT: ago(365), PAN_ED_DT: ago(91), CLSG_ST_DT: fmt(today), CLSG_ED_DT: fmt(future) }
+    : { PAN_ST_DT: ago(90), PAN_ED_DT: fmt(today), CLSG_ST_DT: ago(90), CLSG_ED_DT: fmt(future) }
+}
+
+// 카테고리를 인자로 받는다 — 후반 재시도에서 실패한 카테고리만 다시 부르기 위해서다.
+// 반환의 failedTps가 그 대상이 된다.
+async function fetchNoticeList(tps: string[], win: ListWin = 'main'): Promise<{ items: NoticeItem[]; failures: string[]; failedTps: string[] }> {
+  const w = listWindow(win)
   const all: NoticeItem[] = []
   const failures: string[] = []
   const failedTps: string[] = []
@@ -191,8 +205,8 @@ async function fetchNoticeList(tps: string[]): Promise<{ items: NoticeItem[]; fa
     while (true) {
       const url = `https://apis.data.go.kr/B552555/lhLeaseNoticeInfo1/lhLeaseNoticeInfo1` +
         `?ServiceKey=${LH_API_KEY}&PG_SZ=100&PAGE=${page}&UPP_AIS_TP_CD=${tp}` +
-        `&PAN_ST_DT=${fmt(past)}&PAN_ED_DT=${fmt(today)}` +
-        `&CLSG_ST_DT=${fmt(past)}&CLSG_ED_DT=${fmt(future)}`
+        `&PAN_ST_DT=${w.PAN_ST_DT}&PAN_ED_DT=${w.PAN_ED_DT}` +
+        `&CLSG_ST_DT=${w.CLSG_ST_DT}&CLSG_ED_DT=${w.CLSG_ED_DT}`
 
       // 페이지 단위로 실패를 가둔다. 예외가 이 루프 밖으로 나가면 카테고리 3종이 통째로
       // 죽어 lh_fetched가 항상 0이 됐다(2026-08-25 조사). 이제 실패는 그 카테고리만 중단한다.
@@ -208,7 +222,7 @@ async function fetchNoticeList(tps: string[]): Promise<{ items: NoticeItem[]; fa
         const info: FetchFail = e instanceof UpstreamError
           ? e.info
           : { kind: `unexpected:${e instanceof Error ? e.name : 'Error'}`, status: null, contentType: null, snippet: String(e).slice(0, SNIPPET_LEN) }
-        failures.push(describeFail(`LH 목록 tp=${tp} page=${page}`, info))
+        failures.push(describeFail(`LH 목록${win === 'long' ? '(장기 창)' : ''} tp=${tp} page=${page}`, info))
         failedTps.push(tp)
         break   // 이 카테고리만 중단. 다음 카테고리는 그대로 시도하고, 이미 모은 all은 유지한다.
       }
@@ -391,8 +405,12 @@ const sigunguOf = (sbds: SbdItem[]): string | null => {
 // 넣으면 모든 공고가 「여러 벌」이 된다.
 const scdlKey = (x: SplScdlItem): string =>
   [x.SBSC_ACP_ST_DT, x.SBSC_ACP_CLSG_DT, x.PPR_SBM_OPE_ANC_DT, x.PPR_ACP_ST_DT,
-   x.PPR_ACP_CLSG_DT, x.PZWR_ANC_DT, x.CTRT_ST_DT, x.CTRT_ED_DT]
+   x.PPR_ACP_CLSG_DT, x.PZWR_ANC_DT, x.CTRT_ST_DT, x.CTRT_ED_DT, x.UST_ACP_ST_DTTM, x.UST_ACP_CLSG_DTTM]
     .map(v => san(v) ?? '').join('|')
+
+// 접수 시작 — SBSC_ACP_ST_DT 가 없으면 전세임대 칸(UST_ACP_ST_DTTM 의 날짜 부분)을 쓴다. 둘 다 없으면 null(가드가 기존 값을 지킨다).
+const acpStartOf = (x: SplScdlItem | null): string | null =>
+  x ? (parseDate(x.SBSC_ACP_ST_DT) ?? parseDate(san(x.UST_ACP_ST_DTTM)?.slice(0, 10))) : null
 
 // 원소가 없으면 null(모름) — false가 아니다. 가드가 기존 값을 지키게 하려면 null이어야 한다.
 const scheduleVariesOf = (scdls: SplScdlItem[]): boolean | null =>
@@ -402,7 +420,7 @@ const scheduleVariesOf = (scdls: SplScdlItem[]): boolean | null =>
 const earliestApplyStart = (scdls: SplScdlItem[]): string | null => {
   let best: string | null = null
   for (const x of scdls) {
-    const d = parseDate(x.SBSC_ACP_ST_DT)
+    const d = acpStartOf(x)
     if (d && (best === null || d < best)) best = d
   }
   return best
@@ -449,7 +467,7 @@ function mapLHRow(item: NoticeItem, sbds: SbdItem[], scdls: SplScdlItem[], ahflI
     // 🔴 게시일(PAN_NT_ST_DT)과 최초 공고일(PAN_DT)은 다른 값이다. 정정공고는 PAN_DT에
     // 원공고일을 유지한다(2026-09-17 실측 300행: 정정 44건이 갈리고 정정 아닌 것은 1건뿐).
     first_announcement_date: parseDate(item.PAN_DT),
-    apply_start:       varies === true ? earliestApplyStart(scdls) : parseDate(scdl?.SBSC_ACP_ST_DT),
+    apply_start:       varies === true ? earliestApplyStart(scdls) : acpStartOf(scdl),
     apply_end:         parseDate(item.CLSG_DT),
     status:            san(item.PAN_SS),
     url:               san(item.DTL_URL),
@@ -606,6 +624,20 @@ async function collect() {
   } catch(e) {
     errors.push(`LH 목록(예상치 못한 오류): ${e}`)
   }
+  // 🔵 2026-10-11(3-B ①) — 장기 창(게시 91~365일 전 ∧ 아직 열림). 정기 창에 없던 것만 더한다.
+  //    실패해도 후반 재시도(failedTps)에는 넣지 않는다 — 다음 런이 다시 부른다(10분 간격).
+  const longIds = new Set<string>()
+  try {
+    const lng  = await fetchNoticeList(LH_CATEGORIES, 'long')
+    const have = new Set(lhNotices.map(n => n.PAN_ID))
+    const add  = lng.items.filter(n => !have.has(n.PAN_ID))
+    add.forEach(n => longIds.add(n.PAN_ID))
+    lhNotices = [...lhNotices, ...add]
+    errors.push(...lng.failures)
+    console.log(`[LH] 장기 창 ${lng.items.length}건 (새로 더함 ${add.length} · 실패 ${lng.failures.length}건)`)
+  } catch(e) {
+    errors.push(`LH 목록 장기 창(예상치 못한 오류): ${e}`)
+  }
 
   const lhBaseRows = lhNotices.map(n => mapLHRow(n, [], [], null)).filter(r => r.announcement_id && r.title)
   let lhUpserted = 0
@@ -669,17 +701,19 @@ async function collect() {
 
   // 캡은 종전대로 90건 하나이며, 활성 공고가 항상 앞에 온다 — 보강분은 남는 자리만 쓰므로
   // 활성 공고의 상세조회가 보강분에 밀리지 않는다(실측 활성 80건 < 90).
+  // 🔵 2026-10-11(3-B ①) — 장기 창 활성 공고는 정기 창 활성 다음 · 정정 보강 앞(층 0 · 1 · 2). 정기 창 공고의 자리는 줄지 않는다.
+  const tierOf = (n: NoticeItem) => !activeIdSet.has(n.PAN_ID) ? 2 : longIds.has(n.PAN_ID) ? 1 : 0
   const needDetail = [...activeNotices, ...revisionBackfillNotices]
     .sort((a, b) => {
-      const aBackfill = activeIdSet.has(a.PAN_ID) ? 0 : 1
-      const bBackfill = activeIdSet.has(b.PAN_ID) ? 0 : 1
+      const aBackfill = tierOf(a)
+      const bBackfill = tierOf(b)
       if (aBackfill !== bBackfill) return aBackfill - bBackfill
       const aNull = nullApplyStartIds.has(a.PAN_ID) ? 0 : 1
       const bNull = nullApplyStartIds.has(b.PAN_ID) ? 0 : 1
       return aNull - bNull
     })
     .slice(0, 90)
-  console.log(`[LH] 상세대상 ${needDetail.length}건 (활성 ${activeNotices.length}, 정정보강 후보 ${revisionBackfillNotices.length})`)
+  console.log(`[LH] 상세대상 ${needDetail.length}건 (활성 ${activeNotices.length} · 그중 장기 창 ${activeNotices.filter(n => longIds.has(n.PAN_ID)).length}, 정정보강 후보 ${revisionBackfillNotices.length})`)
 
   let lhDetailOk = 0
   const detailRows: ReturnType<typeof mapLHRow>[] = []
@@ -1022,20 +1056,9 @@ const probeListRow = (i: NoticeItem) => ({
 
 // 목록 1쪽. 🔴 fetchNoticeList를 부르지 않는다 — 그 함수는 카테고리를 끝까지 페이징해서
 // 상한(1쪽)을 넘긴다. 윈도우 산출은 그 함수와 같은 식을 쓰되 **읽기만** 한다.
-// 🔵 2026-10-11(우편함 「코드 — 3-B ①」 조사) — win=long 은 「게시 91~365일 전 ∧ 마감이 오늘 이후」 창을 읽는다.
-//    정기 수집 창(게시 90일 안)에 안 걸리는 상시·수시모집(접수 끝 12-31)이 LH 목록 API 에 있는지 보려는 관측이다.
-//    수집(collect)은 이 인자를 보지 않는다 — 창을 넓히는 것은 관측 결과를 본 뒤 따로 정한다.
-async function probeList(tp: string, page: number, sampleN: number, panIds: string[], win = 'main') {
-  const today  = new Date()
-  const past   = new Date(today); past.setDate(today.getDate() - 90)
-  const future = new Date(today); future.setDate(today.getDate() + 365)
-  const fmt    = (d: Date) =>
-    `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`
-  const longPanSt = new Date(today); longPanSt.setDate(today.getDate() - 365)
-  const longPanEd = new Date(today); longPanEd.setDate(today.getDate() - 91)
-  const w = win === 'long'
-    ? { PAN_ST_DT: fmt(longPanSt), PAN_ED_DT: fmt(longPanEd), CLSG_ST_DT: fmt(today), CLSG_ED_DT: fmt(future) }
-    : { PAN_ST_DT: fmt(past), PAN_ED_DT: fmt(today), CLSG_ST_DT: fmt(past), CLSG_ED_DT: fmt(future) }
+// 🔵 2026-10-11(우편함 「코드 — 3-B ①」) — win=long 은 수집과 같은 listWindow('long') 창을 읽는다(읽기만).
+async function probeList(tp: string, page: number, sampleN: number, panIds: string[], win: ListWin = 'main') {
+  const w = listWindow(win)
 
   const url = `https://apis.data.go.kr/B552555/lhLeaseNoticeInfo1/lhLeaseNoticeInfo1` +
     `?ServiceKey=${LH_API_KEY}&PG_SZ=100&PAGE=${page}&UPP_AIS_TP_CD=${tp}` +
@@ -1199,7 +1222,7 @@ async function probe(params: URLSearchParams): Promise<Record<string, unknown>> 
     .map(s => s.trim()).filter(Boolean).slice(0, PROBE_MAX_DETAIL)
   const wantMyHome = params.get('myhome') !== '0'
   const mhPage  = Math.min(Math.max(parseInt(params.get('mh_page') ?? '1', 10) || 1, 1), 20)
-  const win     = params.get('win') === 'long' ? 'long' : 'main'
+  const win: ListWin = params.get('win') === 'long' ? 'long' : 'main'
 
   const out: Record<string, unknown> = {
     params: { tp, page, n: sampleN, pan_ids: panIds, myhome: wantMyHome, mh_page: mhPage, win },
