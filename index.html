@@ -397,6 +397,19 @@ body.theme-dark .hu-ug-name,body.theme-dark .hu-ug-target,body.theme-dark .hu-ug
 .zf-ai-note{margin:0.75rem 0 0;font-size:12px;line-height:1.6;color:#5F5F57;word-break:keep-all}
 .zf-footer .zf-ai-note{margin:0 0 6px;color:#888}
 body.theme-dark .zf-ai-note{color:#9aa0aa}
+/* 🔵 2026-10-12(고지 회차 3 · 6) — 사이트 공지 띠. 데이터는 notices.json(시작·끝 날짜 안에서만) ·
+   닫으면 그 공지는 이 탭에서 다시 안 보인다(sessionStorage — 처리방침 3장: 방문과 방문을 잇지 않는다). */
+.zf-site-notice{display:flex;align-items:center;gap:8px;margin:0 0 0.75rem;padding:4px 4px 4px 12px;border:1px solid #E7D9A8;border-radius:10px;background:#FFF8E1;color:#3D3A2E;font-size:13px;line-height:1.5}
+.zf-site-notice[hidden]{display:none}
+.zf-site-notice .zf-sn-k{flex:none;font-weight:700;color:#7A5A00}
+.zf-site-notice .zf-sn-t{flex:1;min-width:0;word-break:keep-all}
+.zf-site-notice .zf-sn-t a{color:#0F6E56;font-weight:700;text-decoration:underline;text-underline-offset:2px}
+.zf-site-notice .zf-sn-x{flex:none;width:44px;height:44px;border:0;background:none;color:#5F5F57;font-size:18px;line-height:1;cursor:pointer;border-radius:8px}
+.zf-site-notice .zf-sn-x:focus-visible{outline:2px solid #5DCAA5;outline-offset:-2px}
+body.theme-dark .zf-site-notice{background:#2a2617;border-color:#4a4226;color:#e6e1cf}
+body.theme-dark .zf-site-notice .zf-sn-k{color:#f0c75e}
+body.theme-dark .zf-site-notice .zf-sn-t a{color:#5DCAA5}
+body.theme-dark .zf-site-notice .zf-sn-x{color:#c9c4b4}
 .zf-footer a{font-size:12px;color:#888;text-decoration:none}
 body.theme-dark .zf-footer{border-top-color:#2c2f38}
 body.theme-dark .zf-footer a{color:#9aa0aa}
@@ -412,6 +425,7 @@ body.theme-dark .zf-totop{background:#262932;border-color:#3a3e48;color:#5DCAA5;
 </head>
 <body>
 <div class="wrap">
+  <div id="zfSiteNotice" class="zf-site-notice" role="region" aria-label="사이트 공지" hidden></div>
   <div class="hero">
     <div class="logo">🏠 <span>꼭</span>집</div>
     <p class="sub">전국 공공임대 공고 맞춤 매칭 서비스<br>전국 공공기관 공고를 한 곳에서. 내 조건에 맞는 집을 빠르게 찾아드립니다.</p>
@@ -9079,6 +9093,30 @@ function zfScrollToTop(){
   const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
 }
+// 🔵 2026-10-12(고지 회차 3 · 6) — 사이트 공지 띠. notices.json 에서 오늘(KST)이 시작~끝 안이고
+//    이 탭에서 닫지 않은 공지 하나를 맨 위에 보인다. 닫은 공지 번호는 sessionStorage 에만 남긴다
+//    (처리방침 3장 — localStorage 를 쓰지 않는다 · 탭을 닫으면 사라진다). 파일이 없거나 깨지면 띠도 없다.
+(function(){
+  const box = document.getElementById('zfSiteNotice');
+  if(!box) return;
+  const KEY = 'zf_notice_closed';
+  const closed = () => { try{ return JSON.parse(sessionStorage.getItem(KEY) || '[]'); }catch(e){ return []; } };
+  const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+  const esc = t => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  const safeHref = h => /^(\.\/|https:\/\/)/.test(String(h || '')) ? h : null;
+  fetch('./notices.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : []).then(list => {
+    const done = closed();
+    const n = (Array.isArray(list) ? list : []).find(x => x && x.id && x.title && x.start <= today && today <= x.end && !done.includes(x.id));
+    if(!n) return;
+    const links = (n.links || []).map(l => safeHref(l.href) ? `<a href="${esc(l.href)}">${esc(l.label)}</a>` : '').filter(Boolean).join(' · ');
+    box.innerHTML = `<span class="zf-sn-k">공지</span><span class="zf-sn-t">${esc(n.title)}${links ? ' — ' + links : ''}</span><button type="button" class="zf-sn-x" aria-label="공지 닫기">✕</button>`;
+    box.hidden = false;
+    box.querySelector('.zf-sn-x').addEventListener('click', () => {
+      box.hidden = true;
+      try{ const d = closed(); if(!d.includes(n.id)) d.push(n.id); sessionStorage.setItem(KEY, JSON.stringify(d)); }catch(e){}
+    });
+  }).catch(() => {});
+})();
 if('serviceWorker' in navigator){
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW 등록 실패:', e));

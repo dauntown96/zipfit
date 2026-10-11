@@ -57,7 +57,7 @@
 | 알림·트리거 | 🔴 **없음 — Make.com은 2026-08-27 미사용 확정**. 검토했고 안 쓰기로 한 것이지 미검토가 아니다(재검토 트리거는 📦 아카이브 「MCP 생태계 보류」에). 알림 경로는 미구현 상태이며 후보는 백로그 「카카오 알림톡」 |
 | 외부 API | LH 분양임대공고 API, 마이홈포털 API, 카카오맵 API |
 | DB | Supabase PostgreSQL (프로젝트 ID: `khdpjjyspmlqtzperoqg`, 싱가포르) |
-| 인증 | **Supabase Auth** (카카오 OAuth 하나 — 이메일 매직링크 화면·코드는 2026-09-18 걷음(PR #173) · Supabase 이메일 provider는 다운님이 끔(2026-10-11 공개 설정 `external.email=false` 확인 · 옛 이메일 계정 1은 남김)). 신원은 JWT(`auth.uid()`), 프로필 API는 `verify_jwt=true`. 이메일+쿠키(`zipfit_email`) 경로는 2026-08-13 **완전 제거**. `user_profiles`에 RLS 정책 3종(본인 행 select/update/insert) 적용 |
+| 인증 | **Supabase Auth** (카카오 OAuth 하나 — 이메일 매직링크 화면·코드는 2026-09-18 걷음(PR #173) · Supabase 이메일 provider는 다운님이 끔(2026-10-11 공개 설정 `external.email=false` 확인) · 옛 이메일 계정 1은 2026-10-12 삭제(고지 회차 3 — provider email 0)). 신원은 JWT(`auth.uid()`), 프로필 API는 `verify_jwt=true`. 이메일+쿠키(`zipfit_email`) 경로는 2026-08-13 **완전 제거**. `user_profiles`는 RLS를 켠 채 정책 0 · `authenticated` 권한 0 — EF 둘(service_role)로만 읽고 쓴다(2026-10-12 고지 회차 3 · 원칙 15) |
 
 ### Supabase 설정
 - **URL**: `https://khdpjjyspmlqtzperoqg.supabase.co`
