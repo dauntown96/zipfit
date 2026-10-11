@@ -1,6 +1,7 @@
 CREATE OR REPLACE FUNCTION public.refresh_announcement_post_links()
  RETURNS integer
  LANGUAGE plpgsql
+ SET search_path TO 'public', 'pg_temp'
 AS $function$
 -- 같은 게시물 링크(announcement_post_links)를 채운다 — 2026-09-30 코드 회차 「같은 게시물 카드 분할」.
 -- 규칙 B57-link-v2 = B57-link-v1(2026-09-28 한 번 적재한 INSERT … SELECT) ∧ MYHOME 행 url 의 panId = LH announcement_id.

@@ -21,6 +21,20 @@ const minuteUtc = now.getUTCMinutes()
 const FIRST_RUN_DONE = PROMO_DAYTIME && !(hourUtc === 0 && minuteUtc < 40)
 // ⑬ 바깥 감시 기록 — 부른 지 12분 지난(다음 회차가 응답을 옮긴 뒤) 24시간 안 기록 · 새것부터. 미응답(옮기지 못함)도 실패로 센다.
 //    롤백 시험이 이 문자열을 그대로 떠서 쓴다(가짜 실패 행을 넣고 같은 판정이 나오는지) — 바꾸면 시험도 다시 돈다.
+// ⑥ 백업 — pg_cron(zipfit-backup-poll)이 매시 받아 둔 backup.yml 실행 기록(ops_backup_seen)을 읽는다(2026-10-11 고지 회차 2 · 10).
+//    「실제 백업」 = 성공 ∧ 걸린 시간 ≥ 45초(관문만 돌고 끝난 실행은 10여 초 · 마이그레이션 2026-10-11_02 머리 주석).
+//    표가 없으면(적용 전) 쿼리가 실패한다 — 그래서 UPTIME_SQL 처럼 따로 돈다.
+const BACKUP_SQL = `
+select jsonb_build_object(
+  'applied_min', (select extract(epoch from now() - applied_at) / 60 from zipfit_ops.schema_migrations where filename = '2026-10-11_02_backup_poll.sql'),
+  'real_age_h', (select extract(epoch from now() - max(run_updated_at)) / 3600 from public.ops_backup_seen
+                  where conclusion = 'success' and run_updated_at - run_created_at >= interval '45 seconds'),
+  'last_fail', (select jsonb_build_object('at', run_created_at, 'conclusion', conclusion) from public.ops_backup_seen
+                 where status = 'completed' and conclusion not in ('success', 'skipped', 'cancelled') order by run_created_at desc limit 1),
+  'poll_ok_age_h', (select extract(epoch from now() - max(at)) / 3600 from public.ops_backup_poll where status_code = 200),
+  'poll_last', (select jsonb_build_object('code', status_code, 'age_min', extract(epoch from now() - at) / 60) from public.ops_backup_poll
+                 where status_note is not null order by id desc limit 1)
+) as j;`
 const UPTIME_SQL = `
 select jsonb_build_object(
   'applied_min', (select extract(epoch from now() - applied_at) / 60 from zipfit_ops.schema_migrations where filename = '2026-10-08_05_uptime_monitor.sql'),
@@ -46,6 +60,7 @@ const EXPECTED_JOBS = [
   'zipfit-check-source-pages',   // 2026-10-08 열린 원문 키 정기 대조(3-B ③ 1단계 · 마이그레이션 2026-10-08_02)
   'zipfit-uptime-ping',          // 2026-10-08 바깥 감시 1단계(마이그레이션 2026-10-08_05)
   'zipfit-backup-dispatch', 'zipfit-heartbeat-dispatch',   // 2026-10-08 백업·생존 신호 예약도 GitHub 밖으로(마이그레이션 2026-10-08_06)
+  'zipfit-backup-poll',          // 2026-10-11 zipfit-backup backup.yml 실행 기록 수집(마이그레이션 2026-10-11_02 · ⑥ backup)
 ]
 // 🔵 2026-10-03 — workflow_dispatch 토큰(Vault github_actions_dispatch_token · fine-grained · zipfit · zipfit-backup(2026-10-08 더함) · Actions 읽기·쓰기) 만료일.
 //    토큰을 갈면 이 날짜도 함께 고친다(다운님이 알려 준 값 · 값 자체는 Vault 에만 있다).
@@ -394,9 +409,27 @@ try {
   }
   // ⑥ 백업 — 🔴 zipfit-backup(비공개) 커밋을 이 실행의 내장 토큰(github.token · zipfit 한정)으로는 읽을 수 없다.
   //    2026-10-09(고지 회차 1 · 7 ③ 조사) — 발송 토큰(Vault github_actions_dispatch_token)은 zipfit-backup 에 닿지만 이 점검은 DB 를
-  //    읽기 전용 트랜잭션(sqlRead)으로만 읽어 Vault 토큰으로 GitHub 를 부를 수 없다. 살리려면 DB 쪽 함수(pg_cron 이 커밋 목록을 받아 표에 남김)가 필요 — 우편함 회신 설계.
-  //    그동안 발송 자체(≤ 25시간 · 204)는 위 ⑩ backup_dispatch 가 본다.
-  add('backup', '최근 백업 커밋 ≤ 25시간', 'skip', '미구현(DB 쪽 확인 함수 필요)', 'zipfit-backup 은 비공개 — 이 점검은 읽기 전용이라 Vault 토큰을 쓸 수 없다. 발송은 ⑩ backup_dispatch · 실패는 그 저장소 backup-failure 이슈')
+  //    읽기 전용 트랜잭션(sqlRead)으로만 읽어 Vault 토큰으로 GitHub 를 부를 수 없다. 발송 자체(≤ 25시간 · 204)는 위 ⑩ backup_dispatch 가 본다.
+  //    🔵 2026-10-11(고지 회차 2 · 10) — 살렸다: pg_cron(zipfit-backup-poll)이 매시 backup.yml 실행 기록을 ops_backup_seen 에 남기고 여기서는 읽기만 한다.
+  //    커밋 목록(/commits)은 발송 토큰에 내용 읽기 권한이 없어 403 — 실행 기록(Actions 읽기)으로 잰다. 「실제 백업」 = 성공 ∧ ≥ 45초(BACKUP_SQL 위 주석).
+  //    수집이 3시간 넘게 200 을 못 받으면 ⚠️(수집 멈춤 — 판정 재료가 낡는다) · 적용 뒤 2시간까지는 첫 수집 전이라 건너뛴다.
+  const BACKUP_RULE = '「실제 백업」(backup.yml 성공 ∧ ≥ 45초) ≤ 25시간(매일 18:00 UTC) · 수집(zipfit-backup-poll 매시 12분) 200 ≤ 3시간'
+  try {
+    const [b] = await sqlRead(BACKUP_SQL)
+    const x = b.j
+    if (!x.applied_min || (x.applied_min < 120 && x.real_age_h == null)) {
+      add('backup', '최근 백업(실행 기록) ≤ 25시간', 'skip', x.applied_min ? `첫 수집 전(적용 ${Math.round(x.applied_min)}분)` : '마이그레이션 적용 전', BACKUP_RULE)
+    } else {
+      const fail = x.real_age_h == null || x.real_age_h > 25
+      const pollStale = x.poll_ok_age_h == null || x.poll_ok_age_h > 3
+      const lf = x.last_fail ? ` · 마지막 실패 실행 ${String(x.last_fail.at).slice(0, 16)} ${x.last_fail.conclusion}` : ''
+      const poll = x.poll_last ? ` · 수집 HTTP ${x.poll_last.code}(${Math.round(x.poll_last.age_min)}분 전)` : ' · 수집 기록 없음'
+      add('backup', '최근 백업(실행 기록) ≤ 25시간', fail ? 'fail' : pollStale ? 'warn' : 'pass',
+        `${x.real_age_h == null ? '실제 백업 기록 없음' : `${x.real_age_h.toFixed(1)}시간 전`}${lf}${poll}`, BACKUP_RULE)
+    }
+  } catch (e) {
+    add('backup', '최근 백업(실행 기록) ≤ 25시간', 'warn', String(e).slice(0, 200), 'ops_backup_seen 을 읽는다(경고만 — 표가 없거나 읽기 실패)')
+  }
 } catch (e) {
   add('runner', '점검 실행', 'fail', String(e).slice(0, 300), '점검 스크립트가 끝까지 돈다')
 }

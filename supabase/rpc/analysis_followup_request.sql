@@ -1,6 +1,7 @@
 CREATE OR REPLACE FUNCTION public.analysis_followup_request(p_page_ref text, p_note text DEFAULT NULL::text)
  RETURNS jsonb
  LANGUAGE plpgsql
+ SET search_path TO 'public', 'pg_temp'
 AS $function$
 -- 우편함 「진행 요청」 후속 처리 페이지(「운영 — 데이터 쓰기 …」)를 루틴에 바로 맡긴다(2026-10-02 · 우편함 「협의 — 원문 키 사이클 …」 1).
 -- 🔴 service_role(관리 API)·postgres 만 부른다 — 페이지를 만든 뒤 Claude Code(관리 API)나 다운님이 한 번 부른다(claude.ai 는 DB 를 쓰지 않는다 — 분석 스킬).

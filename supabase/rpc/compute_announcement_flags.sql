@@ -1,6 +1,7 @@
 CREATE OR REPLACE FUNCTION public.compute_announcement_flags()
  RETURNS trigger
  LANGUAGE plpgsql
+ SET search_path TO 'public', 'pg_temp'
 AS $function$
 -- 제목 키워드로 파생 플래그를 채운다. BEFORE INSERT OR UPDATE.
 --

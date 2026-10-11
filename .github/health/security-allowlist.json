@@ -107,6 +107,16 @@
    "why": "내부 표 — anon·authenticated 권한 0 · 화면 참조 0 · ops_uptime_ping()(pg_cron)이 쓰고 health-ops 가 읽는다. 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15 · 2026-10-08 바깥 감시 1단계)"
   },
   {
+   "key": "rls_enabled_no_policy_public_ops_backup_seen",
+   "kind": "intended",
+   "why": "내부 표 — anon·authenticated 권한 0 · 화면 참조 0 · ops_backup_poll()(pg_cron zipfit-backup-poll)이 쓰고 health-ops backup 이 읽는다. 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15 · 2026-10-11 고지 회차 2 · 10)"
+  },
+  {
+   "key": "rls_enabled_no_policy_public_ops_backup_poll",
+   "kind": "intended",
+   "why": "내부 표 — anon·authenticated 권한 0 · 화면 참조 0 · ops_backup_poll()(pg_cron zipfit-backup-poll)이 쓰고 health-ops backup 이 읽는다. 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15 · 2026-10-11 고지 회차 2 · 10)"
+  },
+  {
    "key": "rls_enabled_no_policy_public_sh_auto_close_log",
    "kind": "intended",
    "why": "내부 표 — anon·authenticated 권한 0 · 화면(index.html) 참조 0 · DB 함수·pg_cron·운영 점검(postgres)만 쓰고 읽는다. 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15)"
@@ -142,37 +152,7 @@
    "why": "pg_net 이 public 에 있다 — 옮기면 net.http_* 호출처 전부를 함께 고쳐야 한다 · 미결"
   },
   {
-   "key": "function_search_path_mutable_public_analysis_dispatch_tick",
-   "kind": "known",
-   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
-  },
-  {
-   "key": "function_search_path_mutable_public_analysis_followup_request",
-   "kind": "known",
-   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
-  },
-  {
-   "key": "function_search_path_mutable_public_analysis_queue_claim",
-   "kind": "known",
-   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
-  },
-  {
-   "key": "function_search_path_mutable_public_analysis_queue_finish",
-   "kind": "known",
-   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
-  },
-  {
-   "key": "function_search_path_mutable_public_analysis_run_release",
-   "kind": "known",
-   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
-  },
-  {
    "key": "function_search_path_mutable_public_announcement_dedup_key",
-   "kind": "known",
-   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
-  },
-  {
-   "key": "function_search_path_mutable_public_compute_announcement_flags",
    "kind": "known",
    "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
   },
@@ -207,62 +187,7 @@
    "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
   },
   {
-   "key": "function_search_path_mutable_public_ops_dispatch_log_fill",
-   "kind": "known",
-   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
-  },
-  {
-   "key": "function_search_path_mutable_public_ops_health_dispatch",
-   "kind": "known",
-   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
-  },
-  {
-   "key": "function_search_path_mutable_public_ops_health_record",
-   "kind": "known",
-   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
-  },
-  {
-   "key": "function_search_path_mutable_public_ops_screen_dispatch",
-   "kind": "known",
-   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
-  },
-  {
-   "key": "function_search_path_mutable_public_protect_created_at",
-   "kind": "known",
-   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
-  },
-  {
-   "key": "function_search_path_mutable_public_protect_detail_columns",
-   "kind": "known",
-   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
-  },
-  {
-   "key": "function_search_path_mutable_public_refresh_announcement_post_links",
-   "kind": "known",
-   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
-  },
-  {
-   "key": "function_search_path_mutable_public_set_revised_at",
-   "kind": "known",
-   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
-  },
-  {
    "key": "function_search_path_mutable_public_sh_close_missing",
-   "kind": "known",
-   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
-  },
-  {
-   "key": "function_search_path_mutable_public_sh_run_log_fill_started_at",
-   "kind": "known",
-   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
-  },
-  {
-   "key": "function_search_path_mutable_public_track_attachment_history",
-   "kind": "known",
-   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
-  },
-  {
-   "key": "function_search_path_mutable_public_update_updated_at",
    "kind": "known",
    "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
   },

@@ -1,6 +1,7 @@
 CREATE OR REPLACE FUNCTION public.set_revised_at()
  RETURNS trigger
  LANGUAGE plpgsql
+ SET search_path TO 'public', 'pg_temp'
 AS $function$
 BEGIN
   IF TG_OP = 'INSERT' THEN
