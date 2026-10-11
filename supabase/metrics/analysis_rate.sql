@@ -50,3 +50,48 @@ from judged
 where attachments > 0
 group by phase
 order by phase desc;
+
+
+-- ── 14일 갈래 — 「향후 14일 접수분 커버율」(2026-10-11 · 우편함 「코드 — 3-B ①」 · 💡 「런칭 판단용 안정 지표」 정의안)
+-- 위 정본과 다른 점 둘: ① 분모 = 대표 ∧ apply_end ≥ 오늘 ∧ apply_start ≤ 오늘+14(지금 접수 중이거나 14일 안에 열리는 공고)
+--   ② 첨부 유무로 거르지 않는다 — 정본은 「분석할 수 있는 것」 중 비율, 이것은 「사용자가 곧 신청할 것」 중 비율이다.
+--   분자·묶음 규칙(link_map · 같은 회차 구성원 완료 계열)은 위와 같다. with_attachments = 분모 중 묶음에 첨부가 있는 수(빈칸이 분석 쪽인지 첨부 경로 쪽인지 가른다).
+--   apply_start 가 NULL 인 대표는 분모에 들지 않는다(접수 시작을 모르면 「14일 안」을 말할 수 없다).
+with link_map as (
+  select distinct on (l.linked_announcement_id)
+    l.linked_announcement_id as aid, announcement_dedup_key(lh.title) as lh_key
+  from public.announcement_post_links l
+  join public.announcements lh on lh.announcement_id = l.lh_announcement_id
+  where lh.title is not null and lh.hidden_from_listing is not true
+  order by l.linked_announcement_id, l.lh_announcement_id
+),
+keyed as materialized (
+  select a.announcement_id, a.apply_end, a.attachment_urls,
+         coalesce(lm.lh_key, announcement_dedup_key(a.title)) as k,
+         (lm.aid is not null) as linked
+  from public.announcements a
+  left join link_map lm on lm.aid = a.announcement_id
+  where a.title is not null and a.hidden_from_listing is not true
+),
+reps as (
+  select d.announcement_id, d.apply_start, d.apply_end, k.k,
+         case when d.apply_start > current_date then '접수 전' else '접수 중' end as phase
+  from get_announcements_deduped(null, null, null) d
+  join keyed k on k.announcement_id = d.announcement_id
+  where d.apply_end >= current_date and d.apply_start <= current_date + 14
+),
+judged as (
+  select r.*,
+    (select coalesce(sum(jsonb_array_length(g.attachment_urls)), 0)
+       from keyed g where g.k = r.k and jsonb_typeof(g.attachment_urls) = 'array') as attachments,
+    exists (select 1 from keyed g
+              join public.announcement_analysis aa on aa.announcement_id = g.announcement_id
+             where g.k = r.k
+               and (g.apply_end = r.apply_end or g.linked)
+               and aa.status in ('완료', '완료(보조 누락)', '완료(판정 대기)', '완료(소급)')) as done
+  from reps r
+)
+select count(*) as denominator, count(*) filter (where done) as numerator,
+       count(*) filter (where attachments > 0) as with_attachments,
+       string_agg(announcement_id, ',' order by announcement_id) filter (where not done) as not_done
+from judged;

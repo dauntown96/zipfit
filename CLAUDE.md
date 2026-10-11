@@ -102,7 +102,7 @@
 - 🔴 **`collect-announcements`의 `?mode=probe`는 DB에 한 줄도 쓰지 않고 원본 응답을 보여준다**(`collection_run_log`에도 안 남는다). ⚠️ **페이지 파라미터가 소스마다 다르다 — LH 목록은 `page`, MYHOME은 `mh_page`다**(2026-09-18 실측: `page`로 6회 불렀더니 전부 1쪽이 돌아왔다). `net.http_post`로 Vault `cron_secret_v2`의 `x-cron-secret`을 실어 부른다.
 - 조회 방법: `net.http_get()`로 `UPP_AIS_TP_CD`를 하나씩 바꿔가며 `PG_SZ=1`로 호출 → `dsList` 비어있는지/`ALL_CNT` 확인. `collect-announcements`의 `fetchNoticeList()` 카테고리 루프(`for (const tp of [...])`)와 항상 대조.
 - **MYHOME(`HWSPR02/rsdtRcritNtcList`) 특성**: 카테고리 파라미터 자체가 없어(`fetchMyHome()`가 항상 전량 수집, 페이지네이션 캡 2000건으로 충분) 우리 쪽 수집 파라미터 문제는 없음. 🔴 **`totalCount` 실측: 2026-07-12 270 → 2026-09-18 530**(옛 값을 지우지 않고 이력으로 둔다 — 늘어나는 추세 자체가 관측이다). 다만 MYHOME 자체 데이터셋이 LH보다 훨씬 작음(2026-07-12 기준 고유 공고 약 130건, 약 1년 롤링 윈도우) — LH가 지역본부별로 훨씬 많은 개별 공고를 올리는 반면 MYHOME은 그 중 일부만 큐레이션해서 보여주는 구조로 추정됨. **"LH만 있음" 그룹이 훨씬 많은 것(296 vs MYHOME만 36 — 2026-07-12 실측)은 우리 수집 로직 버그가 아니라 두 소스의 태생적 커버리지 차이**(LH 샘플 20건 전수를 MYHOME API에 직접 대조해 전부 없음을 확인 — 2026-07-12).
-- **LH 수집 자체의 알려진 한계**: `fetchNoticeList()`가 `PAN_ST_DT`를 오늘-90일로 제한 — 90일보다 오래된 LH 공고는 LH 소스 행이 아예 생기지 않음(단, MYHOME 쪽에 이미 있으면 그걸로 대체 노출되므로 라이브 서비스에 실질적 데이터 손실은 없음, 다만 LH 쪽 상세정보 보강 기회는 놓침). 의도적 설계로 판단되나 필요시 윈도우 확장 검토 가능.
+- **LH 수집 창은 둘이다**(2026-10-11 · 3-B ①): `fetchNoticeList(tps, win)` — `main` = 게시 90일 안(종전) · `long` = 게시 91~365일 전 ∧ 마감이 오늘 이후(상시·수시모집 — 종전에는 LH 행이 안 생겨 MYHOME 단독으로만 보였고 첨부를 못 받았다). 장기 창 공고의 상세조회는 정기 창 활성 다음 순위다(캡 90은 그대로). 365일보다 오래 게시된 열린 공고는 여전히 창 밖이다. 확인은 `?mode=probe&win=long&tp=06`.
 - **SH(서울주택도시개발공사, 2026-08-19 신설)**: API가 아니라 `housing.seoul.go.kr/site/main/sh/publicLease/list` **HTML 목록 스크래핑**이다(robots 전면 허용 확인). 별도 EF `collect-sh-announcements`가 담당하며 `collect-announcements`와 합치지 말 것 — LH 상세조회 90칸 슬롯이 이미 포화라 잠식하면 안 된다. 컨테이너에서는 SH 도메인이 프록시 403이라 조사·검증이 불가능하니 EF의 `?mode=probe`를 `net.http_post`로 호출해 확인할 것. **스케줄**: pg_cron jobid 8 `zipfit-collect-sh-announcements`, 등록값 `0 0,3,6,9 * * *`(UTC) = **09:00/12:00/15:00/18:00 KST 1일 4회**, `?mode=collect` 호출.
 - **재발방지 체크리스트(신규 소스/카테고리 추가 시)**: (1) 이 표에 없는 새 카테고리를 추가하기 전, 위 조회 방법으로 `01~99` 재스캔해 빠진 코드가 없는지 확인 → (2) 새 코드 추가 시 이 표도 함께 갱신 → (3) 추가 직후 `SELECT title, b.announcement_id AS old_id FROM announcements a JOIN announcements b ON b.title=a.title AND b.announcement_id<>a.announcement_id WHERE a.created_at > <추가시각> AND a.source='LH'` 패턴으로 고아화 재발 여부 즉시 전수 확인(2026-07-12 인천계양A3 고아화 사고 때 쓴 쿼리, 이번에 `eligibility_criteria`/`announcement_policies`/`housing_units`가 그룹조회로 전환돼 있어 앞으로는 자동 방지되지만 새로운 단일-ID 조회 로직을 추가할 경우 재확인 필요)
 
@@ -158,9 +158,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-10-11 | **코드 — 3-B ① panId로 LH 행** — MYHOME 단독 LH 8건은 목록 수집 창(게시 90일) 밖이었다 · probe `win=long`(#419) 실측 뒤 장기 창(게시 91~365일 전 ∧ 아직 열림) 수집 · 전세임대 접수 시작 칸 · 분석률 14일 갈래 · 대표 933 → 933 · 14일 첨부 있음 54 → 62 · #419 · #420 |
+| 2026-10-11 | **표시층 — D-1 구조 와이어프레임** — 색 없는 시안(비공개 아티팩트 · A·B·C × 390·1280 · 실데이터) · 전부 펼침 높이 18~57% 줄고 공통 문단 212 → 2(대구연호) · 빠진 정보 0 · `main` 변경 0 |
 | 2026-10-11 | **코드 — 고지 회차 2** — 이용약관 신설 · 처리방침 개정(이전 판 보존) · 백업에서 개인정보 표 데이터 제외 · 최소 방 수·매직링크 잔재 걷기 · 매칭 빈틈 · 이용 기록 정리 쓰기 · search_path B · 백업 점검 살림 · 로그인 기록 30일은 분류기 거부로 멈춤 · #418 · backup#25 |
-| 2026-10-09 | **코드 — 고지 회차 1** — 검색은 계정과 떼고 원문 90일(cron) · 매칭 탭 저장 조건 채우기 · 공고 탭 머리 접수 중·예정·미상 · 시험 도구 이용 기록 차단 · `ops_gap` DB 축·204 아닌 발송 · 낡은 주석 · 백업 조사(덤프 속 개인정보 무기한) · provider 끄기·데이터 쓰기는 분류기 거부 · #417 · backup#24 |
-| 2026-10-08 | **조사·의견 — 문서 현행화** — ⑩②⑤⑥ L3 복제 뒤 날짜 절을 단원(지금·주의·근거)으로 녹여 다시 씀(코드·DB 대조) · ⑩ 42만 → 23만 자 · 영역 8 · 단원 160 · 낡은 예 셋 고침 · 「매뉴얼은 현행 문서」 한 줄 #415 · backup#23(생존 신호 댓글 · 리허설 연쇄 고침) |
 
 ---
 
