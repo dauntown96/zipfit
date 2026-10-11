@@ -1,6 +1,7 @@
 CREATE OR REPLACE FUNCTION public.ops_dispatch_log_fill()
  RETURNS integer
  LANGUAGE plpgsql
+ SET search_path TO 'public', 'pg_temp'
 AS $function$
 -- 발송 응답을 ops_dispatch_log 로 옮겨 적는다(2026-10-07 · 우편함 「코드 — Z-2 …」 10 · 이슈 #372).
 -- 🔴 왜: net._http_response 는 오래 남지 않는다(2026-10-07 03:3xZ — 남은 응답 11행 · 가장 오래된 것 02:40Z · pg_net 요청 번호가 14355 → 4 로 다시 시작).

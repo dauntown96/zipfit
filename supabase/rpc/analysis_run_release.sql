@@ -1,6 +1,7 @@
 CREATE OR REPLACE FUNCTION public.analysis_run_release(p_run_id bigint, p_note text)
  RETURNS jsonb
  LANGUAGE plpgsql
+ SET search_path TO 'public', 'pg_temp'
 AS $function$
 -- 끝나지 않는 발송 회차의 잠금을 사람이 푼다(2026-10-02 · 우편함 「코드 — … 잠금 감시 C·D」 3 D).
 -- 🔴 service_role(관리 API)만 부른다. 풀기 전에 루틴 세션이 정말 멈췄는지 확인한다 — 절차는 Notion ⑥ 「발송 회차 잠금 풀기」.

@@ -1,6 +1,7 @@
 CREATE OR REPLACE FUNCTION public.protect_detail_columns()
  RETURNS trigger
  LANGUAGE plpgsql
+ SET search_path TO 'public', 'pg_temp'
 AS $function$
 -- 수집이 값을 NULL로 덮어쓰는 것을 막는다. BEFORE UPDATE 전용이라 신규 INSERT는 영향이 없다.
 --

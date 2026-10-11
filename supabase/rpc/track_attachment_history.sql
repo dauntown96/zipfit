@@ -1,6 +1,7 @@
 CREATE OR REPLACE FUNCTION public.track_attachment_history()
  RETURNS trigger
  LANGUAGE plpgsql
+ SET search_path TO 'public', 'pg_temp'
 AS $function$
 begin
   -- WHEN (OLD.attachment_urls IS DISTINCT FROM NEW.attachment_urls) 로만 불린다 — 여기서 다시 비교하지 않는다.

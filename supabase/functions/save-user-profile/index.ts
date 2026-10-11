@@ -27,6 +27,7 @@ const CORS = {
 }
 
 // 프론트가 실제로 소비하는 컬럼만 반환한다(select('*') 금지).
+// 최소 방 수(min_rooms)는 2026-10-11 걷었다(우편함 「고지 회차 2」 5 · 다운님 결정 「받지 않기」) — 읽지도 쓰지도 않는다. 옛 화면이 보내는 minRooms 는 FIELD_MAP 에 없어 무시된다.
 const PROFILE_COLUMNS = [
   'email',
   'alert_email',
@@ -39,7 +40,6 @@ const PROFILE_COLUMNS = [
   'assets',
   'birth_year',
   'max_deposit',
-  'min_rooms',
   'alert_on',
   'new_notice_alert',
   'marketing_alert',
@@ -93,7 +93,6 @@ const FIELD_MAP: Record<string, { col: string; conv: (v: unknown) => unknown }> 
   assets: { col: 'assets', conv: toTextOrNull },
   birthYear: { col: 'birth_year', conv: toIntOrNull },
   maxDeposit: { col: 'max_deposit', conv: toIntOrNull },
-  minRooms: { col: 'min_rooms', conv: toIntOrNull },
   alertOn: { col: 'alert_on', conv: toBool },
   newNoticeAlert: { col: 'new_notice_alert', conv: toBool },
   marketingAlert: { col: 'marketing_alert', conv: toBool },
