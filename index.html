@@ -771,6 +771,57 @@ html[data-ui="d3"] .step[style*="opacity"]{opacity:1!important;color:var(--ink-3
 .zf3-my-n{margin:6px 0 0;font-size:var(--t-xs);color:var(--ink-3);line-height:1.5}
 html[data-ui="d3"] .subtabs{display:flex;gap:0;padding:4px;border-radius:var(--r-3);background:var(--surface-2);margin-bottom:1rem}
 html[data-ui="d3"] .subtabs .step{flex:1}
+/* 지도로 보기 — 레이더(D-3 단계 d) */
+.zf3-lhrow{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.zf3-lhrow .zf3-lh{margin:0;min-width:0}
+.zf3-vseg{display:inline-flex;flex:none;padding:3px;border-radius:var(--r-2);background:var(--surface-2)}
+.zf3-vseg button{all:unset;box-sizing:border-box;min-height:38px;min-width:52px;padding:0 12px;border-radius:8px;font-size:var(--t-s);font-weight:600;color:var(--ink-3);text-align:center;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;position:relative}
+.zf3-vseg button::after{content:"";position:absolute;inset:-3px 0}
+.zf3-vseg button[aria-pressed="true"]{background:var(--paper);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.zf3-vseg button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+html.zf3-mapview[data-ui="d3"] #notice-list{display:none}
+.zf3-map{margin:0 0 14px}
+.zf3-map-wait{margin:20px 0;text-align:center;font-size:var(--t-s);color:var(--ink-3)}
+.zf3-radar{position:relative;border:1px solid var(--line);border-radius:var(--r-3);background:var(--map-sea);overflow:hidden}
+.zf3-radar svg{display:block;width:100%;height:auto;max-height:70vh}
+.zf3-radar .land{fill:var(--map-land);stroke:var(--map-line);stroke-width:.8}
+.zf3-radar .land.on{fill:var(--surface-2)}
+.zf3-radar .dot{fill:var(--map-dot);stroke:var(--map-land);stroke-width:1.5}
+.zf3-radar .dot.soon{fill:var(--map-land);stroke:var(--map-dot);stroke-width:2.2}
+.zf3-radar .dot.hot{fill:var(--map-hot)}
+.zf3-radar .ring{fill:none;stroke:var(--map-dot);stroke-width:1.6;stroke-dasharray:4 3}
+.zf3-radar .pt{cursor:pointer}
+.zf3-radar .pt .hit{fill:transparent}
+.zf3-radar .pt.sel .dot{stroke:var(--ink);stroke-width:3}
+.zf3-radar .ring.sel{stroke:var(--ink);stroke-width:2.6}
+.zf3-radar .pulse{fill:none;stroke:var(--map-hot);stroke-width:2;transform-box:fill-box;transform-origin:center;opacity:0}
+.zf3-radar.live .pulse{animation:zf3pulse 1.8s var(--ease) .4s 2}
+@keyframes zf3pulse{0%{transform:scale(1);opacity:.75}100%{transform:scale(3.2);opacity:0}}
+.zf3-radar.live .pt{animation:zf3ptin var(--m-mid) var(--ease) both;animation-delay:calc(var(--i,0) * 18ms);transform-box:fill-box;transform-origin:center}
+@keyframes zf3ptin{from{opacity:0;transform:scale(.4)}}
+.zf3-radar .lbl{font-size:14px;font-family:var(--f-ui);font-weight:700;fill:var(--ink);paint-order:stroke;stroke:var(--map-land);stroke-width:3.5px;stroke-linejoin:round;pointer-events:none}
+.zf3-radar .cap{position:absolute;left:8px;bottom:6px;font-size:11px;color:var(--ink-2);background:var(--paper);padding:1px 6px;border-radius:4px}
+.zf3-legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--ink-2);margin:8px 2px 0}
+.zf3-legend i,.zf3-places i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px;background:var(--map-dot);box-sizing:border-box}
+.zf3-legend i.soon,.zf3-places i.soon{background:var(--map-land);border:2px solid var(--map-dot)}
+.zf3-legend i.hot,.zf3-places i.hot{background:var(--map-hot)}
+.zf3-legend i.ring,.zf3-places i.ring{background:none;border:1.5px dashed var(--map-dot)}
+.zf3-map-n{margin:8px 2px 4px;font-size:var(--t-xs);color:var(--ink-3)}
+.zf3-places{display:flex;flex-wrap:wrap;gap:6px}
+.zf3-places button{all:unset;box-sizing:border-box;display:inline-flex;align-items:center;min-height:var(--hit);padding:0 12px;border:1px solid var(--line);border-radius:999px;background:var(--paper);color:var(--ink);font-size:13px;cursor:pointer;gap:2px}
+.zf3-places button b{font-family:var(--f-led);margin-left:4px}
+.zf3-places .zf3-pall{border-style:dashed;font-weight:700}
+.zf3-places button[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.zf3-places button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+@media (min-width:1200px){
+  html[data-ui="d3"] .zf3-vseg{display:none}
+  html[data-ui="d3"] body:has(#main2:not(.hidden)) .wrap{margin-left:max(24px,calc((100vw - 1232px) / 2));margin-right:auto}
+  html[data-ui="d3"] body:has(#main2:not(.hidden)) #zf3Map{position:fixed;top:60px;left:calc(max(24px,calc((100vw - 1232px) / 2)) + 752px);width:480px;max-height:calc(100vh - 76px);overflow:auto;margin:0;padding:2px}
+  html[data-ui="d3"] body:has(#main2:not(.hidden)) .zf3-sticky{left:max(24px,calc((100vw - 1232px) / 2));transform:none;width:720px}
+  html[data-ui="d3"] body:has(#main2:not(.hidden)) .zf3-radar svg{max-height:calc(100vh - 300px)}
+  html[data-ui="d3"] body:has(#main2:not(.hidden)) .zf-totop{right:auto;left:calc(max(24px,calc((100vw - 1232px) / 2)) + 660px)}
+}
+@media (prefers-reduced-motion:reduce){.zf3-radar .pulse,.zf3-radar .pt{animation:none!important}}
 @keyframes zf3breath{from{opacity:.55}to{opacity:1}}
 @keyframes zf3grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
 @keyframes zf3flag{from{opacity:0;transform:translate(-50%,-4px)}to{opacity:1;transform:translateX(-50%)}}
@@ -3050,6 +3101,8 @@ function applyNoticeFiltersAndRender(keepPage){
   let base = closedHidden ? noticeData.filter(n => !isHiddenAsClosed(n)) : noticeData;
   if(activeNoticeStatus) base = base.filter(n => noticeStateLabel(n) === activeNoticeStatus);
   let filtered = applyNoticeSubFilters(base);
+  // 🔵 D-3 단계 d — 지도에서 고른 시군구(d3 · 메모리만 · 칩 ✕로 뺀다). 지도는 이 줄 앞의 행으로 그린다(고른 곳을 빼고 센 분포).
+  if(typeof zf3PlaceFilter === 'function') filtered = zf3PlaceFilter(filtered);
 
   const sortVal = document.getElementById('noticeSortSel')?.value || 'date-desc';
   const nullLast = zfNullLast;   // 🔵 사본을 두지 않는다 — 빈 값 처리가 한 곳이다
@@ -3890,7 +3943,8 @@ function zfWarnBadges(o){
 }
 
 function renderNoticeList(filtered, totalCount, hiddenClosedCount){
-  if(typeof zf3RenderNoticeHead === 'function') zf3RenderNoticeHead(filtered);   // 🔵 D-3 a — ui=d3 일 때만 새 머리를 그린다(뒤 <script> 가 읽히기 전 호출은 건너뜀 · zf3Init 이 다시 그린다)
+  if(typeof zf3RenderNoticeHead === 'function') zf3RenderNoticeHead(filtered);
+  if(typeof zf3RenderMap === 'function') zf3RenderMap();   // 🔵 D-3 d — 지도(1280 은 늘 · 390 은 「지도」를 골랐을 때)   // 🔵 D-3 a — ui=d3 일 때만 새 머리를 그린다(뒤 <script> 가 읽히기 전 호출은 건너뜀 · zf3Init 이 다시 그린다)
   const statusEl = document.getElementById('notice-status');
   const listEl   = document.getElementById('notice-list');
   listEl.innerHTML = '';
@@ -10039,6 +10093,7 @@ function zf3CondChips(){
   if(q) out.push(['q', `검색 「${q}」`]);
   const chk = document.getElementById('hideClosedChk');
   if(chk && !chk.checked && !activeNoticeStatus) out.push(['closed', '신청할 수 없는 공고 포함']);
+  if(zf3PlaceSel && zf3PlaceName) out.push(['place', `📍 ${zf3PlaceName}`]);
   return out;
 }
 function zf3RenderNoticeHead(filtered){
@@ -10060,7 +10115,7 @@ function zf3RenderNoticeHead(filtered){
   const at = noticeLoadedAt ? new Date(noticeLoadedAt + 9 * 3600 * 1000).toISOString() : '';
   const atText = at ? `${at.slice(0, 10).replace(/-/g, '.')} KST` : '불러오는 중';   // 시안 「slim」 그대로 날짜만 — 390px 한 줄
   const sheetOpen = !document.getElementById('noticeFilterPanel')?.classList.contains('hidden');
-  el.innerHTML = `<p class="zf3-lh">${head}</p>`
+  el.innerHTML = `<div class="zf3-lhrow"><p class="zf3-lh">${head}</p><span class="zf3-vseg" role="group" aria-label="보기"><button type="button" data-act="view" data-v="list" aria-pressed="${zf3View !== 'map'}">목록</button><button type="button" data-act="view" data-v="map" aria-pressed="${zf3View === 'map'}">지도</button></span></div>`
     + `<p class="zf3-lsub">${closedExcluded ? '' : `열린 ${o.n.toLocaleString()}건: `}접수 중 ${o.a.toLocaleString()} · 예정 ${o.b.toLocaleString()}${o.k ? ` · 미상 ${o.k.toLocaleString()}` : ''}${sortText ? ` · ${escapeHtml(sortText)}` : ''}</p>`
     + `<div class="zf3-tblock" role="note"><div><span class="k">기준</span><span class="v led">${escapeHtml(atText)}</span></div><div><span class="k">출처</span><span class="v">LH · 마이홈 · SH 원문 → 꼭집 정리</span></div></div>`
     + `<div class="zf3-chips" role="group" aria-label="걸린 조건">${chips.map(([k, t]) => `<button type="button" class="zf3-chip on" data-act="clear" data-k="${k}" aria-label="${zfAttr(t)} 조건 빼기">${escapeHtml(t)}<span aria-hidden="true">✕</span></button>`).join('')}`
@@ -10074,6 +10129,7 @@ function zf3ClearCond(k){
   if(k === 'target'){ activeNoticeTarget = null; refreshChipSel('noticeTargetChips', null); }
   if(k === 'q'){ const q = document.getElementById('noticeSearchInput'); if(q) q.value = ''; }
   if(k === 'closed'){ const c = document.getElementById('hideClosedChk'); if(c) c.checked = true; }
+  if(k === 'place'){ zf3PlaceSel = null; zf3PlaceName = ''; }
   updateFilterToggleBtn();
   applyNoticeFiltersAndRender();
 }
@@ -10087,6 +10143,112 @@ function zf3ToggleSheet(open){
   if(add) add.setAttribute('aria-expanded', String(open));
   if(open){ const f = panel.querySelector('input,select,button,[tabindex="0"]'); if(f) f.focus(); }
   else if(add) add.focus();
+}
+// ── 지도로 보기(레이더 · D-3 단계 d · 2026-10-12) ─────────────────────────────────────────────
+//    밝은 지도 위에 열린 공고가 걸친 시군구마다 점 하나(점 크기 = 공고 수 · 오늘·내일 마감이 있으면 빨강 맥박 두 번 · 접수 예정만이면 빈 점).
+//    🔴 점은 단지 위치가 아니라 시군구 중심점이다(캡션에 밝힌다). 재료는 RPC 행의 region_names(그룹이 걸친 시군구 전부) → 없으면 sido_nm·sigungu_nm.
+//    2013 경계(geo/kr-2013.json)에 없는 이름은 ① 이름만 바뀐 구(미추홀구 = 2013 남구) ② 부모 시(화성시 ○○구 → 화성시 · 청주시 서원구 → 청주시 구들의 가운데)
+//    ③ 시도가 바뀐 군(군위군 — 이름이 하나뿐일 때만) ④ 그래도 없으면 시도 가운데 점선 고리(「인천 제물포구」 · 「서울(시군구 미상)」).
+//    점·지역 단추를 누르면 목록이 그 시군구 공고로 좁혀진다(📍 칩 · ✕로 뺀다 · 메모리만 — 새 저장 0). 지도 자료는 같은 출처 파일 하나를 처음 열 때만 받는다(외부 요청 0).
+let zf3Geo = null, zf3GeoP = null, zf3View = 'list', zf3PlaceSel = null, zf3PlaceName = '', zf3PrePlace = [];
+const ZF3_PROV = { 서울특별시: '11', 부산광역시: '21', 대구광역시: '22', 인천광역시: '23', 광주광역시: '24', 대전광역시: '25', 울산광역시: '26', 세종특별자치시: '29', 경기도: '31', 강원특별자치도: '32', 강원도: '32', 충청북도: '33', 충청남도: '34', 전북특별자치도: '35', 전라북도: '35', 전라남도: '36', 경상북도: '37', 경상남도: '38', 제주특별자치도: '39' };
+const ZF3_SGG_ALIAS = { '23|미추홀구': '23|남구' };
+const ZF3_METRO = new Set(['11', '21', '22', '23', '24', '25', '26']);
+let zf3PlacesAll = false;   // 2018 이름만 바뀐 구(경계 같음)
+const zf3ShortSido = t => String(t || '').replace(/특별자치시|특별자치도|특별시|광역시/, '').replace(/^(충청|전라|경상)(남|북)도$/, (m, a, b) => a[0] + b).replace(/도$/, '');
+function zf3LoadGeo(){
+  if(!zf3GeoP) zf3GeoP = fetch('./geo/kr-2013.json', { cache: 'force-cache' }).then(r => r.ok ? r.json() : null).then(g => { zf3Geo = g && g.cent ? g : null; return zf3Geo; }).catch(() => { zf3GeoP = null; return null; });
+  return zf3GeoP;
+}
+function zf3PlaceOf(sido, sgg){
+  const G = zf3Geo, pc = ZF3_PROV[String(sido || '').trim()];
+  if(!G || !pc) return null;
+  const sg = String(sgg || '').replace(/\s+/g, '');
+  if(sg){
+    const k0 = pc + '|' + sg, k = ZF3_SGG_ALIAS[k0] || k0;
+    if(G.cent[k]) return { key: k0, name: (ZF3_METRO.has(pc) ? zf3ShortSido(sido) + ' ' : '') + String(sgg).trim(), xy: G.cent[k], exact: true, pc };   // 「북구」는 어느 시의 북구인지 — 특별·광역시 구는 시 이름을 앞에
+    const city = sg.replace(/^(\S+?시)\S+구$/, '$1');
+    if(city !== sg){
+      if(G.cent[pc + '|' + city]) return { key: pc + '|' + city, name: city, xy: G.cent[pc + '|' + city], exact: true, pc };
+      const kids = Object.keys(G.cent).filter(x => x.startsWith(pc + '|' + city));
+      if(kids.length) return { key: pc + '|' + city, name: city, xy: [0, 1].map(i => kids.reduce((a, x) => a + G.cent[x][i], 0) / kids.length), exact: true, pc };
+    }
+    const same = Object.keys(G.cent).filter(x => x.split('|')[1] === sg);
+    if(same.length === 1) return { key: k0, name: String(sgg).trim(), xy: G.cent[same[0]], exact: true, pc };
+    return { key: pc + '|*' + sg, name: zf3ShortSido(sido) + ' ' + String(sgg).trim(), xy: G.prov[pc], exact: false, pc, note: '2013 경계에 없는 구 — 시도 가운데 고리' };
+  }
+  return { key: pc + '|*', name: zf3ShortSido(sido) + '(시군구 미상)', xy: G.prov[pc], exact: false, pc, note: '시군구 없음 — 시도 가운데 고리' };
+}
+function zf3PlacesOfRow(n){
+  const out = new Map();
+  let names = Array.isArray(n['region_names']) ? n['region_names'].map(x => String(x || '').trim()).filter(Boolean) : [];
+  names = names.filter(x => !names.some(y => y !== x && y.startsWith(x + ' ')));   // 「창원시」와 「창원시 마산회원구」가 함께면 구만
+  const parts = names.length ? names.map(x => { const i = x.indexOf(' '); return i < 0 ? [x, ''] : [x.slice(0, i), x.slice(i + 1)]; }) : [[n['sido_nm'], n['sigungu_nm']]];
+  parts.forEach(([sd, sg]) => { const pl = zf3PlaceOf(sd, sg); if(pl && !out.has(pl.key)) out.set(pl.key, pl); });
+  return [...out.values()];
+}
+function zf3PlaceFilter(rows){
+  zf3PrePlace = rows || [];
+  if(!zf3On() || !zf3PlaceSel || !zf3Geo) return rows;
+  const hit = zf3PrePlace.filter(n => zf3PlacesOfRow(n).some(p => p.key === zf3PlaceSel));
+  if(!hit.length){ zf3PlaceSel = null; zf3PlaceName = ''; return rows; }   // 조건이 바뀌어 그 곳에 공고가 없으면 고른 곳을 푼다(0건 화면을 만들지 않는다)
+  return hit;
+}
+const zf3Wide = () => { try{ return matchMedia('(min-width:1200px)').matches; }catch(e){ return false; } };
+function zf3SetView(v){
+  zf3View = v === 'map' ? 'map' : 'list';
+  document.documentElement.classList.toggle('zf3-mapview', zf3View === 'map');
+  document.querySelectorAll('#zf3NoticeHead [data-act="view"]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === zf3View)));
+  zf3RenderMap();
+}
+function zf3SetPlace(key, name){
+  zf3PlaceSel = zf3PlaceSel === key ? null : key;
+  zf3PlaceName = zf3PlaceSel ? name : '';
+  applyNoticeFiltersAndRender();
+  if(zf3PlaceSel && !zf3Wide()){
+    zf3SetView('list');
+    try{ document.getElementById('zf3NoticeHead').scrollIntoView({ block: 'start' }); }catch(e){}
+  }
+}
+function zf3MapGroups(){
+  const G = new Map(), today = zf3Today();
+  (zf3PrePlace || []).forEach(n => {
+    const st = applyWindowState(n), end = zf3Real(zfSoonestOpenEnd(n));
+    const hot = st === 'open' && end && zf3Days(today, end) <= 1;
+    zf3PlacesOfRow(n).forEach(pl => {
+      const g = G.get(pl.key) || Object.assign({ n: 0, hot: false, open: false }, pl);
+      g.n++; if(hot) g.hot = true; if(st === 'open') g.open = true;
+      G.set(pl.key, g);
+    });
+  });
+  return [...G.values()].map(g => Object.assign(g, { cls: g.hot ? 'hot' : g.open ? '' : 'soon' })).sort((a, b) => b.n - a.n || a.name.localeCompare(b.name, 'ko'));
+}
+function zf3RenderMap(){
+  if(!zf3On()) return;
+  const head = document.getElementById('zf3NoticeHead');
+  if(!head) return;
+  let box = document.getElementById('zf3Map');
+  const show = zf3View === 'map' || zf3Wide();
+  if(!show){ if(box) box.hidden = true; return; }
+  if(!box){ box = document.createElement('section'); box.id = 'zf3Map'; box.className = 'zf3-map'; box.setAttribute('aria-label', '지도로 보기'); head.after(box); box.addEventListener('click', ev => { const a = ev.target.closest('[data-act="all"]'); if(a){ zf3PlacesAll = !zf3PlacesAll; zf3RenderMap(); const f = document.querySelector('#zf3Map [data-act="all"]'); if(f) f.focus(); return; } const b = ev.target.closest('[data-place]'); if(b) zf3SetPlace(b.dataset.place, b.dataset.name); }); }
+  box.hidden = false;
+  if(!zf3Geo){ box.innerHTML = '<p class="zf3-map-wait">지도를 불러오는 중…</p>'; zf3LoadGeo().then(g => { if(g){ applyNoticeFiltersAndRender(noticePage); } else box.innerHTML = '<p class="zf3-map-wait">지도를 불러오지 못했어요 · 목록으로 보세요</p>'; }); return; }
+  const G = zf3Geo, gs = zf3MapGroups(), on = new Set(gs.map(g => g.pc));
+  const placed = [], clash = b => placed.some(q => !(b[2] < q[0] || b[0] > q[2] || b[3] < q[1] || b[1] > q[3]));
+  const lbl = g => { const t = `${g.exact ? g.name.replace(/^\S+시\s(\S+구)$/, '$1').replace(ZF3_METRO.has(g.pc) ? /^\S+\s/ : /^$/, '') : g.name} ${g.n}`, w = t.length * 12.5;
+    const x = g.exact ? g.xy[0] + 10 : g.xy[0] - w / 2, y = g.exact ? g.xy[1] + 5 : g.xy[1] - 28 - Math.min(14, g.n);
+    const b = [x, y - 14, x + w, y + 3]; if(clash(b)) return ''; placed.push(b); return `<text class="lbl" x="${x.toFixed(1)}" y="${y.toFixed(1)}">${escapeHtml(t)}</text>`; };
+  const rings = gs.filter(g => !g.exact), dots = gs.filter(g => g.exact);
+  const labels = [...rings, ...dots].map(lbl).join('');
+  const pts = gs.map((g, i) => { const r = 5 + Math.min(7, g.n - 1), [x, y] = g.xy, sel = zf3PlaceSel === g.key ? ' sel' : '';
+    return `<g class="pt${sel}" style="--i:${Math.min(i, 30)}" data-place="${zfAttr(g.key)}" data-name="${zfAttr(g.name)}">${g.exact ? `${g.hot ? `<circle class="pulse" cx="${x}" cy="${y}" r="${r}"/>` : ''}<circle class="dot ${g.cls}" cx="${x}" cy="${y}" r="${r}"/>` : `<circle class="ring${sel}" cx="${x}" cy="${y}" r="${20 + Math.min(14, g.n)}"/>`}<circle class="hit" cx="${x}" cy="${y}" r="16"/></g>`; }).join('');
+  const nOpen = (zf3PrePlace || []).length;
+  box.innerHTML = `<div class="zf3-radar"><svg viewBox="${G.vb.join(' ')}" aria-hidden="true" focusable="false">${G.paths.map(p => `<path class="land${on.has(p.code) ? ' on' : ''}" d="${p.d}"/>`).join('')}${pts}${labels}</svg><span class="cap">점 = 시군구 가운데(단지 위치 아님) · 2013 경계</span></div>`
+    + `<div class="zf3-legend"><span><i></i>접수 중</span><span><i class="hot"></i>오늘·내일 마감</span><span><i class="soon"></i>접수 예정</span><span><i class="ring"></i>시군구 미상</span></div>`
+    + `<p class="zf3-map-n">${gs.length ? `공고 ${nOpen.toLocaleString()}건이 걸친 ${gs.length}곳 · 누르면 그곳 공고만` : '지금 조건에 맞는 공고가 없어요'}</p>`
+    + `<div class="zf3-places" role="group" aria-label="지역으로 좁히기">${gs.filter((g, i) => zf3PlacesAll || i < 12 || g.key === zf3PlaceSel).map(g => `<button type="button" data-place="${zfAttr(g.key)}" data-name="${zfAttr(g.name)}" aria-pressed="${zf3PlaceSel === g.key}"><i class="${g.exact ? g.cls : 'ring'}" aria-hidden="true"></i>${escapeHtml(g.name)} <b>${g.n}</b></button>`).join('')}`
+    + (gs.length > 12 ? `<button type="button" class="zf3-pall" data-act="all" aria-expanded="${zf3PlacesAll}">${zf3PlacesAll ? '접기' : `모든 지역 ${gs.length}곳`}</button>` : '') + `</div>`;
+  try{ if(!matchMedia('(prefers-reduced-motion: reduce)').matches) box.querySelector('.zf3-radar').classList.add('live'); }catch(e){}
 }
 // 관리 탭 「나의 노선도」(d3 · 둘러보기 ④ · 2026-10-12) — 저장한 공고들의 앞으로 남은 날짜(접수 시작 · 접수 마감 · 당첨자 발표)를
 //    한 줄 세로 노선으로. 재료는 저장한 공고뿐(처리방침 — 이미 저장 목록이 쓰는 같은 대표행 날짜) · 새 저장·새 요청 0.
@@ -10267,6 +10429,7 @@ function zf3Init(){
     if(!b) return;
     if(b.dataset.act === 'clear') zf3ClearCond(b.dataset.k);
     else if(b.dataset.act === 'sheet') zf3ToggleSheet();
+    else if(b.dataset.act === 'view') zf3SetView(b.dataset.v);
   });
   const board = document.getElementById('zf3Board');
   if(board) board.addEventListener('click', e => {
