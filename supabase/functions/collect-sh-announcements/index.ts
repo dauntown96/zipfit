@@ -48,6 +48,11 @@ const MAX_PAGES_HARD_CAP = 50   // 파싱 실패로 페이지 수가 폭주해�
 const PAGE_DELAY_MS = 1000      // 요청 간 최소 간격. 동시 요청하지 않는다.
 
 const listUrl = (cp: number) => `${BASE}${LIST_PATH}?cp=${cp}&supplyType=publicLease`
+// 🔵 2026-10-12(우편함 「코드 — B′ ② SH · ③ 부산도시공사 원문 운반」) — 열린 공고만 상세(i-sh 게시글)를 열어 첨부 목록을 읽는다.
+//    상세 HTML 의 `initParam.downList = [{brdId, seq, fileSeq, fileSize, oriFileNm, fileTp}, …]` 를 그대로 옮긴다(짓지 않는다).
+//    받기 주소는 같은 게시판의 innoFD.do — fetch-attachment 허용목록(www.i-sh.co.kr)에 이미 있다.
+const SH_FILE_BASE = 'https://www.i-sh.co.kr/main/com/file/innoFD.do'
+const DETAIL_CAP = 30            // 한 런에서 상세를 여는 상한(열린 공고는 보통 한 자리 수)
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
@@ -166,6 +171,26 @@ function isHidden(row: ShRow): boolean {
   return HIDDEN_TITLE_KEYWORDS.some(k => row.title.includes(k))
 }
 
+type ShFile = { url: string; label: string; filename: string }
+
+/** 상세 HTML 의 downList 를 첨부 목록으로. 못 읽으면 null(→ 그 행의 attachment_urls 를 싣지 않아 기존 값이 남는다). */
+function parseDownList(html: string): ShFile[] | null {
+  const m = html.match(/initParam\.downList\s*=\s*(\[[\s\S]*?\])\s*;/)
+  if (!m) return null
+  let arr: unknown
+  try { arr = JSON.parse(m[1]) } catch { return null }
+  if (!Array.isArray(arr)) return null
+  const out: ShFile[] = []
+  for (const f of arr as Record<string, unknown>[]) {
+    const brdId = String(f?.brdId ?? ''), seq = String(f?.seq ?? ''), fileSeq = String(f?.fileSeq ?? '')
+    const fileTp = String(f?.fileTp ?? 'A'), name = String(f?.oriFileNm ?? '').trim()
+    if (!brdId || !seq || !fileSeq || !name) continue
+    const q = new URLSearchParams({ brdId, seq, fileTp, fileSeq })
+    out.push({ url: `${SH_FILE_BASE}?${q.toString()}`, label: name, filename: name })
+  }
+  return out.length ? out : null
+}
+
 function mapRow(row: ShRow) {
   return {
     source:               'SH',
@@ -231,8 +256,24 @@ async function collect() {
   // 미리 병합한다 — MYHOME에서 실제로 겪은 "ON CONFLICT ... cannot affect row a second time".
   const map = new Map<string, ReturnType<typeof mapRow>>()
   for (const r of allRows) { const m = mapRow(r); map.set(m.announcement_id, m) }
-  const rows = [...map.values()]
+  const rows: (ReturnType<typeof mapRow> & { attachment_urls?: ShFile[] })[] = [...map.values()]
   const dedupMerged = allRows.length - rows.length
+
+  // 🔵 열린(보이고 마감 아닌) 공고만 상세를 연다 — 첨부 목록. 🔴 상세 실패는 errors 에 넣지 않는다:
+  //    errors 가 비지 않은 런은 sh_close_missing 의 「봤다」 판정에서 빠진다(목록을 다 봤는지와 상세는 다른 물음).
+  const detail = { tried: 0, with_files: 0, files: 0, failed: [] as string[] }
+  for (const r of rows.filter(r => !r.hidden_from_listing && r.status !== '접수마감').slice(0, DETAIL_CAP)) {
+    await sleep(PAGE_DELAY_MS)
+    detail.tried++
+    try {
+      const d = await fetchText(r.url)
+      if (d.status !== 200) { detail.failed.push(`${r.announcement_id}: status=${d.status}`); continue }
+      const files = parseDownList(pickDecoded(d.utf8, d.euckr).text)
+      if (!files) { detail.failed.push(`${r.announcement_id}: downList 없음`); continue }
+      r.attachment_urls = files
+      detail.with_files++; detail.files += files.length
+    } catch (e) { detail.failed.push(`${r.announcement_id}: ${e}`) }
+  }
 
   let upserted = 0
   for (let i = 0; i < rows.length; i += 50) {
@@ -255,7 +296,7 @@ async function collect() {
     errors,
   }
   await logRun(result)
-  return result
+  return { ...result, detail }   // detail 은 런 로그 표 칸이 아니라 응답에만 싣는다
 
   } catch (e) {
     // 🔴 1페이지부터 죽은 런도 남긴다 — 「무엇이 실패했는지 사후에 볼 방법이 없다」가 이 표의 이유다.
@@ -271,7 +312,7 @@ async function collect() {
   }
 }
 
-async function probe() {
+async function probe(probeSeq: string | null) {
   const out: Record<string, unknown> = {}
   try {
     const r = await fetchText(`${BASE}/robots.txt`)
@@ -294,6 +335,16 @@ async function probe() {
     }
   } catch (e) { out.list = { error: String(e) } }
 
+  // ?seq=<i-sh 게시글 seq> — 상세 한 건의 첨부 목록 파싱(DB 미기록)
+  const seq = probeSeq
+  if (seq) {
+    try {
+      const r = await fetchText(`https://www.i-sh.co.kr/main/lay2/program/S1T294C295/www/brd/m_241/view.do?seq=${encodeURIComponent(seq)}`)
+      const p = pickDecoded(r.utf8, r.euckr)
+      out.detail = { status: r.status, encoding_guess: p.encoding, html_length: p.text.length, files: parseDownList(p.text) }
+    } catch (e) { out.detail = { error: String(e) } }
+  }
+
   return out
 }
 
@@ -312,7 +363,7 @@ Deno.serve(async (req: Request) => {
   const mode = new URL(req.url).searchParams.get('mode') ?? 'collect'
   try {
     if (mode === 'probe') {
-      return new Response(JSON.stringify({ mode: 'probe', ...(await probe()) }), { headers: { 'Content-Type': 'application/json' } })
+      return new Response(JSON.stringify({ mode: 'probe', ...(await probe(new URL(req.url).searchParams.get('seq'))) }), { headers: { 'Content-Type': 'application/json' } })
     }
     if (mode === 'collect') {
       return new Response(JSON.stringify({ mode: 'collect', ...(await collect()) }), { headers: { 'Content-Type': 'application/json' } })
