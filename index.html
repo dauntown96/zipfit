@@ -2032,7 +2032,13 @@ function zfRouteVerdict(rows, today){
       const t0 = startOfLocalDay(today || new Date());
       const day = d => startOfLocalDay(parseNoticeDate(d));
       const cur = wins.find(w => day(w.s) <= t0 && t0 <= day(w.e)), nxt = wins.find(w => day(w.s) > t0);
-      const ex = zfRouteExcludeOf(rs);
+      // 제외 조각 — period_text 괄호 조각(zfRouteExcludeOf)이 없으면 note_text 의 접수 안 받는 날 문장을 **원문 그대로** 하나(「…토요일·일요일·법정공휴일에는 신청접수 받지 않습니다」).
+      //    창이 「매월 1일~10일」처럼 날수로만 적혀 주말이 창 안에 들 수 있어서 — 이 갈래에서만 본다(다른 갈래 · 다른 공고 불변).
+      let ex = zfRouteExcludeOf(rs);
+      if(!ex){
+        const ns = [...new Set(rs.map(r => String(r.note_text || '').replace(/^\s*[*※]\s*/, '').trim()).filter(t => /(요일|주말|공휴일|휴일)/.test(t) && /(받지 않|제외|불가)/.test(t)))];
+        if(ns.length === 1) ex = ns[0];
+      }
       const tail = ` · 접수 기간이 ${wins.length}번으로 나뉘어 있어요` + (ex ? ` · ${ex}` : '');
       if(cur) return { kind: '②-마', ex, text: `현장 접수 중 ${zfMdDow(cur.s)}~${zfMdDow(cur.e)}` + (nxt ? ` · 다음 ${zfMdDow(nxt.s)}~${zfMdDow(nxt.e)}` : '') + tail };
       if(nxt) return { kind: '②-마', ex, text: `다음 현장 접수 ${zfMdDow(nxt.s)}~${zfMdDow(nxt.e)}` + tail };
