@@ -1700,7 +1700,7 @@ function zfLoadCardSide(){
     }
   };
   zfSidePromise = Promise.all([
-    paged('announcement_apply_routes?select=announcement_id,route,site_text,phase_text,start_date,end_date,sort_order,period_text,place_text', 'announcement_id,sort_order,route'),
+    paged('announcement_apply_routes?select=announcement_id,route,site_text,phase_text,start_date,end_date,sort_order,period_text,place_text,note_text', 'announcement_id,sort_order,route'),
     paged('announcement_post_links?select=lh_announcement_id,linked_announcement_id,linked_group_key', 'lh_announcement_id,linked_announcement_id'),
     paged('kukmin_rent_per_sqm_rank?is_low=eq.true&select=announcement_id,title,complex_key,area_label,area_complexes', 'announcement_id,complex_key,area_label')
   ]).then(async ([routes, links, low]) => {
