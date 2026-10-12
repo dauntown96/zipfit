@@ -64,8 +64,10 @@ const ALLOWED: Record<string, string[] | null> = {
 }
 
 // 국내 IP만 받는 호스트 — 실행 지역(SB_REGION · Supabase 런타임 변수)이 서울일 때만 연다.
+//   다른 지역에서 불리면 본체 맨 앞에서 서울 지역으로 자신에게 한 번 넘긴다(아래 Deno.serve).
 const SEOUL_REGION = 'ap-northeast-2'
 const SEOUL_ONLY = new Set(['www.bmc.busan.kr'])
+const mode_of = (u: URL) => u.searchParams.get('mode') ?? 'fetch'
 
 // 🔴 운반 상한. 원본 바이트 기준이다.
 //
@@ -804,6 +806,26 @@ Deno.serve(async (req: Request) => {
 
   const reqUrl = new URL(req.url)
   const target = reqUrl.searchParams.get('url')
+
+  // 🔴 서울 지역 전용 호스트(SEOUL_ONLY) — 다른 지역에서 불리면 같은 요청을 `x-region: ap-northeast-2`로 자신에게 한 번 넘긴다
+  //   (2026-10-12 · 루틴·DB가 지역 머리를 몰라도 받게). 넘긴 요청에는 x-zf-region-hop 을 달아 두 번 넘기지 않는다 —
+  //   넘겨받은 쪽도 서울이 아니면 아래 허용목록 검사(rejectReason)가 사유를 돌려준다.
+  if (target && mode_of(reqUrl) !== 'selftest' && req.headers.get('x-zf-region-hop') !== '1') {
+    let host: string | null = null
+    try { host = new URL(target).hostname } catch { /* 아래 검사가 사유를 돌려준다 */ }
+    const base = Deno.env.get('SUPABASE_URL')
+    if (host && SEOUL_ONLY.has(host) && Deno.env.get('SB_REGION') !== SEOUL_REGION && base) {
+      const headers = new Headers({ 'x-cron-secret': req.headers.get('x-cron-secret') ?? '', 'x-region': SEOUL_REGION, 'x-zf-region-hop': '1' })
+      const ct = req.headers.get('content-type')
+      if (ct) headers.set('content-type', ct)
+      const body = req.method === 'GET' || req.method === 'HEAD' ? undefined : await req.arrayBuffer()
+      const res = await fetch(`${base}/functions/v1/fetch-attachment${reqUrl.search}`, { method: req.method, headers, body })
+      return new Response(res.body, {
+        status: res.status,
+        headers: { 'Content-Type': res.headers.get('content-type') ?? 'application/json', 'x-zf-region-hop': `${Deno.env.get('SB_REGION') ?? '?'}→${res.headers.get('x-sb-edge-region') ?? '?'}` },
+      })
+    }
+  }
   // meta=1 이면 본문(base64)을 빼고 메타데이터만 돌려준다.
   const metaOnly = reqUrl.searchParams.get('meta') === '1'
   const mode = reqUrl.searchParams.get('mode') ?? 'fetch'
