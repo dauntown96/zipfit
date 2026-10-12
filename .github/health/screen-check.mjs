@@ -395,6 +395,20 @@ try {
     add('open_count', '숫자가 말하는 「지금」 — 열린 공고 수 한 정의 · 누적 표기', ok ? 'pass' : 'fail', value,
       '공고 탭 기본 머리 = 「지금 열린 공고 M건(접수 중 a · 예정 b[ · 미상 k])」 · a+b+k = M · a = 인사이트 접수중 KPI · 인사이트 머리 「지금 열린 공고 M건」 · M = zfOpenNotices(noticeData) · 누적 T·기간 = DB')
   }
+  // ⑧ 접근성(axe-core · 2026-10-12 · 우편함 「코드 — Claude Code 장비 정비」 1) — 다섯 상태를 따로 열어 재고 기준선(a11y-baseline.json)과 견준다.
+  //    🔴 처음엔 경고만(warn — 이슈를 열지 않는다). 패키지가 없거나 재다 죽어도 warn 이다 — 나머지 점검을 실패로 만들지 않는다.
+  //    실패 승격은 D-3 끝난 뒤 claude.ai 판정(원칙 33). 기준선을 새로 쓰는 것도 그 판정 뒤에만(a11y.mjs --write-baseline).
+  try {
+    const { measure, compare, loadBaseline } = await import('./a11y.mjs')
+    const AxeBuilder = (await import('@axe-core/playwright')).default
+    const got = await measure(browser, SITE + '?a11y=' + Date.now(), { AxeBuilder })
+    const c = compare(got, loadBaseline())
+    extra.a11y = { states: got, increased: c.increased }
+    add('a11y', '접근성(axe-core · WCAG 2.1 A·AA) — 기준선보다 늘었나', c.status, c.value,
+      '다섯 상태(390 추천 · 390 공고 탭 · 390 카드 펼침 · 1280 공고 탭 · 390 어둡게)의 규칙별 위반 요소 수 ≤ 기준선 + max(3, 20%) · 새 규칙 0 — 처음엔 경고만')
+  } catch (e) {
+    add('a11y', '접근성(axe-core · WCAG 2.1 A·AA) — 기준선보다 늘었나', 'warn', '못 잼: ' + String(e).slice(0, 200), '처음엔 경고만')
+  }
 } catch (e) {
   add('runner', '점검 실행', 'fail', String(e).slice(0, 300), '점검 스크립트가 끝까지 돈다')
 } finally {
