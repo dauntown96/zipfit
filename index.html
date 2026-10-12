@@ -8496,6 +8496,9 @@ function initMapForHouse(h,id){
     if(!mapEl){ zfMapWarn(id, '좌표는 받았으나 지도 상자가 사라졌다(카드가 다시 그려짐)'); return; }
     const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
     const state = huMapState[id];
+    // 🔴 D-3 검증 c — 단지 이름표는 카카오가 「실제 주소」(도로명·지번 주소)로 찾았을 때만. 지명(REGION)으로 찾은 점은
+    //    그 지역의 가운데라 단지 위치로 읽히면 안 된다(양주 …20727 — 동 이름까지만 있는 주소가 시청 자리로 떨어졌다).
+    const zf3Exact = !approx && /_ADDR$/.test(String((result[0] || {}).address_type || ''));
     // 지도는 처음 한 번만 생성하고, 이후 건물 클릭 시에는 기존 지도/마커를 그 위치로 옮겨서
     // 항상 마커가 1개만 유지되도록 함.
     // 🔴 단, 「그 지도가 지금 이 상자에 들어 있을 때」만 그렇다.
@@ -8510,7 +8513,7 @@ function initMapForHouse(h,id){
     if(state && state.map && state.marker && state.el === mapEl){
       state.map.setCenter(coords);
       state.marker.setPosition(coords);
-      if(state.label && typeof zf3MapLabel === 'function'){ try{ state.label.setMap(null); }catch(e){} state.label = zf3MapLabel(state.map, coords, zf3MapName(id, h), state.el); }
+      if(state.label && typeof zf3MapLabel === 'function'){ try{ state.label.setMap(null); }catch(e){} state.label = zf3Exact ? zf3MapLabel(state.map, coords, zf3MapName(id, h), state.el) : null; }   // 🔴 대략 핀(시군구 가운데)에는 단지 이름표를 달지 않는다 — 단지 위치로 읽힌다(D-3 검증 c · 양주 …20727)
     } else {
       // 🔴 카카오 지도는 컨테이너에 타일을 **덧붙인다** — 기존 자식을 지우지 않는다.
       //    그래서 「📍 지도를 불러오는 중...」 자리표시자가 타일 뒤에 그대로 남아,
@@ -8518,9 +8521,9 @@ function initMapForHouse(h,id){
       //    지우는 책임이 어디에도 없었다 — 실패 경로만 innerHTML로 덮어쓰고 있었다.
       mapEl.innerHTML = '';
       const map = new kakao.maps.Map(mapEl, {center:coords, level:5});
-      const marker = new kakao.maps.Marker(Object.assign({position:coords, map}, (typeof zf3On === 'function' && zf3On() && typeof zf3MapName === 'function' && zf3MapName(id, h)) ? { title: zf3MapName(id, h) } : {}));   // 🔵 D-3 c 후속 — d3 만 표지 이름(카카오가 만드는 <area alt> 자리)
+      const marker = new kakao.maps.Marker(Object.assign({position:coords, map}, (typeof zf3On === 'function' && zf3On() && typeof zf3MapName === 'function' && zf3MapName(id, zf3Exact ? h : null)) ? { title: zf3MapName(id, zf3Exact ? h : null) } : {}));   // 🔵 D-3 c 후속 — d3 만 표지 이름(카카오가 만드는 <area alt> 자리)
       huMapState[id] = { map, marker, el: mapEl };   // 🔵 어느 상자에 들어 있는지까지 기억한다
-      if(typeof zf3MapLabel === 'function') huMapState[id].label = zf3MapLabel(map, coords, zf3MapName(id, h), mapEl);   // 🔵 D-3 c — d3 만
+      if(typeof zf3MapLabel === 'function' && zf3Exact) huMapState[id].label = zf3MapLabel(map, coords, zf3MapName(id, h), mapEl);   // 🔵 D-3 c — d3 만 · 대략 핀은 이름표 없음(검증 c)
     }
     setMapApproxNote(mapEl, approx);
     buildPoiTabs(id, coords);
