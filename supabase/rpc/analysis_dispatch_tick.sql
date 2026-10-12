@@ -35,6 +35,13 @@ AS $function$
 --   정정본 분석이 없으면(get_revision_analysis_done 거짓 — 화면 「정정 전 공고 기준」 배너와 같은 판정) 후보로 올린다.
 --   대기열 키 = 묶음 키 || ' #정정 ' || 정정 시각(KST 분) — 원공고의 끝난(done) 행과 겹치지 않고, 다시 정정되면 새 몫이 된다.
 --   루틴은 잡은 몫의 group_key 에 ' #정정 ' 이 있으면 신규 분석이 아니라 reverify 스킬 「정정공고」 갈래로 처리한다.
+-- 🔵 접수기간 없는 SH 공고(2026-10-12 · 우편함 「코드·운영 — 부산 첨부 등록 · SH 접수기간 없는 열린 공고 대기열 진입」 2):
+--   SH 목록에는 접수기간이 없어 apply_end 가 NULL 인 열린 SH 대표가 「apply_end ≥ 오늘+3」과 대기열 PK(apply_end NOT NULL)에서 빠졌다.
+--   대표의 apply_end 가 NULL ∧ SH ∧ status 가 접수마감이 아님 ∧ 최근 원문 키 대조(source_page_checks)의 SH 목록 모집상태가 「모집중」이면 후보로 올린다.
+--   (SH 목록이 모집상태를 비워 두는 후속 공지 — 접수결과·2순위 안내 — 는 여기서 빠진다.)
+--   대기열 키만 가상으로 둔다: group_key = 묶음 키 || ' #접수기간 없음 ' || 공고일 · apply_end = 9999-12-31(몫 순서 맨 뒤).
+--   🔴 이 가상 값은 analysis_dispatch_queue 밖으로 나가지 않는다 — announcements · 화면 · RPC 의 날짜는 그대로 NULL 이고,
+--   접수기간은 분석이 원문으로 *_confirmed 에 채운다. 채워진 뒤 같은 공고는 같은 공고 ID 의 완료 분석으로 후보에서 빠진다(SH 만의 자기 일치).
 -- 비밀값: Vault zipfit_routine_fire_url · zipfit_routine_fire_token(값은 표·반환에 싣지 않는다).
 declare
   cfg public.analysis_dispatch_config%rowtype;
@@ -112,10 +119,14 @@ begin
     where a.title is not null and a.hidden_from_listing is not true
   ),
   reps as (
-    select d.announcement_id, d.title, d.source, d.housing_type, d.apply_start, d.apply_end, k.k
+    select d.announcement_id, d.title, d.source, d.housing_type, d.apply_start, d.apply_end, d.announcement_date, k.k
     from get_announcements_deduped() d
     join keyed k on k.announcement_id = d.announcement_id
     where d.apply_end >= current_date + 3
+       or (d.apply_end is null and d.source = 'SH' and d.status is distinct from '접수마감'
+           and (select c.page_status from public.source_page_checks c
+                 where c.source = 'SH' and c.card_id = d.announcement_id and c.error is null
+                 order by c.checked_at desc limit 1) = '모집중')
   ),
   cand as (
     select r.* from reps r
@@ -123,7 +134,7 @@ begin
             where g.k = r.k and jsonb_typeof(g.attachment_urls) = 'array') > 0
       and not exists (select 1 from keyed g
             join public.announcement_analysis aa on aa.announcement_id = g.announcement_id
-           where g.k = r.k and (g.apply_end = r.apply_end or g.linked)
+           where g.k = r.k and (g.apply_end = r.apply_end or g.linked or (r.source = 'SH' and g.announcement_id = r.announcement_id))
              and aa.status in ('완료', '완료(보조 누락)', '완료(판정 대기)', '완료(소급)'))
   ),
   rcand as (
@@ -131,7 +142,7 @@ begin
            r.k || ' #정정 ' || to_char(a.revised_at at time zone 'Asia/Seoul', 'YYYY-MM-DD HH24:MI') as k
     from reps r
     join public.announcements a on a.announcement_id = r.announcement_id
-    where a.is_revised is true and a.revised_at is not null
+    where a.is_revised is true and a.revised_at is not null and r.apply_end is not null
       and (select coalesce(sum(jsonb_array_length(g.attachment_urls)), 0) from keyed g
             where g.k = r.k and jsonb_typeof(g.attachment_urls) = 'array') > 0
       and exists (select 1 from keyed g
@@ -141,16 +152,21 @@ begin
       and not public.get_revision_analysis_done(r.announcement_id)
   ),
   allc as (
-    select c.announcement_id, c.title, c.source, c.housing_type, c.apply_start, c.apply_end, c.k, false as rev from cand c
+    select c.announcement_id, c.title, c.source, c.housing_type, c.apply_start,
+           coalesce(c.apply_end, date '9999-12-31') as apply_end,
+           case when c.apply_end is null then c.k || ' #접수기간 없음 ' || coalesce(c.announcement_date::text, '공고일 없음') else c.k end as k,
+           false as rev, (c.apply_end is null) as noend
+    from cand c
     union all
-    select x.announcement_id, x.title, x.source, x.housing_type, x.apply_start, x.apply_end, x.k, true from rcand x
+    select x.announcement_id, x.title, x.source, x.housing_type, x.apply_start, x.apply_end, x.k, true, false from rcand x
   ),
   ins as (
     insert into public.analysis_dispatch_queue (group_key, apply_end, announcement_id, title, apply_start, phase, needs_promo, note)
     select c.k, c.apply_end, c.announcement_id, c.title, c.apply_start,
-           case when c.apply_start > current_date then '접수 전' else '접수 중' end,
+           case when c.noend then '접수기간 없음' when c.apply_start > current_date then '접수 전' else '접수 중' end,
            (c.source = 'LH' and c.housing_type = '주거복지 - 매입임대'),
-           case when c.rev then '정정본 — reverify 스킬 「정정공고」 갈래' end
+           case when c.rev then '정정본 — reverify 스킬 「정정공고」 갈래'
+                when c.noend then '접수기간 없음(SH 목록 모집중) — apply_end 9999-12-31 은 대기열 키 전용 · 접수기간은 원문으로 확정' end
     from allc c
     on conflict (group_key, apply_end) do nothing
     returning 1
