@@ -692,6 +692,61 @@ html[data-ui="d3"] .zf3-card:has(.zf3-dpill.hot) .zf3-today b{animation:zf3ping 
 .zf3-close:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
 html[data-ui="d3"] .zf3-card .chip-row .chip.zf3-minechip{background:var(--surface-2)!important;color:var(--ink)!important;border-color:transparent!important;font-weight:700}
 @media (prefers-reduced-motion:reduce){.zf3-tind,.zf3-sticky,.zf3-in,html[data-ui="d3"] .zf3-card.zf3-open > [data-ann-id],html[data-ui="d3"] .zf3-card .zf3-today b,.zf3-gotop span{animation:none!important;transition:none!important}}
+/* 인사이트(d3 · 둘러보기 ①③) */
+.zf3-ins{display:flex;flex-direction:column;gap:14px}
+.zf3-ins-head h2{margin:4px 0 4px;font-size:var(--t-xl);color:var(--ink)}
+.zf3-ins-head p{margin:0;font-size:var(--t-s);color:var(--ink-2);line-height:1.55;word-break:keep-all}
+.zf3-ins-head b{color:var(--ink)}
+.zf3-kpi{display:grid;grid-template-columns:repeat(3,1fr);border-radius:var(--r-3);overflow:hidden;background:var(--board);background-image:radial-gradient(circle at center,var(--led-dot) 0 1px,transparent 1.4px);background-size:4px 4px;border:1px solid #2b2e35}
+.zf3-kc{display:flex;flex-direction:column;align-items:center;gap:4px;padding:16px 6px 14px;text-align:center}
+.zf3-kc + .zf3-kc{border-left:1px solid rgba(255,255,255,.08)}
+.zf3-kc b{font-family:var(--f-led);font-size:34px;line-height:1;color:var(--c);text-shadow:0 0 10px color-mix(in srgb,var(--c) 45%,transparent);font-variant-numeric:tabular-nums}
+.zf3-kc span{font-size:12px;color:var(--board-ink-2);word-break:keep-all;line-height:1.3}
+.zf3-ins-card{background:var(--paper);border:1px solid var(--line-2);border-radius:var(--r-3);padding:16px}
+.zf3-ins-card h3{margin:0 0 2px;font-size:var(--t-l);color:var(--ink);display:flex;align-items:baseline;gap:8px}
+.zf3-ins-card h3 span{font-size:var(--t-xs);color:var(--ink-3);font-weight:500}
+.zf3-ins-note{margin:0 0 12px;font-size:var(--t-xs);color:var(--ink-3);line-height:1.5;word-break:keep-all}
+.zf3-ins-empty{margin:8px 0;font-size:var(--t-s);color:var(--ink-3);text-align:center}
+.zf3-tl{display:grid;grid-template-columns:repeat(14,1fr);gap:3px;align-items:end;height:128px}
+.zf3-tc{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0}
+.zf3-tc .n{font:700 11px/1 var(--f-led);color:var(--ink);margin-bottom:3px;min-height:11px}
+.zf3-tc i{display:block;width:100%;max-width:18px;height:calc(var(--h) * .7px + 3px);background:var(--ink-3);border-radius:3px 3px 0 0;transform-origin:bottom;animation:zf3grow 500ms var(--ease) both}
+.zf3-tc.z i{background:var(--line-2)}
+.zf3-tc.hot:not(.z) i{background:var(--warn)}
+.zf3-tc.hot .n,.zf3-tc.hot .d,.zf3-tc.hot .w{color:var(--warn);font-weight:700}
+.zf3-tc .d{margin-top:5px;font:700 11px/1.1 var(--f-led);color:var(--ink-2);white-space:nowrap}
+.zf3-tc .w{font-size:10px;color:var(--ink-3);line-height:1.2;white-space:nowrap;letter-spacing:-.04em}
+.zf3-rl{display:flex;flex-direction:column;gap:8px}
+.zf3-rr{display:grid;grid-template-columns:minmax(0,7.5em) 1fr auto;align-items:center;gap:10px;font-size:var(--t-s)}
+.zf3-rr .nm{color:var(--ink);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.zf3-rr .tr{height:8px;border-radius:4px;background:var(--surface-2);overflow:hidden}
+.zf3-rr .tr i{display:block;height:100%;width:calc(var(--w) * 1%);background:var(--ink);border-radius:4px;transform-origin:left;animation:zf3grow-x 600ms var(--ease) both}
+.zf3-rr .ct{font:700 13px/1 var(--f-led);color:var(--ink);min-width:2.5em;text-align:right}
+.zf3-more{all:unset;box-sizing:border-box;display:flex;align-items:center;justify-content:center;width:100%;min-height:var(--hit);margin-top:10px;border:1px solid var(--line);border-radius:var(--r-2);font-size:var(--t-s);font-weight:700;color:var(--ink);cursor:pointer}
+.zf3-more:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.zf3-tr{display:flex;align-items:flex-end;gap:2px;height:90px}
+.zf3-trc{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
+.zf3-trc .n{font:700 9px/1 var(--f-led);color:var(--ink-3);margin-bottom:2px}
+.zf3-trc i{display:block;width:100%;max-width:14px;height:calc(var(--h) * .62px + 2px);background:var(--ln-kuk);border-radius:2px 2px 0 0;transform-origin:bottom;animation:zf3grow 500ms var(--ease) both}
+.zf3-trx{display:flex;justify-content:space-between;margin-top:6px;font:700 11px/1 var(--f-led);color:var(--ink-3)}
+@keyframes zf3grow{from{transform:scaleY(0)}}
+@keyframes zf3grow-x{from{transform:scaleX(0)}}
+@media (prefers-reduced-motion:reduce){.zf3-tc i,.zf3-rr .tr i,.zf3-trc i{animation:none!important}}
+/* 단계 알약 · 단추(d3 · 둘러보기 ① — 어둡게 모드에서 흰 알약·흰 단추가 남던 자리) */
+html[data-ui="d3"] .steps{gap:0;padding:4px;border-radius:var(--r-3);background:var(--surface-2)}
+html[data-ui="d3"] .step{min-height:var(--hit);display:flex;align-items:center;justify-content:center;border:0;border-radius:var(--r-2);background:transparent;color:var(--ink-3);font-size:var(--t-s);font-family:var(--f-ui);transition:background var(--m-fast),color var(--m-fast)}
+html[data-ui="d3"] .step.active{background:var(--paper);color:var(--ink);font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+html[data-ui="d3"] .step.done{background:transparent;color:var(--ink-2)}
+html[data-ui="d3"] .btn-primary{background:var(--ink);color:var(--paper)}
+html[data-ui="d3"] .btn-primary:hover{background:var(--ink-2)}
+html[data-ui="d3"] .btn-sec{background:var(--paper);color:var(--ink);border:1px solid var(--line)}
+html[data-ui="d3"] .btn-sec:hover{background:var(--surface)}
+html[data-ui="d3"] .btn-sm{min-height:var(--hit);display:inline-flex;align-items:center;justify-content:center;font-size:var(--t-s);font-weight:600}
+/* 손으로 적힌 회색 글자(종전 화면 인라인 #555~#bbb) → 토큰 — 어둡게 모드에서 2:1 까지 떨어지던 자리(둘러보기 ①) */
+html[data-ui="d3"] [style*="color:#555"],html[data-ui="d3"] [style*="color:#666"]{color:var(--ink-2)!important}
+html[data-ui="d3"] [style*="color:#888"],html[data-ui="d3"] [style*="color:#999"],html[data-ui="d3"] [style*="color:#aaa"],html[data-ui="d3"] [style*="color:#bbb"]{color:var(--ink-3)!important}
+/* 아직 못 가는 단계(추천 「② 주택 매칭」 — opacity .4 로 흐리던 것) → 흐림 대신 옅은 글자 · 단계 e 에서 노선 스텝으로 바뀐다 */
+html[data-ui="d3"] .step[style*="opacity"]{opacity:1!important;color:var(--ink-3)}
 @keyframes zf3breath{from{opacity:.55}to{opacity:1}}
 @keyframes zf3grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
 @keyframes zf3flag{from{opacity:0;transform:translate(-50%,-4px)}to{opacity:1;transform:translateX(-50%)}}
@@ -748,7 +803,7 @@ html[data-ui="d3"] .zf3-card .chip-row .chip.zf3-minechip{background:var(--surfa
     <p id="zfMatchPrefillNote" class="hidden" style="font-size:12px;color:#0F6E56;margin:-0.25rem 0 0.75rem">✅ 저장한 조건으로 채웠어요</p>
     <div class="row">
       <div class="field">
-        <label class="label">혼인 상태</label>
+        <label class="label" for="marital">혼인 상태</label>
         <select id="marital">
           <option value="">혼인 상태를 선택하세요</option>
           <option value="single">결혼한 적 없음</option>
@@ -762,7 +817,7 @@ html[data-ui="d3"] .zf3-card .chip-row .chip.zf3-minechip{background:var(--surfa
         </select>
       </div>
       <div class="field">
-        <label class="label">자녀 수 (미성년)</label>
+        <label class="label" for="children">자녀 수 (미성년)</label>
         <select id="children">
           <option value="0">자녀 수: 없음</option>
           <option value="1">자녀 수: 1명</option>
@@ -773,7 +828,7 @@ html[data-ui="d3"] .zf3-card .chip-row .chip.zf3-minechip{background:var(--surfa
     </div>
     <div class="row">
       <div class="field">
-        <label class="label">가구원 수</label>
+        <label class="label" for="members">가구원 수</label>
         <select id="members">
           <option value="1">가구원 수: 1인</option>
           <option value="2" selected>가구원 수: 2인</option>
@@ -827,7 +882,7 @@ html[data-ui="d3"] .zf3-card .chip-row .chip.zf3-minechip{background:var(--surfa
         <p style="font-size:11px;color:#999;margin:0.35rem 0 0">부동산·자동차·금융자산 등을 모두 더하고 부채를 뺀 금액이에요.</p>
       </div>
       <div class="field">
-        <label class="label">주택 소유 여부</label>
+        <label class="label" for="owned">주택 소유 여부</label>
         <select id="owned">
           <option value="no">주택 소유: 없음 (무주택)</option>
           <option value="yes">주택 소유: 있음</option>
@@ -856,7 +911,7 @@ html[data-ui="d3"] .zf3-card .chip-row .chip.zf3-minechip{background:var(--surfa
     </div>
     <div class="row">
       <div class="field">
-        <label class="label">주택청약종합저축 보유</label>
+        <label class="label" for="hasSavings">주택청약종합저축 보유</label>
         <select id="hasSavings">
           <option value="unknown">청약통장: 모름</option>
           <option value="yes">청약통장: 있음</option>
@@ -864,7 +919,7 @@ html[data-ui="d3"] .zf3-card .chip-row .chip.zf3-minechip{background:var(--surfa
         </select>
       </div>
       <div class="field">
-        <label class="label">최하층 우선배정 신청 여부</label>
+        <label class="label" for="wantsGroundFloor">최하층 우선배정 신청 여부</label>
         <select id="wantsGroundFloor">
           <option value="no">최하층 우선배정: 해당 없음</option>
           <option value="yes">최하층 우선배정: 신청 희망 (장애인·노약자)</option>
@@ -4503,83 +4558,7 @@ function renderInsight(rows, wrap, statsRows){
   const S = 'background:#fff;border-radius:14px;padding:20px;margin-bottom:16px;box-shadow:0 1px 6px rgba(0,0,0,0.07)';
   const T = 'font-size:15px;font-weight:700;margin-bottom:14px;color:#333;margin-top:0';
 
-  wrap.innerHTML = `
-    <div style="${S}">
-      <p style="${T}">📊 공고 통계 인사이트</p>
-      <p style="font-size:13px;color:#888;margin:0">지금 열린 공고 <strong style="color:#5a7af7">${regionRows.length.toLocaleString()}건</strong> · ${zfCumulativeText(rows)} · 수시로 자동 업데이트</p>
-    </div>
-
-    <div style="${S}">
-      <p style="${T}">📌 주요 현황</p>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
-        <div style="background:#f0f3ff;border-radius:12px;padding:16px;text-align:center;box-shadow:0 1px 4px rgba(90,122,247,0.08)">
-          <p style="font-size:28px;font-weight:700;color:#5a7af7;margin:0">${kpiActive.toLocaleString()}</p>
-          <p style="font-size:12px;color:#888;margin-top:6px">🟢 접수중</p>
-        </div>
-        <div style="background:#f0faf5;border-radius:12px;padding:16px;text-align:center;box-shadow:0 1px 4px rgba(29,158,117,0.08)">
-          <p style="font-size:28px;font-weight:700;color:#1D9E75;margin:0">${kpiNew.toLocaleString()}</p>
-          <p style="font-size:12px;color:#888;margin-top:6px">🆕 이번주 신규</p>
-        </div>
-        <div style="background:#fff7f0;border-radius:12px;padding:16px;text-align:center;box-shadow:0 1px 4px rgba(239,159,39,0.08)">
-          <p style="font-size:28px;font-weight:700;color:#EF9F27;margin:0">${kpiClosing.toLocaleString()}</p>
-          <p style="font-size:12px;color:#888;margin-top:6px">⏰ 마감임박</p>
-        </div>
-      </div>
-    </div>
-
-    <div style="${S}">
-      <p style="${T}">📅 마감 임박 타임라인</p>
-      <div style="display:flex;align-items:flex-end;gap:6px;overflow-x:auto;padding-bottom:6px;min-height:100px">
-        ${timelineEntries.map(([date,cnt])=>{
-          const isToday = date===todayStr;
-          const isTomorrow = date===tomorrowStr;
-          const label = isToday?'오늘':isTomorrow?'내일':date.slice(5);
-          const barH = cnt>0 ? Math.round(cnt/timelineMax*60)+8 : 4;
-          const barColor = isToday?'#5a7af7':isTomorrow?'#EF9F27':'#a0b4fa';
-          const labelColor = (isToday||isTomorrow)?'#5a7af7':'#bbb';
-          return `<div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;min-width:34px">
-            <span style="font-size:10px;color:#666;margin-bottom:2px;font-weight:${cnt>0?'600':'400'}">${cnt||''}</span>
-            <div style="background:${barColor};border-radius:3px 3px 0 0;width:22px;height:${barH}px;opacity:${cnt>0?1:0.2}"></div>
-            <span style="font-size:9px;color:${labelColor};margin-top:3px;font-weight:${isToday||isTomorrow?'700':'400'}">${label}</span>
-          </div>`;
-        }).join('')}
-      </div>
-    </div>
-
-    <div style="${S}">
-      <p style="${T};margin-bottom:4px">📍 지역별 공고 현황 (${regionAll.length}개 지역)</p>
-      <p style="font-size:12px;color:#888;margin:0 0 14px;line-height:1.5">신청할 수 없는 공고는 빼고 <strong style="color:#5a7af7">${regionRows.length.toLocaleString()}건</strong>을 세었어요 · 목록에 없는 지역은 지금 신청할 수 있는 공고가 없는 곳이에요</p>
-      ${regionAll.length===0 ? '<p style="font-size:13px;color:#aaa;text-align:center;padding:20px 0">지금 신청할 수 있는 공고가 없어요</p>' : `
-      <div style="display:flex;flex-direction:column;gap:10px">
-        ${regionTop.map(regionRowHTML).join('')}
-      </div>
-      ${regionRest.length ? `
-        <div id="regionRest" style="display:none;flex-direction:column;gap:10px;margin-top:10px">
-          ${regionRest.map(regionRowHTML).join('')}
-        </div>
-        <button class="btn btn-sec btn-sm" id="regionMoreBtn" style="margin-top:10px"
-                data-more="나머지 ${regionRest.length}개 지역 더 보기 ↓" data-less="접기 ↑"
-                onclick="toggleRegionRest(this)">나머지 ${regionRest.length}개 지역 더 보기 ↓</button>` : ''}
-      `}
-    </div>
-
-    <div style="${S}">
-      <p style="${T};margin-bottom:4px">📈 최근 30일 공고 추이</p>
-      <p style="font-size:12px;color:#888;margin:0 0 12px">공고일 기준 · 마감 포함</p>
-      ${trendEntries.length===0
-        ? '<p style="font-size:13px;color:#aaa;text-align:center;padding:20px 0">최근 30일 데이터가 없어요</p>'
-        : `<div style="display:flex;align-items:flex-end;gap:4px;overflow-x:auto;padding-bottom:4px;min-height:84px">
-            ${trendEntries.map(([date,cnt])=>`
-              <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;min-width:24px" title="${date}: ${cnt}건">
-                <span style="font-size:9px;color:#888;margin-bottom:2px">${cnt}</span>
-                <div style="background:#5a7af7;border-radius:3px 3px 0 0;width:18px;height:${Math.round(cnt/trendMax*60)+4}px"></div>
-                <span style="font-size:8px;color:#bbb;margin-top:2px;writing-mode:vertical-rl;text-orientation:mixed">${date.slice(5)}</span>
-              </div>`).join('')}
-          </div>`
-      }
-    </div>
-
-    ${(()=>{
+  const statsHTML = (()=>{
       if(!statsRows){
         return `<div style="background:#f5f5f5;border-radius:14px;padding:20px;margin-bottom:16px;text-align:center">
           <p style="font-size:13px;color:#aaa">재고 데이터를 불러올 수 없습니다</p>
@@ -4672,7 +4651,89 @@ function renderInsight(rows, wrap, statsRows){
       return `<div style="margin:8px 0 4px">
         <p style="font-size:13px;font-weight:700;color:#888;margin:0 0 12px;padding-left:2px">📊 전국 공공임대 재고 현황 (출처: 공공데이터포털)</p>
       </div>${secA}${secB}`;
-    })()}`;
+  })();
+  // 🔵 D-3 둘러보기 ③ — d3 는 같은 수로 다른 판(LED 숫자판 · 14일 마감 막대 · 지역 막대 · 30일 추이)을 그리고, 재고 절은 색만 토큰으로(어둡게 모드)
+  if(typeof zf3On === 'function' && zf3On()){
+    wrap.innerHTML = zf3InsightTop({ openN: regionRows.length, cumText: zfCumulativeText(rows), kpiActive, kpiNew, kpiClosing, timelineEntries, todayStr, tomorrowStr, regionAll, regionTop, regionRest, regionMaxCnt, trendEntries, trendMax }) + zf3Recolor(statsHTML);
+    return;
+  }
+  wrap.innerHTML = `
+    <div style="${S}">
+      <p style="${T}">📊 공고 통계 인사이트</p>
+      <p style="font-size:13px;color:#888;margin:0">지금 열린 공고 <strong style="color:#5a7af7">${regionRows.length.toLocaleString()}건</strong> · ${zfCumulativeText(rows)} · 수시로 자동 업데이트</p>
+    </div>
+
+    <div style="${S}">
+      <p style="${T}">📌 주요 현황</p>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+        <div style="background:#f0f3ff;border-radius:12px;padding:16px;text-align:center;box-shadow:0 1px 4px rgba(90,122,247,0.08)">
+          <p style="font-size:28px;font-weight:700;color:#5a7af7;margin:0">${kpiActive.toLocaleString()}</p>
+          <p style="font-size:12px;color:#888;margin-top:6px">🟢 접수중</p>
+        </div>
+        <div style="background:#f0faf5;border-radius:12px;padding:16px;text-align:center;box-shadow:0 1px 4px rgba(29,158,117,0.08)">
+          <p style="font-size:28px;font-weight:700;color:#1D9E75;margin:0">${kpiNew.toLocaleString()}</p>
+          <p style="font-size:12px;color:#888;margin-top:6px">🆕 이번주 신규</p>
+        </div>
+        <div style="background:#fff7f0;border-radius:12px;padding:16px;text-align:center;box-shadow:0 1px 4px rgba(239,159,39,0.08)">
+          <p style="font-size:28px;font-weight:700;color:#EF9F27;margin:0">${kpiClosing.toLocaleString()}</p>
+          <p style="font-size:12px;color:#888;margin-top:6px">⏰ 마감임박</p>
+        </div>
+      </div>
+    </div>
+
+    <div style="${S}">
+      <p style="${T}">📅 마감 임박 타임라인</p>
+      <div style="display:flex;align-items:flex-end;gap:6px;overflow-x:auto;padding-bottom:6px;min-height:100px">
+        ${timelineEntries.map(([date,cnt])=>{
+          const isToday = date===todayStr;
+          const isTomorrow = date===tomorrowStr;
+          const label = isToday?'오늘':isTomorrow?'내일':date.slice(5);
+          const barH = cnt>0 ? Math.round(cnt/timelineMax*60)+8 : 4;
+          const barColor = isToday?'#5a7af7':isTomorrow?'#EF9F27':'#a0b4fa';
+          const labelColor = (isToday||isTomorrow)?'#5a7af7':'#bbb';
+          return `<div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;min-width:34px">
+            <span style="font-size:10px;color:#666;margin-bottom:2px;font-weight:${cnt>0?'600':'400'}">${cnt||''}</span>
+            <div style="background:${barColor};border-radius:3px 3px 0 0;width:22px;height:${barH}px;opacity:${cnt>0?1:0.2}"></div>
+            <span style="font-size:9px;color:${labelColor};margin-top:3px;font-weight:${isToday||isTomorrow?'700':'400'}">${label}</span>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <div style="${S}">
+      <p style="${T};margin-bottom:4px">📍 지역별 공고 현황 (${regionAll.length}개 지역)</p>
+      <p style="font-size:12px;color:#888;margin:0 0 14px;line-height:1.5">신청할 수 없는 공고는 빼고 <strong style="color:#5a7af7">${regionRows.length.toLocaleString()}건</strong>을 세었어요 · 목록에 없는 지역은 지금 신청할 수 있는 공고가 없는 곳이에요</p>
+      ${regionAll.length===0 ? '<p style="font-size:13px;color:#aaa;text-align:center;padding:20px 0">지금 신청할 수 있는 공고가 없어요</p>' : `
+      <div style="display:flex;flex-direction:column;gap:10px">
+        ${regionTop.map(regionRowHTML).join('')}
+      </div>
+      ${regionRest.length ? `
+        <div id="regionRest" style="display:none;flex-direction:column;gap:10px;margin-top:10px">
+          ${regionRest.map(regionRowHTML).join('')}
+        </div>
+        <button class="btn btn-sec btn-sm" id="regionMoreBtn" style="margin-top:10px"
+                data-more="나머지 ${regionRest.length}개 지역 더 보기 ↓" data-less="접기 ↑"
+                onclick="toggleRegionRest(this)">나머지 ${regionRest.length}개 지역 더 보기 ↓</button>` : ''}
+      `}
+    </div>
+
+    <div style="${S}">
+      <p style="${T};margin-bottom:4px">📈 최근 30일 공고 추이</p>
+      <p style="font-size:12px;color:#888;margin:0 0 12px">공고일 기준 · 마감 포함</p>
+      ${trendEntries.length===0
+        ? '<p style="font-size:13px;color:#aaa;text-align:center;padding:20px 0">최근 30일 데이터가 없어요</p>'
+        : `<div style="display:flex;align-items:flex-end;gap:4px;overflow-x:auto;padding-bottom:4px;min-height:84px">
+            ${trendEntries.map(([date,cnt])=>`
+              <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;min-width:24px" title="${date}: ${cnt}건">
+                <span style="font-size:9px;color:#888;margin-bottom:2px">${cnt}</span>
+                <div style="background:#5a7af7;border-radius:3px 3px 0 0;width:18px;height:${Math.round(cnt/trendMax*60)+4}px"></div>
+                <span style="font-size:8px;color:#bbb;margin-top:2px;writing-mode:vertical-rl;text-orientation:mixed">${date.slice(5)}</span>
+              </div>`).join('')}
+          </div>`
+      }
+    </div>
+
+    ${statsHTML}`;
 }
 
 async function updateBannerFromDB(){
@@ -9995,6 +10056,54 @@ function zf3ToggleSheet(open){
   if(add) add.setAttribute('aria-expanded', String(open));
   if(open){ const f = panel.querySelector('input,select,button,[tabindex="0"]'); if(f) f.focus(); }
   else if(add) add.focus();
+}
+// 인사이트 탭(d3 · 둘러보기 ③ · 2026-10-12) — renderInsight 가 센 수를 그대로 받아 다른 판으로만 그린다(수·술어는 renderInsight 한 곳).
+//    LED 숫자판(접수 중 · 최근 7일 신규 · 3일 안 마감) · 앞으로 14일 마감 막대(오늘·내일 경고 색) · 지역 막대 · 최근 30일 공고 추이.
+//    낱말은 술어 그대로 밝힌다 — 종전 「이번주 신규」는 실제로 「공고일이 최근 7일」, 「마감임박」은 「마감이 오늘~3일 뒤」다(isClosingSoon).
+function zf3InsightTop(c){
+  const fmt = v => Number(v || 0).toLocaleString();
+  const dow = k => '일월화수목금토'[new Date(k + 'T00:00:00Z').getUTCDay()];
+  const tMax = Math.max(1, ...c.timelineEntries.map(e => e[1]));
+  const tl = c.timelineEntries.map(([k, n], i) => {
+    const hot = k === c.todayStr || k === c.tomorrowStr;
+    const day = +k.slice(8, 10);
+    const lab = day === 1 || i === 0 ? `${+k.slice(5, 7)}/${day}` : String(day);   // 날짜는 숫자로 · 오늘·내일은 아래 요일 칸에(두 글자가 14칸에 겹치지 않게)
+    const wk = k === c.todayStr ? '오늘' : k === c.tomorrowStr ? '내일' : dow(k);
+    return `<div class="zf3-tc${hot ? ' hot' : ''}${n ? '' : ' z'}" title="${k}: ${n}건"><span class="n">${n || ''}</span><i style="--h:${n ? Math.round(n / tMax * 100) : 0}"></i><span class="d">${lab}</span><span class="w">${wk}</span></div>`;
+  }).join('');
+  const tlAria = '앞으로 14일 마감 공고 — ' + (c.timelineEntries.filter(e => e[1]).map(([k, n]) => `${k === c.todayStr ? '오늘' : k === c.tomorrowStr ? '내일' : (+k.slice(5, 7)) + '월 ' + (+k.slice(8, 10)) + '일'} ${n}건`).join(', ') || '없음');
+  const rRow = ([name, v]) => `<div class="zf3-rr"><span class="nm">${escapeHtml(name)}</span><span class="tr"><i style="--w:${Math.round(v.cnt / c.regionMaxCnt * 100)}"></i></span><span class="ct">${fmt(v.cnt)}</span></div>`;
+  const trMax = Math.max(1, ...c.trendEntries.map(e => e[1]));
+  const tr = c.trendEntries.map(([k, n]) => `<div class="zf3-trc" title="${k}: ${n}건"><span class="n">${n}</span><i style="--h:${Math.round(n / trMax * 100)}"></i></div>`).join('');
+  const trFirst = c.trendEntries.length ? c.trendEntries[0][0] : '', trLast = c.trendEntries.length ? c.trendEntries[c.trendEntries.length - 1][0] : '';
+  return `<section class="zf3-ins">
+    <div class="zf3-ins-head"><h2>인사이트</h2><p>지금 열린 공고 <b>${fmt(c.openN)}건</b> · ${escapeHtml(c.cumText)} · 수시로 자동 업데이트</p></div>
+    <div class="zf3-kpi" role="group" aria-label="주요 현황 — 지금 열린 공고 기준">
+      <div class="zf3-kc"><b style="--c:var(--led-green)">${fmt(c.kpiActive)}</b><span>접수 중</span></div>
+      <div class="zf3-kc"><b style="--c:var(--led)">${fmt(c.kpiNew)}</b><span>최근 7일 신규</span></div>
+      <div class="zf3-kc"><b style="--c:var(--led-red)">${fmt(c.kpiClosing)}</b><span>3일 안 마감</span></div>
+    </div>
+    <div class="zf3-ins-card"><h3>앞으로 14일 마감</h3><p class="zf3-ins-note">지금 열린 공고의 마감일</p>
+      <div class="zf3-tl" role="img" aria-label="${zfAttr(tlAria)}">${tl}</div></div>
+    <div class="zf3-ins-card"><h3>지역별 열린 공고 <span>${c.regionAll.length}개 지역</span></h3>
+      <p class="zf3-ins-note">신청할 수 없는 공고는 빼고 ${fmt(c.openN)}건을 세었어요 · 목록에 없는 지역은 지금 신청할 수 있는 공고가 없는 곳이에요</p>
+      ${c.regionAll.length === 0 ? '<p class="zf3-ins-empty">지금 신청할 수 있는 공고가 없어요</p>' : `<div class="zf3-rl">${c.regionTop.map(rRow).join('')}</div>
+      ${c.regionRest.length ? `<div id="regionRest" class="zf3-rl" style="display:none;margin-top:10px">${c.regionRest.map(rRow).join('')}</div>
+      <button type="button" class="zf3-more" id="regionMoreBtn" data-more="나머지 ${c.regionRest.length}개 지역 더 보기" data-less="접기" onclick="toggleRegionRest(this)">나머지 ${c.regionRest.length}개 지역 더 보기</button>` : ''}`}</div>
+    <div class="zf3-ins-card"><h3>최근 30일 공고 추이</h3><p class="zf3-ins-note">공고일 기준 · 마감 포함</p>
+      ${c.trendEntries.length === 0 ? '<p class="zf3-ins-empty">최근 30일 데이터가 없어요</p>' : `<div class="zf3-tr">${tr}</div><div class="zf3-trx"><span>${trFirst.slice(5).replace('-', '/')}</span><span>${trLast.slice(5).replace('-', '/')}</span></div>`}</div>
+  </section>`;
+}
+// 재고 절(renderInsight 의 statsHTML)은 글자·수를 그대로 두고 손으로 적힌 색만 토큰으로 바꾼다 — 어둡게 모드에서 흰 카드가 남던 자리(둘러보기 ①).
+function zf3Recolor(html){
+  const map = [
+    ['background:#fff;', 'background:var(--paper);border:1px solid var(--line-2);'],
+    ['box-shadow:0 1px 6px rgba(0,0,0,0.07)', 'box-shadow:none'],
+    ['background:#f8f9ff', 'background:var(--surface)'], ['background:#f5f5f5', 'background:var(--surface)'],
+    ['color:#333', 'color:var(--ink)'], ['color:#888', 'color:var(--ink-3)'], ['color:#bbb', 'color:var(--ink-3)'], ['color:#ccc', 'color:var(--ink-3)'], ['color:#aaa', 'color:var(--ink-3)'],
+    ['color:#5a7af7', 'color:var(--ln-kuk)'], ['color:#1D9E75', 'color:var(--ln-hang)'], ['color:#EF9F27', 'color:var(--ln-jeon)']
+  ];
+  return map.reduce((h, [a, b]) => h.split(a).join(b), String(html || ''));
 }
 // 탭 — 아이콘(390 아래 고정 탭에서만 보임) · 미끄러지는 표시 하나(둘러보기 ⑤·⑨ · 2026-10-12). 탭 단추·ID·goMain 그대로(원칙 7).
 //    아이콘: 추천 = 과녁(꼭 집어) · 공고 = 문서 · 인사이트 = 막대 · 관리 = 책갈피 · 설정 = 조절기. 장식이라 aria-hidden.
