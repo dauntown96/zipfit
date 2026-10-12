@@ -428,8 +428,13 @@ body.theme-dark .zf-totop{background:#262932;border-color:#3a3e48;color:#5DCAA5;
 
 /* ===== 🔵 2026-10-12 표시층 D-3 · 단계 a — 「지금 판」 토큰 · 부품(ui=d3 일 때만) =====
    토큰 정본은 꼭집 Design System 아티팩트(D-2 4차 「확정 토큰 지금 판」 표) — 이름을 같게 둔다.
-   어둡게는 앱 설정(body.theme-dark)을 따른다. 글꼴은 아직 내려받지 않는다(외부 요청 0 — 회신 ②) — 이름만 앞에 두고 기기 글꼴로 떨어진다.
+   어둡게는 앱 설정(body.theme-dark)을 따른다. 글꼴은 같은 출처의 부분 글꼴(fonts/ · 외부 요청 0) — 없는 글자는 기기 글꼴로 떨어진다.
    새 부품은 zf3- 접두. 기존 클래스·ID 는 지우지 않고 d3 에서만 숨기거나 옮긴다(원칙 7). */
+/* 화면 글꼴 — 자체 호스팅 부분 글꼴(fonts/README.md · 원본 IBM Plex Sans KR · Nanum Gothic Coding, OFL 수정본이라 이름을 바꿨다).
+   쓰는 요소가 그려질 때만 내려받는다 — d3 밖(종전 화면)은 받지 않는다 · swap 이라 기다리지 않고 기기 글꼴로 먼저 그린다. */
+@font-face{font-family:"Kkokzip Sans";src:url("fonts/kkokzip-sans-400.woff2") format("woff2");font-weight:400 500;font-style:normal;font-display:swap}
+@font-face{font-family:"Kkokzip Sans";src:url("fonts/kkokzip-sans-700.woff2") format("woff2");font-weight:600 800;font-style:normal;font-display:swap}
+@font-face{font-family:"Kkokzip LED";src:url("fonts/kkokzip-led-700.woff2") format("woff2");font-weight:400 800;font-style:normal;font-display:swap}
 html[data-ui="d3"] body{
   --bg:#F2F0EB; --paper:#FFFFFF; --surface:#F7F6F2; --surface-2:#EEECE6;
   --ink:#15171B; --ink-2:#3D424A; --ink-3:#5A616B;
@@ -440,8 +445,8 @@ html[data-ui="d3"] body{
   --warn:#B3261E; --warn-bg:#FCEDEB;
   --ln-kuk:#1F5FBF; --ln-young:#B5462B; --ln-hang:#1E7B4F; --ln-mae:#7B4BB0; --ln-jeon:#A35C00; --ln-gong:#0F7C8A; --ln-gi:#5B616B; --ln-ink:#FFFFFF;
   --map-sea:#E9EEF3; --map-land:#FFFFFF; --map-line:#B7BEC8; --map-dot:#1F5FBF; --map-hot:#B3261E;
-  --f-ui:"IBM Plex Sans KR",-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
-  --f-led:"Nanum Gothic Coding",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --f-ui:"Kkokzip Sans","IBM Plex Sans KR",-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --f-led:"Kkokzip LED","Nanum Gothic Coding",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   --t-xs:12px; --t-s:13px; --t-m:14px; --t-l:16px; --t-xl:18px; --t-2xl:22px;
   --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px;
   --r-1:6px; --r-2:10px; --r-3:14px; --hit:44px; --hit-band:48px;
@@ -500,7 +505,7 @@ span.zf3-mi{cursor:default}
 .zf3-tg.empty{color:var(--led-white)}
 .zf3-star{color:var(--led);font-size:13px}
 .zf3-nm{color:var(--led)}
-.zf3-pl{color:var(--board-ink-2);text-shadow:none;font-weight:400;font-size:13px}
+.zf3-pl{color:var(--board-ink-2);text-shadow:none;font-weight:400;font-size:13px;font-family:var(--f-ui)}
 .zf3-ntc{display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
 .zf3-ntc .zf3-nm{color:var(--led-white);text-shadow:0 0 5px rgba(242,241,236,.35)}
 .zf3-nl{color:var(--led-white);text-decoration:underline;text-underline-offset:3px;font-weight:400;font-size:13px;display:inline-flex;align-items:center;min-height:var(--hit);text-shadow:none}
@@ -513,7 +518,8 @@ span.zf3-mi{cursor:default}
 .zf3-one .zf3-view::after{display:none}
 .zf3-one .zf3-track{display:flex;justify-content:space-between;white-space:normal;width:100%;gap:8px;padding-block:4px}
 .zf3-one .zf3-mi{white-space:normal;flex-wrap:wrap;min-width:0}
-.zf3-cnt{font-size:12px;color:var(--board-ink-2);text-shadow:none;flex:none;font-weight:400}
+.zf3-one .zf3-ntc,.zf3-quiet .zf3-ntc{white-space:normal;flex-wrap:wrap;min-width:0;row-gap:0}   /* 한 줄씩 · 소식 없음 모드는 흐르지 않으니 접어서 다 보인다 */
+.zf3-cnt{font-size:12px;color:var(--board-ink-2);text-shadow:none;flex:none;font-weight:400;font-family:var(--f-ui)}
 .zf3-quiet .zf3-view{mask-image:none;-webkit-mask-image:none}
 .zf3-quiet .zf3-track{white-space:normal;padding-block:6px}
 .zf3-quiet .zf3-mi{white-space:normal}
