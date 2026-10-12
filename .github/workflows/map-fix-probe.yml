@@ -1,0 +1,25 @@
+# 1회용 검증(2026-10-12 · 우편함 「코드 — 지도 위치 고침」) — 세션 가지 push 에서만 · 병합 전에 지운다 · 결과는 잡 로그 FIX 줄
+name: Probe — map fix (temporary)
+on:
+  push:
+    branches: [claude/trusting-cray-wv9feg]
+    paths: ['.github/probe/**', '.github/workflows/map-fix-probe.yml']
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+      - name: Playwright 준비
+        run: |
+          set -euo pipefail
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund playwright@1.55.0 >/dev/null
+          npx playwright install --with-deps chromium >/dev/null
+      - name: 검증
+        run: node .github/probe/map-fix-probe.mjs
