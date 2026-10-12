@@ -18,7 +18,15 @@
       "mcp__bbb71e44-2993-4e98-a215-4b1ea5be27c5",
       "mcp__claude_ai_Gmail",
       "mcp__claude_ai_Slack",
-      "mcp__claude_ai_Canva"
+      "mcp__claude_ai_Canva",
+      "mcp__5b603e7b-dfe4-40fe-b38f-d15bec602bff__apply_migration",
+      "mcp__5b603e7b-dfe4-40fe-b38f-d15bec602bff__deploy_edge_function",
+      "mcp__5b603e7b-dfe4-40fe-b38f-d15bec602bff__execute_sql",
+      "mcp__5b603e7b-dfe4-40fe-b38f-d15bec602bff__create_project",
+      "mcp__5b603e7b-dfe4-40fe-b38f-d15bec602bff__pause_project",
+      "mcp__2360c257-2317-4276-beb1-6c477e3ecafe",
+      "mcp__d75e71b7-d27e-4368-8230-45be44203256",
+      "mcp__902f9056-3741-4964-876e-d160d563e186"
     ]
   },
   "hooks": {
