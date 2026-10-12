@@ -1,0 +1,25 @@
+# 1회용 조사(2026-10-12 · 우편함 「지도·일정·이전 회차 조사」 1) — 세션 가지에서만 돈다 · 병합하지 않는다 · 결과는 잡 로그의 PROBE 줄
+name: Probe — map fallback (temporary)
+on:
+  push:
+    branches: [claude/trusting-cray-wv9feg]
+    paths: ['.github/probe/**', '.github/workflows/map-probe.yml']
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+      - name: Playwright 준비
+        run: |
+          set -euo pipefail
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund playwright@1.55.0 >/dev/null
+          npx playwright install --with-deps chromium >/dev/null
+      - name: 조사
+        run: node .github/probe/map-probe.mjs
