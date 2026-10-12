@@ -604,6 +604,8 @@ html[data-ui="d3"] .zf3-card>div[id^="ncard-"]{margin:0 -14px 0 -18px!important;
 .zf3-stn.next i{border-color:var(--ln,var(--ink))}
 .zf3-stn.unk i{border-style:dashed;border-color:var(--ink-3)}
 .zf3-stn .k{font-size:11px;color:var(--ink-3);line-height:1.3;margin-top:2px}
+.zf3-stn .k .yr{font-weight:700;color:var(--ink-2);font-family:var(--f-led)}
+html[data-ui="d3"] .zf3-dup{display:none!important}
 .zf3-stn .v{font-size:12px;font-weight:700;font-family:var(--f-led);color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.25;overflow-wrap:anywhere}
 .zf3-stn .v small{display:block;font-family:var(--f-ui);font-weight:400;font-size:11px;color:var(--ink-3)}
 .zf3-stn.unk .v{font-family:var(--f-ui);font-weight:400;color:var(--ink-3)}
@@ -1641,7 +1643,7 @@ function applyUnknownChip(row){
   if(row['apply_period_check'] === true){
     return `<span class="chip" title="이 공급기관은 공고 목록의 접수기간이 공사 공고와 다른 적이 있어요. 공사 공고에서 확인하세요." style="cursor:help;padding:4px 10px;font-size:11px;background:#F6F6F2;border-color:#E8E8E0;color:#6B6B63">📅 ${APPLY_CHECK_LABEL}</span>`;
   }
-  return `<span class="chip" title="이 공고는 접수기간이 공개 목록에 없어요. 원문에서 확인하세요." style="cursor:help;padding:4px 10px;font-size:11px;background:#F6F6F2;border-color:#E8E8E0;color:#6B6B63">📅 ${APPLY_UNKNOWN_LABEL}</span>`;
+  return `<span class="chip" data-zf-unk="1" title="이 공고는 접수기간이 공개 목록에 없어요. 원문에서 확인하세요." style="cursor:help;padding:4px 10px;font-size:11px;background:#F6F6F2;border-color:#E8E8E0;color:#6B6B63">📅 ${APPLY_UNKNOWN_LABEL}</span>`;
 }
 // 날짜 줄. unknown이면 하이픈 대신 '미상'과 원문 링크를 놓는다 —
 // `접수마감: -`는 「마감일이 없다」로도 「비어 있다」로도 읽혀 아무 말도 안 한다.
@@ -9636,10 +9638,10 @@ const ZF3_DOW = '일월화수목금토';
 function zf3Today(){ return new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10); }
 function zf3Days(a, b){ return Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 864e5); }
 const zf3Real = d => (d && /^\d{4}-\d{2}-\d{2}/.test(d) && !/^9999/.test(d)) ? String(d).slice(0, 10) : null;
-function zf3Md(d){
+function zf3Md(d, noYear){
   if(!zf3Real(d)) return '';
   const x = new Date(d.slice(0, 10) + 'T00:00:00Z');
-  return (d.slice(0, 4) !== zf3Today().slice(0, 4) ? d.slice(2, 4) + '-' : '') + d.slice(5, 7) + '-' + d.slice(8, 10) + '(' + ZF3_DOW[x.getUTCDay()] + ')';
+  return (!noYear && d.slice(0, 4) !== zf3Today().slice(0, 4) ? d.slice(2, 4) + '-' : '') + d.slice(5, 7) + '-' + d.slice(8, 10) + '(' + ZF3_DOW[x.getUTCDay()] + ')';
 }
 const ZF3_ALWAYS = /상시\s?모집|수시\s?모집/;
 // 상태 알약 — 종전 상태 꼬리표(zfStatusTag 「공고중 · 접수중 · 접수마감」)의 자리. 같은 술어(applyWindowState)를 쓴다.
@@ -9668,8 +9670,8 @@ function zf3LineHTML(stns, label){
     else { const j = last + 1 + j0, f = zf3Days(stns[last].d, today) / Math.max(1, zf3Days(stns[last].d, stns[j].d)); p = (last + f * (j - last)) / (n - 1); moving = true; }
   }
   const nextI = stns.findIndex(x => x.d && x.d > today);
-  const st = stns.map((x, i) => `<span class="zf3-stn${!x.d ? ' unk' : x.d <= today ? ' past' : i === nextI ? ' next' : ''}"><i></i><span class="k">${escapeHtml(x.k)}</span><span class="v">${x.d ? zf3Md(x.d) : escapeHtml(x.u || '원문 확인')}${x.sub ? `<small>${escapeHtml(x.sub)}</small>` : ''}</span></span>`).join('');
-  const aria = stns.map(x => `${x.k} ${x.d ? zf3Md(x.d) : (x.u || '원문 확인')}${x.sub ? ' ' + x.sub : ''}`).join(', ');
+  const st = stns.map((x, i) => `<span class="zf3-stn${!x.d ? ' unk' : x.d <= today ? ' past' : i === nextI ? ' next' : ''}"><i></i><span class="k">${escapeHtml(x.k)}${x.d && x.d.slice(0, 4) !== today.slice(0, 4) ? ` <b class="yr">${x.d.slice(0, 4)}</b>` : ''}</span><span class="v">${x.d ? zf3Md(x.d, true) : escapeHtml(x.u || '원문 확인')}${x.sub ? `<small>${escapeHtml(x.sub)}</small>` : ''}</span></span>`).join('');
+  const aria = stns.map(x => `${x.k} ${x.d ? (x.d.slice(0, 4) !== today.slice(0, 4) ? x.d.slice(0, 4) + '년 ' : '') + zf3Md(x.d, true) : (x.u || '원문 확인')}${x.sub ? ' ' + x.sub : ''}`).join(', ');
   return `<div class="zf3-line" style="--n:${n};--p:${p.toFixed(3)}" role="img" aria-label="${zfAttr((label ? label + ' — ' : '') + aria)}"><span class="zf3-rail"></span><span class="zf3-done"></span>${st}${moving ? '<span class="zf3-today" aria-hidden="true"><b>오늘</b></span>' : ''}</div>`;
 }
 function zf3Stations(n){
@@ -9713,7 +9715,10 @@ function zf3DecorateCards(){
         top.appendChild(typeEl);
       }
       if(ZF3_ALWAYS.test(n['공고명'] || '')) top.insertAdjacentHTML('beforeend', '<span class="zf3-always">상시모집</span>');
-      if(!cancel){ const pl = zf3Pill(n); top.insertAdjacentHTML('beforeend', `<span class="zf3-dpill ${pl.cls}">${escapeHtml(pl.t)}</span>`); }
+      if(!cancel){ const pl = zf3Pill(n); top.insertAdjacentHTML('beforeend', `<span class="zf3-dpill ${pl.cls}">${escapeHtml(pl.t)}</span>`);
+        // 알약이 「접수기간 미상」이면 같은 말 칩(📅 접수기간 미상)은 접고 그 설명(title)을 알약으로 옮긴다 — 같은 사실을 세 번(알약·칩·날짜 줄) 말하지 않게.
+        const uc = pl.t === APPLY_UNKNOWN_LABEL ? card.querySelector('[data-zf-unk]') : null;
+        if(uc){ uc.classList.add('zf3-dup'); const pe = top.lastElementChild; pe.title = uc.title; } }
       card.insertBefore(top, card.firstChild);
       // ② 노선 — 날짜를 믿을 수 있을 때만. 종전 날짜 줄의 배지(단지마다 일정이 달라요 · 원문 확인 일정)는 노선 아래 한 줄로 옮긴다.
       const dl = card.querySelector('.zf-dateline');
@@ -9765,17 +9770,18 @@ function zf3DecorateCards(){
     if(card.dataset.zf3 === '1' && zfSide.loaded && card.dataset.zf3Win !== '1'){
       card.dataset.zf3Win = '1';
       const rows = zfSide.routesByKey.get(zfDedupKey(n['공고명']));
-      const wins = rows && rows.length && rows.every(r => r.route === '현장') ? zfRouteWindows(rows) : [];
+      const vk = rows && rows.length ? (zfRouteVerdict(rows, new Date()) || {}).kind || '' : '';
+      const wins = /^②-마/.test(vk) ? zfRouteWindows(rows) : [];   // 순위·단지로 갈린 창(②-가·나)은 반복 창이 아니다
       if(wins.length >= 2 && n['apply_period_check'] !== true){
         const today = zf3Today();
-        const cur = wins.find(w => w.s <= today && today <= w.e), nxt = wins.find(w => w.s > today), w = cur || nxt;
+        const cur = wins.find(w => w.s <= today && today <= w.e), nxt = wins.find(w => w.s > today), w = cur || nxt, began = wins.some(w0 => w0.e < today);
         const pill = card.querySelector('.zf3-dpill');
         if(pill && cur){ const d = zf3Days(today, cur.e); pill.className = 'zf3-dpill open' + (d <= 1 ? ' hot' : ''); pill.textContent = d === 0 ? '오늘 창 마감' : '접수 중 · 이번 창 D-' + d; }
-        else if(pill && nxt){ pill.className = 'zf3-dpill before'; pill.textContent = '다음 창 대기 · ' + zf3Md(nxt.s).replace(/\(.\)$/, ''); }
+        else if(pill && nxt && began){ pill.className = 'zf3-dpill before'; pill.textContent = '다음 창 대기 · ' + zf3Md(nxt.s).replace(/\(.\)$/, ''); }
         const route = card.querySelector('.zf3-route');
         if(route && w && card.dataset.zf3Branch !== '1'){
           const st = zf3Stations(n);
-          st[1] = { k: '접수', d: w.s, sub: (cur ? '이번 창' : '다음 창') + ' ~' + zf3Md(w.e).replace(/\(.\)$/, '') };
+          st[1] = { k: '접수', d: w.s, sub: (cur ? '이번 창' : began ? '다음 창' : '첫 창') + ' ~' + zf3Md(w.e).replace(/\(.\)$/, '') };
           route.innerHTML = zf3LineHTML(st);
         }
       }
