@@ -142,6 +142,11 @@
    "why": "내부 표 — anon·authenticated 권한 0 · 화면(index.html) 참조 0 · DB 함수·pg_cron·운영 점검(postgres)만 쓰고 읽는다. 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15)"
   },
   {
+   "key": "rls_enabled_no_policy_public_user_profiles",
+   "kind": "intended",
+   "why": "개인정보 표 — anon·authenticated 권한 0 · 화면 직접 조회 0 · EF save-user-profile·delete-account(service_role)만 읽고 쓴다. 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15 · 2026-10-12 고지 회차 3 · 5에서 정책 셋 걷음)"
+  },
+  {
    "key": "auth_leaked_password_protection",
    "kind": "known",
    "why": "유출 비밀번호 보호(HIBP) 꺼짐 — 화면은 비밀번호를 쓰지 않는다(카카오·매직링크) · 다만 이메일 공급자가 켜져 있어 API 로 비밀번호 가입은 열려 있다(메일 확인 필요 · 최소 6자) · 켜면 그 경로의 유출 비밀번호만 거부 · 켜기는 다운님 대시보드 몫"
