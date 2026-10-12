@@ -1962,6 +1962,20 @@ function zfRouteExcludeOf(rows){
   return found.length === 1 ? found[0] : '';
 }
 // 반환 { kind, text, ex? } — ex 는 text 끝에 붙은 제외 조각(zfRouteExcludeOf) · kind 는 ① · ②-가 · ②-나 · ②-다 · ②-다(지남) · ②-라 · ②-라(지남) · 없음. text 가 빈 문자열이면 한 줄을 그리지 않는다.
+// 🔵 2026-10-12(D-3 · 반복 접수 창 가안 — 다운님 승인) — 경로 행의 서로 다른 기간을 「창」으로 본다(시작 순).
+//    기간이 겹치면 끊긴 창이 아니므로 빈 목록(종전 갈래 그대로). 날짜 둘 다 있는 행만.
+function zfRouteWindows(rows){
+  const seen = new Set(), out = [];
+  (rows || []).forEach(r => {
+    if(!r.start_date || !r.end_date) return;
+    const k = r.start_date + '|' + r.end_date;
+    if(seen.has(k)) return;
+    seen.add(k); out.push({ s: String(r.start_date).slice(0, 10), e: String(r.end_date).slice(0, 10) });
+  });
+  out.sort((x, y) => x.s.localeCompare(y.s));
+  for(let i = 1; i < out.length; i++) if(out[i].s <= out[i - 1].e) return [];
+  return out;
+}
 function zfRouteVerdict(rows, today){
   if(!Array.isArray(rows) || !rows.length) return { kind: '없음', text: '' };
   const rs = rows.slice().sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
@@ -2008,6 +2022,22 @@ function zfRouteVerdict(rows, today){
     if(spans.length > 1) return { kind: '②-가', text: '접수일이 나뉘어 있어요 · ' + lineOf(spans) };
     const hsp = merge(groups.filter(g => g.hs || g.he), g => (g.hs || '') + '|' + (g.he || ''), g => zfSpanText(g.hs, g.he));
     if(hsp.length > 1) return { kind: '②-나', text: '현장 접수일이 나뉘어 있어요 · ' + lineOf(hsp) };
+  }
+  // ②-마 — 현장 접수 창이 여럿(단지·순위 구분 없이 기간이 다른 현장 행 둘 이상 · 서로 안 겹침 — 「매월 1일~10일」 꼴을 경로 표에 달마다 한 행).
+  //    🔴 한 기간으로 잇지 않는다(끊긴 창을 「3/3~12/10」처럼 그리면 창 밖 날에 간다). 오늘이 창 안이면 그 창 · 아니면 다음 창 · 다 지났으면 그리지 않는다.
+  //    날짜는 경로 행 값 그대로 · 문구는 행 수를 셀 뿐 원문 낱말을 짓지 않는다(D-3 가안 · 2026-10-12).
+  if(rs.every(r => r.route === '현장')){
+    const wins = zfRouteWindows(rs);
+    if(wins.length >= 2){
+      const t0 = startOfLocalDay(today || new Date());
+      const day = d => startOfLocalDay(parseNoticeDate(d));
+      const cur = wins.find(w => day(w.s) <= t0 && t0 <= day(w.e)), nxt = wins.find(w => day(w.s) > t0);
+      const ex = zfRouteExcludeOf(rs);
+      const tail = ` · 접수 기간이 ${wins.length}번으로 나뉘어 있어요` + (ex ? ` · ${ex}` : '');
+      if(cur) return { kind: '②-마', ex, text: `현장 접수 중 ${zfMdDow(cur.s)}~${zfMdDow(cur.e)}` + (nxt ? ` · 다음 ${zfMdDow(nxt.s)}~${zfMdDow(nxt.e)}` : '') + tail };
+      if(nxt) return { kind: '②-마', ex, text: `다음 현장 접수 ${zfMdDow(nxt.s)}~${zfMdDow(nxt.e)}` + tail };
+      return { kind: '②-마(지남)', text: '' };
+    }
   }
   // ②-라 — 경로 행이 전부 현장(인터넷 행 없음)이고 위 갈래(순위·단지로 갈림)에 걸리지 않았을 때.
   //    🔵 2026-10-01 — 종전에는 ②-다가 인터넷 마감과 견주는 갈래라 현장 전용 공고(전주평화1 …0824)가 한 줄을 못 받았다.
@@ -2057,7 +2087,7 @@ function zfFillSideSlots(){
     const v = zfRouteVerdict(rows);
     if(!v.text) return;
     // 🔵 2026-10-07(Z-2 ③ 3 · 다운님 승인 3) — 현장 접수 줄(②-나·②-다·②-라) 끝에 접수 장소를 경로 칸 place_text 그대로 붙인다(여럿이면 「 / 」).
-    const places = (v.kind === '②-나' || v.kind === '②-다' || v.kind === '②-라')
+    const places = (v.kind === '②-나' || v.kind === '②-다' || v.kind === '②-라' || v.kind === '②-마')
       ? [...new Set((rows || []).map(r => String(r.place_text || '').trim()).filter(Boolean))] : [];
     const pl = places.length ? ` · 접수 장소 ${places.join(' / ')}` : '';
     // 두 줄을 넘치면 말줄임 · 전문은 툴팁(누르면 펼친다 — 손가락으로는 툴팁을 못 본다) · ▾는 말줄임 밖 칸
@@ -2076,6 +2106,7 @@ function zfFillSideSlots(){
     if(rows && rows.length) el.outerHTML = zfRentLowChip(rows[0]);
   });
   zfTitleClippedChips();
+  if(typeof zf3DecorateCards === 'function') zf3DecorateCards();   // 🔵 D-3 — 경로 행이 도착하면 반복 접수 창을 노선 카드에
 }
 // 표시층 B ② — 접힌 상태에서도 첫 날짜(M/D)가 든 줄까지는 보이게 줄 수를 늘린다(최소 두 줄).
 // 🔵 2026-10-02 — 제외 조각(.zf-route-ex · 「금요일, 주말, 공휴일 제외」)도 접힌 상태에서 끝까지 보이게 줄 수를 늘린다.
@@ -9676,6 +9707,26 @@ function zf3DecorateCards(){
         route.innerHTML = `<p class="zf3-bhead">📑 공고문 ${nl.length}개 · 공고문마다 접수일이 달라요</p>`
           + nl.map(x => `<div class="zf3-branch"><p class="zf3-bn"><span title="${zfAttr(x.title)}">${escapeHtml(x.name || x.title)}</span>${zfNoticeStateBadge(x.state, x.end)}</p>${zf3LineHTML([{ k: '공고', d: ann }, { k: '접수', d: zf3Real(x.start), u: '미상' }, { k: '마감', d: zf3Real(x.end), u: '미상' }], x.name || x.title)}</div>`).join('');
         slot.classList.add('zf3-off');
+      }
+    }
+    // ⑤ 반복 접수 창(경로 표에 기간이 다른 현장 창 둘 이상 — 「매월 1일~10일」 꼴 · 가안 2026-10-12) — 경로 행이 온 뒤 한 번.
+    //    알약은 지금 창 안이면 「접수 중 · 이번 창 D-n」, 창 사이면 「다음 창 대기 · MM-DD」 · 노선 접수 역 = 이번·다음 창 시작(아래에 창 끝).
+    if(card.dataset.zf3 === '1' && zfSide.loaded && card.dataset.zf3Win !== '1'){
+      card.dataset.zf3Win = '1';
+      const rows = zfSide.routesByKey.get(zfDedupKey(n['공고명']));
+      const wins = rows && rows.length && rows.every(r => r.route === '현장') ? zfRouteWindows(rows) : [];
+      if(wins.length >= 2 && n['apply_period_check'] !== true){
+        const today = zf3Today();
+        const cur = wins.find(w => w.s <= today && today <= w.e), nxt = wins.find(w => w.s > today), w = cur || nxt;
+        const pill = card.querySelector('.zf3-dpill');
+        if(pill && cur){ const d = zf3Days(today, cur.e); pill.className = 'zf3-dpill open' + (d <= 1 ? ' hot' : ''); pill.textContent = d === 0 ? '오늘 창 마감' : '접수 중 · 이번 창 D-' + d; }
+        else if(pill && nxt){ pill.className = 'zf3-dpill before'; pill.textContent = '다음 창 대기 · ' + zf3Md(nxt.s).replace(/\(.\)$/, ''); }
+        const route = card.querySelector('.zf3-route');
+        if(route && w && card.dataset.zf3Branch !== '1'){
+          const st = zf3Stations(n);
+          st[1] = { k: '접수', d: w.s, sub: (cur ? '이번 창' : '다음 창') + ' ~' + zf3Md(w.e).replace(/\(.\)$/, '') };
+          route.innerHTML = zf3LineHTML(st);
+        }
       }
     }
   });
