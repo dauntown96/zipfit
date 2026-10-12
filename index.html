@@ -651,7 +651,6 @@ html[data-ui="d3"] .zf3-vline .policy-item.next .policy-category::after{content:
 html[data-ui="d3"] .zf3-vline .policy-item.now::before{background:linear-gradient(var(--ln,var(--ink)) 0 12px,var(--rail) 12px)}
 html[data-ui="d3"] .zf3-vline .policy-item.now::after{background:var(--ln,var(--ink));border-color:var(--ln,var(--ink));box-shadow:0 0 0 3px var(--surface-2)}
 html[data-ui="d3"] .zf3-vline .policy-item.now .policy-category::after{content:" · 진행 중";color:var(--ink);font-weight:700}
-.zf3-abar{display:block;height:4px;margin-top:4px;border-radius:2px;background:linear-gradient(90deg,var(--ln,var(--ink)) calc(var(--w,0) * 1%),var(--line-2) 0);max-width:140px}
 .zf3-none{margin:8px 0;padding:10px 12px;font-size:12px;color:var(--ink-2);background:var(--surface-2);border-radius:var(--r-1);word-break:keep-all;line-height:1.5}
 .zf3-maplbl{margin-left:14px;padding:2px 8px;font:700 12px/18px var(--f-ui);color:var(--paper);background:var(--ink);border-radius:999px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.18);max-width:60vw;overflow:hidden;text-overflow:ellipsis}
 .zf3-maplbl.left{margin-left:0;margin-right:14px}
@@ -9877,26 +9876,11 @@ function zf3EnhanceSchedule(root){
     items.forEach((it, i) => it.classList.add(!it.dataset.zfD ? 'unk' : it.dataset.zfD <= today ? ((it.dataset.zfE || '') >= today ? 'now' : 'past') : i === nextI ? 'next' : 'fut'));
   });
 }
-// 면적 막대 — 세대 칸 「전용면적」 값을 그 공고에서 가장 넓은 값 대비 막대로(값 글자는 그대로). 새 행이 오면 그 목록 전체를 다시 잰다.
-function zf3EnhanceAreas(root){
-  root.querySelectorAll('.hu-list').forEach(list => {
-    const cells = [...list.querySelectorAll('.hu-item')].filter(it => (it.querySelector('.hu-label') || {}).textContent === '전용면적');
-    const vals = cells.map(it => parseFloat(String((it.querySelector('.hu-value') || {}).textContent || '').replace(/,/g, '').match(/[\d.]+/) || '')).map(v => isFinite(v) ? v : null);
-    const max = Math.max(0, ...vals.filter(v => v != null));
-    if(!max) return;
-    cells.forEach((it, i) => {
-      if(vals[i] == null) return;
-      let bar = it.querySelector('.zf3-abar');
-      if(!bar){ bar = document.createElement('span'); bar.className = 'zf3-abar'; bar.setAttribute('aria-hidden', 'true'); it.appendChild(bar); }
-      bar.style.setProperty('--w', Math.max(4, Math.round(vals[i] / max * 100)));
-    });
-  });
-}
 let zf3DetailQ = false;
 function zf3WatchDetails(){
   const list = document.getElementById('notice-list');
   if(!list || !zf3On() || typeof MutationObserver === 'undefined') return;
-  const run = () => { zf3DetailQ = false; try{ zf3EnhanceSchedule(list); zf3EnhanceAreas(list); }catch(e){} };
+  const run = () => { zf3DetailQ = false; try{ zf3EnhanceSchedule(list); }catch(e){} };
   new MutationObserver(() => { if(!zf3DetailQ){ zf3DetailQ = true; requestAnimationFrame(run); } }).observe(list, { childList: true, subtree: true });
 }
 // 공고 탭 머리 — 「조건에 맞는 n건 / 열린 m건」 · 표제란 한 줄 · 조건 칩 줄(✕로 빼기 · 「＋ 조건」 → 조건 칸)
@@ -9932,7 +9916,7 @@ function zf3RenderNoticeHead(filtered){
   const atText = at ? `${at.slice(0, 10).replace(/-/g, '.')} KST` : '불러오는 중';   // 시안 「slim」 그대로 날짜만 — 390px 한 줄
   const sheetOpen = !document.getElementById('noticeFilterPanel')?.classList.contains('hidden');
   el.innerHTML = `<p class="zf3-lh">${head}</p>`
-    + `<p class="zf3-lsub">열린 ${o.n.toLocaleString()}건: 접수 중 ${o.a.toLocaleString()} · 예정 ${o.b.toLocaleString()}${o.k ? ` · 미상 ${o.k.toLocaleString()}` : ''}${sortText ? ` · ${escapeHtml(sortText)}` : ''}</p>`
+    + `<p class="zf3-lsub">${closedExcluded ? '' : `열린 ${o.n.toLocaleString()}건: `}접수 중 ${o.a.toLocaleString()} · 예정 ${o.b.toLocaleString()}${o.k ? ` · 미상 ${o.k.toLocaleString()}` : ''}${sortText ? ` · ${escapeHtml(sortText)}` : ''}</p>`
     + `<div class="zf3-tblock" role="note"><div><span class="k">기준</span><span class="v led">${escapeHtml(atText)}</span></div><div><span class="k">출처</span><span class="v">LH · 마이홈 · SH 원문 → 꼭집 정리</span></div></div>`
     + `<div class="zf3-chips" role="group" aria-label="걸린 조건">${chips.map(([k, t]) => `<button type="button" class="zf3-chip on" data-act="clear" data-k="${k}" aria-label="${zfAttr(t)} 조건 빼기">${escapeHtml(t)}<span aria-hidden="true">✕</span></button>`).join('')}`
     + `<button type="button" class="zf3-chip add" data-act="sheet" aria-expanded="${sheetOpen}" aria-controls="noticeFilterPanel">＋ 조건</button></div>`;
@@ -10006,7 +9990,7 @@ function zf3Init(){
   const stEl = document.getElementById('notice-status');
   if(stEl) stEl.addEventListener('click', ev => { const b = ev.target.closest('[data-zf3-clear]'); if(b) zf3ClearCond(b.dataset.zf3Clear); });
   if(!noticeLoaded) zf3Skeleton();
-  zf3WatchDetails();   // 단계 c — 상세 칸이 채워질 때마다 세로 노선 · 면적 막대
+  zf3WatchDetails();   // 단계 c — 상세 칸이 채워질 때마다 세로 노선(면적 막대는 공고 탭 재편 뒤 다시 본다 — 다운님 10-12)
   setInterval(zf3TickOne, 4000);
   try{ matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', () => { zf3Key = ''; if(zf3Rows) zf3PaintBoard(zf3Rows); }); }catch(e){}
   zf3RenderBoard();
