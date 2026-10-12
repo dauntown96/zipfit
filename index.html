@@ -10764,17 +10764,17 @@ function zf3RecSaved(){
 // ── 지도로 보기(레이더 · D-3 단계 d · 2026-10-12) ─────────────────────────────────────────────
 //    밝은 지도 위에 열린 공고가 걸친 시군구마다 점 하나(점 크기 = 공고 수 · 오늘·내일 마감이 있으면 빨강 맥박 두 번 · 접수 예정만이면 빈 점).
 //    🔴 점은 단지 위치가 아니라 시군구 중심점이다(캡션에 밝힌다). 재료는 RPC 행의 region_names(그룹이 걸친 시군구 전부) → 없으면 sido_nm·sigungu_nm.
-//    2013 경계(geo/kr-2013.json)에 없는 이름은 ① 이름만 바뀐 구(미추홀구 = 2013 남구) ② 부모 시(화성시 ○○구 → 화성시 · 청주시 서원구 → 청주시 구들의 가운데)
-//    ③ 시도가 바뀐 군(군위군 — 이름이 하나뿐일 때만) ④ 그래도 없으면 시도 가운데 점선 고리(「인천 제물포구」 · 「서울(시군구 미상)」).
+//    경계는 국가데이터처 SGIS 2025년 2분기 기준(geo/kr-2025.json · 2026-10-12 2013 자료에서 바꿈 — 미추홀구 · 청주 서원구·청원구 · 대구 군위군이 제 이름으로 들어왔다).
+//    거기 없는 이름은 ① 부모 시(화성시 ○○구 → 화성시) ② 시도가 바뀐 이름(이름이 하나뿐일 때만) ③ 그래도 없으면 시도 가운데 점선 고리(「인천 제물포구」 · 「서울(시군구 미상)」).
 //    점·지역 단추를 누르면 목록이 그 시군구 공고로 좁혀진다(📍 칩 · ✕로 뺀다 · 메모리만 — 새 저장 0). 지도 자료는 같은 출처 파일 하나를 처음 열 때만 받는다(외부 요청 0).
 let zf3Geo = null, zf3GeoP = null, zf3View = 'list', zf3PlaceSel = null, zf3PlaceName = '', zf3PrePlace = [];
 const ZF3_PROV = { 서울특별시: '11', 부산광역시: '21', 대구광역시: '22', 인천광역시: '23', 광주광역시: '24', 대전광역시: '25', 울산광역시: '26', 세종특별자치시: '29', 경기도: '31', 강원특별자치도: '32', 강원도: '32', 충청북도: '33', 충청남도: '34', 전북특별자치도: '35', 전라북도: '35', 전라남도: '36', 경상북도: '37', 경상남도: '38', 제주특별자치도: '39' };
-const ZF3_SGG_ALIAS = { '23|미추홀구': '23|남구' };
+const ZF3_SGG_ALIAS = {};   // 이름만 바뀐 구(경계 같음) — 2025 경계에는 남은 것이 없다(2013 「남구 → 미추홀구」는 걷음)
 const ZF3_METRO = new Set(['11', '21', '22', '23', '24', '25', '26']);
-let zf3PlacesAll = false;   // 2018 이름만 바뀐 구(경계 같음)
+let zf3PlacesAll = false;   // 지역 단추 「모든 지역 N곳」을 펼쳤는가
 const zf3ShortSido = t => String(t || '').replace(/특별자치시|특별자치도|특별시|광역시/, '').replace(/^(충청|전라|경상)(남|북)도$/, (m, a, b) => a[0] + b).replace(/도$/, '');
 function zf3LoadGeo(){
-  if(!zf3GeoP) zf3GeoP = fetch('./geo/kr-2013.json', { cache: 'force-cache' }).then(r => r.ok ? r.json() : null).then(g => { zf3Geo = g && g.cent ? g : null; return zf3Geo; }).catch(() => { zf3GeoP = null; return null; });
+  if(!zf3GeoP) zf3GeoP = fetch('./geo/kr-2025.json', { cache: 'force-cache' }).then(r => r.ok ? r.json() : null).then(g => { zf3Geo = g && g.cent ? g : null; return zf3Geo; }).catch(() => { zf3GeoP = null; return null; });
   return zf3GeoP;
 }
 function zf3PlaceOf(sido, sgg){
@@ -10792,7 +10792,7 @@ function zf3PlaceOf(sido, sgg){
     }
     const same = Object.keys(G.cent).filter(x => x.split('|')[1] === sg);
     if(same.length === 1) return { key: k0, name: String(sgg).trim(), xy: G.cent[same[0]], exact: true, pc };
-    return { key: pc + '|*' + sg, name: zf3ShortSido(sido) + ' ' + String(sgg).trim(), xy: G.prov[pc], exact: false, pc, note: '2013 경계에 없는 구 — 시도 가운데 고리' };
+    return { key: pc + '|*' + sg, name: zf3ShortSido(sido) + ' ' + String(sgg).trim(), xy: G.prov[pc], exact: false, pc, note: '2025 경계에 없는 구 — 시도 가운데 고리' };
   }
   return { key: pc + '|*', name: zf3ShortSido(sido) + '(시군구 미상)', xy: G.prov[pc], exact: false, pc, note: '시군구 없음 — 시도 가운데 고리' };
 }
@@ -10860,7 +10860,7 @@ function zf3RenderMap(){
   const pts = gs.map((g, i) => { const r = 5 + Math.min(7, g.n - 1), [x, y] = g.xy, sel = zf3PlaceSel === g.key ? ' sel' : '';
     return `<g class="pt${sel}" style="--i:${Math.min(i, 30)}" data-place="${zfAttr(g.key)}" data-name="${zfAttr(g.name)}">${g.exact ? `${g.hot ? `<circle class="pulse" cx="${x}" cy="${y}" r="${r}"/>` : ''}<circle class="dot ${g.cls}" cx="${x}" cy="${y}" r="${r}"/>` : `<circle class="ring${sel}" cx="${x}" cy="${y}" r="${20 + Math.min(14, g.n)}"/>`}<circle class="hit" cx="${x}" cy="${y}" r="16"/></g>`; }).join('');
   const nOpen = (zf3PrePlace || []).length;
-  box.innerHTML = `<div class="zf3-radar"><svg viewBox="${G.vb.join(' ')}" aria-hidden="true" focusable="false">${G.paths.map(p => `<path class="land${on.has(p.code) ? ' on' : ''}${mine.has(p.code) ? ' mine' : ''}" d="${p.d}"/>`).join('')}${pts}${labels}</svg><span class="cap">점 = 시군구 가운데(단지 위치 아님) · 2013 경계</span></div>`
+  box.innerHTML = `<div class="zf3-radar"><svg viewBox="${G.vb.join(' ')}" aria-hidden="true" focusable="false">${G.paths.map(p => `<path class="land${on.has(p.code) ? ' on' : ''}${mine.has(p.code) ? ' mine' : ''}" d="${p.d}"/>`).join('')}${pts}${labels}</svg><span class="cap">점 = 시군구 가운데(단지 위치 아님) · 경계 2025 국가데이터처 SGIS</span></div>`
     + `<div class="zf3-legend"><span><i></i>접수 중</span><span><i class="hot"></i>오늘·내일 마감</span><span><i class="soon"></i>접수 예정</span><span><i class="ring"></i>시군구 미상</span>${mine.size ? '<span><i class="mine"></i>내 희망 지역</span>' : ''}</div>`
     + `<p class="zf3-map-n">${gs.length ? `공고 ${nOpen.toLocaleString()}건이 걸친 ${gs.length}곳 · 누르면 그곳 공고만` : '지금 조건에 맞는 공고가 없어요'}</p>`
     + `<div class="zf3-places" role="group" aria-label="지역으로 좁히기">${gs.filter((g, i) => zf3PlacesAll || i < 12 || g.key === zf3PlaceSel).map(g => `<button type="button" data-place="${zfAttr(g.key)}" data-name="${zfAttr(g.name)}" aria-pressed="${zf3PlaceSel === g.key}"><i class="${g.exact ? g.cls : 'ring'}" aria-hidden="true"></i>${mine.has(g.pc) ? '<span class="zf3-pmine" aria-label="내 희망 지역">★</span>' : ''}${escapeHtml(g.name)} <b>${g.n}</b></button>`).join('')}`
