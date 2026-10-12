@@ -87,7 +87,9 @@ export function compare (got, baseline) {
     }
   }
   const rulesNow = new Set(Object.values(got).flatMap(r => Object.keys(r.rules || {})))
-  const head = `위반 규칙 ${rulesNow.size}종 · 요소 ${total}`
+  // 🔵 2026-10-12(우편함 「표시층 — 런칭 전 남은 화면 일」 2) — critical 은 규칙·상태까지 줄에 적는다(런칭 조건 ① 잣대 · 결과물 파일을 열지 않고 로그에서 확인)
+  const crit = Object.entries(got).flatMap(([st, r]) => Object.entries(r.rules || {}).filter(([, v]) => v.impact === 'critical').map(([id, v]) => `${id} ${v.nodes}(${st})`))
+  const head = `위반 규칙 ${rulesNow.size}종 · 요소 ${total} · critical ${crit.length ? crit.join(', ') : '0'}`
   if (errs.length) return { status: 'warn', value: `${head} · 못 잰 상태 ${errs.length}: ${errs.join(' / ')}`, increased: inc }
   if (inc.length) return { status: 'warn', value: `${head} · 기준선보다 늚 ${inc.length}: ${inc.slice(0, 4).join(' / ')}`, increased: inc }
   return { status: 'pass', value: `${head} · 기준선 이내`, increased: [] }
