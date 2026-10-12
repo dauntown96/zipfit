@@ -715,6 +715,7 @@ html[data-ui="d3"] .zf3-card .chip-row .chip.zf3-minechip{background:var(--surfa
 .zf3-tc .n{font:700 11px/1 var(--f-led);color:var(--ink);margin-bottom:3px;min-height:11px}
 .zf3-tc i{display:block;width:100%;max-width:18px;height:calc(var(--h) * .7px + 3px);background:var(--ink-3);border-radius:3px 3px 0 0;transform-origin:bottom;animation:zf3grow 500ms var(--ease) both}
 .zf3-tc.z i{background:var(--line-2)}
+.zf3-tc.z .n{color:var(--ink-3);font-weight:400}   /* 0건 칸도 흐린 0 — 숫자를 이어 읽을 때 다음 칸 숫자가 앞 날짜에 붙지 않게 */
 .zf3-tc.hot:not(.z) i{background:var(--warn)}
 .zf3-tc.hot .n,.zf3-tc.hot .d,.zf3-tc.hot .w{color:var(--warn);font-weight:700}
 .zf3-tc .d{margin-top:5px;font:700 11px/1.1 var(--f-led);color:var(--ink-2);white-space:nowrap}
@@ -4910,8 +4911,11 @@ function renderInsight(rows, wrap, statsRows){
           const barH = cnt>0 ? Math.round(cnt/timelineMax*60)+8 : 4;
           const barColor = isToday?'#5a7af7':isTomorrow?'#EF9F27':'#a0b4fa';
           const labelColor = (isToday||isTomorrow)?'#5a7af7':'#bbb';
-          return `<div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;min-width:34px">
-            <span style="font-size:10px;color:#666;margin-bottom:2px;font-weight:${cnt>0?'600':'400'}">${cnt||''}</span>
+          // 🔵 2026-10-12 — 막대마다 낭독 이름표 · 0건 칸에도 흐린 0. 숫자(위) → 날짜(아래) 순서라 글자를 이어 읽으면 오늘(0건 · 숫자 없음) 뒤 「3」이
+          //    「오늘 3」으로 읽혔다(D-3 검증 철회 · 회신 ⑦ ⑴). 낭독기·자동 점검이 같은 오독을 하지 않게 한다.
+          const spoken = `${+date.slice(5,7)}월 ${+date.slice(8,10)}일${isToday?'(오늘)':isTomorrow?'(내일)':''} 마감 ${cnt}건`;
+          return `<div role="img" aria-label="${spoken}" title="${spoken}" style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;min-width:34px">
+            <span style="font-size:10px;color:${cnt>0?'#666':'#767676'};margin-bottom:2px;font-weight:${cnt>0?'600':'400'}">${cnt}</span>
             <div style="background:${barColor};border-radius:3px 3px 0 0;width:22px;height:${barH}px;opacity:${cnt>0?1:0.2}"></div>
             <span style="font-size:9px;color:${labelColor};margin-top:3px;font-weight:${isToday||isTomorrow?'700':'400'}">${label}</span>
           </div>`;
@@ -10922,7 +10926,7 @@ function zf3InsightTop(c){
     const day = +k.slice(8, 10);
     const lab = day === 1 || i === 0 ? `${+k.slice(5, 7)}/${day}` : String(day);   // 날짜는 숫자로 · 오늘·내일은 아래 요일 칸에(두 글자가 14칸에 겹치지 않게)
     const wk = k === c.todayStr ? '오늘' : k === c.tomorrowStr ? '내일' : dow(k);
-    return `<div class="zf3-tc${hot ? ' hot' : ''}${n ? '' : ' z'}" title="${k}: ${n}건"><span class="n">${n || ''}</span><i style="--h:${n ? Math.round(n / tMax * 100) : 0}"></i><span class="d">${lab}</span><span class="w">${wk}</span></div>`;
+    return `<div class="zf3-tc${hot ? ' hot' : ''}${n ? '' : ' z'}" title="${k}: ${n}건"><span class="n">${n}</span><i style="--h:${n ? Math.round(n / tMax * 100) : 0}"></i><span class="d">${lab}</span><span class="w">${wk}</span></div>`;
   }).join('');
   const tlAria = '앞으로 14일 마감 공고 — ' + (c.timelineEntries.filter(e => e[1]).map(([k, n]) => `${k === c.todayStr ? '오늘' : k === c.tomorrowStr ? '내일' : (+k.slice(5, 7)) + '월 ' + (+k.slice(8, 10)) + '일'} ${n}건`).join(', ') || '없음');
   const rRow = ([name, v]) => `<div class="zf3-rr"><span class="nm">${escapeHtml(name)}</span><span class="tr"><i style="--w:${Math.round(v.cnt / c.regionMaxCnt * 100)}"></i></span><span class="ct">${fmt(v.cnt)}</span></div>`;
