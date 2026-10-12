@@ -6973,6 +6973,12 @@ function loadAnnouncementBlocks(annId, id, detailEl){
       // 단지 모양 블록의 단지명 칩은 site_label 그대로다(블록 모양의 「블록 ID 세대 building_name 하나」와 같은 이름 · 같은 조건 — 묶인 카드만).
       if(zfIsPostMerged(annId)) blocks.forEach(b => { if(b.site_label) b._zfSite = b.site_label; });
       renderAnnouncementBlocks(blocks, id, roundMap, recruitSums);
+      // 🔴 2026-10-12(지도 위치 고침 4) — 블록 카드는 단지를 펼쳐야 지도를 부른다. 그 전까지 「불러오는 중」이라 쓰면
+      //    아무것도 불러오지 않는 자리에 거짓 상태가 남는다. 주변시설 칸은 닫지 않는다 — 단지를 펼치면 바로 채워진다.
+      if(!blockHuFallback[id] && !zfMapDrawnHere(id)){
+        const mapEl = document.getElementById('map-'+id);
+        if(mapEl && mapEl.querySelector('.poi-loading')) mapEl.innerHTML = '<p class="map-closed"><strong>📍 아래에서 단지를 펼치면 그 단지 위치를 지도에 보여 드려요</strong></p>';
+      }
       // 🔵 2026-10-02 — 블록이 세대를 하나도 못 가진 카드만 카드 전체 세대 영역을 그린다(그룹 조회 — 블록 ID 는 0행이라 대표 ID 행뿐).
       //    어느 블록 것인지 가를 근거가 행에 없으므로 블록에 나눠 붙이지 않고 「단지 구분 전 전체」로 사실대로 둔다.
       if(blockHuFallback[id]) loadHousingUnits(annId, detailEl, id, true);
@@ -7900,7 +7906,11 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
       // 세대별 정보가 없는 공고 — 시군구 단위 지도를 최후수단으로 사용
       const fb = huRegionFallback[id];
       const mid = huMapTargetId[id] || id;
-      if(fb) initMapForHouse(fb, mid);
+      // 🔴 2026-10-12(지도 위치 고침 D) — 시·구까지만 아는데 공고가 여러 지역에 걸친 매입은 핀을 꽂지 않는다.
+      //    대표 행의 시군구 하나는 그 공고의 위치가 아니다(사하구 공고가 북구 중심에 찍혔다 · 우편함 「지도·일정·이전 회차 조사」 1).
+      const multi = (fb && fb.level === 'sigungu') ? zfPlaceNames(zfCardRegionNames(mid)) : [];
+      if(multi.length >= 2) closeMapAsMultiRegion(mid, multi);
+      else if(fb) initMapForHouse(fb, mid);
       else mapFail(mid, '위치 정보가 없어요', '세대정보도 폴백 주소도 없다(정밀주소·시군구 모두 비어 있음)');
       // 🔴 한 칸 카드 상세 경로에서만 안내를 넣는다 — 블록 본문에는 이미 .blk-empty가 있다(중복 방지).
       if(!huFetchFailed && !huIsBlock){
@@ -8479,6 +8489,22 @@ function isJeonseLeaseCard(id){
   return !!(el && String(el.dataset.housingType || '').includes('전세임대'));
 }
 
+// 🔴 2026-10-12(지도 위치 고침 D) — 세대 행이 없고 여러 지역에 걸친 공고. 대표 행 시군구 하나에 핀을 꽂으면
+//    그 공고와 다른 곳을 가리킨다. 지역 목록은 region_names 그대로 적는다(짓지 않는다).
+function zfCardRegionNames(id){
+  const el = cardElFor(String(id).replace(/-blk\d+$/, ''));
+  const aid = el && el.dataset ? String(el.dataset.announcementId || '') : '';
+  const pool = [].concat(typeof noticeData !== 'undefined' && Array.isArray(noticeData) ? noticeData : [], typeof zf3Rows !== 'undefined' && Array.isArray(zf3Rows) ? zf3Rows : []);
+  const n = aid ? pool.find(x => String(x['announcement_id'] || '') === aid) : null;
+  return n && Array.isArray(n['region_names']) ? n['region_names'] : [];
+}
+function closeMapAsMultiRegion(id, names){
+  return closeMapBox(id,
+    '<p class="map-closed"><strong>📍 여러 지역에 걸친 공고라 지도를 표시하지 않았어요</strong>'
+    + '<span class="sub">대상 지역: ' + names.map(escapeHtml).join(' · ') + '. 주택마다 위치가 달라요 — '
+    + '주소는 아래 「AI 정리 · 원문 보기」의 공고 원문에서 확인하세요.</span></p>');
+}
+
 function initMapForHouse(h,id){
   // 🔴 전세임대는 **주소 유무와 무관하게** 닫는다 — 판정이 주소에 매여 있으면 시군구가 들어오는
   //    순간 지도와 주변시설이 뜨는데, 그 핀이 가리킬 단지가 애초에 없다(2026-09-16).
@@ -8525,6 +8551,7 @@ function initMapForHouse(h,id){
       huMapState[id] = { map, marker, el: mapEl };   // 🔵 어느 상자에 들어 있는지까지 기억한다
       if(typeof zf3MapLabel === 'function' && zf3Exact) huMapState[id].label = zf3MapLabel(map, coords, zf3MapName(id, h), mapEl);   // 🔵 D-3 c — d3 만 · 대략 핀은 이름표 없음(검증 c)
     }
+    zfMapApproxShape(huMapState[id], coords, approx);
     setMapApproxNote(mapEl, approx);
     buildPoiTabs(id, coords);
   };
@@ -8547,25 +8574,61 @@ function initMapForHouse(h,id){
       geocoder.addressSearch(fallback, (r3, s3) => {
         console.warn('[ZipFit geocode] Lv3(시군구) 시도:', fallback, '결과:', s3);
         if(s3 === kakao.maps.services.Status.OK && r3.length){
-          renderMap(r3, true);   // Lv3 = 시군구 중심. 추정이다.
+          renderMap(r3, 'notfound');   // Lv3 = 시군구 중심. 추정이다 — 주소는 있는데 지도 서비스가 못 찾았다.
         } else {
           mapFail(id, '주소 위치를 찾을 수 없어요', 'Lv3(시군구) 지오코딩 실패: ' + fallback + ' → ' + s3);
         }
       });
     };
 
+    // 🔵 2026-10-12(지도 위치 고침 A) — Lv1·Lv2가 다 실패하면 Lv3(시군구 중심) 전에 같은 공고의 다른 후보를 차례로 묻는다.
+    //    순서를 바꾸지 않고 「실패하면 다음」이다 — 매입은 세대 주소가 가장 정확해 앞 순서를 건드리면 나빠진다.
+    //    주소 후보는 행정구역 중심(REGION)으로만 잡히면 받지 않는다(그것도 대략이다). 단지 이름은 카카오 장소 검색으로 묻고,
+    //    결과 주소에 이 카드의 시군구가 없으면 받지 않는다(이름이 같은 다른 지역 단지).
+    //    대략 핀(h.approx — 처음부터 시·구뿐)은 후보를 찾지 않는다 — 찾기 실패가 아니다.
+    const tryAlts = () => {
+      const alt = h.approx ? { addrs: [], names: [], sigungu: '' } : zfMapAltCandidates(id, h, lv1Addr);
+      const okAddr = r => r && r.length && r[0].address_type !== 'REGION';
+      const nextName = () => {
+        const nm = alt.names.shift();
+        if(!nm || !alt.sigungu || !kakao.maps.services.Places){ tryLevel3(); return; }
+        new kakao.maps.services.Places().keywordSearch(nm, (rk, sk) => {
+          const hit = sk === kakao.maps.services.Status.OK && (rk || []).find(p => String(p.road_address_name || p.address_name || '').split(/\s+/).includes(alt.sigungu));
+          console.warn('[ZipFit geocode] 후보(단지 이름) 시도:', nm, '결과:', sk, hit ? '— ' + (hit.road_address_name || hit.address_name) : '— 시군구 맞는 것 없음');
+          if(hit) renderMap([hit], false);
+          else nextName();
+        });
+      };
+      const nextAddr = () => {
+        const q = alt.addrs.shift();
+        if(!q){ nextName(); return; }
+        const q1 = stripCommaLotNumbers(q), q2 = toGeocodeAddress(q1);
+        geocoder.addressSearch(q1, (ra, sa) => {
+          console.warn('[ZipFit geocode] 후보(주소) 시도:', q1, '결과:', sa);
+          if(sa === kakao.maps.services.Status.OK && okAddr(ra)){ renderMap(ra, false); return; }
+          if(!q2 || q2 === q1){ nextAddr(); return; }
+          geocoder.addressSearch(q2, (rb, sb) => {
+            console.warn('[ZipFit geocode] 후보(주소 정제) 시도:', q2, '결과:', sb);
+            if(sb === kakao.maps.services.Status.OK && okAddr(rb)) renderMap(rb, false);
+            else nextAddr();
+          });
+        });
+      };
+      nextAddr();
+    };
+
     const tryLevel2 = () => {
       const roadAddr = toGeocodeAddress(lv1Addr);
       if(!roadAddr || roadAddr === lv1Addr){
-        tryLevel3();
+        tryAlts();
         return;
       }
       geocoder.addressSearch(roadAddr, (r2, s2) => {
         console.warn('[ZipFit geocode] Lv2(도로명 정제) 시도:', roadAddr, '결과:', s2);
         if(s2 === kakao.maps.services.Status.OK && r2.length){
-          renderMap(r2, !!h.approx);
+          renderMap(r2, h.approx ? 'fallback' : false);
         } else {
-          tryLevel3();
+          tryAlts();
         }
       });
     };
@@ -8573,7 +8636,7 @@ function initMapForHouse(h,id){
     geocoder.addressSearch(lv1Addr, (result, status) => {
       console.warn('[ZipFit geocode] Lv1(전체주소) 시도:', lv1Addr, '결과:', status);
       if(status === kakao.maps.services.Status.OK && result.length){
-        renderMap(result, !!h.approx);
+        renderMap(result, h.approx ? 'fallback' : false);
       } else {
         tryLevel2();
       }
@@ -8586,9 +8649,54 @@ function initMapForHouse(h,id){
   });
 }
 
+// 🔵 2026-10-12(지도 위치 고침 A) — 지도 주소가 안 잡혔을 때 물어볼 같은 공고의 다른 후보.
+//    ① 카드 지역(LH 공고 페이지 「공급정보 소재지」 꼴 · 3어절 이상) ② 세대 주소 ③ 단지·건물 이름(장소 검색).
+//    🔴 ①②는 그 카드가 한 단지일 때만 쓴다 — 블록이 여럿이거나 건물이 여럿이면 카드 지역·다른 건물 주소는
+//       「이 건물」의 위치가 아니다. 그때는 지금 건물의 이름만 묻는다.
+function zfMapAltCandidates(id, h, tried){
+  const card = cardElFor(String(id).replace(/-blk\d+$/, ''));
+  const title = card ? String(card.dataset.title || '').trim() : '';
+  const seen = new Set([String(tried || '').trim(), String((h && h.addr) || '').trim()]);
+  const addrs = [], names = [];
+  const add = (arr, v) => { v = String(v || '').trim(); if(v && !seen.has(v) && arr.indexOf(v) === -1) arr.push(v); };
+  const groups = [];
+  Object.keys(huGroupsCache).forEach(k => { if(k === id || k.indexOf(id + '-blk') === 0) groups.push(...(huGroupsCache[k] || [])); });
+  const single = !((blockInfo[id] || []).length >= 2) && groups.length <= 1;
+  if(single){
+    const rg = card ? String(card.dataset.region || '').trim() : '';
+    if(rg.split(/\s+/).length >= 3) add(addrs, rg);
+    groups.forEach(g => add(addrs, g.address));
+    groups.forEach(g => { if(g.building_name !== title) add(names, g.building_name); });
+  }
+  if(h && h.name && h.name !== title && h.name !== h.addr) add(names, h.name);
+  return { addrs, names, sigungu: card ? String(card.dataset.sigungu || '').trim() : '' };
+}
+// 🔵 2026-10-12(지도 위치 고침 3) — 대략 핀은 보통 표지가 아니라 테 원으로 그린다. 표지(마커)는 「여기가 그 집」으로 읽힌다.
+//    같은 지도를 정밀 위치로 다시 쓰면(건물 클릭) 원을 걷고 표지를 되살린다. 대략일 때는 시·군·구가 보이게 넓게 본다.
+function zfMapApproxShape(st, coords, approx){
+  try{
+    if(!st || !st.map || !st.marker) return;
+    if(approx){
+      if(!st.circle) st.circle = new kakao.maps.Circle({ center: coords, radius: 1500, strokeWeight: 2, strokeColor: '#B7791F', strokeOpacity: 0.9, strokeStyle: 'dash', fillColor: '#FAC775', fillOpacity: 0.18 });
+      st.circle.setPosition(coords); st.circle.setMap(st.map);
+      st.marker.setMap(null);
+      st.map.setLevel(8);
+    } else {
+      if(st.circle) st.circle.setMap(null);
+      if(st.marker.getMap() !== st.map){ st.marker.setMap(st.map); st.map.setLevel(5); }
+    }
+  }catch(e){}
+}
+
 // 🔴 핀이 시·군·구 중심일 때만 그 사실을 적는다. 정확한 주소로 찍힌 핀에는 붙이지 않는다
 //    — 전부에 붙이면 소음이 되고, 「대략」이라는 말이 아무 뜻도 없게 된다.
 //    고치는 일이 아니라 적는 일이다: 지오코딩·좌표 계산은 건드리지 않았다.
+//    🔴 2026-10-12(지도 위치 고침 3) — 문구는 둘이다. 'fallback' = 처음부터 시·구까지만 아는 공고(지금 문구) ·
+//       'notfound' = 주소는 있는데 지도 서비스가 못 찾음(Lv3). 양주 …20727 에 「세부 주소가 없어」는 사실이 아니었다.
+const ZF_MAP_APPROX_TEXT = {
+  fallback: '📍 대략의 위치예요 — 공고에 세부 주소가 없어 시·군·구 중심을 표시했어요. 정확한 위치는 공고 원문에서 확인하세요.',
+  notfound: '📍 대략의 위치예요 — 지도에서 이 주소를 찾지 못해 시·군·구 중심을 표시했어요. 정확한 위치는 공고 원문에서 확인하세요.'
+};
 function setMapApproxNote(mapEl, approx){
   if(!mapEl) return;
   let note = mapEl.nextElementSibling;
@@ -8597,10 +8705,9 @@ function setMapApproxNote(mapEl, approx){
     if(!approx) return;              // 지울 것이 없으면 만들지 않는다
     note = document.createElement('p');
     note.className = 'map-approx';
-    note.textContent = '📍 대략의 위치예요 — 공고에 세부 주소가 없어 시·군·구 중심을 표시했어요. 정확한 위치는 공고 원문에서 확인하세요.';
     mapEl.insertAdjacentElement('afterend', note);
-    return;
   }
+  if(approx) note.textContent = ZF_MAP_APPROX_TEXT[approx] || ZF_MAP_APPROX_TEXT.fallback;
   note.hidden = !approx;             // 같은 지도를 다시 쓸 때(건물 클릭) 되돌아간다
 }
 
