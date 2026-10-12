@@ -2064,7 +2064,7 @@ function zfRouteVerdict(rows, today){
         const ns = [...new Set(rs.map(r => String(r.note_text || '').replace(/^\s*[*※]\s*/, '').trim()).filter(t => /(요일|주말|공휴일|휴일)/.test(t) && /(받지 않|제외|불가)/.test(t)))];
         if(ns.length === 1) ex = ns[0];
       }
-      const tail = ` · 접수 기간이 ${wins.length}번으로 나뉘어 있어요` + (ex ? ` · ${ex}` : '');
+      const tail = ` · 접수 기간이 여러 번으로 나뉘어 있어요` + (ex ? ` · ${ex}` : '');
       if(cur) return { kind: '②-마', ex, text: `현장 접수 중 ${zfMdDow(cur.s)}~${zfMdDow(cur.e)}` + (nxt ? ` · 다음 ${zfMdDow(nxt.s)}~${zfMdDow(nxt.e)}` : '') + tail };
       if(nxt) return { kind: '②-마', ex, text: `다음 현장 접수 ${zfMdDow(nxt.s)}~${zfMdDow(nxt.e)}` + tail };
       return { kind: '②-마(지남)', text: '' };
@@ -8285,7 +8285,7 @@ function initMapForHouse(h,id){
       //    지우는 책임이 어디에도 없었다 — 실패 경로만 innerHTML로 덮어쓰고 있었다.
       mapEl.innerHTML = '';
       const map = new kakao.maps.Map(mapEl, {center:coords, level:5});
-      const marker = new kakao.maps.Marker({position:coords, map});
+      const marker = new kakao.maps.Marker(Object.assign({position:coords, map}, (typeof zf3On === 'function' && zf3On() && typeof zf3MapName === 'function' && zf3MapName(id, h)) ? { title: zf3MapName(id, h) } : {}));   // 🔵 D-3 c 후속 — d3 만 표지 이름(카카오가 만드는 <area alt> 자리)
       huMapState[id] = { map, marker, el: mapEl };   // 🔵 어느 상자에 들어 있는지까지 기억한다
       if(typeof zf3MapLabel === 'function') huMapState[id].label = zf3MapLabel(map, coords, zf3MapName(id, h), mapEl);   // 🔵 D-3 c — d3 만
     }
@@ -9521,7 +9521,7 @@ function zf3ItemHTML(it, dup){
   const ti = dup ? ' tabindex="-1"' : '';
   const tag = `<span class="zf3-tg ${it.type === 'card' ? it.ev : it.type}">${escapeHtml(it.tag)}</span>`;
   if(it.type === 'card'){
-    return `<button type="button" class="zf3-mi" data-act="go" data-id="${zfAttr(it.id)}"${ti}>${tag}${zf3BoardMine ? '<span class="zf3-star" aria-label="내 조건">★</span>' : ''}<span class="zf3-nm">${escapeHtml(it.name)}</span>${it.place ? `<span class="zf3-pl">${escapeHtml(it.place)}</span>` : ''}</button>`;
+    return `<button type="button" class="zf3-mi" data-act="go" data-id="${zfAttr(it.id)}"${ti}>${tag}${zf3BoardMine ? '<span class="zf3-star" role="img" aria-label="내 조건">★</span>' : ''}<span class="zf3-nm">${escapeHtml(it.name)}</span>${it.place ? `<span class="zf3-pl">${escapeHtml(it.place)}</span>` : ''}</button>`;
   }
   if(it.type === 'notice'){
     const links = it.links.map(l => `<a class="zf3-nl" href="${zfAttr(l.href)}"${ti}>${escapeHtml(l.label)}</a>`).join('');
@@ -9681,7 +9681,7 @@ function zf3Stations(n){
     { k: '공고', d: ann, sub: rev ? '정정 ' + rev.slice(5) : '' },
     { k: '접수', d: s, u: '미상' },
     { k: '마감', d: e, u: '미상' },
-    { k: '발표', d: zf3Real(w), u: /^9999/.test(w) ? '정해지지 않음' : '원문 확인' }
+    { k: '발표', d: zf3Real(w), u: '원문 확인' }
   ];
 }
 let zf3CardRows = new Map();
