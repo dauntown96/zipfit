@@ -631,6 +631,31 @@ html[data-ui="d3"] #notice-status .rdesc{color:var(--ink-2)}
 html[data-ui="d3"] #notice-status .btn{min-height:var(--hit);padding:0 16px;border-radius:var(--r-2);background:var(--board);color:var(--board-ink);border:0;font-weight:700}
 .zf3-chips-wrap{flex-wrap:wrap;margin-top:10px}
 .zf3-chip small{font-size:11px;opacity:.85;margin-left:2px}
+/* ── 단계 c — 상세(d3) ── */
+html[data-ui="d3"] .zf3-card .detail-grid{background:var(--board);background-image:radial-gradient(circle at center,var(--led-dot) 0 1px,transparent 1.4px);background-size:4px 4px;border-radius:var(--r-2);padding:12px 14px;gap:10px 18px;border:1px solid #2b2e35}
+html[data-ui="d3"] .zf3-card .detail-grid>div>span:first-child{color:var(--board-ink-2)!important;font-size:11px}
+html[data-ui="d3"] .zf3-card .detail-grid>div>span:last-child{color:var(--led)!important;font-family:var(--f-led);font-weight:700!important;font-size:13px;text-shadow:0 0 6px var(--led-glow);font-variant-numeric:tabular-nums}
+.zf3-vline{border:0!important;background:transparent!important}
+html[data-ui="d3"] .zf3-vline .policy-item{position:relative;padding:2px 0 12px 28px!important;border:0!important;background:transparent!important;margin:0!important}
+html[data-ui="d3"] .zf3-vline .policy-item::before{content:"";position:absolute;left:9px;top:0;bottom:0;width:3px;background:var(--rail)}
+html[data-ui="d3"] .zf3-vline .policy-item:first-of-type::before{top:8px}
+html[data-ui="d3"] .zf3-vline .policy-item:last-of-type::before{bottom:calc(100% - 8px)}
+html[data-ui="d3"] .zf3-vline .policy-item::after{content:"";position:absolute;left:4px;top:3px;width:13px;height:13px;box-sizing:border-box;border-radius:50%;background:var(--paper);border:3px solid var(--rail)}
+html[data-ui="d3"] .zf3-vline .policy-item.past::before{background:var(--ln,var(--ink))}
+html[data-ui="d3"] .zf3-vline .policy-item.past::after{background:var(--ln,var(--ink));border-color:var(--ln,var(--ink))}
+html[data-ui="d3"] .zf3-vline .policy-item.next::after{border-color:var(--ln,var(--ink));box-shadow:0 0 0 3px var(--surface-2)}
+html[data-ui="d3"] .zf3-vline .policy-item.unk::after{border-style:dashed;border-color:var(--ink-3)}
+html[data-ui="d3"] .zf3-vline .policy-category{font-size:12px!important;color:var(--ink-3)!important;font-weight:600}
+html[data-ui="d3"] .zf3-vline .policy-content{font-family:var(--f-led);font-weight:700;font-size:13px!important;color:var(--ink)!important;font-variant-numeric:tabular-nums}
+html[data-ui="d3"] .zf3-vline .policy-item.next .policy-category::after{content:" · 다음";color:var(--ink);font-weight:700}
+html[data-ui="d3"] .zf3-vline .policy-item.now::before{background:linear-gradient(var(--ln,var(--ink)) 0 12px,var(--rail) 12px)}
+html[data-ui="d3"] .zf3-vline .policy-item.now::after{background:var(--ln,var(--ink));border-color:var(--ln,var(--ink));box-shadow:0 0 0 3px var(--surface-2)}
+html[data-ui="d3"] .zf3-vline .policy-item.now .policy-category::after{content:" · 진행 중";color:var(--ink);font-weight:700}
+.zf3-abar{display:block;height:4px;margin-top:4px;border-radius:2px;background:linear-gradient(90deg,var(--ln,var(--ink)) calc(var(--w,0) * 1%),var(--line-2) 0);max-width:140px}
+.zf3-none{margin:8px 0;padding:10px 12px;font-size:12px;color:var(--ink-2);background:var(--surface-2);border-radius:var(--r-1);word-break:keep-all;line-height:1.5}
+.zf3-maplbl{margin-left:14px;padding:2px 8px;font:700 12px/18px var(--f-ui);color:var(--paper);background:var(--ink);border-radius:999px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.18);max-width:60vw;overflow:hidden;text-overflow:ellipsis}
+.zf3-maplbl.left{margin-left:0;margin-right:14px}
+.zf3-maplbl.clip{max-width:min(46vw,260px)}
 @keyframes zf3breath{from{opacity:.55}to{opacity:1}}
 @keyframes zf3grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
 @keyframes zf3flag{from{opacity:0;transform:translate(-50%,-4px)}to{opacity:1;transform:translateX(-50%)}}
@@ -6044,6 +6069,13 @@ function injectRevisionNoteChip(cardEl, note){
 
 // 카드 data-* 속성(접수기간/서류제출대상자발표일/서류접수기간/당첨자발표일/계약기간)을 읽어
 // 값이 있는 항목만 순서대로 "공급일정" 섹션으로 렌더링 (별도 fetch 없이 동기 렌더링, renderSpecialNotes와 동일 패턴)
+// 공급일정 칸 출처 — 카드 대표 행의 수집 출처(LH 상세 공급일정 · 마이홈 · SH). 모르면 빈 문자열(이름표를 짓지 않는다).
+function zfScheduleSourceLabel(cardEl){
+  const aid = cardEl && cardEl.dataset ? String(cardEl.dataset.announcementId || '') : '';
+  const pool = [].concat(typeof noticeData !== 'undefined' && Array.isArray(noticeData) ? noticeData : [], typeof zf3Rows !== 'undefined' && Array.isArray(zf3Rows) ? zf3Rows : []);
+  const n = aid ? pool.find(x => String(x['announcement_id'] || '') === aid) : null;
+  return ({ LH: 'LH 공급일정', MYHOME: '마이홈 공급일정', SH: 'SH 공급일정' })[n && n['source']] || '';
+}
 function renderSupplySchedule(cardEl, id){
   const applyStart = cardEl.dataset.applyStart || '';
   const applyEnd = cardEl.dataset.applyEnd || '';
@@ -6064,18 +6096,25 @@ function renderSupplySchedule(cardEl, id){
   if(docSubmitStart || docSubmitEnd){
     items.push(['📑 서류접수기간', `${docSubmitStart||'-'} ~ ${docSubmitEnd||'-'}`]);
   }
-  if(winnerAnnounce){
+  // 🔴 2026-10-12(D-3 단계 c · 백로그 「계약기간 9999」) — LH 공급일정 칸의 `9999-12-31`은 날짜가 아니라 자리 표시다.
+  //    그 날짜를 그리지 않는다(뜻을 짓지 않는다 — 「정해지지 않음」 같은 말도 붙이지 않는다). 계약기간은 끝만 9999면 「시작 ~」,
+  //    둘 다 9999면 줄을 두지 않는다. 당첨자 발표일 9999 도 줄을 두지 않는다(같은 규칙 · 열린 공고 3건 — …19241 · …19412 · …20770).
+  //    계약기간 줄 이름에 출처(「LH 공급일정」)를 붙여 공고문의 임대차 계약기간과 가른다.
+  const z9 = v => /^9999/.test(String(v || ''));
+  if(winnerAnnounce && !z9(winnerAnnounce)){
     items.push(['🏆 당첨자 발표일', winnerAnnounce]);
   }
-  if(contractStart || contractEnd){
-    items.push(['✍️ 계약기간', `${contractStart||'-'} ~ ${contractEnd||'-'}`]);
+  const cS = z9(contractStart) ? '' : contractStart, cE = z9(contractEnd) ? '' : contractEnd;
+  if(cS || cE){
+    const src = zfScheduleSourceLabel(cardEl);
+    items.push(['✍️ 계약기간' + (src ? ` · ${src}` : ''), z9(contractEnd) ? `${cS} ~` : `${cS||'-'} ~ ${cE||'-'}`]);
   }
   if(!items.length) return;
 
   const wrap = document.createElement('details');
   wrap.className = 'policy-wrap';
   wrap.innerHTML = `<summary class="policy-title">🗓️ 공급일정</summary>` +
-    items.map(([label,value]) => `<div class="policy-item"><div class="policy-category">${label}</div><div class="policy-content">${escapeHtml(value)}</div></div>`).join('');
+    items.map(([label,value]) => `<div class="policy-item" data-zf-d="${zfAttr((/\d{4}-\d{2}-\d{2}/.exec(value) || [''])[0])}" data-zf-e="${zfAttr((String(value).match(/\d{4}-\d{2}-\d{2}/g) || ['']).pop())}"><div class="policy-category">${label}</div><div class="policy-content">${escapeHtml(value)}</div></div>`).join('');
   const slot = document.getElementById('schedule-slot-'+id);
   if(slot) slot.appendChild(wrap);
 }
@@ -6315,7 +6354,12 @@ function loadAnnouncementExtras(annId, detailEl, id, useGroup){
     if(!zfStillOurs(id, ownerAnn)) return;   // 그 사이 이 자리에 다른 공고가 왔다
     // 🔵 2026-10-06(Z-1 PR-B ②) — 단지 모양 블록 본문은 그 단지 이미지만(site_label · unit_key 머리 — zfExtraInSite).
     if(zfSiteFilter[id] && Array.isArray(rows)) rows = rows.filter(r => zfExtraInSite(r, zfSiteFilter[id]));
-    if(!Array.isArray(rows) || rows.length === 0) return;
+    if(!Array.isArray(rows) || rows.length === 0){
+      // 🔵 D-3 c — 이미지 칸 셋째 상태 「없음」(있음 · 미리보기 없음은 아래 갤러리 · extrasThumbFailed). d3 · 공고 본문 칸만.
+      const sl = document.getElementById('extras-slot-' + id);
+      if(sl && typeof zf3On === 'function' && zf3On() && !/-blk\d+$/.test(id) && !sl.querySelector('.zf3-none')) { const att = document.getElementById('attachments-slot-' + id); sl.innerHTML = `<p class="zf3-none">이 공고는 사진·평면도가 아직 없어요${att && att.querySelector('.policy-wrap') ? ' · 원문 파일은 위 「공고문 원문」' : ''}</p>`; }
+      return;
+    }
     // 🔴 2026-10-01 — 같은 회차 행만 왔으면 배너 없음(zfRowsSameRoundAsCard · 규약 29 블록 배치).
     const staleHtml = zfRowsSameRoundAsCard(rows, roundMap, cardElFor(id)) ? '' : staleSourceBannerHtml(rows, annId, useGroup, id);
     // 같은 건물이 LH·MYHOME 두 파이프라인으로 각각 수집돼 서로 다른 announcement_id를 갖고,
@@ -8233,6 +8277,7 @@ function initMapForHouse(h,id){
     if(state && state.map && state.marker && state.el === mapEl){
       state.map.setCenter(coords);
       state.marker.setPosition(coords);
+      if(state.label && typeof zf3MapLabel === 'function'){ try{ state.label.setMap(null); }catch(e){} state.label = zf3MapLabel(state.map, coords, zf3MapName(id, h), state.el); }
     } else {
       // 🔴 카카오 지도는 컨테이너에 타일을 **덧붙인다** — 기존 자식을 지우지 않는다.
       //    그래서 「📍 지도를 불러오는 중...」 자리표시자가 타일 뒤에 그대로 남아,
@@ -8242,6 +8287,7 @@ function initMapForHouse(h,id){
       const map = new kakao.maps.Map(mapEl, {center:coords, level:5});
       const marker = new kakao.maps.Marker({position:coords, map});
       huMapState[id] = { map, marker, el: mapEl };   // 🔵 어느 상자에 들어 있는지까지 기억한다
+      if(typeof zf3MapLabel === 'function') huMapState[id].label = zf3MapLabel(map, coords, zf3MapName(id, h), mapEl);   // 🔵 D-3 c — d3 만
     }
     setMapApproxNote(mapEl, approx);
     buildPoiTabs(id, coords);
@@ -9786,6 +9832,73 @@ function zf3EmptyChips(){
   });
   return `<div class="zf3-chips zf3-chips-wrap" role="group" aria-label="조건 하나씩 빼 보기">${conds.map(([k, t]) => `<button type="button" class="zf3-chip on" data-zf3-clear="${k}" data-key="${zfAttr(key)}" data-label="${zfAttr(t)}" aria-label="${zfAttr(t)} 조건 빼기">${escapeHtml(t)} <span aria-hidden="true">✕</span><small>빼면 …건</small></button>`).join('')}</div>`;
 }
+// ===== 🔵 2026-10-12 표시층 D-3 · 단계 c — 상세(ui=d3 일 때만) =====
+// 🔴 상세 글자는 그대로다 — 종전 칸(기본 칸 · 공급일정 · 세대 · 이미지)을 지우지 않고 모양과 표지만 더한다.
+//    상세 칸은 비동기로 차례로 채워지므로 목록 상자에 변화 감시 하나를 걸어, 칸이 나타날 때마다 한 번씩 손본다(표지로 되풀이 막음).
+// 지도 이름표 — 마커 오른쪽에 이름 · 오른쪽이 넘치면 왼쪽 · 양쪽 다 넘치면 오른쪽에 두고 말줄임(전문은 title). 실패해도 지도는 그대로.
+// 이름표 글자 — 단지 이름(세대 목록이 넘기는 building_name)이 오면 그것 · 첫 지도처럼 카드 제목이 오면 시·군·구(제목을 지도에 되풀이하지 않는다).
+function zf3MapName(id, h){
+  const nm = String((h && h.name) || '').trim();
+  const card = typeof cardElFor === 'function' ? cardElFor(String(id).replace(/-blk\d+$/, '')) : null;
+  if(nm && (!card || nm !== (card.dataset.title || ''))) return nm;
+  return card ? (card.dataset.sigungu || card.dataset.region || '') : '';
+}
+function zf3MapLabel(map, coords, name, boxEl){
+  try{
+    if(!zf3On() || !name || !window.kakao || !kakao.maps || !kakao.maps.CustomOverlay) return null;
+    const mk = side => {
+      const div = document.createElement('div');
+      div.className = 'zf3-maplbl' + (side === 'left' ? ' left' : '');
+      div.textContent = String(name); div.title = String(name);
+      const ov = new kakao.maps.CustomOverlay({ position: coords, content: div, xAnchor: side === 'left' ? 1 : 0, yAnchor: 0.5, zIndex: 3 });
+      ov.setMap(map);
+      return { ov, div };
+    };
+    let cur = mk('right');
+    requestAnimationFrame(() => {
+      try{
+        const W = boxEl ? boxEl.clientWidth : 0, w = cur.div.offsetWidth;
+        const pt = map.getProjection && map.getProjection().containerPointFromCoords(coords);
+        if(!W || !pt) return;
+        if(pt.x + w > W - 8 && pt.x - w >= 8){ cur.ov.setMap(null); const l = mk('left'); cur.ov = l.ov; cur.div = l.div; }
+        else if(pt.x + w > W - 8) cur.div.classList.add('clip');
+      }catch(e){}
+    });
+    return { setMap: m => cur.ov.setMap(m) };
+  }catch(e){ return null; }
+}
+// 공급일정 세로 노선 — 항목의 첫 날짜(data-zf-d)로 지난 역 · 다음 역 · 날짜 없는 역을 가른다. 처음부터 펼친다.
+function zf3EnhanceSchedule(root){
+  const today = zf3Today();
+  root.querySelectorAll('[id^="schedule-slot-"] details.policy-wrap:not([data-zf3])').forEach(w => {
+    w.dataset.zf3 = '1'; w.classList.add('zf3-vline'); w.open = true;
+    const items = [...w.querySelectorAll('.policy-item')];
+    const nextI = items.findIndex(it => (it.dataset.zfD || '') > today);
+    items.forEach((it, i) => it.classList.add(!it.dataset.zfD ? 'unk' : it.dataset.zfD <= today ? ((it.dataset.zfE || '') >= today ? 'now' : 'past') : i === nextI ? 'next' : 'fut'));
+  });
+}
+// 면적 막대 — 세대 칸 「전용면적」 값을 그 공고에서 가장 넓은 값 대비 막대로(값 글자는 그대로). 새 행이 오면 그 목록 전체를 다시 잰다.
+function zf3EnhanceAreas(root){
+  root.querySelectorAll('.hu-list').forEach(list => {
+    const cells = [...list.querySelectorAll('.hu-item')].filter(it => (it.querySelector('.hu-label') || {}).textContent === '전용면적');
+    const vals = cells.map(it => parseFloat(String((it.querySelector('.hu-value') || {}).textContent || '').replace(/,/g, '').match(/[\d.]+/) || '')).map(v => isFinite(v) ? v : null);
+    const max = Math.max(0, ...vals.filter(v => v != null));
+    if(!max) return;
+    cells.forEach((it, i) => {
+      if(vals[i] == null) return;
+      let bar = it.querySelector('.zf3-abar');
+      if(!bar){ bar = document.createElement('span'); bar.className = 'zf3-abar'; bar.setAttribute('aria-hidden', 'true'); it.appendChild(bar); }
+      bar.style.setProperty('--w', Math.max(4, Math.round(vals[i] / max * 100)));
+    });
+  });
+}
+let zf3DetailQ = false;
+function zf3WatchDetails(){
+  const list = document.getElementById('notice-list');
+  if(!list || !zf3On() || typeof MutationObserver === 'undefined') return;
+  const run = () => { zf3DetailQ = false; try{ zf3EnhanceSchedule(list); zf3EnhanceAreas(list); }catch(e){} };
+  new MutationObserver(() => { if(!zf3DetailQ){ zf3DetailQ = true; requestAnimationFrame(run); } }).observe(list, { childList: true, subtree: true });
+}
 // 공고 탭 머리 — 「조건에 맞는 n건 / 열린 m건」 · 표제란 한 줄 · 조건 칩 줄(✕로 빼기 · 「＋ 조건」 → 조건 칸)
 function zf3CondChips(){
   const out = [];
@@ -9893,6 +10006,7 @@ function zf3Init(){
   const stEl = document.getElementById('notice-status');
   if(stEl) stEl.addEventListener('click', ev => { const b = ev.target.closest('[data-zf3-clear]'); if(b) zf3ClearCond(b.dataset.zf3Clear); });
   if(!noticeLoaded) zf3Skeleton();
+  zf3WatchDetails();   // 단계 c — 상세 칸이 채워질 때마다 세로 노선 · 면적 막대
   setInterval(zf3TickOne, 4000);
   try{ matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', () => { zf3Key = ''; if(zf3Rows) zf3PaintBoard(zf3Rows); }); }catch(e){}
   zf3RenderBoard();
