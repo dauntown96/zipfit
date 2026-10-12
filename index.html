@@ -732,6 +732,26 @@ html[data-ui="d3"] .zf3-card .chip-row .chip.zf3-minechip{background:var(--surfa
 .zf3-trc .n{font:700 9px/1 var(--f-led);color:var(--ink-3);margin-bottom:2px}
 .zf3-trc i{display:block;width:100%;max-width:14px;height:calc(var(--h) * .62px + 2px);background:var(--ln-kuk);border-radius:2px 2px 0 0;transform-origin:bottom;animation:zf3grow 500ms var(--ease) both}
 .zf3-trx{display:flex;justify-content:space-between;margin-top:6px;font:700 11px/1 var(--f-led);color:var(--ink-3)}
+.zf3-trc.part i{background:var(--line)}
+.zf3-trc.z i{height:2px;background:var(--line-2)}
+.zf3-trc.none{background:repeating-linear-gradient(135deg,transparent 0 3px,var(--line-2) 3px 4px);opacity:.6}
+.zf3-trnav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 6px}
+.zf3-trnav span{font:700 12px/1.3 var(--f-led);color:var(--ink-2);text-align:center}
+.zf3-trnav button{all:unset;box-sizing:border-box;width:var(--hit);height:var(--hit);display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:50%;font-size:18px;color:var(--ink);cursor:pointer}
+.zf3-trnav button:hover:not([disabled]){background:var(--surface)}
+.zf3-trnav button[disabled]{color:var(--ink-3);border-color:var(--line-2);cursor:default}
+.zf3-trnav button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.zf3-trpart{margin-top:8px}
+.zf3-xmiss{position:absolute;top:0;left:0;right:0;padding:3px 5px;background:var(--warn);color:var(--paper);font-size:10px;font-weight:700;line-height:1.3}
+.zf3-hux{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 6px;font-size:var(--t-s);color:var(--ink-2)}
+.zf3-hux b{color:var(--ink)}
+.zf3-hux button{all:unset;box-sizing:border-box;min-height:var(--hit);padding:0 12px;border:1px solid var(--line);border-radius:999px;font-size:var(--t-s);font-weight:700;color:var(--ink);cursor:pointer;display:inline-flex;align-items:center}
+.zf3-hux button.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.zf3-hux button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.zf3-phonly .hu-group:not([data-zf3-ph]){display:none}
+.zf3-phonly .hu-more-btn{display:none}
+html[data-ui="d3"] .poi-loading{color:var(--ink-2)}   /* 종전 #999 — 대비 2.85:1(axe · 1200 상세 패널) */
+html[data-ui="d3"] [id^="map-"] > .poi-loading{color:#4a4f57}   /* 지도 자리 바탕은 두 모드 모두 밝은 #f0f0e8 이라 고정색 */
 @keyframes zf3grow{from{transform:scaleY(0)}}
 @keyframes zf3grow-x{from{transform:scaleX(0)}}
 @media (prefers-reduced-motion:reduce){.zf3-tc i,.zf3-rr .tr i,.zf3-trc i{animation:none!important}}
@@ -913,6 +933,12 @@ html[data-ui="d3"] #notice-status.zf3-empty{background:var(--surface)!important;
   .zf3-dx:hover{background:var(--surface)}
   .zf3-dx:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
   html[data-ui="d3"] #notice-list .zf3-card.zf3-open .zf3-close{display:none}
+  html[data-ui="d3"] #notice-list .zf3-card.zf3-open .zf3-dtop{flex-wrap:wrap}
+  .zf3-djump{flex-basis:100%;display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;margin:0 0 2px}
+  .zf3-djump::-webkit-scrollbar{display:none}
+  .zf3-djump button{all:unset;box-sizing:border-box;flex:none;min-height:var(--hit);padding:0 10px;border-radius:999px;font-size:var(--t-s);font-weight:700;color:var(--ink-2);cursor:pointer;display:inline-flex;align-items:center}
+  .zf3-djump button:hover{background:var(--surface);color:var(--ink)}
+  .zf3-djump button:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
 }
 /* Notion 후보 반영 2차 — 상태 숫자 링크 · 묶음 항목 · 감사 남은 다듬기(어둡게 color-scheme · 마우스 올림 · 칩 넘침 단서 · 작은 글자) */
 .zf3-stl{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;gap:3px;min-height:var(--hit);padding:0 2px;margin:-12px 0;color:inherit;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
@@ -4847,7 +4873,7 @@ function renderInsight(rows, wrap, statsRows){
   })();
   // 🔵 D-3 둘러보기 ③ — d3 는 같은 수로 다른 판(LED 숫자판 · 14일 마감 막대 · 지역 막대 · 30일 추이)을 그리고, 재고 절은 색만 토큰으로(어둡게 모드)
   if(typeof zf3On === 'function' && zf3On()){
-    wrap.innerHTML = zf3InsightTop({ openN: regionRows.length, cumText: zfCumulativeText(rows), kpiActive, kpiNew, kpiClosing, timelineEntries, todayStr, tomorrowStr, regionAll, regionTop, regionRest, regionMaxCnt, trendEntries, trendMax }) + zf3Recolor(statsHTML);
+    wrap.innerHTML = zf3InsightTop({ openN: regionRows.length, cumText: zfCumulativeText(rows), kpiActive, kpiNew, kpiClosing, timelineEntries, todayStr, tomorrowStr, regionAll, regionTop, regionRest, regionMaxCnt, trendEntries, trendMax, rows }) + zf3Recolor(statsHTML);
     return;
   }
   wrap.innerHTML = `
@@ -6722,7 +6748,7 @@ function loadAnnouncementExtras(annId, detailEl, id, useGroup){
             ${thumbSrc
               ? `<img src="${thumbSrc}" loading="lazy" alt="${escapeHtml(caption)}" onerror="extrasThumbFailed(this)">`
               : `<span class="extras-thumb-missing-mark">불러올 수 없음</span>`}
-            ${caption ? `<span class="extras-thumb-label">${escapeHtml(caption)}</span>` : ''}
+            ${caption ? `<span class="extras-thumb-label">${escapeHtml(caption)}</span>` : ''}${it.extra_type === 'floorplan' && !it.unit_key && typeof zf3On === 'function' && zf3On() && zf3PlanMissing(it.building_address, keys) ? '<span class="zf3-xmiss">이번 모집 세대 목록에 없는 주택형</span>' : ''}
           </a>`;
         }).join('') + `</div>`;
     };
@@ -7769,6 +7795,7 @@ function zfFillUnitChips(id){
     used.add(key);
     el.innerHTML = `<button type="button" class="chip hu-x-chip" title="이 ${escapeHtml(g.kind)}의 사진·평면도 ${g.items.length}건" onclick="event.preventDefault();event.stopPropagation();openExtrasViewer('${g.gid}',0)">📷 ${g.items.length}</button>`;
   });
+  if(typeof zf3On === 'function' && zf3On()) zf3HuPhotoBar(id);
 }
 
 // ===== 카드 id 안정 키 + 공통 가드 (2026-09-16 · G-4 2단계) =====
@@ -10225,6 +10252,10 @@ function zf3DecorateIn(list, rowsMap, isMatch){
         top.innerHTML = `<b>${escapeHtml(n['공고명'] || '')}</b><button type="button" class="zf3-dx" aria-label="상세 닫고 지도로">✕</button>`;
         top.querySelector('button').addEventListener('click', ev => { ev.stopPropagation(); card.click(); go.focus({ preventScroll: true }); });
         det.prepend(top);
+        // 아이디어 2회차 ⑤ — 절이 늦게 채워지므로 상세 안이 바뀔 때마다(넓은 화면에서 열려 있을 때만) 바로가기를 다시 센다
+        let djT = 0;
+        new MutationObserver(() => { if(!card.classList.contains('zf3-open') || !zf3Wide()) return; clearTimeout(djT); djT = setTimeout(() => zf3DJump(top, det.id), 250); }).observe(det, { childList: true, subtree: true });
+        card.addEventListener('click', () => setTimeout(() => { if(card.classList.contains('zf3-open') && zf3Wide()) zf3DJump(top, det.id); }, 300));
       }
     }
     // ④ 갈래 노선 — 같은 게시물 공고문마다 접수일이 다르면(공고문 목록이 선 뒤) 노선을 공고문별로 가른다. 공고문 목록 상자의 말은 그대로 옮긴다.
@@ -10239,6 +10270,21 @@ function zf3DecorateIn(list, rowsMap, isMatch){
         route.innerHTML = `<p class="zf3-bhead">📑 공고문 ${nl.length}개 · 공고문마다 접수일이 달라요</p>`
           + nl.map(x => `<div class="zf3-branch"><p class="zf3-bn"><span title="${zfAttr(x.title)}">${escapeHtml(x.name || x.title)}</span>${zfNoticeStateBadge(x.state, x.end)}</p>${zf3LineHTML([{ k: '공고', d: ann }, { k: '접수', d: zf3Real(x.start), u: '미상' }, { k: '마감', d: zf3Real(x.end), u: '미상' }], x.name || x.title)}</div>`).join('');
         slot.classList.add('zf3-off');
+      }
+    }
+    // ⑦ 오늘 마감 카드 — 경로 표 원문(period_text)에 끝 시각이 적혀 있으면 알약을 「오늘 16:00까지 · n시간 남음」으로(1분마다 고침).
+    //    오늘 끝나는 경로 행이 모두 시각을 적고 그 시각이 하나일 때만 · 아니면 종전 「오늘 마감」 그대로.
+    if(card.dataset.zf3 === '1' && zfSide.loaded && card.dataset.zf3Hour !== '1'){
+      card.dataset.zf3Hour = '1';
+      const pill = card.querySelector('.zf3-dpill'), today = zf3Today();
+      if(pill && pill.textContent === '오늘 마감'){
+        const rr = (zfSide.routesByKey.get(zfDedupKey(n['공고명'])) || []).filter(r => r.end_date === today);
+        const hm = [...new Set(rr.map(r => zf3EndHm(r.period_text)))];
+        if(rr.length && hm.length === 1 && hm[0]){
+          pill.dataset.zf3Hm = hm[0]; pill.dataset.zf3End = today + 'T' + hm[0];
+          pill.title = '공고 원문 접수기간: ' + rr.map(r => (r.route ? r.route + ' ' : '') + (r.period_text || '')).join(' / ');
+          zf3TickHour(pill); zf3HourTimer();
+        }
       }
     }
     // ⑥ 하루뿐인 현장 접수 → 기기 달력(.ics · Notion 💡 「하루뿐인 현장 접수를 기기 캘린더에 넣기」) — 경로 표 현장 행 중 시작=끝 · 오늘 이후만.
@@ -10461,6 +10507,140 @@ function zf3EmptyHTML(title, desc, btn){
 //    하루 종일 일정 · 제목 「[꼭집] 접수 마감 · 공고명」 · 설명에 원문 링크와 「신청 전 공고 원문 확인」. 9999·확인 필요 공고는 넣지 않는다(zf3MyRoute 와 같은 거름).
 function zf3IcsEsc(t){ return String(t || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n'); }
 function zf3IcsFold(line){ const out = []; let cur = ''; for(const ch of line){ if(new TextEncoder().encode(cur + ch).length > 73){ out.push(cur); cur = ' ' + ch; } else cur += ch; } out.push(cur); return out.join('\r\n'); }
+// 아이디어 2회차 ④ — 오늘 마감 카드의 끝 시각. 경로 표 원문(period_text)에 적힌 마지막 시각만 쓴다(지어내지 않는다).
+//    점심시간 괄호는 걷고 마지막 「HH:MM」 또는 「N시」를 읽는다 · 못 읽으면 null(알약은 종전 「오늘 마감」 그대로).
+function zf3EndHm(t){
+  const s = String(t || '').replace(/\([^)]*점심[^)]*\)/g, '').replace(/점심[^0-9]*\d{1,2}\s*[:시]\s*\d{0,2}\s*[~∼-]\s*\d{1,2}\s*[:시]\s*\d{0,2}[^)]*/g, '');
+  const all = [...s.matchAll(/(\d{1,2})\s*(?::\s*(\d{2})|시(?:\s*(\d{2})\s*분)?)/g)];
+  if(!all.length) return null;
+  const m = all[all.length - 1], h = +m[1], mi = +(m[2] || m[3] || 0);
+  if(h > 24 || mi > 59) return null;
+  return String(h).padStart(2, '0') + ':' + String(mi).padStart(2, '0');
+}
+function zf3TickHour(pill){
+  const hm = pill.dataset.zf3Hm, end = new Date(pill.dataset.zf3End + ':00+09:00');   // 원문 시각은 한국 시각
+  const left = end.getTime() - Date.now();
+  if(left > 0){
+    const h = Math.floor(left / 3600000), m = Math.floor(left % 3600000 / 60000);
+    pill.textContent = `오늘 ${hm}까지 · ${h ? h + '시간' : m + '분'} 남음`;
+  } else pill.textContent = `오늘 ${hm} 마감 시각 지남`;
+}
+let zf3HourT = null;
+function zf3HourTimer(){
+  if(zf3HourT) return;
+  zf3HourT = setInterval(() => document.querySelectorAll('.zf3-dpill[data-zf3-end]').forEach(zf3TickHour), 60000);
+}
+// 아이디어 2회차 ② — 세대 머리에 붙지 않은 평면도(unit_key 없음)의 설명글 「평면도(36A)」 주택형이 이 공고 세대 목록 어디에도 없을 때만 꼬리.
+//    표기가 제각각이라(「26형」·「26」·「29T」·「19평」·「전체형」) 글자가 아니라 **면적 숫자**로만 견준다 — 숫자가 세대 머리 어디든 있으면 꼬리 없음.
+//    읽을 수 없는 꼴(평·iso·공용·전체형·소수)은 꼬리를 달지 않는다(모르면 말하지 않는다).
+function zf3PlanMissing(cap, keys){
+  const m = /평면도\s*\(([^)]+)\)/.exec(String(cap || ''));
+  if(!m || !keys || !keys.types || !keys.types.size) return false;
+  const toks = m[1].split(/[,，]/).map(x => x.trim().replace(/형$/, ''));
+  const nums = toks.map(x => { const k = /^(\d{2,3})[A-Z]{0,2}\d?$/.exec(x); return k ? k[1] : null; });
+  if(!nums.length || nums.some(x => !x)) return false;
+  const have = new Set();
+  keys.types.forEach(k => (String(k).split('::').pop().match(/\d{2,3}/g) || []).forEach(x => have.add(x)));
+  if(!have.size) return false;
+  return nums.every(x => !have.has(x));
+}
+// 아이디어 2회차 ① — 건물이 둘 이상인 세대 목록 머리: 「📷 사진 있는 건물 N/M」 + 「📷 있는 건물만」(사진·평면도가 건물·주택형 머리에 붙은 건물).
+const zf3HuPhotoOnly = {};
+function zf3HuPhotoBar(id){
+  const listEl = document.getElementById('hu-list-' + id), groups = huGroupsCache[id], map = extrasByUnitKey[id];
+  if(!listEl || !groups || groups.length < 2 || !map) return;
+  const ph = new Set(); map.forEach((g, k) => ph.add(String(k).split('::')[0]));
+  const n = groups.filter(g => ph.has(g.label)).length;
+  let bar = document.getElementById('zf3-hux-' + id);
+  if(!n){ if(bar) bar.remove(); return; }
+  if(!bar){ bar = document.createElement('div'); bar.id = 'zf3-hux-' + id; bar.className = 'zf3-hux'; listEl.parentNode.insertBefore(bar, listEl); }
+  const on = !!zf3HuPhotoOnly[id];
+  bar.innerHTML = `<span>📷 사진 있는 건물 <b>${n}</b>/${groups.length}</span><button type="button" aria-pressed="${on}" class="${on ? 'on' : ''}">📷 있는 건물만</button>`;
+  bar.querySelector('button').onclick = ev => {
+    ev.stopPropagation();
+    zf3HuPhotoOnly[id] = !zf3HuPhotoOnly[id];
+    if(zf3HuPhotoOnly[id] && listEl.querySelectorAll('.hu-group').length < groups.length) renderHousingGroupRows(id, groups.length);
+    else zf3HuPhotoMark(id);
+    zf3HuPhotoBar(id);
+  };
+  zf3HuPhotoMark(id);
+}
+function zf3HuPhotoMark(id){
+  const listEl = document.getElementById('hu-list-' + id), groups = huGroupsCache[id], map = extrasByUnitKey[id];
+  if(!listEl || !groups || !map) return;
+  const ph = new Set(); map.forEach((g, k) => ph.add(String(k).split('::')[0]));
+  listEl.classList.toggle('zf3-phonly', !!zf3HuPhotoOnly[id]);
+  listEl.querySelectorAll('.hu-group').forEach((el, i) => { el.toggleAttribute('data-zf3-ph', !!(groups[i] && ph.has(groups[i].label))); });
+}
+// 아이디어 2회차 ⑤ — 1200px 상세 패널 머리 아래 절 바로가기(일정 · 자격 · 단지 · 세대 · 공고문 원문 · 사진 · 정책 · 서류). 채워진 절만 · 누르면 그 절을 펼쳐 머리 아래로.
+const ZF3_DJ = [['schedule', '일정'], ['elig', '자격'], ['blocks', '단지'], ['hu', '세대'], ['attachments', '공고문 원문'], ['extras', '사진·평면도'], ['policy', '정책 안내'], ['docs', '제출서류']];
+function zf3DJump(top, cid){
+  let row = top.querySelector('.zf3-djump');
+  const items = ZF3_DJ.filter(([k]) => { const el = document.getElementById(k + '-slot-' + cid); return el && el.firstElementChild && el.offsetParent !== null && el.textContent.trim() && !(el.children.length === 1 && el.firstElementChild.classList.contains('zf3-none')); });   // 「아직 없어요」 안내만 있는 절은 뺀다
+  const sig = items.map(x => x[0]).join(',');
+  if(row && row.dataset.sig === sig) return;
+  if(!items.length){ if(row) row.remove(); return; }
+  if(!row){ row = document.createElement('nav'); row.className = 'zf3-djump'; row.setAttribute('aria-label', '상세 절 바로가기'); top.appendChild(row); }
+  row.dataset.sig = sig;
+  row.innerHTML = items.map(([k, t]) => `<button type="button" data-k="${k}">${t}</button>`).join('');
+  row.querySelectorAll('button').forEach(b => b.addEventListener('click', ev => {
+    ev.stopPropagation();
+    const el = document.getElementById(b.dataset.k + '-slot-' + cid);
+    if(!el) return;
+    const d = el.querySelector('details'); if(d) d.open = true;
+    el.style.scrollMarginTop = (top.offsetHeight + 8) + 'px';
+    el.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    const f = el.querySelector('summary') || el; try{ f.focus({ preventScroll: true }); }catch(e){}
+  }));
+}
+// 아이디어 2회차 ③ — 인사이트 「공고 추이」 기간 이동(30일씩). 백로그 「인사이트 그래프 기간 이동」의 세 상태 규칙:
+//    ⓐ 완전 = 모든 공급기관을 모으기 시작한 뒤(소스마다 처음 모은 날 중 가장 늦은 날부터 · 데이터에서 계산)
+//    ⓑ 불완전 = 그 전(회색 막대 · 「실제보다 적게 보일 수 있어요」 · 같은 색으로 잇지 않는다) · ⓒ 없음 = 가장 이른 수집 −90일 전(그리지 않음 · 그 앞으로는 못 간다)
+let zf3TrOff = 0, zf3TrRows = null, zf3TrToday = '', zf3TrCnt = null, zf3TrB = null;
+function zf3DayShift(k, d){ const x = new Date(k + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + d); return x.toISOString().slice(0, 10); }
+function zf3TrendPrep(rows, todayStr){
+  zf3TrRows = rows; zf3TrToday = todayStr; zf3TrOff = 0; zf3TrCnt = {};
+  const first = {};
+  (rows || []).forEach(r => {
+    const s = r.source || '?', c = String(r.created_at || '').slice(0, 10);
+    if(/^\d{4}-\d{2}-\d{2}$/.test(c) && (!first[s] || c < first[s])) first[s] = c;
+    if(!r.announcement_date) return;
+    const d = parseNoticeDate(r.announcement_date); if(!d) return;
+    const k = dateKey(d); zf3TrCnt[k] = (zf3TrCnt[k] || 0) + 1;
+  });
+  const v = Object.values(first).sort();
+  zf3TrB = v.length ? { full: v[v.length - 1], none: zf3DayShift(v[0], -90) } : null;
+}
+function zf3TrendHTML(){
+  if(!zf3TrCnt || !zf3TrToday) return '';
+  const end = zf3DayShift(zf3TrToday, -30 * zf3TrOff), start = zf3DayShift(end, -29);
+  const days = []; for(let k = start; k <= end; k = zf3DayShift(k, 1)) days.push(k);
+  const st = k => !zf3TrB ? 'full' : k < zf3TrB.none ? 'none' : k < zf3TrB.full ? 'part' : 'full';
+  const max = Math.max(1, ...days.filter(k => st(k) !== 'none').map(k => zf3TrCnt[k] || 0));
+  const md = k => `${+k.slice(5, 7)}/${+k.slice(8, 10)}`;
+  const total = days.filter(k => st(k) !== 'none').reduce((a, k) => a + (zf3TrCnt[k] || 0), 0);
+  const nPart = days.filter(k => st(k) === 'part').length, nNone = days.filter(k => st(k) === 'none').length;
+  const canBack = !!zf3TrB && zf3DayShift(start, -1) >= zf3TrB.none && zf3TrOff < 12;
+  const bars = days.map(k => { const s = st(k), n = zf3TrCnt[k] || 0;
+    return s === 'none' ? `<div class="zf3-trc none" title="${k}: 수집 전"></div>`
+      : `<div class="zf3-trc${s === 'part' ? ' part' : ''}${n ? '' : ' z'}" title="${k}: ${n}건${s === 'part' ? ' (수집 범위 밖 — 실제보다 적을 수 있음)' : ''}"><span class="n">${n || ''}</span><i style="--h:${Math.round(n / max * 100)}"></i></div>`; }).join('');
+  const aria = `${md(start)}부터 ${md(end)}까지 공고 ${total}건` + (nPart ? ` · 회색 ${nPart}일은 수집 범위 밖이라 실제보다 적을 수 있음` : '') + (nNone ? ` · ${nNone}일은 수집 전` : '');
+  return `<div class="zf3-trnav"><button type="button" data-act="tr" data-v="1" aria-label="앞 30일 보기"${canBack ? '' : ' disabled'}>‹</button><span aria-live="polite">${md(start)} – ${md(end)}${zf3TrOff ? '' : ' (오늘까지)'} · ${total.toLocaleString()}건</span><button type="button" data-act="tr" data-v="-1" aria-label="뒤 30일 보기"${zf3TrOff ? '' : ' disabled'}>›</button></div>
+    <div class="zf3-tr" role="img" aria-label="${zfAttr(aria)}">${bars}</div><div class="zf3-trx"><span>${md(start)}</span><span>${md(end)}</span></div>`
+    + (nPart ? `<p class="zf3-ins-note zf3-trpart">회색 막대 — 꼭집이 모든 공급기관 공고를 모으기 시작한 ${+zf3TrB.full.slice(5, 7)}월 ${+zf3TrB.full.slice(8, 10)}일 전이라 실제보다 적게 보일 수 있어요</p>` : '')
+    + (nNone ? `<p class="zf3-ins-note">빈 칸 — 꼭집이 공고를 모으기 전이에요</p>` : '');
+}
+document.addEventListener('click', ev => {
+  const b = ev.target.closest && ev.target.closest('[data-act="tr"]');
+  if(!b || b.disabled) return;
+  zf3TrOff = Math.max(0, zf3TrOff + Number(b.dataset.v || 0));
+  const box = document.getElementById('zf3Trend');
+  if(box){
+    box.innerHTML = zf3TrendHTML();
+    const nb = box.querySelector(`[data-act="tr"][data-v="${b.dataset.v}"]:not([disabled])`) || box.querySelector('[data-act="tr"]:not([disabled])');   // 초점을 잃지 않게
+    if(nb) nb.focus();
+  }
+});
 function zf3IcsDownload(events, calName, fileTag){
   if(!events || !events.length) return;
   const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
@@ -10763,8 +10943,8 @@ function zf3InsightTop(c){
       ${c.regionAll.length === 0 ? '<p class="zf3-ins-empty">지금 신청할 수 있는 공고가 없어요</p>' : `<div class="zf3-rl">${c.regionTop.map(rRow).join('')}</div>
       ${c.regionRest.length ? `<div id="regionRest" class="zf3-rl" style="display:none;margin-top:10px">${c.regionRest.map(rRow).join('')}</div>
       <button type="button" class="zf3-more" id="regionMoreBtn" data-more="나머지 ${c.regionRest.length}개 지역 더 보기" data-less="접기" onclick="toggleRegionRest(this)">나머지 ${c.regionRest.length}개 지역 더 보기</button>` : ''}`}</div>
-    <div class="zf3-ins-card"><h3>최근 30일 공고 추이</h3><p class="zf3-ins-note">공고일 기준 · 마감 포함</p>
-      ${c.trendEntries.length === 0 ? '<p class="zf3-ins-empty">최근 30일 데이터가 없어요</p>' : `<div class="zf3-tr">${tr}</div><div class="zf3-trx"><span>${trFirst.slice(5).replace('-', '/')}</span><span>${trLast.slice(5).replace('-', '/')}</span></div>`}</div>
+    <div class="zf3-ins-card"><h3>공고 추이 <span>30일씩</span></h3><p class="zf3-ins-note">공고일 기준 · 마감 포함 · ‹ › 로 지난 기간</p>
+      ${c.rows ? `<div id="zf3Trend">${(zf3TrendPrep(c.rows, c.todayStr), zf3TrendHTML())}</div>` : c.trendEntries.length === 0 ? '<p class="zf3-ins-empty">최근 30일 데이터가 없어요</p>' : `<div class="zf3-tr">${tr}</div><div class="zf3-trx"><span>${trFirst.slice(5).replace('-', '/')}</span><span>${trLast.slice(5).replace('-', '/')}</span></div>`}</div>
   </section>`;
 }
 // 재고 절(renderInsight 의 statsHTML)은 글자·수를 그대로 두고 손으로 적힌 색만 토큰으로 바꾼다 — 어둡게 모드에서 흰 카드가 남던 자리(둘러보기 ①).
