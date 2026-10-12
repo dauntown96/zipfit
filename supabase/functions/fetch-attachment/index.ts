@@ -51,12 +51,21 @@ const matchCronSecret = (req: Request): boolean =>
 // 🔴 `/upload/Files/`는 LH 공고 페이지의 단지 이미지(평면도·조감도·배치도) 경로다(2026-09-29 EF 회차).
 //   첨부 경로(`/lhapply/`)와 달리 문서가 아니라 그림만 오는 자리라, 최종 응답 형식을
 //   `image/*`·`application/pdf`로 한 번 더 좁힌다(아래 typeReject — 아니면 415).
+// 🔴 `www.bmc.busan.kr`(부산도시공사 · 2026-10-12 우편함 「부산 첨부·SH 대기열」)는 해외 IP에 Apache 403을 준다
+//   (싱가포르 DB `net.http_get` 실측). 그래서 SEOUL_ONLY에 두어 **서울 지역 실행일 때만** 연다 — 호출하는 쪽이
+//   `x-region: ap-northeast-2`(또는 `?forceFunctionRegion=ap-northeast-2`)를 싣는다. 다른 지역이면 막고 사유를 돌려준다.
+//   이것은 우회가 아니라 우리 함수의 실행 위치 선택이다 — UA·경유는 바꾸지 않는다. 경로는 게시판 상세·첨부 받기 둘뿐.
 const ALLOWED: Record<string, string[] | null> = {
   'apply.lh.or.kr': ['/lhapply/', '/upload/Files/'],
   'www.i-sh.co.kr': null,
   'i-sh.co.kr': null,
   'housing.seoul.go.kr': null,
+  'www.bmc.busan.kr': ['/board/download.do', '/board/view.do'],
 }
+
+// 국내 IP만 받는 호스트 — 실행 지역(SB_REGION · Supabase 런타임 변수)이 서울일 때만 연다.
+const SEOUL_REGION = 'ap-northeast-2'
+const SEOUL_ONLY = new Set(['www.bmc.busan.kr'])
 
 // 🔴 운반 상한. 원본 바이트 기준이다.
 //
@@ -120,6 +129,12 @@ const rejectReason = (u: URL): string | null => {
   const paths = ALLOWED[u.hostname]
   if (paths && !paths.some((p) => u.pathname.startsWith(p))) {
     return `허용되지 않은 path: ${u.hostname}${u.pathname}`
+  }
+  if (SEOUL_ONLY.has(u.hostname)) {
+    const region = Deno.env.get('SB_REGION') ?? '(없음)'
+    if (region !== SEOUL_REGION) {
+      return `서울 지역 실행이 필요한 host: ${u.hostname} — x-region: ${SEOUL_REGION}로 부른다(지금 ${region})`
+    }
   }
   return null
 }
