@@ -70,8 +70,8 @@
 
 ### 🧰 컨테이너 환경 메모 — 세션마다 다시 겪는 것
 
-- 🔵 **PDF는 `/usr/bin/python3`(3.13)에서 `pdfplumber`로 읽는다** — 이미지에 깔려 있다(0.11.10 · 2026-10-12 실측 · run 182 ② 제안 · claude.ai 채택). 종전 「없다 → `pip install pdfplumber cffi`」(2026-09-22)는 다른 파이썬에서 다시 막힐 때만 쓴다. ⚠️ `cryptography`는 debian 패키지라 `--upgrade`가 `RECORD file not found`로 실패하지만 **그대로 동작한다** — 재시도하지 않는다.
-- 🔵 **hwp → hwpx는 `python-hwpx`의 `hwpx.hwp5.package.convert(바이트)` → `to_hwpx_bytes(결과.files)`**(run 182 ② 제안 · claude.ai 채택). 🔴 기본 설치가 아니다 — `/usr/bin/python3 -m pip install python-hwpx`(2026-10-12 6.8.0). ⚠️ 모듈 경로는 `hwp5.package`가 아니라 `hwpx.hwp5.package`다(2026-10-12 실측).
+- 🔴 **파이썬 패키지(pdfplumber · pgdumplib · python-hwpx)는 「있다/없다」를 여기 적지 않는다 — 세션 첫 작업 전에 `bash /home/user/zipfit/.claude/hooks/session-setup.sh`를 한 번 돌린다**(버전 고정 · 있으면 몇 초 · 결과는 `/tmp/zipfit-session-setup.log`). 컨테이너마다 달랐다(2026-09-22 pdfplumber 없음 · 2026-10-12 pdfplumber 있음·pgdumplib·python-hwpx 없음). 🔴 저장소 `.claude/settings.json`의 SessionStart 훅은 **두 저장소가 함께 붙은 세션(루틴 포함)에서는 돌지 않는다**(Claude Code 문서 · 2026-10-12 실측 — 우편함 「코드 — Claude Code 장비 정비」) — 그래서 손으로 돌린다. PDF는 `/usr/bin/python3`에서 `pdfplumber`로 읽는다 · ⚠️ `cryptography`는 debian 패키지라 `--upgrade`가 `RECORD file not found`로 실패하지만 **그대로 동작한다** — 재시도하지 않는다.
+- 🔵 **hwp → hwpx는 `python-hwpx`의 `hwpx.hwp5.package.convert(바이트)` → `to_hwpx_bytes(결과.files)`**(run 182 ② 제안 · claude.ai 채택). ⚠️ 모듈 경로는 `hwp5.package`가 아니라 `hwpx.hwp5.package`다(2026-10-12 실측).
 - 🔴 **DB 쓰기의 기본 경로는 관리 API 파일 실행이다**(B51 실측 · B54 판정). ⚠️ **데이터 쓰기(INSERT·UPDATE·DELETE)만이다 — 스키마·함수 변경(DDL)은 원칙 32**(2026-09-30). `POST https://api.supabase.com/v1/projects/khdpjjyspmlqtzperoqg/database/query`에 `{"query": "<SQL>"}`를 싣는다 — SQL을 파일로 쓰고 `python3 -c 'import json,sys; print(json.dumps({"query": open(sys.argv[1], encoding="utf-8").read()}))' f.sql | curl -sS -X POST <엔드포인트> -H 'Content-Type: application/json' --data-binary @-`. 🔴 **`jq -Rs`로 싣지 않는다**(B57 실측 — 168KB 파일에서 한글 5글자가 깨졌다. 입력을 조각으로 읽다 UTF-8 멀티바이트를 가른다. 가드가 잡아 롤백됐다). 🔴 **인증은 프록시가 주입한다** — 토큰 환경변수는 없고 헤더를 붙이지 않는다. 키·토큰 값을 회신·로그·커밋에 찍지 않는다.
   - 요청 하나 = 트랜잭션 하나(명시 `BEGIN`/`COMMIT`도 된다) · `DO` 가드가 예외를 던지면 **HTTP 400으로 요청 전체가 롤백**된다 · 성공은 201 · **마지막 문장의 결과만** 돌아온다 · 1,025,039B 페이로드 통과 · `statement_timeout` 2분.
   - 🔴 **응답은 약 30초에 프록시 502(`upstream request failed`)로 끊길 수 있다**(2026-10-07 실측 3회 · 30.4~30.6초 — `statement_timeout` 2분보다 먼저). 끊겨도 서버의 트랜잭션은 커밋됐을 수 있다 — **커밋 여부는 기록 표·행 수로 따로 확인**한다. 긴 쓰기는 트랜잭션 안 검증을 줄여 30초 안에 두고, 전수 대조는 커밋 뒤 읽기로 한다. 롤백 전용 시험 파일을 잘라 쓸 때는 끝 예외(`raise exception 'RESULT …'`)를 함께 남긴다(같은 날 시험 파일의 「시험 전용 스위치 끄기」 한 줄이 커밋된 사고).
@@ -82,7 +82,7 @@
 - ⚠️ **Drive `download_file_content`는 약 14KB 이하 작은 파일을 파일로 떨어뜨리지 않고 대화로 들인다**(B51 원주문막1 평면도) — base64를 되살릴 수 없어 판독 불가다. 서브에이전트에 맡기거나 다른 경로(`fetch-attachment` 등)로 받는다.
 - 🔵 **Notion 파일 업로드가 된다**(2026-10-08 실측 18/18 — 환경 네트워크 허용에 `api.notion.com` 추가 뒤 · 그 전 세션은 프록시 403이었다): `notion-create-file-upload`로 받은 업로드 URL에 multipart POST · 🔴 mp4는 `video/mp4`를 명시한다 · 업로드 URL은 약 23분 산다.
 - 🔴 **Node `fetch`는 프록시 환경변수를 저절로 쓰지 않는다**(2026-10-08 · 점검기 로컬 시험에서 `TypeError: fetch failed`) — `NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt`를 붙이고, 로컬 서버를 함께 쓰면 `NO_PROXY=127.0.0.1,localhost`. curl·Playwright(Chromium)는 그대로 된다.
-- 🔴 **백업 덤프(`zipfit-backup/dumps/*.dump` — pg_dump 17 형식)를 조사에 쓸 때 컨테이너 `pg_restore` 16은 못 읽는다**(`unsupported version (1.16) in file header` — 2026-09-30 실측). **`pgdumplib`(설치돼 있다)로 읽는다** — `pgdumplib.load(경로)`.
+- 🔴 **백업 덤프(`zipfit-backup/dumps/*.dump` — pg_dump 17 형식)를 조사에 쓸 때 컨테이너 `pg_restore` 16은 못 읽는다**(`unsupported version (1.16) in file header` — 2026-09-30 실측). **`pgdumplib`로 읽는다**(위 세션 준비 스크립트가 깐다) — `pgdumplib.load(경로)`.
 - **국토부 아파트 전월세 실거래 API** — 컨테이너 환경변수 `MOLIT_RENT_API_KEY`(이름만 적는다) · `https://apis.data.go.kr/1613000/RTMSDataSvcAptRent/getRTMSDataSvcAptRent`(`LAWD_CD` 5자리 · `DEAL_YMD` YYYYMM) · 🔴 **전북은 새 코드 `52xxx`**(군산 `52130` — 2026-08 totalCount 293, B51 실측) · 금액은 만원 단위 쉼표 문자열(`deposit`·`monthlyRent`).
 
 ---
