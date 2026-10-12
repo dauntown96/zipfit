@@ -23,12 +23,19 @@ const FIRST_RUN_DONE = PROMO_DAYTIME && !(hourUtc === 0 && minuteUtc < 40)
 //    롤백 시험이 이 문자열을 그대로 떠서 쓴다(가짜 실패 행을 넣고 같은 판정이 나오는지) — 바꾸면 시험도 다시 돈다.
 // ⑥ 백업 — pg_cron(zipfit-backup-poll)이 매시 받아 둔 backup.yml 실행 기록(ops_backup_seen)을 읽는다(2026-10-11 고지 회차 2 · 10).
 //    「실제 백업」 = 성공 ∧ 걸린 시간 ≥ 45초(관문만 돌고 끝난 실행은 10여 초 · 마이그레이션 2026-10-11_02 머리 주석).
+//    🔵 2026-10-12(우편함 「코드 — 점검 오탐 둘 + 고지 마무리」 2) — 판정은 「경과 시간」이 아니라 「UTC 날짜」다: 덤프 이름이 UTC 날짜라
+//    날짜 D 의 백업은 D 18:00 UTC 정기 + 여유 4시간(수집이 응답을 다음 시각에 옮겨 기록이 최대 약 1시간 10분 늦다) = D 22:00 UTC 부터 요구한다.
+//    통과 = 실제 백업의 가장 늦은 실행 UTC 날짜 ≥ (지금 UTC − 22시간)의 날짜. 종전 「≤ 25시간」은 ① 같은 날 이른 시각 승인 실행 뒤
+//    그날 정기 회차가 관문에서 건너뛰면 다음 정기까지 최대 약 42시간을 실패로 냈고 ② 18:00 백업이 19:12 에야 기록되는 틈에서 25.1시간 오탐을 냈다.
 //    표가 없으면(적용 전) 쿼리가 실패한다 — 그래서 UPTIME_SQL 처럼 따로 돈다.
 const BACKUP_SQL = `
 select jsonb_build_object(
   'applied_min', (select extract(epoch from now() - applied_at) / 60 from zipfit_ops.schema_migrations where filename = '2026-10-11_02_backup_poll.sql'),
   'real_age_h', (select extract(epoch from now() - max(run_updated_at)) / 3600 from public.ops_backup_seen
                   where conclusion = 'success' and run_updated_at - run_created_at >= interval '45 seconds'),
+  'real_last_date', (select max((run_created_at at time zone 'UTC')::date) from public.ops_backup_seen
+                  where conclusion = 'success' and run_updated_at - run_created_at >= interval '45 seconds'),
+  'due_date', (((now() at time zone 'UTC') - interval '22 hours')::date),
   'last_fail', (select jsonb_build_object('at', run_created_at, 'conclusion', conclusion) from public.ops_backup_seen
                  where status = 'completed' and conclusion not in ('success', 'skipped', 'cancelled') order by run_created_at desc limit 1),
   'poll_ok_age_h', (select extract(epoch from now() - max(at)) / 3600 from public.ops_backup_poll where status_code = 200),
@@ -413,22 +420,22 @@ try {
   //    🔵 2026-10-11(고지 회차 2 · 10) — 살렸다: pg_cron(zipfit-backup-poll)이 매시 backup.yml 실행 기록을 ops_backup_seen 에 남기고 여기서는 읽기만 한다.
   //    커밋 목록(/commits)은 발송 토큰에 내용 읽기 권한이 없어 403 — 실행 기록(Actions 읽기)으로 잰다. 「실제 백업」 = 성공 ∧ ≥ 45초(BACKUP_SQL 위 주석).
   //    수집이 3시간 넘게 200 을 못 받으면 ⚠️(수집 멈춤 — 판정 재료가 낡는다) · 적용 뒤 2시간까지는 첫 수집 전이라 건너뛴다.
-  const BACKUP_RULE = '「실제 백업」(backup.yml 성공 ∧ ≥ 45초) ≤ 25시간(매일 18:00 UTC) · 수집(zipfit-backup-poll 매시 12분) 200 ≤ 3시간'
+  const BACKUP_RULE = '「실제 백업」(backup.yml 성공 ∧ ≥ 45초)의 가장 늦은 실행 UTC 날짜 ≥ (지금 UTC − 22시간)의 날짜(매일 18:00 UTC 정기 + 여유 4시간 — 같은 날 승인 실행으로 정기 회차가 건너뛰어도 그날 백업이 있으면 통과) · 수집(zipfit-backup-poll 매시 12분) 200 ≤ 3시간'
   try {
     const [b] = await sqlRead(BACKUP_SQL)
     const x = b.j
     if (!x.applied_min || (x.applied_min < 120 && x.real_age_h == null)) {
-      add('backup', '최근 백업(실행 기록) ≤ 25시간', 'skip', x.applied_min ? `첫 수집 전(적용 ${Math.round(x.applied_min)}분)` : '마이그레이션 적용 전', BACKUP_RULE)
+      add('backup', '최근 백업(실행 기록) — 기한 날짜의 백업', 'skip', x.applied_min ? `첫 수집 전(적용 ${Math.round(x.applied_min)}분)` : '마이그레이션 적용 전', BACKUP_RULE)
     } else {
-      const fail = x.real_age_h == null || x.real_age_h > 25
+      const fail = x.real_last_date == null || String(x.real_last_date) < String(x.due_date)
       const pollStale = x.poll_ok_age_h == null || x.poll_ok_age_h > 3
       const lf = x.last_fail ? ` · 마지막 실패 실행 ${String(x.last_fail.at).slice(0, 16)} ${x.last_fail.conclusion}` : ''
       const poll = x.poll_last ? ` · 수집 HTTP ${x.poll_last.code}(${Math.round(x.poll_last.age_min)}분 전)` : ' · 수집 기록 없음'
-      add('backup', '최근 백업(실행 기록) ≤ 25시간', fail ? 'fail' : pollStale ? 'warn' : 'pass',
-        `${x.real_age_h == null ? '실제 백업 기록 없음' : `${x.real_age_h.toFixed(1)}시간 전`}${lf}${poll}`, BACKUP_RULE)
+      add('backup', '최근 백업(실행 기록) — 기한 날짜의 백업', fail ? 'fail' : pollStale ? 'warn' : 'pass',
+        `${x.real_age_h == null ? '실제 백업 기록 없음' : `${x.real_age_h.toFixed(1)}시간 전 · 실행 날짜(UTC) ${x.real_last_date} · 기한 날짜 ${x.due_date}`}${lf}${poll}`, BACKUP_RULE)
     }
   } catch (e) {
-    add('backup', '최근 백업(실행 기록) ≤ 25시간', 'warn', String(e).slice(0, 200), 'ops_backup_seen 을 읽는다(경고만 — 표가 없거나 읽기 실패)')
+    add('backup', '최근 백업(실행 기록) — 기한 날짜의 백업', 'warn', String(e).slice(0, 200), 'ops_backup_seen 을 읽는다(경고만 — 표가 없거나 읽기 실패)')
   }
 } catch (e) {
   add('runner', '점검 실행', 'fail', String(e).slice(0, 300), '점검 스크립트가 끝까지 돈다')
