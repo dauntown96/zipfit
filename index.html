@@ -563,6 +563,11 @@ html[data-ui="d3"] #notice-list .hcard.zf3-card{position:relative;background:var
 html[data-ui="d3"] #notice-list .hcard.zf3-card::before{content:"";position:absolute;inset:0 auto 0 0;width:6px;background:var(--ln,var(--ln-gi))}
 @media (hover:hover){html[data-ui="d3"] #notice-list .hcard.zf3-card:hover{border-color:var(--ink-3);box-shadow:0 6px 20px rgba(0,0,0,.06)}}
 html[data-ui="d3"] #notice-list .hcard.zf3-card:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+html[data-ui="d3"] #notice-list .hcard.zf3-card.zf3-open{border-color:var(--ink)}
+html[data-ui="d3"] .zf3-card .zf-dateline{color:var(--ink-3)!important}
+html[data-ui="d3"] .zf-footer{border-top-color:var(--line-2)}
+html[data-ui="d3"] .zf-footer .zf-ai-note,html[data-ui="d3"] .zf-footer{color:var(--ink-3)}
+html[data-ui="d3"] .zf-footer a{color:var(--ink-2)}
 html[data-ui="d3"] #notice-list .hcard.zf3-closed{background:var(--surface)}
 html[data-ui="d3"] #notice-list .hcard.zf3-closed::before{background:var(--rail)}
 .zf3-ctop{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0 0 6px}
@@ -5596,6 +5601,11 @@ function toggleDetail(id, card, from){
   if(cardEl){
     cardEl.style.borderColor = open ? '' : '#1D9E75';
     cardEl.setAttribute('aria-expanded', open ? 'false' : 'true');
+    // 🔵 D-3 b — 노선 카드(d3)는 카드가 아니라 「상세 ›」 단추가 펼침 상태를 갖는다(카드는 role 없는 묶음 — aria-allowed-attr)
+    if(cardEl.classList.contains('zf3-card')){
+      cardEl.removeAttribute('aria-expanded'); cardEl.style.borderColor = ''; cardEl.classList.toggle('zf3-open', !open);
+      const g = cardEl.querySelector('.zf3-go'); if(g) g.setAttribute('aria-expanded', open ? 'false' : 'true');
+    }
   }
   if(!open && !detailEl.dataset.mapLoaded && cardEl){
     detailEl.dataset.mapLoaded = '1';
@@ -9534,7 +9544,7 @@ async function zf3GoCard(aid){
   document.querySelectorAll('.zf3-hl').forEach(x => x.classList.remove('zf3-hl'));
   el.classList.add('zf3-hl');
   if(el.scrollIntoView) el.scrollIntoView({ block: 'center', behavior: zf3RM() ? 'auto' : 'smooth' });
-  try{ el.focus({ preventScroll: true }); }catch(e){}
+  try{ (el.querySelector('.zf3-go') || el).focus({ preventScroll: true }); }catch(e){}   // 단계 b — 카드는 초점을 받지 않는다(「상세 ›」로)
 }
 // ===== 🔵 2026-10-12 표시층 D-3 · 단계 b — 노선 카드 · 상태 넷(ui=d3 일 때만) =====
 // 🔴 카드가 하던 말은 줄이지 않는다 — 종전 카드 DOM(사실 전부)은 그대로 두고 그 위에 부품을 덧입힌다:
@@ -9640,7 +9650,16 @@ function zf3DecorateCards(){
       foot.innerHTML = `<span class="zf3-mine">${prefs && zf3Mine(n, prefs) ? '★ 내 희망 조건에 맞아요' : ''}</span><button type="button" class="zf3-go" aria-expanded="false">상세 <span aria-hidden="true">›</span></button>`;
       const go = foot.querySelector('.zf3-go');
       go.setAttribute('aria-label', `${n['공고명'] || ''} 상세 보기`);
-      const sync = () => go.setAttribute('aria-expanded', card.getAttribute('aria-expanded') === 'true' ? 'true' : 'false');
+      // 접근성: d3 에서는 카드의 role=button·tabindex 를 걷는다(안에 단추·링크가 있어 「중첩된 조작 요소」가 된다 — axe nested-interactive).
+      //    마우스로 카드 아무 데나 누르는 것은 그대로 · 키보드·화면 낭독기는 「상세 ›」 단추 하나로 펼친다 · 펼침 상태는 단추에만(aria-expanded · aria-controls).
+      card.removeAttribute('role'); card.removeAttribute('tabindex'); card.removeAttribute('aria-expanded');
+      if(det){ go.setAttribute('aria-controls', det.id); }
+      const sync = () => {
+        const open = !!(det && det.style.display === 'block');
+        go.setAttribute('aria-expanded', open ? 'true' : 'false');
+        card.classList.toggle('zf3-open', open);
+        card.removeAttribute('aria-expanded'); card.style.borderColor = '';
+      };
       go.addEventListener('click', ev => { ev.stopPropagation(); card.click(); });
       card.addEventListener('click', () => setTimeout(sync, 0));
       if(det) det.before(foot); else card.appendChild(foot);
@@ -9659,10 +9678,6 @@ function zf3DecorateCards(){
         slot.classList.add('zf3-off');
       }
     }
-  });
-  list.querySelectorAll('.hcard.zf3-card').forEach(card => {
-    const go = card.querySelector('.zf3-go');
-    if(go) go.setAttribute('aria-expanded', card.getAttribute('aria-expanded') === 'true' ? 'true' : 'false');
   });
 }
 // 상태 — 불러오는 중: 빈 노선 카드 둘(숨쉬기 · 움직임 줄이기면 멈춤)
