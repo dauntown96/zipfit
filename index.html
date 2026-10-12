@@ -692,6 +692,136 @@ html[data-ui="d3"] .zf3-card:has(.zf3-dpill.hot) .zf3-today b{animation:zf3ping 
 .zf3-close:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
 html[data-ui="d3"] .zf3-card .chip-row .chip.zf3-minechip{background:var(--surface-2)!important;color:var(--ink)!important;border-color:transparent!important;font-weight:700}
 @media (prefers-reduced-motion:reduce){.zf3-tind,.zf3-sticky,.zf3-in,html[data-ui="d3"] .zf3-card.zf3-open > [data-ann-id],html[data-ui="d3"] .zf3-card .zf3-today b,.zf3-gotop span{animation:none!important;transition:none!important}}
+/* 인사이트(d3 · 둘러보기 ①③) */
+.zf3-ins{display:flex;flex-direction:column;gap:14px}
+.zf3-ins-head h2{margin:4px 0 4px;font-size:var(--t-xl);color:var(--ink)}
+.zf3-ins-head p{margin:0;font-size:var(--t-s);color:var(--ink-2);line-height:1.55;word-break:keep-all}
+.zf3-ins-head b{color:var(--ink)}
+.zf3-kpi{display:grid;grid-template-columns:repeat(3,1fr);border-radius:var(--r-3);overflow:hidden;background:var(--board);background-image:radial-gradient(circle at center,var(--led-dot) 0 1px,transparent 1.4px);background-size:4px 4px;border:1px solid #2b2e35}
+.zf3-kc{display:flex;flex-direction:column;align-items:center;gap:4px;padding:16px 6px 14px;text-align:center}
+.zf3-kc + .zf3-kc{border-left:1px solid rgba(255,255,255,.08)}
+.zf3-kc b{font-family:var(--f-led);font-size:34px;line-height:1;color:var(--c);text-shadow:0 0 10px color-mix(in srgb,var(--c) 45%,transparent);font-variant-numeric:tabular-nums}
+.zf3-kc span{font-size:12px;color:var(--board-ink-2);word-break:keep-all;line-height:1.3}
+.zf3-ins-card{background:var(--paper);border:1px solid var(--line-2);border-radius:var(--r-3);padding:16px}
+.zf3-ins-card h3{margin:0 0 2px;font-size:var(--t-l);color:var(--ink);display:flex;align-items:baseline;gap:8px}
+.zf3-ins-card h3 span{font-size:var(--t-xs);color:var(--ink-3);font-weight:500}
+.zf3-ins-note{margin:0 0 12px;font-size:var(--t-xs);color:var(--ink-3);line-height:1.5;word-break:keep-all}
+.zf3-ins-empty{margin:8px 0;font-size:var(--t-s);color:var(--ink-3);text-align:center}
+.zf3-tl{display:grid;grid-template-columns:repeat(14,1fr);gap:3px;align-items:end;height:128px}
+.zf3-tc{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0}
+.zf3-tc .n{font:700 11px/1 var(--f-led);color:var(--ink);margin-bottom:3px;min-height:11px}
+.zf3-tc i{display:block;width:100%;max-width:18px;height:calc(var(--h) * .7px + 3px);background:var(--ink-3);border-radius:3px 3px 0 0;transform-origin:bottom;animation:zf3grow 500ms var(--ease) both}
+.zf3-tc.z i{background:var(--line-2)}
+.zf3-tc.hot:not(.z) i{background:var(--warn)}
+.zf3-tc.hot .n,.zf3-tc.hot .d,.zf3-tc.hot .w{color:var(--warn);font-weight:700}
+.zf3-tc .d{margin-top:5px;font:700 11px/1.1 var(--f-led);color:var(--ink-2);white-space:nowrap}
+.zf3-tc .w{font-size:10px;color:var(--ink-3);line-height:1.2;white-space:nowrap;letter-spacing:-.04em}
+.zf3-rl{display:flex;flex-direction:column;gap:8px}
+.zf3-rr{display:grid;grid-template-columns:minmax(0,7.5em) 1fr auto;align-items:center;gap:10px;font-size:var(--t-s)}
+.zf3-rr .nm{color:var(--ink);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.zf3-rr .tr{height:8px;border-radius:4px;background:var(--surface-2);overflow:hidden}
+.zf3-rr .tr i{display:block;height:100%;width:calc(var(--w) * 1%);background:var(--ink);border-radius:4px;transform-origin:left;animation:zf3grow-x 600ms var(--ease) both}
+.zf3-rr .ct{font:700 13px/1 var(--f-led);color:var(--ink);min-width:2.5em;text-align:right}
+.zf3-more{all:unset;box-sizing:border-box;display:flex;align-items:center;justify-content:center;width:100%;min-height:var(--hit);margin-top:10px;border:1px solid var(--line);border-radius:var(--r-2);font-size:var(--t-s);font-weight:700;color:var(--ink);cursor:pointer}
+.zf3-more:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.zf3-tr{display:flex;align-items:flex-end;gap:2px;height:90px}
+.zf3-trc{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
+.zf3-trc .n{font:700 9px/1 var(--f-led);color:var(--ink-3);margin-bottom:2px}
+.zf3-trc i{display:block;width:100%;max-width:14px;height:calc(var(--h) * .62px + 2px);background:var(--ln-kuk);border-radius:2px 2px 0 0;transform-origin:bottom;animation:zf3grow 500ms var(--ease) both}
+.zf3-trx{display:flex;justify-content:space-between;margin-top:6px;font:700 11px/1 var(--f-led);color:var(--ink-3)}
+@keyframes zf3grow{from{transform:scaleY(0)}}
+@keyframes zf3grow-x{from{transform:scaleX(0)}}
+@media (prefers-reduced-motion:reduce){.zf3-tc i,.zf3-rr .tr i,.zf3-trc i{animation:none!important}}
+/* 단계 알약 · 단추(d3 · 둘러보기 ① — 어둡게 모드에서 흰 알약·흰 단추가 남던 자리) */
+html[data-ui="d3"] .steps{gap:0;padding:4px;border-radius:var(--r-3);background:var(--surface-2)}
+html[data-ui="d3"] .step{min-height:var(--hit);display:flex;align-items:center;justify-content:center;border:0;border-radius:var(--r-2);background:transparent;color:var(--ink-3);font-size:var(--t-s);font-family:var(--f-ui);transition:background var(--m-fast),color var(--m-fast)}
+html[data-ui="d3"] .step.active{background:var(--paper);color:var(--ink);font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+html[data-ui="d3"] .step.done{background:transparent;color:var(--ink-2)}
+html[data-ui="d3"] .btn-primary{background:var(--ink);color:var(--paper)}
+html[data-ui="d3"] .btn-primary:hover{background:var(--ink-2)}
+html[data-ui="d3"] .btn-sec{background:var(--paper);color:var(--ink);border:1px solid var(--line)}
+html[data-ui="d3"] .btn-sec:hover{background:var(--surface)}
+html[data-ui="d3"] .btn-sm{min-height:var(--hit);display:inline-flex;align-items:center;justify-content:center;font-size:var(--t-s);font-weight:600}
+/* 손으로 적힌 회색 글자(종전 화면 인라인 #555~#bbb) → 토큰 — 어둡게 모드에서 2:1 까지 떨어지던 자리(둘러보기 ①) */
+html[data-ui="d3"] [style*="color:#555"],html[data-ui="d3"] [style*="color:#666"]{color:var(--ink-2)!important}
+html[data-ui="d3"] [style*="color:#888"],html[data-ui="d3"] [style*="color:#999"],html[data-ui="d3"] [style*="color:#aaa"],html[data-ui="d3"] [style*="color:#bbb"]{color:var(--ink-3)!important}
+/* 아직 못 가는 단계(추천 「② 주택 매칭」 — opacity .4 로 흐리던 것) → 흐림 대신 옅은 글자 · 단계 e 에서 노선 스텝으로 바뀐다 */
+html[data-ui="d3"] .step[style*="opacity"]{opacity:1!important;color:var(--ink-3)}
+/* 나의 노선도(d3 · 둘러보기 ④) */
+.zf3-my{background:var(--paper);border:1px solid var(--line-2);border-radius:var(--r-3);padding:16px;margin:0 0 14px}
+.zf3-my-h{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin:0 0 10px}
+.zf3-my-h h2{margin:0;font-size:var(--t-l);color:var(--ink)}
+.zf3-my-h span{font-size:var(--t-xs);color:var(--ink-3)}
+.zf3-my-l{list-style:none;margin:0;padding:0}
+.zf3-my-l li{position:relative;display:grid;grid-template-columns:auto auto 1fr;align-items:start;column-gap:10px;padding:0 0 12px 22px}
+.zf3-my-l li::before{content:"";position:absolute;left:6px;top:0;bottom:0;width:3px;background:var(--rail)}
+.zf3-my-l li:first-child::before{top:8px}
+.zf3-my-l:not(.zf3-my-rest) li:last-child::before,.zf3-my-rest li:last-child::before{bottom:calc(100% - 8px)}
+.zf3-my-l li::after{content:"";position:absolute;left:1px;top:3px;width:13px;height:13px;box-sizing:border-box;border-radius:50%;background:var(--paper);border:3px solid var(--ink)}
+.zf3-my-l li.now::after{background:var(--ink)}
+.zf3-my-l li.hot::after{border-color:var(--warn)}
+.zf3-my-l .dt{font:700 13px/1.4 var(--f-led);color:var(--ink);white-space:nowrap}
+.zf3-my-l .dd{font:700 11px/1.6 var(--f-led);color:var(--ink-3);white-space:nowrap;min-width:3.4em}
+.zf3-my-l li.hot .dd{color:var(--warn)}
+.zf3-my-l .tx{min-width:0;display:flex;flex-direction:column}
+.zf3-my-l .k{font-size:12px;font-weight:700;color:var(--ink-2);line-height:1.4}
+.zf3-my-l li.hot .k{color:var(--warn)}
+.zf3-my-l .nm{all:unset;box-sizing:border-box;min-height:var(--hit);display:flex;align-items:flex-start;font-size:var(--t-s);color:var(--ink);line-height:1.45;cursor:pointer;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px;word-break:keep-all}
+.zf3-my-l .nm:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.zf3-my-n{margin:6px 0 0;font-size:var(--t-xs);color:var(--ink-3);line-height:1.5}
+html[data-ui="d3"] .subtabs{display:flex;gap:0;padding:4px;border-radius:var(--r-3);background:var(--surface-2);margin-bottom:1rem}
+html[data-ui="d3"] .subtabs .step{flex:1}
+/* 지도로 보기 — 레이더(D-3 단계 d) */
+.zf3-lhrow{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.zf3-lhrow .zf3-lh{margin:0;min-width:0}
+.zf3-vseg{display:inline-flex;flex:none;padding:3px;border-radius:var(--r-2);background:var(--surface-2)}
+.zf3-vseg button{all:unset;box-sizing:border-box;min-height:38px;min-width:52px;padding:0 12px;border-radius:8px;font-size:var(--t-s);font-weight:600;color:var(--ink-3);text-align:center;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;position:relative}
+.zf3-vseg button::after{content:"";position:absolute;inset:-3px 0}
+.zf3-vseg button[aria-pressed="true"]{background:var(--paper);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.zf3-vseg button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+html.zf3-mapview[data-ui="d3"] #notice-list{display:none}
+.zf3-map{margin:0 0 14px}
+.zf3-map-wait{margin:20px 0;text-align:center;font-size:var(--t-s);color:var(--ink-3)}
+.zf3-radar{position:relative;border:1px solid var(--line);border-radius:var(--r-3);background:var(--map-sea);overflow:hidden}
+.zf3-radar svg{display:block;width:100%;height:auto;max-height:70vh}
+.zf3-radar .land{fill:var(--map-land);stroke:var(--map-line);stroke-width:.8}
+.zf3-radar .land.on{fill:var(--surface-2)}
+.zf3-radar .dot{fill:var(--map-dot);stroke:var(--map-land);stroke-width:1.5}
+.zf3-radar .dot.soon{fill:var(--map-land);stroke:var(--map-dot);stroke-width:2.2}
+.zf3-radar .dot.hot{fill:var(--map-hot)}
+.zf3-radar .ring{fill:none;stroke:var(--map-dot);stroke-width:1.6;stroke-dasharray:4 3}
+.zf3-radar .pt{cursor:pointer}
+.zf3-radar .pt .hit{fill:transparent}
+.zf3-radar .pt.sel .dot{stroke:var(--ink);stroke-width:3}
+.zf3-radar .ring.sel{stroke:var(--ink);stroke-width:2.6}
+.zf3-radar .pulse{fill:none;stroke:var(--map-hot);stroke-width:2;transform-box:fill-box;transform-origin:center;opacity:0}
+.zf3-radar.live .pulse{animation:zf3pulse 1.8s var(--ease) .4s 2}
+@keyframes zf3pulse{0%{transform:scale(1);opacity:.75}100%{transform:scale(3.2);opacity:0}}
+.zf3-radar.live .pt{animation:zf3ptin var(--m-mid) var(--ease) both;animation-delay:calc(var(--i,0) * 18ms);transform-box:fill-box;transform-origin:center}
+@keyframes zf3ptin{from{opacity:0;transform:scale(.4)}}
+.zf3-radar .lbl{font-size:14px;font-family:var(--f-ui);font-weight:700;fill:var(--ink);paint-order:stroke;stroke:var(--map-land);stroke-width:3.5px;stroke-linejoin:round;pointer-events:none}
+.zf3-radar .cap{position:absolute;left:8px;bottom:6px;font-size:11px;color:var(--ink-2);background:var(--paper);padding:1px 6px;border-radius:4px}
+.zf3-legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--ink-2);margin:8px 2px 0}
+.zf3-legend i,.zf3-places i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px;background:var(--map-dot);box-sizing:border-box}
+.zf3-legend i.soon,.zf3-places i.soon{background:var(--map-land);border:2px solid var(--map-dot)}
+.zf3-legend i.hot,.zf3-places i.hot{background:var(--map-hot)}
+.zf3-legend i.ring,.zf3-places i.ring{background:none;border:1.5px dashed var(--map-dot)}
+.zf3-map-n{margin:8px 2px 4px;font-size:var(--t-xs);color:var(--ink-3)}
+.zf3-places{display:flex;flex-wrap:wrap;gap:6px}
+.zf3-places button{all:unset;box-sizing:border-box;display:inline-flex;align-items:center;min-height:var(--hit);padding:0 12px;border:1px solid var(--line);border-radius:999px;background:var(--paper);color:var(--ink);font-size:13px;cursor:pointer;gap:2px}
+.zf3-places button b{font-family:var(--f-led);margin-left:4px}
+.zf3-places .zf3-pall{border-style:dashed;font-weight:700}
+.zf3-places button[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.zf3-places button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+@media (min-width:1200px){
+  html[data-ui="d3"] .zf3-vseg{display:none}
+  html[data-ui="d3"] body:has(#main2:not(.hidden)) .wrap{margin-left:max(24px,calc((100vw - 1232px) / 2));margin-right:auto}
+  html[data-ui="d3"] body:has(#main2:not(.hidden)) #zf3Map{position:fixed;top:60px;left:calc(max(24px,calc((100vw - 1232px) / 2)) + 752px);width:480px;max-height:calc(100vh - 76px);overflow:auto;margin:0;padding:2px}
+  html[data-ui="d3"] body:has(#main2:not(.hidden)) .zf3-sticky{left:max(24px,calc((100vw - 1232px) / 2));transform:none;width:720px}
+  html[data-ui="d3"] body:has(#main2:not(.hidden)) .zf3-radar svg{max-height:calc(100vh - 300px)}
+  html[data-ui="d3"] body:has(#main2:not(.hidden)) .zf-totop{right:auto;left:calc(max(24px,calc((100vw - 1232px) / 2)) + 660px)}
+}
+@media (prefers-reduced-motion:reduce){.zf3-radar .pulse,.zf3-radar .pt{animation:none!important}}
 @keyframes zf3breath{from{opacity:.55}to{opacity:1}}
 @keyframes zf3grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
 @keyframes zf3flag{from{opacity:0;transform:translate(-50%,-4px)}to{opacity:1;transform:translateX(-50%)}}
@@ -748,7 +878,7 @@ html[data-ui="d3"] .zf3-card .chip-row .chip.zf3-minechip{background:var(--surfa
     <p id="zfMatchPrefillNote" class="hidden" style="font-size:12px;color:#0F6E56;margin:-0.25rem 0 0.75rem">✅ 저장한 조건으로 채웠어요</p>
     <div class="row">
       <div class="field">
-        <label class="label">혼인 상태</label>
+        <label class="label" for="marital">혼인 상태</label>
         <select id="marital">
           <option value="">혼인 상태를 선택하세요</option>
           <option value="single">결혼한 적 없음</option>
@@ -762,7 +892,7 @@ html[data-ui="d3"] .zf3-card .chip-row .chip.zf3-minechip{background:var(--surfa
         </select>
       </div>
       <div class="field">
-        <label class="label">자녀 수 (미성년)</label>
+        <label class="label" for="children">자녀 수 (미성년)</label>
         <select id="children">
           <option value="0">자녀 수: 없음</option>
           <option value="1">자녀 수: 1명</option>
@@ -773,7 +903,7 @@ html[data-ui="d3"] .zf3-card .chip-row .chip.zf3-minechip{background:var(--surfa
     </div>
     <div class="row">
       <div class="field">
-        <label class="label">가구원 수</label>
+        <label class="label" for="members">가구원 수</label>
         <select id="members">
           <option value="1">가구원 수: 1인</option>
           <option value="2" selected>가구원 수: 2인</option>
@@ -827,7 +957,7 @@ html[data-ui="d3"] .zf3-card .chip-row .chip.zf3-minechip{background:var(--surfa
         <p style="font-size:11px;color:#999;margin:0.35rem 0 0">부동산·자동차·금융자산 등을 모두 더하고 부채를 뺀 금액이에요.</p>
       </div>
       <div class="field">
-        <label class="label">주택 소유 여부</label>
+        <label class="label" for="owned">주택 소유 여부</label>
         <select id="owned">
           <option value="no">주택 소유: 없음 (무주택)</option>
           <option value="yes">주택 소유: 있음</option>
@@ -856,7 +986,7 @@ html[data-ui="d3"] .zf3-card .chip-row .chip.zf3-minechip{background:var(--surfa
     </div>
     <div class="row">
       <div class="field">
-        <label class="label">주택청약종합저축 보유</label>
+        <label class="label" for="hasSavings">주택청약종합저축 보유</label>
         <select id="hasSavings">
           <option value="unknown">청약통장: 모름</option>
           <option value="yes">청약통장: 있음</option>
@@ -864,7 +994,7 @@ html[data-ui="d3"] .zf3-card .chip-row .chip.zf3-minechip{background:var(--surfa
         </select>
       </div>
       <div class="field">
-        <label class="label">최하층 우선배정 신청 여부</label>
+        <label class="label" for="wantsGroundFloor">최하층 우선배정 신청 여부</label>
         <select id="wantsGroundFloor">
           <option value="no">최하층 우선배정: 해당 없음</option>
           <option value="yes">최하층 우선배정: 신청 희망 (장애인·노약자)</option>
@@ -2971,6 +3101,8 @@ function applyNoticeFiltersAndRender(keepPage){
   let base = closedHidden ? noticeData.filter(n => !isHiddenAsClosed(n)) : noticeData;
   if(activeNoticeStatus) base = base.filter(n => noticeStateLabel(n) === activeNoticeStatus);
   let filtered = applyNoticeSubFilters(base);
+  // 🔵 D-3 단계 d — 지도에서 고른 시군구(d3 · 메모리만 · 칩 ✕로 뺀다). 지도는 이 줄 앞의 행으로 그린다(고른 곳을 빼고 센 분포).
+  if(typeof zf3PlaceFilter === 'function') filtered = zf3PlaceFilter(filtered);
 
   const sortVal = document.getElementById('noticeSortSel')?.value || 'date-desc';
   const nullLast = zfNullLast;   // 🔵 사본을 두지 않는다 — 빈 값 처리가 한 곳이다
@@ -3337,7 +3469,12 @@ function zfSavedCardFrom(sr, r){
     type:      r ? (r.housing_type||'') : '',
     url:       r ? (r.url||'')          : '',
     apply_end: r ? (r.apply_end||'')    : '',
-    source:    r ? (r.source||'')       : ''
+    source:    r ? (r.source||'')       : '',
+    // 🔵 D-3 둘러보기 ④ 「나의 노선도」(d3) 가 읽는 날짜 — 같은 대표행 값 그대로(종전 화면은 쓰지 않는다)
+    rid:       r ? String(r.announcement_id||'') : '',
+    apply_start: r ? (r.apply_start||'') : '',
+    winner:    r ? (r.winner_announce_date||'') : '',
+    period_check: !!(r && r.apply_period_check === true)
   };
 }
 
@@ -3545,6 +3682,7 @@ function renderSavedNotices(){
       <p style="font-weight:600;color:#333;margin-bottom:6px">아직 저장한 공고가 없어요</p>
       <p style="font-size:13px;color:#888">공고 카드에서 🔖 저장 버튼을 눌러보세요</p>
     </div>`;
+    if(typeof zf3MyRoute === 'function') zf3MyRoute();
     return;
   }
   let html = `<p style="font-size:13px;color:#888;margin-bottom:12px">총 ${saved.length}건 저장됨</p>`;
@@ -3565,6 +3703,7 @@ function renderSavedNotices(){
     </div>`;
   });
   el.innerHTML = html;
+  if(typeof zf3MyRoute === 'function') zf3MyRoute();
 }
 
 async function shareNotice(btn, title, region, type, url){
@@ -3804,7 +3943,8 @@ function zfWarnBadges(o){
 }
 
 function renderNoticeList(filtered, totalCount, hiddenClosedCount){
-  if(typeof zf3RenderNoticeHead === 'function') zf3RenderNoticeHead(filtered);   // 🔵 D-3 a — ui=d3 일 때만 새 머리를 그린다(뒤 <script> 가 읽히기 전 호출은 건너뜀 · zf3Init 이 다시 그린다)
+  if(typeof zf3RenderNoticeHead === 'function') zf3RenderNoticeHead(filtered);
+  if(typeof zf3RenderMap === 'function') zf3RenderMap();   // 🔵 D-3 d — 지도(1280 은 늘 · 390 은 「지도」를 골랐을 때)   // 🔵 D-3 a — ui=d3 일 때만 새 머리를 그린다(뒤 <script> 가 읽히기 전 호출은 건너뜀 · zf3Init 이 다시 그린다)
   const statusEl = document.getElementById('notice-status');
   const listEl   = document.getElementById('notice-list');
   listEl.innerHTML = '';
@@ -4503,83 +4643,7 @@ function renderInsight(rows, wrap, statsRows){
   const S = 'background:#fff;border-radius:14px;padding:20px;margin-bottom:16px;box-shadow:0 1px 6px rgba(0,0,0,0.07)';
   const T = 'font-size:15px;font-weight:700;margin-bottom:14px;color:#333;margin-top:0';
 
-  wrap.innerHTML = `
-    <div style="${S}">
-      <p style="${T}">📊 공고 통계 인사이트</p>
-      <p style="font-size:13px;color:#888;margin:0">지금 열린 공고 <strong style="color:#5a7af7">${regionRows.length.toLocaleString()}건</strong> · ${zfCumulativeText(rows)} · 수시로 자동 업데이트</p>
-    </div>
-
-    <div style="${S}">
-      <p style="${T}">📌 주요 현황</p>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
-        <div style="background:#f0f3ff;border-radius:12px;padding:16px;text-align:center;box-shadow:0 1px 4px rgba(90,122,247,0.08)">
-          <p style="font-size:28px;font-weight:700;color:#5a7af7;margin:0">${kpiActive.toLocaleString()}</p>
-          <p style="font-size:12px;color:#888;margin-top:6px">🟢 접수중</p>
-        </div>
-        <div style="background:#f0faf5;border-radius:12px;padding:16px;text-align:center;box-shadow:0 1px 4px rgba(29,158,117,0.08)">
-          <p style="font-size:28px;font-weight:700;color:#1D9E75;margin:0">${kpiNew.toLocaleString()}</p>
-          <p style="font-size:12px;color:#888;margin-top:6px">🆕 이번주 신규</p>
-        </div>
-        <div style="background:#fff7f0;border-radius:12px;padding:16px;text-align:center;box-shadow:0 1px 4px rgba(239,159,39,0.08)">
-          <p style="font-size:28px;font-weight:700;color:#EF9F27;margin:0">${kpiClosing.toLocaleString()}</p>
-          <p style="font-size:12px;color:#888;margin-top:6px">⏰ 마감임박</p>
-        </div>
-      </div>
-    </div>
-
-    <div style="${S}">
-      <p style="${T}">📅 마감 임박 타임라인</p>
-      <div style="display:flex;align-items:flex-end;gap:6px;overflow-x:auto;padding-bottom:6px;min-height:100px">
-        ${timelineEntries.map(([date,cnt])=>{
-          const isToday = date===todayStr;
-          const isTomorrow = date===tomorrowStr;
-          const label = isToday?'오늘':isTomorrow?'내일':date.slice(5);
-          const barH = cnt>0 ? Math.round(cnt/timelineMax*60)+8 : 4;
-          const barColor = isToday?'#5a7af7':isTomorrow?'#EF9F27':'#a0b4fa';
-          const labelColor = (isToday||isTomorrow)?'#5a7af7':'#bbb';
-          return `<div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;min-width:34px">
-            <span style="font-size:10px;color:#666;margin-bottom:2px;font-weight:${cnt>0?'600':'400'}">${cnt||''}</span>
-            <div style="background:${barColor};border-radius:3px 3px 0 0;width:22px;height:${barH}px;opacity:${cnt>0?1:0.2}"></div>
-            <span style="font-size:9px;color:${labelColor};margin-top:3px;font-weight:${isToday||isTomorrow?'700':'400'}">${label}</span>
-          </div>`;
-        }).join('')}
-      </div>
-    </div>
-
-    <div style="${S}">
-      <p style="${T};margin-bottom:4px">📍 지역별 공고 현황 (${regionAll.length}개 지역)</p>
-      <p style="font-size:12px;color:#888;margin:0 0 14px;line-height:1.5">신청할 수 없는 공고는 빼고 <strong style="color:#5a7af7">${regionRows.length.toLocaleString()}건</strong>을 세었어요 · 목록에 없는 지역은 지금 신청할 수 있는 공고가 없는 곳이에요</p>
-      ${regionAll.length===0 ? '<p style="font-size:13px;color:#aaa;text-align:center;padding:20px 0">지금 신청할 수 있는 공고가 없어요</p>' : `
-      <div style="display:flex;flex-direction:column;gap:10px">
-        ${regionTop.map(regionRowHTML).join('')}
-      </div>
-      ${regionRest.length ? `
-        <div id="regionRest" style="display:none;flex-direction:column;gap:10px;margin-top:10px">
-          ${regionRest.map(regionRowHTML).join('')}
-        </div>
-        <button class="btn btn-sec btn-sm" id="regionMoreBtn" style="margin-top:10px"
-                data-more="나머지 ${regionRest.length}개 지역 더 보기 ↓" data-less="접기 ↑"
-                onclick="toggleRegionRest(this)">나머지 ${regionRest.length}개 지역 더 보기 ↓</button>` : ''}
-      `}
-    </div>
-
-    <div style="${S}">
-      <p style="${T};margin-bottom:4px">📈 최근 30일 공고 추이</p>
-      <p style="font-size:12px;color:#888;margin:0 0 12px">공고일 기준 · 마감 포함</p>
-      ${trendEntries.length===0
-        ? '<p style="font-size:13px;color:#aaa;text-align:center;padding:20px 0">최근 30일 데이터가 없어요</p>'
-        : `<div style="display:flex;align-items:flex-end;gap:4px;overflow-x:auto;padding-bottom:4px;min-height:84px">
-            ${trendEntries.map(([date,cnt])=>`
-              <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;min-width:24px" title="${date}: ${cnt}건">
-                <span style="font-size:9px;color:#888;margin-bottom:2px">${cnt}</span>
-                <div style="background:#5a7af7;border-radius:3px 3px 0 0;width:18px;height:${Math.round(cnt/trendMax*60)+4}px"></div>
-                <span style="font-size:8px;color:#bbb;margin-top:2px;writing-mode:vertical-rl;text-orientation:mixed">${date.slice(5)}</span>
-              </div>`).join('')}
-          </div>`
-      }
-    </div>
-
-    ${(()=>{
+  const statsHTML = (()=>{
       if(!statsRows){
         return `<div style="background:#f5f5f5;border-radius:14px;padding:20px;margin-bottom:16px;text-align:center">
           <p style="font-size:13px;color:#aaa">재고 데이터를 불러올 수 없습니다</p>
@@ -4672,7 +4736,89 @@ function renderInsight(rows, wrap, statsRows){
       return `<div style="margin:8px 0 4px">
         <p style="font-size:13px;font-weight:700;color:#888;margin:0 0 12px;padding-left:2px">📊 전국 공공임대 재고 현황 (출처: 공공데이터포털)</p>
       </div>${secA}${secB}`;
-    })()}`;
+  })();
+  // 🔵 D-3 둘러보기 ③ — d3 는 같은 수로 다른 판(LED 숫자판 · 14일 마감 막대 · 지역 막대 · 30일 추이)을 그리고, 재고 절은 색만 토큰으로(어둡게 모드)
+  if(typeof zf3On === 'function' && zf3On()){
+    wrap.innerHTML = zf3InsightTop({ openN: regionRows.length, cumText: zfCumulativeText(rows), kpiActive, kpiNew, kpiClosing, timelineEntries, todayStr, tomorrowStr, regionAll, regionTop, regionRest, regionMaxCnt, trendEntries, trendMax }) + zf3Recolor(statsHTML);
+    return;
+  }
+  wrap.innerHTML = `
+    <div style="${S}">
+      <p style="${T}">📊 공고 통계 인사이트</p>
+      <p style="font-size:13px;color:#888;margin:0">지금 열린 공고 <strong style="color:#5a7af7">${regionRows.length.toLocaleString()}건</strong> · ${zfCumulativeText(rows)} · 수시로 자동 업데이트</p>
+    </div>
+
+    <div style="${S}">
+      <p style="${T}">📌 주요 현황</p>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+        <div style="background:#f0f3ff;border-radius:12px;padding:16px;text-align:center;box-shadow:0 1px 4px rgba(90,122,247,0.08)">
+          <p style="font-size:28px;font-weight:700;color:#5a7af7;margin:0">${kpiActive.toLocaleString()}</p>
+          <p style="font-size:12px;color:#888;margin-top:6px">🟢 접수중</p>
+        </div>
+        <div style="background:#f0faf5;border-radius:12px;padding:16px;text-align:center;box-shadow:0 1px 4px rgba(29,158,117,0.08)">
+          <p style="font-size:28px;font-weight:700;color:#1D9E75;margin:0">${kpiNew.toLocaleString()}</p>
+          <p style="font-size:12px;color:#888;margin-top:6px">🆕 이번주 신규</p>
+        </div>
+        <div style="background:#fff7f0;border-radius:12px;padding:16px;text-align:center;box-shadow:0 1px 4px rgba(239,159,39,0.08)">
+          <p style="font-size:28px;font-weight:700;color:#EF9F27;margin:0">${kpiClosing.toLocaleString()}</p>
+          <p style="font-size:12px;color:#888;margin-top:6px">⏰ 마감임박</p>
+        </div>
+      </div>
+    </div>
+
+    <div style="${S}">
+      <p style="${T}">📅 마감 임박 타임라인</p>
+      <div style="display:flex;align-items:flex-end;gap:6px;overflow-x:auto;padding-bottom:6px;min-height:100px">
+        ${timelineEntries.map(([date,cnt])=>{
+          const isToday = date===todayStr;
+          const isTomorrow = date===tomorrowStr;
+          const label = isToday?'오늘':isTomorrow?'내일':date.slice(5);
+          const barH = cnt>0 ? Math.round(cnt/timelineMax*60)+8 : 4;
+          const barColor = isToday?'#5a7af7':isTomorrow?'#EF9F27':'#a0b4fa';
+          const labelColor = (isToday||isTomorrow)?'#5a7af7':'#bbb';
+          return `<div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;min-width:34px">
+            <span style="font-size:10px;color:#666;margin-bottom:2px;font-weight:${cnt>0?'600':'400'}">${cnt||''}</span>
+            <div style="background:${barColor};border-radius:3px 3px 0 0;width:22px;height:${barH}px;opacity:${cnt>0?1:0.2}"></div>
+            <span style="font-size:9px;color:${labelColor};margin-top:3px;font-weight:${isToday||isTomorrow?'700':'400'}">${label}</span>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <div style="${S}">
+      <p style="${T};margin-bottom:4px">📍 지역별 공고 현황 (${regionAll.length}개 지역)</p>
+      <p style="font-size:12px;color:#888;margin:0 0 14px;line-height:1.5">신청할 수 없는 공고는 빼고 <strong style="color:#5a7af7">${regionRows.length.toLocaleString()}건</strong>을 세었어요 · 목록에 없는 지역은 지금 신청할 수 있는 공고가 없는 곳이에요</p>
+      ${regionAll.length===0 ? '<p style="font-size:13px;color:#aaa;text-align:center;padding:20px 0">지금 신청할 수 있는 공고가 없어요</p>' : `
+      <div style="display:flex;flex-direction:column;gap:10px">
+        ${regionTop.map(regionRowHTML).join('')}
+      </div>
+      ${regionRest.length ? `
+        <div id="regionRest" style="display:none;flex-direction:column;gap:10px;margin-top:10px">
+          ${regionRest.map(regionRowHTML).join('')}
+        </div>
+        <button class="btn btn-sec btn-sm" id="regionMoreBtn" style="margin-top:10px"
+                data-more="나머지 ${regionRest.length}개 지역 더 보기 ↓" data-less="접기 ↑"
+                onclick="toggleRegionRest(this)">나머지 ${regionRest.length}개 지역 더 보기 ↓</button>` : ''}
+      `}
+    </div>
+
+    <div style="${S}">
+      <p style="${T};margin-bottom:4px">📈 최근 30일 공고 추이</p>
+      <p style="font-size:12px;color:#888;margin:0 0 12px">공고일 기준 · 마감 포함</p>
+      ${trendEntries.length===0
+        ? '<p style="font-size:13px;color:#aaa;text-align:center;padding:20px 0">최근 30일 데이터가 없어요</p>'
+        : `<div style="display:flex;align-items:flex-end;gap:4px;overflow-x:auto;padding-bottom:4px;min-height:84px">
+            ${trendEntries.map(([date,cnt])=>`
+              <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;min-width:24px" title="${date}: ${cnt}건">
+                <span style="font-size:9px;color:#888;margin-bottom:2px">${cnt}</span>
+                <div style="background:#5a7af7;border-radius:3px 3px 0 0;width:18px;height:${Math.round(cnt/trendMax*60)+4}px"></div>
+                <span style="font-size:8px;color:#bbb;margin-top:2px;writing-mode:vertical-rl;text-orientation:mixed">${date.slice(5)}</span>
+              </div>`).join('')}
+          </div>`
+      }
+    </div>
+
+    ${statsHTML}`;
 }
 
 async function updateBannerFromDB(){
@@ -10057,6 +10203,7 @@ function zf3CondChips(){
   if(q) out.push(['q', `검색 「${q}」`]);
   const chk = document.getElementById('hideClosedChk');
   if(chk && !chk.checked && !activeNoticeStatus) out.push(['closed', '신청할 수 없는 공고 포함']);
+  if(zf3PlaceSel && zf3PlaceName) out.push(['place', `📍 ${zf3PlaceName}`]);
   return out;
 }
 function zf3RenderNoticeHead(filtered){
@@ -10078,7 +10225,7 @@ function zf3RenderNoticeHead(filtered){
   const at = noticeLoadedAt ? new Date(noticeLoadedAt + 9 * 3600 * 1000).toISOString() : '';
   const atText = at ? `${at.slice(0, 10).replace(/-/g, '.')} KST` : '불러오는 중';   // 시안 「slim」 그대로 날짜만 — 390px 한 줄
   const sheetOpen = !document.getElementById('noticeFilterPanel')?.classList.contains('hidden');
-  el.innerHTML = `<p class="zf3-lh">${head}</p>`
+  el.innerHTML = `<div class="zf3-lhrow"><p class="zf3-lh">${head}</p><span class="zf3-vseg" role="group" aria-label="보기"><button type="button" data-act="view" data-v="list" aria-pressed="${zf3View !== 'map'}">목록</button><button type="button" data-act="view" data-v="map" aria-pressed="${zf3View === 'map'}">지도</button></span></div>`
     + `<p class="zf3-lsub">${closedExcluded ? '' : `열린 ${o.n.toLocaleString()}건: `}접수 중 ${o.a.toLocaleString()} · 예정 ${o.b.toLocaleString()}${o.k ? ` · 미상 ${o.k.toLocaleString()}` : ''}${sortText ? ` · ${escapeHtml(sortText)}` : ''}</p>`
     + `<div class="zf3-tblock" role="note"><div><span class="k">기준</span><span class="v led">${escapeHtml(atText)}</span></div><div><span class="k">출처</span><span class="v">LH · 마이홈 · SH 원문 → 꼭집 정리</span></div></div>`
     + `<div class="zf3-chips" role="group" aria-label="걸린 조건">${chips.map(([k, t]) => `<button type="button" class="zf3-chip on" data-act="clear" data-k="${k}" aria-label="${zfAttr(t)} 조건 빼기">${escapeHtml(t)}<span aria-hidden="true">✕</span></button>`).join('')}`
@@ -10092,6 +10239,7 @@ function zf3ClearCond(k){
   if(k === 'target'){ activeNoticeTarget = null; refreshChipSel('noticeTargetChips', null); }
   if(k === 'q'){ const q = document.getElementById('noticeSearchInput'); if(q) q.value = ''; }
   if(k === 'closed'){ const c = document.getElementById('hideClosedChk'); if(c) c.checked = true; }
+  if(k === 'place'){ zf3PlaceSel = null; zf3PlaceName = ''; }
   updateFilterToggleBtn();
   applyNoticeFiltersAndRender();
 }
@@ -10105,6 +10253,206 @@ function zf3ToggleSheet(open){
   if(add) add.setAttribute('aria-expanded', String(open));
   if(open){ const f = panel.querySelector('input,select,button,[tabindex="0"]'); if(f) f.focus(); }
   else if(add) add.focus();
+}
+// ── 지도로 보기(레이더 · D-3 단계 d · 2026-10-12) ─────────────────────────────────────────────
+//    밝은 지도 위에 열린 공고가 걸친 시군구마다 점 하나(점 크기 = 공고 수 · 오늘·내일 마감이 있으면 빨강 맥박 두 번 · 접수 예정만이면 빈 점).
+//    🔴 점은 단지 위치가 아니라 시군구 중심점이다(캡션에 밝힌다). 재료는 RPC 행의 region_names(그룹이 걸친 시군구 전부) → 없으면 sido_nm·sigungu_nm.
+//    2013 경계(geo/kr-2013.json)에 없는 이름은 ① 이름만 바뀐 구(미추홀구 = 2013 남구) ② 부모 시(화성시 ○○구 → 화성시 · 청주시 서원구 → 청주시 구들의 가운데)
+//    ③ 시도가 바뀐 군(군위군 — 이름이 하나뿐일 때만) ④ 그래도 없으면 시도 가운데 점선 고리(「인천 제물포구」 · 「서울(시군구 미상)」).
+//    점·지역 단추를 누르면 목록이 그 시군구 공고로 좁혀진다(📍 칩 · ✕로 뺀다 · 메모리만 — 새 저장 0). 지도 자료는 같은 출처 파일 하나를 처음 열 때만 받는다(외부 요청 0).
+let zf3Geo = null, zf3GeoP = null, zf3View = 'list', zf3PlaceSel = null, zf3PlaceName = '', zf3PrePlace = [];
+const ZF3_PROV = { 서울특별시: '11', 부산광역시: '21', 대구광역시: '22', 인천광역시: '23', 광주광역시: '24', 대전광역시: '25', 울산광역시: '26', 세종특별자치시: '29', 경기도: '31', 강원특별자치도: '32', 강원도: '32', 충청북도: '33', 충청남도: '34', 전북특별자치도: '35', 전라북도: '35', 전라남도: '36', 경상북도: '37', 경상남도: '38', 제주특별자치도: '39' };
+const ZF3_SGG_ALIAS = { '23|미추홀구': '23|남구' };
+const ZF3_METRO = new Set(['11', '21', '22', '23', '24', '25', '26']);
+let zf3PlacesAll = false;   // 2018 이름만 바뀐 구(경계 같음)
+const zf3ShortSido = t => String(t || '').replace(/특별자치시|특별자치도|특별시|광역시/, '').replace(/^(충청|전라|경상)(남|북)도$/, (m, a, b) => a[0] + b).replace(/도$/, '');
+function zf3LoadGeo(){
+  if(!zf3GeoP) zf3GeoP = fetch('./geo/kr-2013.json', { cache: 'force-cache' }).then(r => r.ok ? r.json() : null).then(g => { zf3Geo = g && g.cent ? g : null; return zf3Geo; }).catch(() => { zf3GeoP = null; return null; });
+  return zf3GeoP;
+}
+function zf3PlaceOf(sido, sgg){
+  const G = zf3Geo, pc = ZF3_PROV[String(sido || '').trim()];
+  if(!G || !pc) return null;
+  const sg = String(sgg || '').replace(/\s+/g, '');
+  if(sg){
+    const k0 = pc + '|' + sg, k = ZF3_SGG_ALIAS[k0] || k0;
+    if(G.cent[k]) return { key: k0, name: (ZF3_METRO.has(pc) ? zf3ShortSido(sido) + ' ' : '') + String(sgg).trim(), xy: G.cent[k], exact: true, pc };   // 「북구」는 어느 시의 북구인지 — 특별·광역시 구는 시 이름을 앞에
+    const city = sg.replace(/^(\S+?시)\S+구$/, '$1');
+    if(city !== sg){
+      if(G.cent[pc + '|' + city]) return { key: pc + '|' + city, name: city, xy: G.cent[pc + '|' + city], exact: true, pc };
+      const kids = Object.keys(G.cent).filter(x => x.startsWith(pc + '|' + city));
+      if(kids.length) return { key: pc + '|' + city, name: city, xy: [0, 1].map(i => kids.reduce((a, x) => a + G.cent[x][i], 0) / kids.length), exact: true, pc };
+    }
+    const same = Object.keys(G.cent).filter(x => x.split('|')[1] === sg);
+    if(same.length === 1) return { key: k0, name: String(sgg).trim(), xy: G.cent[same[0]], exact: true, pc };
+    return { key: pc + '|*' + sg, name: zf3ShortSido(sido) + ' ' + String(sgg).trim(), xy: G.prov[pc], exact: false, pc, note: '2013 경계에 없는 구 — 시도 가운데 고리' };
+  }
+  return { key: pc + '|*', name: zf3ShortSido(sido) + '(시군구 미상)', xy: G.prov[pc], exact: false, pc, note: '시군구 없음 — 시도 가운데 고리' };
+}
+function zf3PlacesOfRow(n){
+  const out = new Map();
+  let names = Array.isArray(n['region_names']) ? n['region_names'].map(x => String(x || '').trim()).filter(Boolean) : [];
+  names = names.filter(x => !names.some(y => y !== x && y.startsWith(x + ' ')));   // 「창원시」와 「창원시 마산회원구」가 함께면 구만
+  const parts = names.length ? names.map(x => { const i = x.indexOf(' '); return i < 0 ? [x, ''] : [x.slice(0, i), x.slice(i + 1)]; }) : [[n['sido_nm'], n['sigungu_nm']]];
+  parts.forEach(([sd, sg]) => { const pl = zf3PlaceOf(sd, sg); if(pl && !out.has(pl.key)) out.set(pl.key, pl); });
+  return [...out.values()];
+}
+function zf3PlaceFilter(rows){
+  zf3PrePlace = rows || [];
+  if(!zf3On() || !zf3PlaceSel || !zf3Geo) return rows;
+  const hit = zf3PrePlace.filter(n => zf3PlacesOfRow(n).some(p => p.key === zf3PlaceSel));
+  if(!hit.length){ zf3PlaceSel = null; zf3PlaceName = ''; return rows; }   // 조건이 바뀌어 그 곳에 공고가 없으면 고른 곳을 푼다(0건 화면을 만들지 않는다)
+  return hit;
+}
+const zf3Wide = () => { try{ return matchMedia('(min-width:1200px)').matches; }catch(e){ return false; } };
+function zf3SetView(v){
+  zf3View = v === 'map' ? 'map' : 'list';
+  document.documentElement.classList.toggle('zf3-mapview', zf3View === 'map');
+  document.querySelectorAll('#zf3NoticeHead [data-act="view"]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === zf3View)));
+  zf3RenderMap();
+}
+function zf3SetPlace(key, name){
+  zf3PlaceSel = zf3PlaceSel === key ? null : key;
+  zf3PlaceName = zf3PlaceSel ? name : '';
+  applyNoticeFiltersAndRender();
+  if(zf3PlaceSel && !zf3Wide()){
+    zf3SetView('list');
+    try{ document.getElementById('zf3NoticeHead').scrollIntoView({ block: 'start' }); }catch(e){}
+  }
+}
+function zf3MapGroups(){
+  const G = new Map(), today = zf3Today();
+  (zf3PrePlace || []).forEach(n => {
+    const st = applyWindowState(n), end = zf3Real(zfSoonestOpenEnd(n));
+    const hot = st === 'open' && end && zf3Days(today, end) <= 1;
+    zf3PlacesOfRow(n).forEach(pl => {
+      const g = G.get(pl.key) || Object.assign({ n: 0, hot: false, open: false }, pl);
+      g.n++; if(hot) g.hot = true; if(st === 'open') g.open = true;
+      G.set(pl.key, g);
+    });
+  });
+  return [...G.values()].map(g => Object.assign(g, { cls: g.hot ? 'hot' : g.open ? '' : 'soon' })).sort((a, b) => b.n - a.n || a.name.localeCompare(b.name, 'ko'));
+}
+function zf3RenderMap(){
+  if(!zf3On()) return;
+  const head = document.getElementById('zf3NoticeHead');
+  if(!head) return;
+  let box = document.getElementById('zf3Map');
+  const show = zf3View === 'map' || zf3Wide();
+  if(!show){ if(box) box.hidden = true; return; }
+  if(!box){ box = document.createElement('section'); box.id = 'zf3Map'; box.className = 'zf3-map'; box.setAttribute('aria-label', '지도로 보기'); head.after(box); box.addEventListener('click', ev => { const a = ev.target.closest('[data-act="all"]'); if(a){ zf3PlacesAll = !zf3PlacesAll; zf3RenderMap(); const f = document.querySelector('#zf3Map [data-act="all"]'); if(f) f.focus(); return; } const b = ev.target.closest('[data-place]'); if(b) zf3SetPlace(b.dataset.place, b.dataset.name); }); }
+  box.hidden = false;
+  if(!zf3Geo){ box.innerHTML = '<p class="zf3-map-wait">지도를 불러오는 중…</p>'; zf3LoadGeo().then(g => { if(g){ applyNoticeFiltersAndRender(noticePage); } else box.innerHTML = '<p class="zf3-map-wait">지도를 불러오지 못했어요 · 목록으로 보세요</p>'; }); return; }
+  const G = zf3Geo, gs = zf3MapGroups(), on = new Set(gs.map(g => g.pc));
+  const placed = [], clash = b => placed.some(q => !(b[2] < q[0] || b[0] > q[2] || b[3] < q[1] || b[1] > q[3]));
+  const lbl = g => { const t = `${g.exact ? g.name.replace(/^\S+시\s(\S+구)$/, '$1').replace(ZF3_METRO.has(g.pc) ? /^\S+\s/ : /^$/, '') : g.name} ${g.n}`, w = t.length * 12.5;
+    const x = g.exact ? g.xy[0] + 10 : g.xy[0] - w / 2, y = g.exact ? g.xy[1] + 5 : g.xy[1] - 28 - Math.min(14, g.n);
+    const b = [x, y - 14, x + w, y + 3]; if(clash(b)) return ''; placed.push(b); return `<text class="lbl" x="${x.toFixed(1)}" y="${y.toFixed(1)}">${escapeHtml(t)}</text>`; };
+  const rings = gs.filter(g => !g.exact), dots = gs.filter(g => g.exact);
+  const labels = [...rings, ...dots].map(lbl).join('');
+  const pts = gs.map((g, i) => { const r = 5 + Math.min(7, g.n - 1), [x, y] = g.xy, sel = zf3PlaceSel === g.key ? ' sel' : '';
+    return `<g class="pt${sel}" style="--i:${Math.min(i, 30)}" data-place="${zfAttr(g.key)}" data-name="${zfAttr(g.name)}">${g.exact ? `${g.hot ? `<circle class="pulse" cx="${x}" cy="${y}" r="${r}"/>` : ''}<circle class="dot ${g.cls}" cx="${x}" cy="${y}" r="${r}"/>` : `<circle class="ring${sel}" cx="${x}" cy="${y}" r="${20 + Math.min(14, g.n)}"/>`}<circle class="hit" cx="${x}" cy="${y}" r="16"/></g>`; }).join('');
+  const nOpen = (zf3PrePlace || []).length;
+  box.innerHTML = `<div class="zf3-radar"><svg viewBox="${G.vb.join(' ')}" aria-hidden="true" focusable="false">${G.paths.map(p => `<path class="land${on.has(p.code) ? ' on' : ''}" d="${p.d}"/>`).join('')}${pts}${labels}</svg><span class="cap">점 = 시군구 가운데(단지 위치 아님) · 2013 경계</span></div>`
+    + `<div class="zf3-legend"><span><i></i>접수 중</span><span><i class="hot"></i>오늘·내일 마감</span><span><i class="soon"></i>접수 예정</span><span><i class="ring"></i>시군구 미상</span></div>`
+    + `<p class="zf3-map-n">${gs.length ? `공고 ${nOpen.toLocaleString()}건이 걸친 ${gs.length}곳 · 누르면 그곳 공고만` : '지금 조건에 맞는 공고가 없어요'}</p>`
+    + `<div class="zf3-places" role="group" aria-label="지역으로 좁히기">${gs.filter((g, i) => zf3PlacesAll || i < 12 || g.key === zf3PlaceSel).map(g => `<button type="button" data-place="${zfAttr(g.key)}" data-name="${zfAttr(g.name)}" aria-pressed="${zf3PlaceSel === g.key}"><i class="${g.exact ? g.cls : 'ring'}" aria-hidden="true"></i>${escapeHtml(g.name)} <b>${g.n}</b></button>`).join('')}`
+    + (gs.length > 12 ? `<button type="button" class="zf3-pall" data-act="all" aria-expanded="${zf3PlacesAll}">${zf3PlacesAll ? '접기' : `모든 지역 ${gs.length}곳`}</button>` : '') + `</div>`;
+  try{ if(!matchMedia('(prefers-reduced-motion: reduce)').matches) box.querySelector('.zf3-radar').classList.add('live'); }catch(e){}
+}
+// 관리 탭 「나의 노선도」(d3 · 둘러보기 ④ · 2026-10-12) — 저장한 공고들의 앞으로 남은 날짜(접수 시작 · 접수 마감 · 당첨자 발표)를
+//    한 줄 세로 노선으로. 재료는 저장한 공고뿐(처리방침 — 이미 저장 목록이 쓰는 같은 대표행 날짜) · 새 저장·새 요청 0.
+//    날짜를 믿을 수 없는 공고(접수기간 확인 필요)와 지난 날짜만 남은 공고는 노선에 넣지 않고 아래 한 줄로 센다. 9999 는 날짜가 아니다(zf3Real).
+function zf3MyRoute(){
+  if(!zf3On()) return;
+  const main4 = document.getElementById('main4');
+  if(!main4) return;
+  let box = document.getElementById('zf3MyRoute');
+  const saved = getSavedNotices();
+  if(!saved.length){ if(box) box.remove(); return; }
+  if(!box){ box = document.createElement('section'); box.id = 'zf3MyRoute'; box.className = 'zf3-my'; box.setAttribute('aria-labelledby', 'zf3MyT'); main4.prepend(box); }
+  const today = zf3Today(), ev = [];
+  let unk = 0, done = 0;
+  saved.forEach(sv => {
+    if(sv.cancelled) return;
+    if(sv.period_check){ unk++; return; }
+    const st = zf3Real(sv.apply_start), en = zf3Real(sv.apply_end), wn = zf3Real(sv.winner);
+    const before = ev.length;
+    if(st && st > today) ev.push({ d: st, k: '접수 시작', sv });
+    if(en && en >= today) ev.push({ d: en, k: '접수 마감', sv, hot: zf3Days(today, en) <= 1 });
+    if(wn && wn >= today) ev.push({ d: wn, k: '당첨자 발표', sv });
+    if(ev.length === before){ if(!st && !en) unk++; else done++; }
+  });
+  ev.sort((a, b) => a.d.localeCompare(b.d) || (a.k === '접수 마감' ? -1 : 1));
+  const HEAD = 6;
+  const li = e => {
+    const dd = zf3Days(today, e.d);
+    return `<li class="${e.hot ? 'hot' : ''}"><span class="dt">${zf3Md(e.d)}</span><span class="dd">${dd === 0 ? '오늘' : 'D-' + dd}</span>`
+      + `<span class="tx"><span class="k">${e.k}</span><button type="button" class="nm" data-id="${zfAttr(e.sv.rid || e.sv.id)}">${escapeHtml(e.sv.title || '(공고명 없음)')}</button></span></li>`;
+  };
+  const note = [unk ? `날짜를 원문에서 확인해야 하는 공고 ${unk}건` : '', done ? `남은 일정이 없는 공고 ${done}건` : ''].filter(Boolean).join(' · ');
+  box.innerHTML = `<div class="zf3-my-h"><h2 id="zf3MyT">나의 노선도</h2><span>저장한 공고 ${saved.length}건의 다음 일정</span></div>`
+    + (ev.length ? `<ol class="zf3-my-l"><li class="now"><span class="dt">${zf3Md(today)}</span><span class="dd">오늘</span><span class="tx"></span></li>${ev.slice(0, HEAD).map(li).join('')}</ol>`
+      + (ev.length > HEAD ? `<ol class="zf3-my-l zf3-my-rest" hidden>${ev.slice(HEAD).map(li).join('')}</ol><button type="button" class="zf3-more" data-act="more" aria-expanded="false">남은 일정 ${ev.length - HEAD}개 더 보기</button>` : '')
+      : '<p class="zf3-my-n">저장한 공고에 앞으로 남은 일정이 없어요</p>')
+    + (note ? `<p class="zf3-my-n">${note}</p>` : '');
+  if(!box.dataset.wired){
+    box.dataset.wired = '1';
+    box.addEventListener('click', ev2 => {
+      const b = ev2.target.closest('button');
+      if(!b) return;
+      if(b.dataset.act === 'more'){ const r = box.querySelector('.zf3-my-rest'); const open = r.hidden; r.hidden = !open; b.setAttribute('aria-expanded', String(open)); b.textContent = open ? '접기' : b.textContent; if(!open) zf3MyRoute(); }
+      else if(b.dataset.id) zf3GoCard(b.dataset.id);
+    });
+  }
+}
+// 인사이트 탭(d3 · 둘러보기 ③ · 2026-10-12) — renderInsight 가 센 수를 그대로 받아 다른 판으로만 그린다(수·술어는 renderInsight 한 곳).
+//    LED 숫자판(접수 중 · 최근 7일 신규 · 3일 안 마감) · 앞으로 14일 마감 막대(오늘·내일 경고 색) · 지역 막대 · 최근 30일 공고 추이.
+//    낱말은 술어 그대로 밝힌다 — 종전 「이번주 신규」는 실제로 「공고일이 최근 7일」, 「마감임박」은 「마감이 오늘~3일 뒤」다(isClosingSoon).
+function zf3InsightTop(c){
+  const fmt = v => Number(v || 0).toLocaleString();
+  const dow = k => '일월화수목금토'[new Date(k + 'T00:00:00Z').getUTCDay()];
+  const tMax = Math.max(1, ...c.timelineEntries.map(e => e[1]));
+  const tl = c.timelineEntries.map(([k, n], i) => {
+    const hot = k === c.todayStr || k === c.tomorrowStr;
+    const day = +k.slice(8, 10);
+    const lab = day === 1 || i === 0 ? `${+k.slice(5, 7)}/${day}` : String(day);   // 날짜는 숫자로 · 오늘·내일은 아래 요일 칸에(두 글자가 14칸에 겹치지 않게)
+    const wk = k === c.todayStr ? '오늘' : k === c.tomorrowStr ? '내일' : dow(k);
+    return `<div class="zf3-tc${hot ? ' hot' : ''}${n ? '' : ' z'}" title="${k}: ${n}건"><span class="n">${n || ''}</span><i style="--h:${n ? Math.round(n / tMax * 100) : 0}"></i><span class="d">${lab}</span><span class="w">${wk}</span></div>`;
+  }).join('');
+  const tlAria = '앞으로 14일 마감 공고 — ' + (c.timelineEntries.filter(e => e[1]).map(([k, n]) => `${k === c.todayStr ? '오늘' : k === c.tomorrowStr ? '내일' : (+k.slice(5, 7)) + '월 ' + (+k.slice(8, 10)) + '일'} ${n}건`).join(', ') || '없음');
+  const rRow = ([name, v]) => `<div class="zf3-rr"><span class="nm">${escapeHtml(name)}</span><span class="tr"><i style="--w:${Math.round(v.cnt / c.regionMaxCnt * 100)}"></i></span><span class="ct">${fmt(v.cnt)}</span></div>`;
+  const trMax = Math.max(1, ...c.trendEntries.map(e => e[1]));
+  const tr = c.trendEntries.map(([k, n]) => `<div class="zf3-trc" title="${k}: ${n}건"><span class="n">${n}</span><i style="--h:${Math.round(n / trMax * 100)}"></i></div>`).join('');
+  const trFirst = c.trendEntries.length ? c.trendEntries[0][0] : '', trLast = c.trendEntries.length ? c.trendEntries[c.trendEntries.length - 1][0] : '';
+  return `<section class="zf3-ins">
+    <div class="zf3-ins-head"><h2>인사이트</h2><p>지금 열린 공고 <b>${fmt(c.openN)}건</b> · ${escapeHtml(c.cumText)} · 수시로 자동 업데이트</p></div>
+    <div class="zf3-kpi" role="group" aria-label="주요 현황 — 지금 열린 공고 기준">
+      <div class="zf3-kc"><b style="--c:var(--led-green)">${fmt(c.kpiActive)}</b><span>접수 중</span></div>
+      <div class="zf3-kc"><b style="--c:var(--led)">${fmt(c.kpiNew)}</b><span>최근 7일 신규</span></div>
+      <div class="zf3-kc"><b style="--c:var(--led-red)">${fmt(c.kpiClosing)}</b><span>3일 안 마감</span></div>
+    </div>
+    <div class="zf3-ins-card"><h3>앞으로 14일 마감</h3><p class="zf3-ins-note">지금 열린 공고의 마감일</p>
+      <div class="zf3-tl" role="img" aria-label="${zfAttr(tlAria)}">${tl}</div></div>
+    <div class="zf3-ins-card"><h3>지역별 열린 공고 <span>${c.regionAll.length}개 지역</span></h3>
+      <p class="zf3-ins-note">신청할 수 없는 공고는 빼고 ${fmt(c.openN)}건을 세었어요 · 목록에 없는 지역은 지금 신청할 수 있는 공고가 없는 곳이에요</p>
+      ${c.regionAll.length === 0 ? '<p class="zf3-ins-empty">지금 신청할 수 있는 공고가 없어요</p>' : `<div class="zf3-rl">${c.regionTop.map(rRow).join('')}</div>
+      ${c.regionRest.length ? `<div id="regionRest" class="zf3-rl" style="display:none;margin-top:10px">${c.regionRest.map(rRow).join('')}</div>
+      <button type="button" class="zf3-more" id="regionMoreBtn" data-more="나머지 ${c.regionRest.length}개 지역 더 보기" data-less="접기" onclick="toggleRegionRest(this)">나머지 ${c.regionRest.length}개 지역 더 보기</button>` : ''}`}</div>
+    <div class="zf3-ins-card"><h3>최근 30일 공고 추이</h3><p class="zf3-ins-note">공고일 기준 · 마감 포함</p>
+      ${c.trendEntries.length === 0 ? '<p class="zf3-ins-empty">최근 30일 데이터가 없어요</p>' : `<div class="zf3-tr">${tr}</div><div class="zf3-trx"><span>${trFirst.slice(5).replace('-', '/')}</span><span>${trLast.slice(5).replace('-', '/')}</span></div>`}</div>
+  </section>`;
+}
+// 재고 절(renderInsight 의 statsHTML)은 글자·수를 그대로 두고 손으로 적힌 색만 토큰으로 바꾼다 — 어둡게 모드에서 흰 카드가 남던 자리(둘러보기 ①).
+function zf3Recolor(html){
+  const map = [
+    ['background:#fff;', 'background:var(--paper);border:1px solid var(--line-2);'],
+    ['box-shadow:0 1px 6px rgba(0,0,0,0.07)', 'box-shadow:none'],
+    ['background:#f8f9ff', 'background:var(--surface)'], ['background:#f5f5f5', 'background:var(--surface)'],
+    ['color:#333', 'color:var(--ink)'], ['color:#888', 'color:var(--ink-3)'], ['color:#bbb', 'color:var(--ink-3)'], ['color:#ccc', 'color:var(--ink-3)'], ['color:#aaa', 'color:var(--ink-3)'],
+    ['color:#5a7af7', 'color:var(--ln-kuk)'], ['color:#1D9E75', 'color:var(--ln-hang)'], ['color:#EF9F27', 'color:var(--ln-jeon)']
+  ];
+  return map.reduce((h, [a, b]) => h.split(a).join(b), String(html || ''));
 }
 // 탭 — 아이콘(390 아래 고정 탭에서만 보임) · 미끄러지는 표시 하나(둘러보기 ⑤·⑨ · 2026-10-12). 탭 단추·ID·goMain 그대로(원칙 7).
 //    아이콘: 추천 = 과녁(꼭 집어) · 공고 = 문서 · 인사이트 = 막대 · 관리 = 책갈피 · 설정 = 조절기. 장식이라 aria-hidden.
@@ -10191,6 +10539,7 @@ function zf3Init(){
     if(!b) return;
     if(b.dataset.act === 'clear') zf3ClearCond(b.dataset.k);
     else if(b.dataset.act === 'sheet') zf3ToggleSheet();
+    else if(b.dataset.act === 'view') zf3SetView(b.dataset.v);
   });
   const board = document.getElementById('zf3Board');
   if(board) board.addEventListener('click', e => {
