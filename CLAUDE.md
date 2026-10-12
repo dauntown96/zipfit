@@ -28,6 +28,7 @@
 | 판단이 뒤집힌 경위 | [⑧ 판례집](https://www.notion.so/3b48aaa7e15581c0bcd7d3c8868df713) |
 | 3자 분장·git·지시서·병합 규약 | [⑦ 협업 규약](https://www.notion.so/3b48aaa7e155816ea873d4c3f006510a) |
 | 어디를 봐야 할지 모를 때 | [⑨ 라우팅 규약](https://www.notion.so/3b98aaa7e155812686b6ff3d11ea43fa) — 5장 검색 키워드 사전 |
+| 디자인 판단·결정 기록 | [🎨 표시층 — 디자인 상시 판](https://www.notion.so/3f78aaa7e155810c9192fc4765741102) — 🔴 닫지 않는다 · 다운님께 여쭐 디자인 자리와 결정 기록(한 줄씩)은 그 페이지 · 구현·회신은 그 회차의 코드(표시층) 페이지(D-3 0장 · 2026-10-12) |
 | 요청서·회신 — 한 회차 = 한 페이지 | [📬 ZipFit 우편함](https://www.notion.so/eeb36bcacbff40bb816716b1b393f4be) — 착수 때 「작업중」 · 끝나면 「## 회신」 절(원칙 22)·「회신 완료」·PR 칸. 🔴 규약 정본은 ⑦ 「2026-09-29 운영 구조 재편」 |
 
 ⚠️ **헤더에 출처(⑦·⑨ 등)를 밝힌 코딩 원칙은 전부 그 문서의 요약 사본이다. 어긋나면 정본이 이긴다.** 🔴 **각 조항 헤더의 반영 시점이 그 조항의 유효기간이다** — 그보다 뒤에 정본이 바뀌었으면 그 조항은 낡은 것이다. 번호를 여기 나열하지 않는다(조항이 늘 때마다 이 줄이 또 낡는다).
@@ -69,7 +70,8 @@
 
 ### 🧰 컨테이너 환경 메모 — 세션마다 다시 겪는 것
 
-- 🔴 **`pdfplumber`가 이 컨테이너에 없다**(2026-09-22 실측). `pip install pdfplumber`만 하면 `_cffi_backend` 결손으로 import가 죽으니 **`pip install pdfplumber cffi`**로 함께 올린다. ⚠️ `cryptography`는 debian 패키지라 `--upgrade`가 `RECORD file not found`로 실패하지만 **그대로 동작한다** — 재시도하지 않는다.
+- 🔵 **PDF는 `/usr/bin/python3`(3.13)에서 `pdfplumber`로 읽는다** — 이미지에 깔려 있다(0.11.10 · 2026-10-12 실측 · run 182 ② 제안 · claude.ai 채택). 종전 「없다 → `pip install pdfplumber cffi`」(2026-09-22)는 다른 파이썬에서 다시 막힐 때만 쓴다. ⚠️ `cryptography`는 debian 패키지라 `--upgrade`가 `RECORD file not found`로 실패하지만 **그대로 동작한다** — 재시도하지 않는다.
+- 🔵 **hwp → hwpx는 `python-hwpx`의 `hwpx.hwp5.package.convert(바이트)` → `to_hwpx_bytes(결과.files)`**(run 182 ② 제안 · claude.ai 채택). 🔴 기본 설치가 아니다 — `/usr/bin/python3 -m pip install python-hwpx`(2026-10-12 6.8.0). ⚠️ 모듈 경로는 `hwp5.package`가 아니라 `hwpx.hwp5.package`다(2026-10-12 실측).
 - 🔴 **DB 쓰기의 기본 경로는 관리 API 파일 실행이다**(B51 실측 · B54 판정). ⚠️ **데이터 쓰기(INSERT·UPDATE·DELETE)만이다 — 스키마·함수 변경(DDL)은 원칙 32**(2026-09-30). `POST https://api.supabase.com/v1/projects/khdpjjyspmlqtzperoqg/database/query`에 `{"query": "<SQL>"}`를 싣는다 — SQL을 파일로 쓰고 `python3 -c 'import json,sys; print(json.dumps({"query": open(sys.argv[1], encoding="utf-8").read()}))' f.sql | curl -sS -X POST <엔드포인트> -H 'Content-Type: application/json' --data-binary @-`. 🔴 **`jq -Rs`로 싣지 않는다**(B57 실측 — 168KB 파일에서 한글 5글자가 깨졌다. 입력을 조각으로 읽다 UTF-8 멀티바이트를 가른다. 가드가 잡아 롤백됐다). 🔴 **인증은 프록시가 주입한다** — 토큰 환경변수는 없고 헤더를 붙이지 않는다. 키·토큰 값을 회신·로그·커밋에 찍지 않는다.
   - 요청 하나 = 트랜잭션 하나(명시 `BEGIN`/`COMMIT`도 된다) · `DO` 가드가 예외를 던지면 **HTTP 400으로 요청 전체가 롤백**된다 · 성공은 201 · **마지막 문장의 결과만** 돌아온다 · 1,025,039B 페이로드 통과 · `statement_timeout` 2분.
   - 🔴 **응답은 약 30초에 프록시 502(`upstream request failed`)로 끊길 수 있다**(2026-10-07 실측 3회 · 30.4~30.6초 — `statement_timeout` 2분보다 먼저). 끊겨도 서버의 트랜잭션은 커밋됐을 수 있다 — **커밋 여부는 기록 표·행 수로 따로 확인**한다. 긴 쓰기는 트랜잭션 안 검증을 줄여 30초 안에 두고, 전수 대조는 커밋 뒤 읽기로 한다. 롤백 전용 시험 파일을 잘라 쓸 때는 끝 예외(`raise exception 'RESULT …'`)를 함께 남긴다(같은 날 시험 파일의 「시험 전용 스위치 끄기」 한 줄이 커밋된 사고).

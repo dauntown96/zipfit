@@ -23,6 +23,10 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/dist/umd/supabase.js"
         integrity="sha384-qafw21c/iciq0VXsi9FzkfoQv5I/V0iqE4lSNcKXPnW9/UTJLnv5CcN4FHxVLnKg"
         crossorigin="anonymous"></script>
+<!-- 🔵 2026-10-12(표시층 D-3 · 단계 a) — 새 화면 스위치. 주소에 ui=d3 이 있을 때만 <html data-ui="d3"> 를 달아 단계별로 만든
+     새 꼴을 보인다. 없으면 종전 화면 그대로라 단계 사이에 사용자가 반쯤 바뀐 화면을 보지 않는다. 브라우저 저장은 쓰지 않는다(처리방침 3장).
+     마지막 단계(e) 뒤 기본값을 뒤집는 한 줄로 켠다. -->
+<script>try{if(/(?:^|[?&])ui=d3(?:&|$)/.test(location.search))document.documentElement.setAttribute('data-ui','d3');}catch(e){}</script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-padding-top:88px}
@@ -421,10 +425,143 @@ body.theme-dark .zf-footer a{color:#9aa0aa}
 .zf-totop.show{opacity:1;visibility:visible;transform:none}
 .zf-totop:focus-visible{outline:2px solid #5DCAA5;outline-offset:2px}
 body.theme-dark .zf-totop{background:#262932;border-color:#3a3e48;color:#5DCAA5;box-shadow:0 2px 10px rgba(0,0,0,0.5)}
+
+/* ===== 🔵 2026-10-12 표시층 D-3 · 단계 a — 「지금 판」 토큰 · 부품(ui=d3 일 때만) =====
+   토큰 정본은 꼭집 Design System 아티팩트(D-2 4차 「확정 토큰 지금 판」 표) — 이름을 같게 둔다.
+   어둡게는 앱 설정(body.theme-dark)을 따른다. 글꼴은 아직 내려받지 않는다(외부 요청 0 — 회신 ②) — 이름만 앞에 두고 기기 글꼴로 떨어진다.
+   새 부품은 zf3- 접두. 기존 클래스·ID 는 지우지 않고 d3 에서만 숨기거나 옮긴다(원칙 7). */
+html[data-ui="d3"] body{
+  --bg:#F2F0EB; --paper:#FFFFFF; --surface:#F7F6F2; --surface-2:#EEECE6;
+  --ink:#15171B; --ink-2:#3D424A; --ink-3:#5A616B;
+  --line:#C6C9CF; --line-2:#E2E3E6; --rail:#CDD1D7; --focus:#1F5FBF;
+  --board:#17181C; --board-2:#24262C; --board-ink:#F2F1EC; --board-ink-2:#B9BCC4;
+  --led:#FFB21A; --led-red:#FF7A66; --led-green:#7CF0A8; --led-cyan:#8FDCFF; --led-white:#F2F1EC;
+  --led-dot:rgba(255,178,26,.09); --led-gap:rgba(8,9,11,.55); --led-glow:rgba(255,178,26,.45);
+  --warn:#B3261E; --warn-bg:#FCEDEB;
+  --ln-kuk:#1F5FBF; --ln-young:#B5462B; --ln-hang:#1E7B4F; --ln-mae:#7B4BB0; --ln-jeon:#A35C00; --ln-gong:#0F7C8A; --ln-gi:#5B616B; --ln-ink:#FFFFFF;
+  --map-sea:#E9EEF3; --map-land:#FFFFFF; --map-line:#B7BEC8; --map-dot:#1F5FBF; --map-hot:#B3261E;
+  --f-ui:"IBM Plex Sans KR",-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --f-led:"Nanum Gothic Coding",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --t-xs:12px; --t-s:13px; --t-m:14px; --t-l:16px; --t-xl:18px; --t-2xl:22px;
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px;
+  --r-1:6px; --r-2:10px; --r-3:14px; --hit:44px; --hit-band:48px;
+  --m-fast:160ms; --m-mid:320ms; --m-slow:700ms; --ease:cubic-bezier(.2,.8,.2,1);
+  background:var(--bg); color:var(--ink); font-family:var(--f-ui);
+}
+html[data-ui="d3"] body.theme-dark{
+  --bg:#0E0F12; --paper:#16171B; --surface:#1C1E23; --surface-2:#23262C;
+  --ink:#ECEDEF; --ink-2:#C5C9D0; --ink-3:#9EA4AD;
+  --line:#3B3F47; --line-2:#2A2D33; --rail:#3B3F47; --focus:#7FA8F0;
+  --board:#0A0B0D; --board-2:#1A1C21;
+  --warn:#FF8A80; --warn-bg:#3A1A18;
+  --ln-kuk:#7FA8F0; --ln-young:#F09A80; --ln-hang:#6FCB9C; --ln-mae:#B99AE6; --ln-jeon:#E8A453; --ln-gong:#5CC3D0; --ln-gi:#A9AFB8; --ln-ink:#111216;
+  --map-sea:#12161C; --map-land:#1E2127; --map-line:#3E444E; --map-dot:#7FA8F0; --map-hot:#FF8A80;
+}
+html[data-ui="d3"] .wrap{padding-top:0}
+html[data-ui="d3"] :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+/* 종전 머리 · 공지 띠 · 탭 그림 — d3 에서는 새 부품이 대신한다 */
+html[data-ui="d3"] .hero,
+html[data-ui="d3"] #zfSiteNotice{display:none!important}
+/* 앱 머리 */
+.zf3-top[hidden],.zf3-band[hidden],.zf3-nhead[hidden],.zf3-ai-full[hidden]{display:none!important}
+.zf3-badge{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 4px;border-radius:6px;background:var(--ln,var(--ln-gi));color:var(--ln-ink);font-size:12px;font-weight:700}   /* 노선 배지 부품 — 단계 b 카드에서 쓴다 */
+.zf3-top{display:flex;align-items:center;gap:10px;padding:10px 2px;background:transparent}
+.zf3-brand{display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:var(--t-l);color:var(--ink)}
+.zf3-mark{display:inline-block;width:26px;height:26px;border-radius:50%;border:4px solid var(--ink)}
+.zf3-ai{margin-left:auto;font:inherit;font-size:var(--t-xs);color:var(--ink-2);background:none;border:0;min-height:var(--hit);padding:0 2px 0 8px;display:inline-flex;align-items:center;gap:4px;cursor:pointer;text-align:right}
+.zf3-ai-ic{font-size:13px;color:var(--ink-3)}
+.zf3-ai[aria-expanded="true"]{color:var(--ink)}
+.zf3-ai-full{margin:0 0 8px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-2);background:var(--paper);font-size:var(--t-s);line-height:1.6;color:var(--ink-2);word-break:keep-all}
+.zf3-ai-full a{color:var(--ink);font-weight:700;display:inline-flex;align-items:center;min-height:var(--hit)}
+/* 탭 — 밑줄 하나 */
+html[data-ui="d3"] .maintabs{background:var(--paper);border-radius:0;padding:0;gap:0;box-shadow:none;border-bottom:1px solid var(--line);margin:0 -1rem;padding:0 1rem}
+html[data-ui="d3"] .maintab{min-height:var(--hit);border-radius:0;font-size:var(--t-s);font-weight:500;color:var(--ink-3);background:transparent;box-shadow:none;font-family:var(--f-ui)}
+html[data-ui="d3"] .maintab.active{background:transparent;color:var(--ink);font-weight:700;box-shadow:inset 0 -3px 0 var(--ink)}
+html[data-ui="d3"] .maintab-icon{display:none}
+/* 맞춤 LED 전광판 */
+.zf3-band{margin:0 -1rem 12px;background:var(--board);background-image:radial-gradient(circle at center,var(--led-dot) 0 1px,transparent 1.4px);background-size:4px 4px;border-block:1px solid #2b2e35;color:var(--board-ink);font-family:var(--f-led)}
+.zf3-mq{display:flex;align-items:stretch;min-height:var(--hit-band)}
+.zf3-view{flex:1;min-width:0;overflow:hidden;position:relative;display:flex;align-items:center;mask-image:linear-gradient(90deg,transparent,#000 12px,#000 calc(100% - 12px),transparent);-webkit-mask-image:linear-gradient(90deg,transparent,#000 12px,#000 calc(100% - 12px),transparent)}
+.zf3-view::after{content:"";position:absolute;inset:0;pointer-events:none;background-image:linear-gradient(to right,var(--led-gap) 1px,transparent 1px),linear-gradient(to bottom,var(--led-gap) 1px,transparent 1px);background-size:3px 3px;mix-blend-mode:multiply}
+.zf3-track{display:inline-flex;align-items:center;white-space:nowrap;gap:14px;padding-inline:12px;font-size:15px;font-weight:700;will-change:transform}
+.zf3-run .zf3-track{animation:zf3mq var(--mq-dur,30s) linear infinite;gap:0;padding-inline:0;flex:none}
+.zf3-half{display:inline-flex;align-items:center;gap:14px;padding-right:14px}   /* 두 반쪽이 같은 너비라 -50% 가 이음매 없이 맞는다 */
+.zf3-run .zf3-view:hover .zf3-track,.zf3-run .zf3-view:focus-within .zf3-track,.zf3-mq.zf3-hold .zf3-track{animation-play-state:paused}
+@keyframes zf3mq{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.zf3-mi{all:unset;box-sizing:border-box;display:inline-flex;align-items:center;gap:8px;min-height:var(--hit);cursor:pointer;color:var(--led);text-shadow:0 0 6px var(--led-glow);white-space:nowrap}
+.zf3-mi:focus-visible,.zf3-nl:focus-visible,.zf3-nx:focus-visible{outline:2px solid var(--led);outline-offset:2px}
+span.zf3-mi{cursor:default}
+.zf3-tg{font-weight:700;flex:none}
+.zf3-tg.close{color:var(--led-red);text-shadow:0 0 6px rgba(255,122,102,.45)}
+.zf3-tg.start{color:var(--led-green);text-shadow:0 0 6px rgba(124,240,168,.4)}
+.zf3-tg.fresh{color:var(--led)}
+.zf3-tg.rev{color:var(--led-white);border:1px solid currentColor;border-radius:3px;padding:0 4px}
+.zf3-tg.notice{color:#17181C;background:var(--led-cyan);border-radius:3px;padding:0 5px;text-shadow:none}
+.zf3-tg.empty{color:var(--led-white)}
+.zf3-star{color:var(--led);font-size:13px}
+.zf3-nm{color:var(--led)}
+.zf3-pl{color:var(--board-ink-2);text-shadow:none;font-weight:400;font-size:13px}
+.zf3-ntc{display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.zf3-ntc .zf3-nm{color:var(--led-white);text-shadow:0 0 5px rgba(242,241,236,.35)}
+.zf3-nl{color:var(--led-white);text-decoration:underline;text-underline-offset:3px;font-weight:400;font-size:13px;display:inline-flex;align-items:center;min-height:var(--hit);text-shadow:none}
+.zf3-nx{all:unset;box-sizing:border-box;display:inline-grid;place-items:center;min-width:var(--hit);min-height:var(--hit);color:var(--board-ink-2);cursor:pointer;font-family:var(--f-ui);font-size:13px}
+.zf3-sep{color:#8A8E97;font-size:9px;text-shadow:none}
+.zf3-ico{all:unset;box-sizing:border-box;display:grid;place-items:center;flex:none;width:var(--hit);min-height:var(--hit-band);color:var(--led);cursor:pointer;border-left:1px solid #2b2e35;background:var(--board)}
+.zf3-ico:focus-visible{outline:2px solid var(--led);outline-offset:-3px}
+.zf3-ico[aria-pressed="true"]{color:var(--board-ink)}
+.zf3-one .zf3-view{mask-image:none;-webkit-mask-image:none}
+.zf3-one .zf3-view::after{display:none}
+.zf3-one .zf3-track{display:flex;justify-content:space-between;white-space:normal;width:100%;gap:8px;padding-block:4px}
+.zf3-one .zf3-mi{white-space:normal;flex-wrap:wrap;min-width:0}
+.zf3-cnt{font-size:12px;color:var(--board-ink-2);text-shadow:none;flex:none;font-weight:400}
+.zf3-quiet .zf3-view{mask-image:none;-webkit-mask-image:none}
+.zf3-quiet .zf3-track{white-space:normal;padding-block:6px}
+.zf3-quiet .zf3-mi{white-space:normal}
+/* 공고 탭 머리 — 결과 수 · 표제란 한 줄 · 조건 칩 줄 */
+.zf3-nhead{margin:0 0 8px}
+.zf3-lh{margin:0;font-size:var(--t-l);font-weight:700;color:var(--ink)}
+.zf3-lh .zf3-of{font-weight:500;color:var(--ink-3);font-size:var(--t-m)}
+.zf3-lsub{margin:2px 0 0;font-size:var(--t-xs);color:var(--ink-3)}
+.zf3-tblock{display:grid;grid-template-columns:auto 1fr;border:1px solid var(--ink);border-radius:var(--r-1);font-size:11px;margin:6px 0 8px;overflow:hidden;background:var(--paper)}
+.zf3-tblock>div{display:flex;gap:6px;align-items:baseline;padding:3px 8px;min-width:0}
+.zf3-tblock>div+div{border-left:1px solid var(--ink)}
+.zf3-tblock .k{color:var(--ink-3);white-space:nowrap}
+.zf3-tblock .v{font-weight:700;color:var(--ink)}
+.zf3-tblock .v.led{font-family:var(--f-led)}
+.zf3-chips{display:flex;gap:6px;overflow-x:auto;padding:2px 0 8px;scrollbar-width:none}
+.zf3-chips::-webkit-scrollbar{display:none}
+.zf3-chip{all:unset;box-sizing:border-box;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;min-height:var(--hit);padding:0 14px;border-radius:999px;border:1px solid var(--line);font-size:var(--t-s);cursor:pointer;background:var(--paper);color:var(--ink);font-family:var(--f-ui)}
+.zf3-chip.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.zf3-chip.on span{font-size:11px;opacity:.85}
+.zf3-chip.add{border-style:dashed}
+.zf3-chip:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+/* 조건 칸 = 시트(종전 필터 패널을 그대로 쓴다) */
+html[data-ui="d3"] #noticeFilterPanel{background:var(--paper)!important;border:1px solid var(--ink)!important;box-shadow:0 8px 24px rgba(0,0,0,.12);color:var(--ink)}
+html[data-ui="d3"] #noticeFilterPanel .label{color:var(--ink-2)}
+.zf3-sheet-top{display:flex;align-items:center;justify-content:space-between;margin:0 0 8px}
+.zf3-sheet-top b{font-size:var(--t-m)}
+.zf3-sheet-x{font:inherit;font-size:var(--t-s);border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:var(--r-1);padding:0 12px;min-height:var(--hit);cursor:pointer}
+/* 종전 공고 탭 머리(제목 · 설명 · 필터 단추 · 「✅ n건」 상자 · 위 「n건 중 a–b」) — d3 에서는 새 머리가 대신한다 */
+html[data-ui="d3"] #panel4>.panel-title,
+html[data-ui="d3"] #panel4>p.sub,
+html[data-ui="d3"] #filterToggleBtn,
+html[data-ui="d3"] #notice-status.ok,
+html[data-ui="d3"] #notice-list>.pg-range{display:none!important}
+html[data-ui="d3"] #panel4{background:transparent;border:0;box-shadow:none;padding-left:0;padding-right:0;padding-top:2px}
+/* 전광판에서 연 카드 표시 */
+.zf3-hl{outline:3px solid var(--led)!important;outline-offset:1px}
+/* 움직임 줄이기 — 움직임 0(흐름 대신 한 줄씩은 스크립트가 고른다) */
+@media (prefers-reduced-motion:reduce){html[data-ui="d3"] .zf3-track{animation:none!important}}
 </style>
 </head>
 <body>
 <div class="wrap">
+  <!-- 🔵 D-3 a — 앱 머리. 줄인 AI 표시는 누르면 전체 문장과 이용약관 제3조(D-2 4차 검증 ③ ⑵). ui=d3 일 때만 보인다. -->
+  <div id="zf3Top" class="zf3-top" hidden>
+    <span class="zf3-brand"><span class="zf3-mark" aria-hidden="true"></span>꼭집</span>
+    <button type="button" class="zf3-ai" id="zf3AiBtn" aria-expanded="false" aria-controls="zf3AiFull">AI 정리 · 신청 전 원문 확인<span aria-hidden="true" class="zf3-ai-ic">ⓘ</span></button>
+  </div>
+  <p id="zf3AiFull" class="zf3-ai-full" hidden>꼭집의 공고 정보는 AI가 공고문 원문을 읽고 정리했어요. 신청 전에는 원문을 꼭 확인해 주세요. <a href="./terms.html#art3">이용약관 제3조 보기</a></p>
   <div id="zfSiteNotice" class="zf-site-notice" role="region" aria-label="사이트 공지" hidden></div>
   <div class="hero">
     <div class="logo">🏠 <span>꼭</span>집</div>
@@ -439,6 +576,8 @@ body.theme-dark .zf-totop{background:#262932;border-color:#3a3e48;color:#5DCAA5;
     <button class="maintab" id="m4" role="tab" aria-selected="false" onclick="goMain(4)"><span class="maintab-icon" aria-hidden="true">📁</span>관리<span id="savedBadge" style="display:none;background:#D85A30;color:#fff;border-radius:10px;font-size:10px;padding:1px 5px;margin-left:3px;vertical-align:middle"></span></button>
     <button class="maintab" id="m5" role="tab" aria-selected="false" onclick="goMain(5)"><span class="maintab-icon" aria-hidden="true">⚙️</span>설정</button>
   </div>
+  <!-- 🔵 D-3 a — 맞춤 LED 전광판(공지 포함 · 띠는 하나). ui=d3 일 때만. -->
+  <div id="zf3Board" class="zf3-band" hidden></div>
 
   <!-- ===== 대탭 1: 맞춤 추천 ===== -->
   <div id="main1" class="main-section">
@@ -639,6 +778,8 @@ body.theme-dark .zf-totop{background:#262932;border-color:#3a3e48;color:#5DCAA5;
 
   <!-- STEP 4: 전체 공고 (실시간 DB 연동) -->
   <div id="panel4" class="panel">
+    <!-- 🔵 D-3 a — 공고 탭 머리(결과 수 · 표제란 · 조건 칩 줄). ui=d3 일 때만. -->
+    <div id="zf3NoticeHead" class="zf3-nhead" hidden></div>
     <p class="panel-title">전국 공공임대 공고 전체 목록</p>
     <p class="sub" style="margin-bottom:1rem">매일 자동 수집되는 LH 전국 공고예요. 꼭집이 신혼·신생아·청년 타깃과 수도권 여부를 자동으로 표시해드려요.</p>
 
@@ -3478,6 +3619,7 @@ function zfWarnBadges(o){
 }
 
 function renderNoticeList(filtered, totalCount, hiddenClosedCount){
+  if(typeof zf3RenderNoticeHead === 'function') zf3RenderNoticeHead(filtered);   // 🔵 D-3 a — ui=d3 일 때만 새 머리를 그린다(뒤 <script> 가 읽히기 전 호출은 건너뜀 · zf3Init 이 다시 그린다)
   const statusEl = document.getElementById('notice-status');
   const listEl   = document.getElementById('notice-list');
   listEl.innerHTML = '';
@@ -3865,6 +4007,7 @@ function zfSetRecPrompt(kind){
 }
 
 function renderPersonalizedRecommendations(){
+  if(typeof zf3RenderBoard === 'function') zf3RenderBoard();   // 🔵 D-3 a — 같은 항목이면 다시 그리지 않는다(zf3Key)
   const panel=document.getElementById('personalizedPanel');
   const prompt=document.getElementById('personalizedPrompt');
   if(!panel||!prompt) return;
@@ -8812,6 +8955,7 @@ function zfSkipAlertEmail(){
 // ⚠️ 이때 첫 `page_view` 는 `{tab:'설정', nav:'load'}` 가 된다. 왜곡이 아니라 사용자가
 //    실제로 처음 본 화면이 설정 탭이기 때문이다(집계에서 가르려면 이 사실을 안다).
 if(ZF_AUTH_URL_ERROR) goMain(5);
+else if(document.documentElement.getAttribute('data-ui') === 'd3') goMain(2);   // 🔵 D-3 a — 첫 화면 기본 탭 = 공고(D-2 4차 확정) · zf3* 는 뒤 <script> 에 있어 여기서 아직 없다
 
 if(zfAuthAvailable()){
   zfAuth.auth.onAuthStateChange((event, session)=>{
@@ -9093,12 +9237,335 @@ function zfScrollToTop(){
   const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
 }
+// ===== 🔵 2026-10-12 표시층 D-3 · 단계 a — 앱 머리 · 맞춤 LED 전광판 · 공고 탭 머리(ui=d3 일 때만) =====
+// 정본: 우편함 「표시층 — D-3 구현」 단계 a · D-2 4차 확정값 · 디자인 상시 판 결정 기록.
+// 🔴 맞춤 재료는 희망 조건(설정 · 지역 · 유형 · 최대 보증금)만 — 추천 탭과 같은 판정. 진단 · 찜 · 이용 기록은 쓰지 않는다(처리방침 목적).
+// 🔴 전광판은 사실의 정본이 아니라 알림 채널이다 — 항목은 「무슨 일 → 카드로」까지(금액 · 조건 세부 없음).
+function zf3On(){ return document.documentElement.getAttribute('data-ui') === 'd3'; }
+const zf3RM = () => { try{ return matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){ return false; } };
+function zf3DayTo(str){
+  const d = parseNoticeDate(str || '');
+  return d ? Math.round((startOfLocalDay(d) - startOfLocalDay(new Date())) / 864e5) : null;
+}
+// 전량(인자 없는 목록 RPC · 60초 공유)을 화면 행으로 — 공고 탭의 지역·유형 칩은 서버 인자라 noticeData 가 좁을 수 있다(원칙 26: 매핑을 거친 행).
+let zf3Rows = null, zf3RowsP = null;
+function zf3LoadRows(){
+  if(zf3RowsP) return zf3RowsP;
+  zf3RowsP = Promise.all([zfFetchAllNoticeRows(), Promise.resolve(zfLoadPostNotices()).catch(() => null)]).then(([rows]) => {
+    const keep = noticeLoadedAt;
+    const mapped = zfMapNoticeRows(rows);
+    noticeLoadedAt = keep;   // 목록의 「기준 시각」은 공고 탭이 받은 때 그대로
+    zf3Rows = mapped;
+    return mapped;
+  });
+  zf3RowsP.catch(() => { zf3RowsP = null; });
+  return zf3RowsP;
+}
+function zf3Prefs(){
+  const u = currentUser;
+  if(!u) return null;
+  const arr = v => Array.isArray(v) ? v : (typeof v === 'string' ? v.split(',').filter(Boolean) : []);
+  const regions = arr(u.regions), types = arr(u.types), dep = parseInt(u.max_deposit) || 0;
+  return (regions.length || types.length || dep > 0) ? { regions, types, dep } : null;
+}
+// 추천 탭(renderPersonalizedRecommendations)과 같은 규칙 — 지역(zfInRegions) · 유형 · 최대 보증금(가격을 모르면 통과)
+function zf3Mine(n, p){
+  if(!zfInRegions(n, p.regions)) return false;
+  if(p.types.length && !p.types.some(t => classifyNoticeType(n['공급유형'], n['공고명']) === t || (n['공급유형'] || '').includes(t))) return false;
+  if(p.dep > 0){
+    const sm = zfPriceCache.get(String(n['announcement_id']));
+    const lo = (sm && sm.deposit_min != null) ? Number(sm.deposit_min) : null;
+    if(lo != null && lo > p.dep * 10000) return false;
+  }
+  return true;
+}
+// 사건(위가 먼저) — 창 · 한 바퀴 몫(D-2 3차 다운님 확정: 마감 3 · 시작 3 · 새 공고 3일 · 정정 7일 / 3 · 3 · 2 · 1)
+// 유형 노선 일곱 — 시안(D-2 4차) 규칙 그대로, 재료는 화면 글자 zfTypeLabel(표준 이름 · 표준이 없으면 원문). 🔴 표시만 — 판정·거름은 바꾸지 않는다.
+//    순서가 경계다: 「영구」가 먼저(영구임대) · 「전세」는 장기전세도 잡는다 · 어디에도 안 걸리면 「기」(공공분양 · 집주인임대 · SH 고유 이름 등). 카드에 쓰는 것은 단계 b.
+const ZF3_LINES = [['young', '영', /영구/], ['kuk', '국', /국민/], ['hang', '행', /행복/], ['mae', '매', /매입/], ['jeon', '전', /전세/], ['gong', '공', /공공임대|통합/], ['gi', '기', /./]];
+function zf3LineOf(label){ return ZF3_LINES.find(x => x[2].test(String(label || ''))) || ZF3_LINES[6]; }
+const ZF3_EVENTS = [
+  { k: 'close', quota: 3, label: d => d === 0 ? '오늘 마감' : d === 1 ? '내일 마감' : `마감 D-${d}`,
+    test: n => { if(n['apply_period_check'] === true || applyWindowState(n) !== 'open') return null; const d = zf3DayTo(zfSoonestOpenEnd(n)); return d != null && d >= 0 && d <= 3 ? d : null; } },
+  { k: 'start', quota: 3, label: d => d === 0 ? '오늘 접수 시작' : d === 1 ? '내일 접수 시작' : `접수 시작 D-${d}`,
+    test: n => { if(n['apply_period_check'] === true) return null; const st = applyWindowState(n); if(st !== 'before' && st !== 'open') return null; const d = zf3DayTo(n['신청시작일'] || n['apply_start']); return d != null && d >= 0 && d <= 3 ? d : null; } },
+  { k: 'fresh', quota: 2, label: () => '새 공고',
+    test: n => { const d = zf3DayTo(zfNoticeDate(n)); return d != null && d <= 0 && d >= -3 ? -d : null; } },
+  { k: 'rev', quota: 1, label: () => '정정',
+    test: n => { if(n['is_revised'] !== true) return null; const d = zf3DayTo(n['announcement_date']); return d != null && d <= 0 && d >= -7 ? -d : null; } }
+];
+const ZF3_LOOP_MAX = 8;
+function zf3ShortName(n){
+  const t = String(n['공고명'] || '').replace(/^(\[[^\]]*\]\s*)+/, '')
+    .replace(/^(20)?\d{2}년\s*(상반기|하반기)?\s*(\d+차|\d+월)?\s*/, '')
+    .replace(/\(.*?\)/g, '').replace(/\s+(예비)?입주자.*$|\s+모집.*$|\s+공고.*$/, '').trim();
+  return t.length > 14 ? t.slice(0, 13) + '…' : (t || String(n['공고명'] || '').slice(0, 14));
+}
+function zf3Place(n){
+  const sg = String(n['sigungu_nm'] || '').trim();
+  const many = zfComplexCount(n) > 1 || (Array.isArray(n.region_names) && n.region_names.length > 1);
+  if(sg) return sg.split(' ').pop() + (many ? ' 외' : '');
+  const sd = String(n['sido_nm'] || n['지역대분류'] || '').replace(/특별자치시|특별자치도|특별시|광역시|통합특별시/, '').replace(/^(충청|전라|경상)(남|북)도$/, (m, a, b) => a[0] + b).replace(/도$/, '');
+  return sd ? sd + (many ? ' 외' : '') : '';
+}
+// 공지 — 「고지 회차 3」 notices.json 그대로. 띠는 하나: d3 에서는 공지도 이 전광판으로 흐른다(종전 띠는 숨김). 닫기 = 같은 탭 안만(같은 저장 칸).
+const ZF3_NOTICE_KEY = 'zf_notice_closed';
+let zf3Notices = [];
+function zf3ClosedNotices(){ try{ return JSON.parse(sessionStorage.getItem(ZF3_NOTICE_KEY) || '[]'); }catch(e){ return []; } }
+function zf3BoardItems(rows){
+  const pool = rows.filter(n => !isHiddenAsClosed(n) && !zfIsCancelRow(n['공고명']));
+  const pref = zf3Prefs();
+  const mine = pref ? pool.filter(n => zf3Mine(n, pref)) : pool;
+  const evOf = n => { for(const E of ZF3_EVENTS){ const d = E.test(n); if(d != null) return { E, d }; } return null; };
+  const cand = mine.map(n => Object.assign({ n }, evOf(n))).filter(x => x.E)
+    .sort((x, y) => ZF3_EVENTS.indexOf(x.E) - ZF3_EVENTS.indexOf(y.E) || x.d - y.d || String(zfNoticeDate(y.n)).localeCompare(String(zfNoticeDate(x.n))));
+  const used = {}, out = [];
+  cand.forEach(x => { if(out.length < ZF3_LOOP_MAX && (used[x.E.k] || 0) < x.E.quota){ used[x.E.k] = (used[x.E.k] || 0) + 1; out.push(x); } });
+  cand.forEach(x => { if(out.length < ZF3_LOOP_MAX && !out.includes(x)) out.push(x); });   // 몫을 채우고도 자리가 남으면 차례대로
+  const items = [];
+  out.forEach(x => {
+    const it = { type: 'card', id: String(x.n['announcement_id'] || ''), ev: x.E.k, tag: x.E.label(x.d), name: zf3ShortName(x.n), place: zf3Place(x.n), n: 1 };
+    const same = items.find(y => y.tag === it.tag && y.name === it.name && y.place === it.place);
+    if(same) same.n++; else items.push(it);
+  });
+  items.forEach(it => { if(it.n > 1) it.place = (it.place ? it.place + ' ' : '') + it.n + '건'; });
+  const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+  const shut = zf3ClosedNotices();
+  const notices = zf3Notices.filter(x => x && x.id && x.title && x.start <= today && today <= x.end && !shut.includes(x.id))
+    .map(x => ({ type: 'notice', id: x.id, tag: '공지', name: x.title, links: (x.links || []).filter(l => /^(\.\/|https:\/\/)/.test(String(l.href || ''))) }));
+  if(!items.length) items.push({ type: 'empty', tag: '안내', name: pref ? `내 조건 공고에 오늘 새 소식이 없어요 · 조건에 맞는 열린 공고 ${mine.length.toLocaleString()}건` : `오늘 새 소식이 없어요 · 열린 공고 ${pool.length.toLocaleString()}건` });
+  return { list: [...notices, ...items], mine: !!pref };
+}
+const ZF3_ICON_PAUSE = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><rect x="3" y="2" width="3.4" height="12" rx="1" fill="currentColor"/><rect x="9.6" y="2" width="3.4" height="12" rx="1" fill="currentColor"/></svg>';
+const ZF3_ICON_PLAY = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M4 2.2v11.6c0 .6.7 1 1.2.6l8.4-5.8a.75.75 0 0 0 0-1.2L5.2 1.6C4.7 1.2 4 1.6 4 2.2z" fill="currentColor"/></svg>';
+const ZF3_MQ_SPEED = 80;   // px/초 — D-2 3차 다운님 확정(초당 약 5.3자)
+let zf3Paused = false, zf3Key = '', zf3I = 0, zf3List = [], zf3Mode = '';
+function zf3ItemHTML(it, dup){
+  const ti = dup ? ' tabindex="-1"' : '';
+  const tag = `<span class="zf3-tg ${it.type === 'card' ? it.ev : it.type}">${escapeHtml(it.tag)}</span>`;
+  if(it.type === 'card'){
+    return `<button type="button" class="zf3-mi" data-act="go" data-id="${zfAttr(it.id)}"${ti}>${tag}${zf3BoardMine ? '<span class="zf3-star" aria-label="내 조건">★</span>' : ''}<span class="zf3-nm">${escapeHtml(it.name)}</span>${it.place ? `<span class="zf3-pl">${escapeHtml(it.place)}</span>` : ''}</button>`;
+  }
+  if(it.type === 'notice'){
+    const links = it.links.map(l => `<a class="zf3-nl" href="${zfAttr(l.href)}"${ti}>${escapeHtml(l.label)}</a>`).join('');
+    return `<span class="zf3-ntc">${tag}<span class="zf3-nm">${escapeHtml(it.name)}</span>${links}<button type="button" class="zf3-nx" data-act="nx" data-nid="${zfAttr(it.id)}" aria-label="공지 닫기"${ti}>✕</button></span>`;
+  }
+  return `<span class="zf3-mi">${tag}<span class="zf3-nm">${escapeHtml(it.name)}</span></span>`;
+}
+let zf3BoardMine = false;
+function zf3PauseBtn(){ return `<button type="button" class="zf3-ico" data-act="mq" aria-pressed="${zf3Paused}" aria-label="${zf3Paused ? '전광판 다시 흐르기' : '전광판 멈추기'}">${zf3Paused ? ZF3_ICON_PLAY : ZF3_ICON_PAUSE}</button>`; }
+function zf3RenderBoard(){
+  if(!zf3On()) return;
+  zf3LoadRows().then(zf3PaintBoard).catch(err => { console.warn('꼭집 전광판 재료를 못 받았어요:', err); });
+}
+function zf3PaintBoard(rows){
+  const box = document.getElementById('zf3Board');
+  if(!box || !rows) return;
+  const B = zf3BoardItems(rows), rm = zf3RM();
+  const quiet = B.list.length === 1 && B.list[0].type === 'empty';
+  const mode = quiet ? 'quiet' : (rm ? 'one' : 'run');
+  const key = JSON.stringify([mode, B.mine, B.list.map(x => [x.type, x.id, x.tag, x.name, x.place || ''])]);
+  if(key === zf3Key && box.firstChild) return;   // 같으면 다시 그리지 않는다 — 멈춘 자리·흐르던 자리가 그대로
+  // 흐르던 자리 이어 가기(다시 그려도 처음으로 돌아가지 않게 — D-2 4차 ① 미확인)
+  let at = null;
+  const oldTrack = box.querySelector('.zf3-run .zf3-track');
+  if(oldTrack && oldTrack.getAnimations){ const a = oldTrack.getAnimations()[0]; if(a) at = a.currentTime; }
+  zf3Key = key; zf3List = B.list; zf3Mode = mode; zf3BoardMine = B.mine;
+  const label = `${B.mine ? '내 조건' : '전체'} 소식 ${B.list.length}개 전광판`;
+  if(quiet){
+    box.innerHTML = `<div class="zf3-mq zf3-quiet"><div class="zf3-view" role="group" aria-label="${zfAttr(label)}"><div class="zf3-track">${zf3ItemHTML(B.list[0])}</div></div></div>`;
+  }else if(rm){
+    zf3I = zf3I % B.list.length;
+    box.innerHTML = `<div class="zf3-mq zf3-one"><div class="zf3-view" role="group" aria-label="${zfAttr(label)} — 4초마다 한 줄씩 바뀌어요" aria-live="off"><div class="zf3-track" id="zf3OneTrack">${zf3OneHTML()}</div></div>${zf3PauseBtn()}</div>`;
+  }else{
+    const sep = '<span class="zf3-sep" aria-hidden="true">◆</span>';
+    const items = B.list.map(it => zf3ItemHTML(it)).join(sep);
+    const dup = B.list.map(it => zf3ItemHTML(it, true)).join(sep);
+    box.innerHTML = `<div class="zf3-mq zf3-run${zf3Paused ? ' zf3-hold' : ''}"><div class="zf3-view" tabindex="0" role="group" aria-label="${zfAttr(label)} — 손가락이나 초점이 올라가면 멈춰요"><div class="zf3-track"><span class="zf3-half">${items}${sep}</span><span class="zf3-half zf3-dup" aria-hidden="true">${dup}${sep}</span></div></div>${zf3PauseBtn()}</div>`;
+    box.hidden = false;   // 숨긴 채 재면 너비가 0이라 속도가 틀린다 — 먼저 보이고 잰다
+    const tr = box.querySelector('.zf3-track');
+    const setDur = () => { const half = tr.getBoundingClientRect().width / 2; if(half > 0) tr.style.setProperty('--mq-dur', (half / ZF3_MQ_SPEED).toFixed(2) + 's'); return half > 0; };
+    if(!setDur()) requestAnimationFrame(setDur);
+    if(at != null && tr.getAnimations){ const a = tr.getAnimations()[0]; if(a) try{ a.currentTime = at; }catch(e){} }
+  }
+  box.hidden = false;
+}
+function zf3OneHTML(){
+  const it = zf3List[zf3I % zf3List.length];
+  return `${zf3ItemHTML(it)}<span class="zf3-cnt">${(zf3I % zf3List.length) + 1}/${zf3List.length}</span>`;
+}
+function zf3TickOne(){
+  if(zf3Mode !== 'one' || zf3Paused || !zf3List.length) return;
+  const box = document.getElementById('zf3Board'), view = box && box.querySelector('.zf3-one .zf3-view');
+  if(!view || view.matches(':hover, :focus-within')) return;
+  zf3I = (zf3I + 1) % zf3List.length;
+  const tr = document.getElementById('zf3OneTrack');
+  if(tr) tr.innerHTML = zf3OneHTML();
+}
+function zf3TogglePause(){
+  zf3Paused = !zf3Paused;
+  const box = document.getElementById('zf3Board');
+  const mq = box && box.querySelector('.zf3-mq');
+  if(mq) mq.classList.toggle('zf3-hold', zf3Paused);
+  const b = box && box.querySelector('.zf3-ico');
+  if(b){ b.setAttribute('aria-pressed', String(zf3Paused)); b.setAttribute('aria-label', zf3Paused ? '전광판 다시 흐르기' : '전광판 멈추기'); b.innerHTML = zf3Paused ? ZF3_ICON_PLAY : ZF3_ICON_PAUSE; }
+}
+function zf3CloseNotice(id){
+  try{ const d = zf3ClosedNotices(); if(!d.includes(id)) d.push(id); sessionStorage.setItem(ZF3_NOTICE_KEY, JSON.stringify(d)); }catch(e){}
+  zf3Notices = zf3Notices.filter(x => x.id !== id);
+  zf3Key = '';
+  if(zf3Rows) zf3PaintBoard(zf3Rows);
+}
+// 전광판 항목 → 그 카드로(공고 탭 · 가린 조건은 걷는다 · 호박색 테두리 · 초점)
+async function zf3GoCard(aid){
+  goMain(2);
+  for(let i = 0; i < 60 && !noticeLoaded; i++) await new Promise(r => setTimeout(r, 100));
+  const find = () => noticeData.find(n => String(n['announcement_id'] || '') === String(aid));
+  let row = noticeLoaded ? find() : null;
+  if(!row && noticeLoaded && (activeNoticeRegion || activeNoticeType)){
+    activeNoticeRegion = null; activeNoticeType = null;
+    refreshChipSel('noticeRegionChips', null);
+    refreshChipSel('noticeTypeChips', null);
+    await loadNoticeData();
+    row = find();
+  }
+  if(!row) return;
+  if(noticeFiltered.indexOf(row) === -1){
+    activeNoticeStatus = null; activeNoticeTarget = null;
+    refreshChipSel('noticeStatusChips', null);
+    refreshChipSel('noticeTargetChips', null);
+    const q = document.getElementById('noticeSearchInput');
+    if(q) q.value = '';
+    const chk = document.getElementById('hideClosedChk');
+    if(chk && isHiddenAsClosed(row)) chk.checked = false;
+    updateFilterToggleBtn();
+    applyNoticeFiltersAndRender();
+  }
+  const idx = noticeFiltered.indexOf(row);
+  if(idx === -1) return;
+  noticePage = Math.floor(idx / noticePageSize) + 1;
+  renderNoticeList(noticeFiltered, noticeData.length);
+  const el = cardElFor('ncard-' + zfCardKey(row['announcement_id'] || idx));
+  if(!el) return;
+  document.querySelectorAll('.zf3-hl').forEach(x => x.classList.remove('zf3-hl'));
+  el.classList.add('zf3-hl');
+  if(el.scrollIntoView) el.scrollIntoView({ block: 'center', behavior: zf3RM() ? 'auto' : 'smooth' });
+  try{ el.focus({ preventScroll: true }); }catch(e){}
+}
+// 공고 탭 머리 — 「조건에 맞는 n건 / 열린 m건」 · 표제란 한 줄 · 조건 칩 줄(✕로 빼기 · 「＋ 조건」 → 조건 칸)
+function zf3CondChips(){
+  const out = [];
+  if(activeNoticeRegion) out.push(['region', `지역 ${activeNoticeRegion}`]);
+  if(activeNoticeType) out.push(['type', activeNoticeType]);
+  if(activeNoticeStatus) out.push(['status', activeNoticeStatus]);
+  if(activeNoticeTarget) out.push(['target', `대상 ${activeNoticeTarget}`]);
+  const q = (document.getElementById('noticeSearchInput')?.value || '').trim();
+  if(q) out.push(['q', `검색 「${q}」`]);
+  const chk = document.getElementById('hideClosedChk');
+  if(chk && !chk.checked && !activeNoticeStatus) out.push(['closed', '신청할 수 없는 공고 포함']);
+  return out;
+}
+function zf3RenderNoticeHead(filtered){
+  if(!zf3On()) return;
+  const el = document.getElementById('zf3NoticeHead');
+  if(!el) return;
+  const chk = document.getElementById('hideClosedChk');
+  const closedExcluded = activeNoticeStatus ? activeNoticeStatus !== '마감' : !!(chk ? chk.checked : true);
+  const all = zf3Rows || noticeData;
+  const o = zfOpenBreakdown(all);
+  const chips = zf3CondChips();
+  const n = (filtered || []).length;
+  const denom = closedExcluded ? `열린 ${o.n.toLocaleString()}건` : `마감 포함 ${all.length.toLocaleString()}건`;
+  const head = chips.length
+    ? `조건에 맞는 ${n.toLocaleString()}건 <span class="zf3-of">/ ${denom}</span>`
+    : (closedExcluded ? `열린 공고 ${o.n.toLocaleString()}건` : `마감 포함 ${n.toLocaleString()}건`);
+  const sortSel = document.getElementById('noticeSortSel');
+  const sortText = sortSel && sortSel.selectedOptions[0] ? sortSel.selectedOptions[0].textContent : '';
+  const at = noticeLoadedAt ? new Date(noticeLoadedAt + 9 * 3600 * 1000).toISOString() : '';
+  const atText = at ? `${at.slice(0, 10).replace(/-/g, '.')} KST` : '불러오는 중';   // 시안 「slim」 그대로 날짜만 — 390px 한 줄
+  const sheetOpen = !document.getElementById('noticeFilterPanel')?.classList.contains('hidden');
+  el.innerHTML = `<p class="zf3-lh">${head}</p>`
+    + `<p class="zf3-lsub">열린 ${o.n.toLocaleString()}건: 접수 중 ${o.a.toLocaleString()} · 예정 ${o.b.toLocaleString()}${o.k ? ` · 미상 ${o.k.toLocaleString()}` : ''}${sortText ? ` · ${escapeHtml(sortText)}` : ''}</p>`
+    + `<div class="zf3-tblock" role="note"><div><span class="k">기준</span><span class="v led">${escapeHtml(atText)}</span></div><div><span class="k">출처</span><span class="v">LH · 마이홈 · SH 원문 → 꼭집 정리</span></div></div>`
+    + `<div class="zf3-chips" role="group" aria-label="걸린 조건">${chips.map(([k, t]) => `<button type="button" class="zf3-chip on" data-act="clear" data-k="${k}" aria-label="${zfAttr(t)} 조건 빼기">${escapeHtml(t)}<span aria-hidden="true">✕</span></button>`).join('')}`
+    + `<button type="button" class="zf3-chip add" data-act="sheet" aria-expanded="${sheetOpen}" aria-controls="noticeFilterPanel">＋ 조건</button></div>`;
+  el.hidden = false;
+}
+function zf3ClearCond(k){
+  if(k === 'region'){ activeNoticeRegion = null; refreshChipSel('noticeRegionChips', null); updateFilterToggleBtn(); loadNoticeData(); return; }
+  if(k === 'type'){ activeNoticeType = null; refreshChipSel('noticeTypeChips', null); updateFilterToggleBtn(); loadNoticeData(); return; }
+  if(k === 'status'){ activeNoticeStatus = null; refreshChipSel('noticeStatusChips', null); }
+  if(k === 'target'){ activeNoticeTarget = null; refreshChipSel('noticeTargetChips', null); }
+  if(k === 'q'){ const q = document.getElementById('noticeSearchInput'); if(q) q.value = ''; }
+  if(k === 'closed'){ const c = document.getElementById('hideClosedChk'); if(c) c.checked = true; }
+  updateFilterToggleBtn();
+  applyNoticeFiltersAndRender();
+}
+function zf3ToggleSheet(open){
+  const panel = document.getElementById('noticeFilterPanel');
+  if(!panel) return;
+  const isOpen = !panel.classList.contains('hidden');
+  if(open === undefined) open = !isOpen;
+  if(open !== isOpen) toggleNoticeFilter();
+  const add = document.querySelector('#zf3NoticeHead [data-act="sheet"]');
+  if(add) add.setAttribute('aria-expanded', String(open));
+  if(open){ const f = panel.querySelector('input,select,button,[tabindex="0"]'); if(f) f.focus(); }
+  else if(add) add.focus();
+}
+function zf3Init(){
+  if(!zf3On()) return;
+  const top = document.getElementById('zf3Top');
+  if(top) top.hidden = false;
+  const aiBtn = document.getElementById('zf3AiBtn'), aiFull = document.getElementById('zf3AiFull');
+  if(aiBtn && aiFull) aiBtn.addEventListener('click', () => {
+    const open = aiBtn.getAttribute('aria-expanded') !== 'true';
+    aiBtn.setAttribute('aria-expanded', String(open));
+    aiFull.hidden = !open;
+  });
+  // 조건 칸 = 시트: 종전 필터 패널에 검색 줄 · 정렬 줄을 옮겨 담는다(요소 · ID 그대로 — 원칙 7)
+  const panel = document.getElementById('noticeFilterPanel');
+  if(panel){
+    const head = document.createElement('div');
+    head.className = 'zf3-sheet-top';
+    head.innerHTML = '<b>조건</b><button type="button" class="zf3-sheet-x">닫기</button>';
+    head.querySelector('button').addEventListener('click', () => zf3ToggleSheet(false));
+    const searchRow = document.getElementById('noticeSearchInput')?.parentElement;
+    const sortRow = document.getElementById('noticeSortSel')?.parentElement;
+    panel.prepend(head);
+    if(searchRow) head.after(searchRow);
+    if(sortRow) (searchRow || head).after(sortRow);
+  }
+  const nh = document.getElementById('zf3NoticeHead');
+  if(nh) nh.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if(!b) return;
+    if(b.dataset.act === 'clear') zf3ClearCond(b.dataset.k);
+    else if(b.dataset.act === 'sheet') zf3ToggleSheet();
+  });
+  const board = document.getElementById('zf3Board');
+  if(board) board.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if(!b) return;
+    if(b.dataset.act === 'go') zf3GoCard(b.dataset.id);
+    else if(b.dataset.act === 'mq') zf3TogglePause();
+    else if(b.dataset.act === 'nx') zf3CloseNotice(b.dataset.nid);
+  });
+  fetch('./notices.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : []).then(list => {
+    zf3Notices = Array.isArray(list) ? list : [];
+    zf3Key = '';
+    if(zf3Rows) zf3PaintBoard(zf3Rows);
+  }).catch(() => {});
+  setInterval(zf3TickOne, 4000);
+  try{ matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', () => { zf3Key = ''; if(zf3Rows) zf3PaintBoard(zf3Rows); }); }catch(e){}
+  zf3RenderBoard();
+}
+zf3Init();
 // 🔵 2026-10-12(고지 회차 3 · 6) — 사이트 공지 띠. notices.json 에서 오늘(KST)이 시작~끝 안이고
 //    이 탭에서 닫지 않은 공지 하나를 맨 위에 보인다. 닫은 공지 번호는 sessionStorage 에만 남긴다
 //    (처리방침 3장 — localStorage 를 쓰지 않는다 · 탭을 닫으면 사라진다). 파일이 없거나 깨지면 띠도 없다.
 (function(){
   const box = document.getElementById('zfSiteNotice');
-  if(!box) return;
+  if(!box || document.documentElement.getAttribute('data-ui') === 'd3') return;   // d3 에서는 전광판 공지 항목이 대신한다(띠 하나)
   const KEY = 'zf_notice_closed';
   const closed = () => { try{ return JSON.parse(sessionStorage.getItem(KEY) || '[]'); }catch(e){ return []; } };
   const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
