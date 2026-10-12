@@ -1,0 +1,103 @@
+{
+ "_at": "2026-10-12T02:32:30.027Z",
+ "_url": "https://kkokzip.com/",
+ "_axe": "4.13.0",
+ "_tags": [
+  "wcag2a",
+  "wcag2aa",
+  "wcag21a",
+  "wcag21aa"
+ ],
+ "states": {
+  "home-390": {
+   "rules": {
+    "color-contrast": {
+     "impact": "serious",
+     "nodes": 12,
+     "sample": "#m2"
+    },
+    "select-name": {
+     "impact": "critical",
+     "nodes": 6,
+     "sample": "#marital"
+    }
+   }
+  },
+  "notices-390": {
+   "rules": {
+    "color-contrast": {
+     "impact": "serious",
+     "nodes": 83,
+     "sample": "#m1"
+    },
+    "nested-interactive": {
+     "impact": "serious",
+     "nodes": 2,
+     "sample": "div[data-card-id=\"ncard-SH_5f_311200\"]"
+    },
+    "select-name": {
+     "impact": "critical",
+     "nodes": 2,
+     "sample": "#noticeSearchScopeSel"
+    }
+   }
+  },
+  "detail-390": {
+   "rules": {
+    "color-contrast": {
+     "impact": "serious",
+     "nodes": 93,
+     "sample": "#m1"
+    },
+    "nested-interactive": {
+     "impact": "serious",
+     "nodes": 3,
+     "sample": "div[data-card-id=\"ncard-2015122300020895\"]"
+    },
+    "select-name": {
+     "impact": "critical",
+     "nodes": 2,
+     "sample": "#noticeSearchScopeSel"
+    }
+   }
+  },
+  "notices-1280": {
+   "rules": {
+    "color-contrast": {
+     "impact": "serious",
+     "nodes": 83,
+     "sample": "#m1"
+    },
+    "nested-interactive": {
+     "impact": "serious",
+     "nodes": 2,
+     "sample": "div[data-card-id=\"ncard-SH_5f_311200\"]"
+    },
+    "select-name": {
+     "impact": "critical",
+     "nodes": 2,
+     "sample": "#noticeSearchScopeSel"
+    }
+   }
+  },
+  "notices-390-dark": {
+   "rules": {
+    "color-contrast": {
+     "impact": "serious",
+     "nodes": 47,
+     "sample": "#m1"
+    },
+    "nested-interactive": {
+     "impact": "serious",
+     "nodes": 2,
+     "sample": "div[data-card-id=\"ncard-SH_5f_311200\"]"
+    },
+    "select-name": {
+     "impact": "critical",
+     "nodes": 2,
+     "sample": "#noticeSearchScopeSel"
+    }
+   }
+  }
+ }
+}
