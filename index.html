@@ -604,6 +604,8 @@ html[data-ui="d3"] .zf3-card>div[id^="ncard-"]{margin:0 -14px 0 -18px!important;
 .zf3-stn.next i{border-color:var(--ln,var(--ink))}
 .zf3-stn.unk i{border-style:dashed;border-color:var(--ink-3)}
 .zf3-stn .k{font-size:11px;color:var(--ink-3);line-height:1.3;margin-top:2px}
+.zf3-stn .k .yr{font-weight:700;color:var(--ink-2);font-family:var(--f-led)}
+html[data-ui="d3"] .zf3-dup{display:none!important}
 .zf3-stn .v{font-size:12px;font-weight:700;font-family:var(--f-led);color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.25;overflow-wrap:anywhere}
 .zf3-stn .v small{display:block;font-family:var(--f-ui);font-weight:400;font-size:11px;color:var(--ink-3)}
 .zf3-stn.unk .v{font-family:var(--f-ui);font-weight:400;color:var(--ink-3)}
@@ -614,8 +616,6 @@ html[data-ui="d3"] .zf3-card>div[id^="ncard-"]{margin:0 -14px 0 -18px!important;
 .zf3-branch{border-left:2px solid var(--ln,var(--ink));padding-left:8px;margin:6px 0 0 2px}
 .zf3-bn{margin:0 0 -8px;font-size:12px;font-weight:700;color:var(--ink-2);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 /* 아래 줄 — 「내 희망 조건」 · 「상세 ›」 */
-.zf3-cfoot{display:flex;justify-content:space-between;align-items:center;gap:8px;border-top:1px solid var(--line-2);margin:4px -14px 0 -18px;padding:0 4px 0 18px}
-.zf3-mine{font-size:12px;font-weight:700;color:var(--ink)}
 .zf3-go{all:unset;box-sizing:border-box;min-height:var(--hit);min-width:var(--hit);padding:0 12px;font-size:13px;font-weight:700;color:var(--ink);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:4px;border-radius:var(--r-1)}
 .zf3-go span{display:inline-block;transition:transform var(--m-fast) var(--ease)}
 .zf3-go[aria-expanded="true"] span{transform:rotate(90deg)}
@@ -651,11 +651,47 @@ html[data-ui="d3"] .zf3-vline .policy-item.next .policy-category::after{content:
 html[data-ui="d3"] .zf3-vline .policy-item.now::before{background:linear-gradient(var(--ln,var(--ink)) 0 12px,var(--rail) 12px)}
 html[data-ui="d3"] .zf3-vline .policy-item.now::after{background:var(--ln,var(--ink));border-color:var(--ln,var(--ink));box-shadow:0 0 0 3px var(--surface-2)}
 html[data-ui="d3"] .zf3-vline .policy-item.now .policy-category::after{content:" · 진행 중";color:var(--ink);font-weight:700}
-.zf3-abar{display:block;height:4px;margin-top:4px;border-radius:2px;background:linear-gradient(90deg,var(--ln,var(--ink)) calc(var(--w,0) * 1%),var(--line-2) 0);max-width:140px}
 .zf3-none{margin:8px 0;padding:10px 12px;font-size:12px;color:var(--ink-2);background:var(--surface-2);border-radius:var(--r-1);word-break:keep-all;line-height:1.5}
 .zf3-maplbl{margin-left:14px;padding:2px 8px;font:700 12px/18px var(--f-ui);color:var(--paper);background:var(--ink);border-radius:999px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.18);max-width:60vw;overflow:hidden;text-overflow:ellipsis}
 .zf3-maplbl.left{margin-left:0;margin-right:14px}
 .zf3-maplbl.clip{max-width:min(46vw,260px)}
+/* 탭 — 미끄러지는 표시(둘러보기 ⑤) · 390 아래 고정 탭(⑨) · 스크롤하면 붙는 얇은 머리(⑩) — 2026-10-12 */
+html[data-ui="d3"] .maintab{position:relative}
+html[data-ui="d3"] .maintabs.zf3-ind-on .maintab.active{box-shadow:none}
+.zf3-ti{display:none}
+.zf3-tind{position:absolute;left:1rem;bottom:0;width:calc((100% - 2rem) / 5);height:3px;transform:translateX(calc(var(--i,0) * 100%));transition:transform 240ms var(--ease);pointer-events:none}
+.zf3-tind::after{content:"";position:absolute;inset:0 18%;background:var(--ink);border-radius:3px 3px 0 0}
+@media (max-width:720px){
+  html[data-ui="d3"] body{padding-bottom:calc(76px + env(safe-area-inset-bottom,0px))}
+  html[data-ui="d3"] .maintabs.zf3-ind-on{position:fixed;top:auto;left:0;right:0;bottom:0;margin:0;padding:0 8px env(safe-area-inset-bottom,0px);z-index:120;border-bottom:0;border-top:1px solid var(--line);background:var(--paper);box-shadow:0 -4px 16px rgba(0,0,0,.06)}
+  html[data-ui="d3"] .maintabs.zf3-ind-on .maintab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;font-size:11px;line-height:1.1;padding:4px 0}
+  html[data-ui="d3"] .maintabs.zf3-ind-on .zf3-ti{display:block;width:22px;height:22px}
+  html[data-ui="d3"] .maintabs.zf3-ind-on .maintab.active .zf3-ti{stroke-width:2.3}
+  html[data-ui="d3"] .maintabs.zf3-ind-on .zf3-tind{left:8px;top:0;bottom:auto;width:calc((100% - 16px) / 5)}
+  html[data-ui="d3"] .maintabs.zf3-ind-on .zf3-tind::after{inset:0 30%;border-radius:0 0 3px 3px}
+  html[data-ui="d3"] .maintabs.zf3-ind-on #savedBadge{position:absolute;top:5px;left:calc(50% + 6px);margin:0!important}
+  html[data-ui="d3"] .zf-totop{bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+}
+.zf3-sticky{position:fixed;left:50%;top:0;width:min(720px,100%);box-sizing:border-box;transform:translateX(-50%);z-index:110;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 16px;background:var(--paper);border-bottom:1px solid var(--line);box-shadow:0 4px 14px rgba(0,0,0,.06);animation:zf3slide 200ms var(--ease)}
+.zf3-sticky[hidden]{display:none!important}
+.zf3-st-t{font-weight:700;font-size:var(--t-s);color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@keyframes zf3slide{from{transform:translate(-50%,-100%)}}
+/* 카드 첫 등장(⑥) · 상세 펼침(⑦) · 마감 임박 깃발(⑧) · 「상세」 꺾쇠(⑪) */
+.zf3-in{animation:zf3up 360ms var(--ease) both;animation-delay:var(--d,0ms)}
+@keyframes zf3up{from{opacity:0;transform:translateY(10px)}}
+html[data-ui="d3"] .zf3-card.zf3-open > [data-ann-id]{animation:zf3open 260ms var(--ease)}
+@keyframes zf3open{from{opacity:0;transform:translateY(-6px)}}
+html[data-ui="d3"] .zf3-card:has(.zf3-dpill.hot) .zf3-today b{animation:zf3ping 1.1s var(--ease) .9s 2}
+@keyframes zf3ping{0%{box-shadow:0 0 0 0 var(--ln,var(--ink))}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+.zf3-gotop{all:unset;box-sizing:border-box;flex:none;width:var(--hit);height:var(--hit);margin:-8px -10px -8px 0;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:var(--ink-2);cursor:pointer}
+.zf3-gotop span{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:var(--surface-2);font-size:17px;font-weight:700;line-height:1;transition:transform var(--m-fast) var(--ease),background var(--m-fast)}
+.zf3-gotop:hover span{background:var(--line)}
+.zf3-gotop[aria-expanded="true"] span{transform:rotate(90deg)}
+.zf3-gotop:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+.zf3-close{all:unset;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:4px;width:100%;min-height:var(--hit);margin-top:8px;border-top:1px solid var(--line-2);font-size:13px;font-weight:700;color:var(--ink-2);cursor:pointer}
+.zf3-close:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+html[data-ui="d3"] .zf3-card .chip-row .chip.zf3-minechip{background:var(--surface-2)!important;color:var(--ink)!important;border-color:transparent!important;font-weight:700}
+@media (prefers-reduced-motion:reduce){.zf3-tind,.zf3-sticky,.zf3-in,html[data-ui="d3"] .zf3-card.zf3-open > [data-ann-id],html[data-ui="d3"] .zf3-card .zf3-today b,.zf3-gotop span{animation:none!important;transition:none!important}}
 @keyframes zf3breath{from{opacity:.55}to{opacity:1}}
 @keyframes zf3grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
 @keyframes zf3flag{from{opacity:0;transform:translate(-50%,-4px)}to{opacity:1;transform:translateX(-50%)}}
@@ -1642,7 +1678,7 @@ function applyUnknownChip(row){
   if(row['apply_period_check'] === true){
     return `<span class="chip" title="이 공급기관은 공고 목록의 접수기간이 공사 공고와 다른 적이 있어요. 공사 공고에서 확인하세요." style="cursor:help;padding:4px 10px;font-size:11px;background:#F6F6F2;border-color:#E8E8E0;color:#6B6B63">📅 ${APPLY_CHECK_LABEL}</span>`;
   }
-  return `<span class="chip" title="이 공고는 접수기간이 공개 목록에 없어요. 원문에서 확인하세요." style="cursor:help;padding:4px 10px;font-size:11px;background:#F6F6F2;border-color:#E8E8E0;color:#6B6B63">📅 ${APPLY_UNKNOWN_LABEL}</span>`;
+  return `<span class="chip" data-zf-unk="1" title="이 공고는 접수기간이 공개 목록에 없어요. 원문에서 확인하세요." style="cursor:help;padding:4px 10px;font-size:11px;background:#F6F6F2;border-color:#E8E8E0;color:#6B6B63">📅 ${APPLY_UNKNOWN_LABEL}</span>`;
 }
 // 날짜 줄. unknown이면 하이픈 대신 '미상'과 원문 링크를 놓는다 —
 // `접수마감: -`는 「마감일이 없다」로도 「비어 있다」로도 읽혀 아무 말도 안 한다.
@@ -9637,10 +9673,10 @@ const ZF3_DOW = '일월화수목금토';
 function zf3Today(){ return new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10); }
 function zf3Days(a, b){ return Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 864e5); }
 const zf3Real = d => (d && /^\d{4}-\d{2}-\d{2}/.test(d) && !/^9999/.test(d)) ? String(d).slice(0, 10) : null;
-function zf3Md(d){
+function zf3Md(d, noYear){
   if(!zf3Real(d)) return '';
   const x = new Date(d.slice(0, 10) + 'T00:00:00Z');
-  return (d.slice(0, 4) !== zf3Today().slice(0, 4) ? d.slice(2, 4) + '-' : '') + d.slice(5, 7) + '-' + d.slice(8, 10) + '(' + ZF3_DOW[x.getUTCDay()] + ')';
+  return (!noYear && d.slice(0, 4) !== zf3Today().slice(0, 4) ? d.slice(2, 4) + '-' : '') + d.slice(5, 7) + '-' + d.slice(8, 10) + '(' + ZF3_DOW[x.getUTCDay()] + ')';
 }
 const ZF3_ALWAYS = /상시\s?모집|수시\s?모집/;
 // 상태 알약 — 종전 상태 꼬리표(zfStatusTag 「공고중 · 접수중 · 접수마감」)의 자리. 같은 술어(applyWindowState)를 쓴다.
@@ -9669,8 +9705,8 @@ function zf3LineHTML(stns, label){
     else { const j = last + 1 + j0, f = zf3Days(stns[last].d, today) / Math.max(1, zf3Days(stns[last].d, stns[j].d)); p = (last + f * (j - last)) / (n - 1); moving = true; }
   }
   const nextI = stns.findIndex(x => x.d && x.d > today);
-  const st = stns.map((x, i) => `<span class="zf3-stn${!x.d ? ' unk' : x.d <= today ? ' past' : i === nextI ? ' next' : ''}"><i></i><span class="k">${escapeHtml(x.k)}</span><span class="v">${x.d ? zf3Md(x.d) : escapeHtml(x.u || '원문 확인')}${x.sub ? `<small>${escapeHtml(x.sub)}</small>` : ''}</span></span>`).join('');
-  const aria = stns.map(x => `${x.k} ${x.d ? zf3Md(x.d) : (x.u || '원문 확인')}${x.sub ? ' ' + x.sub : ''}`).join(', ');
+  const st = stns.map((x, i) => `<span class="zf3-stn${!x.d ? ' unk' : x.d <= today ? ' past' : i === nextI ? ' next' : ''}"><i></i><span class="k">${escapeHtml(x.k)}${x.d && x.d.slice(0, 4) !== today.slice(0, 4) ? ` <b class="yr">${x.d.slice(0, 4)}</b>` : ''}</span><span class="v">${x.d ? zf3Md(x.d, true) : escapeHtml(x.u || '원문 확인')}${x.sub ? `<small>${escapeHtml(x.sub)}</small>` : ''}</span></span>`).join('');
+  const aria = stns.map(x => `${x.k} ${x.d ? (x.d.slice(0, 4) !== today.slice(0, 4) ? x.d.slice(0, 4) + '년 ' : '') + zf3Md(x.d, true) : (x.u || '원문 확인')}${x.sub ? ' ' + x.sub : ''}`).join(', ');
   return `<div class="zf3-line" style="--n:${n};--p:${p.toFixed(3)}" role="img" aria-label="${zfAttr((label ? label + ' — ' : '') + aria)}"><span class="zf3-rail"></span><span class="zf3-done"></span>${st}${moving ? '<span class="zf3-today" aria-hidden="true"><b>오늘</b></span>' : ''}</div>`;
 }
 function zf3Stations(n){
@@ -9691,12 +9727,14 @@ function zf3DecorateCards(){
   if(!list) return;
   zf3CardRows = new Map((noticeFiltered || []).map((n, i) => ['ncard-' + zfCardKey(n['announcement_id'] || i), n]));
   const prefs = zf3Prefs();
+  let fresh = 0;   // 이번에 처음 꾸미는 카드 순번 — 첫 등장 60ms 간격(둘러보기 ⑥ · 여덟째부터는 같이)
   list.querySelectorAll('.hcard[data-card-id]').forEach(card => {
     const n = zf3CardRows.get(card.getAttribute('data-card-id'));
     if(!n) return;
     if(card.dataset.zf3 !== '1'){
       card.dataset.zf3 = '1';
-      card.classList.add('zf3-card');
+      card.classList.add('zf3-card', 'zf3-in');
+      card.style.setProperty('--d', Math.min(fresh++, 8) * 60 + 'ms');
       const label = zfTypeLabel(n['source'], n['공급유형'], n['공고명'] || n['name']);
       const ln = zf3LineOf(label);
       card.style.setProperty('--ln', `var(--ln-${ln[0]})`);
@@ -9714,7 +9752,10 @@ function zf3DecorateCards(){
         top.appendChild(typeEl);
       }
       if(ZF3_ALWAYS.test(n['공고명'] || '')) top.insertAdjacentHTML('beforeend', '<span class="zf3-always">상시모집</span>');
-      if(!cancel){ const pl = zf3Pill(n); top.insertAdjacentHTML('beforeend', `<span class="zf3-dpill ${pl.cls}">${escapeHtml(pl.t)}</span>`); }
+      if(!cancel){ const pl = zf3Pill(n); top.insertAdjacentHTML('beforeend', `<span class="zf3-dpill ${pl.cls}">${escapeHtml(pl.t)}</span>`);
+        // 알약이 「접수기간 미상」이면 같은 말 칩(📅 접수기간 미상)은 접고 그 설명(title)을 알약으로 옮긴다 — 같은 사실을 세 번(알약·칩·날짜 줄) 말하지 않게.
+        const uc = pl.t === APPLY_UNKNOWN_LABEL ? card.querySelector('[data-zf-unk]') : null;
+        if(uc){ uc.classList.add('zf3-dup'); const pe = top.lastElementChild; pe.title = uc.title; } }
       card.insertBefore(top, card.firstChild);
       // ② 노선 — 날짜를 믿을 수 있을 때만. 종전 날짜 줄의 배지(단지마다 일정이 달라요 · 원문 확인 일정)는 노선 아래 한 줄로 옮긴다.
       const dl = card.querySelector('.zf-dateline');
@@ -9726,17 +9767,25 @@ function zf3DecorateCards(){
         if(tags.length){ const t = document.createElement('p'); t.className = 'zf3-dl-tags'; tags.forEach(x => t.appendChild(x)); dl.before(t); }
         dl.classList.add('zf3-off');
       }
-      // ③ 아래 줄 — 왼쪽 「내 희망 조건」 · 오른쪽 「상세 ›」(카드 전체를 누르는 것과 같다)
+      // ③ 「상세」 — 제목 줄 오른쪽 꺾쇠(카드 전체를 누르는 것과 같다 · 둘러보기 ⑪: 종전 아래 줄 「★ … · 상세 ›」 45px 를 걷는다).
+      //    펼친 뒤에는 상세 끝에 「상세 접기」(긴 상세를 다 읽고 위로 돌아가지 않게) · 「내 희망 조건」은 칩 줄로.
       const det = card.querySelector('#' + CSS.escape(card.getAttribute('data-card-id')));
-      const foot = document.createElement('div');
-      foot.className = 'zf3-cfoot';
-      foot.innerHTML = `<span class="zf3-mine">${prefs && zf3Mine(n, prefs) ? '★ 내 희망 조건에 맞아요' : ''}</span><button type="button" class="zf3-go" aria-expanded="false">상세 <span aria-hidden="true">›</span></button>`;
-      const go = foot.querySelector('.zf3-go');
+      const go = document.createElement('button');
+      go.type = 'button'; go.className = 'zf3-go zf3-gotop'; go.setAttribute('aria-expanded', 'false');
+      go.innerHTML = '<span aria-hidden="true">›</span>';
       go.setAttribute('aria-label', `${n['공고명'] || ''} 상세 보기`);
       // 접근성: d3 에서는 카드의 role=button·tabindex 를 걷는다(안에 단추·링크가 있어 「중첩된 조작 요소」가 된다 — axe nested-interactive).
-      //    마우스로 카드 아무 데나 누르는 것은 그대로 · 키보드·화면 낭독기는 「상세 ›」 단추 하나로 펼친다 · 펼침 상태는 단추에만(aria-expanded · aria-controls).
+      //    마우스로 카드 아무 데나 누르는 것은 그대로 · 키보드·화면 낭독기는 꺾쇠 단추 하나로 펼친다 · 펼침 상태는 단추에만(aria-expanded · aria-controls).
       card.removeAttribute('role'); card.removeAttribute('tabindex'); card.removeAttribute('aria-expanded');
       if(det){ go.setAttribute('aria-controls', det.id); }
+      if(prefs && zf3Mine(n, prefs)){
+        const row = card.querySelector('.chip-row');
+        const mine = '<span class="chip zf3-minechip">★ 내 희망 조건에 맞아요</span>';
+        if(row) row.insertAdjacentHTML('afterbegin', mine); else (card.querySelector('.htop') || card).insertAdjacentHTML('afterend', `<div class="chip-row">${mine}</div>`);
+      }
+      const close = document.createElement('button');
+      close.type = 'button'; close.className = 'zf3-close'; close.textContent = '상세 접기';
+      if(det) close.setAttribute('aria-controls', det.id);
       const sync = () => {
         const open = !!(det && det.style.display === 'block');
         go.setAttribute('aria-expanded', open ? 'true' : 'false');
@@ -9744,8 +9793,10 @@ function zf3DecorateCards(){
         card.removeAttribute('aria-expanded'); card.style.borderColor = '';
       };
       go.addEventListener('click', ev => { ev.stopPropagation(); card.click(); });
+      close.addEventListener('click', ev => { ev.stopPropagation(); card.click(); try{ card.scrollIntoView({ block: 'nearest' }); }catch(e){} go.focus({ preventScroll: true }); });
       card.addEventListener('click', () => setTimeout(sync, 0));
-      if(det) det.before(foot); else card.appendChild(foot);
+      (card.querySelector('.htop') || card).appendChild(go);
+      if(det) det.appendChild(close);
     }
     // ④ 갈래 노선 — 같은 게시물 공고문마다 접수일이 다르면(공고문 목록이 선 뒤) 노선을 공고문별로 가른다. 공고문 목록 상자의 말은 그대로 옮긴다.
     const slot = card.querySelector('.zf-notices-slot');
@@ -9766,17 +9817,18 @@ function zf3DecorateCards(){
     if(card.dataset.zf3 === '1' && zfSide.loaded && card.dataset.zf3Win !== '1'){
       card.dataset.zf3Win = '1';
       const rows = zfSide.routesByKey.get(zfDedupKey(n['공고명']));
-      const wins = rows && rows.length && rows.every(r => r.route === '현장') ? zfRouteWindows(rows) : [];
+      const vk = rows && rows.length ? (zfRouteVerdict(rows, new Date()) || {}).kind || '' : '';
+      const wins = /^②-마/.test(vk) ? zfRouteWindows(rows) : [];   // 순위·단지로 갈린 창(②-가·나)은 반복 창이 아니다
       if(wins.length >= 2 && n['apply_period_check'] !== true){
         const today = zf3Today();
-        const cur = wins.find(w => w.s <= today && today <= w.e), nxt = wins.find(w => w.s > today), w = cur || nxt;
+        const cur = wins.find(w => w.s <= today && today <= w.e), nxt = wins.find(w => w.s > today), w = cur || nxt, began = wins.some(w0 => w0.e < today);
         const pill = card.querySelector('.zf3-dpill');
         if(pill && cur){ const d = zf3Days(today, cur.e); pill.className = 'zf3-dpill open' + (d <= 1 ? ' hot' : ''); pill.textContent = d === 0 ? '오늘 창 마감' : '접수 중 · 이번 창 D-' + d; }
-        else if(pill && nxt){ pill.className = 'zf3-dpill before'; pill.textContent = '다음 창 대기 · ' + zf3Md(nxt.s).replace(/\(.\)$/, ''); }
+        else if(pill && nxt && began){ pill.className = 'zf3-dpill before'; pill.textContent = '다음 창 대기 · ' + zf3Md(nxt.s).replace(/\(.\)$/, ''); }
         const route = card.querySelector('.zf3-route');
         if(route && w && card.dataset.zf3Branch !== '1'){
           const st = zf3Stations(n);
-          st[1] = { k: '접수', d: w.s, sub: (cur ? '이번 창' : '다음 창') + ' ~' + zf3Md(w.e).replace(/\(.\)$/, '') };
+          st[1] = { k: '접수', d: w.s, sub: (cur ? '이번 창' : began ? '다음 창' : '첫 창') + ' ~' + zf3Md(w.e).replace(/\(.\)$/, '') };
           route.innerHTML = zf3LineHTML(st);
         }
       }
@@ -9877,26 +9929,11 @@ function zf3EnhanceSchedule(root){
     items.forEach((it, i) => it.classList.add(!it.dataset.zfD ? 'unk' : it.dataset.zfD <= today ? ((it.dataset.zfE || '') >= today ? 'now' : 'past') : i === nextI ? 'next' : 'fut'));
   });
 }
-// 면적 막대 — 세대 칸 「전용면적」 값을 그 공고에서 가장 넓은 값 대비 막대로(값 글자는 그대로). 새 행이 오면 그 목록 전체를 다시 잰다.
-function zf3EnhanceAreas(root){
-  root.querySelectorAll('.hu-list').forEach(list => {
-    const cells = [...list.querySelectorAll('.hu-item')].filter(it => (it.querySelector('.hu-label') || {}).textContent === '전용면적');
-    const vals = cells.map(it => parseFloat(String((it.querySelector('.hu-value') || {}).textContent || '').replace(/,/g, '').match(/[\d.]+/) || '')).map(v => isFinite(v) ? v : null);
-    const max = Math.max(0, ...vals.filter(v => v != null));
-    if(!max) return;
-    cells.forEach((it, i) => {
-      if(vals[i] == null) return;
-      let bar = it.querySelector('.zf3-abar');
-      if(!bar){ bar = document.createElement('span'); bar.className = 'zf3-abar'; bar.setAttribute('aria-hidden', 'true'); it.appendChild(bar); }
-      bar.style.setProperty('--w', Math.max(4, Math.round(vals[i] / max * 100)));
-    });
-  });
-}
 let zf3DetailQ = false;
 function zf3WatchDetails(){
   const list = document.getElementById('notice-list');
   if(!list || !zf3On() || typeof MutationObserver === 'undefined') return;
-  const run = () => { zf3DetailQ = false; try{ zf3EnhanceSchedule(list); zf3EnhanceAreas(list); }catch(e){} };
+  const run = () => { zf3DetailQ = false; try{ zf3EnhanceSchedule(list); }catch(e){} };
   new MutationObserver(() => { if(!zf3DetailQ){ zf3DetailQ = true; requestAnimationFrame(run); } }).observe(list, { childList: true, subtree: true });
 }
 // 공고 탭 머리 — 「조건에 맞는 n건 / 열린 m건」 · 표제란 한 줄 · 조건 칩 줄(✕로 빼기 · 「＋ 조건」 → 조건 칸)
@@ -9932,7 +9969,7 @@ function zf3RenderNoticeHead(filtered){
   const atText = at ? `${at.slice(0, 10).replace(/-/g, '.')} KST` : '불러오는 중';   // 시안 「slim」 그대로 날짜만 — 390px 한 줄
   const sheetOpen = !document.getElementById('noticeFilterPanel')?.classList.contains('hidden');
   el.innerHTML = `<p class="zf3-lh">${head}</p>`
-    + `<p class="zf3-lsub">열린 ${o.n.toLocaleString()}건: 접수 중 ${o.a.toLocaleString()} · 예정 ${o.b.toLocaleString()}${o.k ? ` · 미상 ${o.k.toLocaleString()}` : ''}${sortText ? ` · ${escapeHtml(sortText)}` : ''}</p>`
+    + `<p class="zf3-lsub">${closedExcluded ? '' : `열린 ${o.n.toLocaleString()}건: `}접수 중 ${o.a.toLocaleString()} · 예정 ${o.b.toLocaleString()}${o.k ? ` · 미상 ${o.k.toLocaleString()}` : ''}${sortText ? ` · ${escapeHtml(sortText)}` : ''}</p>`
     + `<div class="zf3-tblock" role="note"><div><span class="k">기준</span><span class="v led">${escapeHtml(atText)}</span></div><div><span class="k">출처</span><span class="v">LH · 마이홈 · SH 원문 → 꼭집 정리</span></div></div>`
     + `<div class="zf3-chips" role="group" aria-label="걸린 조건">${chips.map(([k, t]) => `<button type="button" class="zf3-chip on" data-act="clear" data-k="${k}" aria-label="${zfAttr(t)} 조건 빼기">${escapeHtml(t)}<span aria-hidden="true">✕</span></button>`).join('')}`
     + `<button type="button" class="zf3-chip add" data-act="sheet" aria-expanded="${sheetOpen}" aria-controls="noticeFilterPanel">＋ 조건</button></div>`;
@@ -9958,6 +9995,62 @@ function zf3ToggleSheet(open){
   if(add) add.setAttribute('aria-expanded', String(open));
   if(open){ const f = panel.querySelector('input,select,button,[tabindex="0"]'); if(f) f.focus(); }
   else if(add) add.focus();
+}
+// 탭 — 아이콘(390 아래 고정 탭에서만 보임) · 미끄러지는 표시 하나(둘러보기 ⑤·⑨ · 2026-10-12). 탭 단추·ID·goMain 그대로(원칙 7).
+//    아이콘: 추천 = 과녁(꼭 집어) · 공고 = 문서 · 인사이트 = 막대 · 관리 = 책갈피 · 설정 = 조절기. 장식이라 aria-hidden.
+function zf3Tabs(){
+  const bar = document.querySelector('.maintabs');
+  if(!bar || bar.classList.contains('zf3-ind-on')) return;
+  const ICON = {
+    1: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5"/>',
+    2: '<rect x="5" y="3.5" width="14" height="17" rx="2"/><path d="M8.5 8h7M8.5 12h7M8.5 16h4"/>',
+    3: '<path d="M5 20V11M12 20V5M19 20v-6"/>',
+    4: '<path d="M7 3.5h10a1 1 0 0 1 1 1V20l-6-3.8L6 20V4.5a1 1 0 0 1 1-1z"/>',
+    5: '<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>'
+  };
+  [1, 2, 3, 4, 5].forEach(i => {
+    const t = document.getElementById('m' + i);
+    if(t && !t.querySelector('.zf3-ti')) t.insertAdjacentHTML('afterbegin', `<svg class="zf3-ti" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICON[i]}</svg>`);
+  });
+  const ind = document.createElement('span');
+  ind.className = 'zf3-tind'; ind.setAttribute('aria-hidden', 'true');
+  bar.appendChild(ind);
+  bar.classList.add('zf3-ind-on');
+  const sync = () => {
+    const i = [1, 2, 3, 4, 5].findIndex(k => document.getElementById('m' + k)?.classList.contains('active'));
+    ind.style.setProperty('--i', Math.max(0, i));
+    if(typeof window.zf3StickyUpd === 'function') window.zf3StickyUpd();
+  };
+  sync();
+  new MutationObserver(sync).observe(bar, { subtree: true, attributes: true, attributeFilter: ['class'] });
+}
+// 스크롤하면 붙는 얇은 머리(둘러보기 ⑩) — 공고 탭 머리(#zf3NoticeHead)가 화면 위로 나가면 「조건에 맞는 n건 / 열린 m건」 + 「＋ 조건」 한 줄.
+//    「＋ 조건」은 머리로 돌아가 조건 시트를 연다(시트는 머리 아래에 펼쳐진다). 넓은 화면은 위 탭 아래에, 390 은 맨 위에 붙는다.
+function zf3StickyHead(){
+  const head = document.getElementById('zf3NoticeHead');
+  if(!head || !('IntersectionObserver' in window) || document.getElementById('zf3Sticky')) return;
+  const st = document.createElement('div');
+  st.id = 'zf3Sticky'; st.className = 'zf3-sticky'; st.hidden = true;
+  st.innerHTML = '<span class="zf3-st-t" aria-live="off"></span><button type="button" class="zf3-chip add">＋ 조건</button>';
+  document.body.appendChild(st);
+  const reduce = () => { try{ return matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){ return false; } };
+  st.querySelector('button').addEventListener('click', () => {
+    head.scrollIntoView({ block: 'start', behavior: reduce() ? 'auto' : 'smooth' });
+    setTimeout(() => zf3ToggleSheet(true), reduce() ? 0 : 380);
+  });
+  let out = false;
+  const upd = () => {
+    const main2 = document.getElementById('main2');
+    const on = out && main2 && !main2.classList.contains('hidden');
+    st.hidden = !on;
+    if(!on) return;
+    st.querySelector('.zf3-st-t').textContent = (head.querySelector('.zf3-lh') || {}).textContent || '';
+    const tb = document.querySelector('.maintabs');
+    st.style.top = tb && getComputedStyle(tb).position !== 'fixed' ? Math.round(tb.getBoundingClientRect().height) + 'px' : '0px';
+  };
+  new IntersectionObserver(es => { const e = es[es.length - 1]; out = !e.isIntersecting && e.boundingClientRect.top < 0; upd(); }, { threshold: 0 }).observe(head);
+  new MutationObserver(upd).observe(head, { childList: true });
+  window.zf3StickyUpd = upd;
 }
 function zf3Init(){
   if(!zf3On()) return;
@@ -10006,10 +10099,12 @@ function zf3Init(){
   const stEl = document.getElementById('notice-status');
   if(stEl) stEl.addEventListener('click', ev => { const b = ev.target.closest('[data-zf3-clear]'); if(b) zf3ClearCond(b.dataset.zf3Clear); });
   if(!noticeLoaded) zf3Skeleton();
-  zf3WatchDetails();   // 단계 c — 상세 칸이 채워질 때마다 세로 노선 · 면적 막대
+  zf3WatchDetails();   // 단계 c — 상세 칸이 채워질 때마다 세로 노선(면적 막대는 공고 탭 재편 뒤 다시 본다 — 다운님 10-12)
   setInterval(zf3TickOne, 4000);
   try{ matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', () => { zf3Key = ''; if(zf3Rows) zf3PaintBoard(zf3Rows); }); }catch(e){}
   zf3RenderBoard();
+  zf3Tabs();
+  zf3StickyHead();
 }
 zf3Init();
 // 🔵 2026-10-12(고지 회차 3 · 6) — 사이트 공지 띠. notices.json 에서 오늘(KST)이 시작~끝 안이고
