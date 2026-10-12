@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" data-ui="d3">
 <head>
 <meta charset="UTF-8">
 <link rel="icon" href="data:,">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>꼭집 — 꼭 맞는 집만 꼭 집어서</title>
 <meta name="description" content="전국 공공임대주택 공고를 한곳에서 보고, 내 조건으로 자격진단까지. LH·마이홈·SH 공고를 모아 보여줍니다.">
 <meta property="og:type" content="website">
@@ -14,7 +14,7 @@
 <meta name="twitter:title" content="꼭집 — 꼭 맞는 집만 꼭 집어서">
 <meta name="twitter:description" content="전국 공공임대주택 공고를 한곳에서 보고, 내 조건으로 자격진단까지. LH·마이홈·SH 공고를 모아 보여줍니다.">
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#1D9E75">
+<meta name="theme-color" content="#F2F0EB">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="꼭집">
@@ -23,21 +23,19 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/dist/umd/supabase.js"
         integrity="sha384-qafw21c/iciq0VXsi9FzkfoQv5I/V0iqE4lSNcKXPnW9/UTJLnv5CcN4FHxVLnKg"
         crossorigin="anonymous"></script>
-<!-- 🔵 2026-10-12(표시층 D-3 · 단계 a) — 새 화면 스위치. 주소에 ui=d3 이 있을 때만 <html data-ui="d3"> 를 달아 단계별로 만든
-     새 꼴을 보인다. 없으면 종전 화면 그대로라 단계 사이에 사용자가 반쯤 바뀐 화면을 보지 않는다. 브라우저 저장은 쓰지 않는다(처리방침 3장).
-     마지막 단계(e) 뒤 기본값을 뒤집는 한 줄로 켠다. -->
-<script>try{if(/(?:^|[?&])ui=d3(?:&|$)/.test(location.search))document.documentElement.setAttribute('data-ui','d3');}catch(e){}</script>
+<!-- 🔵 새 화면 전환(우편함 「표시층 — 런칭 전 남은 화면 일」 1) — <html data-ui="d3"> 를 모든 사용자에게 단다. 단계마다 쓰던 주소 스위치(?ui=d3)는
+     걷었다(주소에 남아 있어도 해가 없다 — 같은 화면이 뜬다). 되돌리기는 이 PR 을 되돌리는 PR 하나다. -->
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-padding-top:88px}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f0;color:#1a1a1a;min-height:100vh}
 body.theme-dark{background:#16181d;color:#e8e8e8}
-body.theme-dark .hero,body.theme-dark .panel,body.theme-dark .hcard,body.theme-dark .hu-row,body.theme-dark .hu-group-head,body.theme-dark .hu-group-body,body.theme-dark .policy-item,body.theme-dark .docs-group,body.theme-dark .elig-item,body.theme-dark .extras-thumb{background:#1f2229;border-color:#2c2f38}
+body.theme-dark .panel,body.theme-dark .hcard,body.theme-dark .hu-row,body.theme-dark .hu-group-head,body.theme-dark .hu-group-body,body.theme-dark .policy-item,body.theme-dark .docs-group,body.theme-dark .elig-item,body.theme-dark .extras-thumb{background:#1f2229;border-color:#2c2f38}
 body.theme-dark .label,body.theme-dark .sub,body.theme-dark .haddr,body.theme-dark .building-desc,body.theme-dark .hu-label,body.theme-dark .hu-group-count{color:#9aa0aa}
 body.theme-dark select,body.theme-dark input{background:#262932;border-color:#3a3e48;color:#e8e8e8}
 body.theme-dark .maintabs{background:#262932}
 body.theme-dark .maintab.active{background:#1f2229;color:#5DCAA5}
-body.theme-dark .logo,body.theme-dark .setting-label,body.theme-dark .panel-title,body.theme-dark .hname,body.theme-dark .mval,body.theme-dark .hu-title,body.theme-dark .hu-addr,body.theme-dark .hu-value,body.theme-dark .hu-group-name,body.theme-dark .policy-title,body.theme-dark .policy-content,body.theme-dark .docs-title,body.theme-dark .docs-list li,body.theme-dark .elig-title,body.theme-dark .elig-row,body.theme-dark .extras-title,body.theme-dark .extras-group-label,body.theme-dark .hu-note-price,body.theme-dark .hu-note-long{color:#e8e8e8}
+body.theme-dark .setting-label,body.theme-dark .panel-title,body.theme-dark .hname,body.theme-dark .mval,body.theme-dark .hu-title,body.theme-dark .hu-addr,body.theme-dark .hu-value,body.theme-dark .hu-group-name,body.theme-dark .policy-title,body.theme-dark .policy-content,body.theme-dark .docs-title,body.theme-dark .docs-list li,body.theme-dark .elig-title,body.theme-dark .elig-row,body.theme-dark .extras-title,body.theme-dark .extras-group-label,body.theme-dark .hu-note-price,body.theme-dark .hu-note-long{color:#e8e8e8}
 body.theme-dark .hu-group-head.hu-group-active{background:#1d3d33;border-color:#5DCAA5}
 body.theme-dark .hu-note-wrap{border-color:#2c2f38}
 body.theme-dark .hu-group-head:hover{background:#262932}
@@ -47,9 +45,6 @@ body.theme-dark .zf-round-tag{background:#3a2f14;color:#e9c979;border-color:#6b5
 body.fs-small{font-size:13px}
 body.fs-large{font-size:17px}
 .wrap{max-width:720px;margin:0 auto;padding:1.5rem 1rem}
-.hero{background:#fff;border-radius:16px;padding:2rem 1.5rem 1.5rem;margin-bottom:1.5rem;border:1px solid #e8e8e0;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
-.logo{font-size:24px;font-weight:600;color:#111;margin-bottom:0.5rem}
-.logo span{color:#1D9E75}
 .sub{font-size:14px;color:#666;line-height:1.7}
 .badge{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom;font-size:11px;padding:4px 12px;border-radius:20px;background:#E1F5EE;color:#085041;margin-top:0.75rem;font-weight:500}
 .steps{display:flex;gap:8px;margin-bottom:1.5rem}
@@ -57,7 +52,6 @@ body.fs-large{font-size:17px}
 .maintabs{display:flex;gap:6px;margin-bottom:1rem;background:#ece9e0;padding:5px;border-radius:14px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,0.08)}
 .maintab{flex:1;padding:0.65rem 0.2rem;border-radius:10px;font-size:11.5px;font-weight:600;color:#777;text-align:center;cursor:pointer;transition:all 0.15s;border:none;background:transparent}
 .maintab.active{background:#fff;color:#0F6E56;box-shadow:0 1px 3px rgba(0,0,0,0.08)}
-.maintab-icon{display:block;font-size:18px;margin-bottom:2px}
 /* 소탭 (서브 네비게이션) */
 .subtabs{display:flex;gap:8px;margin-bottom:1.25rem}
 .subtab{flex:1;padding:0.6rem 0.5rem;border-radius:10px;border:1px solid #e0e0d8;font-size:13px;color:#888;text-align:center;cursor:pointer;background:#fff;font-weight:500}
@@ -401,21 +395,8 @@ body.theme-dark .hu-ug-name,body.theme-dark .hu-ug-target,body.theme-dark .hu-ug
 .zf-ai-note{margin:0.75rem 0 0;font-size:12px;line-height:1.6;color:#5F5F57;word-break:keep-all}
 .zf-footer .zf-ai-note{margin:0 0 6px;color:#888}
 body.theme-dark .zf-ai-note{color:#9aa0aa}
-/* 🔵 2026-10-12(고지 회차 3 · 6) — 사이트 공지 띠. 데이터는 notices.json(시작·끝 날짜 안에서만) ·
-   닫으면 그 공지는 이 탭에서 다시 안 보인다(sessionStorage — 처리방침 3장: 방문과 방문을 잇지 않는다). */
-.zf-site-notice{display:flex;align-items:center;gap:8px;margin:0 0 0.75rem;padding:4px 4px 4px 12px;border:1px solid #E7D9A8;border-radius:10px;background:#FFF8E1;color:#3D3A2E;font-size:13px;line-height:1.5}
-.zf-site-notice[hidden]{display:none}
 .zf-ops-badge{position:fixed;left:8px;bottom:calc(8px + env(safe-area-inset-bottom, 0px));z-index:130;padding:4px 10px;border-radius:999px;background:#3d424a;color:#fff;font-size:11px;font-weight:700;line-height:1.6;box-shadow:0 2px 8px rgba(0,0,0,.2)}
 .zf-ops-badge a{color:#fff;text-decoration:underline;margin-left:4px;display:inline-block;min-height:24px;min-width:24px}
-.zf-site-notice .zf-sn-k{flex:none;font-weight:700;color:#7A5A00}
-.zf-site-notice .zf-sn-t{flex:1;min-width:0;word-break:keep-all}
-.zf-site-notice .zf-sn-t a{color:#0F6E56;font-weight:700;text-decoration:underline;text-underline-offset:2px}
-.zf-site-notice .zf-sn-x{flex:none;width:44px;height:44px;border:0;background:none;color:#5F5F57;font-size:18px;line-height:1;cursor:pointer;border-radius:8px}
-.zf-site-notice .zf-sn-x:focus-visible{outline:2px solid #5DCAA5;outline-offset:-2px}
-body.theme-dark .zf-site-notice{background:#2a2617;border-color:#4a4226;color:#e6e1cf}
-body.theme-dark .zf-site-notice .zf-sn-k{color:#f0c75e}
-body.theme-dark .zf-site-notice .zf-sn-t a{color:#5DCAA5}
-body.theme-dark .zf-site-notice .zf-sn-x{color:#c9c4b4}
 .zf-footer a{font-size:12px;color:#888;text-decoration:none}
 body.theme-dark .zf-footer{border-top-color:#2c2f38}
 body.theme-dark .zf-footer a{color:#9aa0aa}
@@ -466,9 +447,6 @@ html[data-ui="d3"] body.theme-dark{
 }
 html[data-ui="d3"] .wrap{padding-top:0}
 html[data-ui="d3"] :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
-/* 종전 머리 · 공지 띠 · 탭 그림 — d3 에서는 새 부품이 대신한다 */
-html[data-ui="d3"] .hero,
-html[data-ui="d3"] #zfSiteNotice{display:none!important}
 /* 앱 머리 */
 .zf3-top[hidden],.zf3-band[hidden],.zf3-nhead[hidden],.zf3-ai-full[hidden]{display:none!important}
 .zf3-badge{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 4px;border-radius:6px;background:var(--ln,var(--ln-gi));color:var(--ln-ink);font-size:12px;font-weight:700}   /* 노선 배지 부품 — 단계 b 카드에서 쓴다 */
@@ -484,7 +462,6 @@ html[data-ui="d3"] #zfSiteNotice{display:none!important}
 html[data-ui="d3"] .maintabs{background:var(--paper);border-radius:0;padding:0;gap:0;box-shadow:none;border-bottom:1px solid var(--line);margin:0 -1rem;padding:0 1rem}
 html[data-ui="d3"] .maintab{min-height:var(--hit);border-radius:0;font-size:var(--t-s);font-weight:500;color:var(--ink-3);background:transparent;box-shadow:none;font-family:var(--f-ui)}
 html[data-ui="d3"] .maintab.active{background:transparent;color:var(--ink);font-weight:700;box-shadow:inset 0 -3px 0 var(--ink)}
-html[data-ui="d3"] .maintab-icon{display:none}
 /* 맞춤 LED 전광판 */
 .zf3-band{margin:0 -1rem 12px;background:var(--board);background-image:radial-gradient(circle at center,var(--led-dot) 0 1px,transparent 1.4px);background-size:4px 4px;border-block:1px solid #2b2e35;color:var(--board-ink);font-family:var(--f-led)}
 .zf3-mq{display:flex;align-items:stretch;min-height:var(--hit-band)}
@@ -665,7 +642,7 @@ html[data-ui="d3"] .maintabs.zf3-ind-on .maintab.active{box-shadow:none}
 .zf3-tind::after{content:"";position:absolute;inset:0 18%;background:var(--ink);border-radius:3px 3px 0 0}
 @media (max-width:720px){
   html[data-ui="d3"] body{padding-bottom:calc(76px + env(safe-area-inset-bottom,0px))}
-  html[data-ui="d3"] .maintabs.zf3-ind-on{position:fixed;top:auto;left:0;right:0;bottom:0;margin:0;padding:0 8px env(safe-area-inset-bottom,0px);z-index:120;border-bottom:0;border-top:1px solid var(--line);background:var(--paper);box-shadow:0 -4px 16px rgba(0,0,0,.06)}
+  html[data-ui="d3"] .maintabs.zf3-ind-on{position:fixed;top:auto;left:0;right:0;bottom:0;margin:0;padding:0 max(8px,env(safe-area-inset-right,0px)) env(safe-area-inset-bottom,0px) max(8px,env(safe-area-inset-left,0px));z-index:120;border-bottom:0;border-top:1px solid var(--line);background:var(--paper);box-shadow:0 -4px 16px rgba(0,0,0,.06)}
   html[data-ui="d3"] .maintabs.zf3-ind-on .maintab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;font-size:11px;line-height:1.1;padding:4px 0}
   html[data-ui="d3"] .maintabs.zf3-ind-on .zf3-ti{display:block;width:22px;height:22px}
   html[data-ui="d3"] .maintabs.zf3-ind-on .maintab.active .zf3-ti{stroke-width:2.3}
@@ -968,19 +945,13 @@ html[data-ui="d3"] body.theme-dark{color-scheme:dark}
     <button type="button" class="zf3-ai" id="zf3AiBtn" aria-expanded="false" aria-controls="zf3AiFull">AI 정리 · 신청 전 원문 확인<span aria-hidden="true" class="zf3-ai-ic">ⓘ</span></button>
   </div>
   <p id="zf3AiFull" class="zf3-ai-full" hidden>꼭집의 공고 정보는 AI가 공고문 원문을 읽고 정리했어요. 신청 전에는 공고 원문을 꼭 확인해 주세요. <a href="./terms.html#art3">이용약관 제3조 보기</a></p>
-  <div id="zfSiteNotice" class="zf-site-notice" role="region" aria-label="사이트 공지" hidden></div>
-  <div class="hero">
-    <div class="logo">🏠 <span>꼭</span>집</div>
-    <p class="sub">전국 공공임대 공고 맞춤 매칭 서비스<br>전국 공공기관 공고를 한 곳에서. 내 조건에 맞는 집을 빠르게 찾아드립니다.</p>
-    <p class="zf-ai-note">꼭집의 공고 정보는 AI가 공고문 원문을 읽고 정리했어요. 신청 전에는 공고 원문을 꼭 확인해 주세요.</p>
-  </div>
 
   <div class="maintabs" role="tablist" aria-label="메인 탭">
-    <button class="maintab active" id="m1" role="tab" aria-selected="true" onclick="goMain(1)"><span class="maintab-icon" aria-hidden="true">🏠</span>추천</button>
-    <button class="maintab" id="m2" role="tab" aria-selected="false" onclick="goMain(2)"><span class="maintab-icon" aria-hidden="true">📋</span>공고</button>
-    <button class="maintab" id="m3" role="tab" aria-selected="false" onclick="goMain(3)"><span class="maintab-icon" aria-hidden="true">📊</span>인사이트</button>
-    <button class="maintab" id="m4" role="tab" aria-selected="false" onclick="goMain(4)"><span class="maintab-icon" aria-hidden="true">📁</span>관리<span id="savedBadge" style="display:none;background:#D85A30;color:#fff;border-radius:10px;font-size:10px;padding:1px 5px;margin-left:3px;vertical-align:middle"></span></button>
-    <button class="maintab" id="m5" role="tab" aria-selected="false" onclick="goMain(5)"><span class="maintab-icon" aria-hidden="true">⚙️</span>설정</button>
+    <button class="maintab active" id="m1" role="tab" aria-selected="true" onclick="goMain(1)">추천</button>
+    <button class="maintab" id="m2" role="tab" aria-selected="false" onclick="goMain(2)">공고</button>
+    <button class="maintab" id="m3" role="tab" aria-selected="false" onclick="goMain(3)">인사이트</button>
+    <button class="maintab" id="m4" role="tab" aria-selected="false" onclick="goMain(4)">관리<span id="savedBadge" style="display:none;background:#D85A30;color:#fff;border-radius:10px;font-size:10px;padding:1px 5px;margin-left:3px;vertical-align:middle"></span></button>
+    <button class="maintab" id="m5" role="tab" aria-selected="false" onclick="goMain(5)">설정</button>
   </div>
   <!-- 🔵 D-3 a — 맞춤 LED 전광판(공지 포함 · 띠는 하나). ui=d3 일 때만. -->
   <div id="zf3Board" class="zf3-band" hidden></div>
@@ -9738,6 +9709,8 @@ function zfSettingsFormPayload(){
 
 function setTheme(theme,silent){
   document.body.classList.toggle('theme-dark',theme==='dark');
+  // 모바일 브라우저 위 막대 = 새 바탕(밝게 --bg #F2F0EB · 어둡게 #0E0F12)
+  try{ const tc = document.querySelector('meta[name="theme-color"]'); if(tc) tc.setAttribute('content', theme==='dark' ? '#0E0F12' : '#F2F0EB'); }catch(e){}
   document.querySelectorAll('[data-theme]').forEach(c=>c.classList.toggle('sel',c.dataset.theme===theme));
   if(!silent) onSettingChange({ theme });
 }
@@ -11121,30 +11094,6 @@ try{ zfOpsBadge(); }catch(e){}   // 운영 세션 표지가 켜진 기기에만 
       m.addedNodes.forEach(n => { if(n.nodeType === 1 && (n.nodeName === 'AREA' || n.nodeName === 'MAP' || (n.querySelector && n.querySelector('area')))) fill(n); });
     })).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['alt', 'title'] });
   }catch(e){}
-})();
-// 🔵 2026-10-12(고지 회차 3 · 6) — 사이트 공지 띠. notices.json 에서 오늘(KST)이 시작~끝 안이고
-//    이 탭에서 닫지 않은 공지 하나를 맨 위에 보인다. 닫은 공지 번호는 sessionStorage 에만 남긴다
-//    (처리방침 3장 — localStorage 를 쓰지 않는다 · 탭을 닫으면 사라진다). 파일이 없거나 깨지면 띠도 없다.
-(function(){
-  const box = document.getElementById('zfSiteNotice');
-  if(!box || document.documentElement.getAttribute('data-ui') === 'd3') return;   // d3 에서는 전광판 공지 항목이 대신한다(띠 하나)
-  const KEY = 'zf_notice_closed';
-  const closed = () => { try{ return JSON.parse(sessionStorage.getItem(KEY) || '[]'); }catch(e){ return []; } };
-  const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
-  const esc = t => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-  const safeHref = h => /^(\.\/|https:\/\/)/.test(String(h || '')) ? h : null;
-  fetch('./notices.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : []).then(list => {
-    const done = closed();
-    const n = (Array.isArray(list) ? list : []).find(x => x && x.id && x.title && x.start <= today && today <= x.end && !done.includes(x.id));
-    if(!n) return;
-    const links = (n.links || []).map(l => safeHref(l.href) ? `<a href="${esc(l.href)}">${esc(l.label)}</a>` : '').filter(Boolean).join(' · ');
-    box.innerHTML = `<span class="zf-sn-k">공지</span><span class="zf-sn-t">${esc(n.title)}${links ? ' — ' + links : ''}</span><button type="button" class="zf-sn-x" aria-label="공지 닫기">✕</button>`;
-    box.hidden = false;
-    box.querySelector('.zf-sn-x').addEventListener('click', () => {
-      box.hidden = true;
-      try{ const d = closed(); if(!d.includes(n.id)) d.push(n.id); sessionStorage.setItem(KEY, JSON.stringify(d)); }catch(e){}
-    });
-  }).catch(() => {});
 })();
 if('serviceWorker' in navigator){
   window.addEventListener('load', () => {

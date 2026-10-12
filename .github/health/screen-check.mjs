@@ -31,7 +31,7 @@ const phraseOf = t =>
 const STALE_DATE_FN = () => {
   const kst = new Date(Date.now() + 9 * 3600 * 1000)
   const today = Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), kst.getUTCDate())
-  const zones = [...document.querySelectorAll('.hero, .maintabs, .zf-footer')].filter(e => e.offsetParent !== null || e.getClientRects().length)
+  const zones = [...document.querySelectorAll('.zf3-top, .maintabs, .zf-footer')].filter(e => e.offsetParent !== null || e.getClientRects().length)
   const out = []
   for (const z of zones) {
     for (const line of (z.innerText || '').split('\n')) {
@@ -120,13 +120,20 @@ try {
       const sw = document.documentElement.scrollWidth
       // 공고문 자리 — 이름 칸(title 속성 = 공고문 제목 전문)마다 같은 줄(.zf-nt-line)의 기간·상태 배지. 한 줄 모양이면 상자 하나가 줄이다.
       const nts = []
-      for (const slot of [...document.querySelectorAll('.hcard .zf-notices-slot')].filter(vis)) {
+      // 🔵 새 화면 전환(원칙 33) — 공고문마다 접수일이 다른 카드는 d3 가 이 자리를 숨기고 같은 목록으로 「갈래 노선」(.zf3-branch)을 그린다
+      //    (data-zf3-branch="1"). 그 카드는 숨은 자리의 글자(기간·상태)를 DB 와 대조하고, 보이는 갈래의 공고문·상태가 그 자리와 같은지 함께 본다.
+      const branchOf = slot => { const c = slot.closest('.hcard'); return c && c.dataset.zf3Branch === '1' ? c : null }
+      for (const slot of [...document.querySelectorAll('.hcard .zf-notices-slot')].filter(s => vis(s) || branchOf(s))) {
         if (!slot.innerHTML.trim()) continue
+        const card = branchOf(slot)
+        const br = card ? [...card.querySelectorAll('.zf3-branch')].map(b => [(b.querySelector('span[title]') || {}).title || '', ((b.querySelector('.zf-nt-state') || {}).textContent || '').trim()]) : null
         for (const nm of slot.querySelectorAll('span[title]')) {
           const line = nm.closest('.zf-nt-line') || slot
           const sp = line.querySelector('.zf-nt-span'), st = line.querySelector('.zf-nt-state')
+          let state = st ? (st.innerText || st.textContent).trim() : '(없음)'
+          if (br) { const b = br.find(x => x[0] === nm.getAttribute('title')); if (!b) state = '(갈래 없음)'; else if (b[1] !== state) state = `(갈래 상태 ${b[1]} ≠ ${state})` }
           nts.push([slot.getAttribute('data-notices-for'), nm.getAttribute('title'),
-            sp ? sp.innerText.replace(/^접수\s*/, '').trim() : '(없음)', st ? st.innerText.trim() : '(없음)'])
+            sp ? (sp.innerText || sp.textContent).replace(/^접수\s*/, '').trim() : '(없음)', state])
         }
       }
       return { cardRows, chips, dates, nts, overflow: sw > window.innerWidth + 1 ? sw : 0 }
@@ -281,10 +288,10 @@ try {
   //    히어로·메인 탭·푸터(데이터가 아니라 손으로 적는 글자)의 줄마다 날짜를 찾아 가장 늦은 날짜가 오늘(KST)보다 과거면 실패.
   //    날짜 꼴: 2026-07-02 · 2026.7.2 · 7월 2일 · 6.30 · 7/2(연도가 없으면 그 줄의 「YYYY년」 · 없으면 올해). 카드 안 날짜는 보지 않는다(마감 공고는 과거가 정상).
   //    SIMULATE=stale_date 이면 옛 배지 글자를 히어로에 넣고 잰다(실패해야 맞다).
-  if (process.env.SIMULATE === 'stale_date') await page.evaluate(() => { const h = document.querySelector('.hero') || document.body; const b = document.createElement('span'); b.className = 'badge'; b.textContent = '📢 2026년 경기북부 2차 공고 · 신청기간 6.30~7.2'; h.appendChild(b) })
+  if (process.env.SIMULATE === 'stale_date') await page.evaluate(() => { const h = document.querySelector('.zf3-top') || document.body; const b = document.createElement('span'); b.className = 'badge'; b.textContent = '📢 2026년 경기북부 2차 공고 · 신청기간 6.30~7.2'; h.appendChild(b) })
   const staleDates = await page.evaluate(STALE_DATE_FN)
   extra.stale_dates = staleDates
-  add('stale_date', '고정 글자(히어로·메인 탭·푸터) 속 지난 날짜', staleDates.length === 0 ? 'pass' : 'fail', staleDates.length ? `${staleDates.length}: ${staleDates.slice(0, 3).join(' / ')}` : 0, '0 — 줄마다 가장 늦은 날짜 ≥ 오늘(KST)')
+  add('stale_date', '고정 글자(앱 머리·메인 탭·푸터) 속 지난 날짜', staleDates.length === 0 ? 'pass' : 'fail', staleDates.length ? `${staleDates.length}: ${staleDates.slice(0, 3).join(' / ')}` : 0, '0 — 줄마다 가장 늦은 날짜 ≥ 오늘(KST)')
   await page.screenshot({ path: 'health-screen.png' })
   // ⑥ 매칭 2단계 — 공급 대상이 달라 뺀 공고(2026-10-08 · 우편함 「표시층 — 추천 매칭 2단계」 · 원칙 33).
   //    시험 사용자 (가)(미혼 · 자녀 0 · 1인 · 1996년생 · 소득 250 · 자산 9,000 · 무주택 · 청약통장)로 진단 → 매칭을 돌리고
@@ -364,15 +371,20 @@ try {
     // 🔵 2026-10-09(고지 회차 1 · 5) — 머리의 접수 중 · 예정 · 미상을 화면 술어(applyWindowState)로 따로 센다(zfOpenBreakdown 을 부르지 않는다 — 같은 함수로 재면 대조가 아니다).
     let A = 0, B = 0, K = 0
     zfOpenNotices(noticeData).forEach(r => { const s = applyWindowState(r); if (s === 'open') A++; else if (s === 'before') B++; else K++ })
-    let tab = (document.querySelector('#notice-status .rtitle') || {}).innerText || ''
+    // 🔵 새 화면 전환(우편함 「표시층 — 런칭 전 남은 화면 일」 1 · 원칙 33) — 공고 탭 머리는 d3 머리 두 줄이다:
+    //    「열린 공고 M건」(.zf3-lh) + 「접수 중 a · 예정 b[ · 미상 k] · 정렬」(.zf3-lsub). 종전 「✅ 지금 열린 공고 M건(…)」 상자는 걷혔다.
+    const lh = ((document.querySelector('#zf3NoticeHead .zf3-lh') || {}).innerText || '').trim()
+    const lsub = ((document.querySelector('#zf3NoticeHead .zf3-lsub') || {}).innerText || '').replace(/\s+/g, ' ').trim()
+    let tab = lh + ' | ' + lsub
     if (sim) tab = tab.replace(/(\d[\d,]*)건/, (m, d) => (Number(d.replace(/,/g, '')) + 1).toLocaleString() + '건')
     goMain(3)
     insightLoaded = false
     await loadInsightData()
     const insLines = ((document.querySelector('#insightContent') || {}).innerText || '').split('\n').map(l => l.trim())
     const ins = insLines.find(l => l.includes('지금 열린 공고')) || ''
-    const kIdx = insLines.findIndex(l => l === '🟢 접수중')
-    const kpi = kIdx > 0 ? Number((insLines.slice(0, kIdx).reverse().find(l => /^[\d,]+$/.test(l)) || '').replace(/,/g, '')) : NaN
+    // 인사이트 「접수 중」 LED 숫자(d3 · .zf3-kpi 첫 칸)
+    const kEl = document.querySelector('#insightContent .zf3-kpi .zf3-kc b')
+    const kpi = kEl ? Number(kEl.textContent.replace(/[^\d]/g, '')) : NaN
     goMain(2)
     return { M, T, since, A, B, K, kpi, tab: tab.trim(), ins: ins.trim() }
   }, process.env.SIMULATE === 'open_count')
@@ -382,18 +394,18 @@ try {
       const [db] = await sqlRead(`select count(*)::int as t, to_char(min(announcement_date), 'YYYY"년 "FMMM"월부터"') as since from get_announcements_deduped()`)
       const want = `지금 열린 공고 ${oc.M.toLocaleString('ko-KR')}건`
       const fmt = n => n.toLocaleString('ko-KR')
-      const wantTab = `${want}(접수 중 ${fmt(oc.A)} · 예정 ${fmt(oc.B)}${oc.K ? ` · 미상 ${fmt(oc.K)}` : ''})`
-      const tabOk = oc.tab === '✅ ' + wantTab
+      const wantTab = `열린 공고 ${fmt(oc.M)}건 | 접수 중 ${fmt(oc.A)} · 예정 ${fmt(oc.B)}${oc.K ? ` · 미상 ${fmt(oc.K)}` : ''}`
+      const tabOk = oc.tab.startsWith(wantTab)
       const insOk = oc.ins.startsWith(want + ' · 마감 포함 누적 ' + oc.T.toLocaleString('ko-KR') + '건(' + oc.since + ')')
       const kpiOk = oc.kpi === oc.A   // 공고 탭 「접수 중 a」 = 인사이트 「🟢 접수중」 KPI
       const sumOk = oc.A + oc.B + oc.K === oc.M
       const dbOk = db.t === oc.T && db.since === oc.since
       ok = tabOk && insOk && kpiOk && sumOk && dbOk && oc.M > 0 && oc.M <= oc.T
-      value = `열린 ${oc.M}(접수 중 ${oc.A} · 예정 ${oc.B} · 미상 ${oc.K})${sumOk ? '' : ' ✗합'} · 인사이트 접수중 KPI ${oc.kpi}${kpiOk ? '' : ' ✗'} · 누적 ${oc.T}(${oc.since}) · 공고 탭 「${oc.tab}」${tabOk ? '' : ' ✗'} · 인사이트 「${oc.ins.slice(0, 60)}」${insOk ? '' : ' ✗'} · DB 누적 ${db.t}(${db.since})${dbOk ? '' : ' ✗'}`
+      value = `열린 ${oc.M}(접수 중 ${oc.A} · 예정 ${oc.B} · 미상 ${oc.K})${sumOk ? '' : ' ✗합'} · 인사이트 「접수 중」 KPI ${oc.kpi}${kpiOk ? '' : ' ✗'} · 누적 ${oc.T}(${oc.since}) · 공고 탭 「${oc.tab}」${tabOk ? '' : ' ✗'} · 인사이트 「${oc.ins.slice(0, 60)}」${insOk ? '' : ' ✗'} · DB 누적 ${db.t}(${db.since})${dbOk ? '' : ' ✗'}`
       extra.open_count = { ...oc, db }
     } else value = `못 잼(${oc.err})`
     add('open_count', '숫자가 말하는 「지금」 — 열린 공고 수 한 정의 · 누적 표기', ok ? 'pass' : 'fail', value,
-      '공고 탭 기본 머리 = 「지금 열린 공고 M건(접수 중 a · 예정 b[ · 미상 k])」 · a+b+k = M · a = 인사이트 접수중 KPI · 인사이트 머리 「지금 열린 공고 M건」 · M = zfOpenNotices(noticeData) · 누적 T·기간 = DB')
+      '공고 탭 기본 머리 = 「열린 공고 M건」 + 「접수 중 a · 예정 b[ · 미상 k]」 · a+b+k = M · a = 인사이트 「접수 중」 KPI · 인사이트 머리 「지금 열린 공고 M건」 · M = zfOpenNotices(noticeData) · 누적 T·기간 = DB')
   }
   // ⑧ 접근성(axe-core · 2026-10-12 · 우편함 「코드 — Claude Code 장비 정비」 1) — 다섯 상태를 따로 열어 재고 기준선(a11y-baseline.json)과 견준다.
   //    🔴 처음엔 경고만(warn — 이슈를 열지 않는다). 패키지가 없거나 재다 죽어도 warn 이다 — 나머지 점검을 실패로 만들지 않는다.
