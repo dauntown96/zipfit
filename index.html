@@ -559,17 +559,17 @@ html[data-ui="d3"] #panel4{background:transparent;border:0;box-shadow:none;paddi
 /* 움직임 줄이기 — 움직임 0(흐름 대신 한 줄씩은 스크립트가 고른다) */
 @media (prefers-reduced-motion:reduce){html[data-ui="d3"] .zf3-track{animation:none!important}}
 /* ── 단계 b — 노선 카드(종전 카드 DOM 위에 덧입힘 · d3 만) ── */
-html[data-ui="d3"] #notice-list .hcard.zf3-card{position:relative;background:var(--paper);border:1px solid var(--line);border-radius:var(--r-3);padding:12px 14px 0 18px;margin-bottom:12px;overflow:clip;color:var(--ink);transition:border-color var(--m-fast) var(--ease),box-shadow var(--m-fast) var(--ease)}
-html[data-ui="d3"] #notice-list .hcard.zf3-card::before{content:"";position:absolute;inset:0 auto 0 0;width:6px;background:var(--ln,var(--ln-gi))}
-@media (hover:hover){html[data-ui="d3"] #notice-list .hcard.zf3-card:hover{border-color:var(--ink-3);box-shadow:0 6px 20px rgba(0,0,0,.06)}}
-html[data-ui="d3"] #notice-list .hcard.zf3-card:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
-html[data-ui="d3"] #notice-list .hcard.zf3-card.zf3-open{border-color:var(--ink)}
+html[data-ui="d3"] :is(#notice-list,#match-result) .hcard.zf3-card{position:relative;background:var(--paper);border:1px solid var(--line);border-radius:var(--r-3);padding:12px 14px 0 18px;margin-bottom:12px;overflow:clip;color:var(--ink);transition:border-color var(--m-fast) var(--ease),box-shadow var(--m-fast) var(--ease)}
+html[data-ui="d3"] :is(#notice-list,#match-result) .hcard.zf3-card::before{content:"";position:absolute;inset:0 auto 0 0;width:6px;background:var(--ln,var(--ln-gi))}
+@media (hover:hover){html[data-ui="d3"] :is(#notice-list,#match-result) .hcard.zf3-card:hover{border-color:var(--ink-3);box-shadow:0 6px 20px rgba(0,0,0,.06)}}
+html[data-ui="d3"] :is(#notice-list,#match-result) .hcard.zf3-card:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+html[data-ui="d3"] :is(#notice-list,#match-result) .hcard.zf3-card.zf3-open{border-color:var(--ink)}
 html[data-ui="d3"] .zf3-card .zf-dateline{color:var(--ink-3)!important}
 html[data-ui="d3"] .zf-footer{border-top-color:var(--line-2)}
 html[data-ui="d3"] .zf-footer .zf-ai-note,html[data-ui="d3"] .zf-footer{color:var(--ink-3)}
 html[data-ui="d3"] .zf-footer a{color:var(--ink-2)}
-html[data-ui="d3"] #notice-list .hcard.zf3-closed{background:var(--surface)}
-html[data-ui="d3"] #notice-list .hcard.zf3-closed::before{background:var(--rail)}
+html[data-ui="d3"] :is(#notice-list,#match-result) .hcard.zf3-closed{background:var(--surface)}
+html[data-ui="d3"] :is(#notice-list,#match-result) .hcard.zf3-closed::before{background:var(--rail)}
 .zf3-ctop{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0 0 6px}
 .zf3-card .zf3-badge{width:24px;min-width:24px;height:24px;padding:0;border-radius:50%;font-size:13px}
 .zf3-ctype{font-size:var(--t-s);font-weight:700;color:var(--ink)}
@@ -690,6 +690,9 @@ html[data-ui="d3"] .zf3-card:has(.zf3-dpill.hot) .zf3-today b{animation:zf3ping 
 .zf3-gotop:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
 .zf3-close{all:unset;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:4px;width:100%;min-height:var(--hit);margin-top:8px;border-top:1px solid var(--line-2);font-size:13px;font-weight:700;color:var(--ink-2);cursor:pointer}
 .zf3-close:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+html[data-ui="d3"] .zf3-card .chip-row .chip.zf3-vb.ok{background:var(--ink)!important;color:var(--paper)!important;border-color:var(--ink)!important;font-weight:700}
+html[data-ui="d3"] .zf3-card .chip-row .chip.zf3-vb.check{background:var(--paper)!important;color:var(--ink)!important;border:1.5px solid var(--ink)!important;font-weight:700}
+html[data-ui="d3"] .zf3-card .zf-target-ok,html[data-ui="d3"] .zf3-card .zf-check-note{background:var(--surface)!important;color:var(--ink-2)!important}
 html[data-ui="d3"] .zf3-card .chip-row .chip.zf3-minechip{background:var(--surface-2)!important;color:var(--ink)!important;border-color:transparent!important;font-weight:700}
 @media (prefers-reduced-motion:reduce){.zf3-tind,.zf3-sticky,.zf3-in,html[data-ui="d3"] .zf3-card.zf3-open > [data-ann-id],html[data-ui="d3"] .zf3-card .zf3-today b,.zf3-gotop span{animation:none!important;transition:none!important}}
 /* 인사이트(d3 · 둘러보기 ①③) */
@@ -822,6 +825,53 @@ html.zf3-mapview[data-ui="d3"] #notice-list{display:none}
   html[data-ui="d3"] body:has(#main2:not(.hidden)) .zf-totop{right:auto;left:calc(max(24px,calc((100vw - 1232px) / 2)) + 660px)}
 }
 @media (prefers-reduced-motion:reduce){.zf3-radar .pulse,.zf3-radar .pt{animation:none!important}}
+/* 추천(D-3 단계 e) — 노선 스텝 · 결과부터 · 1200px 두 단 · 결과 상자 토큰 */
+.zf3-rhead{display:none}
+#panel1.zf3-stepping .zf3-rhead{display:block;margin:0 0 6px}
+.zf3-sl{--n:6;position:relative;display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));padding-top:6px;margin:4px 0 6px}
+.zf3-sl .r,.zf3-sl .d{position:absolute;left:calc(50% / var(--n));top:12px;height:4px;border-radius:2px}
+.zf3-sl .r{right:calc(50% / var(--n));background:var(--rail)}
+.zf3-sl .d{background:var(--ink);width:calc((100% - 100% / var(--n)) * var(--p,0));transition:width var(--m-mid) var(--ease)}
+.zf3-sl .s{position:relative;display:grid;justify-items:center;gap:3px;text-align:center;min-width:0}
+.zf3-sl .s i{display:block;width:14px;height:14px;box-sizing:border-box;border-radius:50%;background:var(--paper);border:3px solid var(--rail);position:relative;z-index:1}
+.zf3-sl .s.past i{background:var(--ink);border-color:var(--ink)}
+.zf3-sl .s.now i{border-color:var(--ink);box-shadow:0 0 0 4px var(--surface-2)}
+.zf3-sl .s b{font-size:11px;font-weight:500;color:var(--ink-3);line-height:1.25;word-break:keep-all}
+.zf3-sl .s.now b{color:var(--ink);font-weight:700}
+.zf3-sq{margin:10px 0 2px;font-size:var(--t-xl);color:var(--ink);outline:none}
+#panel1.zf3-stepping .field[data-zf3-st]:not(.zf3-cur){display:none}
+#panel1.zf3-stepping .row:not(:has(.zf3-cur)){display:none}
+#panel1.zf3-stepping .row{display:grid;grid-template-columns:1fr;gap:0}
+#panel1.zf3-stepping .field{animation:zf3open 240ms var(--ease)}
+#panel1.zf3-stepping:not(.zf3-last) > .btn-primary[onclick="diagnose()"]{display:none}
+.zf3-snav{display:none}
+#panel1.zf3-stepping .zf3-snav{display:flex;gap:8px;margin:8px 0 0}
+.zf3-snav .btn{margin-top:0;min-height:48px}
+.zf3-snav [data-act="prev"]{flex:0 0 auto;width:auto;padding:0 16px}
+.zf3-snav [data-act="next"]{flex:1}
+#panel1.zf3-stepping .zf3-hintf .label{display:none}
+#panel1.zf3-stepping .zf3-hintf p{margin-top:-6px!important}
+#panel1.zf3-resulting #zfMatchPrefillNote,#panel1.zf3-resulting .row,#panel1.zf3-resulting > .btn-primary[onclick="diagnose()"],#panel1.zf3-resulting .zf3-snav{display:none}
+.zf3-rsaved{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 8px;padding:8px 12px;border-radius:var(--r-2);background:var(--surface-2)}
+.zf3-rsaved p{margin:0;font-size:var(--t-s);font-weight:700;color:var(--ink)}
+.zf3-rsaved[hidden]{display:none!important}
+.zf3-rph{display:none}
+html[data-ui="d3"] .rbox.ok,html[data-ui="d3"] .rbox.warn,html[data-ui="d3"] .rbox.err{background:var(--surface);border:1px solid var(--line-2);border-left:4px solid var(--ln-hang);border-radius:var(--r-2)}
+html[data-ui="d3"] .rbox.warn{border-left-color:var(--ln-jeon)}
+html[data-ui="d3"] .rbox.err{background:var(--warn-bg);border-left-color:var(--warn)}
+html[data-ui="d3"] .ok .rtitle,html[data-ui="d3"] .warn .rtitle{color:var(--ink)}
+html[data-ui="d3"] .err .rtitle{color:var(--warn)}
+html[data-ui="d3"] .ok .rdesc,html[data-ui="d3"] .warn .rdesc,html[data-ui="d3"] .err .rdesc{color:var(--ink-2)}
+html[data-ui="d3"] #panel1 select,html[data-ui="d3"] #panel1 input[type=number],html[data-ui="d3"] #panel2 input[type=number]{min-height:var(--hit);font-size:15px;background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:var(--r-1);text-overflow:ellipsis}
+@media (min-width:1200px){
+  html[data-ui="d3"] body:has(#main1:not(.hidden)) .wrap{max-width:1232px}
+  html[data-ui="d3"] #panel1{display:grid;grid-template-columns:minmax(0,1fr) 520px;column-gap:28px;align-items:start}
+  html[data-ui="d3"] #panel1 > *{grid-column:1}
+  html[data-ui="d3"] #panel1 > #diag-result,html[data-ui="d3"] #panel1 > .zf3-rph{grid-column:2;grid-row:1 / span 30;position:sticky;top:60px;margin-top:0;max-height:calc(100vh - 76px);overflow:auto}
+  html[data-ui="d3"] #panel1 > .zf3-rph{display:flex;align-items:center;justify-content:center;min-height:240px;margin:0;padding:24px;border:1px dashed var(--line);border-radius:var(--r-3);color:var(--ink-3);font-size:var(--t-s);text-align:center}
+  html[data-ui="d3"] #panel1:has(#diag-result:not(.hidden)) > .zf3-rph{display:none}
+}
+@media (prefers-reduced-motion:reduce){#panel1.zf3-stepping .field,.zf3-sl .d{animation:none!important;transition:none!important}}
 @keyframes zf3breath{from{opacity:.55}to{opacity:1}}
 @keyframes zf3grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
 @keyframes zf3flag{from{opacity:0;transform:translate(-50%,-4px)}to{opacity:1;transform:translateX(-50%)}}
@@ -916,7 +966,7 @@ html.zf3-mapview[data-ui="d3"] #notice-list{display:none}
         </select>
       </div>
       <div class="field">
-        <label class="label">세대 월평균 소득 (만원)</label>
+        <label class="label" for="income">세대 월평균 소득 (만원)</label>
         <input type="number" id="income" placeholder="예: 450" min="0">
       </div>
     </div>
@@ -949,7 +999,7 @@ html.zf3-mapview[data-ui="d3"] #notice-list{display:none}
     </div>
     <div class="row">
       <div class="field">
-        <label class="label">총 자산 (만원)</label>
+        <label class="label" for="assets">총 자산 (만원)</label>
         <input type="number" id="assets" placeholder="예: 15000" min="0">
         <!-- 🔵 2026-09-23 B24 — 공고 공통 정의 「총자산가액 = 부동산가액+자동차가액+금융자산가액+기타자산가액-부채」
              (예: …020255 원문 p.5)를 옮긴 안내다. 원문 정의를 벗어나는 말을 더하지 않는다.
@@ -966,7 +1016,7 @@ html.zf3-mapview[data-ui="d3"] #notice-list{display:none}
     </div>
     <div class="row">
       <div class="field">
-        <label class="label">출생연도</label>
+        <label class="label" for="birthYear">출생연도</label>
         <input type="number" id="birthYear" placeholder="예: 1995" min="1900" max="2100">
       </div>
       <div class="field">
@@ -976,7 +1026,7 @@ html.zf3-mapview[data-ui="d3"] #notice-list{display:none}
     </div>
     <div class="row">
       <div class="field">
-        <label class="label">자동차 가액 (만원)</label>
+        <label class="label" for="carValue">자동차 가액 (만원)</label>
         <input type="number" id="carValue" placeholder="모르면 비워두세요" min="0">
       </div>
       <div class="field">
@@ -4188,6 +4238,7 @@ function zfPrefillMatchFromProfile(p){
   });
   const note=document.getElementById('zfMatchPrefillNote');
   if(note) note.classList.toggle('hidden', n===0);
+  if(n>0 && typeof zf3RecSaved === 'function') zf3RecSaved();   // 🔵 D-3 e — 저장 조건이 있으면 결과부터(d3)
 }
 function zfClearMatchPrefill(){
   Object.entries(zfMatchFilledVals).forEach(([id,v])=>{
@@ -8471,6 +8522,9 @@ function initMapForHouse(h,id){
     if(!mapEl){ zfMapWarn(id, '좌표는 받았으나 지도 상자가 사라졌다(카드가 다시 그려짐)'); return; }
     const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
     const state = huMapState[id];
+    // 🔴 D-3 검증 c — 단지 이름표는 카카오가 「실제 주소」(도로명·지번 주소)로 찾았을 때만. 지명(REGION)으로 찾은 점은
+    //    그 지역의 가운데라 단지 위치로 읽히면 안 된다(양주 …20727 — 동 이름까지만 있는 주소가 시청 자리로 떨어졌다).
+    const zf3Exact = !approx && /_ADDR$/.test(String((result[0] || {}).address_type || ''));
     // 지도는 처음 한 번만 생성하고, 이후 건물 클릭 시에는 기존 지도/마커를 그 위치로 옮겨서
     // 항상 마커가 1개만 유지되도록 함.
     // 🔴 단, 「그 지도가 지금 이 상자에 들어 있을 때」만 그렇다.
@@ -8482,13 +8536,10 @@ function initMapForHouse(h,id){
     //    → 새 상자에는 「📍 지도를 불러오는 중...」만 남는다(2026-09-15 실측: 기준값 7 / 비교값 0).
     //    원소 동일성으로 가른다 — 같은 카드 안의 건물·블록 클릭은 상자가 그대로라 재사용이 살아 있고,
     //    목록이 다시 그려진 뒤에는 상자가 다른 노드라 새로 만든다.
-    // 🔴 2026-10-12(지도 위치 고침 3) — 대략 핀(시·군·구 중심)에는 단지·건물 이름을 붙이지 않는다.
-    //    시청 자리 표지에 「양주회천 A25BL」이 붙으면 그곳이 단지로 읽힌다(런칭 조건 ① 틀린 위치). 시·군·구 이름만 쓴다.
-    const pinName = approx ? zfShortPlace((result[0] && result[0].address_name) || '') : zf3MapName(id, h);
     if(state && state.map && state.marker && state.el === mapEl){
       state.map.setCenter(coords);
       state.marker.setPosition(coords);
-      if(state.label && typeof zf3MapLabel === 'function'){ try{ state.label.setMap(null); }catch(e){} state.label = zf3MapLabel(state.map, coords, pinName, state.el); }
+      if(state.label && typeof zf3MapLabel === 'function'){ try{ state.label.setMap(null); }catch(e){} state.label = zf3Exact ? zf3MapLabel(state.map, coords, zf3MapName(id, h), state.el) : null; }   // 🔴 대략 핀(시군구 가운데)에는 단지 이름표를 달지 않는다 — 단지 위치로 읽힌다(D-3 검증 c · 양주 …20727)
     } else {
       // 🔴 카카오 지도는 컨테이너에 타일을 **덧붙인다** — 기존 자식을 지우지 않는다.
       //    그래서 「📍 지도를 불러오는 중...」 자리표시자가 타일 뒤에 그대로 남아,
@@ -8496,9 +8547,9 @@ function initMapForHouse(h,id){
       //    지우는 책임이 어디에도 없었다 — 실패 경로만 innerHTML로 덮어쓰고 있었다.
       mapEl.innerHTML = '';
       const map = new kakao.maps.Map(mapEl, {center:coords, level:5});
-      const marker = new kakao.maps.Marker(Object.assign({position:coords, map}, (typeof zf3On === 'function' && zf3On() && pinName) ? { title: pinName } : {}));   // 🔵 D-3 c 후속 — d3 만 표지 이름(카카오가 만드는 <area alt> 자리)
+      const marker = new kakao.maps.Marker(Object.assign({position:coords, map}, (typeof zf3On === 'function' && zf3On() && typeof zf3MapName === 'function' && zf3MapName(id, zf3Exact ? h : null)) ? { title: zf3MapName(id, zf3Exact ? h : null) } : {}));   // 🔵 D-3 c 후속 — d3 만 표지 이름(카카오가 만드는 <area alt> 자리)
       huMapState[id] = { map, marker, el: mapEl };   // 🔵 어느 상자에 들어 있는지까지 기억한다
-      if(typeof zf3MapLabel === 'function') huMapState[id].label = zf3MapLabel(map, coords, pinName, mapEl);   // 🔵 D-3 c — d3 만
+      if(typeof zf3MapLabel === 'function' && zf3Exact) huMapState[id].label = zf3MapLabel(map, coords, zf3MapName(id, h), mapEl);   // 🔵 D-3 c — d3 만 · 대략 핀은 이름표 없음(검증 c)
     }
     zfMapApproxShape(huMapState[id], coords, approx);
     setMapApproxNote(mapEl, approx);
@@ -8790,7 +8841,7 @@ function renderMatchResults(rows){
       </div>
       ${pairKeyM?`<div style="font-size:11px;color:#A32D2D;background:#FFF3F3;border:1px solid #F5C2C2;border-radius:8px;padding:5px 10px;margin-bottom:6px">⚠️ 동일 회차 짝공고와 <b>중복 신청 시 자동 탈락</b>될 수 있어요. 공고문을 반드시 확인하세요.</div>`:''}
       <div data-sum-for="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" data-sum-url="${(n.url||'').replace(/"/g,'&quot;')}" data-sum-key="${zfAttr(zfDedupKey(n.title))}"></div>
-      <p style="font-size:12px;color:#888;margin-bottom:8px">${dateLine}</p>
+      <p class="zf-dateline" style="font-size:12px;color:#888;margin-bottom:8px">${dateLine}</p>
       ${n._zfTarget ? zfTargetNoteHtml(n._zfTarget) + zfCheckNoteHtml([], n._zfTypeCheck) : zfCheckNoteHtml(n._zfSupplyCheck, n._zfTypeCheck)}
       ${zfRouteSlotHtml(n, n.title)}
       ${zfNoticesSlotHtml(n)}
@@ -8820,6 +8871,7 @@ function renderMatchResults(rows){
   html += `<button class="btn btn-primary" onclick="goMain(4);goStep(3)" style="margin-top:0.5rem">서류 체크리스트 보기 →</button>`;
 
   r.innerHTML = html;
+  if(typeof zf3DecorateMatch === 'function') zf3DecorateMatch(shown);   // 🔵 D-3 e — d3 에서만 노선 카드로
   zfPruneCardCaches();   // 🔴 안정 키는 낡지 않는 대신 쌓인다 — 화면에 없는 키를 비운다
   zfFillSummarySlots();
   zfEnsurePriceSummaries(shown.map(n => n.announcement_id)).then(ok => { if(ok) zfFillSummarySlots(); });
@@ -9977,20 +10029,40 @@ function zf3Stations(n){
   ];
 }
 let zf3CardRows = new Map();
+// 🔵 D-3 단계 e — 추천 탭 매칭 결과(#match-result · mcard-)도 같은 노선 카드로. 매칭 행은 RPC 행 그대로라
+//    공고 탭 매핑 이름(공고명 · 공급유형 · 신청시작일 …)을 곁에 붙인 사본으로 넘긴다(zf3MatchRows · 원본 행은 건드리지 않는다).
+let zf3MatchRows = new Map();
+function zf3DecorateMatch(rows){
+  if(!zf3On()) return;
+  zf3MatchRows = new Map((rows || []).map((r, i) => ['mcard-' + zfCardKey(r.announcement_id || i), Object.assign({}, r, {
+    '공고명': r.title || '', '공급유형': r.housing_type || '', '신청시작일': r.apply_start || '', '신청마감일': r.apply_end || '',
+    '지역': r.region || '', '처리상태': r.status || '', '공고URL': r.url || '', 'name': r.title || '' })]));
+  zf3DecorateCards();
+}
 function zf3DecorateCards(){
   if(!zf3On()) return;
-  const list = document.getElementById('notice-list');
-  if(!list) return;
   zf3CardRows = new Map((noticeFiltered || []).map((n, i) => ['ncard-' + zfCardKey(n['announcement_id'] || i), n]));
+  const nl = document.getElementById('notice-list'), ml = document.getElementById('match-result');
+  if(nl) zf3DecorateIn(nl, zf3CardRows);
+  if(ml && zf3MatchRows.size) zf3DecorateIn(ml, zf3MatchRows, true);
+}
+function zf3DecorateIn(list, rowsMap, isMatch){
   const prefs = zf3Prefs();
   let fresh = 0;   // 이번에 처음 꾸미는 카드 순번 — 첫 등장 60ms 간격(둘러보기 ⑥ · 여덟째부터는 같이)
   list.querySelectorAll('.hcard[data-card-id]').forEach(card => {
-    const n = zf3CardRows.get(card.getAttribute('data-card-id'));
+    const n = rowsMap.get(card.getAttribute('data-card-id'));
     if(!n) return;
     if(card.dataset.zf3 !== '1'){
       card.dataset.zf3 = '1';
       card.classList.add('zf3-card', 'zf3-in');
       card.style.setProperty('--d', Math.min(fresh++, 8) * 60 + 'ms');
+      // 추천 판정 배지(매칭 결과만) — 근거 문장은 카드 안 종전 줄(zfTargetNoteHtml) 그대로 · 배지는 그 갈래의 이름표일 뿐
+      const tv = isMatch && n._zfTarget && n._zfTarget.state;
+      if(tv === 'ok' || tv === 'check'){
+        const cr = card.querySelector('.chip-row');
+        const vb = `<span class="chip zf3-vb ${tv}">${tv === 'ok' ? '✓ 대상 조건 맞음' : '요건 확인 필요'}</span>`;
+        if(cr) cr.insertAdjacentHTML('afterbegin', vb);
+      }
       const label = zfTypeLabel(n['source'], n['공급유형'], n['공고명'] || n['name']);
       const ln = zf3LineOf(label);
       card.style.setProperty('--ln', `var(--ln-${ln[0]})`);
@@ -10253,6 +10325,72 @@ function zf3ToggleSheet(open){
   if(add) add.setAttribute('aria-expanded', String(open));
   if(open){ const f = panel.querySelector('input,select,button,[tabindex="0"]'); if(f) f.focus(); }
   else if(add) add.focus();
+}
+// ── 추천(D-3 단계 e · 2026-10-12) — 종전 진단 양식(#panel1)을 지우지 않고 덧입힌다(입력칸·ID·diagnose() 그대로 · 원칙 7).
+//    ① 처음 온 사람(390~1199px): 노선 따라 한 역씩 6역(나이 · 혼인 · 자녀·가구 · 소득 · 자산·차 · 집·통장) — 「다음 역 →」 · 마지막 역에서 「자격 진단하기」
+//    ② 저장 조건으로 칸이 채워진 사람: 결과부터(진단을 한 번 돌려 보여 주고 「조건 고치기」로 노선 스텝) — D-2 4차 검증 ③ ⑶
+//    ③ 1200px 이상: 한 장(입력 | 결과 두 단).  근거 — GOV.UK 「한 화면에 한 가지」 · 390 한 장 입력 약 1,700px(D-2 4차 실측).
+const ZF3_REC_ST = [['나이', ['birthYear']], ['혼인', ['marital']], ['자녀·가구', ['children', 'members', 'birthAfterBase']], ['소득', ['income', 'dualIncome']], ['자산·차', ['assets', 'carValue']], ['집·통장', ['owned', 'hasSavings', 'wantsGroundFloor']]];
+let zf3RecI = 0, zf3RecMode = '', zf3RecSavedRan = false;
+function zf3RecWide(){ try{ return matchMedia('(min-width:1200px)').matches; }catch(e){ return false; } }
+function zf3RecInit(){
+  const pn = document.getElementById('panel1');
+  if(!pn || pn.dataset.zf3 === '1') return;
+  pn.dataset.zf3 = '1';
+  const idx = {}; ZF3_REC_ST.forEach(([, ids], i) => ids.forEach(id => idx[id] = i));
+  pn.querySelectorAll('.field').forEach(f => { const c = f.querySelector('select,input'); if(c && idx[c.id] != null) f.dataset.zf3St = idx[c.id]; });
+  pn.querySelectorAll('.field:not([data-zf3-st])').forEach(f => { const sib = f.parentElement && f.parentElement.querySelector('.field[data-zf3-st]'); if(sib){ f.dataset.zf3St = sib.dataset.zf3St; f.classList.add('zf3-hintf'); } });   // 안내 글만 든 칸은 짝 칸의 역으로
+  const head = document.createElement('div');
+  head.className = 'zf3-rhead';
+  head.innerHTML = `<div class="zf3-sl" role="img"></div><h3 class="zf3-sq" tabindex="-1"></h3>`;
+  pn.querySelector('.panel-title').after(head);
+  const nav = document.createElement('div');
+  nav.className = 'zf3-snav';
+  nav.innerHTML = '<button type="button" class="btn btn-sec" data-act="prev">← 이전</button><button type="button" class="btn btn-primary" data-act="next">다음 역 →</button>';
+  const go = pn.querySelector('button[onclick="diagnose()"]');
+  if(go) go.before(nav); else pn.appendChild(nav);
+  nav.addEventListener('click', e => { const b = e.target.closest('[data-act]'); if(!b) return; zf3RecGo(zf3RecI + (b.dataset.act === 'next' ? 1 : -1), true); });
+  const bar = document.createElement('div');
+  bar.className = 'zf3-rsaved'; bar.hidden = true;
+  bar.innerHTML = '<p>저장한 조건으로 확인한 결과예요</p><button type="button" class="btn btn-sec btn-sm" data-act="edit">조건 고치기</button>';
+  head.after(bar);
+  bar.addEventListener('click', e => { if(e.target.closest('[data-act="edit"]')){ zf3RecSetMode('step'); zf3RecGo(0, true); } });
+  const ph = document.createElement('p');
+  ph.className = 'zf3-rph'; ph.textContent = '입력을 마치고 「자격 진단하기」를 누르면 결과가 여기에 나와요';
+  const dr = document.getElementById('diag-result'); if(dr) dr.before(ph);
+  try{ matchMedia('(min-width:1200px)').addEventListener('change', () => zf3RecSetMode(zf3RecMode === 'result' ? 'result' : zf3RecWide() ? 'sheet' : 'step')); }catch(e){}
+  zf3RecSetMode(zf3RecWide() ? 'sheet' : 'step');
+  zf3RecGo(0, false);
+}
+function zf3RecSetMode(m){
+  const pn = document.getElementById('panel1'); if(!pn) return;
+  zf3RecMode = m === 'step' && zf3RecWide() ? 'sheet' : m;
+  pn.classList.toggle('zf3-stepping', zf3RecMode === 'step');
+  pn.classList.toggle('zf3-resulting', zf3RecMode === 'result');
+  const bar = pn.querySelector('.zf3-rsaved'); if(bar) bar.hidden = zf3RecMode !== 'result';
+}
+function zf3RecGo(i, focus){
+  const pn = document.getElementById('panel1'); if(!pn) return;
+  zf3RecI = Math.max(0, Math.min(ZF3_REC_ST.length - 1, i));
+  const n = ZF3_REC_ST.length, last = zf3RecI === n - 1;
+  pn.querySelectorAll('.field[data-zf3-st]').forEach(f => f.classList.toggle('zf3-cur', +f.dataset.zf3St === zf3RecI));
+  pn.classList.toggle('zf3-last', last);
+  const sl = pn.querySelector('.zf3-sl');
+  sl.style.setProperty('--n', n); sl.style.setProperty('--p', (zf3RecI / (n - 1)).toFixed(3));
+  sl.setAttribute('aria-label', `질문 ${n}역 중 ${zf3RecI + 1}번째 — ${ZF3_REC_ST[zf3RecI][0]}`);
+  sl.innerHTML = '<span class="r"></span><span class="d"></span>' + ZF3_REC_ST.map(([k], j) => `<span class="s${j < zf3RecI ? ' past' : j === zf3RecI ? ' now' : ''}"><i></i><b>${k}</b></span>`).join('');
+  const q = pn.querySelector('.zf3-sq'); q.textContent = `${zf3RecI + 1}/${n} · ${ZF3_REC_ST[zf3RecI][0]}`;
+  const prev = pn.querySelector('.zf3-snav [data-act="prev"]'); if(prev) prev.hidden = zf3RecI === 0;
+  const next = pn.querySelector('.zf3-snav [data-act="next"]'); if(next) next.hidden = last;
+  if(focus && zf3RecMode === 'step'){ q.focus({ preventScroll: true }); try{ pn.scrollIntoView({ block: 'start', behavior: 'auto' }); }catch(e){} }
+}
+function zf3RecSaved(){
+  if(!zf3On()) return;
+  zf3RecInit();
+  if(zf3RecSavedRan) return;
+  zf3RecSavedRan = true;
+  zf3RecSetMode('result');
+  try{ diagnose(); }catch(e){}
 }
 // ── 지도로 보기(레이더 · D-3 단계 d · 2026-10-12) ─────────────────────────────────────────────
 //    밝은 지도 위에 열린 공고가 걸친 시군구마다 점 하나(점 크기 = 공고 수 · 오늘·내일 마감이 있으면 빨강 맥박 두 번 · 접수 예정만이면 빈 점).
@@ -10564,6 +10702,7 @@ function zf3Init(){
   zf3RenderBoard();
   zf3Tabs();
   zf3StickyHead();
+  zf3RecInit();
 }
 zf3Init();
 // 🔵 2026-10-12(고지 회차 3 · 6) — 사이트 공지 띠. notices.json 에서 오늘(KST)이 시작~끝 안이고
