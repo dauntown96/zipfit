@@ -161,8 +161,8 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 | 날짜 | 내용 |
 |---|---|
 | 2026-10-12 | **표시층 — 새 화면 전환(d3 → 모두)** — #470을 main 위로 다시 얹어 병합 · 모든 사용자에게 새 화면(히어로·공지 띠·탭 그림 걷음 · AI 고지는 앱 머리) · `zipfit-v200` · 다시 잰 카드 글자 16장 차이 0 · health-screen 실패 0·critical 0 · PR #476 |
+| 2026-10-12 | **코드 — 일정 표 2단계 ①: `announcement_schedule` 신설 · 경로 표 「우편」 · 불변식 v3.10** — 설계안 A 그대로 마이그레이션(apply 성공 · 행 0 · anon select 200/insert 401) · 경로 표 95행 불변 · V14a·b·c 롤백 시험 4/4 · 운영 v3.10 0행 · 정책 행 붙이는 축 = 그룹 + 회차 갈라 보임(섞인 카드 0) · PR #474 · 불변식 전환 PR |
 | 2026-10-12 | **운영 — 분석 run 192: 강동구 청년창업가·예술인주택(수요자맞춤형) 잔여세대** — `SH_311087` · 접수 10-08~10-22 확정 · 임대조건 표(그림) 37호 전수 판독 · 세대 37(7개소)·자격 7·정책 41·경로 1 · 상태 「완료」 · DB 데이터 쓰기만 |
-| 2026-10-12 | **코드·운영 — 부산 첨부 서울 지역 실행 · SH 접수기간 없는 공고 대기열** — 부산도시공사 해외 IP 403 → `fetch-attachment` 서울 전용 호스트 자동 넘김 · 부산 첨부 3 등록 → run 191 완료 · 14일 67/67 · tick에 접수기간 없는 SH(가상 키는 대기열만) · 관점 대조 표 · PR #467 #468 #469 |
 
 ---
 
@@ -329,7 +329,7 @@ const requireEnv = (key: string): string => {
 - 토큰은 Actions Secret `SUPABASE_ACCESS_TOKEN`만 쓴다(저장소 설정은 다운님 몫).
 
 32. **DB 스키마·함수 변경은 적용 SQL 파일 + PR 병합으로만 — 관리 API로 운영 DB에 DDL을 직접 보내지 않는다(데이터 쓰기는 종전대로)** (2026-09-30 신설 — 우편함 「운영 — DB 함수·스키마 변경도 PR 병합 = 적용」)
-- `supabase/migrations/YYYY-MM-DD_NN_이름.sql`에 쓰고 PR을 연다 → `db-migrations.yml` check가 **되돌리기 전용** 트랜잭션으로 실제 DB에서 돌린다(스키마 지문 전후 같음 · 불변식 v3.9 · `anon` 3초 · 함수 정의 md5 = `supabase/rpc/` 사본 · ACL·SECURITY DEFINER = 파일 선언). 🔴 **빨간 체크의 PR은 병합하지 않는다.**
+- `supabase/migrations/YYYY-MM-DD_NN_이름.sql`에 쓰고 PR을 연다 → `db-migrations.yml` check가 **되돌리기 전용** 트랜잭션으로 실제 DB에서 돌린다(스키마 지문 전후 같음 · 불변식 v3.10 · `anon` 3초 · 함수 정의 md5 = `supabase/rpc/` 사본 · ACL·SECURITY DEFINER = 파일 선언). 🔴 **빨간 체크의 PR은 병합하지 않는다.**
 - 병합하면 apply가 **아직 기록 안 된 파일만** 파일마다 한 트랜잭션으로 적용하고 `zipfit_ops.schema_migrations`에 같은 트랜잭션으로 기록한다. 🔴 병합 뒤 Actions 결과(적용 · 대조)를 회신 ④에 적는다. 실패하면 `db-apply` 이슈.
 - 파일 규칙(트랜잭션 제어 금지 · 함수 선언 줄 · 사본 갱신)은 `supabase/migrations/README.md`가 정본이다. 원칙 20(고치기 전 정의 먼저 커밋)은 그대로다.
 - 🔵 **`check`는 모든 PR에서 결과를 낸다**(2026-09-30 · PR #281) — DB 파일(다섯 경로)을 안 건드린 PR은 「해당 없음」으로 즉시 통과(DB 호출 0). `main` 필수 체크다(룰셋 `main-db-check` — `check`가 초록이어야 병합된다).
