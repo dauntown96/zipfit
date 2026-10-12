@@ -528,7 +528,7 @@ span.zf3-mi{cursor:default}
 .zf3-lh{margin:0;font-size:var(--t-l);font-weight:700;color:var(--ink)}
 .zf3-lh .zf3-of{font-weight:500;color:var(--ink-3);font-size:var(--t-m)}
 .zf3-lsub{margin:2px 0 0;font-size:var(--t-xs);color:var(--ink-3)}
-.zf3-tblock{display:grid;grid-template-columns:auto 1fr;border:1px solid var(--ink);border-radius:var(--r-1);font-size:11px;margin:6px 0 8px;overflow:hidden;background:var(--paper)}
+.zf3-tblock{display:grid;grid-template-columns:auto 1fr;border:1px solid var(--ink);border-radius:var(--r-1);font-size:12px;margin:6px 0 8px;overflow:hidden;background:var(--paper)}
 .zf3-tblock>div{display:flex;gap:6px;align-items:baseline;padding:3px 8px;min-width:0}
 .zf3-tblock>div+div{border-left:1px solid var(--ink)}
 .zf3-tblock .k{color:var(--ink-3);white-space:nowrap}
@@ -887,6 +887,10 @@ html[data-ui="d3"] #notice-status.zf3-empty{background:var(--surface)!important;
 .zf3-ics{all:unset;box-sizing:border-box;margin-left:auto;min-height:var(--hit);padding:0 12px;border:1px solid var(--line);border-radius:999px;font-size:var(--t-s);font-weight:700;color:var(--ink);cursor:pointer;display:inline-flex;align-items:center}
 .zf3-ics:hover{background:var(--surface)}
 .zf3-ics:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.zf3-fics{margin:6px 0 0}
+.zf3-fics button{all:unset;box-sizing:border-box;min-height:var(--hit);padding:0 12px;border:1px solid var(--line);border-radius:999px;font-size:var(--t-s);font-weight:700;color:var(--ink);cursor:pointer;display:inline-flex;align-items:center}
+.zf3-fics button:hover{background:var(--surface)}
+.zf3-fics button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 .zf3-radar .land.mine{fill:var(--surface-2);stroke:var(--ink);stroke-width:1.6}
 .zf3-legend i.mine{background:var(--surface-2);border:1.6px solid var(--ink);border-radius:3px}
 .zf3-pmine{color:var(--ln-jeon);margin-right:4px;font-weight:700}
@@ -910,6 +914,16 @@ html[data-ui="d3"] #notice-status.zf3-empty{background:var(--surface)!important;
   .zf3-dx:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
   html[data-ui="d3"] #notice-list .zf3-card.zf3-open .zf3-close{display:none}
 }
+/* Notion 후보 반영 2차 — 상태 숫자 링크 · 묶음 항목 · 감사 남은 다듬기(어둡게 color-scheme · 마우스 올림 · 칩 넘침 단서 · 작은 글자) */
+.zf3-stl{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;gap:3px;min-height:var(--hit);padding:0 2px;margin:-12px 0;color:inherit;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
+.zf3-stl b{font-family:var(--f-led);color:var(--ink)}
+.zf3-stl.on{color:var(--ink);font-weight:700;text-decoration-color:var(--ink)}
+.zf3-stl:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.zf3-pl{font-family:var(--f-led);color:var(--board-ink-2);text-shadow:none;font-weight:400;font-size:13px}
+html[data-ui="d3"] body.theme-dark{color-scheme:dark}
+@media (hover:hover){.zf3-ai:hover{color:var(--ink)}.zf3-chip:hover{background:var(--surface)}.zf3-chip.on:hover{background:var(--ink-2)}.zf3-sheet-x:hover{background:var(--surface)}.zf3-vseg button:hover{color:var(--ink)}.zf3-places button:hover{border-color:var(--ink-3)}.zf3-stat:hover{filter:brightness(1.15)}}
+.zf3-chips{mask-image:linear-gradient(90deg,#000 calc(100% - 20px),transparent);-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 20px),transparent);padding-right:20px}
+.zf3-chip.on span{font-size:13px!important}
 @keyframes zf3breath{from{opacity:.55}to{opacity:1}}
 @keyframes zf3grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
 @keyframes zf3flag{from{opacity:0;transform:translate(-50%,-4px)}to{opacity:1;transform:translateX(-50%)}}
@@ -3802,7 +3816,10 @@ async function shareNotice(btn, title, region, type, url){
   if(cv) region = cv.textContent;
   if(ct) type = ct.textContent;
   // 기본값은 실행 위치(배포 루트) — 2026-10-06 도메인 전환 ①: 전환 전엔 옛 주소, 전환 뒤엔 kkokzip.com
-  const shareUrl = url || ZF_REDIRECT_TO;
+  let shareUrl = url || ZF_REDIRECT_TO;
+  // 🔵 d3 — 꼭집 카드 링크(?n=공고ID · 열면 그 카드가 펼쳐진다)를 나눈다. 원문은 그 카드 상세의 「AI 정리 · 원문 보기」에 있다.
+  const aidS = card && card.dataset ? card.dataset.announcementId : '';
+  if(aidS && typeof zf3On === 'function' && zf3On()) shareUrl = ZF_REDIRECT_TO.replace(/[?#].*$/, '') + '?n=' + encodeURIComponent(aidS);
   const text = [region, type].filter(Boolean).join(' · ') + ' | 꼭집';
   if(navigator.share){
     try{ await navigator.share({ title, text, url: shareUrl }); }catch(e){ if(e.name!=='AbortError') console.warn('공유 실패:', e); }
@@ -6622,7 +6639,7 @@ function loadAnnouncementExtras(annId, detailEl, id, useGroup){
   const keysP = huKeysReady[id] ? huKeysReady[id].promise : Promise.resolve(null);
   resolveAnnouncementIds(annId, useGroup).then(ids => fetch(`${SUPABASE_URL}/rest/v1/announcement_extras?${idFilterFor(ids)}&order=extra_type,building_address`, {
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
-  }).then(r => r.ok ? r.json() : []).then(rows => zfRoundsIfOrphan(rows, annId, ids, useGroup, id).then(roundMap => [rows, roundMap])))
+  }).then(r => r.ok ? r.json() : null).then(rows => zfRoundsIfOrphan(rows, annId, ids, useGroup, id).then(roundMap => [rows, roundMap])))
   .then(([rows, roundMap]) => keysP.then(keys => [rows, keys, roundMap])).then(([rows, keys, roundMap]) => {
     if(!zfStillOurs(id, ownerAnn)) return;   // 그 사이 이 자리에 다른 공고가 왔다
     // 🔵 2026-10-06(Z-1 PR-B ②) — 단지 모양 블록 본문은 그 단지 이미지만(site_label · unit_key 머리 — zfExtraInSite).
@@ -6630,7 +6647,10 @@ function loadAnnouncementExtras(annId, detailEl, id, useGroup){
     if(!Array.isArray(rows) || rows.length === 0){
       // 🔵 D-3 c — 이미지 칸 셋째 상태 「없음」(있음 · 미리보기 없음은 아래 갤러리 · extrasThumbFailed). d3 · 공고 본문 칸만.
       const sl = document.getElementById('extras-slot-' + id);
-      if(sl && typeof zf3On === 'function' && zf3On() && !/-blk\d+$/.test(id) && !sl.querySelector('.zf3-none')) { const att = document.getElementById('attachments-slot-' + id); sl.innerHTML = `<p class="zf3-none">이 공고는 사진·평면도가 아직 없어요${att && att.querySelector('.policy-wrap') ? ' · 원문 파일은 위 「공고문 원문」' : ''}</p>`; }
+      if(sl && typeof zf3On === 'function' && zf3On() && !/-blk\d+$/.test(id) && !sl.querySelector('.zf3-none')) { const att = document.getElementById('attachments-slot-' + id); sl.innerHTML = rows === null
+        // 🔵 백로그 「로더 네 곳이 HTTP 실패와 정상 0행을 구별하지 않는다」 — 실패(null)에 「없어요」를 말하지 않는다
+        ? `<p class="zf3-none">사진·평면도를 불러오지 못했어요 — 새로 고침하면 한 번 더 받아요</p>`
+        : `<p class="zf3-none">이 공고는 사진·평면도가 아직 없어요${att && att.querySelector('.policy-wrap') ? ' · 원문 파일은 위 「공고문 원문」' : ''}</p>`; }
       return;
     }
     // 🔴 2026-10-01 — 같은 회차 행만 왔으면 배너 없음(zfRowsSameRoundAsCard · 규약 29 블록 배치).
@@ -9892,6 +9912,12 @@ function zf3BoardItems(rows){
     if(same) same.n++; else items.push(it);
   });
   items.forEach(it => { if(it.n > 1) it.place = (it.place ? it.place + ' ' : '') + it.n + '건'; });
+  // 🔵 묶음 항목(Notion 💡 「전광판 묶음 항목 — 내일 접수 시작 n건 · 내 조건 k건」 · 2026-10-12) — 내일 접수가 열리는 열린 공고가 둘 이상이면 맨 앞에 한 줄.
+  //    누르면 공고 탭을 접수 시작순으로(그날 시작 공고가 위로). 세는 술어는 종전 그대로(applyWindowState · 신청시작일) · 내 조건은 희망 조건만(zf3Mine).
+  { const tm = new Date(Date.now() + 33 * 3600 * 1000).toISOString().slice(0, 10);
+    const tmr = pool.filter(n => applyWindowState(n) === 'before' && zf3Real(n['신청시작일'] || n['apply_start']) === tm);
+    if(tmr.length >= 2){ const k = pref ? tmr.filter(n => zf3Mine(n, pref)).length : 0;
+      items.unshift({ type: 'sum', ev: 'start', tag: '내일 접수 시작', name: `${tmr.length}건${pref ? ` · 내 조건 ${k}건` : ''}`, place: '' }); } }
   const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
   const shut = zf3ClosedNotices();
   const notices = zf3Notices.filter(x => x && x.id && x.title && x.start <= today && today <= x.end && !shut.includes(x.id))
@@ -9909,6 +9935,7 @@ function zf3ItemHTML(it, dup){
   if(it.type === 'card'){
     return `<button type="button" class="zf3-mi" data-act="go" data-id="${zfAttr(it.id)}"${ti}>${tag}${zf3BoardMine ? '<span class="zf3-star" role="img" aria-label="내 조건">★</span>' : ''}<span class="zf3-nm">${escapeHtml(it.name)}</span>${it.place ? `<span class="zf3-pl">${escapeHtml(it.place)}</span>` : ''}</button>`;
   }
+  if(it.type === 'sum') return `<button type="button" class="zf3-mi" data-act="sum"${ti}><span class="zf3-tg start">${escapeHtml(it.tag)}</span><span class="zf3-nm">${escapeHtml(it.name)}</span><span class="zf3-pl">접수 시작순으로 보기</span></button>`;
   if(it.type === 'notice'){
     const links = it.links.map(l => `<a class="zf3-nl" href="${zfAttr(l.href)}"${ti}>${escapeHtml(l.label)}</a>`).join('');
     return `<span class="zf3-ntc">${tag}<span class="zf3-nm">${escapeHtml(it.name)}</span>${links}<button type="button" class="zf3-nx" data-act="nx" data-nid="${zfAttr(it.id)}" aria-label="공지 닫기"${ti}>✕</button></span>`;
@@ -10014,7 +10041,25 @@ async function zf3GoCard(aid){
   el.classList.add('zf3-hl');
   if(el.scrollIntoView) el.scrollIntoView({ block: 'center', behavior: zf3RM() ? 'auto' : 'smooth' });
   try{ (el.querySelector('.zf3-go') || el).focus({ preventScroll: true }); }catch(e){}   // 단계 b — 카드는 초점을 받지 않는다(「상세 ›」로)
+  return el;
 }
+// 🔵 공고 링크 ?n=공고ID — 열면 공고 탭의 그 카드가 펼쳐진 채로(Notion 💡 「공고 공유 링크를 꼭집 카드로」 · 2026-10-12) · 저장 0 · 두 모드 공통.
+//    id 는 글자·숫자·밑줄·점·하이픈·한글만 남긴다(목록 행 announcement_id 와 견주기만 한다 — 화면에 그대로 쓰지 않는다).
+(function(){
+  let id = '';
+  try{ id = new URLSearchParams(location.search).get('n') || ''; }catch(e){}
+  id = id.replace(/[^\w가-힣.\-]/g, '').slice(0, 80);
+  if(!id) return;
+  const go = async () => {
+    goMain(2);
+    for(let i = 0; i < 150 && !noticeLoaded; i++) await new Promise(r => setTimeout(r, 100));
+    const el = await zf3GoCard(id);
+    if(!el) return;
+    const det = document.getElementById(el.getAttribute('data-card-id'));
+    if(det && det.style.display !== 'block') (el.querySelector('.zf3-gotop') || el).click();
+  };
+  if(document.readyState === 'complete') go(); else window.addEventListener('load', go);
+})();
 // ===== 🔵 2026-10-12 표시층 D-3 · 단계 b — 노선 카드 · 상태 넷(ui=d3 일 때만) =====
 // 🔴 카드가 하던 말은 줄이지 않는다 — 종전 카드 DOM(사실 전부)은 그대로 두고 그 위에 부품을 덧입힌다:
 //    유형 배지 · 상태 알약(종전 상태 꼬리표 대신) · 가로 노선(종전 날짜 줄 대신 — 날짜 줄의 배지는 노선 아래로) · 「상세 ›」 줄.
@@ -10196,6 +10241,27 @@ function zf3DecorateIn(list, rowsMap, isMatch){
         slot.classList.add('zf3-off');
       }
     }
+    // ⑥ 하루뿐인 현장 접수 → 기기 달력(.ics · Notion 💡 「하루뿐인 현장 접수를 기기 캘린더에 넣기」) — 경로 표 현장 행 중 시작=끝 · 오늘 이후만.
+    //    파일은 기기 안에서 만든다(새 저장 0 · 외부 요청 0). 문구·장소·기간은 경로 표 원문 칸 그대로(place_text · period_text · site_text · phase_text).
+    if(card.dataset.zf3 === '1' && zfSide.loaded && card.dataset.zf3Fics !== '1'){
+      card.dataset.zf3Fics = '1';
+      const today = zf3Today(), seen = new Set();
+      const one = (zfSide.routesByKey.get(zfDedupKey(n['공고명'])) || []).filter(r => r.route === '현장' && r.start_date && r.start_date === r.end_date && r.start_date >= today)
+        .filter(r => { const k = [r.start_date, r.site_text, r.phase_text, r.place_text].join('|'); if(seen.has(k)) return false; seen.add(k); return true; });
+      const route = card.querySelector('.zf3-route');
+      if(one.length && route && n['apply_period_check'] !== true){
+        const days = [...new Set(one.map(r => r.start_date))].sort();
+        const p = document.createElement('p'); p.className = 'zf3-fics';
+        p.innerHTML = `<button type="button">📅 현장 접수 ${days.length === 1 ? escapeHtml(zf3Md(days[0])) : days.length + '일'} 달력에 넣기</button>`;
+        p.querySelector('button').addEventListener('click', ev => {
+          ev.stopPropagation();
+          const sv = { title: n['공고명'] || '', url: n['공고URL'] || '', rid: n['announcement_id'] || '', id: n['announcement_id'] || '' };
+          zf3IcsDownload(one.map(r => ({ d: r.start_date, k: '현장 접수' + (r.site_text ? ' · ' + r.site_text : '') + (r.phase_text ? ' · ' + r.phase_text : ''), sv,
+            note: [r.period_text, r.place_text ? '접수 장소 ' + r.place_text : '', r.note_text].filter(Boolean).join('\n'), loc: r.place_text || '' })), '꼭집 현장 접수', 'field');
+        });
+        (card.querySelector('.zf-route-slot') || route).insertAdjacentElement('afterend', p);   // 「현장 접수는 … 하루만 받아요」 줄 바로 뒤
+      }
+    }
     // ⑤ 반복 접수 창(경로 표에 기간이 다른 현장 창 둘 이상 — 「매월 1일~10일」 꼴 · 가안 2026-10-12) — 경로 행이 온 뒤 한 번.
     //    알약은 지금 창 안이면 「접수 중 · 이번 창 D-n」, 창 사이면 「다음 창 대기 · MM-DD」 · 노선 접수 역 = 이번·다음 창 시작(아래에 창 끝).
     if(card.dataset.zf3 === '1' && zfSide.loaded && card.dataset.zf3Win !== '1'){
@@ -10351,10 +10417,10 @@ function zf3RenderNoticeHead(filtered){
   const sortSel = document.getElementById('noticeSortSel');
   const sortText = sortSel && sortSel.selectedOptions[0] ? sortSel.selectedOptions[0].textContent : '';
   const at = noticeLoadedAt ? new Date(noticeLoadedAt + 9 * 3600 * 1000).toISOString() : '';
-  const atText = at ? `${at.slice(0, 10).replace(/-/g, '.')} KST` : '불러오는 중';   // 시안 「slim」 그대로 날짜만 — 390px 한 줄
+  const atText = at ? `${at.slice(0, 10).replace(/-/g, '.')} KST` : '불러오는 중…';   // 시안 「slim」 그대로 날짜만 — 390px 한 줄
   const sheetOpen = !document.getElementById('noticeFilterPanel')?.classList.contains('hidden');
   el.innerHTML = `<div class="zf3-lhrow"><p class="zf3-lh">${head}</p><span class="zf3-vseg" role="group" aria-label="보기"><button type="button" data-act="view" data-v="list" aria-pressed="${zf3View !== 'map'}">목록</button><button type="button" data-act="view" data-v="map" aria-pressed="${zf3View === 'map'}">지도</button></span></div>`
-    + `<p class="zf3-lsub">${closedExcluded ? '' : `열린 ${o.n.toLocaleString()}건: `}접수 중 ${o.a.toLocaleString()} · 예정 ${o.b.toLocaleString()}${o.k ? ` · 미상 ${o.k.toLocaleString()}` : ''}${sortText ? ` · ${escapeHtml(sortText)}` : ''}</p>`
+    + `<p class="zf3-lsub">${closedExcluded ? '' : `열린 ${o.n.toLocaleString()}건: `}${zf3StLink('접수 중', '접수 중', o.a)} · ${zf3StLink('예정', '접수 예정', o.b)}${o.k ? ` · ${zf3StLink('미상', '접수기간 미상', o.k)}` : ''}${sortText ? ` · ${escapeHtml(sortText)}` : ''}</p>`
     + zf3StatChips(all)
     + `<div class="zf3-tblock" role="note"><div><span class="k">기준</span><span class="v led">${escapeHtml(atText)}</span></div><div><span class="k">출처</span><span class="v">LH · 마이홈 · SH 원문 → 꼭집 정리</span></div></div>`
     + `<div class="zf3-chips" role="group" aria-label="걸린 조건">${chips.map(([k, t]) => `<button type="button" class="zf3-chip on" data-act="clear" data-k="${k}" aria-label="${zfAttr(t)} 조건 빼기">${escapeHtml(t)}<span aria-hidden="true">✕</span></button>`).join('')}`
@@ -10393,26 +10459,27 @@ function zf3EmptyHTML(title, desc, btn){
 }
 // ① 「나의 노선도」 → 달력 파일(.ics) — 사용자 기기 안에서 만들어 내려받는다(새 저장 0 · 외부 요청 0 · 서버로 보내지 않음).
 //    하루 종일 일정 · 제목 「[꼭집] 접수 마감 · 공고명」 · 설명에 원문 링크와 「신청 전 공고 원문 확인」. 9999·확인 필요 공고는 넣지 않는다(zf3MyRoute 와 같은 거름).
-function zf3IcsEsc(t){ return String(t || '').replace(/\\/g, '\\\\').replace(/;/g, '\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n'); }
+function zf3IcsEsc(t){ return String(t || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n'); }
 function zf3IcsFold(line){ const out = []; let cur = ''; for(const ch of line){ if(new TextEncoder().encode(cur + ch).length > 73){ out.push(cur); cur = ' ' + ch; } else cur += ch; } out.push(cur); return out.join('\r\n'); }
-function zf3IcsDownload(events){
+function zf3IcsDownload(events, calName, fileTag){
   if(!events || !events.length) return;
   const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
   const day = d => d.replace(/-/g, '');
   const next = d => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + 1); return x.toISOString().slice(0, 10).replace(/-/g, ''); };
-  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//kkokzip//my-route//KO', 'CALSCALE:GREGORIAN', 'X-WR-CALNAME:꼭집 나의 노선도'];
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//kkokzip//my-route//KO', 'CALSCALE:GREGORIAN', zf3IcsFold('X-WR-CALNAME:' + zf3IcsEsc(calName || '꼭집 나의 노선도'))];
   events.forEach((e, i) => {
     const url = e.sv.url || '';
     lines.push('BEGIN:VEVENT', `UID:${day(e.d)}-${i}-${String(e.sv.rid || e.sv.id).replace(/[^\w-]/g, '')}@kkokzip.com`, `DTSTAMP:${stamp}`,
       `DTSTART;VALUE=DATE:${day(e.d)}`, `DTEND;VALUE=DATE:${next(e.d)}`,
       zf3IcsFold(`SUMMARY:${zf3IcsEsc(`[꼭집] ${e.k} · ${e.sv.title || ''}`)}`),
-      zf3IcsFold(`DESCRIPTION:${zf3IcsEsc(`꼭집이 공고 원문을 정리한 날짜예요. 신청 전에는 공고 원문을 꼭 확인해 주세요.${url ? '\n' + url : ''}`)}`),
+      zf3IcsFold(`DESCRIPTION:${zf3IcsEsc(`꼭집이 공고 원문을 정리한 날짜예요. 신청 전에는 공고 원문을 꼭 확인해 주세요.${e.note ? '\n' + e.note : ''}${url ? '\n' + url : ''}`)}`),
+      ...(e.loc ? [zf3IcsFold(`LOCATION:${zf3IcsEsc(e.loc)}`)] : []),
       ...(url ? [zf3IcsFold(`URL:${url}`)] : []), 'END:VEVENT');
   });
   lines.push('END:VCALENDAR');
   const blob = new Blob([lines.join('\r\n') + '\r\n'], { type: 'text/calendar;charset=utf-8' });
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob); a.download = `kkokzip-${zf3Today()}.ics`;
+  a.href = URL.createObjectURL(blob); a.download = `kkokzip-${fileTag ? fileTag + '-' : ''}${zf3Today()}.ics`;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
@@ -10426,6 +10493,8 @@ function zf3MinePcs(){
 }
 // ④ 공고 탭 머리 한 줄 요약 — 오늘 마감 · 3일 안 마감 · 이번 주 접수 시작 · 새 공고(3일). 누르면 그 순서로 줄 세운다(정렬 칸 noticeSortSel 그대로).
 //    셈은 「신청할 수 없는 공고」를 뺀 열린 공고에서 · 술어는 종전 그대로(isClosingSoon · applyWindowState · zfNoticeDate).
+// 머리 아랫줄 갈래 숫자 → 상태 칩 켜기(Notion 💡 「공고 탭 머리의 접수 중 a · 예정 b · 미상 k 를 해당 상태 칩을 켜는 링크로」) — 같은 칩을 다시 누르면 끈다.
+function zf3StLink(label, st, n){ return `<button type="button" class="zf3-stl${activeNoticeStatus === st ? ' on' : ''}" data-act="st" data-v="${zfAttr(st)}" aria-pressed="${activeNoticeStatus === st}">${label} <b>${Number(n || 0).toLocaleString()}</b></button>`; }
 function zf3StatChips(all){
   const today = zf3Today(), open = (all || []).filter(n => !isHiddenAsClosed(n));
   let d0 = 0, d3 = 0, st = 0, nw = 0;
@@ -10795,6 +10864,7 @@ function zf3Init(){
     if(b.dataset.act === 'clear') zf3ClearCond(b.dataset.k);
     else if(b.dataset.act === 'sheet') zf3ToggleSheet();
     else if(b.dataset.act === 'view') zf3SetView(b.dataset.v);
+    else if(b.dataset.act === 'st'){ activeNoticeStatus = activeNoticeStatus === b.dataset.v ? null : b.dataset.v; refreshChipSel('noticeStatusChips', activeNoticeStatus); updateFilterToggleBtn(); applyNoticeFiltersAndRender(); }
     else if(b.dataset.act === 'sort'){ const ss = document.getElementById('noticeSortSel'); if(ss && ss.value !== b.dataset.v){ ss.value = b.dataset.v; applyNoticeFiltersAndRender(); } }
   });
   const board = document.getElementById('zf3Board');
@@ -10803,6 +10873,7 @@ function zf3Init(){
     if(!b) return;
     if(b.dataset.act === 'go') zf3GoCard(b.dataset.id);
     else if(b.dataset.act === 'mq') zf3TogglePause();
+    else if(b.dataset.act === 'sum'){ goMain(2); const ss = document.getElementById('noticeSortSel'); if(ss){ ss.value = 'start-asc'; } if(noticeLoaded) applyNoticeFiltersAndRender(); try{ document.getElementById('zf3NoticeHead').scrollIntoView({ block: 'start' }); }catch(e){} }
     else if(b.dataset.act === 'nx') zf3CloseNotice(b.dataset.nid);
   });
   fetch('./notices.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : []).then(list => {
