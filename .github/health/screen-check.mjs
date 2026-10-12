@@ -409,6 +409,28 @@ try {
   } catch (e) {
     add('a11y', '접근성(axe-core · WCAG 2.1 A·AA) — 기준선보다 늘었나', 'warn', '못 잼: ' + String(e).slice(0, 200), '처음엔 경고만')
   }
+  // ⑨ 첨부 미리보기(Drive 썸네일 · 2026-10-12 · D-3 단계 c 「썸네일 저장소」 판단) — 화면 갤러리는 공개 끝점
+  //    drive.google.com/thumbnail 을 <img> 로 부른다. 공식 API 가 아니라 Google 이 바꾸거나 막으면 갤러리가 자리표시자로만
+  //    남고(extrasThumbFailed) 아무도 모른다 — 그 신호. 무작위 10장 중 image/* 200 이 8장 미만이면 경고(이슈를 열지 않는다).
+  //    404 가 나는 파일이 원래 있다(2026-09-13 전수 1,126 중 2 — 60MB 넘는 팸플릿 PDF). 이 경고가 서면 Supabase Storage 썸네일로 옮길 때다.
+  try {
+    const rows = await sqlRead(`select substring(file_url from '/file/d/([^/?]+)') fid from announcement_extras
+      where file_url like '%drive.google.com/file/d/%' order by random() limit 10`)
+    let ok = 0
+    const bad = []
+    for (const { fid } of rows) {
+      try {
+        const r = await fetch(`https://drive.google.com/thumbnail?id=${fid}&sz=w300`, { signal: AbortSignal.timeout(15000) })
+        if (r.ok && /^image\//.test(r.headers.get('content-type') || '')) ok++
+        else bad.push(`${fid.slice(0, 8)}…:${r.status}`)
+      } catch (e) { bad.push(`${fid.slice(0, 8)}…:${String(e.name || e).slice(0, 20)}`) }
+    }
+    extra.drive_thumb = { n: rows.length, ok, bad }
+    add('drive_thumb', '첨부 미리보기(Drive 썸네일 끝점)가 그림을 주나', rows.length && ok >= Math.ceil(rows.length * 0.8) ? 'pass' : 'warn',
+      `${ok}/${rows.length}${bad.length ? ' · ' + bad.slice(0, 3).join(' ') : ''}`, '무작위 10장 중 image/* 200 이 8장 이상 — 미만이면 경고만')
+  } catch (e) {
+    add('drive_thumb', '첨부 미리보기(Drive 썸네일 끝점)가 그림을 주나', 'warn', '못 잼: ' + String(e).slice(0, 200), '경고만')
+  }
 } catch (e) {
   add('runner', '점검 실행', 'fail', String(e).slice(0, 300), '점검 스크립트가 끝까지 돈다')
 } finally {
