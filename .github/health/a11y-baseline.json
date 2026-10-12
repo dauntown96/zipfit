@@ -58,6 +58,11 @@
      "impact": "critical",
      "nodes": 2,
      "sample": "#noticeSearchScopeSel"
+    },
+    "area-alt": {
+     "impact": "critical",
+     "nodes": 1,
+     "sample": "area"
     }
    }
   },
@@ -99,5 +104,6 @@
     }
    }
   }
- }
+ },
+ "_note": "2026-10-12 컨테이너 로컬 두 번(같은 수) + 첫 CI 실행(run 38198624137)에서만 보인 detail-390 area-alt 1을 더함 — 컨테이너는 카카오맵 SDK가 막혀 상세 지도(<area>)가 그려지지 않는다. CI 값은 로그 한 줄에서 옮겼다(아티팩트 저장소가 컨테이너에서 막힘)."
 }
