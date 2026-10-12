@@ -822,7 +822,7 @@ Deno.serve(async (req: Request) => {
       const res = await fetch(`${base}/functions/v1/fetch-attachment${reqUrl.search}`, { method: req.method, headers, body })
       return new Response(res.body, {
         status: res.status,
-        headers: { 'Content-Type': res.headers.get('content-type') ?? 'application/json', 'x-zf-region-hop': `${Deno.env.get('SB_REGION') ?? '?'}→${res.headers.get('x-sb-edge-region') ?? '?'}` },
+        headers: { 'Content-Type': res.headers.get('content-type') ?? 'application/json', 'x-zf-region-hop': `${Deno.env.get('SB_REGION') ?? '?'}->${res.headers.get('x-sb-edge-region') ?? '?'}` },
       })
     }
   }
