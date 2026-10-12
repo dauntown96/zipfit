@@ -8292,8 +8292,7 @@ function isJeonseLeaseCard(id){
   return !!(el && String(el.dataset.housingType || '').includes('전세임대'));
 }
 
-function initMapForHouse(h,id){
-  // 🔴 2026-10-12(지도 위치 고침 D) — 세대 행이 없고 여러 지역에 걸친 공고. 대표 행 시군구 하나에 핀을 꽂으면
+// 🔴 2026-10-12(지도 위치 고침 D) — 세대 행이 없고 여러 지역에 걸친 공고. 대표 행 시군구 하나에 핀을 꽂으면
 //    그 공고와 다른 곳을 가리킨다. 지역 목록은 region_names 그대로 적는다(짓지 않는다).
 function zfCardRegionNames(id){
   const el = cardElFor(String(id).replace(/-blk\d+$/, ''));
@@ -8309,7 +8308,8 @@ function closeMapAsMultiRegion(id, names){
     + '주소는 아래 「AI 정리 · 원문 보기」의 공고 원문에서 확인하세요.</span></p>');
 }
 
-// 🔴 전세임대는 **주소 유무와 무관하게** 닫는다 — 판정이 주소에 매여 있으면 시군구가 들어오는
+function initMapForHouse(h,id){
+  // 🔴 전세임대는 **주소 유무와 무관하게** 닫는다 — 판정이 주소에 매여 있으면 시군구가 들어오는
   //    순간 지도와 주변시설이 뜨는데, 그 핀이 가리킬 단지가 애초에 없다(2026-09-16).
   if(isJeonseLeaseCard(id) && closeMapAsJeonseLease(id)) return;
   // 🔴 level 은 pickRegionAddr 이 이미 판정해 둔 것을 **읽기만** 한다(새로 만들지 않는다).
