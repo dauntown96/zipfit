@@ -110,8 +110,12 @@ async function fetchOne(t: Target): Promise<OneResult> {
   if (pageStatus !== 200) throw new Error(`페이지 HTTP ${pageStatus}`)
   const r = parseComplexImages(html)
   if (!r.pageOk) throw new Error('공고 페이지 꼴이 아니다')
-  // 🔴 평면도 스크립트 줄이 없으면 페이지 꼴이 바뀐 것이다 — 「0장」으로 쓰지 않고 실패로 남긴다(2026-10-02 대상 38쪽 전부 이 줄이 있었다).
-  if (!r.floorplanLine) throw new Error('wrtancFloorplan 줄이 없다 — 페이지 꼴 바뀜')
+  // 🔴 이미지 영역이 있는데 평면도 스크립트 줄이 없으면 페이지 꼴이 바뀐 것이다 — 「0장」으로 쓰지 않고 실패로 남긴다(2026-10-02 대상 38쪽 전부 이 줄이 있었다).
+  // 🔵 2026-10-12 — 영역 표지가 하나도 없고 이 공고의 panId 가 실린 공고 페이지면 「이미지 영역 없음」(전세임대 등) — 0장 성공으로 쓴다.
+  if (!r.floorplanLine) {
+    if (r.imageArea) throw new Error('wrtancFloorplan 줄이 없다 — 페이지 꼴 바뀜')
+    if (!html.includes(t.announcement_id)) throw new Error('이미지 영역도 이 공고 panId 도 없다 — 페이지 꼴 바뀜')
+  }
   return { files: r.files, pageStatus, pageBytes: html.length }
 }
 

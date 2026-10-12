@@ -23,7 +23,12 @@ export type ComplexImage = {
   file_size: number | null
 }
 
-export type ParseResult = { pageOk: boolean; floorplanLine: boolean; files: ComplexImage[] }
+// imageArea — 「단지 관련 이미지 정보」 영역의 표지(제목 · 탭 스크립트 · wrtancFloorplan 언급)가 하나라도 있는가.
+//   🔵 2026-10-12 — 전세임대(…19376·…19546·…19550·…19551) 공고 페이지에는 이 영역이 통째로 없다(표지 0 · 평면도 줄 0).
+//   영역이 없으면 평면도 줄이 없는 것이 정상이고, 영역이 있는데 평면도 줄이 없을 때만 페이지 꼴이 바뀐 것이다(index.ts).
+export type ParseResult = { pageOk: boolean; floorplanLine: boolean; imageArea: boolean; files: ComplexImage[] }
+
+const IMAGE_AREA_MARKERS = ['단지 관련 이미지 정보', 'onClickPlanTab', 'onchangeImageTab', 'wrtancFloorplan']
 
 // JS 홑따옴표 문자열 본문 → 실제 문자열(\' \" \\ \/ 만 푼다 — 그 밖의 역슬래시는 JSON 이 읽게 둔다).
 function unescapeJsSingle(s: string): string {
@@ -82,5 +87,6 @@ export function parseComplexImages(html: string): ParseResult {
       file_kind: str(kv.lsSplInfUplFlDsCdNm) ?? str(kv.ahflDesc), hty_nna: null, file_size: num(kv.cmnAhflSz),
     })
   }
-  return { pageOk, floorplanLine, files: out }
+  const imageArea = IMAGE_AREA_MARKERS.some(k => html.includes(k))
+  return { pageOk, floorplanLine, imageArea, files: out }
 }
