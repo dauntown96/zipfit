@@ -22,4 +22,4 @@ jobs:
           npm install --no-audit --no-fund playwright@1.55.0 >/dev/null
           npx playwright install --with-deps chromium >/dev/null
       - name: 조사
-        run: node .github/probe/map-probe.mjs
+        run: node .github/probe/map-probe2.mjs
