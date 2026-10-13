@@ -81,6 +81,22 @@ body.fs-large{font-size:17px}
 .panel-title{font-size:17px;font-weight:600;margin-bottom:1.25rem;color:#111}
 .field{margin-bottom:1rem}
 .label{font-size:13px;color:#555;margin-bottom:6px;display:block;font-weight:500}
+.zf-agex>summary{cursor:pointer;margin:0}
+.diag-hint{font-size:12px;color:#6B6B63;margin:0.35rem 0 0;line-height:1.5;word-break:keep-all}
+.zf-cls{border:0;margin:0;padding:0;min-width:0}
+.zf3-sgg{margin-top:8px}
+.zf3-sgg-h{margin:0 0 6px;font-size:var(--t-xs);color:var(--ink-3);font-weight:600}
+.zf3-sgg-l{display:flex;flex-wrap:wrap;gap:6px}
+.zf3-sgg-l .chip{min-height:var(--hit);display:inline-flex;align-items:center;gap:4px;font-family:inherit}
+.zf3-sgg-l .chip b{font-family:var(--f-led);font-weight:700}
+.zf-cls>legend{padding:0}
+.zf-cls-opts{display:flex;flex-wrap:wrap;gap:6px}
+.zf-cls-opts label{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 12px;border:1px solid #ddd;border-radius:10px;background:#fff;font-size:14px;color:#333;cursor:pointer}
+.zf-cls-opts input{width:18px;height:18px;margin:0;accent-color:#1D9E75}
+.zf-cls-opts label:has(input:checked){border-color:#1D9E75;background:#E1F5EE;color:#085041;font-weight:600}
+body.theme-dark .diag-hint{color:#9aa0aa}
+body.theme-dark .zf-cls-opts label{background:#1f2229;border-color:#3a3e48;color:#d8dbe0}
+body.theme-dark .zf-cls-opts label:has(input:checked){background:#16352b;border-color:#1D9E75;color:#bfeedd}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 select,input[type=number],input[type=text],input[type=email]{width:100%;padding:9px 12px;font-size:14px;border:1px solid #ddd;border-radius:8px;background:#fff;color:#111;outline:none;transition:border 0.15s}
 select:focus,input:focus{border-color:#5DCAA5}
@@ -191,6 +207,10 @@ details.pol-item[open]>summary::after{content:' ▴'}
 details.pol-item>.policy-content{padding:0 12px 10px}
 .pol-site{display:inline-block;margin-right:6px;padding:0 6px;border-radius:9px;background:#EEF2FA;color:#3D5A99;font-size:11px;font-weight:600;vertical-align:1px}
 .pol-empty{font-size:12px;color:#888;padding:6px 2px}
+.pol-xref{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;margin:4px 0 8px;font-size:12px;color:#6B6B63}
+.pol-xref-btn{min-height:44px;padding:0 12px;border:1px solid #cfd8d3;border-radius:10px;background:#fff;color:#1D6F55;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+body.theme-dark .pol-xref{color:#9aa0aa}
+body.theme-dark .pol-xref-btn{background:#1f2229;border-color:#3a3e48;color:#7fd3b5}
 .pol-site.pol-common{background:#F1F1EC;color:#5F5F57}
 .zf-site-pick{display:flex;gap:6px;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;align-items:center;margin:2px 0 8px;padding-bottom:2px}
 .zf-site-pick-label{flex:0 0 auto;font-size:11px;font-weight:600;color:#666}
@@ -430,7 +450,7 @@ html[data-ui="d3"] body{
   --map-sea:#E9EEF3; --map-land:#FFFFFF; --map-line:#B7BEC8; --map-dot:#1F5FBF; --map-hot:#B3261E;
   --f-ui:"Kkokzip Sans","IBM Plex Sans KR",-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
   --f-led:"Kkokzip LED","Nanum Gothic Coding",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-  --t-xs:12px; --t-s:13px; --t-m:14px; --t-l:16px; --t-xl:18px; --t-2xl:22px;
+  --t-xs:12px; --t-s:13px; --t-m:14px; --t-l:16px; --t-xl:18px; --t-2xl:22px; --t-led:34px;   /* t-led = 인사이트 LED 큰 숫자 한 자리만(취향 ③ 유지 · 2026-10-13) */
   --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px;
   --r-1:6px; --r-2:10px; --r-3:14px; --hit:44px; --hit-band:48px;
   --m-fast:160ms; --m-mid:320ms; --m-slow:700ms; --ease:cubic-bezier(.2,.8,.2,1);
@@ -562,6 +582,20 @@ html[data-ui="d3"] :is(#notice-list,#match-result) .hcard.zf3-card:focus-visible
 html[data-ui="d3"] :is(#notice-list,#match-result) .hcard.zf3-card.zf3-open{border-color:var(--ink)}
 html[data-ui="d3"] .zf3-card .zf-dateline{color:var(--ink-3)!important}
 html[data-ui="d3"] .zf-footer{border-top-color:var(--line-2)}
+/* 🔵 2026-10-13(우편함 「표시층 — 실사용 1회차 반영」 1 · D1) — 글자 토큰 최소는 t-xs 12px다. 옛 화면 조각(카드 상세 · 표지 칩 · 인사이트 재고 절)에
+   9~11.5px로 적힌 글자를 d3 에서 12px로 올린다 — 고령 사용자에게 9~10px는 읽기 어렵다(1회차 P4). 글자가 아닌 기호(◆ 구분 · ✕ · ▾ · 원 안 아이콘)는 그대로. */
+html[data-ui="d3"] [style*="font-size:20px"]{font-size:var(--t-2xl)!important}   /* D6 — 재고 절 큰 숫자 20px → t-2xl */
+html[data-ui="d3"] [style*="border-radius:8px"]{border-radius:var(--r-2)!important}   /* D3 — 손으로 적힌 8px 둥글기 → r-2 */
+html[data-ui="d3"] :is([style*="font-size:8px"],[style*="font-size:9px"],[style*="font-size:10px"],[style*="font-size:10.5px"],[style*="font-size:11px"],[style*="font-size:11.5px"]){font-size:var(--t-xs)!important}
+/* D2 — 누름 칸은 hit 44px 이상(카카오로 시작하기 40 · 상세 공유하기·저장 35 · 1회차 실측) */
+html[data-ui="d3"] :is(.btn,.detail-link){min-height:var(--hit);box-sizing:border-box}
+html[data-ui="d3"] .detail-link{display:flex!important;align-items:center;justify-content:center}
+html[data-ui="d3"] #noticeFilterPanel .chip{min-height:var(--hit);display:inline-flex;align-items:center;box-sizing:border-box}
+html[data-ui="d3"] #noticeFilterPanel button{min-height:var(--hit)}
+html[data-ui="d3"] label[for="hideClosedChk"]{min-height:var(--hit);display:inline-flex;align-items:center}
+html[data-ui="d3"] #main2 select{min-height:var(--hit);box-sizing:border-box}
+html[data-ui="d3"] .zf-footer a{display:inline-flex;align-items:center;min-height:var(--hit);padding:0 4px}
+html[data-ui="d3"] :is(.badge,.maintab,.setting-sub,.htag,.mlabel,.best,.rank,.slabel,.detail-note,.pol-chip,.pol-toggle-all,.pol-site,.zf-site-pick-label,.zf-site-chip,.hu-wait-badge,.docs-note,.elig-fold>summary,.elig-subrow,.extras-thumb-label,.extras-thumb-missing-mark,.extras-missing-note,.hu-note-long,.hu-note-badge,.hu-recruit-badge,.hu-round-badge,.hu-diff,.hu-past-only,.zf-round-tag,.hu-group-count,.hu-x-chip,.extras-linked-note,.hu-ug-meta,.hu-ug-sub,.poi-tab,.poi-dist){font-size:var(--t-xs)}
 html[data-ui="d3"] .zf-footer .zf-ai-note,html[data-ui="d3"] .zf-footer{color:var(--ink-3)}
 html[data-ui="d3"] .zf-footer a{color:var(--ink-2)}
 html[data-ui="d3"] :is(#notice-list,#match-result) .hcard.zf3-closed{background:var(--surface)}
@@ -569,7 +603,7 @@ html[data-ui="d3"] :is(#notice-list,#match-result) .hcard.zf3-closed::before{bac
 .zf3-ctop{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0 0 6px}
 .zf3-card .zf3-badge{width:24px;min-width:24px;height:24px;padding:0;border-radius:50%;font-size:13px}
 .zf3-ctype{font-size:var(--t-s);font-weight:700;color:var(--ink)}
-.zf3-always{font-size:11px;font-weight:700;border:1px dashed var(--ink-3);border-radius:999px;padding:1px 8px;color:var(--ink-2)}
+.zf3-always{font-size:var(--t-xs);font-weight:700;border:1px dashed var(--ink-3);border-radius:999px;padding:1px 8px;color:var(--ink-2)}
 .zf3-dpill{margin-left:auto;font-family:var(--f-led);font-size:12px;font-weight:700;border-radius:999px;padding:2px 10px;white-space:nowrap;border:1px solid var(--ink);color:var(--ink);background:var(--paper)}
 .zf3-dpill.open{background:var(--ink);color:var(--paper)}
 .zf3-dpill.hot{background:var(--warn);border-color:var(--warn);color:var(--paper)}
@@ -582,7 +616,7 @@ html[data-ui="d3"] .zf3-card .haddr{font-size:12px;color:var(--ink-3);margin-bot
 .zf3-off{display:none!important}
 .zf3-dl-tags{margin:0 0 6px;font-size:12px}
 html[data-ui="d3"] .zf3-card .chip-row{margin:4px 0 8px!important;gap:6px!important}
-html[data-ui="d3"] .zf3-card .chip-row .chip{font-size:11px!important;padding:3px 9px!important;border-radius:999px!important;background:var(--surface)!important;border:1px solid var(--line)!important;color:var(--ink-2)!important;font-weight:600}
+html[data-ui="d3"] .zf3-card .chip-row .chip{font-size:var(--t-xs)!important;padding:3px 9px!important;border-radius:999px!important;background:var(--surface)!important;border:1px solid var(--line)!important;color:var(--ink-2)!important;font-weight:600}
 html[data-ui="d3"] .zf3-card .chip-row .chip[style*="#D85A30"]{background:var(--ink)!important;border-color:var(--ink)!important;color:var(--paper)!important}
 html[data-ui="d3"] .zf3-card .chip-row .chip[style*="#EF9F27"],html[data-ui="d3"] .zf3-card .chip-row .chip[style*="#A32D2D"],html[data-ui="d3"] .zf3-card .chip-row .chip[style*="#7B5EA7"]{background:var(--warn-bg)!important;border-color:var(--warn)!important;color:var(--warn)!important}
 html[data-ui="d3"] .zf3-card [data-sum-for]>div{background:var(--surface)!important;border-color:var(--line-2)!important;color:var(--ink)!important;font-variant-numeric:tabular-nums}
@@ -599,14 +633,14 @@ html[data-ui="d3"] .zf3-card>div[id^="ncard-"]{margin:0 -14px 0 -18px!important;
 .zf3-stn.past i{border-color:var(--ln,var(--ink));background:var(--ln,var(--ink))}
 .zf3-stn.next i{border-color:var(--ln,var(--ink))}
 .zf3-stn.unk i{border-style:dashed;border-color:var(--ink-3)}
-.zf3-stn .k{font-size:11px;color:var(--ink-3);line-height:1.3;margin-top:2px}
+.zf3-stn .k{font-size:var(--t-xs);color:var(--ink-3);line-height:1.3;margin-top:2px}
 .zf3-stn .k .yr{font-weight:700;color:var(--ink-2);font-family:var(--f-led)}
 html[data-ui="d3"] .zf3-dup{display:none!important}
 .zf3-stn .v{font-size:12px;font-weight:700;font-family:var(--f-led);color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.25;overflow-wrap:anywhere}
-.zf3-stn .v small{display:block;font-family:var(--f-ui);font-weight:400;font-size:11px;color:var(--ink-3)}
+.zf3-stn .v small{display:block;font-family:var(--f-ui);font-weight:400;font-size:var(--t-xs);color:var(--ink-3)}
 .zf3-stn.unk .v{font-family:var(--f-ui);font-weight:400;color:var(--ink-3)}
 .zf3-today{position:absolute;top:-4px;left:calc(50% / var(--n) + (100% - 100% / var(--n)) * var(--p,0));transform:translateX(-50%);z-index:2;pointer-events:none;animation:zf3flag var(--m-slow) var(--ease) both}
-.zf3-today b{display:block;border-radius:4px;padding:0 5px;font:700 10px/16px var(--f-ui);color:var(--paper);background:var(--ink);position:relative;white-space:nowrap}
+.zf3-today b{display:block;border-radius:4px;padding:0 5px;font:700 var(--t-xs)/16px var(--f-ui);color:var(--paper);background:var(--ink);position:relative;white-space:nowrap}
 .zf3-today b::after{content:"";position:absolute;left:50%;top:100%;width:2px;height:7px;margin-left:-1px;background:var(--ink)}
 .zf3-bhead{margin:0 0 2px;font-size:12px;font-weight:700;color:var(--ink-2)}
 .zf3-branch{border-left:2px solid var(--ln,var(--ink));padding-left:8px;margin:6px 0 0 2px}
@@ -626,10 +660,10 @@ html[data-ui="d3"] #notice-status .rtitle{color:var(--ink);font-weight:700}
 html[data-ui="d3"] #notice-status .rdesc{color:var(--ink-2)}
 html[data-ui="d3"] #notice-status .btn{min-height:var(--hit);padding:0 16px;border-radius:var(--r-2);background:var(--board);color:var(--board-ink);border:0;font-weight:700}
 .zf3-chips-wrap{flex-wrap:wrap;margin-top:10px}
-.zf3-chip small{font-size:11px;opacity:.85;margin-left:2px}
+.zf3-chip small{font-size:var(--t-xs);opacity:.85;margin-left:2px}
 /* ── 단계 c — 상세(d3) ── */
 html[data-ui="d3"] .zf3-card .detail-grid{background:var(--board);background-image:radial-gradient(circle at center,var(--led-dot) 0 1px,transparent 1.4px);background-size:4px 4px;border-radius:var(--r-2);padding:12px 14px;gap:10px 18px;border:1px solid #2b2e35}
-html[data-ui="d3"] .zf3-card .detail-grid>div>span:first-child{color:var(--board-ink-2)!important;font-size:11px}
+html[data-ui="d3"] .zf3-card .detail-grid>div>span:first-child{color:var(--board-ink-2)!important;font-size:var(--t-xs)}
 html[data-ui="d3"] .zf3-card .detail-grid>div>span:last-child{color:var(--led)!important;font-family:var(--f-led);font-weight:700!important;font-size:13px;text-shadow:0 0 6px var(--led-glow);font-variant-numeric:tabular-nums}
 .zf3-vline{border:0!important;background:transparent!important}
 html[data-ui="d3"] .zf3-vline .policy-item{position:relative;padding:2px 0 12px 28px!important;border:0!important;background:transparent!important;margin:0!important}
@@ -660,7 +694,7 @@ html[data-ui="d3"] .maintabs.zf3-ind-on .maintab.active{box-shadow:none}
 @media (max-width:720px){
   html[data-ui="d3"] body{padding-bottom:calc(76px + env(safe-area-inset-bottom,0px))}
   html[data-ui="d3"] .maintabs.zf3-ind-on{position:fixed;top:auto;left:0;right:0;bottom:0;margin:0;padding:0 max(8px,env(safe-area-inset-right,0px)) env(safe-area-inset-bottom,0px) max(8px,env(safe-area-inset-left,0px));z-index:120;border-bottom:0;border-top:1px solid var(--line);background:var(--paper);box-shadow:0 -4px 16px rgba(0,0,0,.06)}
-  html[data-ui="d3"] .maintabs.zf3-ind-on .maintab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;font-size:11px;line-height:1.1;padding:4px 0}
+  html[data-ui="d3"] .maintabs.zf3-ind-on .maintab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;font-size:var(--t-xs);line-height:1.1;padding:4px 0}
   html[data-ui="d3"] .maintabs.zf3-ind-on .zf3-ti{display:block;width:22px;height:22px}
   html[data-ui="d3"] .maintabs.zf3-ind-on .maintab.active .zf3-ti{stroke-width:2.3}
   html[data-ui="d3"] .maintabs.zf3-ind-on .zf3-tind{left:8px;top:0;bottom:auto;width:calc((100% - 16px) / 5)}
@@ -683,7 +717,7 @@ html[data-ui="d3"] .zf3-card:has(.zf3-dpill.hot) .zf3-today b{animation:zf3ping 
 .zf3-gotop{all:unset;box-sizing:border-box;position:relative;flex:none;width:30px;height:30px;margin:0;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:var(--ink-2);cursor:pointer}
 /* 누르는 칸은 44px 그대로 — 단추 상자는 30px(부모 안 · 2026-10-13 공고 탭 다듬기 3: 종전 음수 여백이 부모 밖으로 10px 나갔다) */
 .zf3-gotop::before{content:"";position:absolute;inset:-7px;border-radius:50%}
-.zf3-gotop span{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:var(--surface-2);font-size:17px;font-weight:700;line-height:1;transition:transform var(--m-fast) var(--ease),background var(--m-fast)}
+.zf3-gotop span{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:var(--surface-2);font-size:var(--t-xl);font-weight:700;line-height:1;transition:transform var(--m-fast) var(--ease),background var(--m-fast)}
 .zf3-gotop:hover span{background:var(--line)}
 .zf3-gotop[aria-expanded="true"] span{transform:rotate(90deg)}
 .zf3-gotop:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
@@ -702,7 +736,7 @@ html[data-ui="d3"] .zf3-card .chip-row .chip.zf3-minechip{background:var(--surfa
 .zf3-kpi{display:grid;grid-template-columns:repeat(3,1fr);border-radius:var(--r-3);overflow:hidden;background:var(--board);background-image:radial-gradient(circle at center,var(--led-dot) 0 1px,transparent 1.4px);background-size:4px 4px;border:1px solid #2b2e35}
 .zf3-kc{display:flex;flex-direction:column;align-items:center;gap:4px;padding:16px 6px 14px;text-align:center}
 .zf3-kc + .zf3-kc{border-left:1px solid rgba(255,255,255,.08)}
-.zf3-kc b{font-family:var(--f-led);font-size:34px;line-height:1;color:var(--c);text-shadow:0 0 10px color-mix(in srgb,var(--c) 45%,transparent);font-variant-numeric:tabular-nums}
+.zf3-kc b{font-family:var(--f-led);font-size:var(--t-led);line-height:1;color:var(--c);text-shadow:0 0 10px color-mix(in srgb,var(--c) 45%,transparent);font-variant-numeric:tabular-nums}
 .zf3-kc span{font-size:12px;color:var(--board-ink-2);word-break:keep-all;line-height:1.3}
 .zf3-ins-card{background:var(--paper);border:1px solid var(--line-2);border-radius:var(--r-3);padding:16px}
 .zf3-ins-card h3{margin:0 0 2px;font-size:var(--t-l);color:var(--ink);display:flex;align-items:baseline;gap:8px}
@@ -711,14 +745,14 @@ html[data-ui="d3"] .zf3-card .chip-row .chip.zf3-minechip{background:var(--surfa
 .zf3-ins-empty{margin:8px 0;font-size:var(--t-s);color:var(--ink-3);text-align:center}
 .zf3-tl{display:grid;grid-template-columns:repeat(14,1fr);gap:3px;align-items:end;height:128px}
 .zf3-tc{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0}
-.zf3-tc .n{font:700 11px/1 var(--f-led);color:var(--ink);margin-bottom:3px;min-height:11px}
+.zf3-tc .n{font:700 var(--t-xs)/1 var(--f-led);color:var(--ink);margin-bottom:3px;min-height:12px}
 .zf3-tc i{display:block;width:100%;max-width:18px;height:calc(var(--h) * .7px + 3px);background:var(--ink-3);border-radius:3px 3px 0 0;transform-origin:bottom;animation:zf3grow 500ms var(--ease) both}
 .zf3-tc.z i{background:var(--line-2)}
 .zf3-tc.z .n{color:var(--ink-3);font-weight:400}   /* 0건 칸도 흐린 0 — 숫자를 이어 읽을 때 다음 칸 숫자가 앞 날짜에 붙지 않게 */
 .zf3-tc.hot:not(.z) i{background:var(--warn)}
 .zf3-tc.hot .n,.zf3-tc.hot .d,.zf3-tc.hot .w{color:var(--warn);font-weight:700}
-.zf3-tc .d{margin-top:5px;font:700 11px/1.1 var(--f-led);color:var(--ink-2);white-space:nowrap}
-.zf3-tc .w{font-size:10px;color:var(--ink-3);line-height:1.2;white-space:nowrap;letter-spacing:-.04em}
+.zf3-tc .d{margin-top:5px;font:700 var(--t-xs)/1.1 var(--f-led);color:var(--ink-2);white-space:nowrap}
+.zf3-tc .w{font-size:var(--t-xs);color:var(--ink-3);line-height:1.2;white-space:nowrap;letter-spacing:-.04em}
 .zf3-rl{display:flex;flex-direction:column;gap:8px}
 .zf3-rr{display:grid;grid-template-columns:minmax(0,7.5em) 1fr auto;align-items:center;gap:10px;font-size:var(--t-s)}
 .zf3-rr .nm{color:var(--ink);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -729,9 +763,11 @@ html[data-ui="d3"] .zf3-card .chip-row .chip.zf3-minechip{background:var(--surfa
 .zf3-more:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 .zf3-tr{display:flex;align-items:flex-end;gap:2px;height:90px}
 .zf3-trc{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
-.zf3-trc .n{font:700 9px/1 var(--f-led);color:var(--ink-3);margin-bottom:2px}
+.zf3-trc .n{font:700 var(--t-xs)/1 var(--f-led);color:var(--ink-3);margin-bottom:2px;min-height:12px;visibility:hidden;white-space:nowrap}
+.zf3-trc.pk .n{visibility:visible}   /* 30칸에 12px 숫자를 다 세우면 겹친다 — 좁은 화면은 가장 많은 날만(나머지는 막대 이름표·낭독 글) */
+@media (min-width:1000px){.zf3-trc .n{visibility:visible}}
 .zf3-trc i{display:block;width:100%;max-width:14px;height:calc(var(--h) * .62px + 2px);background:var(--ln-kuk);border-radius:2px 2px 0 0;transform-origin:bottom;animation:zf3grow 500ms var(--ease) both}
-.zf3-trx{display:flex;justify-content:space-between;margin-top:6px;font:700 11px/1 var(--f-led);color:var(--ink-3)}
+.zf3-trx{display:flex;justify-content:space-between;margin-top:6px;font:700 var(--t-xs)/1 var(--f-led);color:var(--ink-3)}
 .zf3-trc.part i{background:var(--line)}
 .zf3-trc.z i{height:2px;background:var(--line-2)}
 .zf3-trc.none{background:repeating-linear-gradient(135deg,transparent 0 3px,var(--line-2) 3px 4px);opacity:.6}
@@ -742,7 +778,7 @@ html[data-ui="d3"] .zf3-card .chip-row .chip.zf3-minechip{background:var(--surfa
 .zf3-trnav button[disabled]{color:var(--ink-3);border-color:var(--line-2);cursor:default}
 .zf3-trnav button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 .zf3-trpart{margin-top:8px}
-.zf3-xmiss{position:absolute;top:0;left:0;right:0;padding:3px 5px;background:var(--warn);color:var(--paper);font-size:10px;font-weight:700;line-height:1.3}
+.zf3-xmiss{position:absolute;top:0;left:0;right:0;padding:3px 5px;background:var(--warn);color:var(--paper);font-size:var(--t-xs);font-weight:700;line-height:1.3}
 .zf3-hux{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 6px;font-size:var(--t-s);color:var(--ink-2)}
 .zf3-hux b{color:var(--ink)}
 .zf3-hux button{all:unset;box-sizing:border-box;min-height:var(--hit);padding:0 12px;border:1px solid var(--line);border-radius:999px;font-size:var(--t-s);font-weight:700;color:var(--ink);cursor:pointer;display:inline-flex;align-items:center}
@@ -784,7 +820,7 @@ html[data-ui="d3"] .step[style*="opacity"]{opacity:1!important;color:var(--ink-3
 .zf3-my-l li.now::after{background:var(--ink)}
 .zf3-my-l li.hot::after{border-color:var(--warn)}
 .zf3-my-l .dt{font:700 13px/1.4 var(--f-led);color:var(--ink);white-space:nowrap}
-.zf3-my-l .dd{font:700 11px/1.6 var(--f-led);color:var(--ink-3);white-space:nowrap;min-width:3.4em}
+.zf3-my-l .dd{font:700 var(--t-xs)/1.6 var(--f-led);color:var(--ink-3);white-space:nowrap;min-width:3.4em}
 .zf3-my-l li.hot .dd{color:var(--warn)}
 .zf3-my-l .tx{min-width:0;display:flex;flex-direction:column}
 .zf3-my-l .k{font-size:12px;font-weight:700;color:var(--ink-2);line-height:1.4}
@@ -798,8 +834,7 @@ html[data-ui="d3"] .subtabs .step{flex:1}
 .zf3-lhrow{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .zf3-lhrow .zf3-lh{margin:0;min-width:0}
 .zf3-vseg{display:inline-flex;flex:none;padding:3px;border-radius:var(--r-2);background:var(--surface-2)}
-.zf3-vseg button{all:unset;box-sizing:border-box;min-height:38px;min-width:52px;padding:0 12px;border-radius:8px;font-size:var(--t-s);font-weight:600;color:var(--ink-3);text-align:center;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;position:relative}
-.zf3-vseg button::after{content:"";position:absolute;inset:-3px 0}
+.zf3-vseg button{all:unset;box-sizing:border-box;min-height:var(--hit);min-width:var(--hit);padding:0 12px;border-radius:var(--r-1);font-size:var(--t-s);font-weight:600;color:var(--ink-3);text-align:center;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;position:relative}
 .zf3-vseg button[aria-pressed="true"]{background:var(--paper);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
 .zf3-vseg button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 html.zf3-mapview[data-ui="d3"] #notice-list{display:none}
@@ -823,7 +858,7 @@ html.zf3-mapview[data-ui="d3"] #notice-list{display:none}
 .zf3-radar.live .pt{animation:zf3ptin var(--m-mid) var(--ease) both;animation-delay:calc(var(--i,0) * 18ms);transform-box:fill-box;transform-origin:center}
 @keyframes zf3ptin{from{opacity:0;transform:scale(.4)}}
 .zf3-radar .lbl{font-size:14px;font-family:var(--f-ui);font-weight:700;fill:var(--ink);paint-order:stroke;stroke:var(--map-land);stroke-width:3.5px;stroke-linejoin:round;pointer-events:none}
-.zf3-radar .cap{position:absolute;left:8px;bottom:6px;font-size:11px;color:var(--ink-2);background:var(--paper);padding:1px 6px;border-radius:4px}
+.zf3-radar .cap{position:absolute;left:8px;bottom:6px;font-size:var(--t-xs);color:var(--ink-2);background:var(--paper);padding:1px 6px;border-radius:4px}
 .zf3-legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--ink-2);margin:8px 2px 0}
 .zf3-legend i,.zf3-places i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px;background:var(--map-dot);box-sizing:border-box}
 .zf3-legend i.soon,.zf3-places i.soon{background:var(--map-land);border:2px solid var(--map-dot)}
@@ -836,7 +871,7 @@ html.zf3-mapview[data-ui="d3"] #notice-list{display:none}
 .zf3-places .zf3-pall{border-style:dashed;font-weight:700}
 .zf3-places .zf3-pback{border-style:dashed}
 .zf3-places-h{margin:4px 0 6px;font-size:var(--t-s);font-weight:700;color:var(--ink)}
-.zf3-places-h small{font-weight:400;color:var(--ink-3);margin-left:6px}
+.zf3-places-h small{font-weight:400;font-size:var(--t-xs);color:var(--ink-3);margin-left:6px}
 .zf-units-src{font-family:var(--f-ui);font-size:12px;font-weight:400;letter-spacing:0;color:var(--ink-3,#666)}
 .zf3-places button[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
 .zf3-places button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
@@ -860,7 +895,7 @@ html.zf3-mapview[data-ui="d3"] #notice-list{display:none}
 .zf3-sl .s i{display:block;width:14px;height:14px;box-sizing:border-box;border-radius:50%;background:var(--paper);border:3px solid var(--rail);position:relative;z-index:1}
 .zf3-sl .s.past i{background:var(--ink);border-color:var(--ink)}
 .zf3-sl .s.now i{border-color:var(--ink);box-shadow:0 0 0 4px var(--surface-2)}
-.zf3-sl .s b{font-size:11px;font-weight:500;color:var(--ink-3);line-height:1.25;word-break:keep-all}
+.zf3-sl .s b{font-size:var(--t-xs);font-weight:500;color:var(--ink-3);line-height:1.25;word-break:keep-all}
 .zf3-sl .s.now b{color:var(--ink);font-weight:700}
 .zf3-sq{margin:10px 0 2px;font-size:var(--t-xl);color:var(--ink);outline:none}
 #panel1.zf3-stepping .field[data-zf3-st]:not(.zf3-cur){display:none}
@@ -910,6 +945,7 @@ html[data-ui="d3"] #notice-status.zf3-empty{background:var(--surface)!important;
 .zf3-empty .btn{margin-top:6px}
 .zf3-ics{all:unset;box-sizing:border-box;margin-left:auto;min-height:var(--hit);padding:0 12px;border:1px solid var(--line);border-radius:999px;font-size:var(--t-s);font-weight:700;color:var(--ink);cursor:pointer;display:inline-flex;align-items:center}
 .zf3-ics:hover{background:var(--surface)}
+.zf3-ics+.zf3-myedit{margin-left:0}
 .zf3-ics:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 .zf3-fics{margin:var(--sp-2) 0 0}
 .zf3-fics button{all:unset;box-sizing:border-box;min-height:var(--hit);padding:0 12px;border:1px solid var(--line);border-radius:999px;font-size:var(--t-s);font-weight:700;color:var(--ink);cursor:pointer;display:inline-flex;align-items:center}
@@ -921,7 +957,7 @@ html[data-ui="d3"] #notice-status.zf3-empty{background:var(--surface)!important;
 .zf3-places button[aria-pressed="true"] .zf3-pmine{color:var(--led)}
 .zf3-stats{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:8px 0 2px;padding-bottom:2px;mask-image:linear-gradient(90deg,#000 calc(100% - 18px),transparent)}
 .zf3-stat{all:unset;box-sizing:border-box;flex:none;display:inline-flex;align-items:center;gap:6px;min-height:var(--hit);padding:0 12px;border-radius:var(--r-2);background:var(--board);color:var(--board-ink-2);font-size:12px;cursor:pointer;background-image:radial-gradient(circle at center,var(--led-dot) 0 1px,transparent 1.4px);background-size:4px 4px}
-.zf3-stat b{font:700 17px/1 var(--f-led);color:var(--led);text-shadow:0 0 6px var(--led-glow)}
+.zf3-stat b{font:700 var(--t-xl)/1 var(--f-led);color:var(--led);text-shadow:0 0 6px var(--led-glow)}
 .zf3-stat.hot b{color:var(--led-red);text-shadow:0 0 6px rgba(255,122,102,.45)}
 .zf3-stat.on{box-shadow:inset 0 -3px 0 var(--led)}
 .zf3-stat:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
@@ -1043,7 +1079,10 @@ html[data-ui="d3"] body.theme-dark{color-scheme:dark}
       </div>
       <div class="field">
         <label class="label" for="income">세대 월평균 소득 (만원)</label>
-        <input type="number" id="income" placeholder="예: 450" min="0">
+        <input type="number" id="income" placeholder="예: 450" min="0" aria-describedby="incomeHint">
+        <!-- 🔵 2026-10-13(우편함 「표시층 — 실사용 1회차 반영」 4 · 백로그 F3) — 원문 「월평균소득액은 세전금액으로서 해당세대의 월평균소득액을
+             모두 합산한 금액」을 옮긴 안내다. 원문에 없는 말(연봉 환산 등)을 더하지 않는다. 판정은 그대로. -->
+        <p class="diag-hint" id="incomeHint">세전 금액이에요. 세대원 모두의 월평균 소득을 합한 금액을 넣어 주세요.</p>
       </div>
     </div>
     <div class="row">
@@ -1080,7 +1119,7 @@ html[data-ui="d3"] body.theme-dark{color-scheme:dark}
         <!-- 🔵 2026-09-23 B24 — 공고 공통 정의 「총자산가액 = 부동산가액+자동차가액+금융자산가액+기타자산가액-부채」
              (예: …020255 원문 p.5)를 옮긴 안내다. 원문 정의를 벗어나는 말을 더하지 않는다.
              판정은 바꾸지 않는다 — 입력값 그대로 총자산 한도와 견주며 자동차 가액을 더하지 않는다. -->
-        <p style="font-size:11px;color:#999;margin:0.35rem 0 0">부동산·자동차·금융자산 등을 모두 더하고 부채를 뺀 금액이에요.</p>
+        <p class="diag-hint">부동산·자동차·금융자산 등을 모두 더하고 부채를 뺀 금액이에요.</p>
       </div>
       <div class="field">
         <label class="label" for="owned">주택 소유 여부</label>
@@ -1097,7 +1136,7 @@ html[data-ui="d3"] body.theme-dark{color-scheme:dark}
       </div>
       <div class="field">
         <label class="label">&nbsp;</label>
-        <p style="font-size:11px;color:#999;margin:0.55rem 0 0">나이 요건이 있는 유형을 가려내는 데 써요.<br>비워두면 그 유형은 「확인 필요」로 표시돼요.</p>
+        <p class="diag-hint" style="margin-top:0.55rem">나이 요건이 있는 유형을 가려내는 데 써요.<br>비워두면 그 유형은 「확인 필요」로 표시돼요.</p>
       </div>
     </div>
     <div class="row">
@@ -1107,7 +1146,7 @@ html[data-ui="d3"] body.theme-dark{color-scheme:dark}
       </div>
       <div class="field">
         <label class="label">&nbsp;</label>
-        <p style="font-size:11px;color:#999;margin:0.55rem 0 0">보험개발원 차량기준가액이에요.<br>비워두면 판정에서 빼고 기준만 안내해드려요.</p>
+        <p class="diag-hint" style="margin-top:0.55rem">보험개발원 차량기준가액이에요.<br>비워두면 판정에서 빼고 기준만 안내해드려요.</p>
       </div>
     </div>
     <div class="row">
@@ -1125,6 +1164,27 @@ html[data-ui="d3"] body.theme-dark{color-scheme:dark}
           <option value="no">최하층 우선배정: 해당 없음</option>
           <option value="yes">최하층 우선배정: 신청 희망 (장애인·노약자)</option>
         </select>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <!-- 🔴 2026-10-13(우편함 「표시층 — 실사용 1회차 반영」 7 · 백로그 N7 · 다운님 결정) — 저장하지 않는 칸이다.
+             ⓐ 서버로 보내지 않는다(프로필 저장 payload · 이용 기록 · RPC 인자 어디에도 넣지 않는다 — saveUserProfile 은 칸을 하나씩 골라 싣는다)
+             ⓑ 브라우저 저장소(local·session)에도 쓰지 않는다 · 폼 복원도 끈다(autocomplete=off) — 새로 고치거나 닫으면 사라진다
+             ⓒ 화면에 그 사실을 한 줄로 밝힌다. 쓰는 곳은 매칭의 공급대상 키 판정 하나(zfTargetClassHit) — 키가 없는 공고는 판정하지 않는다. -->
+        <fieldset class="zf-cls" id="zfClassSet">
+          <legend class="label">해당하는 것 모두 (없으면 비워 두세요)</legend>
+          <div class="zf-cls-opts">
+            <label><input type="checkbox" id="zfClsLive" name="zfClass" value="livelihood" autocomplete="off"> 생계급여 수급자</label>
+            <label><input type="checkbox" name="zfClass" value="housing" autocomplete="off"> 주거급여 수급자</label>
+            <label><input type="checkbox" name="zfClass" value="medical" autocomplete="off"> 의료급여 수급자</label>
+            <label><input type="checkbox" name="zfClass" value="nearpoor" autocomplete="off"> 차상위계층</label>
+            <label><input type="checkbox" name="zfClass" value="disabled" autocomplete="off"> 장애인</label>
+            <label><input type="checkbox" name="zfClass" value="veteran" autocomplete="off"> 국가유공자</label>
+            <label><input type="checkbox" name="zfClass" value="singleparent" autocomplete="off"> 한부모가족</label>
+          </div>
+          <p class="diag-hint">🔒 이 칸은 저장되지 않아요. 새로 고치거나 화면을 닫으면 지워져요.</p>
+        </fieldset>
       </div>
     </div>
     <button class="btn btn-primary" onclick="diagnose()">자격 진단하기 →</button>
@@ -1208,6 +1268,7 @@ html[data-ui="d3"] body.theme-dark{color-scheme:dark}
       <div class="field">
         <label class="label">지역</label>
         <div class="chip-group" id="noticeRegionChips"></div>
+        <div id="noticeSggBox" class="zf3-sgg" hidden></div>
       </div>
       <div class="field">
         <label class="label">공고 상태</label>
@@ -1475,6 +1536,7 @@ html[data-ui="d3"] body.theme-dark{color-scheme:dark}
 
   <footer class="zf-footer">
     <p class="zf-ai-note">꼭집의 공고 정보는 AI가 공고문 원문을 읽고 정리했어요. 신청 전에는 공고 원문을 꼭 확인해 주세요.</p>
+    <p class="zf-ai-note zf-src">출처: LH · 마이홈 · SH 공고 원문 → 꼭집 정리</p>
     <a href="./terms.html">이용약관</a><span style="font-size:12px;color:#888"> · </span><a href="./privacy.html">개인정보처리방침</a>
   </footer>
 
@@ -1723,8 +1785,11 @@ function isNewNotice(row){
     row['apply_start'] || row['신청시작일'] ||
     row['created_at'] || row['수집일시'] || ''
   );
-  return d ? (new Date() - d) / 3600000 <= 48 : false;
+  // 🔵 2026-10-13(우편함 「표시층 — 실사용 1회차 반영」 1 · D5) — 「새 공고」 기간을 한 벌로: 공고일이 오늘부터 3일 전까지(날짜 단위).
+  //    종전에는 NEW 표지 48시간 · 공고 탭 「새 공고 · 3일」 · 인사이트 「최근 7일 신규」로 자리마다 달랐다.
+  return d ? Math.round((startOfLocalDay(new Date()) - startOfLocalDay(d)) / 86400000) <= ZF_FRESH_DAYS : false;
 }
+const ZF_FRESH_DAYS = 3;
 function isClosingSoon(row){
   // 🔴 B62 ③ — 접수기간을 믿을 수 없는 행에는 날짜에서 나오는 배지를 달지 않는다.
   if(row['apply_period_check'] === true) return false;
@@ -4689,7 +4754,8 @@ function renderPersonalizedRecommendations(){
     // 🔵 2026-10-08(매칭 2단계 · 함께 고칠 것 ①) — 지역·유형 조건이 없을 뿐 자격(공급 대상)·보증금으로는 거른다 — 문장의 범위를 바로잡는다.
     desc.textContent='저장된 지역·유형 조건이 없어 전체 공고를 표시해요.';
   } else {
-    desc.textContent=`저장된 조건 기준 ${filtered.length}건 매칭됐어요.`;
+    // 🔵 2026-10-13(우편함 「표시층 — 실사용 1회차 반영」 6) — 「매칭」이 자격 판정으로 읽히지 않게 무엇으로 골랐는지를 사실대로 쓴다(판정은 그대로).
+    desc.textContent=`저장한 희망 지역·유형·보증금과 공급 대상(혼인·자녀·나이)으로 고른 ${filtered.length}건이에요. 소득·자산 자격은 「자격 진단」에서 확인해요.`;
   }
 
   const shown=filtered.slice(0,5);
@@ -4820,11 +4886,11 @@ function renderInsight(rows, wrap, statsRows){
   //    종전에는 「이번주 신규」·「마감임박」이 마감 포함 전량에서 세어 신청할 수 없는 공고(LH 조기 마감 등)가 섞였다(2026-10-08 실측 신규 19 중 1 · 마감임박 10 중 3).
   const openRows = zfOpenNotices(rows);
   const kpiActive = openRows.filter(r=>isAcceptingNow(r)).length;
-  const d7ago = new Date(today); d7ago.setDate(d7ago.getDate()-7);
+  // 🔵 2026-10-13(D5) — 「새 공고」는 공고 탭 칩·전광판과 같은 한 벌(회차 날짜 zfNoticeDate · 오늘~3일 전).
+  const freshFrom = new Date(today); freshFrom.setDate(freshFrom.getDate()-ZF_FRESH_DAYS);
   const kpiNew = openRows.filter(r=>{
-    if(!r.announcement_date) return false;
-    const d = parseNoticeDate(r.announcement_date);
-    return d && d >= d7ago;
+    const d = parseNoticeDate(zfNoticeDate(r));
+    return d && startOfLocalDay(d) >= startOfLocalDay(freshFrom);
   }).length;
   const kpiClosing = openRows.filter(r=>isClosingSoon(zfWithSoonestEnd(r))).length;
 
@@ -5023,7 +5089,7 @@ function renderInsight(rows, wrap, statsRows){
         </div>
         <div style="background:#f0faf5;border-radius:12px;padding:16px;text-align:center;box-shadow:0 1px 4px rgba(29,158,117,0.08)">
           <p style="font-size:28px;font-weight:700;color:#1D9E75;margin:0">${kpiNew.toLocaleString()}</p>
-          <p style="font-size:12px;color:#888;margin-top:6px">🆕 이번주 신규</p>
+          <p style="font-size:12px;color:#888;margin-top:6px">🆕 새 공고 · 3일</p>
         </div>
         <div style="background:#fff7f0;border-radius:12px;padding:16px;text-align:center;box-shadow:0 1px 4px rgba(239,159,39,0.08)">
           <p style="font-size:28px;font-weight:700;color:#EF9F27;margin:0">${kpiClosing.toLocaleString()}</p>
@@ -5651,8 +5717,16 @@ async function diagnose(){
       const via = ageExceptionVia.has(c) ? ` (${ageExceptionVia.get(c)})` : '';
       return `· ${c.housing_type}${sf} — 나이 요건 ${range} · ${c.age_exception_note}${via}`;
     }).join('<br>');
-    commonMsgs+=`<div class="rbox warn" style="margin-top:6px"><p class="rtitle">🎂 나이 요건에 예외가 있어요</p><p class="rdesc">${excLabels}</p></div>`;
+    // 🔵 2026-10-13(우편함 「표시층 — 실사용 1회차 반영」 1 · N8) — 상한을 넘긴 사람(71세·46세 등)에게 청년 유형의 예외(대학생·사회초년생 등)를
+    //    맨 앞 경고 상자로 띄우면 자기 일처럼 읽힌다. 모두 「상한 위」일 때는 같은 문장을 접힌 칸으로 내린다(지우지 않는다 — 사유 정본은 DB).
+    const allAbove = birthYear > 0 && ageExceptionEntries.every(c => c.age_max != null && (nowYear - birthYear) > c.age_max);
+    if(allAbove) commonMsgs+=`<details class="rbox zf-agex" style="margin-top:6px"><summary class="rtitle">🎂 나이 상한을 넘었지만 예외 조건이 있는 유형 ${ageExceptionEntries.length}개</summary><p class="rdesc">${excLabels}</p></details>`;
+    else commonMsgs+=`<div class="rbox warn" style="margin-top:6px"><p class="rtitle">🎂 나이 요건에 예외가 있어요</p><p class="rdesc">${excLabels}</p></div>`;
   }
+  // 🔵 2026-10-13(우편함 「표시층 — 실사용 1회차 반영」 7) — 특수 계층 칸을 골랐으면 그것을 어디에 쓰는지 사실대로 한 줄(저장 안 함 · 판정 문장은 원문 키에서만).
+  { const cls = zfDiagClasses();
+    if(cls.size){ const names = ZF_TARGET_CLASS.filter(([k]) => cls.has(k)).map(([, l]) => l).join(' · ');
+      commonMsgs+=`<div class="rbox" style="margin-top:6px"><p class="rtitle">🔒 고른 계층: ${escapeHtml(names)}</p><p class="rdesc">다음 단계 매칭에서 공고가 그 계층을 공급 대상으로 적어 둔 경우에만 「대상 조건」 판정에 써요. 우선공급·순위·가점은 공고문에서 확인해 주세요. 이 값은 저장되지 않아요.</p></div>`; } }
 
   // 🔴 혼인 상태로 신청할 수 없는 유형 — 원문은 DB가 들고 있다.
   if(maritalExclEntries.length){
@@ -5809,7 +5883,21 @@ function zfProfileFacts(){
 //    facts = { marital, children(null = 모름), birthYear(0 = 모름) } — 매칭은 진단 입력(zfTargetDiagFacts), 추천은 저장 조건(zfTargetProfileFacts).
 //    D-1(상세 「내 조건에 맞는 세대」)이 다시 쓰게 판정은 zfTargetBranchState·zfTargetRowState·zfTargetVerdict 세 함수뿐이다.
 const ZF_TARGET_MARRIED = ['married_7','newborn','pre','married_child6'];
+// 🔵 2026-10-13(우편함 「표시층 — 실사용 1회차 반영」 7 · N7) — 진단의 특수 계층 칸(저장하지 않음 · 매칭 판정에만). 갈래의 대상·확인필요 글자에
+//    그 계층 이름이 있고 나이 같은 조건이 따로 없을 때만 그 갈래를 「맞음」으로 본다. 고르지 않은 것은 「해당 없음」이 아니라 「모름」이다 — no 로 빼지 않는다.
+//    키가 없는 공고(일반 공급 · 순위·가점에만 계층이 나오는 공고)는 종전대로 판정하지 않는다.
+const ZF_TARGET_CLASS = [['livelihood', '생계급여 수급자', /생계급여/], ['housing', '주거급여 수급자', /주거급여/], ['medical', '의료급여 수급자', /의료급여/],
+  ['nearpoor', '차상위계층', /차상위/], ['disabled', '장애인', /장애인/], ['veteran', '국가유공자', /국가유공자/], ['singleparent', '한부모가족', /한부모/]];
+function zfDiagClasses(){ return new Set([...document.querySelectorAll('#zfClassSet input[name="zfClass"]:checked')].map(i => i.value)); }
+function zfTargetClassHit(b, f){
+  if(!f || !f.classes || !f.classes.size || !b || typeof b !== 'object') return false;
+  const c = (b['조건'] && typeof b['조건'] === 'object') ? b['조건'] : {};
+  if(Object.keys(c).length) return false;
+  const t = `${b['대상'] || ''} ${b['확인필요'] || ''}`;
+  return ZF_TARGET_CLASS.some(([k, , re]) => f.classes.has(k) && re.test(t));
+}
 function zfTargetBranchState(b, f){
+  if(zfTargetClassHit(b, f)) return 'ok';
   if(!b || typeof b !== 'object' || b['확인필요']) return 'check';
   const c = (b['조건'] && typeof b['조건'] === 'object') ? b['조건'] : {};
   switch(b['대상']){
@@ -5868,7 +5956,7 @@ function zfTargetVerdict(rows, f){
 function zfTargetDiagFacts(){
   const by = parseInt(document.getElementById('birthYear')?.value) || 0;
   const ch = document.getElementById('children')?.value;
-  return { marital: diagMarital || document.getElementById('marital')?.value || '', children: (ch == null || ch === '') ? null : (parseInt(ch) || 0), birthYear: by };
+  return { marital: diagMarital || document.getElementById('marital')?.value || '', children: (ch == null || ch === '') ? null : (parseInt(ch) || 0), birthYear: by, classes: zfDiagClasses() };
 }
 function zfTargetProfileFacts(){
   const u = currentUser || {};
@@ -7549,9 +7637,17 @@ function zfPolListHtml(id){
       : `<p class="pol-empty">이 분류에 맞는 안내가 없어요.</p>`;
   }
   let html = '';
+  // 🔵 2026-10-13(우편함 「표시층 — 실사용 1회차 반영」 1 · N9) — 한 행은 첫 칩 묶음에만 산다(두 번 보이지 않게). 그래서 「서류 4」 칩인데 「전체」에서 「서류 (2)」로
+  //    보였다. 묶음 머리 수를 칩 수와 같게 두고, 다른 묶음에 사는 행은 어디 있는지 한 줄로 알린다(누르면 그 칩만 보기).
   st.chips.forEach(n => {
     const list = rows.filter(p => st.chipsOf(p)[0] === n);
-    if(list.length) html += `<div class="pol-group-head">${escapeHtml(n)} (${list.length})</div>` + list.map(p => zfPolItemHtml(p, { open })).join('');
+    const also = rows.filter(p => st.chipsOf(p).indexOf(n) > 0);
+    if(!list.length && !also.length) return;
+    html += `<div class="pol-group-head">${escapeHtml(n)} (${list.length + also.length})</div>` + list.map(p => zfPolItemHtml(p, { open })).join('');
+    if(also.length){
+      const where = [...new Set(also.map(p => st.chipsOf(p)[0]))].map(w => `「${escapeHtml(w)}」`).join('·');
+      html += `<p class="pol-xref">${also.length}건은 ${where} 묶음에 있어요 <button type="button" class="pol-xref-btn" data-pol-id="${zfAttr(id)}" data-chip="${zfAttr(n)}" onclick="event.stopPropagation();zfPolPickName(this)">${escapeHtml(n)}만 보기</button></p>`;
+    }
   });
   const etc = rows.filter(p => !st.chipsOf(p).length);
   if(etc.length) html += (st.chips.length ? `<div class="pol-group-head">기타 (${etc.length})</div>` : '') + etc.map(p => zfPolItemHtml(p, { open })).join('');
@@ -7607,6 +7703,11 @@ function zfPolPick(btn){
   zfPolState[id].pick = btn.dataset.chip || null;
   box.querySelectorAll('.pol-chip').forEach(b => b.classList.toggle('sel', b === btn));
   zfPolRerender(id);
+}
+function zfPolPickName(el){
+  const box = document.querySelector(`.pol-chips[data-pol-id="${CSS.escape(el.dataset.polId || '')}"]`);
+  const b = box && [...box.querySelectorAll('.pol-chip')].find(x => x.dataset.chip === el.dataset.chip);
+  if(b) zfPolPick(b);
 }
 function zfPolSearch(input){
   const id = input.dataset.polId;
@@ -9450,7 +9551,7 @@ try{
     });
   }
 }catch(err){
-  console.warn('ZipFit: Supabase Auth 초기화 실패 — 기존 이메일 경로로만 동작합니다.', err);
+  console.warn('ZipFit: Supabase Auth 초기화 실패 — 로그인 없이 둘러보기만 됩니다.', err);
   zfAuth = null;
 }
 
@@ -10104,12 +10205,12 @@ function zf3BoardItems(rows){
   { const tm = new Date(Date.now() + 33 * 3600 * 1000).toISOString().slice(0, 10);
     const tmr = pool.filter(n => applyWindowState(n) === 'before' && zf3Real(n['신청시작일'] || n['apply_start']) === tm);
     if(tmr.length >= 2){ const k = pref ? tmr.filter(n => zf3Mine(n, pref)).length : 0;
-      items.unshift({ type: 'sum', ev: 'start', tag: '내일 접수 시작', name: `${tmr.length}건${pref ? ` · 내 조건 ${k}건` : ''}`, place: '' }); } }
+      items.unshift({ type: 'sum', ev: 'start', tag: '내일 접수 시작', name: `${tmr.length}건${pref ? ` · 희망 조건 ${k}건` : ''}`, place: '' }); } }
   const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
   const shut = zf3ClosedNotices();
   const notices = zf3Notices.filter(x => x && x.id && x.title && x.start <= today && today <= x.end && !shut.includes(x.id))
     .map(x => ({ type: 'notice', id: x.id, tag: '공지', name: x.title, links: (x.links || []).filter(l => /^(\.\/|https:\/\/)/.test(String(l.href || ''))) }));
-  if(!items.length) items.push({ type: 'empty', tag: '안내', name: pref ? `내 조건 공고에 오늘 새 소식이 없어요 · 조건에 맞는 열린 공고 ${mine.length.toLocaleString()}건` : `오늘 새 소식이 없어요 · 열린 공고 ${pool.length.toLocaleString()}건` });
+  if(!items.length) items.push({ type: 'empty', tag: '안내', name: pref ? `희망 조건 공고에 오늘 새 소식이 없어요 · 희망 지역·유형·보증금에 맞는 열린 공고 ${mine.length.toLocaleString()}건` : `오늘 새 소식이 없어요 · 열린 공고 ${pool.length.toLocaleString()}건` });
   return { list: [...notices, ...items], mine: !!pref };
 }
 const ZF3_ICON_PAUSE = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><rect x="3" y="2" width="3.4" height="12" rx="1" fill="currentColor"/><rect x="9.6" y="2" width="3.4" height="12" rx="1" fill="currentColor"/></svg>';
@@ -10120,7 +10221,7 @@ function zf3ItemHTML(it, dup){
   const ti = dup ? ' tabindex="-1"' : '';
   const tag = `<span class="zf3-tg ${it.type === 'card' ? it.ev : it.type}">${escapeHtml(it.tag)}</span>`;
   if(it.type === 'card'){
-    return `<button type="button" class="zf3-mi" data-act="go" data-id="${zfAttr(it.id)}"${ti}>${tag}${zf3BoardMine ? '<span class="zf3-star" role="img" aria-label="내 조건">★</span>' : ''}<span class="zf3-nm">${escapeHtml(it.name)}</span>${it.place ? `<span class="zf3-pl">${escapeHtml(it.place)}</span>` : ''}</button>`;
+    return `<button type="button" class="zf3-mi" data-act="go" data-id="${zfAttr(it.id)}"${ti}>${tag}${zf3BoardMine ? '<span class="zf3-star" role="img" aria-label="희망 지역·유형·보증금에 맞음" title="희망 지역·유형·보증금에 맞음 — 자격 판정은 아니에요">★</span>' : ''}<span class="zf3-nm">${escapeHtml(it.name)}</span>${it.place ? `<span class="zf3-pl">${escapeHtml(it.place)}</span>` : ''}</button>`;
   }
   if(it.type === 'sum') return `<button type="button" class="zf3-mi" data-act="sum"${ti}><span class="zf3-tg start">${escapeHtml(it.tag)}</span><span class="zf3-nm">${escapeHtml(it.name)}</span><span class="zf3-pl">접수 시작순으로 보기</span></button>`;
   if(it.type === 'notice'){
@@ -10148,7 +10249,7 @@ function zf3PaintBoard(rows){
   const oldTrack = box.querySelector('.zf3-run .zf3-track');
   if(oldTrack && oldTrack.getAnimations){ const a = oldTrack.getAnimations()[0]; if(a) at = a.currentTime; }
   zf3Key = key; zf3List = B.list; zf3Mode = mode; zf3BoardMine = B.mine;
-  const label = `${B.mine ? '내 조건' : '전체'} 소식 ${B.list.length}개 전광판`;
+  const label = `${B.mine ? '희망 조건(지역·유형·보증금)' : '전체'} 소식 ${B.list.length}개 전광판`;
   if(quiet){
     box.innerHTML = `<div class="zf3-mq zf3-quiet"><div class="zf3-view" role="group" aria-label="${zfAttr(label)}"><div class="zf3-track">${zf3ItemHTML(B.list[0])}</div></div></div>`;
   }else if(rm){
@@ -10463,7 +10564,7 @@ function zf3DecorateIn(list, rowsMap, isMatch){
           ev.stopPropagation();
           const sv = { title: n['공고명'] || '', url: n['공고URL'] || '', rid: n['announcement_id'] || '', id: n['announcement_id'] || '' };
           zf3IcsDownload(one.map(r => ({ d: r.start_date, k: '현장 접수' + (r.site_text ? ' · ' + r.site_text : '') + (r.phase_text ? ' · ' + r.phase_text : ''), sv,
-            note: [r.period_text, r.place_text ? '접수 장소 ' + r.place_text : '', r.note_text].filter(Boolean).join('\n'), loc: r.place_text || '' })), '꼭집 현장 접수', 'field');
+            note: [r.period_text, r.place_text ? '접수 장소 ' + r.place_text : '', r.note_text].filter(Boolean).join('\n'), loc: r.place_text || '', t: zf3IcsTime(r.period_text) })), '꼭집 현장 접수', 'field-' + String(sv.rid || sv.id || ''));
         });
         (card.querySelector('.zf-route-slot') || route).insertAdjacentElement('afterend', p);   // 「현장 접수는 … 하루만 받아요」 줄 바로 뒤
       }
@@ -10609,8 +10710,31 @@ function zf3CondChips(){
   if(zf3PlaceSel && zf3PlaceName) out.push(['place', `📍 ${zf3PlaceName}`]);
   return out;
 }
+// 표제란 「마지막 수집」 — 목록을 받은 날짜가 아니라 실제 마지막 수집 시각(RPC get_last_collected_at · 출처별 셋 중 가장 늦은 것).
+//    🔴 수집 주기 문구를 쓰지 않는다(낮 · 밤 · SH 주기가 달라 한 문장이 늘 틀린다 — 우편함 「표시층 — 실사용 1회차 반영」 3).
+//    받기 전·실패면 「확인 중」 · 10분마다 다시 묻고 그 칸 글자만 바꾼다. 출처 표시는 푸터(.zf-src)로 옮겼다(지우지 않는다 — ⑨ 4-1).
+let zf3Collected = null, zf3CollectedT = null;
+function zf3CollText(){
+  if(!zf3Collected) return '확인 중';
+  const k = new Date(zf3Collected + 9 * 3600 * 1000).toISOString();
+  const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+  const yest = new Date(Date.now() - 15 * 3600 * 1000).toISOString().slice(0, 10);
+  const day = k.slice(0, 10) === today ? '오늘' : k.slice(0, 10) === yest ? '어제' : k.slice(5, 10).replace('-', '.');
+  return `${day} ${k.slice(11, 16)} KST`;
+}
+async function zf3LoadCollected(){
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_last_collected_at`, {method:'POST', headers: zfAnonHeaders(), body: '{}'});
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const rows = await res.json();
+    const ts = (Array.isArray(rows) ? rows : []).map(r => Date.parse(r && r.last_collected_at)).filter(t => !isNaN(t));
+    zf3Collected = ts.length ? Math.max(...ts) : null;
+  }catch(err){ console.warn('꼭집 마지막 수집 시각을 못 받았어요:', err); }
+  document.querySelectorAll('[data-zf3-coll]').forEach(e => { e.textContent = zf3CollText(); });
+}
 function zf3RenderNoticeHead(filtered){
   if(!zf3On()) return;
+  if(!zf3CollectedT){ zf3CollectedT = setInterval(zf3LoadCollected, 10 * 60 * 1000); zf3LoadCollected(); }
   const el = document.getElementById('zf3NoticeHead');
   if(!el) return;
   const chk = document.getElementById('hideClosedChk');
@@ -10627,17 +10751,50 @@ function zf3RenderNoticeHead(filtered){
   //    선택지는 종전 정렬 칸(noticeSortSel)에서 그대로 떠 와 값만 넘긴다 — 정렬 판정은 종전 그 칸 하나(시트 안 그 칸은 d3에서 숨김).
   const sortSel = document.getElementById('noticeSortSel');
   const sortOpts = sortSel ? [...sortSel.options].map(o => `<option value="${zfAttr(o.value)}"${o.value === sortSel.value ? ' selected' : ''}>${escapeHtml(o.textContent)}</option>`).join('') : '';
-  const at =noticeLoadedAt ? new Date(noticeLoadedAt + 9 * 3600 * 1000).toISOString() : '';
-  const atText = at ? `${at.slice(0, 10).replace(/-/g, '.')} KST` : '불러오는 중…';   // 시안 「slim」 그대로 날짜만 — 390px 한 줄
   const sheetOpen = !document.getElementById('noticeFilterPanel')?.classList.contains('hidden');
   el.innerHTML = `<div class="zf3-lhrow"><p class="zf3-lh">${head}</p><span class="zf3-vseg" role="group" aria-label="보기"><button type="button" data-act="view" data-v="list" aria-pressed="${zf3View !== 'map'}">목록</button><button type="button" data-act="view" data-v="map" aria-pressed="${zf3View === 'map'}">지도</button></span></div>`
     + `<p class="zf3-lsub">${closedExcluded ? '' : `열린 ${o.n.toLocaleString()}건: `}${zf3StLink('접수 중', '접수 중', o.a)} · ${zf3StLink('예정', '접수 예정', o.b)}${o.k ? ` · ${zf3StLink('미상', '접수기간 미상', o.k)}` : ''}</p>`
     + zf3StatChips(all)
-    + `<div class="zf3-tblock" role="note"><div><span class="k">기준</span><span class="v led">${escapeHtml(atText)}</span></div><div><span class="k">출처</span><span class="v">LH · 마이홈 · SH 원문 → 꼭집 정리</span></div></div>`
+    + `<div class="zf3-tblock" role="note"><div><span class="k">마지막 수집</span><span class="v led" data-zf3-coll>${escapeHtml(zf3CollText())}</span></div></div>`
     + `<div class="zf3-ctl"><button type="button" class="zf3-chip add zf3-fbtn" data-act="sheet" aria-expanded="${sheetOpen}" aria-controls="noticeFilterPanel">${ZF3_ICO_FILTER}필터${chips.length ? ` <b>${chips.length}</b>` : ''}</button>`
     + (sortOpts ? `<span class="zf3-sortsel">${ZF3_ICO_SORT}<select data-act="sortsel" aria-label="정렬">${sortOpts}</select><span class="cv" aria-hidden="true">▾</span></span>` : '') + `</div>`
     + (chips.length ? `<div class="zf3-chips" role="group" aria-label="걸린 조건">${chips.map(([k, t]) => `<button type="button" class="zf3-chip on" data-act="clear" data-k="${k}" aria-label="${zfAttr(t)} 조건 빼기">${escapeHtml(t)}<span aria-hidden="true">✕</span></button>`).join('')}</div>` : '');
   el.hidden = false;
+  zf3RenderSheetPlaces();
+}
+// 🔵 2026-10-13(우편함 「표시층 — 실사용 1회차 반영」 5 · 백로그 「지역 필터가 시·도 단위뿐」 · 1회차 N4) — 필터 시트의 지역도 두 층:
+//    시·도 칩(종전 그대로 · 목록 RPC 가 거른다) 아래에 그 시·도의 시·군·구 칩. 🔴 상태는 지도 단추와 하나(zf3PlaceSel · 📍 칩 · ✕로 뺀다) ·
+//    재료도 하나(zf3MapGroups — 카드 「주택이 있는 지역」과 같은 세대 주소 ∪ 지역 목록 · #486). 새 저장 0(메모리만).
+function zf3RenderSheetPlaces(){
+  const box = document.getElementById('noticeSggBox');
+  if(!box) return;
+  if(!zf3On()){ box.hidden = true; return; }
+  box.hidden = false;
+  const msg = t => { box.innerHTML = `<p class="zf3-sgg-h">${t}</p>`; };
+  if(!activeNoticeRegion){ msg('시·도를 고르면 시·군·구로 더 좁힐 수 있어요'); return; }
+  if(!zf3Geo){ msg('시·군·구를 불러오는 중…'); zf3LoadGeo().then(g => { if(g) applyNoticeFiltersAndRender(noticePage); else msg('시·군·구를 불러오지 못했어요'); }); return; }
+  zfEnsurePriceSummaries((zf3PrePlace || []).map(n => n['announcement_id'])).then(ok => { if(ok){ applyNoticeFiltersAndRender(noticePage); zfFillSummarySlots(); } });
+  const pc = ZF3_PROV[activeNoticeRegion];   // 목록 RPC 가 이미 그 시·도로 걸렀다 — 이름이 표에 없는 시·도(통합 시·도 등)면 걸린 행의 곳 전부
+  const gs = zf3MapGroups().filter(g => !pc || g.pc === pc);
+  if(!gs.length){ msg('이 시·도에는 시·군·구로 나눌 공고가 없어요'); return; }
+  const inHere = zf3PlaceSel && gs.some(g => g.key === zf3PlaceSel);
+  box.innerHTML = `<p class="zf3-sgg-h" id="noticeSggH">${escapeHtml(zf3ShortSido(activeNoticeRegion))} 시·군·구</p>`
+    + `<div class="zf3-sgg-l" role="group" aria-labelledby="noticeSggH"><button type="button" class="chip${inHere ? '' : ' sel'}" data-place="" aria-pressed="${!inHere}">전체</button>`
+    + gs.map(g => `<button type="button" class="chip${zf3PlaceSel === g.key ? ' sel' : ''}" data-place="${zfAttr(g.key)}" data-name="${zfAttr(g.name)}" aria-pressed="${zf3PlaceSel === g.key}">${escapeHtml(zf3PlaceShort(g))} <b>${g.n}</b></button>`).join('')
+    + `</div>`;
+  if(!box.dataset.wired){
+    box.dataset.wired = '1';
+    box.addEventListener('click', e => {
+      const b = e.target.closest('[data-place]'); if(!b) return;
+      e.stopPropagation();
+      const k = b.dataset.place;
+      if(!k || zf3PlaceSel === k){ zf3PlaceSel = null; zf3PlaceName = ''; }
+      else { zf3PlaceSel = k; zf3PlaceName = b.dataset.name || ''; zf3PlaceSido = k.split('|')[0]; }   // 지도 단추 층도 같은 시·도를 연다
+      updateFilterToggleBtn();
+      applyNoticeFiltersAndRender();
+      const f = box.querySelector(`[data-place="${CSS.escape(zf3PlaceSel || '')}"]`); if(f) f.focus();
+    });
+  }
 }
 function zf3ClearCond(k){
   if(k === 'region'){ activeNoticeRegion = null; refreshChipSel('noticeRegionChips', null); updateFilterToggleBtn(); loadNoticeData(); return; }
@@ -10789,7 +10946,7 @@ function zf3TrendHTML(){
   const canBack = !!zf3TrB && zf3DayShift(start, -1) >= zf3TrB.none && zf3TrOff < 12;
   const bars = days.map(k => { const s = st(k), n = zf3TrCnt[k] || 0;
     return s === 'none' ? `<div class="zf3-trc none" title="${k}: 수집 전"></div>`
-      : `<div class="zf3-trc${s === 'part' ? ' part' : ''}${n ? '' : ' z'}" title="${k}: ${n}건${s === 'part' ? ' (수집 범위 밖 — 실제보다 적을 수 있음)' : ''}"><span class="n">${n || ''}</span><i style="--h:${Math.round(n / max * 100)}"></i></div>`; }).join('');
+      : `<div class="zf3-trc${s === 'part' ? ' part' : ''}${n ? '' : ' z'}${n && n === max ? ' pk' : ''}" title="${k}: ${n}건${s === 'part' ? ' (수집 범위 밖 — 실제보다 적을 수 있음)' : ''}"><span class="n">${n || ''}</span><i style="--h:${Math.round(n / max * 100)}"></i></div>`; }).join('');
   const aria = `${md(start)}부터 ${md(end)}까지 공고 ${total}건` + (nPart ? ` · 회색 ${nPart}일은 수집 범위 밖이라 실제보다 적을 수 있음` : '') + (nNone ? ` · ${nNone}일은 수집 전` : '');
   return `<div class="zf3-trnav"><button type="button" data-act="tr" data-v="1" aria-label="앞 30일 보기"${canBack ? '' : ' disabled'}>‹</button><span aria-live="polite">${md(start)} – ${md(end)}${zf3TrOff ? '' : ' (오늘까지)'} · ${total.toLocaleString()}건</span><button type="button" data-act="tr" data-v="-1" aria-label="뒤 30일 보기"${zf3TrOff ? '' : ' disabled'}>›</button></div>
     <div class="zf3-tr" role="img" aria-label="${zfAttr(aria)}">${bars}</div><div class="zf3-trx"><span>${md(start)}</span><span>${md(end)}</span></div>`
@@ -10807,6 +10964,19 @@ document.addEventListener('click', ev => {
     if(nb) nb.focus();
   }
 });
+// 🔵 2026-10-13(우편함 「표시층 — 실사용 1회차 반영」 1 · N6) — 원문에 「13:00~16:00」처럼 시각이 있으면 하루 종일이 아니라 그 시각으로 넣는다(KST → UTC).
+//    시각이 하나뿐이거나 없으면 종전대로 하루 종일. 글자에서 처음 나온 「시:분 ~ 시:분」 하나만 쓴다.
+function zf3IcsTime(t){
+  const m = /(\d{1,2}):(\d{2})\s*[~∼〜\-–]\s*(\d{1,2}):(\d{2})/.exec(String(t || ''));
+  if(!m) return null;
+  const a = [+m[1], +m[2]], b = [+m[3], +m[4]];
+  if(a[0] > 23 || b[0] > 24 || a[1] > 59 || b[1] > 59 || a[0] * 60 + a[1] >= b[0] * 60 + b[1]) return null;
+  return [a, b];
+}
+function zf3IcsUtc(d, hm){
+  const x = new Date(`${d}T00:00:00Z`); x.setUTCMinutes(hm[0] * 60 + hm[1] - 9 * 60);
+  return x.toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
+}
 function zf3IcsDownload(events, calName, fileTag){
   if(!events || !events.length) return;
   const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
@@ -10816,7 +10986,7 @@ function zf3IcsDownload(events, calName, fileTag){
   events.forEach((e, i) => {
     const url = e.sv.url || '';
     lines.push('BEGIN:VEVENT', `UID:${day(e.d)}-${i}-${String(e.sv.rid || e.sv.id).replace(/[^\w-]/g, '')}@kkokzip.com`, `DTSTAMP:${stamp}`,
-      `DTSTART;VALUE=DATE:${day(e.d)}`, `DTEND;VALUE=DATE:${next(e.d)}`,
+      ...(e.t ? [`DTSTART:${zf3IcsUtc(e.d, e.t[0])}`, `DTEND:${zf3IcsUtc(e.d, e.t[1])}`] : [`DTSTART;VALUE=DATE:${day(e.d)}`, `DTEND;VALUE=DATE:${next(e.d)}`]),
       zf3IcsFold(`SUMMARY:${zf3IcsEsc(`[꼭집] ${e.k} · ${e.sv.title || ''}`)}`),
       zf3IcsFold(`DESCRIPTION:${zf3IcsEsc(`꼭집이 공고 원문을 정리한 날짜예요. 신청 전에는 공고 원문을 꼭 확인해 주세요.${e.note ? '\n' + e.note : ''}${url ? '\n' + url : ''}`)}`),
       ...(e.loc ? [zf3IcsFold(`LOCATION:${zf3IcsEsc(e.loc)}`)] : []),
@@ -10825,7 +10995,9 @@ function zf3IcsDownload(events, calName, fileTag){
   lines.push('END:VCALENDAR');
   const blob = new Blob([lines.join('\r\n') + '\r\n'], { type: 'text/calendar;charset=utf-8' });
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob); a.download = `kkokzip-${fileTag ? fileTag + '-' : ''}${zf3Today()}.ics`;
+  // 🔵 2026-10-13(N6) — 공고 하나의 일정이면 받은 날이 아니라 그 공고로 이름을 짓는다(여러 개 받아도 갈린다). 나의 노선도(여러 공고)는 받은 날 그대로.
+  //    파일 이름은 영문·숫자만(한글이 섞이면 Chromium 이 「download」로 바꿨다 — 2026-10-13 실측).
+  a.href = URL.createObjectURL(blob); a.download = fileTag ? `kkokzip-${String(fileTag).replace(/[^\w-]/g, '').replace(/_+/g, '_').replace(/_$/, '')}.ics` : `kkokzip-${zf3Today()}.ics`;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
@@ -10837,7 +11009,7 @@ function zf3MinePcs(){
   p.regions.forEach(rg => { const r = String(rg).trim(); Object.entries(ZF3_PROV).forEach(([nm, pc]) => { if(nm === r || nm.includes(r) || r.includes(zf3ShortSido(nm))) out.add(pc); }); });
   return out;
 }
-// ④ 공고 탭 머리 한 줄 요약 — 오늘 마감 · 3일 안 마감 · 이번 주 접수 시작 · 새 공고(3일). 누르면 그 순서로 줄 세운다(정렬 칸 noticeSortSel 그대로).
+// ④ 공고 탭 머리 한 줄 요약 — 오늘 마감 · 3일 안 마감 · 7일 안 접수 시작 · 새 공고(3일). 누르면 그 순서로 줄 세운다(정렬 칸 noticeSortSel 그대로).
 //    셈은 「신청할 수 없는 공고」를 뺀 열린 공고에서 · 술어는 종전 그대로(isClosingSoon · applyWindowState · zfNoticeDate).
 // 머리 아랫줄 갈래 숫자 → 상태 칩 켜기(Notion 💡 「공고 탭 머리의 접수 중 a · 예정 b · 미상 k 를 해당 상태 칩을 켜는 링크로」) — 같은 칩을 다시 누르면 끈다.
 function zf3StLink(label, st, n){ return `<button type="button" class="zf3-stl${activeNoticeStatus === st ? ' on' : ''}" data-act="st" data-v="${zfAttr(st)}" aria-pressed="${activeNoticeStatus === st}">${label} <b>${Number(n || 0).toLocaleString()}</b></button>`; }
@@ -10853,13 +11025,14 @@ function zf3StatChips(all){
   });
   const cur = (document.getElementById('noticeSortSel') || {}).value || 'date-desc';
   const chip = (n, label, sort, hot) => `<button type="button" class="zf3-stat${hot && n ? ' hot' : ''}${cur === sort ? ' on' : ''}" data-act="sort" data-v="${sort}" aria-label="${label} ${n}건 — ${sort === 'end-asc' ? '마감 임박순' : sort === 'start-asc' ? '접수 시작순' : '최신 공고순'}으로 보기"><b>${n}</b>${label}</button>`;
-  return `<div class="zf3-stats" role="group" aria-label="열린 공고 한눈에">${chip(d0, '오늘 마감', 'end-asc', true)}${chip(d3, '3일 안 마감', 'end-asc', false)}${chip(st, '이번 주 접수 시작', 'start-asc', false)}${chip(nw, '새 공고 · 3일', 'date-desc', false)}</div>`;
+  return `<div class="zf3-stats" role="group" aria-label="열린 공고 한눈에">${chip(d0, '오늘 마감', 'end-asc', true)}${chip(d3, '3일 안 마감', 'end-asc', false)}${chip(st, '7일 안 접수 시작', 'start-asc', false)}${chip(nw, '새 공고 · 3일', 'date-desc', false)}</div>`;
 }
 // ── 추천(D-3 단계 e · 2026-10-12) — 종전 진단 양식(#panel1)을 지우지 않고 덧입힌다(입력칸·ID·diagnose() 그대로 · 원칙 7).
-//    ① 처음 온 사람(390~1199px): 노선 따라 한 역씩 6역(나이 · 혼인 · 자녀·가구 · 소득 · 자산·차 · 집·통장) — 「다음 역 →」 · 마지막 역에서 「자격 진단하기」
+//    ① 처음 온 사람(390~1199px): 노선 따라 한 역씩 6역(나이 · 혼인 · 자녀·가구 · 소득 · 자산·차 · 집·통장) — 「다음 질문 →」 · 마지막 역에서 「자격 진단하기」
+//       (2026-10-13 취향 ① — 단추는 할 일을 그대로 말한다 · 노선 그림은 진행 표시로 남긴다. 「다음 역」 은유는 고령 사용자에게 한 번 더 풀어 읽게 했다)
 //    ② 저장 조건으로 칸이 채워진 사람: 결과부터(진단을 한 번 돌려 보여 주고 「조건 고치기」로 노선 스텝) — D-2 4차 검증 ③ ⑶
 //    ③ 1200px 이상: 한 장(입력 | 결과 두 단).  근거 — GOV.UK 「한 화면에 한 가지」 · 390 한 장 입력 약 1,700px(D-2 4차 실측).
-const ZF3_REC_ST = [['나이', ['birthYear']], ['혼인', ['marital']], ['자녀·가구', ['children', 'members', 'birthAfterBase']], ['소득', ['income', 'dualIncome']], ['자산·차', ['assets', 'carValue']], ['집·통장', ['owned', 'hasSavings', 'wantsGroundFloor']]];
+const ZF3_REC_ST = [['나이', ['birthYear']], ['혼인', ['marital']], ['자녀·가구', ['children', 'members', 'birthAfterBase']], ['소득', ['income', 'dualIncome']], ['자산·차', ['assets', 'carValue']], ['집·통장', ['owned', 'hasSavings', 'wantsGroundFloor', 'zfClsLive']]];
 let zf3RecI = 0, zf3RecMode = '', zf3RecSavedRan = false;
 function zf3RecWide(){ try{ return matchMedia('(min-width:1200px)').matches; }catch(e){ return false; } }
 function zf3RecInit(){
@@ -10875,7 +11048,7 @@ function zf3RecInit(){
   pn.querySelector('.panel-title').after(head);
   const nav = document.createElement('div');
   nav.className = 'zf3-snav';
-  nav.innerHTML = '<button type="button" class="btn btn-sec" data-act="prev">← 이전</button><button type="button" class="btn btn-primary" data-act="next">다음 역 →</button>';
+  nav.innerHTML = '<button type="button" class="btn btn-sec" data-act="prev">← 이전</button><button type="button" class="btn btn-primary" data-act="next">다음 질문 →</button>';
   const go = pn.querySelector('button[onclick="diagnose()"]');
   if(go) go.before(nav); else pn.appendChild(nav);
   nav.addEventListener('click', e => { const b = e.target.closest('[data-act]'); if(!b) return; zf3RecGo(zf3RecI + (b.dataset.act === 'next' ? 1 : -1), true); });
@@ -10906,7 +11079,7 @@ function zf3RecGo(i, focus){
   pn.classList.toggle('zf3-last', last);
   const sl = pn.querySelector('.zf3-sl');
   sl.style.setProperty('--n', n); sl.style.setProperty('--p', (zf3RecI / (n - 1)).toFixed(3));
-  sl.setAttribute('aria-label', `질문 ${n}역 중 ${zf3RecI + 1}번째 — ${ZF3_REC_ST[zf3RecI][0]}`);
+  sl.setAttribute('aria-label', `질문 ${n}개 중 ${zf3RecI + 1}번째 — ${ZF3_REC_ST[zf3RecI][0]}`);
   sl.innerHTML = '<span class="r"></span><span class="d"></span>' + ZF3_REC_ST.map(([k], j) => `<span class="s${j < zf3RecI ? ' past' : j === zf3RecI ? ' now' : ''}"><i></i><b>${k}</b></span>`).join('');
   const q = pn.querySelector('.zf3-sq'); q.textContent = `${zf3RecI + 1}/${n} · ${ZF3_REC_ST[zf3RecI][0]}`;
   const prev = pn.querySelector('.zf3-snav [data-act="prev"]'); if(prev) prev.hidden = zf3RecI === 0;
@@ -11011,11 +11184,14 @@ function zf3MapGroups(){
 }
 // 지역 단추 두 층(우편함 「표시층 — 공고 탭 다듬기」 4). 시·도 단추의 수 = 그 시·도에 걸친 공고 수(한 공고가 여러 시군구에 걸쳐도 한 번) ·
 //    점의 색 갈래는 그 시·도 안 시·군·구 중 가장 급한 것(오늘·내일 마감 > 접수 중 > 접수 예정). 시군구 미상(고리)도 그 시·도 안에 든다.
+// 🔵 2026-10-13(N5) — 시·도 층 안의 단추는 시·도 이름을 떼고 쓴다(머리에 이미 있다) — 경기 「김포시」와 서울 「서울 강동구」로 꼴이 갈리던 것.
+//    📍 칩(zf3PlaceName)은 시·도를 붙인 이름 그대로 — 목록 위에서 어느 시·도인지가 보여야 한다.
+function zf3PlaceShort(g){ const p = zf3ShortSido(ZF3_PROV_NAME[g.pc] || g.pc) + ' '; return String(g.name).startsWith(p) ? String(g.name).slice(p.length) : String(g.name); }
 function zf3PlacesHTML(gs, mine){
-  const btn = g => `<button type="button" data-place="${zfAttr(g.key)}" data-name="${zfAttr(g.name)}" aria-pressed="${zf3PlaceSel === g.key}"><i class="${g.exact ? g.cls : 'ring'}" aria-hidden="true"></i>${mine.has(g.pc) ? '<span class="zf3-pmine" aria-label="내 희망 지역">★</span>' : ''}${escapeHtml(g.name)} <b>${g.n}</b></button>`;
   const pcs = [...new Set(gs.map(g => g.pc))];
   if(zf3PlaceSido && !pcs.includes(zf3PlaceSido)) zf3PlaceSido = null;   // 조건이 바뀌어 그 시·도에 공고가 없으면 시·도 목록으로
   const sidoName = pc => zf3ShortSido(ZF3_PROV_NAME[pc] || pc);
+  const btn = g => `<button type="button" data-place="${zfAttr(g.key)}" data-name="${zfAttr(g.name)}" aria-pressed="${zf3PlaceSel === g.key}"><i class="${g.exact ? g.cls : 'ring'}" aria-hidden="true"></i>${mine.has(g.pc) ? '<span class="zf3-pmine" aria-label="내 희망 지역">★</span>' : ''}${escapeHtml(zf3PlaceShort(g))} <b>${g.n}</b></button>`;
   if(zf3PlaceSido){
     const kids = gs.filter(g => g.pc === zf3PlaceSido);
     const n = (zf3PrePlace || []).filter(r => zf3PlacesOfRow(r).some(p => p.pc === zf3PlaceSido)).length;
@@ -11043,10 +11219,15 @@ function zf3RenderMap(){
   // 🔵 2026-10-13(N3) — 곳의 재료인 세대 행 지역(가격 요약)을 목록 전체 몫으로 받는다. 새로 온 것이 있으면 목록·지도를 다시 그린다(이미 받은 id 는 다시 묻지 않는다).
   zfEnsurePriceSummaries((zf3PrePlace || []).map(n => n['announcement_id'])).then(ok => { if(ok){ applyNoticeFiltersAndRender(noticePage); zfFillSummarySlots(); } });
   const G = zf3Geo, mine = zf3MinePcs(), gs = zf3MapGroups().sort((a, b) => (mine.has(b.pc) ? 1 : 0) - (mine.has(a.pc) ? 1 : 0)), on = new Set(gs.map(g => g.pc));
-  const placed = [], clash = b => placed.some(q => !(b[2] < q[0] || b[0] > q[2] || b[3] < q[1] || b[1] > q[3]));
+  // 🔵 2026-10-13(우편함 「표시층 — 실사용 1회차 반영」 1 · D4) — 이름표가 다른 이름표뿐 아니라 다른 점과도 겹치지 않게: 점 자리를 먼저 깔고,
+  //    이름표는 오른쪽 → 왼쪽 → 위 → 아래 순으로 빈 자리를 찾는다(자기 점은 빼고 잰다). 자리가 없으면 그리지 않는다 — 아래 지역 단추가 전부를 보인다.
+  const placed = [], clash = (b, own) => placed.some(q => q[4] !== own && !(b[2] < q[0] || b[0] > q[2] || b[3] < q[1] || b[1] > q[3]));
+  gs.forEach(g => { if(g.exact){ const r = 5 + Math.min(7, g.n - 1); placed.push([g.xy[0] - r, g.xy[1] - r, g.xy[0] + r, g.xy[1] + r, g.key]); } });
   const lbl = g => { const t = `${g.exact ? g.name.replace(/^\S+시\s(\S+구)$/, '$1').replace(ZF3_METRO.has(g.pc) ? /^\S+\s/ : /^$/, '') : g.name} ${g.n}`, w = t.length * 12.5;
-    const x = g.exact ? g.xy[0] + 10 : g.xy[0] - w / 2, y = g.exact ? g.xy[1] + 5 : g.xy[1] - 28 - Math.min(14, g.n);
-    const b = [x, y - 14, x + w, y + 3]; if(clash(b)) return ''; placed.push(b); return `<text class="lbl" x="${x.toFixed(1)}" y="${y.toFixed(1)}">${escapeHtml(t)}</text>`; };
+    const r = 5 + Math.min(7, g.n - 1), [cx, cy] = g.xy;
+    const cand = g.exact ? [[cx + r + 3, cy + 5], [cx - r - 3 - w, cy + 5], [cx - w / 2, cy - r - 4], [cx - w / 2, cy + r + 15]] : [[cx - w / 2, cy - 28 - Math.min(14, g.n)]];
+    for(const [x, y] of cand){ const b = [x, y - 14, x + w, y + 3, '#' + g.key]; if(clash(b, g.key)) continue; placed.push(b); return `<text class="lbl" x="${x.toFixed(1)}" y="${y.toFixed(1)}">${escapeHtml(t)}</text>`; }
+    return ''; };
   const rings = gs.filter(g => !g.exact), dots = gs.filter(g => g.exact);
   const labels = [...rings, ...dots].map(lbl).join('');
   const pts = gs.map((g, i) => { const r = 5 + Math.min(7, g.n - 1), [x, y] = g.xy, sel = zf3PlaceSel === g.key ? ' sel' : '';
@@ -11091,7 +11272,7 @@ function zf3MyRoute(){
   };
   const note = [unk ? `날짜를 원문에서 확인해야 하는 공고 ${unk}건` : '', done ? `남은 일정이 없는 공고 ${done}건` : ''].filter(Boolean).join(' · ');
   zf3MyEvents = ev;
-  box.innerHTML = `<div class="zf3-my-h"><h2 id="zf3MyT">나의 노선도</h2><span>저장한 공고 ${saved.length}건의 다음 일정</span>${ev.length ? `<button type="button" class="zf3-ics" data-act="ics" aria-label="남은 일정 ${ev.length}개를 달력 파일로 내려받기">📅 달력에 넣기</button>` : ''}</div>`
+  box.innerHTML = `<div class="zf3-my-h"><h2 id="zf3MyT">나의 노선도</h2><span>저장한 공고 ${saved.length}건의 다음 일정</span>${ev.length ? `<button type="button" class="zf3-ics" data-act="ics" aria-label="남은 일정 ${ev.length}개를 달력 파일로 내려받기">📅 달력에 넣기</button>` : ''}<button type="button" class="zf3-ics zf3-myedit" data-act="manage">저장 해제·관리</button></div>`
     + (ev.length ? `<ol class="zf3-my-l"><li class="now"><span class="dt">${zf3Md(today)}</span><span class="dd">오늘</span><span class="tx"></span></li>${ev.slice(0, HEAD).map(li).join('')}</ol>`
       + (ev.length > HEAD ? `<ol class="zf3-my-l zf3-my-rest" hidden>${ev.slice(HEAD).map(li).join('')}</ol><button type="button" class="zf3-more" data-act="more" aria-expanded="false">남은 일정 ${ev.length - HEAD}개 더 보기</button>` : '')
       : '<p class="zf3-my-n">저장한 공고에 앞으로 남은 일정이 없어요</p>')
@@ -11102,13 +11283,15 @@ function zf3MyRoute(){
       const b = ev2.target.closest('button');
       if(!b) return;
       if(b.dataset.act === 'ics'){ zf3IcsDownload(zf3MyEvents); return; }
+      // 🔵 2026-10-13(우편함 「표시층 — 실사용 1회차 반영」 1) — 저장 해제가 하위 탭(② 저장한 공고) 안에만 있어 첫 화면에서 안 보였다 — 머리에서 바로 간다.
+      if(b.dataset.act === 'manage'){ goStep(5); const t = document.getElementById('panel5'); if(t) try{ t.scrollIntoView({ block: 'start' }); }catch(e){} const h = t && t.querySelector('.panel-title'); if(h){ h.tabIndex = -1; h.focus({ preventScroll: true }); } return; }
       if(b.dataset.act === 'more'){ const r = box.querySelector('.zf3-my-rest'); const open = r.hidden; r.hidden = !open; b.setAttribute('aria-expanded', String(open)); b.textContent = open ? '접기' : b.textContent; if(!open) zf3MyRoute(); }
       else if(b.dataset.id) zf3GoCard(b.dataset.id);
     });
   }
 }
 // 인사이트 탭(d3 · 둘러보기 ③ · 2026-10-12) — renderInsight 가 센 수를 그대로 받아 다른 판으로만 그린다(수·술어는 renderInsight 한 곳).
-//    LED 숫자판(접수 중 · 최근 7일 신규 · 3일 안 마감) · 앞으로 14일 마감 막대(오늘·내일 경고 색) · 지역 막대 · 최근 30일 공고 추이.
+//    LED 숫자판(접수 중 · 새 공고 3일 · 3일 안 마감) · 앞으로 14일 마감 막대(오늘·내일 경고 색) · 지역 막대 · 최근 30일 공고 추이.
 //    낱말은 술어 그대로 밝힌다 — 종전 「이번주 신규」는 실제로 「공고일이 최근 7일」, 「마감임박」은 「마감이 오늘~3일 뒤」다(isClosingSoon).
 function zf3InsightTop(c){
   const fmt = v => Number(v || 0).toLocaleString();
@@ -11117,8 +11300,10 @@ function zf3InsightTop(c){
   const tl = c.timelineEntries.map(([k, n], i) => {
     const hot = k === c.todayStr || k === c.tomorrowStr;
     const day = +k.slice(8, 10);
-    const lab = day === 1 || i === 0 ? `${+k.slice(5, 7)}/${day}` : String(day);   // 날짜는 숫자로 · 오늘·내일은 아래 요일 칸에(두 글자가 14칸에 겹치지 않게)
-    const wk = k === c.todayStr ? '오늘' : k === c.tomorrowStr ? '내일' : dow(k);
+    // 🔵 2026-10-13(D1) — 글자를 12px(t-xs)로 올리면서 390의 14칸(한 칸 약 20px)에 들어가게: 날짜는 일만(달이 바뀌는 1일만 「월/1」 · 시작 달은 위 설명 줄에) ·
+    //    두 글자는 「오늘」 하나만(내일은 요일 · 빨강(경고 색)이 오늘·내일을 함께 가리킨다 — 설명 줄에 적는다).
+    const lab = day === 1 && i > 0 ? `${+k.slice(5, 7)}/1` : String(day);
+    const wk = k === c.todayStr ? '오늘' : dow(k);
     return `<div class="zf3-tc${hot ? ' hot' : ''}${n ? '' : ' z'}" title="${k}: ${n}건"><span class="n">${n}</span><i style="--h:${n ? Math.round(n / tMax * 100) : 0}"></i><span class="d">${lab}</span><span class="w">${wk}</span></div>`;
   }).join('');
   const tlAria = '앞으로 14일 마감 공고 — ' + (c.timelineEntries.filter(e => e[1]).map(([k, n]) => `${k === c.todayStr ? '오늘' : k === c.tomorrowStr ? '내일' : (+k.slice(5, 7)) + '월 ' + (+k.slice(8, 10)) + '일'} ${n}건`).join(', ') || '없음');
@@ -11130,10 +11315,10 @@ function zf3InsightTop(c){
     <div class="zf3-ins-head"><h2>인사이트</h2><p>지금 열린 공고 <b>${fmt(c.openN)}건</b> · ${escapeHtml(c.cumText)} · 수시로 자동 업데이트</p></div>
     <div class="zf3-kpi" role="group" aria-label="주요 현황 — 지금 열린 공고 기준">
       <div class="zf3-kc"><b style="--c:var(--led-green)">${fmt(c.kpiActive)}</b><span>접수 중</span></div>
-      <div class="zf3-kc"><b style="--c:var(--led)">${fmt(c.kpiNew)}</b><span>최근 7일 신규</span></div>
+      <div class="zf3-kc"><b style="--c:var(--led)">${fmt(c.kpiNew)}</b><span>새 공고 · 3일</span></div>
       <div class="zf3-kc"><b style="--c:var(--led-red)">${fmt(c.kpiClosing)}</b><span>3일 안 마감</span></div>
     </div>
-    <div class="zf3-ins-card"><h3>앞으로 14일 마감</h3><p class="zf3-ins-note">지금 열린 공고의 마감일</p>
+    <div class="zf3-ins-card"><h3>앞으로 14일 마감</h3><p class="zf3-ins-note">지금 열린 공고의 마감일 · ${c.timelineEntries.length ? `${+c.timelineEntries[0][0].slice(5, 7)}월 ${+c.timelineEntries[0][0].slice(8, 10)}일(오늘)부터` : ''} · 빨강 = 오늘·내일 마감</p>
       <div class="zf3-tl" role="img" aria-label="${zfAttr(tlAria)}">${tl}</div></div>
     <div class="zf3-ins-card"><h3>지역별 열린 공고 <span>${c.regionAll.length}개 지역</span></h3>
       <p class="zf3-ins-note">신청할 수 없는 공고는 빼고 ${fmt(c.openN)}건을 세었어요 · 목록에 없는 지역은 지금 신청할 수 있는 공고가 없는 곳이에요</p>
