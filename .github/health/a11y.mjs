@@ -1,5 +1,5 @@
 // 접근성 검사(axe-core) — 화면 점검(A)의 한 항목 · 혼자 돌려 D-3 단계 PR 을 재는 도구(2026-10-12 · 우편함 「코드 — Claude Code 장비 정비」 1).
-// 🔴 읽기만 한다. 다섯 상태(390 추천 첫 화면 · 390 공고 탭 · 390 카드 하나 펼침 · 1280 공고 탭 · 390 공고 탭 어둡게)를 열어
+// 🔴 읽기만 한다. 여섯 상태(390 추천 첫 화면 · 390 공고 탭 · 390 카드 하나 펼침 · 1280 공고 탭 · 390 공고 탭 어둡게 · 390 매칭 결과)를 열어
 //    axe-core 규칙(WCAG 2.0·2.1 A·AA)으로 위반을 세고, 기준선(a11y-baseline.json)과 견준다.
 // 🔴 처음엔 경고(⚠️)만 — 기준선보다 늘면 warn · 실패(fail) 승격은 D-3 끝난 뒤 claude.ai 판정(원칙 33 판정표).
 //    「늘었다」 = 그 상태에 기준선에 없던 규칙 id 가 생겼거나 · 같은 규칙의 위반 요소 수가 기준선 + max(3, 기준선의 20%)를 넘음
@@ -42,9 +42,16 @@ export const STATES = [
   }],
   ['notices-1280', 1280, false, async page => { await toTab(page, 2); await page.waitForTimeout(3500) }],
   ['notices-390-dark', 390, true, async page => { await page.evaluate(() => setTheme('dark', true)); await toTab(page, 2); await page.waitForTimeout(3500) }],
+  // 🔵 2026-10-13(우편함 「코드 — 열린 카드 오표시·오답·놓침」 0장 · 원칙 33) — 매칭 결과(추천 탭 ② 주택 매칭 · 지역·유형 고르지 않고 「맞춤 주택 찾기」).
+  //    정렬 선택 칸(#matchSortSel)·선택 칩·건수 줄이 이 상태에만 보인다(1회차 실사용에서 critical select-name 이 여기서만 나왔다).
+  ['match-390', 390, false, async page => {
+    await page.evaluate(() => { goMain(1); goStep(2); return matchHouses() })
+    await page.waitForFunction(() => { const r = document.getElementById('match-result'); return r && !r.classList.contains('hidden') && !/찾는 중/.test(r.innerText) }, null, { timeout: 30000 })
+    await page.waitForTimeout(2500)
+  }],
 ]
 
-// browser 하나로 다섯 상태를 잰다 → { state: { rules: { id: { impact, nodes, sample } }, err? } }
+// browser 하나로 여섯 상태를 잰다 → { state: { rules: { id: { impact, nodes, sample } }, err? } }
 export async function measure (browser, url, { AxeBuilder }) {
   const out = {}
   for (const [name, width, dark, prep] of STATES) {

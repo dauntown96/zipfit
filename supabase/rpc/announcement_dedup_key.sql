@@ -7,7 +7,7 @@ AS $function$
   SELECT regexp_replace(
       regexp_replace(
         regexp_replace(
-          regexp_replace(p_title, '^(\s*(\[정정공고\]|[\[(]\s*(재)?(수정|정정)[^\])]*[\])])\s*)+', ''),
+          regexp_replace(p_title, '^(\s*(\[정정공고\]|\[\s*조기\s*(접수)?\s*마감\s*\]|[\[(]\s*(재)?(수정|정정)[^\])]*[\])])\s*)+', ''),
           '[''‘’`"“”″]', '', 'g'
         ),
         '\s+', '', 'g'
