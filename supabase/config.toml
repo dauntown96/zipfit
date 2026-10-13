@@ -33,3 +33,7 @@ verify_jwt = false
 
 [functions.save-user-profile]
 verify_jwt = true
+
+# 2026-10-13 신설 — 시험 사용자 하나의 1회용 로그인 링크·정리(우편함 「코드 — 시험 로그인 함수」 · 길 A). 수집 함수와 같이 x-cron-secret 으로 막는다(JWT 없음).
+[functions.test-login]
+verify_jwt = false

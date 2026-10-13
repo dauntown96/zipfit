@@ -79,6 +79,7 @@
   - **롤백 전용 시험**: `DO` 블록 안에서 쓰고 읽은 값을 `raise exception 'RESULT …'`로 내보내면 결과는 400 메시지로 보이고 쓰기는 남지 않는다(B53 트리거 시험).
   - 컨테이너에서 `*.supabase.co` anon REST는 curl로 열린다(2026-10-02 실측 200 — B53 때는 프록시 403이었다) · `apply.lh.or.kr` 공고 페이지도 curl 200(2026-10-02). 🔴 다시 막히면 anon REST 확인(원칙 29)은 DB 안에서 `net.http_post(…)`로 부르고 `net._http_response`를 읽는다(B53).
   - 🔴 **지방공사 게시판 도메인(`gbdc.co.kr`·`gndc.co.kr` 등)도 컨테이너에서 프록시 403이다**(B56) — 게시판 **본문 텍스트**는 `net.http_get(…)`으로 받는다. 첨부 바이너리(hwp·pdf)는 `net._http_response.content`가 `text`라 깨져 받지 못하고, `fetch-attachment` 허용목록에도 없다 — 지방공사 공고 분석을 열 때 허용목록을 함께 연다(해외 IP를 막으면 `SEOUL_ONLY`에 함께 — 부산도시공사 선례 2026-10-12).
+  - 🔴 **마이홈(`www.myhome.go.kr`)·청약홈(`www.applyhome.co.kr`)·`www.i-sh.co.kr`·`apis.data.go.kr`은 컨테이너 curl이 000(연결 안 됨)이다**(2026-10-13 실측) — 배포본 화면을 Playwright로 쓸 때 이 주소로 나가는 링크·요청은 컨테이너에서 확인할 수 없다(⑤로 claude.ai에). `dapi.kakao.com`은 curl이 닿는다(키 없이 401 — 같은 날).
 - 🔴 **인증·비밀 설정은 필요한 키만 골라 조회·출력한다**(2026-10-08 — 운영 기반 묶음 ② 사고: 관리 API `config/auth` 조회의 출력 필터가 넓어 카카오 OAuth 비밀값이 도구 출력에 한 번 찍혔다 · 같은 날 다운님 재발급) — 전체 설정 덤프 금지. 비밀값이 도구 출력에 찍히면 회신 ②에 사고 보고 + 다운님께 재발급 권고.
 - ⚠️ **Drive `download_file_content`는 약 14KB 이하 작은 파일을 파일로 떨어뜨리지 않고 대화로 들인다**(B51 원주문막1 평면도) — base64를 되살릴 수 없어 판독 불가다. 서브에이전트에 맡기거나 다른 경로(`fetch-attachment` 등)로 받는다.
 - 🔵 **Notion 파일 업로드가 된다**(2026-10-08 실측 18/18 — 환경 네트워크 허용에 `api.notion.com` 추가 뒤 · 그 전 세션은 프록시 403이었다): `notion-create-file-upload`로 받은 업로드 URL에 multipart POST · 🔴 mp4는 `video/mp4`를 명시한다 · 업로드 URL은 약 23분 산다.
@@ -161,9 +162,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-10-13 | **코드 — 시험 로그인 함수** — 새 EF `test-login`(`x-cron-secret` 게이트 · 상수 주소 하나 · `zf_test` 확인 뒤에만 1회용 링크 · `redirect_to` 상수 · `email` 인자 거부 · `cleanup`은 `usage_events` → `deleteUser`) · 배포 허용 목록 · 컨테이너 메모(curl 000 주소) · ⑦ 1-3 예외의 원칙 14 반영은 분류기 거부로 다운님 손 · PR #484 |
 | 2026-10-13 | **공고 분석 — 자동 run 194 정정 몫** — 양산 삼성파크빌 자격완화 선착순 `…0898`(조기접수마감) · 첨부 바이트가 정정 전 `…0825`와 같아 diff 0 · 제목 접두로 다른 그룹이라 산물(세대1·자격1·정책37·경로1)을 정정본에 복사 + 정정사유 정책 행 1 · 분석률 접수 중 24/25 → 25/25 · 데이터 쓰기만 |
 | 2026-10-13 | **표시층 — 공고 탭 다듬기** — 「＋ 조건」 → 「필터」 · 정렬을 시트 밖 선택 칸으로 · 「›」 넘침 0 · 지도 지역 단추 시·도 → 시·군·구 · LH 「단지 규모」 출처 꼬리 · 묶음 합 전 「…」 · 원칙 14 디자인 분장 · `CLAUDE.md`는 Edit 도구로 · `zipfit-v203` · PR #482 |
-| 2026-10-13 | **코드 — 국면 B′ ③ 지방공사** — 부산 게시판 첨부 목록 자동 등록(`collect-announcements` 게시판 단계 · 빈 게시글만 · 한 런 3건) · `fetch-attachment` `host_probe`(지방공사 17 호스트 · 서울) · `get_last_collected_at()` RPC · INVOKER 8개 `search_path` 고정(목록 RPC 뺌) · 불변식 v3.11 · PR #480 |
 ---
 
 ## 🚫 코딩 원칙
