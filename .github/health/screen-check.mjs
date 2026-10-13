@@ -372,7 +372,9 @@ try {
     let A = 0, B = 0, K = 0
     zfOpenNotices(noticeData).forEach(r => { const s = applyWindowState(r); if (s === 'open') A++; else if (s === 'before') B++; else K++ })
     // 🔵 새 화면 전환(우편함 「표시층 — 런칭 전 남은 화면 일」 1 · 원칙 33) — 공고 탭 머리는 d3 머리 두 줄이다:
-    //    「열린 공고 M건」(.zf3-lh) + 「접수 중 a · 예정 b[ · 미상 k] · 정렬」(.zf3-lsub). 종전 「✅ 지금 열린 공고 M건(…)」 상자는 걷혔다.
+    //    「열린 공고 M건」(.zf3-lh) + 「접수 중 a · 예정 b[ · 미상 k]」(.zf3-lsub). 종전 「✅ 지금 열린 공고 M건(…)」 상자는 걷혔다.
+    //    🔵 2026-10-13(우편함 「표시층 — 공고 탭 다듬기」 2) — 둘째 줄 끝의 정렬 글자는 걷고 정렬은 「필터」 옆 선택 칸(.zf3-ctl)으로 나갔다.
+    //    판정은 startsWith 라 그대로 맞는다(정렬 글자는 판정에 쓰지 않았다).
     const lh = ((document.querySelector('#zf3NoticeHead .zf3-lh') || {}).innerText || '').trim()
     const lsub = ((document.querySelector('#zf3NoticeHead .zf3-lsub') || {}).innerText || '').replace(/\s+/g, ' ').trim()
     let tab = lh + ' | ' + lsub
