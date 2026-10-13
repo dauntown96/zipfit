@@ -520,6 +520,18 @@ span.zf3-mi{cursor:default}
 .zf3-chip.on span{font-size:11px;opacity:.85}
 .zf3-chip.add{border-style:dashed}
 .zf3-chip:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+/* 조작 줄(2026-10-13 공고 탭 다듬기) — 「필터」 + 정렬 선택. 칩 줄과 달리 가로로 스크롤하지 않는다(늘 보인다). */
+.zf3-ctl{display:flex;align-items:center;gap:var(--sp-2);flex-wrap:wrap;margin:var(--sp-2) 0}
+.zf3-ctl + .zf3-chips{margin-top:-2px}
+.zf3-fbtn .ic,.zf3-sortsel .ic{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.zf3-fbtn b{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 5px;box-sizing:border-box;border-radius:999px;background:var(--ink);color:var(--paper);font-size:12px;font-family:var(--f-led)}
+.zf3-sortsel{position:relative;display:inline-flex;align-items:center;min-height:var(--hit);border:1px solid var(--line);border-radius:999px;background:var(--paper);color:var(--ink)}
+.zf3-sortsel .ic{position:absolute;left:13px;pointer-events:none;color:var(--ink-3)}
+.zf3-sortsel .cv{position:absolute;right:13px;pointer-events:none;font-size:11px;color:var(--ink-3)}
+.zf3-sortsel select{appearance:none;-webkit-appearance:none;field-sizing:content;box-sizing:border-box;min-height:var(--hit);margin:0;padding:0 32px 0 36px;border:0;border-radius:999px;background:transparent;color:inherit;font:inherit;font-family:var(--f-ui);font-size:var(--t-s);font-weight:600;cursor:pointer}
+.zf3-sortsel select:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.zf3-sortsel select option{color:#1a1a1a;background:#fff}
+html[data-ui="d3"] #noticeFilterPanel #noticeSortSel{display:none}
 /* 조건 칸 = 시트(종전 필터 패널을 그대로 쓴다) */
 html[data-ui="d3"] #noticeFilterPanel{background:var(--paper)!important;border:1px solid var(--ink)!important;box-shadow:0 8px 24px rgba(0,0,0,.12);color:var(--ink)}
 html[data-ui="d3"] #noticeFilterPanel .label{color:var(--ink-2)}
@@ -663,11 +675,13 @@ html[data-ui="d3"] .zf3-card.zf3-open > [data-ann-id]{animation:zf3open 260ms va
 @keyframes zf3open{from{opacity:0;transform:translateY(-6px)}}
 html[data-ui="d3"] .zf3-card:has(.zf3-dpill.hot) .zf3-today b{animation:zf3ping 1.1s var(--ease) .9s 2}
 @keyframes zf3ping{0%{box-shadow:0 0 0 0 var(--ln,var(--ink))}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
-.zf3-gotop{all:unset;box-sizing:border-box;flex:none;width:var(--hit);height:var(--hit);margin:-8px -10px -8px 0;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:var(--ink-2);cursor:pointer}
+.zf3-gotop{all:unset;box-sizing:border-box;position:relative;flex:none;width:30px;height:30px;margin:0;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:var(--ink-2);cursor:pointer}
+/* 누르는 칸은 44px 그대로 — 단추 상자는 30px(부모 안 · 2026-10-13 공고 탭 다듬기 3: 종전 음수 여백이 부모 밖으로 10px 나갔다) */
+.zf3-gotop::before{content:"";position:absolute;inset:-7px;border-radius:50%}
 .zf3-gotop span{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:var(--surface-2);font-size:17px;font-weight:700;line-height:1;transition:transform var(--m-fast) var(--ease),background var(--m-fast)}
 .zf3-gotop:hover span{background:var(--line)}
 .zf3-gotop[aria-expanded="true"] span{transform:rotate(90deg)}
-.zf3-gotop:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+.zf3-gotop:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 .zf3-close{all:unset;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:4px;width:100%;min-height:var(--hit);margin-top:8px;border-top:1px solid var(--line-2);font-size:13px;font-weight:700;color:var(--ink-2);cursor:pointer}
 .zf3-close:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
 html[data-ui="d3"] .zf3-card .chip-row .chip.zf3-vb.ok{background:var(--ink)!important;color:var(--paper)!important;border-color:var(--ink)!important;font-weight:700}
@@ -815,6 +829,10 @@ html.zf3-mapview[data-ui="d3"] #notice-list{display:none}
 .zf3-places button{all:unset;box-sizing:border-box;display:inline-flex;align-items:center;min-height:var(--hit);padding:0 12px;border:1px solid var(--line);border-radius:999px;background:var(--paper);color:var(--ink);font-size:13px;cursor:pointer;gap:2px}
 .zf3-places button b{font-family:var(--f-led);margin-left:4px}
 .zf3-places .zf3-pall{border-style:dashed;font-weight:700}
+.zf3-places .zf3-pback{border-style:dashed}
+.zf3-places-h{margin:4px 0 6px;font-size:var(--t-s);font-weight:700;color:var(--ink)}
+.zf3-places-h small{font-weight:400;color:var(--ink-3);margin-left:6px}
+.zf-units-src{font-family:var(--f-ui);font-size:12px;font-weight:400;letter-spacing:0;color:var(--ink-3,#666)}
 .zf3-places button[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
 .zf3-places button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 @media (min-width:1200px){
@@ -888,7 +906,7 @@ html[data-ui="d3"] #notice-status.zf3-empty{background:var(--surface)!important;
 .zf3-ics{all:unset;box-sizing:border-box;margin-left:auto;min-height:var(--hit);padding:0 12px;border:1px solid var(--line);border-radius:999px;font-size:var(--t-s);font-weight:700;color:var(--ink);cursor:pointer;display:inline-flex;align-items:center}
 .zf3-ics:hover{background:var(--surface)}
 .zf3-ics:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
-.zf3-fics{margin:6px 0 0}
+.zf3-fics{margin:var(--sp-2) 0 0}
 .zf3-fics button{all:unset;box-sizing:border-box;min-height:var(--hit);padding:0 12px;border:1px solid var(--line);border-radius:999px;font-size:var(--t-s);font-weight:700;color:var(--ink);cursor:pointer;display:inline-flex;align-items:center}
 .zf3-fics button:hover{background:var(--surface)}
 .zf3-fics button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
@@ -1536,23 +1554,32 @@ function zfRecruitBundleSum(rep, rows){
   return same.reduce((s, r) => s + Number(r.total_units), 0);
 }
 // 머리 칸 값 자리 — 「모집 세대수」 칸만 감싼다(글자는 종전 그대로). 카드를 펼칠 때 zfFillRecruitBundle 이 합으로 바꾼다.
+// 🔵 2026-10-13(우편함 「표시층 — 공고 탭 다듬기」 5) — 「단지 규모」(LH) 값 뒤에 출처 꼬리. 값은 LH가 등록한 단지(또는 사업지구)
+//    세대수라 공고 대상 규모와 다를 수 있다(열린 29장 중 원문 확인 일치 14 · 대전천동3 2135 ↔ 원문 712). 수는 바꾸거나 숨기지 않는다.
 function zfUnitsCell(source, units, cardId){
   const txt = units + '세대';
-  return zfUnitsKind(source) === 'recruit' ? `<span data-units-for="${zfAttr(cardId)}">${txt}</span>` : txt;
+  const kind = zfUnitsKind(source);
+  if(kind === 'recruit') return `<span data-units-for="${zfAttr(cardId)}">${txt}</span>`;
+  if(kind === 'complex') return `${txt} <span class="zf-units-src">· LH 단지 등록 기준</span>`;
+  return txt;
 }
 function zfFillRecruitBundle(annId, id){
   const cell = document.querySelector(`[data-units-for="${CSS.escape(id)}"]`);
   if(!cell || !annId) return;
+  // 🔵 2026-10-13(「공고 탭 다듬기」 6) — 합을 받기 전에는 숫자를 쓰지 않는다(펼친 직후 0.3초 대표 행 한 구의 값 「6세대」가 보였다).
+  //    펼침과 같은 차례에 「…」로 바꾸고, 합이 서면 합 · 합이 아니면(분할 행 < 2 · 조회 실패) 종전 값으로 되돌린다.
+  const orig = cell.textContent;
+  cell.textContent = '…'; cell.setAttribute('aria-busy', 'true');
+  const done = txt => { cell.textContent = txt; cell.removeAttribute('aria-busy'); };
   resolveAnnouncementIds(annId, true).then(ids => {
     if(!Array.isArray(ids) || ids.length < 2) return null;
     return fetch(`${SUPABASE_URL}/rest/v1/announcements?select=announcement_id,source,total_units,sigungu_nm,apply_end,announcement_date,is_revised,first_announcement_date&${idFilterFor(ids)}`, {
       headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
     }).then(r => r.ok ? r.json() : null);
   }).then(rows => {
-    if(!Array.isArray(rows)) return;
-    const sum = zfRecruitBundleSum(rows.find(r => r && r.announcement_id === annId), rows);
-    if(sum != null) cell.textContent = sum + '세대';
-  }).catch(() => {});
+    const sum = Array.isArray(rows) ? zfRecruitBundleSum(rows.find(r => r && r.announcement_id === annId), rows) : null;
+    done(sum != null ? sum + '세대' : orig);
+  }).catch(() => done(orig));
 }
 
 function classifyNoticeType(typeText, nameText){
@@ -10483,7 +10510,10 @@ function zf3WatchDetails(){
   const run = () => { zf3DetailQ = false; try{ zf3EnhanceSchedule(list); }catch(e){} };
   new MutationObserver(() => { if(!zf3DetailQ){ zf3DetailQ = true; requestAnimationFrame(run); } }).observe(list, { childList: true, subtree: true });
 }
-// 공고 탭 머리 — 「조건에 맞는 n건 / 열린 m건」 · 표제란 한 줄 · 조건 칩 줄(✕로 빼기 · 「＋ 조건」 → 조건 칸)
+// 공고 탭 머리 — 「조건에 맞는 n건 / 열린 m건」 · 표제란 한 줄 · 조작 줄(「필터」 → 조건 칸 · 정렬 선택) · 걸린 조건 칩 줄(✕로 빼기)
+//    🔵 2026-10-13(우편함 「표시층 — 공고 탭 다듬기」 1·2) — 「＋ 조건」 → 「필터」(걸린 조건 수를 붙임) · 정렬을 시트 밖으로.
+const ZF3_ICO_FILTER = '<svg class="ic" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M3 5h14M6 10h8M9 15h2"/></svg>';
+const ZF3_ICO_SORT = '<svg class="ic" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M6 3v14M3 14l3 3 3-3M14 17V3M11 6l3-3 3 3"/></svg>';
 function zf3CondChips(){
   const out = [];
   if(activeNoticeRegion) out.push(['region', `지역 ${activeNoticeRegion}`]);
@@ -10511,17 +10541,20 @@ function zf3RenderNoticeHead(filtered){
   const head = chips.length
     ? `조건에 맞는 ${n.toLocaleString()}건 <span class="zf3-of">/ ${denom}</span>`
     : (closedExcluded ? `열린 공고 ${o.n.toLocaleString()}건` : `마감 포함 ${n.toLocaleString()}건`);
+  // 정렬은 시트 밖 「필터」 옆에 늘 보이는 선택 칸으로 꺼낸다(다운님 실사용 2026-10-13 「정렬이 없어졌다」 · 우편함 「표시층 — 공고 탭 다듬기」 2).
+  //    선택지는 종전 정렬 칸(noticeSortSel)에서 그대로 떠 와 값만 넘긴다 — 정렬 판정은 종전 그 칸 하나(시트 안 그 칸은 d3에서 숨김).
   const sortSel = document.getElementById('noticeSortSel');
-  const sortText = sortSel && sortSel.selectedOptions[0] ? sortSel.selectedOptions[0].textContent : '';
-  const at = noticeLoadedAt ? new Date(noticeLoadedAt + 9 * 3600 * 1000).toISOString() : '';
+  const sortOpts = sortSel ? [...sortSel.options].map(o => `<option value="${zfAttr(o.value)}"${o.value === sortSel.value ? ' selected' : ''}>${escapeHtml(o.textContent)}</option>`).join('') : '';
+  const at =noticeLoadedAt ? new Date(noticeLoadedAt + 9 * 3600 * 1000).toISOString() : '';
   const atText = at ? `${at.slice(0, 10).replace(/-/g, '.')} KST` : '불러오는 중…';   // 시안 「slim」 그대로 날짜만 — 390px 한 줄
   const sheetOpen = !document.getElementById('noticeFilterPanel')?.classList.contains('hidden');
   el.innerHTML = `<div class="zf3-lhrow"><p class="zf3-lh">${head}</p><span class="zf3-vseg" role="group" aria-label="보기"><button type="button" data-act="view" data-v="list" aria-pressed="${zf3View !== 'map'}">목록</button><button type="button" data-act="view" data-v="map" aria-pressed="${zf3View === 'map'}">지도</button></span></div>`
-    + `<p class="zf3-lsub">${closedExcluded ? '' : `열린 ${o.n.toLocaleString()}건: `}${zf3StLink('접수 중', '접수 중', o.a)} · ${zf3StLink('예정', '접수 예정', o.b)}${o.k ? ` · ${zf3StLink('미상', '접수기간 미상', o.k)}` : ''}${sortText ? ` · ${escapeHtml(sortText)}` : ''}</p>`
+    + `<p class="zf3-lsub">${closedExcluded ? '' : `열린 ${o.n.toLocaleString()}건: `}${zf3StLink('접수 중', '접수 중', o.a)} · ${zf3StLink('예정', '접수 예정', o.b)}${o.k ? ` · ${zf3StLink('미상', '접수기간 미상', o.k)}` : ''}</p>`
     + zf3StatChips(all)
     + `<div class="zf3-tblock" role="note"><div><span class="k">기준</span><span class="v led">${escapeHtml(atText)}</span></div><div><span class="k">출처</span><span class="v">LH · 마이홈 · SH 원문 → 꼭집 정리</span></div></div>`
-    + `<div class="zf3-chips" role="group" aria-label="걸린 조건">${chips.map(([k, t]) => `<button type="button" class="zf3-chip on" data-act="clear" data-k="${k}" aria-label="${zfAttr(t)} 조건 빼기">${escapeHtml(t)}<span aria-hidden="true">✕</span></button>`).join('')}`
-    + `<button type="button" class="zf3-chip add" data-act="sheet" aria-expanded="${sheetOpen}" aria-controls="noticeFilterPanel">＋ 조건</button></div>`;
+    + `<div class="zf3-ctl"><button type="button" class="zf3-chip add zf3-fbtn" data-act="sheet" aria-expanded="${sheetOpen}" aria-controls="noticeFilterPanel">${ZF3_ICO_FILTER}필터${chips.length ? ` <b>${chips.length}</b>` : ''}</button>`
+    + (sortOpts ? `<span class="zf3-sortsel">${ZF3_ICO_SORT}<select data-act="sortsel" aria-label="정렬">${sortOpts}</select><span class="cv" aria-hidden="true">▾</span></span>` : '') + `</div>`
+    + (chips.length ? `<div class="zf3-chips" role="group" aria-label="걸린 조건">${chips.map(([k, t]) => `<button type="button" class="zf3-chip on" data-act="clear" data-k="${k}" aria-label="${zfAttr(t)} 조건 빼기">${escapeHtml(t)}<span aria-hidden="true">✕</span></button>`).join('')}</div>` : '');
   el.hidden = false;
 }
 function zf3ClearCond(k){
@@ -10816,7 +10849,10 @@ let zf3Geo = null, zf3GeoP = null, zf3View = 'list', zf3PlaceSel = null, zf3Plac
 const ZF3_PROV = { 서울특별시: '11', 부산광역시: '21', 대구광역시: '22', 인천광역시: '23', 광주광역시: '24', 대전광역시: '25', 울산광역시: '26', 세종특별자치시: '29', 경기도: '31', 강원특별자치도: '32', 강원도: '32', 충청북도: '33', 충청남도: '34', 전북특별자치도: '35', 전라북도: '35', 전라남도: '36', 경상북도: '37', 경상남도: '38', 제주특별자치도: '39' };
 const ZF3_SGG_ALIAS = {};   // 이름만 바뀐 구(경계 같음) — 2025 경계에는 남은 것이 없다(2013 「남구 → 미추홀구」는 걷음)
 const ZF3_METRO = new Set(['11', '21', '22', '23', '24', '25', '26']);
-let zf3PlacesAll = false;   // 지역 단추 「모든 지역 N곳」을 펼쳤는가
+// 🔵 2026-10-13(우편함 「표시층 — 공고 탭 다듬기」 4) — 지역 단추 두 층: 처음엔 시·도 단추(공고 수) → 누르면 그 시·도의 시·군·구 → 누르면 그곳 공고만.
+//    zf3PlaceSido = 펼친 시·도 코드(null 이면 시·도 목록). 시·군·구 단추·점·좁히는 규칙은 종전 그대로(zf3PlaceOf · zf3SetPlace).
+let zf3PlaceSido = null;
+const ZF3_PROV_NAME = Object.entries(ZF3_PROV).reduce((m, [k, v]) => (m[v] || (m[v] = k), m), {});
 const zf3ShortSido = t => String(t || '').replace(/특별자치시|특별자치도|특별시|광역시/, '').replace(/^(충청|전라|경상)(남|북)도$/, (m, a, b) => a[0] + b).replace(/도$/, '');
 function zf3LoadGeo(){
   if(!zf3GeoP) zf3GeoP = fetch('./geo/kr-2025.json', { cache: 'force-cache' }).then(r => r.ok ? r.json() : null).then(g => { zf3Geo = g && g.cent ? g : null; return zf3Geo; }).catch(() => { zf3GeoP = null; return null; });
@@ -10865,6 +10901,7 @@ function zf3SetView(v){
 }
 function zf3SetPlace(key, name){
   zf3PlaceSel = zf3PlaceSel === key ? null : key;
+  if(zf3PlaceSel) zf3PlaceSido = zf3PlaceSel.split('|')[0];   // 지도 점으로 고른 곳도 그 시·도 단추 층을 연다
   zf3PlaceName = zf3PlaceSel ? name : '';
   applyNoticeFiltersAndRender();
   if(zf3PlaceSel && !zf3Wide()){
@@ -10885,6 +10922,27 @@ function zf3MapGroups(){
   });
   return [...G.values()].map(g => Object.assign(g, { cls: g.hot ? 'hot' : g.open ? '' : 'soon' })).sort((a, b) => b.n - a.n || a.name.localeCompare(b.name, 'ko'));
 }
+// 지역 단추 두 층(우편함 「표시층 — 공고 탭 다듬기」 4). 시·도 단추의 수 = 그 시·도에 걸친 공고 수(한 공고가 여러 시군구에 걸쳐도 한 번) ·
+//    점의 색 갈래는 그 시·도 안 시·군·구 중 가장 급한 것(오늘·내일 마감 > 접수 중 > 접수 예정). 시군구 미상(고리)도 그 시·도 안에 든다.
+function zf3PlacesHTML(gs, mine){
+  const btn = g => `<button type="button" data-place="${zfAttr(g.key)}" data-name="${zfAttr(g.name)}" aria-pressed="${zf3PlaceSel === g.key}"><i class="${g.exact ? g.cls : 'ring'}" aria-hidden="true"></i>${mine.has(g.pc) ? '<span class="zf3-pmine" aria-label="내 희망 지역">★</span>' : ''}${escapeHtml(g.name)} <b>${g.n}</b></button>`;
+  const pcs = [...new Set(gs.map(g => g.pc))];
+  if(zf3PlaceSido && !pcs.includes(zf3PlaceSido)) zf3PlaceSido = null;   // 조건이 바뀌어 그 시·도에 공고가 없으면 시·도 목록으로
+  const sidoName = pc => zf3ShortSido(ZF3_PROV_NAME[pc] || pc);
+  if(zf3PlaceSido){
+    const kids = gs.filter(g => g.pc === zf3PlaceSido);
+    const n = (zf3PrePlace || []).filter(r => zf3PlacesOfRow(r).some(p => p.pc === zf3PlaceSido)).length;
+    return `<p class="zf3-places-h" id="zf3PlacesH">${escapeHtml(sidoName(zf3PlaceSido))}<small>공고 ${n.toLocaleString()}건 · ${kids.length}곳</small></p>`
+      + `<div class="zf3-places" role="group" aria-labelledby="zf3PlacesH"><button type="button" class="zf3-pback" data-act="sidos" data-pc="${zfAttr(zf3PlaceSido)}">← 시·도 전체</button>${kids.map(btn).join('')}</div>`;
+  }
+  const sd = pcs.map(pc => {
+    const kids = gs.filter(g => g.pc === pc);
+    const n = (zf3PrePlace || []).filter(r => zf3PlacesOfRow(r).some(p => p.pc === pc)).length;
+    const cls = kids.some(g => g.hot) ? 'hot' : kids.some(g => g.open) ? '' : 'soon';
+    return { pc, n, cls, name: sidoName(pc) };
+  }).sort((a, b) => (mine.has(b.pc) ? 1 : 0) - (mine.has(a.pc) ? 1 : 0) || b.n - a.n || a.name.localeCompare(b.name, 'ko'));
+  return `<div class="zf3-places" role="group" aria-label="지역으로 좁히기 — 시·도를 누르면 시·군·구">${sd.map(s => `<button type="button" data-act="sido" data-pc="${zfAttr(s.pc)}" aria-expanded="false"><i class="${s.cls}" aria-hidden="true"></i>${mine.has(s.pc) ? '<span class="zf3-pmine" aria-label="내 희망 지역">★</span>' : ''}${escapeHtml(s.name)} <b>${s.n}</b></button>`).join('')}</div>`;
+}
 function zf3RenderMap(){
   if(!zf3On()) return;
   const head = document.getElementById('zf3NoticeHead');
@@ -10892,7 +10950,7 @@ function zf3RenderMap(){
   let box = document.getElementById('zf3Map');
   const show = zf3View === 'map' || zf3Wide();
   if(!show){ if(box) box.hidden = true; return; }
-  if(!box){ box = document.createElement('section'); box.id = 'zf3Map'; box.className = 'zf3-map'; box.setAttribute('aria-label', '지도로 보기'); head.after(box); box.addEventListener('click', ev => { const a = ev.target.closest('[data-act="all"]'); if(a){ zf3PlacesAll = !zf3PlacesAll; zf3RenderMap(); const f = document.querySelector('#zf3Map [data-act="all"]'); if(f) f.focus(); return; } const b = ev.target.closest('[data-place]'); if(b) zf3SetPlace(b.dataset.place, b.dataset.name); }); }
+  if(!box){ box = document.createElement('section'); box.id = 'zf3Map'; box.className = 'zf3-map'; box.setAttribute('aria-label', '지도로 보기'); head.after(box); box.addEventListener('click', ev => { const a = ev.target.closest('[data-act="sido"],[data-act="sidos"]'); if(a){ const back = a.dataset.act === 'sidos', pc = a.dataset.pc; zf3PlaceSido = back ? null : pc; zf3RenderMap(); const f = document.querySelector(back ? `#zf3Map [data-act="sido"][data-pc="${pc}"]` : '#zf3Map [data-act="sidos"]') || document.querySelector('#zf3Map .zf3-places button'); if(f) f.focus(); return; } const b = ev.target.closest('[data-place]'); if(b) zf3SetPlace(b.dataset.place, b.dataset.name); }); }
   box.hidden = false;
   if(!zf3Geo){ box.innerHTML = '<p class="zf3-map-wait">지도를 불러오는 중…</p>'; zf3LoadGeo().then(g => { if(g){ applyNoticeFiltersAndRender(noticePage); } else box.innerHTML = '<p class="zf3-map-wait">지도를 불러오지 못했어요 · 목록으로 보세요</p>'; }); return; }
   const G = zf3Geo, mine = zf3MinePcs(), gs = zf3MapGroups().sort((a, b) => (mine.has(b.pc) ? 1 : 0) - (mine.has(a.pc) ? 1 : 0)), on = new Set(gs.map(g => g.pc));
@@ -10907,9 +10965,8 @@ function zf3RenderMap(){
   const nOpen = (zf3PrePlace || []).length;
   box.innerHTML = `<div class="zf3-radar"><svg viewBox="${G.vb.join(' ')}" aria-hidden="true" focusable="false">${G.paths.map(p => `<path class="land${on.has(p.code) ? ' on' : ''}${mine.has(p.code) ? ' mine' : ''}" d="${p.d}"/>`).join('')}${pts}${labels}</svg><span class="cap">점 = 시군구 가운데(단지 위치 아님) · 경계 2025 국가데이터처 SGIS</span></div>`
     + `<div class="zf3-legend"><span><i></i>접수 중</span><span><i class="hot"></i>오늘·내일 마감</span><span><i class="soon"></i>접수 예정</span><span><i class="ring"></i>시군구 미상</span>${mine.size ? '<span><i class="mine"></i>내 희망 지역</span>' : ''}</div>`
-    + `<p class="zf3-map-n">${gs.length ? `공고 ${nOpen.toLocaleString()}건이 걸친 ${gs.length}곳 · 누르면 그곳 공고만` : '지금 조건에 맞는 공고가 없어요'}</p>`
-    + `<div class="zf3-places" role="group" aria-label="지역으로 좁히기">${gs.filter((g, i) => zf3PlacesAll || i < 12 || g.key === zf3PlaceSel).map(g => `<button type="button" data-place="${zfAttr(g.key)}" data-name="${zfAttr(g.name)}" aria-pressed="${zf3PlaceSel === g.key}"><i class="${g.exact ? g.cls : 'ring'}" aria-hidden="true"></i>${mine.has(g.pc) ? '<span class="zf3-pmine" aria-label="내 희망 지역">★</span>' : ''}${escapeHtml(g.name)} <b>${g.n}</b></button>`).join('')}`
-    + (gs.length > 12 ? `<button type="button" class="zf3-pall" data-act="all" aria-expanded="${zf3PlacesAll}">${zf3PlacesAll ? '접기' : `모든 지역 ${gs.length}곳`}</button>` : '') + `</div>`;
+    + `<p class="zf3-map-n">${gs.length ? `공고 ${nOpen.toLocaleString()}건이 걸친 ${gs.length}곳 · 시·도 → 시·군·구를 누르면 그곳 공고만` : '지금 조건에 맞는 공고가 없어요'}</p>`
+    + zf3PlacesHTML(gs, mine);
   try{ if(!matchMedia('(prefers-reduced-motion: reduce)').matches) box.querySelector('.zf3-radar').classList.add('live'); }catch(e){}
 }
 // 관리 탭 「나의 노선도」(d3 · 둘러보기 ④ · 2026-10-12) — 저장한 공고들의 앞으로 남은 날짜(접수 시작 · 접수 마감 · 당첨자 발표)를
@@ -11037,14 +11094,14 @@ function zf3Tabs(){
   sync();
   new MutationObserver(sync).observe(bar, { subtree: true, attributes: true, attributeFilter: ['class'] });
 }
-// 스크롤하면 붙는 얇은 머리(둘러보기 ⑩) — 공고 탭 머리(#zf3NoticeHead)가 화면 위로 나가면 「조건에 맞는 n건 / 열린 m건」 + 「＋ 조건」 한 줄.
-//    「＋ 조건」은 머리로 돌아가 조건 시트를 연다(시트는 머리 아래에 펼쳐진다). 넓은 화면은 위 탭 아래에, 390 은 맨 위에 붙는다.
+// 스크롤하면 붙는 얇은 머리(둘러보기 ⑩) — 공고 탭 머리(#zf3NoticeHead)가 화면 위로 나가면 「조건에 맞는 n건 / 열린 m건」 + 「필터」 한 줄.
+//    「필터」는 머리로 돌아가 조건 시트를 연다(시트는 머리 아래에 펼쳐진다). 넓은 화면은 위 탭 아래에, 390 은 맨 위에 붙는다.
 function zf3StickyHead(){
   const head = document.getElementById('zf3NoticeHead');
   if(!head || !('IntersectionObserver' in window) || document.getElementById('zf3Sticky')) return;
   const st = document.createElement('div');
   st.id = 'zf3Sticky'; st.className = 'zf3-sticky'; st.hidden = true;
-  st.innerHTML = '<span class="zf3-st-t" aria-live="off"></span><button type="button" class="zf3-chip add">＋ 조건</button>';
+  st.innerHTML = '<span class="zf3-st-t" aria-live="off"></span><button type="button" class="zf3-chip add zf3-fbtn">' + ZF3_ICO_FILTER + '필터</button>';
   document.body.appendChild(st);
   const reduce = () => { try{ return matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){ return false; } };
   st.querySelector('button').addEventListener('click', () => {
@@ -11097,6 +11154,13 @@ function zf3Init(){
     else if(b.dataset.act === 'view') zf3SetView(b.dataset.v);
     else if(b.dataset.act === 'st'){ activeNoticeStatus = activeNoticeStatus === b.dataset.v ? null : b.dataset.v; refreshChipSel('noticeStatusChips', activeNoticeStatus); updateFilterToggleBtn(); applyNoticeFiltersAndRender(); }
     else if(b.dataset.act === 'sort'){ const ss = document.getElementById('noticeSortSel'); if(ss && ss.value !== b.dataset.v){ ss.value = b.dataset.v; applyNoticeFiltersAndRender(); } }
+  });
+  // 시트 밖 정렬 칸 — 값만 종전 정렬 칸(noticeSortSel)에 넘긴다. 머리를 다시 그리므로 초점을 새 칸에 되돌린다.
+  if(nh) nh.addEventListener('change', e => {
+    const s = e.target.closest('[data-act="sortsel"]'), ss = document.getElementById('noticeSortSel');
+    if(!s || !ss || ss.value === s.value) return;
+    ss.value = s.value; applyNoticeFiltersAndRender();
+    const f = document.querySelector('#zf3NoticeHead [data-act="sortsel"]'); if(f) f.focus();
   });
   const board = document.getElementById('zf3Board');
   if(board) board.addEventListener('click', e => {
