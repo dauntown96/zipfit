@@ -191,6 +191,18 @@ function parseDownList(html: string): ShFile[] | null {
   return out.length ? out : null
 }
 
+// 🔵 2026-10-13(우편함 「코드 — SH 새 공고 진입 지연 · SH 자치구」 4) — 제목에 서울 자치구 이름이 **하나만** 있을 때만 그 구를 쓴다.
+//    여러 구·없음은 null(추측하지 않는다 — 「신혼·신생아 매입임대Ⅰ」처럼 여러 구에 걸친 공고는 제목에 구가 없다).
+//    앞이 글자(한글)면 구 이름의 일부로 보지 않는다(「집중구」 같은 낱말에서 「중구」를 줍지 않게).
+const SEOUL_GU = ['종로구', '중구', '용산구', '성동구', '광진구', '동대문구', '중랑구', '성북구', '강북구', '도봉구', '노원구', '은평구', '서대문구', '마포구',
+  '양천구', '강서구', '구로구', '금천구', '영등포구', '동작구', '관악구', '서초구', '강남구', '송파구', '강동구']
+function guFromTitle(title: string): string | null {
+  const t = String(title ?? '')
+  const hit = new Set(SEOUL_GU.filter(g => new RegExp(`(^|[^가-힣])${g}`).test(t)))
+  // 「동대문구」 안의 「대문구」처럼 겹치는 짧은 이름은 없다(25개 실측) · 「중구」는 「중랑구」와 겹치지 않는다(뒤 글자가 다르다).
+  return hit.size === 1 ? [...hit][0] : null
+}
+
 function mapRow(row: ShRow) {
   return {
     source:               'SH',
@@ -202,7 +214,8 @@ function mapRow(row: ShRow) {
     supply_org:           '서울주택도시개발공사',
     region:               '서울',
     sido_nm:              '서울특별시',
-    sigungu_nm:           null,   // 목록·상세에 자치구 정보가 없다. 추측하지 않는다.
+    // 🔴 sigungu_nm 은 싣지 않는다(2026-10-13) — 종전에는 null 을 실어 매 수집마다 덮었다. 제목에서 구 하나를 읽은 행만
+    //    upsert 뒤 따로 「비어 있는 행만」 채운다(collect · fillGu). 목록·상세에 자치구 칸은 없다.
     announcement_date:    row.announceDate,
     winner_announce_date: row.winnerDate,
     apply_start:          null,   // 목록에 접수기간이 없다. 상세 파싱은 이번 범위 밖.
@@ -284,6 +297,18 @@ async function collect() {
     else upserted += data?.length ?? 0
   }
 
+  // 🔵 2026-10-13 — 제목에 서울 자치구 하나가 있는 행의 시군구를 채운다(비어 있는 행만 · 이미 있는 값은 덮지 않는다).
+  //    🔴 errors 에 넣지 않는다 — sh_close_missing 의 「목록을 다 봤다」 판정과 다른 물음이다(상세 실패와 같은 처리 · 응답에만 싣는다).
+  const gu = { filled: 0, failed: [] as string[] }
+  for (const r of rows) {
+    const g = guFromTitle(r.title)
+    if (!g) continue
+    const { data, error } = await supabase.from('announcements').update({ sigungu_nm: g })
+      .eq('source', 'SH').eq('announcement_id', r.announcement_id).is('sigungu_nm', null).select('id')
+    if (error) gu.failed.push(`${r.announcement_id}: ${error.message}`)
+    else gu.filled += data?.length ?? 0
+  }
+
   const result = {
     total_pages: totalPages,
     pages_failed: pagesFailed,
@@ -296,7 +321,7 @@ async function collect() {
     errors,
   }
   await logRun(result)
-  return { ...result, detail }   // detail 은 런 로그 표 칸이 아니라 응답에만 싣는다
+  return { ...result, detail, gu }   // detail · gu 는 런 로그 표 칸이 아니라 응답에만 싣는다
 
   } catch (e) {
     // 🔴 1페이지부터 죽은 런도 남긴다 — 「무엇이 실패했는지 사후에 볼 방법이 없다」가 이 표의 이유다.
