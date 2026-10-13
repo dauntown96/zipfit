@@ -1,6 +1,7 @@
 CREATE OR REPLACE FUNCTION public.sh_close_missing(p_threshold integer DEFAULT 8, p_dry_run boolean DEFAULT false)
  RETURNS TABLE(announcement_id text, prev_status text, misses bigint, last_seen_at timestamp with time zone)
  LANGUAGE sql
+ SET search_path TO 'public', 'pg_temp'
 AS $function$
   with ok_runs as (
     select started_at

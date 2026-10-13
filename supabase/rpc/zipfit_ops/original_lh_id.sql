@@ -2,6 +2,7 @@ CREATE OR REPLACE FUNCTION zipfit_ops.original_lh_id(p_id text)
  RETURNS text
  LANGUAGE sql
  STABLE
+ SET search_path TO 'public', 'pg_temp'
 AS $function$
 -- 🔴 2026-10-07(Z-2 ① PR-A — 우편함 「코드 — Z-2 …」 1) 원문 ID 한 정의. 산물(세대·정책·자격·이미지·경로)이 살 LH 원문 행의 ID를 돌려준다.
 --   분석 스킬 규약 29 · 감지 루틴 · 재확인 스킬 · 이전 회차가 모두 이 함수 하나를 부른다(관리 API · postgres) — 사본을 짓지 않는다.

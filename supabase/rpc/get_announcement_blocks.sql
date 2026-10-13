@@ -2,6 +2,7 @@ CREATE OR REPLACE FUNCTION public.get_announcement_blocks(p_announcement_id text
  RETURNS TABLE(precise_address text, total_units integer, announcement_id text, source text)
  LANGUAGE sql
  STABLE
+ SET search_path TO 'public', 'pg_temp'
 AS $function$
 -- 🔴 target에서 LIMIT 1을 걷어냈다(2026-09-12) — get_announcement_group_ids와 같은 처리다.
 -- announcement_id 단독에는 유니크 제약이 없다(제약은 UNIQUE (source, announcement_id)).

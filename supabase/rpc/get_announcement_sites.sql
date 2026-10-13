@@ -2,6 +2,7 @@ CREATE OR REPLACE FUNCTION public.get_announcement_sites(p_announcement_id text)
  RETURNS TABLE(precise_address text, total_units integer, announcement_id text, source text, site_label text)
  LANGUAGE sql
  STABLE
+ SET search_path TO 'public', 'pg_temp'
 AS $function$
 -- 🔴 2026-10-06(Z-1 PR-B ① — 우편함 「코드 — Z-1 원문 키 사이클」 (나) 세 걸음) — 카드 상세의 단지(블록) 목록을 두 모양으로 돌려준다.
 --   ⓐ 블록 모양(지금 전부) — get_announcement_blocks 행 그대로 + site_label NULL. 블록 ID(MYHOME 분할 행)마다 산물이 산다.

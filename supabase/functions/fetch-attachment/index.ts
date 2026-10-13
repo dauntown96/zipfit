@@ -790,6 +790,99 @@ const handleResumable = async (
   }
 }
 
+// ───────────────────────── 지방공사 호스트 관측(mode=host_probe) ─────────────────────────
+// 🔵 2026-10-13(우편함 「코드 — 국면 B′ ③ 지방공사」 2) — MYHOME 공고 url 의 지방공사 호스트가 이 함수의 실행 지역에서
+//   상세·첨부 받기가 되는지 **읽기만** 한다. 본문·파일 바이트는 돌려주지 않는다(상태·형식·머리 8바이트·링크 꼴 수만).
+// 🔴 범위 장치: 호스트는 PROBE_HOSTS 상수뿐이다(호출자가 준 URL 이라도 이 밖이면 400) · 리다이렉트도 이 안에서만 따라간다 ·
+//   첨부 시험은 상세 안 **같은 호스트** 링크 하나뿐. ALLOWED(받기 허용목록)와 따로다 — 여기 있다고 받기가 열리지 않는다.
+// 🔴 이 모드는 서울 지역에서 돈다(본체 맨 앞 넘기기) — 「서울에서 열리나」를 재는 자리라서다. UA·경유는 바꾸지 않는다.
+// 호스트 목록 = 2026-10-13 MYHOME `announcements.url` 의 LH 밖 호스트 전수(17).
+const PROBE_HOSTS = new Set([
+  'www.bmc.busan.kr', 'www.gbdc.co.kr', 'www.jpdc.co.kr', 'apply.cndc.kr', 'www.ih.co.kr', 'www.sjfmc.or.kr',
+  'www.gndc.co.kr', 'house.gmuc.co.kr', 'www.ansanuc.net', 'apply.ansanuc.net', 'www.gdco.co.kr', 'www.gimje.go.kr',
+  'www.gunsan.go.kr', 'www.jbdc.co.kr', 'happydorm.or.kr', 'www.dcco.kr', 'www.changwon.go.kr',
+])
+const PROBE_TIMEOUT_MS = 20_000
+const PROBE_MAX_HTML = 3_000_000
+const PROBE_LINK_RE = /(?:href|onclick)\s*=\s*["']([^"']*(?:download|fileDown|FileDown|atchFile|getFile|file_down|filedown|downFile|FileDownload)[^"']*)["']/gi
+
+const probeFetch = async (start: URL, init: RequestInit = {}): Promise<{ res: Response; finalUrl: URL; hops: string[] } | string> => {
+  let cur = start
+  const hops: string[] = []
+  for (let i = 0; i <= MAX_REDIRECTS; i++) {
+    let res: Response
+    try {
+      res = await fetch(cur, { ...init, redirect: 'manual', signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) })
+    } catch (e) {
+      return `network:${e instanceof Error ? e.name : 'Error'}`
+    }
+    const loc = res.headers.get('location')
+    if (res.status >= 300 && res.status < 400 && loc) {
+      await res.body?.cancel()
+      let next: URL
+      try { next = new URL(loc, cur) } catch { return `리다이렉트 주소를 읽지 못함: ${loc.slice(0, 120)}` }
+      if (!PROBE_HOSTS.has(next.hostname)) return `관측 밖 호스트로 리다이렉트: ${next.hostname}`
+      hops.push(`${res.status} → ${next.toString().slice(0, 160)}`)
+      cur = next
+      continue
+    }
+    return { res, finalUrl: cur, hops }
+  }
+  return `리다이렉트 ${MAX_REDIRECTS}회 초과`
+}
+
+const hostProbe = async (target: string | null) => {
+  let u: URL
+  try { u = new URL(target ?? '') } catch { return { status: 400, body: { ok: false, error: 'url 이 없거나 읽지 못함' } } }
+  if (!['https:', 'http:'].includes(u.protocol) || !PROBE_HOSTS.has(u.hostname)) {
+    return { status: 400, body: { ok: false, error: `관측 밖 호스트: ${u.hostname}` } }
+  }
+  const region = Deno.env.get('SB_REGION') ?? '(없음)'
+  const t0 = Date.now()
+  const d = await probeFetch(u)
+  if (typeof d === 'string') return { status: 200, body: { ok: true, host: u.hostname, region, detail: { error: d, elapsed_ms: Date.now() - t0 } } }
+  const ct = d.res.headers.get('content-type')
+  const { bytes } = d.res.body ? await readCapped(d.res.body, PROBE_MAX_HTML) : { bytes: new Uint8Array() }
+  const charset = /euc-kr|ks_c_5601/i.test(ct ?? '') ? 'euc-kr' : 'utf-8'
+  const html = bytes ? new TextDecoder(charset).decode(bytes) : ''
+  const title = (html.match(/<title[^>]*>([^<]*)</i)?.[1] ?? '').trim().slice(0, 120)
+  const links = [...html.matchAll(PROBE_LINK_RE)].map(m => m[1].replace(/&amp;/g, '&'))
+  const urlLinks: URL[] = []
+  let scriptN = 0
+  for (const l of links) {
+    if (/^javascript:/i.test(l) || l.includes('(')) { scriptN++; continue }
+    try { const x = new URL(l, d.finalUrl); if (x.hostname === d.finalUrl.hostname) urlLinks.push(x) } catch { /* 버린다 */ }
+  }
+  const detail = {
+    status: d.res.status, final_url: d.finalUrl.toString().slice(0, 200), redirect_hops: d.hops, content_type: ct,
+    bytes: bytes ? bytes.length : null, title, login_hint: /로그인|login/i.test(title) || /login/i.test(d.finalUrl.pathname),
+    elapsed_ms: Date.now() - t0,
+  }
+  let file: Record<string, unknown> | null = null
+  if (urlLinks.length) {
+    const f = await probeFetch(urlLinks[0])
+    if (typeof f === 'string') file = { url: urlLinks[0].toString().slice(0, 200), error: f }
+    else {
+      let head = new Uint8Array()
+      if (f.res.body) {
+        const r = f.res.body.getReader()
+        const { value } = await r.read()
+        head = (value ?? new Uint8Array()).subarray(0, 8)
+        await r.cancel()
+      }
+      file = {
+        url: urlLinks[0].toString().slice(0, 200), status: f.res.status, content_type: f.res.headers.get('content-type'),
+        content_disposition: f.res.headers.get('content-disposition') !== null,
+        head_hex: Array.from(head).map(b => b.toString(16).padStart(2, '0')).join(''),
+      }
+    }
+  }
+  return {
+    status: 200,
+    body: { ok: true, host: u.hostname, region, detail, links: { url_same_host: urlLinks.length, script: scriptN, sample: urlLinks.slice(0, 3).map(x => x.toString().slice(0, 200)) }, file },
+  }
+}
+
 // ───────────────────────── 본체 ─────────────────────────
 
 Deno.serve(async (req: Request) => {
@@ -814,7 +907,8 @@ Deno.serve(async (req: Request) => {
     let host: string | null = null
     try { host = new URL(target).hostname } catch { /* 아래 검사가 사유를 돌려준다 */ }
     const base = Deno.env.get('SUPABASE_URL')
-    if (host && SEOUL_ONLY.has(host) && Deno.env.get('SB_REGION') !== SEOUL_REGION && base) {
+    const seoulWanted = host && (SEOUL_ONLY.has(host) || (mode_of(reqUrl) === 'host_probe' && PROBE_HOSTS.has(host)))
+    if (host && seoulWanted && Deno.env.get('SB_REGION') !== SEOUL_REGION && base) {
       const headers = new Headers({ 'x-cron-secret': req.headers.get('x-cron-secret') ?? '', 'x-region': SEOUL_REGION, 'x-zf-region-hop': '1' })
       const ct = req.headers.get('content-type')
       if (ct) headers.set('content-type', ct)
@@ -855,6 +949,11 @@ Deno.serve(async (req: Request) => {
       secretError = redact(String(e instanceof Error ? e.message : e), cachedSecrets)
     }
     return json({ ok: !secretError, env_present: envPresent, secret_source: secretSource, error: secretError })
+  }
+
+  if (mode === 'host_probe') {
+    const r = await hostProbe(target)
+    return json(r.body, r.status)
   }
 
   // 🔴 공고 폴더만 확보하고 끝낸다 — 첨부를 받지 않는다.
