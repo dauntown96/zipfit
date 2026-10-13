@@ -52,6 +52,50 @@ select jsonb_build_object(
              from public.ops_uptime_log
             where at < now() - interval '12 minutes' and at > now() - interval '24 hours') r), '[]'::jsonb)
 ) as j;`
+// ⑭ 상세 지도 끝 상태(2026-10-13 · 우편함 「코드 — 지도 감시」) — 열린 카드마다 화면(index.html)이 지도를 어떻게 끝내는지를 DB 로 거울한다.
+//    거울하는 화면 규칙(배포본 b242914 기준 — 바뀌면 여기도): toggleDetail(정밀주소 있으면 그 주소로 핀 · 없으면 pickRegionAddr 폴백) ·
+//    loadAnnouncementBlocks(블록 2개 이상이면 블록마다 핀) · loadHousingUnits(세대 행 있으면 세대 주소로 핀 · 없으면 폴백이 시·구 수준 ∧
+//    zfPlaceNames(region_names) 2곳 이상이면 closeMapAsMultiRegion) · initMapForHouse(전세임대 닫힘 → 폴백 시·도뿐 닫힘 → 폴백 시·구 = 대략 핀).
+//    pickRegionAddr: region 3어절 이상 = detail · sido_nm ∧ sigungu_nm = sigungu · region 2어절 = sigungu · 그 밖 sido. zfPlaceNames = 다른 이름의 접두인 이름은 뺀다.
+//    ⚠️ 브라우저 지오코딩 실패(Lv3 「찾지 못함」 대략 핀)는 DB 가 알 수 없다 — 이 점검은 「처음부터 시·구뿐이라 대략인 핀」만 센다.
+//    ⚠️ 세대 행은 회차 가르기 전 그룹 전체로 센다(화면은 이번 회차가 0 이어도 지난 회차만 있으면 그것으로 핀을 꽂는다 — pastOnly).
+const MAP_SQL = `
+with c as (
+  select g.announcement_id, g.housing_type, nullif(trim(g.precise_address), '') pa, coalesce(g.block_count, 1) bc,
+         nullif(trim(g.sido_nm), '') sido, nullif(trim(g.sigungu_nm), '') sgg, trim(coalesce(g.region, '')) rg,
+         coalesce(g.region_names, '{}') rns
+    from public.get_announcements_deduped(null, null, null) g
+   where g.status <> '접수마감'),
+gi as (select c.announcement_id, x.announcement_id gid from c cross join lateral public.get_announcement_group_ids(c.announcement_id) x),
+hu as (select gi.announcement_id, count(h.id) n from gi left join public.housing_units h on h.announcement_id = gi.gid group by 1),
+f as (
+  select c.*, hu.n hu,
+    (select count(*) from unnest(c.rns) a(x) where a.x <> '' and not exists (
+        select 1 from unnest(c.rns) b(y) where b.y <> a.x and starts_with(b.y, a.x || ' '))) places,
+    case when c.rg <> '' and array_length(regexp_split_to_array(c.rg, '\\s+'), 1) >= 3 then 'detail'
+         when c.sido is not null and c.sgg is not null then 'sigungu'
+         when c.rg <> '' and array_length(regexp_split_to_array(c.rg, '\\s+'), 1) = 2 then 'sigungu'
+         when c.sido is not null or c.rg <> '' then 'sido'
+         else 'none' end lvl
+  from c join hu using (announcement_id)),
+s as (
+  select f.announcement_id,
+    case when f.bc >= 2 then 'blocks'
+         when f.pa is not null or f.hu > 0 then case when f.housing_type like '%전세임대%' then 'closed_jeonse' else 'pin' end
+         when f.lvl = 'sigungu' and f.places >= 2 then 'closed_multi'
+         when f.housing_type like '%전세임대%' then 'closed_jeonse'
+         when f.lvl = 'sido' then 'closed_sido'
+         when f.lvl = 'sigungu' then 'approx'
+         when f.lvl = 'detail' then 'pin'
+         else 'none' end st,
+    (f.places >= 2 and f.bc < 2 and f.hu = 0 and f.housing_type not like '%전세임대%' and (f.pa is not null or f.lvl = 'detail')) one_point
+  from f)
+select json_build_object(
+  'open', (select count(*) from s),
+  'states', (select json_object_agg(st, n) from (select st, count(*) n from s group by st) x),
+  'approx', coalesce((select json_agg(announcement_id order by announcement_id) from s where st = 'approx'), '[]'),
+  'multi_one_point', coalesce((select json_agg(announcement_id order by announcement_id) from s where one_point), '[]'),
+  'multi_closed', coalesce((select json_agg(announcement_id order by announcement_id) from s where st = 'closed_multi'), '[]')) as j;`
 const checks = []
 const add =(id, name, status, value, rule) => checks.push({ id, name, status, value, rule })
 
@@ -437,6 +481,23 @@ try {
     }
   } catch (e) {
     add('backup', '최근 백업(실행 기록) — 기한 날짜의 백업', 'warn', String(e).slice(0, 200), 'ops_backup_seen 을 읽는다(경고만 — 표가 없거나 읽기 실패)')
+  }
+  // ⑭ 상세 지도 끝 상태(MAP_SQL 위 주석) — 🔴 셋 다 실패가 아니라 ⚠️ 경고·정보다. 이슈를 열면 루틴이 착수하지 않는데(열린 health-ops 이슈),
+  //    고침은 데이터·코드 회차라 착수를 막으면 스스로 풀리지 않는다(revision_gap 과 같은 처리). 읽기 실패도 ⚠️.
+  try {
+    const t0 = Date.now()
+    const [m] = await sqlRead(MAP_SQL)
+    const x = m.j, ms = Date.now() - t0
+    const ids = a => `${a.length}: ${a.slice(0, 5).join(', ')}`
+    const ap = x.approx || [], op = x.multi_one_point || [], mc = x.multi_closed || []
+    add('map_approx', '열린 카드 중 상세 지도 대략 핀(시·군·구 중심)', ap.length === 0 ? 'pass' : 'warn', ap.length ? ids(ap) : 0,
+      '0 — 세대 행 0 ∧ 정밀주소 없음 ∧ 블록 1 ∧ 폴백 주소가 시·구 수준 ∧ 한 지역(여러 지역이면 닫힘) ∧ 전세임대 아님 · 넘으면 ⚠️ 경고만(이슈를 열지 않는다) · 브라우저 지오코딩 실패(Lv3)는 세지 못한다')
+    add('map_multi_one_point', '여러 지역 공고인데 상세 지도가 한 점으로 눌림', op.length === 0 ? 'pass' : 'warn', op.length ? ids(op) : 0,
+      '0 — region_names(접두 흡수) 2곳 이상 ∧ 블록 1 ∧ 세대 행 0 ∧ 전세임대 아님 ∧ (정밀주소 있음 ∨ region 3어절 이상) · 넘으면 ⚠️ 경고만')
+    add('map_multi_closed', '여러 지역이라 상세 지도를 닫은 열린 카드(정보)', 'pass', `${mc.length ? ids(mc) : 0} · 열린 ${x.open} · ${ms}ms`,
+      '정보 — 판정하지 않는다(closeMapAsMultiRegion 거울: 세대 행 0 ∧ 정밀주소 없음 ∧ 폴백 시·구 수준 ∧ region_names 2곳 이상)')
+  } catch (e) {
+    add('map_approx', '열린 카드 중 상세 지도 대략 핀(시·군·구 중심)', 'warn', String(e).slice(0, 200), 'MAP_SQL 을 읽는다(경고만 — 읽기 실패)')
   }
 } catch (e) {
   add('runner', '점검 실행', 'fail', String(e).slice(0, 300), '점검 스크립트가 끝까지 돈다')
