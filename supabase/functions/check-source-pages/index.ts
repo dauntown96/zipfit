@@ -10,6 +10,10 @@
 //   남은 것은 같은 회차의 다음 cron 호출(5분 간격)이 이어 받는다.
 //
 // 모드: collect(기본 · ?force=1 이면 6시간 건너뛰기 없이 열린 키 전부) · probe(DB 미기록 — ?id=<원문 키> 한 건의 파싱 결과) · authcheck.
+// 🔵 2026-10-13(우편함 「코드 — SH 새 공고 진입 지연」 2) — collect&new=sh 는 **한 번도 오류 없이 대조된 적 없는 SH 키만** 본다.
+//   SH 수집(UTC 0·3·6·9시) 10분 뒤 cron(zipfit-check-source-pages-new-sh)이 부른다. 접수기간 없는 SH 공고는 이 대조의 목록 모집상태(모집중)가
+//   있어야 분석 대기열 후보가 되는데(analysis_dispatch_tick), 정기 회차가 하루 두 번(KST 06:30 · 20:30)뿐이라 아침 수집분이 반나절 기다렸다
+//   (SH_311349 — 09:00 수집 · 첫 대조 20:30 예정). 이미 대조된 키는 정기 회차 몫 그대로라 과거 공고가 몰려 들어오지 않는다.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2.116.0'
 import { parseLhPage, compareLh, parseShList, parseShBoard, matchFollowups, type ShPost, type Phase } from './parse.ts'
@@ -121,9 +125,9 @@ function checkSh(t: Target, runId: number, ctx: { status: Map<string, string>; p
   }
 }
 
-async function collect(force: boolean) {
+async function collect(force: boolean, newSh = false) {
   const startedAt = Date.now()
-  const { data: run, error: re } = await supabase.from('source_page_check_runs').insert({ mode: force ? 'collect-force' : 'collect' }).select('id').single()
+  const { data: run, error: re } = await supabase.from('source_page_check_runs').insert({ mode: newSh ? 'collect-new-sh' : force ? 'collect-force' : 'collect' }).select('id').single()
   if (re) throw new Error(`실행 기록: ${re.message}`)
   const runId = run.id as number
   const finish = async (patch: Record<string, unknown>) => {
@@ -138,7 +142,18 @@ async function collect(force: boolean) {
     if (de) throw new Error(`대조 이력 조회: ${de.message}`)
     // force(?force=1 · 손으로 다시 대조할 때만) 면 6시간 건너뛰기를 쓰지 않는다 — cron 은 넘기지 않는다.
     const doneKeys = new Set(force ? [] : (done ?? []).map(d => d.source_key as string))
-    const todo = ((tg ?? []) as Target[]).filter(t => !doneKeys.has(t.source_key))
+    let pool = (tg ?? []) as Target[]
+    if (newSh) {
+      // 새 SH 키 = 열린 SH 대상 중 오류 없는 대조 행이 한 건도 없는 키(기간 제한 없이 본다).
+      const shKeys = pool.filter(t => t.source === 'SH').map(t => t.source_key)
+      const { data: ever, error: ee } = shKeys.length
+        ? await supabase.from('source_page_checks').select('source_key').in('source_key', shKeys).is('error', null)
+        : { data: [], error: null }
+      if (ee) throw new Error(`새 SH 키 조회: ${ee.message}`)
+      const seen = new Set((ever ?? []).map(d => d.source_key as string))
+      pool = pool.filter(t => t.source === 'SH' && !seen.has(t.source_key))
+    }
+    const todo = pool.filter(t => !doneKeys.has(t.source_key))
       .sort((a, b) => (a.source === b.source ? a.source_key.localeCompare(b.source_key) : a.source === 'SH' ? 1 : -1))
     let checked = 0, failed = 0, closed = 0, ends = 0, streak = 0
     let stoppedBy: string | null = null
@@ -199,7 +214,7 @@ Deno.serve(async (req: Request) => {
       if (!/^(\d{10,20}|SH_\d+)$/.test(id)) return json({ error: 'probe 는 ?id=<panId 또는 SH_seq> 하나' }, 400)
       return json({ mode, ...(await probe(id)) })
     }
-    if (mode === 'collect') return json({ mode, ...(await collect(params.get('force') === '1')) })
+    if (mode === 'collect') return json({ mode, ...(await collect(params.get('force') === '1', params.get('new') === 'sh')) })
     return json({ error: `미구현 mode: ${mode}` }, 400)
   } catch (e) {
     return json({ mode, error: String(e) }, 500)

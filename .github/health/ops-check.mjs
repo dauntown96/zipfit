@@ -65,6 +65,7 @@ const EXPECTED_JOBS = [
   'zipfit-health-ops-dispatch',  // 2026-10-03 운영 점검 예약을 GitHub 밖으로 — pg_cron → workflow_dispatch(마이그레이션 2026-10-02_05)
   'zipfit-health-screen-dispatch', // 2026-10-06 화면 점검 예약도 GitHub 밖으로(마이그레이션 2026-10-06_02)
   'zipfit-check-source-pages',   // 2026-10-08 열린 원문 키 정기 대조(3-B ③ 1단계 · 마이그레이션 2026-10-08_02)
+  'zipfit-check-source-pages-new-sh',   // 2026-10-13 새 SH 키만 SH 수집 10분 뒤 대조(마이그레이션 2026-10-13_03)
   'zipfit-uptime-ping',          // 2026-10-08 바깥 감시 1단계(마이그레이션 2026-10-08_05)
   'zipfit-backup-dispatch', 'zipfit-heartbeat-dispatch',   // 2026-10-08 백업·생존 신호 예약도 GitHub 밖으로(마이그레이션 2026-10-08_06)
   'zipfit-backup-poll',          // 2026-10-11 zipfit-backup backup.yml 실행 기록 수집(마이그레이션 2026-10-11_02 · ⑥ backup)
