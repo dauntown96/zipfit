@@ -9,6 +9,9 @@
 🔴 첫 한 주(~2026-10-19)는 경고만 — 「막기」로 바꿀지는 claude.ai 판정. 훅이 스스로 죽어도 명령은 그대로 간다(언제나 exit 0).
 🔴 두 저장소가 함께 붙은 세션(루틴 포함)에서는 저장소 .claude/settings.json 의 훅이 돌지 않는다 — 회신 참조.
 시험: echo '{"tool_input":{"command":"git commit -m x"},"cwd":"/home/user/zipfit"}' | python3 .claude/hooks/rule-check.py
+🔵 2026-10-13(우편함 「코드 — 카드 머리 세대수」 0장 2) — PR check 도 같은 ② 검사를 부른다:
+   python3 .claude/hooks/rule-check.py --history CLAUDE.md   → 문제 없으면 exit 0 · 있으면 줄마다 출력하고 exit 1
+   (표준 라이브러리만 · 훅 경로와 같은 history_problems() 한 벌 — 사본 없음. 경고/실패는 워크플로가 정한다.)
 """
 import json
 import os
@@ -148,7 +151,17 @@ def main():
                           'hookSpecificOutput': {'hookEventName': 'PreToolUse', 'additionalContext': msg}}, ensure_ascii=False))
 
 
+def history_cli(path):
+    with open(path, encoding='utf-8') as f:
+        probs = history_problems(f.read())
+    for p in probs:
+        print(f'{path} 「최근 작업 이력」: {p}')
+    return 1 if probs else 0
+
+
 if __name__ == '__main__':
+    if len(sys.argv) >= 3 and sys.argv[1] == '--history':
+        sys.exit(history_cli(sys.argv[2]))
     try:
         main()
     except Exception as e:

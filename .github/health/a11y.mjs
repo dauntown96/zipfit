@@ -71,7 +71,9 @@ export async function measure (browser, url, { AxeBuilder }) {
   return out
 }
 
-// 기준선과 견준다 → { status: 'pass'|'warn', value, increased: [...] }
+// 기준선과 견준다 → { status: 'pass'|'warn'|'fail', value, increased: [...] }
+// 🔴 2026-10-13(우편함 「코드 — 카드 머리 세대수」 0장 1 · claude.ai 판정 「critical 승격」) — critical 이 하나라도 있으면 fail 이다
+//    (런칭 조건 ① 잣대 · 배포 v201 다섯 상태 위반 0 에서 승격). 그 밖의 늘어남·못 잰 상태는 종전대로 경고다.
 export function compare (got, baseline) {
   if (!baseline) return { status: 'warn', value: '기준선 파일 없음', increased: [] }
   const inc = [], errs = []
@@ -90,6 +92,7 @@ export function compare (got, baseline) {
   // 🔵 2026-10-12(우편함 「표시층 — 런칭 전 남은 화면 일」 2) — critical 은 규칙·상태까지 줄에 적는다(런칭 조건 ① 잣대 · 결과물 파일을 열지 않고 로그에서 확인)
   const crit = Object.entries(got).flatMap(([st, r]) => Object.entries(r.rules || {}).filter(([, v]) => v.impact === 'critical').map(([id, v]) => `${id} ${v.nodes}(${st})`))
   const head = `위반 규칙 ${rulesNow.size}종 · 요소 ${total} · critical ${crit.length ? crit.join(', ') : '0'}`
+  if (crit.length) return { status: 'fail', value: `${head} · critical 은 실패`, increased: inc }
   if (errs.length) return { status: 'warn', value: `${head} · 못 잰 상태 ${errs.length}: ${errs.join(' / ')}`, increased: inc }
   if (inc.length) return { status: 'warn', value: `${head} · 기준선보다 늚 ${inc.length}: ${inc.slice(0, 4).join(' / ')}`, increased: inc }
   return { status: 'pass', value: `${head} · 기준선 이내`, increased: [] }

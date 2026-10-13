@@ -70,8 +70,8 @@
 
 ### 🧰 컨테이너 환경 메모 — 세션마다 다시 겪는 것
 
-- 🔴 **파이썬 패키지(pdfplumber · pgdumplib · python-hwpx)는 「있다/없다」를 여기 적지 않는다 — 세션 첫 작업 전에 `bash /home/user/zipfit/.claude/hooks/session-setup.sh`를 한 번 돌린다**(버전 고정 · 있으면 몇 초 · 결과는 `/tmp/zipfit-session-setup.log`). 컨테이너마다 달랐다(2026-09-22 pdfplumber 없음 · 2026-10-12 pdfplumber 있음·pgdumplib·python-hwpx 없음). 🔴 저장소 `.claude/settings.json`의 SessionStart 훅은 **두 저장소가 함께 붙은 세션(루틴 포함)에서는 돌지 않는다**(Claude Code 문서 · 2026-10-12 실측 — 우편함 「코드 — Claude Code 장비 정비」) — 그래서 손으로 돌린다. PDF는 `/usr/bin/python3`에서 `pdfplumber`로 읽는다 · ⚠️ `cryptography`는 debian 패키지라 `--upgrade`가 `RECORD file not found`로 실패하지만 **그대로 동작한다** — 재시도하지 않는다.
-- 🔵 **hwp → hwpx는 `python-hwpx`의 `hwpx.hwp5.package.convert(바이트)` → `to_hwpx_bytes(결과.files)`**(run 182 ② 제안 · claude.ai 채택). ⚠️ 모듈 경로는 `hwp5.package`가 아니라 `hwpx.hwp5.package`다(2026-10-12 실측).
+- 🔴 **파이썬 패키지(pdfplumber · pgdumplib · python-hwpx)는 「있다/없다」를 여기 적지 않는다 — 세션 첫 작업 전에 `bash /home/user/zipfit/.claude/hooks/session-setup.sh`를 한 번 돌린다**(버전 고정 · 있으면 몇 초 · 결과는 `/tmp/zipfit-session-setup.log`). 컨테이너마다 달랐다(2026-09-22 pdfplumber 없음 · 2026-10-12 pdfplumber 있음·pgdumplib·python-hwpx 없음). 🔴 저장소 `.claude/settings.json`의 SessionStart 훅은 **두 저장소가 함께 붙은 세션(루틴 포함)에서는 돌지 않는다**(Claude Code 문서 · 2026-10-12 실측 — 우편함 「코드 — Claude Code 장비 정비」) — 그래서 손으로 돌린다. PDF는 `/usr/bin/python3`(3.13 · 2026-10-13 실측)에서 `pdfplumber`로 읽는다 · ⚠️ `cryptography`는 debian 패키지라 `--upgrade`가 `RECORD file not found`로 실패하지만 **그대로 동작한다** — 재시도하지 않는다.
+- 🔵 **hwp → hwpx는 `python-hwpx`의 `hwpx.hwp5.package.convert(바이트)` → `to_hwpx_bytes(결과.files)`**(run 182 ② 제안 · claude.ai 채택). ⚠️ 모듈 경로는 `hwp5.package`가 아니라 `hwpx.hwp5.package`다(2026-10-12 실측 · 2026-10-13 같은 `/usr/bin/python3`에서 `convert` 있음 재확인).
 - 🔴 **DB 쓰기의 기본 경로는 관리 API 파일 실행이다**(B51 실측 · B54 판정). ⚠️ **데이터 쓰기(INSERT·UPDATE·DELETE)만이다 — 스키마·함수 변경(DDL)은 원칙 32**(2026-09-30). `POST https://api.supabase.com/v1/projects/khdpjjyspmlqtzperoqg/database/query`에 `{"query": "<SQL>"}`를 싣는다 — SQL을 파일로 쓰고 `python3 -c 'import json,sys; print(json.dumps({"query": open(sys.argv[1], encoding="utf-8").read()}))' f.sql | curl -sS -X POST <엔드포인트> -H 'Content-Type: application/json' --data-binary @-`. 🔴 **`jq -Rs`로 싣지 않는다**(B57 실측 — 168KB 파일에서 한글 5글자가 깨졌다. 입력을 조각으로 읽다 UTF-8 멀티바이트를 가른다. 가드가 잡아 롤백됐다). 🔴 **인증은 프록시가 주입한다** — 토큰 환경변수는 없고 헤더를 붙이지 않는다. 키·토큰 값을 회신·로그·커밋에 찍지 않는다.
   - 요청 하나 = 트랜잭션 하나(명시 `BEGIN`/`COMMIT`도 된다) · `DO` 가드가 예외를 던지면 **HTTP 400으로 요청 전체가 롤백**된다 · 성공은 201 · **마지막 문장의 결과만** 돌아온다 · 1,025,039B 페이로드 통과 · `statement_timeout` 2분.
   - 🔴 **응답은 약 30초에 프록시 502(`upstream request failed`)로 끊길 수 있다**(2026-10-07 실측 3회 · 30.4~30.6초 — `statement_timeout` 2분보다 먼저). 끊겨도 서버의 트랜잭션은 커밋됐을 수 있다 — **커밋 여부는 기록 표·행 수로 따로 확인**한다. 긴 쓰기는 트랜잭션 안 검증을 줄여 30초 안에 두고, 전수 대조는 커밋 뒤 읽기로 한다. 롤백 전용 시험 파일을 잘라 쓸 때는 끝 예외(`raise exception 'RESULT …'`)를 함께 남긴다(같은 날 시험 파일의 「시험 전용 스위치 끄기」 한 줄이 커밋된 사고).
@@ -160,9 +160,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-10-13 | **코드 — 카드 머리 세대수** — MYHOME 다구 묶음 머리 「모집 세대수」 = 같은 회차 분할 행 합(`zfRecruitBundleSum` · 사하구 6 → 16 · 정렬·블록 줄 불변) · `zipfit-v202` · LH 단지 규모 4건 = 업스트림 `HSH_CNT` 그대로 · 열린 LH 29장 어긋남 1 · a11y critical 실패 승격 · 이력 표 PR check · 불변식만 바꾼 PR도 실행 · PR #478 |
 | 2026-10-13 | **공고 분석 — 자동 run 193: 충주신한강변 국민임대 예비입주자(자격완화) `…0899`** — 완료 · 정책 43 · 세대 4(모집 17) · 자격 1(소득 150% 완화) · 전환 검산 일치 · 불변식 v3.10 0행 · 분석률 72/72 · 보조 자료 LH 확인 — 없음 · Drive 폴더 신설 · 데이터 쓰기만 |
 | 2026-10-12 | **표시층 — 지도 경계 2025(국가데이터처 SGIS)** — 지도로 보기 경계를 2013 → 2025년 2분기 시도·시군구(공공데이터포털 15129688 · 제한 없음)로 · 같은 꼴·같은 좌표계 42KB · 미추홀구·청주 서원/청원·대구 군위군 제 경계 · 별칭 걷음 · 캡션 출처 · `zipfit-v201` · 점·고리 main과 같음 · PR #477 |
-| 2026-10-12 | **표시층 — 새 화면 전환(d3 → 모두)** — #470을 main 위로 다시 얹어 병합 · 모든 사용자에게 새 화면(히어로·공지 띠·탭 그림 걷음 · AI 고지는 앱 머리) · `zipfit-v200` · 다시 잰 카드 글자 16장 차이 0 · health-screen 실패 0·critical 0 · PR #476 |
 
 ---
 

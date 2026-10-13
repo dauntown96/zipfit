@@ -18,6 +18,7 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 import urllib.error
@@ -28,7 +29,23 @@ API = f'https://api.supabase.com/v1/projects/{PROJECT_REF}/database/query'
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 MIG_DIR = os.path.join(ROOT, 'supabase', 'migrations')
 RPC_DIR = os.path.join(ROOT, 'supabase', 'rpc')
-INV_FILE = os.path.join(ROOT, 'supabase', 'invariants', 'v3.10.sql')
+INV_DIR = os.path.join(ROOT, 'supabase', 'invariants')
+
+
+def latest_invariants():
+    """현행 불변식 = 가장 큰 번호 파일(supabase/invariants/README — 「최신 번호 파일만 돌린다」).
+    🔵 2026-10-13(우편함 「코드 — 카드 머리 세대수」 0장 3) — 파일 이름을 여기 박아 두지 않는다. 새 번호 파일을 더한 PR 이
+    그 파일로 바로 검사받는다(종전에는 이 줄을 함께 고쳐야 했다)."""
+    vs = []
+    for n in os.listdir(INV_DIR):
+        m = re.match(r'^v(\d+(?:\.\d+)*)\.sql$', n)
+        if m:
+            vs.append((tuple(int(x) for x in m.group(1).split('.')), n))
+    return os.path.join(INV_DIR, max(vs)[1])
+
+
+INV_FILE = latest_invariants()
+INV_NAME = os.path.basename(INV_FILE)[:-4]
 FILE_RE = re.compile(r'^\d{4}-\d{2}-\d{2}_\d{2}_[a-z0-9_]+\.sql$')
 LEDGER = 'zipfit_ops.schema_migrations'
 ANON_LIMIT_MS = 3000
@@ -158,6 +175,32 @@ def invariants_sql():
     q = open(INV_FILE, encoding='utf-8').read().strip()
     q = q.rstrip(';').strip()
     return q
+
+
+def inv_base_count(inv):
+    """적용 전 불변식 위반 수(기준값). → (수, 덧붙일 말)
+    🔵 2026-10-13(0장 3 ② · to_regclass 가드) — 새 표와 그 표를 읽는 불변식을 한 PR 로 올리면, 적용 **전** 운영 DB 에는
+    그 표가 없어 기준값 측정이 42P01(relation does not exist)로 죽었다. 그때는 기준값을 0 으로 둔다 — 적용 뒤(같은
+    트랜잭션 안)에는 표가 있으므로 그 검사도 0 이어야 통과한다. 다른 오류는 종전대로 그대로 올린다."""
+    try:
+        return read(f'select count(*)::int as n from ({inv}) x')[0]['n'], ''
+    except RuntimeError as e:
+        if '42P01' not in str(e):
+            raise
+        return 0, f'적용 전 DB 에 없는 표를 읽어 기준값 0 으로 둠(42P01 · {str(e)[:160]})'
+
+
+def changed_invariants():
+    """이 PR 이 바꾼 supabase/invariants/*.sql — BASE_SHA(워크플로가 넘긴다)가 없으면 빈 목록."""
+    base = os.environ.get('BASE_SHA', '')
+    if not base:
+        return []
+    try:
+        out = subprocess.run(['git', 'diff', '--name-only', f'{base}...HEAD', '--', 'supabase/invariants/'],
+                             cwd=ROOT, capture_output=True, text=True, timeout=30).stdout
+    except Exception:
+        return []
+    return [l for l in out.split() if l.endswith('.sql')]
 
 
 # ───────────────────────── 지문·기록 ─────────────────────────
@@ -366,9 +409,25 @@ def cmd_check():
         lines += ['', '### 파일 규칙 위반', *[f'- ❌ {e}' for e in errs]]
         return report('check', 'DB 변경 PR 체크', False, lines, data)
     if not pending:
+        # 🔵 2026-10-13(0장 3 ①) — 불변식 파일만 바꾼 PR 도 현행 불변식을 읽기 전용으로 한 번 돌린다.
+        #    종전에는 「적용할 파일이 없다」로 통과해, 깨진 불변식 파일(42601 등)이 병합 뒤 다음 DB 회차에서야 드러났다.
+        #    판정: SQL 이 끝까지 돌고 위반 0 이어야 초록(운영 위반 0 이 현행 규칙 — 새 검사가 이미 위반을 찾으면 데이터부터 본다).
+        inv_changed = changed_invariants()
+        if inv_changed:
+            data['invariants_changed'] = inv_changed
+            st, txt = query(f'select count(*)::int as n from ({invariants_sql()}) x', read_only=True)
+            if st not in (200, 201):
+                lines.append(f'- ❌ 불변식 {INV_NAME} 이 돌지 못했다(HTTP {st}) — 바뀐 파일 {", ".join(inv_changed)}: `{txt[:400]}`')
+                return report('check', 'DB 변경 PR 체크', False, lines, data)
+            n = json.loads(txt)[0]['n']
+            data['invariants'] = n
+            lines.append(f'- {"✅" if n == 0 else "❌"} 불변식 {INV_NAME} 읽기 전용 실행 — 위반 {n}(바뀐 파일 {", ".join(inv_changed)})')
+            return report('check', 'DB 변경 PR 체크', n == 0, lines, data)
         lines.append('- 적용할 파일이 없다 — 통과')
         return report('check', 'DB 변경 PR 체크', True, lines, data)
-    inv_base = read(f'select count(*)::int as n from ({invariants_sql()}) x')[0]['n']
+    inv_base, inv_note = inv_base_count(invariants_sql())
+    if inv_note:
+        lines.append(f'- ℹ️ {inv_note}')
     fp0 = fingerprint()
     sql, names = build_check_sql(pending, inv_base)
     t0 = time.time()
@@ -399,9 +458,9 @@ def cmd_check():
         inv_n, inv_b = res['invariants'], res['invariants_before']
         if inv_n > inv_b:
             ok = False
-            lines.append(f'- ❌ 불변식 v3.10 위반 {inv_b} → {inv_n}: `{json.dumps(res["invariants_sample"], ensure_ascii=False)[:400]}`')
+            lines.append(f'- ❌ 불변식 {INV_NAME} 위반 {inv_b} → {inv_n}: `{json.dumps(res["invariants_sample"], ensure_ascii=False)[:400]}`')
         else:
-            lines.append(f'- ✅ 불변식 v3.10 위반 {inv_b} → {inv_n}')
+            lines.append(f'- ✅ 불변식 {INV_NAME} 위반 {inv_b} → {inv_n}')
         for a in res.get('anon', []):
             good = a['ms'] < ANON_LIMIT_MS
             ok = ok and good
@@ -441,14 +500,16 @@ def cmd_apply():
     inv = invariants_sql()
     ok = True
     for f in pending:
-        inv_base = read(f'select count(*)::int as n from ({inv}) x')[0]['n']
+        inv_base, inv_note = inv_base_count(inv)
+        if inv_note:
+            lines.append(f'- ℹ️ `{f["name"]}` {inv_note}')
         fp0 = fingerprint()
         guard = f"""
 DO {dq(f'''
 declare n bigint;
 begin
   execute {dq('select count(*) from (' + inv + ') x', 'zz_inv')} into n;
-  if n > {inv_base} then raise exception 'ZIPFIT_APPLY_GUARD 불변식 v3.10 위반 % → %', {inv_base}, n; end if;
+  if n > {inv_base} then raise exception 'ZIPFIT_APPLY_GUARD 불변식 {INV_NAME} 위반 % → %', {inv_base}, n; end if;
 end
 ''', 'zz_g')};
 """
