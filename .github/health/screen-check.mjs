@@ -297,7 +297,9 @@ try {
   //    시험 사용자 (가)(미혼 · 자녀 0 · 1인 · 1996년생 · 소득 250 · 자산 9,000 · 무주택 · 청약통장)로 진단 → 매칭을 돌리고
   //    ⓐ 뺀 공고마다 DB 에서 **따로** 같은 판정을 SQL 로 계산한다 — 카드 자신의 자격 행이 모두 공급대상 키(객체)를 갖고
   //       모든 행의 모든 갈래가 이 입력으로 「아님」이어야 한다(확인필요 갈래 · 모르는 대상은 아님이 아니다). 하나라도 어긋나면 실패 = 근거 없이 뺐다.
-  //    ⓑ 매칭 표시 문구는 네 갈래(맞음 · 확인필요 · 유형 기준 없음 · 👥 상자 제목) 중 하나여야 하고, 상자 수 = 뺀 공고 수.
+  //       🔵 2026-10-13(PR #491 뒤 · 이슈 #493) — 카드 ID에 키 행이 없으면 화면처럼 같은 그룹 키(announcement_dedup_key = 화면 zfDedupKey) 형제 중
+  //       키 행을 가진 ID 가장 큰 공고 하나의 행으로 잰다(정정 카드 …20876 ← …20840).
+  //    ⓑ 매칭 표시 문구는 다섯 갈래(맞음 · 확인필요 · 확인필요-only 원문 대상 · 유형 기준 없음 · 👥 상자 제목) 중 하나여야 하고, 상자 수 = 뺀 공고 수.
   //    SIMULATE=target_out 이면 키 없는 남은 카드 하나를 뺀 목록에 끼워 넣는다(실패해야 맞다).
   const tgt = await page.evaluate(async sim => {
     if (typeof diagnose !== 'function' || typeof matchHouses !== 'function') return { err: '화면 함수 없음' }
@@ -317,6 +319,7 @@ try {
     const PH = [
       /^👥 .+ 대상 모집 — 입력하신 정보로는 대상 조건에 맞아요$/,
       /^📄 이 공고는 .+ 대상 모집이에요( \(.+\))? — 신청할 수 있는지 공고문에서 확인해 주세요$/,
+      /^📄 이 공고의 모집 대상은 「.+」이에요( \(.+\))? — 신청할 수 있는지 공고문에서 확인해 주세요$/,
       /^📄 자격 진단에 이 유형\(.+\) 기준이 없어요 — 신청할 수 있는지 공고문에서 확인해 주세요$/,
     ]
     let ok = !tgt.err, value = '', bad = []
@@ -328,8 +331,15 @@ try {
         const by = 1996, y = tgt.year
         const rows = await sqlRead(`
           with ids(aid) as (select unnest(array[${ids}]::text[])),
-          r as (select i.aid, e.id, e.verification_requirements->'공급대상' g
-                  from ids i left join public.eligibility_criteria e on e.announcement_id = i.aid),
+          kid as (select distinct e.announcement_id aid, public.announcement_dedup_key(a.title) k
+                    from public.eligibility_criteria e join public.announcements a on a.announcement_id = e.announcement_id
+                   where jsonb_typeof(e.verification_requirements->'공급대상') = 'object'),
+          src as (select i.aid, coalesce(
+                    (select k.aid from kid k where k.aid = i.aid limit 1),
+                    (select max(k.aid) from kid k where k.k in (select public.announcement_dedup_key(c.title) from public.announcements c where c.announcement_id = i.aid))) sid
+                  from ids i),
+          r as (select s.aid, e.id, e.verification_requirements->'공급대상' g
+                  from src s left join public.eligibility_criteria e on e.announcement_id = s.sid),
           b as (select r.aid, r.id, x.b from r left join lateral jsonb_array_elements(
                   case when jsonb_typeof(r.g) = 'object' and jsonb_typeof(r.g->'갈래') = 'array' then r.g->'갈래' else '[]'::jsonb end) x(b) on true),
           bs as (select aid, id, b,
@@ -353,7 +363,7 @@ try {
       extra.target_out = { out: tgt.out, bad, unknown }
     } else value = `못 잼(${tgt.err})`
     add('target_out', '매칭 2단계 — 공급 대상이 달라 뺀 공고 근거 · 표시 문구 갈래', ok ? 'pass' : 'fail', value,
-      '시험 사용자 (가) — 뺀 공고 전부 DB 로 따로 계산한 「모든 행 키 · 모든 갈래 아님」 · 문구 네 갈래 · 상자 수 = 뺀 수')
+      '시험 사용자 (가) — 뺀 공고 전부 DB 로 따로 계산한 「모든 행 키 · 모든 갈래 아님」(카드 ID에 키 행이 없으면 같은 그룹 키 형제) · 문구 다섯 갈래 · 상자 수 = 뺀 수')
   }
   // ⑦ 숫자가 말하는 「지금」(2026-10-08 · 우편함 「표시층 — 숫자가 말하는 「지금」」 · 원칙 33).
   //    공고 탭 머리(기본 거름 — 신청할 수 없는 공고 숨기기)와 인사이트 머리의 「지금 열린 공고 M건」이 화면 정의(zfOpenNotices) 한 값과 같은가 ·
