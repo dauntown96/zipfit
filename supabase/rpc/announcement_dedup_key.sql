@@ -2,6 +2,7 @@ CREATE OR REPLACE FUNCTION public.announcement_dedup_key(p_title text)
  RETURNS text
  LANGUAGE sql
  IMMUTABLE PARALLEL SAFE
+ SET search_path TO 'public', 'pg_temp'
 AS $function$
   SELECT regexp_replace(
       regexp_replace(

@@ -2,6 +2,7 @@ CREATE OR REPLACE FUNCTION public.get_document_templates_for(p_housing_type text
  RETURNS TABLE(doc_category text, requirement_level text, level_rank integer)
  LANGUAGE sql
  STABLE
+ SET search_path TO 'public', 'pg_temp'
 AS $function$
   WITH norm AS (
     SELECT

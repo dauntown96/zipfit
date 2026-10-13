@@ -596,6 +596,140 @@ function mapMyHomeRow(it: MyHomeItem) {
   }
 }
 
+// ── 지방공사 게시판 첨부 목록(2026-10-13 · 우편함 「코드 — 국면 B′ ③ 지방공사」 1) ─────────────────────
+// 🔴 MYHOME 은 지방공사 공고의 `url` 로 공사 게시판 상세를 줄 뿐 첨부 목록을 주지 않는다 — 그래서 MYHOME 단독 공고는
+//    첨부를 받을 경로가 없었다(run 191 은 부산 `21390_*` 첨부를 손 데이터 쓰기로 넣었다). 공사 게시판 상세를
+//    fetch-attachment(허용목록 · 서울 지역 넘기기 · 바이트만 돌려준다)로 받아 첨부 이름·받기 링크를 읽고,
+//    같은 `url` 의 MYHOME 행에 `attachment_urls` 로 싣는다 — SH downList 갈래와 같은 꼴 {url, label, filename}.
+// 🔴 대상: 열린(apply_end ≥ 오늘) 보이는 MYHOME 행 중 url 이 BOARD_SOURCES 의 상세 경로이고 **같은 url 의 어느 행에도
+//    첨부가 없는** 게시글. 한 행이라도 첨부가 있으면 손대지 않는다(손으로 넣은 값 보존). 한 런 BOARD_CAP 건.
+// 🔴 대표 행 고르기·dedup·그룹 규칙과 무관하다 — `attachment_urls` 한 칸만, 그것도 비어 있는 행에만 쓴다.
+// 🔴 파일 이름은 게시판이 보여 주는 글자 그대로다(「(안)」 등을 고치지 않는다). 못 읽으면 쓰지 않는다(다음 런이 다시 본다).
+// 🔴 결과는 응답(`board`)에만 싣고 errors 에 넣지 않는다 — 게시판 실패가 LH·MYHOME 수집 런의 성패로 읽히지 않게.
+type BoardFile = { url: string; label: string; filename: string }
+type BoardSource = { host: string; viewPath: string; parse: (html: string, base: string) => BoardFile[] | null }
+
+const decodeEntities = (s: string): string =>
+  s.replace(/&#(\d+);/g, (_, d) => String.fromCharCode(Number(d)))
+   .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)))
+   .replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+   .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
+
+// 부산도시공사 게시판 상세 — `<div class="fileList"><ul><li>…<span class="fileName">이름</span>…
+//   <a href="/board/download.do?…&fileSid=N">다운로드</a></li>…`(2026-10-13 `dataSid=800690` 실물). 한 <li> 안에서 이름·링크를 짝짓는다
+//   (이름이나 링크가 빠진 <li> 는 버린다 — 다음 <li> 의 링크와 엇갈려 짝지어지지 않게).
+function parseBmcFiles(html: string, base: string): BoardFile[] | null {
+  const start = html.indexOf('class="fileList"')
+  if (start < 0) return null
+  const end = html.indexOf('</ul>', start)
+  const seg = html.slice(start, end < 0 ? undefined : end)
+  const out: BoardFile[] = []
+  for (const li of seg.split(/<li[\s>]/i).slice(1)) {
+    const name = li.match(/class="fileName"[^>]*>([^<]*)</i)
+    const href = li.match(/href="(\/board\/download\.do\?[^"]*fileSid=\d+[^"]*)"/i)
+    if (!name || !href) continue
+    const label = decodeEntities(name[1]).trim()
+    let u: URL
+    try { u = new URL(decodeEntities(href[1]), base) } catch { continue }
+    if (u.hostname !== new URL(base).hostname || !label) continue
+    out.push({ url: u.toString(), label, filename: label })
+  }
+  return out.length ? out : null
+}
+
+const BOARD_SOURCES: BoardSource[] = [
+  { host: 'www.bmc.busan.kr', viewPath: '/board/view.do', parse: parseBmcFiles },
+]
+const BOARD_CAP = 3
+const BOARD_FETCH_TIMEOUT_MS = 30000
+// 런이 이미 이만큼 썼으면 게시판 단계를 건너뛴다(Free 플랜 wall-clock 150초 — 만료 표시·런 기록이 뒤에 남아 있다).
+const BOARD_SKIP_AFTER_MS = 90000
+
+const boardSourceOf = (url: string | null): BoardSource | null => {
+  if (!url) return null
+  try {
+    const u = new URL(url)
+    return BOARD_SOURCES.find(s => s.host === u.hostname && u.pathname.startsWith(s.viewPath)) ?? null
+  } catch { return null }
+}
+
+// 게시판 상세 HTML 을 fetch-attachment 로 받는다(서울 지역 전용 호스트면 그 함수가 서울로 넘긴다). 실패는 사유 문자열.
+async function fetchBoardHtml(url: string): Promise<{ html: string; finalUrl: string } | string> {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/fetch-attachment?url=${encodeURIComponent(url)}`, {
+      method: 'POST', headers: { 'x-cron-secret': CRON_SECRET, 'Content-Type': 'application/json' }, body: '{}',
+      signal: AbortSignal.timeout(BOARD_FETCH_TIMEOUT_MS),
+    })
+    const j = await res.json().catch(() => null) as Record<string, unknown> | null
+    if (!res.ok || !j || j.ok !== true || typeof j.base64 !== 'string') {
+      return `fetch-attachment ${res.status}: ${String(j?.error ?? j?.status ?? '응답 없음').slice(0, 160)}`
+    }
+    const bin = atob(j.base64 as string)
+    const bytes = new Uint8Array(bin.length)
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+    return { html: new TextDecoder('utf-8').decode(bytes), finalUrl: String(j.final_url ?? url) }
+  } catch (e) {
+    return `fetch-attachment 예외: ${e instanceof Error ? e.name : e}`
+  }
+}
+
+// 대상 게시글(url) 고르기 — write=false(probe)면 첨부가 이미 있는 게시글도 넣는다(읽기 대조용).
+async function boardTargets(write: boolean): Promise<{ urls: string[]; error?: string }> {
+  const today = new Date().toISOString().slice(0, 10)
+  const byUrl = new Map<string, boolean>()   // url → 첨부 있는 행이 하나라도 있나
+  for (const s of BOARD_SOURCES) {
+    const { data, error } = await supabase.from('announcements')
+      .select('url, attachment_urls')
+      .eq('source', 'MYHOME')
+      .gte('apply_end', today)
+      .or('hidden_from_listing.is.null,hidden_from_listing.eq.false')
+      .like('url', `https://${s.host}${s.viewPath}%`)
+    if (error) return { urls: [], error: `게시판 대상 조회: ${error.message}` }
+    for (const r of data ?? []) {
+      const url = r.url as string
+      const has = Array.isArray(r.attachment_urls) && (r.attachment_urls as unknown[]).length > 0
+      byUrl.set(url, (byUrl.get(url) ?? false) || has)
+    }
+  }
+  const urls = [...byUrl.entries()].filter(([u, has]) => boardSourceOf(u) && (!write || !has)).map(([u]) => u)
+  return { urls: urls.slice(0, BOARD_CAP) }
+}
+
+async function fillBoardAttachments(startedAt: number) {
+  const out = { targets: 0, filled_posts: 0, filled_rows: 0, files: 0, skipped: null as string | null, failed: [] as string[] }
+  if (Date.now() - startedAt >= BOARD_SKIP_AFTER_MS) { out.skipped = `시간 예산(${BOARD_SKIP_AFTER_MS}ms) 초과`; return out }
+  const t = await boardTargets(true)
+  if (t.error) { out.failed.push(t.error); return out }
+  out.targets = t.urls.length
+  for (const url of t.urls) {
+    const src = boardSourceOf(url)!
+    const got = await fetchBoardHtml(url)
+    if (typeof got === 'string') { out.failed.push(`${url}: ${got}`); continue }
+    const files = src.parse(got.html, got.finalUrl)
+    if (!files) { out.failed.push(`${url}: 첨부 목록 없음`); continue }
+    const { data, error } = await supabase.from('announcements')
+      .update({ attachment_urls: files })
+      .eq('source', 'MYHOME').eq('url', url).is('attachment_urls', null)
+      .select('announcement_id')
+    if (error) { out.failed.push(`${url}: update ${error.message}`); continue }
+    out.filled_posts++; out.filled_rows += data?.length ?? 0; out.files += files.length
+  }
+  return out
+}
+
+// probe 전용 — 같은 대상(첨부가 이미 있는 게시글 포함)을 읽기만 한다. DB 에 쓰지 않는다.
+async function probeBoard() {
+  const t = await boardTargets(false)
+  if (t.error) return { error: t.error }
+  const posts: unknown[] = []
+  for (const url of t.urls) {
+    const got = await fetchBoardHtml(url)
+    if (typeof got === 'string') { posts.push({ url, error: got }); continue }
+    posts.push({ url, files: boardSourceOf(url)!.parse(got.html, got.finalUrl) })
+  }
+  return { cap: BOARD_CAP, posts }
+}
+
 async function markExpired(): Promise<number> {
   const today = new Date().toISOString().slice(0, 10)
   const { data } = await supabase
@@ -966,6 +1100,12 @@ async function collect() {
     console.log(`[LATE_RETRY] ${notes.join(' / ')}`)
   }
 
+  // 🔵 2026-10-13 — 지방공사 게시판 첨부 목록(fillBoardAttachments 주석). 실패는 errors 에 넣지 않는다.
+  let board: Awaited<ReturnType<typeof fillBoardAttachments>> | { failed: string[] }
+  try { board = await fillBoardAttachments(startedAt) }
+  catch (e) { board = { failed: [`게시판 단계 예외: ${e}`] } }
+  console.log(`[BOARD] ${JSON.stringify(board)}`)
+
   const expired = await markExpired()
   const durationMs = Date.now() - startedAt
 
@@ -991,6 +1131,7 @@ async function collect() {
     lh:     { fetched: lhNotices.length, detail_ok: lhDetailOk, upserted: lhUpserted, slow_retry_ok: slowRetryOk, late_retry_ok: lateRetryLhOk },
     myhome: { fetched: mhFetched, upserted: mhUpserted, dedup_merged: mhDedupMerged, late_retry_ok: lateRetryMhOk },
     expired,
+    board,
     errors,
   }
 }
@@ -1265,6 +1406,12 @@ async function probe(params: URLSearchParams): Promise<Record<string, unknown>> 
     }
   } else {
     out.myhome = { skipped: 'myhome=0' }
+  }
+
+  // 🔵 2026-10-13 — `board=1` 이면 지방공사 게시판 첨부 목록을 읽기만 한다(fillBoardAttachments 와 같은 대상·같은 파서 · DB 쓰기 0).
+  if (params.get('board') === '1') {
+    try { out.board = await probeBoard() }
+    catch (e) { out.board = { error: String(e) } }
   }
 
   return out
