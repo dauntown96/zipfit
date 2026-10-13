@@ -1,5 +1,5 @@
 {
- "_at": "2026-10-12T02:32:30.027Z",
+ "_at": "2026-10-13T01:01:44.962Z",
  "_url": "https://kkokzip.com/",
  "_axe": "4.13.0",
  "_tags": [
@@ -10,100 +10,19 @@
  ],
  "states": {
   "home-390": {
-   "rules": {
-    "color-contrast": {
-     "impact": "serious",
-     "nodes": 12,
-     "sample": "#m2"
-    },
-    "select-name": {
-     "impact": "critical",
-     "nodes": 6,
-     "sample": "#marital"
-    }
-   }
+   "rules": {}
   },
   "notices-390": {
-   "rules": {
-    "color-contrast": {
-     "impact": "serious",
-     "nodes": 83,
-     "sample": "#m1"
-    },
-    "nested-interactive": {
-     "impact": "serious",
-     "nodes": 2,
-     "sample": "div[data-card-id=\"ncard-SH_5f_311200\"]"
-    },
-    "select-name": {
-     "impact": "critical",
-     "nodes": 2,
-     "sample": "#noticeSearchScopeSel"
-    }
-   }
+   "rules": {}
   },
   "detail-390": {
-   "rules": {
-    "color-contrast": {
-     "impact": "serious",
-     "nodes": 93,
-     "sample": "#m1"
-    },
-    "nested-interactive": {
-     "impact": "serious",
-     "nodes": 3,
-     "sample": "div[data-card-id=\"ncard-2015122300020895\"]"
-    },
-    "select-name": {
-     "impact": "critical",
-     "nodes": 2,
-     "sample": "#noticeSearchScopeSel"
-    },
-    "area-alt": {
-     "impact": "critical",
-     "nodes": 1,
-     "sample": "area"
-    }
-   }
+   "rules": {}
   },
   "notices-1280": {
-   "rules": {
-    "color-contrast": {
-     "impact": "serious",
-     "nodes": 83,
-     "sample": "#m1"
-    },
-    "nested-interactive": {
-     "impact": "serious",
-     "nodes": 2,
-     "sample": "div[data-card-id=\"ncard-SH_5f_311200\"]"
-    },
-    "select-name": {
-     "impact": "critical",
-     "nodes": 2,
-     "sample": "#noticeSearchScopeSel"
-    }
-   }
+   "rules": {}
   },
   "notices-390-dark": {
-   "rules": {
-    "color-contrast": {
-     "impact": "serious",
-     "nodes": 47,
-     "sample": "#m1"
-    },
-    "nested-interactive": {
-     "impact": "serious",
-     "nodes": 2,
-     "sample": "div[data-card-id=\"ncard-SH_5f_311200\"]"
-    },
-    "select-name": {
-     "impact": "critical",
-     "nodes": 2,
-     "sample": "#noticeSearchScopeSel"
-    }
-   }
+   "rules": {}
   }
- },
- "_note": "2026-10-12 컨테이너 로컬 두 번(같은 수) + 첫 CI 실행(run 38198624137)에서만 보인 detail-390 area-alt 1을 더함 — 컨테이너는 카카오맵 SDK가 막혀 상세 지도(<area>)가 그려지지 않는다. CI 값은 로그 한 줄에서 옮겼다(아티팩트 저장소가 컨테이너에서 막힘)."
+ }
 }

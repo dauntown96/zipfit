@@ -1514,6 +1514,46 @@ const ZF_UNITS_LABEL  = { complex: '단지 규모', recruit: '모집 세대수',
 const ZF_UNITS_PREFIX = { complex: '단지 ',     recruit: '모집 ',       unknown: '' };
 const zfUnitsLabel  = src => ZF_UNITS_LABEL[zfUnitsKind(src)];
 const zfUnitsPrefix = src => ZF_UNITS_PREFIX[zfUnitsKind(src)];
+// 🔵 2026-10-13(우편함 「코드 — 카드 머리 세대수」 1) — MYHOME 다구 묶음 카드의 머리 「모집 세대수」.
+//    MYHOME 은 한 공고(pblanc)를 시군구마다 행으로 쪼개 싣고 total_units 도 **그 구의 값**이라, 대표 행 하나의 값은
+//    공고 전체 모집이 아니다(21390 사하구 6 ↔ 같은 회차 일곱 구 합 16 = 원문 주택 목록 16호).
+//    그래서 같은 회차 분할 행(MYHOME · 같은 pblanc · 같은 접수 마감 · 같은 회차 날짜)의 total_units 합을 돌려준다.
+// 🔴 원문·수집값에 없는 수를 만들지 않는다 — 아래 중 하나면 null 이고 머리 칸은 대표 행 값 그대로다.
+//    분할 행 < 2 · total_units 가 빈 행 · 시군구가 빈 행(시도 단위 합계 행일 수 있다 — 21347 전북 160 ↔ 시군 넷 105)
+//    · ID 꼴이 섞임(번호 없는 옛 꼴과 번호 있는 새 꼴이 같은 것을 두 번 싣기도 한다 — 21333 / 21333_1 둘 다 8).
+// 🔴 머리 칸 하나만이다 — 정렬(units-desc)·블록 줄·인사이트는 이 값을 쓰지 않고 종전 total_units 그대로다.
+function zfRecruitBundleSum(rep, rows){
+  if(!rep || zfUnitsKind(rep.source) !== 'recruit' || !Array.isArray(rows)) return null;
+  const pb = id => String(id || '').split('_')[0];
+  const numbered = id => /^\d+_\d+_/.test(String(id || ''));
+  const repRound = zfNoticeDate(rep);
+  const same = rows.filter(r => r && zfUnitsKind(r.source) === 'recruit'
+    && pb(r.announcement_id) === pb(rep.announcement_id)
+    && (r.apply_end || '') === (rep.apply_end || '') && zfNoticeDate(r) === repRound);
+  if(same.length < 2) return null;
+  if(same.some(r => r.total_units == null || !String(r.sigungu_nm || '').trim())) return null;
+  if(new Set(same.map(r => numbered(r.announcement_id))).size > 1) return null;
+  return same.reduce((s, r) => s + Number(r.total_units), 0);
+}
+// 머리 칸 값 자리 — 「모집 세대수」 칸만 감싼다(글자는 종전 그대로). 카드를 펼칠 때 zfFillRecruitBundle 이 합으로 바꾼다.
+function zfUnitsCell(source, units, cardId){
+  const txt = units + '세대';
+  return zfUnitsKind(source) === 'recruit' ? `<span data-units-for="${zfAttr(cardId)}">${txt}</span>` : txt;
+}
+function zfFillRecruitBundle(annId, id){
+  const cell = document.querySelector(`[data-units-for="${CSS.escape(id)}"]`);
+  if(!cell || !annId) return;
+  resolveAnnouncementIds(annId, true).then(ids => {
+    if(!Array.isArray(ids) || ids.length < 2) return null;
+    return fetch(`${SUPABASE_URL}/rest/v1/announcements?select=announcement_id,source,total_units,sigungu_nm,apply_end,announcement_date,is_revised,first_announcement_date&${idFilterFor(ids)}`, {
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
+    }).then(r => r.ok ? r.json() : null);
+  }).then(rows => {
+    if(!Array.isArray(rows)) return;
+    const sum = zfRecruitBundleSum(rows.find(r => r && r.announcement_id === annId), rows);
+    if(sum != null) cell.textContent = sum + '세대';
+  }).catch(() => {});
+}
 
 function classifyNoticeType(typeText, nameText){
   const t = (typeText||'') + ' ' + (nameText||'');
@@ -4153,7 +4193,7 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
         (n['area_max']&&n['area_max']!==n['area_min'] ? ' ~ '+parseFloat(n['area_max']).toFixed(1)+'㎡' : '');
       detailRows.push(['단지 전용면적', areaStr]);
     }
-    if(n['total_units']) detailRows.push([zfUnitsLabel(n['source']), n['total_units']+'세대']);
+    if(n['total_units']) detailRows.push([zfUnitsLabel(n['source']), zfUnitsCell(n['source'], n['total_units'], cardId)]);
     if(n['move_in_date']) detailRows.push(moveInRow(n['move_in_date']));
     if(n['deposit_min']) detailRows.push(['보증금', Number(n['deposit_min']).toLocaleString()+'원']);
     if(n['rent_min']) detailRows.push(['월임대료', Number(n['rent_min']).toLocaleString()+'원']);
@@ -6042,6 +6082,11 @@ function toggleDetail(id, card, from){
     renderSpecialNotes(cardEl, id);
     renderSupplySchedule(cardEl, id);
     renderAttachments(cardEl, id);
+  }
+  // 🔵 2026-10-13 — MYHOME 다구 묶음의 머리 「모집 세대수」를 같은 회차 분할 행 합으로(zfRecruitBundleSum 주석).
+  if(!open && !detailEl.dataset.unitsLoaded && cardEl){
+    detailEl.dataset.unitsLoaded = '1';
+    zfFillRecruitBundle(cardEl.dataset.announcementId || '', id);
   }
   if(!open && !detailEl.dataset.blocksLoaded && cardEl){
     detailEl.dataset.blocksLoaded = '1';
@@ -8881,7 +8926,7 @@ function renderMatchResults(rows){
         (n.area_max&&n.area_max!==n.area_min ? ' ~ '+parseFloat(n.area_max).toFixed(1)+'㎡' : '');
       detailRows.push(['단지 전용면적', areaStr]);
     }
-    if(n.total_units) detailRows.push([zfUnitsLabel(n.source), n.total_units+'세대']);
+    if(n.total_units) detailRows.push([zfUnitsLabel(n.source), zfUnitsCell(n.source, n.total_units, cardId)]);
     if(n.move_in_date) detailRows.push(moveInRow(n.move_in_date));
     if(n.deposit_min) detailRows.push(['보증금', Number(n.deposit_min).toLocaleString()+'원']);
     if(n.rent_min) detailRows.push(['월임대료', Number(n.rent_min).toLocaleString()+'원']);
