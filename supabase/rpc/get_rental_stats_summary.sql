@@ -2,6 +2,7 @@ CREATE OR REPLACE FUNCTION public.get_rental_stats_summary()
  RETURNS TABLE("임대종류" text, "총세대수" bigint, "평균보증금" numeric, "평균월임대료" numeric)
  LANGUAGE sql
  STABLE
+ SET search_path TO 'public', 'pg_temp'
 AS $function$
   SELECT
     "임대종류"::text,

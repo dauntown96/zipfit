@@ -17,6 +17,11 @@
    "why": "화면 「정정 전 공고 기준」 배너(rpc/get_revision_analysis_done) · announcement_analysis 를 읽어 참/거짓 하나만 돌려준다 · search_path 고정"
   },
   {
+   "key": "anon_security_definer_function_executable_public_get_last_collected_at_",
+   "kind": "intended",
+   "why": "화면 「기준」 시각 재료(rpc/get_last_collected_at · 2026-10-13 국면 B′ ③) · anon 이 못 읽는 런 기록 표에서 출처별 마지막 성공 수집 시각 셋만 돌려준다 · 개인정보 없음 · search_path 고정"
+  },
+  {
    "key": "authenticated_security_definer_function_executable_public_get_announcement_group_ids_p_announcement_id text",
    "kind": "intended",
    "why": "화면이 카드 열 때 부른다(index.html fetch rpc/get_announcement_group_ids) · 돌려주는 값은 announcement_id 목록뿐 · 로그인 사용자도 같은 화면을 본다"
@@ -30,6 +35,11 @@
    "key": "authenticated_security_definer_function_executable_public_get_revision_analysis_done_p_id text",
    "kind": "intended",
    "why": "화면 「정정 전 공고 기준」 배너(rpc/get_revision_analysis_done) · announcement_analysis 를 읽어 참/거짓 하나만 돌려준다 · search_path 고정 · 로그인 사용자도 같은 화면을 본다"
+  },
+  {
+   "key": "authenticated_security_definer_function_executable_public_get_last_collected_at_",
+   "kind": "intended",
+   "why": "화면 「기준」 시각 재료(rpc/get_last_collected_at · 2026-10-13 국면 B′ ③) · anon 이 못 읽는 런 기록 표에서 출처별 마지막 성공 수집 시각 셋만 돌려준다 · 개인정보 없음 · search_path 고정 · 로그인 사용자도 같은 화면을 본다"
   },
   {
    "key": "rls_enabled_no_policy_public_analysis_dispatch_config",
@@ -157,47 +167,7 @@
    "why": "pg_net 이 public 에 있다 — 옮기면 net.http_* 호출처 전부를 함께 고쳐야 한다 · 미결"
   },
   {
-   "key": "function_search_path_mutable_public_announcement_dedup_key",
-   "kind": "known",
-   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
-  },
-  {
-   "key": "function_search_path_mutable_public_get_announcement_blocks",
-   "kind": "known",
-   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
-  },
-  {
-   "key": "function_search_path_mutable_public_get_announcement_sites",
-   "kind": "known",
-   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
-  },
-  {
    "key": "function_search_path_mutable_public_get_announcements_deduped",
-   "kind": "known",
-   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
-  },
-  {
-   "key": "function_search_path_mutable_public_get_document_templates_for",
-   "kind": "known",
-   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
-  },
-  {
-   "key": "function_search_path_mutable_public_get_reanalysis_queue",
-   "kind": "known",
-   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
-  },
-  {
-   "key": "function_search_path_mutable_public_get_rental_stats_summary",
-   "kind": "known",
-   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
-  },
-  {
-   "key": "function_search_path_mutable_public_sh_close_missing",
-   "kind": "known",
-   "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
-  },
-  {
-   "key": "function_search_path_mutable_zipfit_ops_original_lh_id",
    "kind": "known",
    "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
   }
