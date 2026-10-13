@@ -1245,7 +1245,7 @@ html[data-ui="d3"] body.theme-dark{color-scheme:dark}
 
     <!-- 공고 검색 -->
     <div style="display:flex;gap:8px;margin-bottom:0.75rem">
-      <input type="text" id="noticeSearchInput" placeholder="공고명, 지역 등으로 검색" oninput="applyNoticeFiltersAndRender();zfLogSearchSoon(this.value)"
+      <input type="text" id="noticeSearchInput" placeholder="공고명, 지역 등으로 검색" oninput="if(event.isComposing)return;applyNoticeFiltersAndRender();zfLogSearchSoon(this.value)" oncompositionend="applyNoticeFiltersAndRender();zfLogSearchSoon(this.value)"
         style="flex:1;min-width:0;padding:9px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px">
       <select id="noticeSearchScopeSel" onchange="applyNoticeFiltersAndRender()"
         style="font-size:13px;padding:5px 8px;border:1px solid #e0e0e0;border-radius:8px;background:#fff;color:#333;cursor:pointer">
@@ -3366,7 +3366,7 @@ function zfTierTagsOf(n){
   const s = zfTierByKey.get(zfDedupKey(n['공고명'] || ''));
   return s ? [...s] : [];
 }
-function applyNoticeSubFilters(rows){
+function applyNoticeSubFilters(rows, opts){
   let out = rows;
   if(activeNoticeTarget){
     if(!zfTierTagsReady) zfLoadTierTags().then(ok => { if(ok) applyNoticeFiltersAndRender(); });
@@ -3375,7 +3375,8 @@ function applyNoticeSubFilters(rows){
       return tags.some(t => t.label === activeNoticeTarget) || zfTierTagsOf(n).includes(activeNoticeTarget);
     });
   }
-  const searchQuery = document.getElementById('noticeSearchInput')?.value || '';
+  // opts.q — 검색어를 칸 대신 넘길 때(0건 화면 「빼면 N건」 · 칸 value 를 건드리지 않게)
+  const searchQuery = (opts && opts.q != null) ? opts.q : (document.getElementById('noticeSearchInput')?.value || '');
   const searchScope = document.getElementById('noticeSearchScopeSel')?.value || 'title-region';
   return searchFilterNotices(out, searchQuery, searchScope);
 }
@@ -4741,7 +4742,7 @@ function renderPersonalizedRecommendations(){
   };
   const recKeep = n => {
     if(!recDepOk(n)) return false;
-    const v = zfTargetVerdictFor(n['announcement_id'], recTf);
+    const v = zfTargetVerdictFor(n['announcement_id'], recTf, n['공고명'] || n['name']);
     n._zfTarget = v;
     if(v && v.state === 'no'){ recOut.push({ id: n['announcement_id'], title: n['공고명'] || n['name'], v }); return false; }
     return true;
@@ -5926,12 +5927,20 @@ const ZF_TARGET_UNCOVERED = [
   { re: /\d\s*순위\s*유형/, label: '순위 유형', covered: [] },
   { re: /창업|예술인|유튜버/, label: '직업', covered: ['창업', '계층'] },
   { re: /주거약자/, label: '주거약자 요건', covered: ['고령자', '장애인'] },
+  // 🔵 2026-10-13(우편함 「코드 — 한글 중복 입력 · 매칭 「맞음」 낱말 확장 …」 2 · run 197) — `SH_311349` 은평구 은빛주택
+  //    「은평구에 거주 … 만 65세 이상 … 생계·의료급여 또는 주거급여 수급자 중 무주택 홀몸 어르신」(갈래 = 고령자 나이뿐) → 65세 이상 누구나 「맞음」이었다.
+  //    키 119행(2026-10-13 · 「맞음」을 낼 수 있는 행 전수) 중 이 셋이 갈래 밖에 남은 것은 이 행뿐이다 — 다른 「맞음」은 그대로.
+  { re: /에\s*거주/, label: '거주 지역', covered: [] },
+  { re: /수급자|수급권자|차상위/, label: '수급·차상위', covered: ['계층'] },
+  { re: /홀몸|독거|1인\s*가구/, label: '홀몸(1인 가구)', covered: [] },
 ];
 function zfTargetUncovered(g){
   const w = String((g && g['원문']) || '');
   if(!w) return [];
   const kinds = new Set(((g && g['갈래']) || []).map(b => b && b['대상']).filter(Boolean));
-  return ZF_TARGET_UNCOVERED.filter(u => u.re.test(w) && !u.covered.some(k => kinds.has(k))).map(u => u.label);
+  // 갈래의 확인필요 글자가 이미 그 조건을 말하면(`…20880` 「1인가구」) 다시 세지 않는다 — 같은 조건이 두 번 나오지 않게.
+  const said = ((g && g['갈래']) || []).map(b => (b && b['확인필요']) || '').join(' ');
+  return ZF_TARGET_UNCOVERED.filter(u => u.re.test(w) && !u.covered.some(k => kinds.has(k)) && !u.re.test(said)).map(u => u.label);
 }
 function zfTargetRowState(g, f){
   const br = (g && Array.isArray(g['갈래'])) ? g['갈래'] : [];
@@ -5951,6 +5960,14 @@ function zfTargetVerdict(rows, f){
   if(st.every(s => s === 'no')) return { state: 'no', names: names('*'), quotes };
   if(st.includes('ok')) return { state: 'ok', names: names('ok'), quotes };
   const checks = [...new Set(rows.flatMap(g => (g['갈래'] || []).map(b => b && b['확인필요']).filter(Boolean).concat(zfTargetUncovered(g))))];
+  // 🔵 2026-10-13(우편함 「코드 — 한글 중복 입력 · 매칭 「맞음」 낱말 확장 …」 3 ②) — 대상 이름 없이 「확인필요」만 있는 갈래가 있으면
+  //    「○○ 대상 모집」으로 묶지 않는다(`…20880` 장애인 · 1인가구 → 「장애인 대상 모집」은 1인가구를 지웠다). 갈래마다 원문 대상 글자를 그대로 낸다.
+  if(rows.some(g => (g['갈래'] || []).some(b => b && b['확인필요'] && !b['대상']))){
+    const targets = [...new Set(rows.flatMap(g => (g['갈래'] || []).map(b => !b ? '' :
+      (b['대상'] && b['확인필요']) ? `${b['대상']}(${b['확인필요']})` : (b['확인필요'] || b['대상'] || '')).filter(Boolean)))];
+    const extra = [...new Set(rows.flatMap(g => zfTargetUncovered(g)))];
+    return { state: 'check', names: names('*'), checks: extra, targets, quotes };
+  }
   return { state: 'check', names: names('*'), checks, quotes };
 }
 function zfTargetDiagFacts(){
@@ -5964,9 +5981,13 @@ function zfTargetProfileFacts(){
   return { marital: u.marital || '', children: (ch == null || ch === '') ? null : (parseInt(ch) || 0), birthYear: parseInt(u.birth_year || u.birthYear) || 0 };
 }
 // 공급대상 키를 가진 공고의 자격 행(공급대상 칸만)을 한 번 받아 둔다 — 키 있는 공고는 수십 장이라 목록 전체를 부르지 않는다.
-// 🔵 키 행은 대표 카드 ID 자신에 있다(2026-10-08 실측 19공고 전부). 그래서 카드 ID 하나로 찾는다.
+// 🔵 키 행은 대표 카드 ID 자신에 있다(2026-10-08 실측 19공고 전부). 그래서 카드 ID 하나로 먼저 찾는다.
+// 🔵 2026-10-13(우편함 「코드 — 한글 중복 입력 · 매칭 「맞음」 낱말 확장 …」 3 ①) — 정정 카드는 키 행이 정정 전 형제 ID에만 있을 수 있다
+//    (`…20876` [정정공고] ← 산물 `…20840` · `…20904` ← `…20854` — 같은 그룹 키). 카드 ID에 행이 없으면 같은 그룹 키(zfDedupKey)의 형제 하나의 행을 쓴다.
+//    한 키에 키 행을 가진 공고가 여럿이면 ID가 가장 큰(나중) 공고 하나 — 두 공고의 행을 섞지 않는다.
 let zfTargetRowsP = null;
 const zfTargetRowsByAnn = new Map();
+const zfTargetRowsByKey = new Map();
 function zfLoadTargetRows(){
   if(zfTargetRowsP) return zfTargetRowsP;
   const h = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
@@ -5977,12 +5998,27 @@ function zfLoadTargetRows(){
       if(!ids.length) return true;
       return fetch(`${SUPABASE_URL}/rest/v1/eligibility_criteria?select=announcement_id,gk:verification_requirements->공급대상&${idFilterFor(ids)}&limit=10000`, { headers: h })
         .then(r => r.ok ? r.json() : [])
-        .then(all => { (all || []).forEach(r => { const a = String(r.announcement_id); if(!zfTargetRowsByAnn.has(a)) zfTargetRowsByAnn.set(a, []); zfTargetRowsByAnn.get(a).push(r.gk ?? null); }); return true; });
+        .then(all => { (all || []).forEach(r => { const a = String(r.announcement_id); if(!zfTargetRowsByAnn.has(a)) zfTargetRowsByAnn.set(a, []); zfTargetRowsByAnn.get(a).push(r.gk ?? null); }); })
+        .then(() => fetch(`${SUPABASE_URL}/rest/v1/announcements?select=announcement_id,title&${idFilterFor(ids)}&limit=10000`, { headers: h }))
+        .then(r => r && r.ok ? r.json() : [])
+        .then(ts => {
+          const pick = new Map();
+          (ts || []).forEach(t => {
+            const a = String(t.announcement_id), k = zfDedupKey(t.title);
+            if(!k || !zfTargetRowsByAnn.has(a)) return;
+            if(!pick.has(k) || a > pick.get(k)) pick.set(k, a);
+          });
+          pick.forEach((a, k) => zfTargetRowsByKey.set(k, zfTargetRowsByAnn.get(a)));
+          return true;
+        });
     })
     .catch(() => { zfTargetRowsP = null; return false; });
   return zfTargetRowsP;
 }
-function zfTargetVerdictFor(annId, f){ return zfTargetVerdict(zfTargetRowsByAnn.get(String(annId)), f); }
+function zfTargetVerdictFor(annId, f, title){
+  const own = zfTargetRowsByAnn.get(String(annId));
+  return zfTargetVerdict(own || (title ? zfTargetRowsByKey.get(zfDedupKey(title)) : undefined), f);
+}
 // 문구 — 다운님 승인 2026-10-08(우편함 「표시층 — 추천 매칭 2단계」 「## 승인」). 맞음 줄은 공급 대상만 본 판정이라
 //    「신청 자격 전체가 맞다」로 읽히지 않게 「대상 조건」이라고 쓴다.
 function zfTargetNoteHtml(v){
@@ -5991,6 +6027,7 @@ function zfTargetNoteHtml(v){
   if(v.state === 'ok') return `<p class="zf-target-ok" style="font-size:12px;color:#0F6E56;background:#E6F4EE;border-radius:8px;padding:6px 10px;margin:0 0 8px">👥 ${nm} 대상 모집 — 입력하신 정보로는 대상 조건에 맞아요</p>`;
   if(v.state === 'check'){
     const why = (v.checks || []).length ? ` (${escapeHtml(v.checks.join(' · '))})` : '';
+    if((v.targets || []).length) return `<p class="zf-check-note" style="font-size:12px;color:#8A5A12;background:#FBF0DC;border-radius:8px;padding:6px 10px;margin:0 0 8px">📄 이 공고의 모집 대상은 ${v.targets.map(t => `「${escapeHtml(t)}」`).join(' · ')}이에요${why} — 신청할 수 있는지 공고문에서 확인해 주세요</p>`;
     return `<p class="zf-check-note" style="font-size:12px;color:#8A5A12;background:#FBF0DC;border-radius:8px;padding:6px 10px;margin:0 0 8px">📄 이 공고는 ${nm} 대상 모집이에요${why} — 신청할 수 있는지 공고문에서 확인해 주세요</p>`;
   }
   return '';
@@ -6111,7 +6148,7 @@ async function matchHouses(){
     const tf = zfTargetDiagFacts();
     lastTargetOut = [];
     rows = rows.filter(r => {
-      const v = zfTargetVerdictFor(r.announcement_id, tf);
+      const v = zfTargetVerdictFor(r.announcement_id, tf, r.title);
       r._zfTarget = v;
       if(v && v.state === 'no'){ lastTargetOut.push({ id: r.announcement_id, title: r.title, v }); return false; }
       return true;
@@ -10614,16 +10651,18 @@ function zf3EmptyChips(){
   if(q && q.value.trim()) conds.push(['q', `검색 「${q.value.trim()}」`]);
   if(!conds.length) return '';
   const clientCount = (rows, drop) => {
-    const save = { g: activeNoticeTarget, q: q ? q.value : '' };
+    // 🔴 2026-10-13(우편함 「코드 — 한글 중복 입력 …」 1) — 검색어를 뺀 건수는 칸의 value 를 비웠다 되돌리지 않고 인자로 센다.
+    //    종전에는 q.value = '' → 복원을 했는데, 한글 조합 중(「ㅂ」 = 0건 → 이 화면)에 value 를 다시 쓰면 조합이 깨져
+    //    「부산」이 「ㅂ부붓부사산」이 됐다(CDP 조합 이벤트로 재현 · 이 두 줄만 뺀 사본에서 「부산」 그대로).
+    const save = { g: activeNoticeTarget };
     try{
       if(drop === 'target') activeNoticeTarget = null;
-      if(drop === 'q' && q) q.value = '';
       const hide = document.getElementById('hideClosedChk')?.checked;
       const sta = drop === 'status' ? null : activeNoticeStatus;
       let base = (hide && !sta) ? rows.filter(n => !isHiddenAsClosed(n)) : rows;
       if(sta) base = base.filter(n => noticeStateLabel(n) === sta);
-      return applyNoticeSubFilters(base).length;
-    }finally{ activeNoticeTarget = save.g; if(q) q.value = save.q; }
+      return applyNoticeSubFilters(base, drop === 'q' ? { q: '' } : undefined).length;
+    }finally{ activeNoticeTarget = save.g; }
   };
   const key = JSON.stringify([activeNoticeRegion, activeNoticeType, activeNoticeStatus, activeNoticeTarget, q ? q.value : '']);
   conds.forEach(([k]) => {
@@ -10775,7 +10814,8 @@ function zf3RenderSheetPlaces(){
   if(!zf3Geo){ msg('시·군·구를 불러오는 중…'); zf3LoadGeo().then(g => { if(g) applyNoticeFiltersAndRender(noticePage); else msg('시·군·구를 불러오지 못했어요'); }); return; }
   zfEnsurePriceSummaries((zf3PrePlace || []).map(n => n['announcement_id'])).then(ok => { if(ok){ applyNoticeFiltersAndRender(noticePage); zfFillSummarySlots(); } });
   const pc = ZF3_PROV[activeNoticeRegion];   // 목록 RPC 가 이미 그 시·도로 걸렀다 — 이름이 표에 없는 시·도(통합 시·도 등)면 걸린 행의 곳 전부
-  const gs = zf3MapGroups().filter(g => !pc || g.pc === pc);
+  const pcs = ZF3_PROV_SPLIT[activeNoticeRegion] || (pc ? [pc] : null);
+  const gs = zf3MapGroups().filter(g => !pcs || pcs.includes(g.pc));
   if(!gs.length){ msg('이 시·도에는 시·군·구로 나눌 공고가 없어요'); return; }
   const inHere = zf3PlaceSel && gs.some(g => g.key === zf3PlaceSel);
   box.innerHTML = `<p class="zf3-sgg-h" id="noticeSggH">${escapeHtml(zf3ShortSido(activeNoticeRegion))} 시·군·구</p>`
@@ -11101,7 +11141,11 @@ function zf3RecSaved(){
 //    거기 없는 이름은 ① 부모 시(화성시 ○○구 → 화성시) ② 시도가 바뀐 이름(이름이 하나뿐일 때만) ③ 그래도 없으면 시도 가운데 점선 고리(「인천 제물포구」 · 「서울(시군구 미상)」).
 //    점·지역 단추를 누르면 목록이 그 시군구 공고로 좁혀진다(📍 칩 · ✕로 뺀다 · 메모리만 — 새 저장 0). 지도 자료는 같은 출처 파일 하나를 처음 열 때만 받는다(외부 요청 0).
 let zf3Geo = null, zf3GeoP = null, zf3View = 'list', zf3PlaceSel = null, zf3PlaceName = '', zf3PrePlace = [];
-const ZF3_PROV = { 서울특별시: '11', 부산광역시: '21', 대구광역시: '22', 인천광역시: '23', 광주광역시: '24', 대전광역시: '25', 울산광역시: '26', 세종특별자치시: '29', 경기도: '31', 강원특별자치도: '32', 강원도: '32', 충청북도: '33', 충청남도: '34', 전북특별자치도: '35', 전라북도: '35', 전라남도: '36', 경상북도: '37', 경상남도: '38', 제주특별자치도: '39' };
+const ZF3_PROV = { 서울특별시: '11', 부산광역시: '21', 대구광역시: '22', 인천광역시: '23', 광주광역시: '24', 대전광역시: '25', 울산광역시: '26', 세종특별자치시: '29', 경기도: '31', 강원특별자치도: '32', 강원도: '32', 충청북도: '33', 충청남도: '34', 전북특별자치도: '35', 전라북도: '35', 전라남도: '36', 경상북도: '37', 경상남도: '38', 제주특별자치도: '39', 전남광주통합특별시: '36' };
+// 🔵 2026-10-13(우편함 「코드 — 한글 중복 입력 · 매칭 「맞음」 낱말 확장 …」 4) — 수집 시·도 이름 「전남광주통합특별시」(공고 325행 · 목록 69그룹 — 전부 접수마감)가
+//    위 표에 없어 지도·시트 시·군·구에서 통째로 빠졌다(zf3PlaceOf 가 null). 경계 그림(2025)은 광주(24)·전남(36) 두 장 그대로 —
+//    시·군·구가 광주 구(광산·동·서·남·북구)면 24, 아니면 36 으로 그린다. 시·도 이름표·단추는 그 그림의 이름(광주 · 전남)을 쓴다.
+const ZF3_PROV_SPLIT = { 전남광주통합특별시: ['24', '36'] };
 const ZF3_SGG_ALIAS = {};   // 이름만 바뀐 구(경계 같음) — 2025 경계에는 남은 것이 없다(2013 「남구 → 미추홀구」는 걷음)
 const ZF3_METRO = new Set(['11', '21', '22', '23', '24', '25', '26']);
 // 🔵 2026-10-13(우편함 「표시층 — 공고 탭 다듬기」 4) — 지역 단추 두 층: 처음엔 시·도 단추(공고 수) → 누르면 그 시·도의 시·군·구 → 누르면 그곳 공고만.
@@ -11114,12 +11158,14 @@ function zf3LoadGeo(){
   return zf3GeoP;
 }
 function zf3PlaceOf(sido, sgg){
-  const G = zf3Geo, pc = ZF3_PROV[String(sido || '').trim()];
+  const G = zf3Geo, sd = String(sido || '').trim();
+  let pc = ZF3_PROV[sd];
   if(!G || !pc) return null;
   const sg = String(sgg || '').replace(/\s+/g, '');
+  if(sg && ZF3_PROV_SPLIT[sd]) pc = ZF3_PROV_SPLIT[sd].find(p => G.cent[p + '|' + sg] || G.cent[p + '|' + sg.replace(/^(\S+?시)\S+구$/, '$1')]) || pc;
   if(sg){
     const k0 = pc + '|' + sg, k = ZF3_SGG_ALIAS[k0] || k0;
-    if(G.cent[k]) return { key: k0, name: (ZF3_METRO.has(pc) ? zf3ShortSido(sido) + ' ' : '') + String(sgg).trim(), xy: G.cent[k], exact: true, pc };   // 「북구」는 어느 시의 북구인지 — 특별·광역시 구는 시 이름을 앞에
+    if(G.cent[k]) return { key: k0, name: (ZF3_METRO.has(pc) ? zf3ShortSido(ZF3_PROV_NAME[pc] || sd) + ' ' : '') + String(sgg).trim(), xy: G.cent[k], exact: true, pc };   // 「북구」는 어느 시의 북구인지 — 특별·광역시 구는 시 이름을 앞에
     const city = sg.replace(/^(\S+?시)\S+구$/, '$1');
     // 🔵 2026-10-13(N3) — 세대 주소가 구 없이 「고양시」처럼 오면(2025 경계엔 구 단위만 있는 시) 구 가운데들의 평균을 쓴다(아래 같은 규칙).
     if(city !== sg || /시$/.test(sg)){
@@ -11129,9 +11175,9 @@ function zf3PlaceOf(sido, sgg){
     }
     const same = Object.keys(G.cent).filter(x => x.split('|')[1] === sg);
     if(same.length === 1) return { key: k0, name: String(sgg).trim(), xy: G.cent[same[0]], exact: true, pc };
-    return { key: pc + '|*' + sg, name: zf3ShortSido(sido) + ' ' + String(sgg).trim(), xy: G.prov[pc], exact: false, pc, note: '2025 경계에 없는 구 — 시도 가운데 고리' };
+    return { key: pc + '|*' + sg, name: zf3ShortSido(ZF3_PROV_NAME[pc] || sd) + ' ' + String(sgg).trim(), xy: G.prov[pc], exact: false, pc, note: '2025 경계에 없는 구 — 시도 가운데 고리' };
   }
-  return { key: pc + '|*', name: zf3ShortSido(sido) + '(시군구 미상)', xy: G.prov[pc], exact: false, pc, note: '시군구 없음 — 시도 가운데 고리' };
+  return { key: pc + '|*', name: zf3ShortSido(ZF3_PROV_NAME[pc] || sd) + '(시군구 미상)', xy: G.prov[pc], exact: false, pc, note: '시군구 없음 — 시도 가운데 고리' };
 }
 // 🔴 2026-10-13(우편함 「코드 — 열린 카드 오표시·오답·놓침」 3 · N3) — 곳의 재료는 카드 상세 「이 공고의 주택이 있는 지역」과 같다:
 //    그룹 행 시군구(region_names) ∪ 세대 행 시군구(가격 요약 RPC unit_places — zfMergeUnitPlaces). 공고 행 sido_nm·sigungu_nm 은 둘 다 없을 때만.

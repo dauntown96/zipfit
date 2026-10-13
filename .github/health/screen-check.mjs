@@ -409,6 +409,38 @@ try {
     add('open_count', '숫자가 말하는 「지금」 — 열린 공고 수 한 정의 · 누적 표기', ok ? 'pass' : 'fail', value,
       '공고 탭 기본 머리 = 「열린 공고 M건」 + 「접수 중 a · 예정 b[ · 미상 k]」 · a+b+k = M · a = 인사이트 「접수 중」 KPI · 인사이트 머리 「지금 열린 공고 M건」 · M = zfOpenNotices(noticeData) · 누적 T·기간 = DB')
   }
+  // ⑦-2 한글 조합 입력(2026-10-13 · 우편함 「코드 — 한글 중복 입력 …」 1 · 원칙 33) — 공고 검색 칸에 실제 조합 이벤트(CDP Input.imeSetComposition →
+  //    insertText)로 「부산」을 친다(ㅂ → 부 → 붓 → 「부」 확정 → 사 → 산 → 「산」 확정). 칸 글자가 「부산」이 아니면 실패다.
+  //    계기: 0건 화면의 「빼면 N건」 계산이 칸 value 를 비웠다 되돌려 조합이 깨지고 「ㅂ부붓부사산」이 됐다(다운님 실사용). 새 문맥 · 이용 기록 송신 막음.
+  {
+    let value = '', ok = false
+    const ictx = await browser.newContext({ viewport: VIEWPORT, serviceWorkers: 'block', locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+    try {
+      await ictx.route(/\/rest\/v1\/usage_events(\?|$)/, r => r.fulfill({ status: 201, body: '' }))
+      const ip = await ictx.newPage()
+      await ip.goto(SITE + '?ime=' + Date.now(), { waitUntil: 'networkidle', timeout: 90000 })
+      await ip.waitForFunction(() => typeof noticeData !== 'undefined' && noticeData.length > 0 && noticeLoaded, null, { timeout: 60000 })
+      await ip.evaluate(() => { goMain(2); if (typeof zf3ToggleSheet === 'function') zf3ToggleSheet(true) })
+      await ip.waitForTimeout(1200)
+      await ip.focus('#noticeSearchInput')
+      const cdp = await ictx.newCDPSession(ip)
+      const trace = []
+      for (const [k, t] of [['c', 'ㅂ'], ['c', '부'], ['c', '붓'], ['i', '부'], ['c', '사'], ['c', '산'], ['i', '산']]) {
+        if (k === 'c') await cdp.send('Input.imeSetComposition', { text: t, selectionStart: t.length, selectionEnd: t.length })
+        else await cdp.send('Input.insertText', { text: t })
+        await ip.waitForTimeout(200)
+        trace.push(await ip.evaluate(() => document.getElementById('noticeSearchInput').value))
+      }
+      ok = trace[trace.length - 1] === '부산'
+      value = `「${trace[trace.length - 1]}」(단계 ${trace.join(' → ')})`
+    } catch (e) {
+      value = '못 잼: ' + String(e).slice(0, 160)
+    } finally {
+      await ictx.close()
+    }
+    add('ime_ko', '한글 조합 입력 — 공고 검색 칸에 「부산」', ok ? 'pass' : (value.startsWith('못 잼') ? 'warn' : 'fail'), value,
+      '조합 이벤트로 친 「부산」 = 칸 글자 「부산」(겹침 0) · 재다 죽으면 경고')
+  }
   // ⑧ 접근성(axe-core · 2026-10-12 · 우편함 「코드 — Claude Code 장비 정비」 1) — 여섯 상태(2026-10-13 매칭 결과 더함)를 따로 열어 재고 기준선(a11y-baseline.json)과 견준다.
   //    🔴 critical ≥ 1 은 실패(fail — 이슈가 열린다 · 2026-10-13 claude.ai 판정으로 승격 · 기준선은 같은 날 배포 v201 다섯 상태 0 으로 다시 씀).
   //    기준선보다 늘어난 serious 이하는 여전히 경고다. 패키지가 없거나 재다 죽어도 warn 이다 — 나머지 점검을 실패로 만들지 않는다.
