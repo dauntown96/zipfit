@@ -10271,7 +10271,7 @@ function zf3Pill(n){
     return { cls: 'open' + (d != null && d <= 1 ? ' hot' : ''), t: d === 0 ? '오늘 마감' : '접수 중' + (d != null ? ' · D-' + d : '') };
   }
   if(st === 'before') return { cls: 'before', t: start ? '접수 예정 · D-' + zf3Days(today, start) : '접수 예정' };
-  if(st === 'closed') return { cls: 'closed', t: '마감' };
+  if(st === 'closed') return { cls: 'closed', t: zfEarlyClosed(n) ? '조기 마감' : '마감' };   // 🔵 2026-10-13 — 공급기관이 알린 조기 접수마감(zfEarlyClosed)
   if(end && end >= today) return { cls: 'unknown', t: '시작일 미상 · 마감 D-' + zf3Days(today, end) };
   return { cls: 'unknown', t: APPLY_UNKNOWN_LABEL };
 }
