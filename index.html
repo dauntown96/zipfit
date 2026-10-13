@@ -562,6 +562,7 @@ html[data-ui="d3"] #noticeFilterPanel{background:var(--paper)!important;border:1
 html[data-ui="d3"] #noticeFilterPanel .label{color:var(--ink-2)}
 .zf3-sheet-top{display:flex;align-items:center;justify-content:space-between;margin:0 0 8px}
 .zf3-sheet-top b{font-size:var(--t-m)}
+.zf3-sheet-n{flex:1;margin:0 8px;font-size:var(--t-s);color:var(--ink-2);font-variant-numeric:tabular-nums}
 .zf3-sheet-x{font:inherit;font-size:var(--t-s);border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:var(--r-1);padding:0 12px;min-height:var(--hit);cursor:pointer}
 /* 종전 공고 탭 머리(제목 · 설명 · 필터 단추 · 「✅ n건」 상자 · 위 「n건 중 a–b」) — d3 에서는 새 머리가 대신한다 */
 html[data-ui="d3"] #panel4>.panel-title,
@@ -1244,8 +1245,12 @@ html[data-ui="d3"] body.theme-dark{color-scheme:dark}
     <p class="sub" style="margin-bottom:1rem">매일 자동 수집되는 LH 전국 공고예요. 꼭집이 신혼·신생아·청년 타깃과 수도권 여부를 자동으로 표시해드려요.</p>
 
     <!-- 공고 검색 -->
+    <!-- 🔴 2026-10-13(우편함 「코드 — 공고 탭 검색어를 쳐도 결과가 안 바뀐다」) — 조합 중(한글)에도 치는 대로 다시 그린다. #491 이 둔 `isComposing` 건너뜀 +
+         `oncompositionend` 속성은 결과를 멈췄다: 조합 이벤트에는 인라인 처리기 속성이 없어(typeof input.oncompositionend = 'undefined') 그 속성은 불리지 않고,
+         모바일 입력기는 단어를 다 칠 때까지 조합을 이어 가 input 이 전부 건너뛰어졌다. 중복 입력(#491)의 원인은 그리는 쪽이 칸 value 를 다시 쓴 것이었고
+         그 줄은 걷혀 있다 — 그리는 쪽은 칸 value 를 쓰지 않는다(applyNoticeSubFilters 의 q 인자). -->
     <div style="display:flex;gap:8px;margin-bottom:0.75rem">
-      <input type="text" id="noticeSearchInput" placeholder="공고명, 지역 등으로 검색" oninput="if(event.isComposing)return;applyNoticeFiltersAndRender();zfLogSearchSoon(this.value)" oncompositionend="applyNoticeFiltersAndRender();zfLogSearchSoon(this.value)"
+      <input type="text" id="noticeSearchInput" placeholder="공고명, 지역 등으로 검색" oninput="applyNoticeFiltersAndRender();zfLogSearchSoon(this.value)"
         style="flex:1;min-width:0;padding:9px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px">
       <select id="noticeSearchScopeSel" onchange="applyNoticeFiltersAndRender()"
         style="font-size:13px;padding:5px 8px;border:1px solid #e0e0e0;border-radius:8px;background:#fff;color:#333;cursor:pointer">
@@ -10791,6 +10796,8 @@ function zf3RenderNoticeHead(filtered){
   const sortSel = document.getElementById('noticeSortSel');
   const sortOpts = sortSel ? [...sortSel.options].map(o => `<option value="${zfAttr(o.value)}"${o.value === sortSel.value ? ' selected' : ''}>${escapeHtml(o.textContent)}</option>`).join('') : '';
   const sheetOpen = !document.getElementById('noticeFilterPanel')?.classList.contains('hidden');
+  const sn = document.querySelector('[data-zf3-sheetcount]');
+  if(sn) sn.textContent = chips.length ? `조건에 맞는 ${n.toLocaleString()}건` : (closedExcluded ? `열린 공고 ${o.n.toLocaleString()}건` : `마감 포함 ${n.toLocaleString()}건`);
   el.innerHTML = `<div class="zf3-lhrow"><p class="zf3-lh">${head}</p><span class="zf3-vseg" role="group" aria-label="보기"><button type="button" data-act="view" data-v="list" aria-pressed="${zf3View !== 'map'}">목록</button><button type="button" data-act="view" data-v="map" aria-pressed="${zf3View === 'map'}">지도</button></span></div>`
     + `<p class="zf3-lsub">${closedExcluded ? '' : `열린 ${o.n.toLocaleString()}건: `}${zf3StLink('접수 중', '접수 중', o.a)} · ${zf3StLink('예정', '접수 예정', o.b)}${o.k ? ` · ${zf3StLink('미상', '접수기간 미상', o.k)}` : ''}</p>`
     + zf3StatChips(all)
@@ -11457,7 +11464,9 @@ function zf3Init(){
   if(panel){
     const head = document.createElement('div');
     head.className = 'zf3-sheet-top';
-    head.innerHTML = '<b>조건</b><button type="button" class="zf3-sheet-x">닫기</button>';
+    // 🔵 2026-10-13(우편함 「코드 — 공고 탭 검색어를 쳐도 결과가 안 바뀐다」 2) — 시트 머리줄에 결과 수(머리 「조건에 맞는 N건」과 같은 값).
+    //    화면 키보드가 열리면(390×420 꼴) 칸이 가운데로 올라와 공고 탭 머리의 수가 화면 밖으로 밀린다 — 시트를 닫지 않아도 치는 대로 수가 보이게.
+    head.innerHTML = '<b>조건</b><span class="zf3-sheet-n" data-zf3-sheetcount aria-live="polite"></span><button type="button" class="zf3-sheet-x">닫기</button>';
     head.querySelector('button').addEventListener('click', () => zf3ToggleSheet(false));
     const searchRow = document.getElementById('noticeSearchInput')?.parentElement;
     const sortRow = document.getElementById('noticeSortSel')?.parentElement;

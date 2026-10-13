@@ -420,8 +420,12 @@ try {
       '공고 탭 기본 머리 = 「열린 공고 M건」 + 「접수 중 a · 예정 b[ · 미상 k]」 · a+b+k = M · a = 인사이트 「접수 중」 KPI · 인사이트 머리 「지금 열린 공고 M건」 · M = zfOpenNotices(noticeData) · 누적 T·기간 = DB')
   }
   // ⑦-2 한글 조합 입력(2026-10-13 · 우편함 「코드 — 한글 중복 입력 …」 1 · 원칙 33) — 공고 검색 칸에 실제 조합 이벤트(CDP Input.imeSetComposition →
-  //    insertText)로 「부산」을 친다(ㅂ → 부 → 붓 → 「부」 확정 → 사 → 산 → 「산」 확정). 칸 글자가 「부산」이 아니면 실패다.
-  //    계기: 0건 화면의 「빼면 N건」 계산이 칸 value 를 비웠다 되돌려 조합이 깨지고 「ㅂ부붓부사산」이 됐다(다운님 실사용). 새 문맥 · 이용 기록 송신 막음.
+  //    insertText)로 「부산」을 친다. 두 꼴을 본다:
+  //    ⓐ 단어 조합(모바일 입력기처럼 ㅂ → 부 → 붓 → 부사 → 부산을 한 조합으로 · 확정 전) — 확정하기 전에 공고 탭 머리 「조건에 맞는 N건」과 시트 머리줄 수가
+  //       칸 value 를 코드로 넣고 그린 기준 수와 같아야 한다(치는 대로 결과가 따라온다 · 빈 칸 수와 달라야 한다).
+  //    ⓑ 음절 확정(데스크톱처럼 ㅂ → 부 → 붓 → 「부」 확정 → 사 → 산 → 「산」 확정) — 칸 글자 「부산」(겹침 0).
+  //    계기: ① 0건 화면 「빼면 N건」 계산이 칸 value 를 비웠다 되돌려 「ㅂ부붓부사산」(#491) ② 그 고침이 둔 isComposing 건너뜀 + 불리지 않는
+  //    oncompositionend 속성 때문에 조합 중 결과가 멈췄다(v206 · 다운님 실사용 「검색어를 쳐도 결과가 안 바뀐다」). 새 문맥 · 이용 기록 송신 막음.
   {
     let value = '', ok = false
     const ictx = await browser.newContext({ viewport: VIEWPORT, serviceWorkers: 'block', locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
@@ -432,24 +436,50 @@ try {
       await ip.waitForFunction(() => typeof noticeData !== 'undefined' && noticeData.length > 0 && noticeLoaded, null, { timeout: 60000 })
       await ip.evaluate(() => { goMain(2); if (typeof zf3ToggleSheet === 'function') zf3ToggleSheet(true) })
       await ip.waitForTimeout(1200)
+      const num = () => ip.evaluate(() => {
+        const t = (document.querySelector('#zf3NoticeHead .zf3-lh') || {}).textContent || ''
+        const m = t.match(/([\d,]+)건/)
+        const sc = (document.querySelector('[data-zf3-sheetcount]') || {}).textContent || ''
+        const ms = sc.match(/([\d,]+)건/)
+        return { v: document.getElementById('noticeSearchInput').value, n: m ? Number(m[1].replace(/,/g, '')) : null, s: ms ? Number(ms[1].replace(/,/g, '')) : null }
+      })
+      const n0 = (await num()).n
       await ip.focus('#noticeSearchInput')
       const cdp = await ictx.newCDPSession(ip)
-      const trace = []
+      // ⓐ 단어 조합 — 확정하지 않은 채 잰다
+      const wtrace = []
+      for (const t of ['ㅂ', '부', '붓', '부사', '부산']) {
+        await cdp.send('Input.imeSetComposition', { text: t, selectionStart: t.length, selectionEnd: t.length })
+        await ip.waitForTimeout(250)
+        wtrace.push(await num())
+      }
+      const wlast = wtrace[wtrace.length - 1]
+      await cdp.send('Input.insertText', { text: '부산' })
+      await ip.waitForTimeout(250)
+      // 기준 수 — 조합 없이 칸에 「부산」을 넣고 그린 수
+      const ref = await ip.evaluate(() => { const i = document.getElementById('noticeSearchInput'); i.value = '부산'; applyNoticeFiltersAndRender(); return null }).then(() => num())
+      await ip.evaluate(() => { const i = document.getElementById('noticeSearchInput'); i.value = ''; applyNoticeFiltersAndRender() })
+      await ip.waitForTimeout(300)
+      await ip.focus('#noticeSearchInput')
+      // ⓑ 음절 확정
+      const strace = []
       for (const [k, t] of [['c', 'ㅂ'], ['c', '부'], ['c', '붓'], ['i', '부'], ['c', '사'], ['c', '산'], ['i', '산']]) {
         if (k === 'c') await cdp.send('Input.imeSetComposition', { text: t, selectionStart: t.length, selectionEnd: t.length })
         else await cdp.send('Input.insertText', { text: t })
         await ip.waitForTimeout(200)
-        trace.push(await ip.evaluate(() => document.getElementById('noticeSearchInput').value))
+        strace.push(await ip.evaluate(() => document.getElementById('noticeSearchInput').value))
       }
-      ok = trace[trace.length - 1] === '부산'
-      value = `「${trace[trace.length - 1]}」(단계 ${trace.join(' → ')})`
+      const sv = strace[strace.length - 1]
+      const live = wlast.v === '부산' && wlast.n != null && wlast.n === ref.n && wlast.n !== n0 && wlast.s === wlast.n
+      ok = live && sv === '부산'
+      value = `단어 조합(확정 전) 칸 「${wlast.v}」 · 결과 ${wtrace.map(x => x.n).join(' → ')}건(시트 ${wlast.s ?? '없음'}) · 기준 ${ref.n} · 빈 칸 ${n0} / 음절 확정 칸 「${sv}」(단계 ${strace.join(' → ')})`
     } catch (e) {
       value = '못 잼: ' + String(e).slice(0, 160)
     } finally {
       await ictx.close()
     }
-    add('ime_ko', '한글 조합 입력 — 공고 검색 칸에 「부산」', ok ? 'pass' : (value.startsWith('못 잼') ? 'warn' : 'fail'), value,
-      '조합 이벤트로 친 「부산」 = 칸 글자 「부산」(겹침 0) · 재다 죽으면 경고')
+    add('ime_ko', '한글 조합 입력 — 공고 검색 칸에 「부산」 · 치는 대로 결과', ok ? 'pass' : (value.startsWith('못 잼') ? 'warn' : 'fail'), value,
+      '단어 조합(확정 전)에서 머리·시트 결과 수 = 「부산」 기준 수 ≠ 빈 칸 수 · 음절 확정 칸 글자 「부산」(겹침 0) · 재다 죽으면 경고')
   }
   // ⑧ 접근성(axe-core · 2026-10-12 · 우편함 「코드 — Claude Code 장비 정비」 1) — 여섯 상태(2026-10-13 매칭 결과 더함)를 따로 열어 재고 기준선(a11y-baseline.json)과 견준다.
   //    🔴 critical ≥ 1 은 실패(fail — 이슈가 열린다 · 2026-10-13 claude.ai 판정으로 승격 · 기준선은 같은 날 배포 v201 다섯 상태 0 으로 다시 씀).
