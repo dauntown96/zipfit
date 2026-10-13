@@ -135,7 +135,7 @@ select:focus,input:focus{border-color:#5DCAA5}
 .chip-group{display:flex;flex-wrap:wrap;gap:6px}
 .chip{padding:7px 14px;border-radius:20px;border:1px solid #ddd;background:#fff;font-size:13px;color:#444;cursor:pointer;transition:all 0.12s;user-select:none}
 .chip:hover{border-color:#5DCAA5}
-.chip.sel{background:#1D9E75;border-color:#1D9E75;color:#fff;font-weight:500}
+.chip.sel{background:#0F6E56;border-color:#0F6E56;color:#fff;font-weight:500}
 .chip-all{font-weight:600}
 /* 🔵 표시층 B ① — 카드 칩 행: 칩 단위로 줄을 바꾼다(칩 하나는 한 줄). 카드 폭보다 긴 칩만 말줄임 — 전문은 툴팁(zfTitleClippedChips) */
 .chip-row{display:flex;flex-wrap:wrap;align-items:center}
@@ -447,6 +447,11 @@ html[data-ui="d3"] body.theme-dark{
 }
 html[data-ui="d3"] .wrap{padding-top:0}
 html[data-ui="d3"] :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+/* 2026-10-13(우편함 「코드 — 열린 카드 오표시·오답·놓침」 5 · F10) — 매칭 결과 접근성: 「전체」 등 선택된 칩 글자 대비(흰 글자 3.38 → 6.3 · 아래 .chip.sel) ·
+   건수 줄 회색 글자(#888 3.54 → --ink-3) · 아래 고정 탭의 초점 테두리는 막대 가장자리에 잘리지 않게 안쪽으로 · 어둡게에서 「대상이 달라 뺀 공고」 상자 바탕 */
+html[data-ui="d3"] .count-info{color:var(--ink-3)}
+html[data-ui="d3"] .maintabs.zf3-ind-on .maintab:focus-visible{outline:2px solid var(--focus);outline-offset:-3px;border-radius:8px}
+html[data-ui="d3"] body.theme-dark .zf-target-out{background:var(--surface-2)!important}
 /* 앱 머리 */
 .zf3-top[hidden],.zf3-band[hidden],.zf3-nhead[hidden],.zf3-ai-full[hidden]{display:none!important}
 .zf3-badge{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 4px;border-radius:6px;background:var(--ln,var(--ln-gi));color:var(--ln-ink);font-size:12px;font-weight:700}   /* 노선 배지 부품 — 단계 b 카드에서 쓴다 */
@@ -1151,7 +1156,7 @@ html[data-ui="d3"] body.theme-dark{color-scheme:dark}
 
     <button class="btn btn-primary" onclick="matchHouses()">맞춤 주택 찾기 →</button>
     <div style="display:flex;align-items:center;justify-content:flex-end;margin-top:10px">
-      <select id="matchSortSel" onchange="applyMatchSortAndRender()" style="font-size:13px;padding:5px 8px;border:1px solid #e0e0e0;border-radius:8px;background:#fff;color:#333;cursor:pointer">
+      <select id="matchSortSel" aria-label="매칭 결과 정렬" onchange="applyMatchSortAndRender()" style="font-size:13px;padding:5px 8px;border:1px solid #e0e0e0;border-radius:8px;background:#fff;color:#333;cursor:pointer">
         <option value="date-desc">최신 공고순</option>
         <option value="end-asc">마감 임박순</option>
         <option value="start-asc">접수 시작순</option>
@@ -1769,7 +1774,7 @@ function zfLhSpanIsUnion(row, pn){
 function applyWindowState(row){
   const st = zfWindowStateOne(row);
   const pn = zfPostNoticeFor(row);
-  if(!pn || zfLhPostClosed(row)) return st;
+  if(!pn || zfLhPostClosed(row) || zfEarlyClosed(row)) return st;
   // 당첨발표가 지났거나 기간 확인 대상이면(zfWindowStateOne 의 날짜 앞 판정) LH 행 판정을 그대로 센다 — 날짜로 연 「open」만 공고문에 맡긴다.
   let best = (st === 'open' && zfLhSpanIsUnion(row, pn)) ? 'closed' : st;
   pn.linked.forEach(nt => { const s = zfWindowStateOne(nt.row); if(ZF_WINDOW_RANK[s] < ZF_WINDOW_RANK[best]) best = s; });
@@ -1777,6 +1782,17 @@ function applyWindowState(row){
 }
 function zfLhPostClosed(row){
   return String((row && row.source) || '') === 'LH' && statusSaysClosed(row);
+}
+// 🔴 2026-10-13(우편함 「코드 — 열린 카드 오표시·오답·놓침」 1) — 공급기관이 「조기 접수마감」을 알린 공고는 날짜보다 그 알림을 믿는다.
+//    양산 삼성파크빌 `…20898` — LH 정정사유 「모집호수 소진으로 조기 접수마감합니다」 · 제목 머리 `[조기접수마감]` 인데 LH 공고상태는
+//    「공고중」·「정정공고중」 그대로라 날짜(~11-12)로 「접수 중 · D-30」이 섰다. 보는 것은 원문 글자 둘뿐이다 — 제목 머리(여러 머리 중 하나)와
+//    정정사유(revision_note). 마감 날짜는 지어내지 않는다(날짜 줄은 수집 날짜 그대로 · 칩만 「조기 마감」).
+//    정정 전 카드는 그룹 키(zfDedupKey ↔ DB announcement_dedup_key)가 `[조기접수마감]` 머리를 걷어 같은 카드로 합친다.
+function zfEarlyClosed(row){
+  if(!row) return false;
+  const t = String(row['공고명'] ?? row.title ?? '');
+  if(/^\s*(\[[^\]]*\]\s*)*\[\s*조기\s*(접수)?\s*마감\s*\]/.test(t)) return true;
+  return /조기\s*(접수\s*)?마감/.test(String(row.revision_note || ''));
 }
 const ZF_WINDOW_RANK = { open: 0, before: 1, unknown: 2, closed: 3 };
 function zfWindowStateOne(row){
@@ -1791,6 +1807,8 @@ function zfWindowStateOne(row){
   //    상시·수시모집은 애초에 winner_announce_date 가 NULL 이라(875건 중 408건) 이 가지를 타지 않는다.
   const w = parseNoticeDate(row['winner_announce_date']||'');
   if(w && startOfLocalDay(w) < today) return 'closed';
+  // 🔴 2026-10-13 — 공급기관이 조기 접수마감을 알렸으면 마감이다(zfEarlyClosed 주석).
+  if(zfEarlyClosed(row)) return 'closed';
   // 🔴 2026-09-30 — LH 가 대표인 카드는 LH 「…마감」을 날짜보다 먼저 믿는다(조기 마감 · 표시층·필터 회차).
   //    LH 목록 API 의 PAN_SS 를 수집이 그대로 싣는다. 해당순위 접수가 공급량을 넘으면 후순위 접수일이 남아도
   //    LH 가 「접수마감」으로 바꾼다(천안쌍용5-2 원문 「…후순위 접수는 받지 아니하며」).
@@ -1963,7 +1981,7 @@ function zfStatusTag(row){
   const st = applyWindowState(row);
   let text = raw;
   if(st === 'open') text = '접수중';
-  else if(st === 'closed') text = /마감$/.test(raw) ? raw : '접수마감';
+  else if(st === 'closed') text = zfEarlyClosed(row) ? '조기 마감' : (/마감$/.test(raw) ? raw : '접수마감');
   else if(st === 'before') text = (!raw || raw === '접수중' || /마감$/.test(raw)) ? '공고중' : raw;
   return { text: text || '-', closed: /마감$/.test(text) };
 }
@@ -2967,7 +2985,7 @@ async function zfLoadTypeStd(){
 const ZF_CANCEL_PREFIX = '[취소공고]';
 function zfDedupKey(title){
   return String(title || '')
-    .replace(/^(\s*(\[정정공고\]|[[(]\s*(재)?(수정|정정)[^\])]*[\])])\s*)+/, '')
+    .replace(/^(\s*(\[정정공고\]|\[\s*조기\s*(접수)?\s*마감\s*\]|[[(]\s*(재)?(수정|정정)[^\])]*[\])])\s*)+/, '')
     .replace(/['‘’`"“”″]/g, '')
     .replace(/\s+/g, '')
     .replace(/\.{2,}/g, '.');
@@ -3238,12 +3256,58 @@ function zfNoticeHighlight(cards){
 // 포함해 한 번 더 세야 하는데, loadNoticeData()가 서버에 넘기는 p_status는 status 칩만
 // 반영하므로(마감 숨기기는 서버로 안 나간다) noticeData에는 마감 공고가 이미 들어 있다.
 // 따라서 재질의 없이 클라이언트에서 셀 수 있다.
+// 🔴 2026-10-13(우편함 「코드 — 열린 카드 오표시·오답·놓침」 4 · F1) — 대상 계층 칩은 제목·유형 글자에 더해 분석 산물의 원문 칸도 본다:
+//    자격 행 supply_form(「신혼부부·한부모가족 계층」 · 「…장애인 1순위…」) · 세대 행 supply_target(「고령자(주거약자)」) · 공급대상 키 갈래(대상 이름 · 확인필요 글자).
+//    글자를 계층 이름으로 바꾸는 규칙은 표지와 같은 classifyDemographics 한 벌이다(사본 0). 제목으로 잡히던 카드는 그대로 잡힌다(OR — 더하기만).
+//    목록 RPC 반환 칸은 바꾸지 않는다 — 칩을 처음 고를 때 두 표(자격 행 825 · supply_target 있는 세대 행 300 — 2026-10-13)와 그 공고 제목을 한 번 받아
+//    카드 그룹 키(zfDedupKey — 카드 상세가 산물을 모으는 get_announcement_group_ids 와 같은 제목 키)로 붙인다. 받기 전·실패면 제목만(종전 그대로).
+let zfTierTagsP = null, zfTierTagsReady = false;
+const zfTierByKey = new Map();
+function zfLoadTierTags(){
+  if(zfTierTagsP) return zfTierTagsP;
+  const h = zfAnonHeaders();
+  const get = q => fetch(`${SUPABASE_URL}/rest/v1/${q}`, { headers: h }).then(r => { if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+  zfTierTagsP = Promise.all([
+    get('eligibility_criteria?select=announcement_id,supply_form,gk:verification_requirements->공급대상&limit=10000'),
+    get('housing_units?select=announcement_id,supply_target&supply_target=not.is.null&limit=10000'),
+  ]).then(([ec, hu]) => {
+    const textById = new Map();
+    const add = (id, t) => { if(!id || !t) return; id = String(id); textById.set(id, (textById.get(id) || '') + ' ' + t); };
+    (ec || []).forEach(r => {
+      add(r.announcement_id, r.supply_form);
+      const g = r.gk;
+      if(g && typeof g === 'object' && Array.isArray(g['갈래'])) g['갈래'].forEach(b => { if(b){ add(r.announcement_id, b['대상']); add(r.announcement_id, b['확인필요']); } });
+    });
+    (hu || []).forEach(r => add(r.announcement_id, r.supply_target));
+    const ids = [...textById.keys()];
+    const chunks = [];
+    for(let i = 0; i < ids.length; i += 120) chunks.push(ids.slice(i, i + 120));
+    return Promise.all(chunks.map(c => get(`announcements?select=announcement_id,title&${idFilterFor(c)}`))).then(parts => {
+      parts.flat().forEach(a => {
+        const key = zfDedupKey(a && a.title), t = textById.get(String(a && a.announcement_id));
+        if(!key || !t) return;
+        const set = zfTierByKey.get(key) || new Set();
+        // 「한부모」 갈래 이름은 표지 낱말(한부모가족)과 같은 규칙으로 읽힌다 — classifyDemographics 가 「한부모」를 본다.
+        classifyDemographics('', t).forEach(x => set.add(x.label));
+        zfTierByKey.set(key, set);
+      });
+      zfTierTagsReady = true;
+      return true;
+    });
+  }).catch(err => { zfTierTagsP = null; console.warn('ZipFit: 대상 계층 원문 칸 로드 실패 — 제목으로만 거릅니다', err); return false; });
+  return zfTierTagsP;
+}
+function zfTierTagsOf(n){
+  const s = zfTierByKey.get(zfDedupKey(n['공고명'] || ''));
+  return s ? [...s] : [];
+}
 function applyNoticeSubFilters(rows){
   let out = rows;
   if(activeNoticeTarget){
+    if(!zfTierTagsReady) zfLoadTierTags().then(ok => { if(ok) applyNoticeFiltersAndRender(); });
     out = out.filter(n => {
       const tags = classifyDemographics(n['공급유형'], n['공고명']);
-      return tags.some(t => t.label === activeNoticeTarget);
+      return tags.some(t => t.label === activeNoticeTarget) || zfTierTagsOf(n).includes(activeNoticeTarget);
     });
   }
   const searchQuery = document.getElementById('noticeSearchInput')?.value || '';
@@ -5764,11 +5828,29 @@ function zfTargetBranchState(b, f){
     default: return 'check';   // 창업 · 장애인 · 계층 · 모르는 값
   }
 }
+// 🔴 2026-10-13(우편함 「코드 — 열린 카드 오표시·오답·놓침」 2 · F2·N2) — 키 갈래가 담지 못한 조건이 원문에 남아 있으면 「맞음」을 내지 않는다.
+//    갈래는 나이·혼인 축·미성년 자녀 수만 담는다. 그런데 원문이 그 밖의 조건을 함께 거는 행이 있다 —
+//    `…19376` 청년 전세임대 「혼인 중이 아닌 … 아래 1순위 유형 중 어느 하나」(갈래 = 청년 나이뿐) · `SH_311087` 「청년 창업가·예술인·유튜버」(갈래 = 청년 나이뿐).
+//    원문을 읽어 판정하지 않는다 — 「갈래에 없는 축의 조건 낱말이 원문에 있다」만 가려 그 행을 「확인 필요」로 둔다(no 로 빼지 않는다).
+//    낱말은 키 46종(2026-10-13 실측)에서 갈래 밖 조건으로 쓰인 것만 골랐다. 그 축의 갈래가 있으면 그 낱말은 이미 담긴 것이라 보지 않는다.
+const ZF_TARGET_UNCOVERED = [
+  { re: /혼인\s*중이\s*아닌|미혼/, label: '혼인 여부', covered: ['신혼·신생아', '한부모'] },
+  { re: /\d\s*순위\s*유형/, label: '순위 유형', covered: [] },
+  { re: /창업|예술인|유튜버/, label: '직업', covered: ['창업', '계층'] },
+  { re: /주거약자/, label: '주거약자 요건', covered: ['고령자', '장애인'] },
+];
+function zfTargetUncovered(g){
+  const w = String((g && g['원문']) || '');
+  if(!w) return [];
+  const kinds = new Set(((g && g['갈래']) || []).map(b => b && b['대상']).filter(Boolean));
+  return ZF_TARGET_UNCOVERED.filter(u => u.re.test(w) && !u.covered.some(k => kinds.has(k))).map(u => u.label);
+}
 function zfTargetRowState(g, f){
   const br = (g && Array.isArray(g['갈래'])) ? g['갈래'] : [];
   if(!br.length) return 'check';
   const st = br.map(b => zfTargetBranchState(b, f));
-  return st.includes('ok') ? 'ok' : (st.every(s => s === 'no') ? 'no' : 'check');
+  if(st.includes('ok')) return zfTargetUncovered(g).length ? 'check' : 'ok';
+  return st.every(s => s === 'no') ? 'no' : 'check';
 }
 // rows = 그 카드 자신의 자격 행 공급대상 칸 배열(객체가 아니면 「키 없음」). 판정하지 않으면 null.
 function zfTargetVerdict(rows, f){
@@ -5780,7 +5862,7 @@ function zfTargetVerdict(rows, f){
   const quotes = [...new Set(rows.map(g => g['원문']).filter(Boolean))];
   if(st.every(s => s === 'no')) return { state: 'no', names: names('*'), quotes };
   if(st.includes('ok')) return { state: 'ok', names: names('ok'), quotes };
-  const checks = [...new Set(rows.flatMap(g => (g['갈래'] || []).map(b => b && b['확인필요']).filter(Boolean)))];
+  const checks = [...new Set(rows.flatMap(g => (g['갈래'] || []).map(b => b && b['확인필요']).filter(Boolean).concat(zfTargetUncovered(g))))];
   return { state: 'check', names: names('*'), checks, quotes };
 }
 function zfTargetDiagFacts(){
@@ -10189,7 +10271,7 @@ function zf3Pill(n){
     return { cls: 'open' + (d != null && d <= 1 ? ' hot' : ''), t: d === 0 ? '오늘 마감' : '접수 중' + (d != null ? ' · D-' + d : '') };
   }
   if(st === 'before') return { cls: 'before', t: start ? '접수 예정 · D-' + zf3Days(today, start) : '접수 예정' };
-  if(st === 'closed') return { cls: 'closed', t: '마감' };
+  if(st === 'closed') return { cls: 'closed', t: zfEarlyClosed(n) ? '조기 마감' : '마감' };   // 🔵 2026-10-13 — 공급기관이 알린 조기 접수마감(zfEarlyClosed)
   if(end && end >= today) return { cls: 'unknown', t: '시작일 미상 · 마감 D-' + zf3Days(today, end) };
   return { cls: 'unknown', t: APPLY_UNKNOWN_LABEL };
 }
@@ -10866,7 +10948,8 @@ function zf3PlaceOf(sido, sgg){
     const k0 = pc + '|' + sg, k = ZF3_SGG_ALIAS[k0] || k0;
     if(G.cent[k]) return { key: k0, name: (ZF3_METRO.has(pc) ? zf3ShortSido(sido) + ' ' : '') + String(sgg).trim(), xy: G.cent[k], exact: true, pc };   // 「북구」는 어느 시의 북구인지 — 특별·광역시 구는 시 이름을 앞에
     const city = sg.replace(/^(\S+?시)\S+구$/, '$1');
-    if(city !== sg){
+    // 🔵 2026-10-13(N3) — 세대 주소가 구 없이 「고양시」처럼 오면(2025 경계엔 구 단위만 있는 시) 구 가운데들의 평균을 쓴다(아래 같은 규칙).
+    if(city !== sg || /시$/.test(sg)){
       if(G.cent[pc + '|' + city]) return { key: pc + '|' + city, name: city, xy: G.cent[pc + '|' + city], exact: true, pc };
       const kids = Object.keys(G.cent).filter(x => x.startsWith(pc + '|' + city));
       if(kids.length) return { key: pc + '|' + city, name: city, xy: [0, 1].map(i => kids.reduce((a, x) => a + G.cent[x][i], 0) / kids.length), exact: true, pc };
@@ -10877,9 +10960,13 @@ function zf3PlaceOf(sido, sgg){
   }
   return { key: pc + '|*', name: zf3ShortSido(sido) + '(시군구 미상)', xy: G.prov[pc], exact: false, pc, note: '시군구 없음 — 시도 가운데 고리' };
 }
+// 🔴 2026-10-13(우편함 「코드 — 열린 카드 오표시·오답·놓침」 3 · N3) — 곳의 재료는 카드 상세 「이 공고의 주택이 있는 지역」과 같다:
+//    그룹 행 시군구(region_names) ∪ 세대 행 시군구(가격 요약 RPC unit_places — zfMergeUnitPlaces). 공고 행 sido_nm·sigungu_nm 은 둘 다 없을 때만.
+//    종전에는 region_names(없으면 공고 행 sigungu_nm)만 봐서 SH 신혼 매입 Ⅰ·Ⅱ(공고 행 시군구 없음 · 세대 주소 관악·성동 등)가 「서울(시군구 미상)」에,
+//    경기남부 든든전세(세대 주소 화성 등 8곳)가 경기 고리에만 섰다. 세대 행 지역은 zf3RenderMap 이 목록 전체 몫을 한 번에 받는다.
 function zf3PlacesOfRow(n){
   const out = new Map();
-  let names = Array.isArray(n['region_names']) ? n['region_names'].map(x => String(x || '').trim()).filter(Boolean) : [];
+  let names = zfMergeUnitPlaces(n['region_names'], zfUnitPlacesFor(n['announcement_id'])).map(x => String(x || '').trim()).filter(Boolean);
   names = names.filter(x => !names.some(y => y !== x && y.startsWith(x + ' ')));   // 「창원시」와 「창원시 마산회원구」가 함께면 구만
   const parts = names.length ? names.map(x => { const i = x.indexOf(' '); return i < 0 ? [x, ''] : [x.slice(0, i), x.slice(i + 1)]; }) : [[n['sido_nm'], n['sigungu_nm']]];
   parts.forEach(([sd, sg]) => { const pl = zf3PlaceOf(sd, sg); if(pl && !out.has(pl.key)) out.set(pl.key, pl); });
@@ -10953,6 +11040,8 @@ function zf3RenderMap(){
   if(!box){ box = document.createElement('section'); box.id = 'zf3Map'; box.className = 'zf3-map'; box.setAttribute('aria-label', '지도로 보기'); head.after(box); box.addEventListener('click', ev => { const a = ev.target.closest('[data-act="sido"],[data-act="sidos"]'); if(a){ const back = a.dataset.act === 'sidos', pc = a.dataset.pc; zf3PlaceSido = back ? null : pc; zf3RenderMap(); const f = document.querySelector(back ? `#zf3Map [data-act="sido"][data-pc="${pc}"]` : '#zf3Map [data-act="sidos"]') || document.querySelector('#zf3Map .zf3-places button'); if(f) f.focus(); return; } const b = ev.target.closest('[data-place]'); if(b) zf3SetPlace(b.dataset.place, b.dataset.name); }); }
   box.hidden = false;
   if(!zf3Geo){ box.innerHTML = '<p class="zf3-map-wait">지도를 불러오는 중…</p>'; zf3LoadGeo().then(g => { if(g){ applyNoticeFiltersAndRender(noticePage); } else box.innerHTML = '<p class="zf3-map-wait">지도를 불러오지 못했어요 · 목록으로 보세요</p>'; }); return; }
+  // 🔵 2026-10-13(N3) — 곳의 재료인 세대 행 지역(가격 요약)을 목록 전체 몫으로 받는다. 새로 온 것이 있으면 목록·지도를 다시 그린다(이미 받은 id 는 다시 묻지 않는다).
+  zfEnsurePriceSummaries((zf3PrePlace || []).map(n => n['announcement_id'])).then(ok => { if(ok){ applyNoticeFiltersAndRender(noticePage); zfFillSummarySlots(); } });
   const G = zf3Geo, mine = zf3MinePcs(), gs = zf3MapGroups().sort((a, b) => (mine.has(b.pc) ? 1 : 0) - (mine.has(a.pc) ? 1 : 0)), on = new Set(gs.map(g => g.pc));
   const placed = [], clash = b => placed.some(q => !(b[2] < q[0] || b[0] > q[2] || b[3] < q[1] || b[1] > q[3]));
   const lbl = g => { const t = `${g.exact ? g.name.replace(/^\S+시\s(\S+구)$/, '$1').replace(ZF3_METRO.has(g.pc) ? /^\S+\s/ : /^$/, '') : g.name} ${g.n}`, w = t.length * 12.5;

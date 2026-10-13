@@ -409,7 +409,7 @@ try {
     add('open_count', '숫자가 말하는 「지금」 — 열린 공고 수 한 정의 · 누적 표기', ok ? 'pass' : 'fail', value,
       '공고 탭 기본 머리 = 「열린 공고 M건」 + 「접수 중 a · 예정 b[ · 미상 k]」 · a+b+k = M · a = 인사이트 「접수 중」 KPI · 인사이트 머리 「지금 열린 공고 M건」 · M = zfOpenNotices(noticeData) · 누적 T·기간 = DB')
   }
-  // ⑧ 접근성(axe-core · 2026-10-12 · 우편함 「코드 — Claude Code 장비 정비」 1) — 다섯 상태를 따로 열어 재고 기준선(a11y-baseline.json)과 견준다.
+  // ⑧ 접근성(axe-core · 2026-10-12 · 우편함 「코드 — Claude Code 장비 정비」 1) — 여섯 상태(2026-10-13 매칭 결과 더함)를 따로 열어 재고 기준선(a11y-baseline.json)과 견준다.
   //    🔴 critical ≥ 1 은 실패(fail — 이슈가 열린다 · 2026-10-13 claude.ai 판정으로 승격 · 기준선은 같은 날 배포 v201 다섯 상태 0 으로 다시 씀).
   //    기준선보다 늘어난 serious 이하는 여전히 경고다. 패키지가 없거나 재다 죽어도 warn 이다 — 나머지 점검을 실패로 만들지 않는다.
   //    기준선을 새로 쓰는 것은 claude.ai 판정 뒤에만(a11y.mjs --write-baseline).
@@ -420,7 +420,7 @@ try {
     const c = compare(got, loadBaseline())
     extra.a11y = { states: got, increased: c.increased }
     add('a11y', '접근성(axe-core · WCAG 2.1 A·AA) — 기준선보다 늘었나', c.status, c.value,
-      '다섯 상태(390 추천 · 390 공고 탭 · 390 카드 펼침 · 1280 공고 탭 · 390 어둡게) critical 0(넘으면 실패) · 규칙별 위반 요소 수 ≤ 기준선 + max(3, 20%) · 새 규칙 0(넘으면 경고)')
+      '여섯 상태(390 추천 · 390 공고 탭 · 390 카드 펼침 · 1280 공고 탭 · 390 어둡게 · 390 매칭 결과) critical 0(넘으면 실패) · 규칙별 위반 요소 수 ≤ 기준선 + max(3, 20%) · 새 규칙 0(넘으면 경고)')
   } catch (e) {
     add('a11y', '접근성(axe-core · WCAG 2.1 A·AA) — 기준선보다 늘었나', 'warn', '못 잼: ' + String(e).slice(0, 200), '처음엔 경고만')
   }
