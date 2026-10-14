@@ -20,5 +20,20 @@ PY=/usr/bin/python3
     timeout 120 "$PY" -m pip install -q --disable-pip-version-check "${need[@]}" 2>&1 | grep -v 'Running pip as the' || true
     "$PY" -c 'import pdfplumber, pgdumplib, hwpx.hwp5.package; print("확인: 셋 다 import 됨")' 2>&1
   fi
+  # 🔵 2026-10-14 — 허용 목록 실측(우편함 「코드 — … 허용 목록 점검 장치 …」 3). 도메인은 docs/network-allowlist.md 표 첫 칸에서 읽는다.
+  #    판별: CONNECT 403 = 허용 목록이 막음 · 서버 응답(200·301·302·400·401·403·404) = 열림 · 그 밖의 000 = 판정 보류.
+  #    8개씩 나란히 · 한 호스트 8초 상한 · 판정 보류면 한 번 더(apis.data.go.kr 은 절반쯤 11초 뒤 서버가 끊는다 — 2026-10-14) — 지금 35개가 약 3~20초.
+  AL="$(dirname "$0")/../../docs/network-allowlist.md"
+  if [ -f "$AL" ]; then
+    echo "-- 허용 목록 실측(docs/network-allowlist.md)"
+    sed -n 's/^| `\([^`]*\)` |.*/\1/p' "$AL" | xargs -P 8 -I{} sh -c '
+      r=$(curl -sS -o /dev/null -w "%{http_code} %{http_connect}" --max-time 8 "https://{}/" 2>/dev/null)
+      case "$r" in 000\ 403) ;; 000\ *) r=$(curl -sS -o /dev/null -w "%{http_code} %{http_connect}" --max-time 8 "https://{}/" 2>/dev/null) ;; esac
+      c=${r%% *}; k=${r##* }
+      if [ "$k" = "403" ]; then v="막힘(허용 목록 · CONNECT 403)"
+      elif [ "$c" != "000" ]; then v="열림 $c"
+      else v="판정 보류(000 · CONNECT $k)"; fi
+      echo "{} $v"' | sort
+  fi
 } >>"$LOG" 2>&1
 exit 0

@@ -99,27 +99,6 @@ best_location AS (
     --   동률 그룹 137개(dedup_key 115개). 아래 winner CTE 가 이미 쓰는 것과 같은 컬럼이다.
     id DESC
 ),
--- 🔴 2026-09-25(B26) — 결정적 꼬리키 id DESC 를 더했다. 같은 dedup_key 안에 created_at 이 같은 행
---   (MYHOME 다블록 한 배치)이 실재해, 어느 형제의 값이 뽑히는지가 실행 계획에 따라 갈렸다 — P1 로 계획이
---   바뀌자 접수마감 카드들의 building_name 이 다른 블록 이름으로 바뀐 것으로 드러났다. 종전 정의도 같은
---   데이터에서 계획에 따라 다른 값을 냈다(2026-09-25 실측) — 되돌아갈 「종전 값」이 고정돼 있지 않았다.
---   방향은 best_location 과 같은 id DESC 다 — 표지의 주소(best_precise)와 건물명이 같은 블록 행에서 온다
---   (건물명이 2종 이상인 146그룹 중 id DESC 142 · id ASC 29).
--- 🔵 2026-09-30 — 붙은 공고문(linked_in)의 일정은 LH 카드 일정의 폴백으로 쓰지 않는다 — 공고문마다 일정이 다르다(아산 신창·인주 ↔ 탕정2).
---   공고문별 접수기간은 화면이 링크 표로 따로 받는다.
-best_schedule AS (
-  SELECT dedup_key,
-    (array_agg(apply_start ORDER BY created_at DESC, id DESC) FILTER (WHERE apply_start IS NOT NULL AND NOT linked_in))[1] AS best_apply_start,
-    (array_agg(doc_submit_announce_date ORDER BY created_at DESC, id DESC) FILTER (WHERE doc_submit_announce_date IS NOT NULL AND NOT linked_in))[1] AS best_doc_submit_announce_date,
-    (array_agg(doc_submit_start ORDER BY created_at DESC, id DESC) FILTER (WHERE doc_submit_start IS NOT NULL AND NOT linked_in))[1] AS best_doc_submit_start,
-    (array_agg(doc_submit_end ORDER BY created_at DESC, id DESC) FILTER (WHERE doc_submit_end IS NOT NULL AND NOT linked_in))[1] AS best_doc_submit_end,
-    (array_agg(winner_announce_date ORDER BY created_at DESC, id DESC) FILTER (WHERE winner_announce_date IS NOT NULL AND NOT linked_in))[1] AS best_winner_announce_date,
-    (array_agg(contract_start ORDER BY created_at DESC, id DESC) FILTER (WHERE contract_start IS NOT NULL AND NOT linked_in))[1] AS best_contract_start,
-    (array_agg(contract_end ORDER BY created_at DESC, id DESC) FILTER (WHERE contract_end IS NOT NULL AND NOT linked_in))[1] AS best_contract_end,
-    (array_agg(building_name ORDER BY created_at DESC, id DESC) FILTER (WHERE building_name IS NOT NULL AND NOT linked_in))[1] AS best_building_name
-  FROM base
-  GROUP BY dedup_key
-),
 first_seen AS (
   -- 🔴 2026-09-29(EF 회차 4) last_seen_at — 그룹 안 행 중 수집 EF가 원천에서 마지막으로 다시 본 시각(max).
   --   announcements.last_seen_at 은 수집 매퍼만 채운다(분석·만료 처리로는 안 바뀐다). SH 행은 NULL.
@@ -231,6 +210,43 @@ winner AS (
     CASE b.source WHEN 'LH' THEN 1 WHEN 'MYHOME' THEN 2 ELSE 3 END,
     b.created_at DESC,
     b.id ASC
+),
+-- 🔴 2026-10-14(코드 — 표지 일정 칸이 다른 회차 형제에서 채워지는 문제) — 대표(winner)와 **같은 회차**인 형제에서만 채운다.
+--   같은 회차 = 대표 자신 ∨ 같은 apply_end ∨ 같은 회차 날짜(round_date) ∨ (대표가 LH ∧ MYHOME 형제 url 의 panId = 대표 announcement_id).
+--   앞 둘은 open_past_rounds 가 회차를 떼는 조건(회차 날짜·apply_end 둘 다 다름)의 반대다 — 그 조건으로 떼지지 않은 지난 회차(접수마감)가
+--   대표 그룹에 남아 일정 칸을 채우던 것을 막는다.
+--   계기: 김제하동 …20908(접수 10-20~21) 자기 발표일 NULL — 같은 회차 MYHOME 21402_1 이 들어오기 전(2026-10-14 10:10~13:30 KST) 표지가
+--   지난 회차 MYHOME 21167_1(접수 09-15~17)의 발표일 11-30 을 냈다. 새 회차 LH 행이 MYHOME 짝보다 먼저 들어오는 회차마다 되풀이된다.
+--   한 기준만 쓰면 같은 회차 값을 잃는다(2026-10-14 실측 · 형제에서 채운 칸 763): apply_end 만 → 9카드 21칸(LH·MYHOME 마감일 1~2일 차) ·
+--   회차 날짜만 → 14카드 16칸(공고일 차) · 넷의 합이면 걸러지는 칸은 다른 게시물(panId)·다른 회차 날짜·다른 마감일인 …20176 apply_start 1칸뿐.
+--   panId 는 대표가 LH 일 때만 본다 — MYHOME url panId 는 앞 회차 LH 를 가리킬 수 있어(21197 → …20344) MYHOME 대표에서 거꾸로 따라가면
+--   지난 회차 값이 다시 들어온다. LH 대표 쪽은 그룹 안 MYHOME 이 대표보다 늦지 않으므로(대표 = 공고일 최신) 그 함정이 없다.
+--   winner 를 쓰므로 이 CTE 는 winner 뒤에 둔다(종전에는 first_seen 앞).
+-- 🔴 2026-09-25(B26) — 결정적 꼬리키 id DESC 를 더했다. 같은 dedup_key 안에 created_at 이 같은 행
+--   (MYHOME 다블록 한 배치)이 실재해, 어느 형제의 값이 뽑히는지가 실행 계획에 따라 갈렸다 — P1 로 계획이
+--   바뀌자 접수마감 카드들의 building_name 이 다른 블록 이름으로 바뀐 것으로 드러났다. 종전 정의도 같은
+--   데이터에서 계획에 따라 다른 값을 냈다(2026-09-25 실측) — 되돌아갈 「종전 값」이 고정돼 있지 않았다.
+--   방향은 best_location 과 같은 id DESC 다 — 표지의 주소(best_precise)와 건물명이 같은 블록 행에서 온다
+--   (건물명이 2종 이상인 146그룹 중 id DESC 142 · id ASC 29).
+-- 🔵 2026-09-30 — 붙은 공고문(linked_in)의 일정은 LH 카드 일정의 폴백으로 쓰지 않는다 — 공고문마다 일정이 다르다(아산 신창·인주 ↔ 탕정2).
+--   공고문별 접수기간은 화면이 링크 표로 따로 받는다.
+best_schedule AS (
+  SELECT b.dedup_key,
+    (array_agg(b.apply_start ORDER BY b.created_at DESC, b.id DESC) FILTER (WHERE b.apply_start IS NOT NULL AND NOT b.linked_in))[1] AS best_apply_start,
+    (array_agg(b.doc_submit_announce_date ORDER BY b.created_at DESC, b.id DESC) FILTER (WHERE b.doc_submit_announce_date IS NOT NULL AND NOT b.linked_in))[1] AS best_doc_submit_announce_date,
+    (array_agg(b.doc_submit_start ORDER BY b.created_at DESC, b.id DESC) FILTER (WHERE b.doc_submit_start IS NOT NULL AND NOT b.linked_in))[1] AS best_doc_submit_start,
+    (array_agg(b.doc_submit_end ORDER BY b.created_at DESC, b.id DESC) FILTER (WHERE b.doc_submit_end IS NOT NULL AND NOT b.linked_in))[1] AS best_doc_submit_end,
+    (array_agg(b.winner_announce_date ORDER BY b.created_at DESC, b.id DESC) FILTER (WHERE b.winner_announce_date IS NOT NULL AND NOT b.linked_in))[1] AS best_winner_announce_date,
+    (array_agg(b.contract_start ORDER BY b.created_at DESC, b.id DESC) FILTER (WHERE b.contract_start IS NOT NULL AND NOT b.linked_in))[1] AS best_contract_start,
+    (array_agg(b.contract_end ORDER BY b.created_at DESC, b.id DESC) FILTER (WHERE b.contract_end IS NOT NULL AND NOT b.linked_in))[1] AS best_contract_end,
+    (array_agg(b.building_name ORDER BY b.created_at DESC, b.id DESC) FILTER (WHERE b.building_name IS NOT NULL AND NOT b.linked_in))[1] AS best_building_name
+  FROM base b
+  JOIN winner w ON w.dedup_key = b.dedup_key
+  WHERE b.announcement_id = w.announcement_id
+     OR b.apply_end IS NOT DISTINCT FROM w.apply_end
+     OR b.round_date IS NOT DISTINCT FROM w.round_date
+     OR (w.source = 'LH' AND b.source = 'MYHOME' AND substring(b.url from 'panId=([0-9]+)') = w.announcement_id)
+  GROUP BY b.dedup_key
 ),
 -- 🔴 2026-10-07(Z-2 ① PR-A) — 단지 수는 **이번 회차** 세대 행의 단지명으로 센다(get_announcement_sites ⑴ 회차 거름의 거울).
 --   이번 회차 = 대표(winner) 행 자신 ∨ 대표와 같은 apply_end ∨ 같은 게시물 링크로 붙은 행(same_round_units 와 같은 규칙 + 대표 자신).
