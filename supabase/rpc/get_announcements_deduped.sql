@@ -3,7 +3,6 @@ CREATE OR REPLACE FUNCTION public.get_announcements_deduped(p_region text DEFAUL
  LANGUAGE sql
  STABLE
 AS $function$
--- 🧪 시험 전용 주석(병합 전에 뺀다)
 -- 🔴 2026-10-14(코드 — LH 카드 발표일 A 후속) — search_path 는 SET 절이 아니라 본문 스키마 이름으로 고정한다(public.announcements ·
 --   public.announcement_dedup_key — 나머지 표는 이미 public. · 연산자·내장 함수는 pg_catalog 가 먼저 찾힌다).
 --   SET 절이 붙은 SQL 함수는 인라인되지 않아 anon 실행이 약 330ms → 약 815ms 로 늘었다(2026-10-14 실측 · Function Scan) — 그래서 뺐다.
