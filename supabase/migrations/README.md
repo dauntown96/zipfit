@@ -18,6 +18,7 @@
 3. 🔴 **되돌리기 전용 증명** — 실행 전·후 스키마 지문(`public`·`zipfit_ops`의 함수 정의 md5·ACL·SECURITY DEFINER·설정·설명, 표·열·정책·트리거)이 같다. 다르면 빨강 — 병합하지 말고 먼저 확인한다.
 4. 불변식(`supabase/invariants/`의 최신 번호 파일 — 2026-10-13부터 `migrate.py`가 저절로 고른다 · 지금 `v3.13.sql`) 위반 수가 적용 전보다 늘지 않는다.
 5. `-- zipfit:anon` 줄마다 `anon` 역할 · `statement_timeout = 3s`로 돌려 3초 안에 끝난다.
+   - 🔵 2026-10-14 — 같은 트랜잭션에서 **적용 전·후**를 각각 3번 재 중앙값을 견준다: 후/전 > 1.5배 ∧ 100ms 넘게 늘면 실패 · 최상위 노드(EXPLAIN)가 `Function Scan`으로 바뀌면 ⚠️(SQL 함수 인라인이 막힌 표지 — PR #507 `SET search_path` 330 → 815ms가 「3초 안」으로는 초록이었다). 새 함수를 부르는 줄은 전에 돌지 못해 비율 없이 3초만 본다.
 6. 파일이 건드린 함수마다: DB 정의 md5 = `supabase/rpc/<이름>.sql` 사본(`zipfit_ops` 함수는 `supabase/rpc/zipfit_ops/<이름>.sql` · 선언은 `zipfit_ops.<이름>(인자)`) · ACL·SECURITY DEFINER = 파일 머리의 선언 · 같은 이름 함수 1개.
 
 ### apply 가 보는 것

@@ -49,6 +49,15 @@ INV_NAME = os.path.basename(INV_FILE)[:-4]
 FILE_RE = re.compile(r'^\d{4}-\d{2}-\d{2}_\d{2}_[a-z0-9_]+\.sql$')
 LEDGER = 'zipfit_ops.schema_migrations'
 ANON_LIMIT_MS = 3000
+# 🔵 2026-10-14(우편함 「코드 — 마이그레이션 check에 anon 속도 전후 비율·최상위 노드 …」 1) — 「3초 안」 하나로는 PR #507
+#    (get_announcements_deduped 에 SET search_path → 인라인이 막혀 anon 330 → 815ms · 2.5배)이 초록이었다.
+#    같은 트랜잭션에서 적용 **전·후** zipfit:anon 질의를 각각 ANON_RUNS 번 재 중앙값을 견준다(첫 번은 캐시가 데워지는 값이라 중앙값이 버린다).
+#    실패 = 후/전 > ANON_RATIO_FAIL ∧ 후 − 전 ≥ ANON_DELTA_MIN_MS(작은 질의의 잡음 — 5ms → 9ms 같은 것 — 은 비율만으로 떨어뜨리지 않는다).
+#    최상위 노드(EXPLAIN · 실행 안 함)가 Function Scan 이 아니던 것이 Function Scan 이 되면 ⚠️ — SQL 함수가 인라인되지 않게 된 표지다(실패는 아니다).
+#    문턱 근거: 같은 정의를 두 번 잰 전후 비율(주석 한 줄 PR)과 #507 꼴 시험 PR 의 비율 — 이 PR 회신 표.
+ANON_RUNS = 3
+ANON_RATIO_FAIL = 1.5
+ANON_DELTA_MIN_MS = 100
 CHECK_TAG = 'ZIPFIT_CHECK_RESULT'
 
 
@@ -361,6 +370,13 @@ def build_check_sql(pending, inv_base):
     inv = invariants_sql()
     parts = []
     parts.append(BOOTSTRAP_SQL)
+    anon_all = [q for f in pending for q in f['anon']]
+    if anon_all:
+        # 적용 **전** — 파일이 새로 만드는 함수·표를 부르는 질의는 전에는 돌지 못한다(오류를 남기고 비율을 재지 않는다).
+        parts.append("set local role anon;\nset local statement_timeout = '3s';\n")
+        for i, q in enumerate(anon_all):
+            parts.append(anon_probe_sql(q, i, 'before'))
+        parts.append('reset statement_timeout;\nreset role;\n')
     for f in pending:
         parts.append(f'-- ▼ {f["name"]}\n{f["sql"].rstrip()}\n')
     parts.append(f"""
@@ -374,26 +390,66 @@ begin
     into fns
     from pg_proc p join pg_namespace ns on ns.oid=p.pronamespace
    where ns.nspname in ('public','zipfit_ops') and {QNAME_SQL} = any({arr});
-  perform set_config('zipfit.check', jsonb_build_object('invariants', n, 'invariants_before', {inv_base}, 'invariants_sample', smp, 'functions', fns, 'anon', '[]'::jsonb)::text, true);
+  perform set_config('zipfit.check', jsonb_build_object('invariants', n, 'invariants_before', {inv_base}, 'invariants_sample', smp, 'functions', fns)::text, true);
 end
 ''', 'zz_pg')};
 """)
-    anon_all = [q for f in pending for q in f['anon']]
     if anon_all:
+        # 적용 **뒤** — 종전처럼 오류·3초 초과는 요청 전체를 실패시킨다(결과 표식 없음 → ❌).
         parts.append("set local role anon;\nset local statement_timeout = '3s';\n")
         for i, q in enumerate(anon_all):
-            parts.append(f"""DO {dq(f'''
-declare t0 timestamptz := clock_timestamp(); n bigint; c jsonb := current_setting('zipfit.check')::jsonb;
-begin
-  execute {dq('select count(*) from (' + q + ') x', 'zz_q' + str(i))} into n;
-  c := jsonb_set(c, '{{anon}}', (c->'anon') || jsonb_build_array(jsonb_build_object('query', {dq(q, 'zz_t' + str(i))}, 'rows', n, 'ms', round(extract(epoch from clock_timestamp()-t0)*1000))));
-  perform set_config('zipfit.check', c::text, true);
-end
-''', 'zz_a' + str(i))};
-""")
+            parts.append(anon_probe_sql(q, i, 'after'))
         parts.append('reset statement_timeout;\nreset role;\n')
-    parts.append(f"DO $zz_end$ begin raise exception '{CHECK_TAG} %', current_setting('zipfit.check'); end $zz_end$;\n")
-    return '\n'.join(parts), names
+    parts.append(f"""DO $zz_end$ begin raise exception '{CHECK_TAG} %', (current_setting('zipfit.check')::jsonb
+  || jsonb_build_object('anon_before', coalesce(nullif(current_setting('zipfit.anon_before', true), ''), '{{}}')::jsonb,
+                        'anon_after', coalesce(nullif(current_setting('zipfit.anon_after', true), ''), '{{}}')::jsonb))::text; end $zz_end$;
+""")
+    return '\n'.join(parts), names, anon_all
+
+
+def anon_probe_sql(q, i, phase):
+    """anon 질의 i 를 phase(before|after)에서 ANON_RUNS 번 재고(한 번 = DO 한 문장 — statement_timeout 3s 가 한 번마다 걸린다)
+    최상위 노드를 EXPLAIN(실행 안 함)으로 한 번 읽어 GUC zipfit.anon_<phase> 의 {i: {runs, rows, node, err}} 에 모은다.
+    before 는 오류를 삼켜 err 로 남긴다(새 함수를 부르는 질의) — after 는 삼키지 않는다(종전 판정 그대로)."""
+    g = 'zipfit.anon_' + phase
+    k = str(i)
+    swallow = phase == 'before'
+    out = []
+    for r in range(ANON_RUNS):
+        tag = f'zz_{phase[0]}{i}_{r}'
+        body = f'''
+declare t0 timestamptz := clock_timestamp(); n bigint; c jsonb := coalesce(nullif(current_setting({lit(g)}, true), ''), '{{}}')::jsonb; e jsonb;
+begin
+  e := coalesce(c->{lit(k)}, jsonb_build_object('runs', '[]'::jsonb));
+  if e ? 'err' then return; end if;
+  execute {dq('select count(*) from (' + q + ') x', tag + 'q')} into n;
+  e := jsonb_set(e, '{{runs}}', (e->'runs') || to_jsonb(round(extract(epoch from clock_timestamp()-t0)*1000)));
+  e := e || jsonb_build_object('rows', n);
+  perform set_config({lit(g)}, jsonb_set(c, array[{lit(k)}], e)::text, true);''' + (f'''
+exception when others then
+  perform set_config({lit(g)}, jsonb_set(c, array[{lit(k)}], jsonb_build_object('err', SQLERRM))::text, true);''' if swallow else '') + '''
+end
+'''
+        out.append(f'DO {dq(body, tag)};\n')
+    tag = f'zz_{phase[0]}{i}_x'
+    body = f'''
+declare p jsonb; c jsonb := coalesce(nullif(current_setting({lit(g)}, true), ''), '{{}}')::jsonb;
+begin
+  if c->{lit(k)} ? 'err' then return; end if;
+  execute {dq('explain (format json) ' + q, tag + 'q')} into p;
+  perform set_config({lit(g)}, jsonb_set(c, array[{lit(k)}], (c->{lit(k)}) || jsonb_build_object('node', p->0->'Plan'->>'Node Type'))::text, true);''' + (f'''
+exception when others then
+  perform set_config({lit(g)}, jsonb_set(c, array[{lit(k)}], jsonb_build_object('err', SQLERRM))::text, true);''' if swallow else '') + '''
+end
+'''
+    out.append(f'DO {dq(body, tag)};\n')
+    return ''.join(out)
+
+
+def median(xs):
+    xs = sorted(xs)
+    n = len(xs)
+    return None if n == 0 else (xs[n // 2] if n % 2 else (xs[n // 2 - 1] + xs[n // 2]) / 2)
 
 
 def cmd_check():
@@ -429,7 +485,7 @@ def cmd_check():
     if inv_note:
         lines.append(f'- ℹ️ {inv_note}')
     fp0 = fingerprint()
-    sql, names = build_check_sql(pending, inv_base)
+    sql, names, anon_all = build_check_sql(pending, inv_base)
     t0 = time.time()
     st, txt = query(sql)
     ms = int((time.time() - t0) * 1000)
@@ -461,11 +517,29 @@ def cmd_check():
             lines.append(f'- ❌ 불변식 {INV_NAME} 위반 {inv_b} → {inv_n}: `{json.dumps(res["invariants_sample"], ensure_ascii=False)[:400]}`')
         else:
             lines.append(f'- ✅ 불변식 {INV_NAME} 위반 {inv_b} → {inv_n}')
-        for a in res.get('anon', []):
-            good = a['ms'] < ANON_LIMIT_MS
+        res['anon'] = []
+        for i, q in enumerate(anon_all):
+            b = (res.get('anon_before') or {}).get(str(i)) or {}
+            a = (res.get('anon_after') or {}).get(str(i)) or {}
+            am, bm = median(a.get('runs', [])), (None if 'err' in b else median(b.get('runs', [])))
+            ratio = (am / bm) if (am is not None and bm) else None
+            slow = ratio is not None and ratio > ANON_RATIO_FAIL and am - bm >= ANON_DELTA_MIN_MS
+            good = am is not None and am < ANON_LIMIT_MS and not slow
             ok = ok and good
-            lines.append(f'- {"✅" if good else "❌"} anon 역할 {a["ms"]}ms · {a["rows"]}행 — `{a["query"][:160]}` (한도 {ANON_LIMIT_MS}ms · statement_timeout 3s 안에서 돌렸다)')
-        if not res.get('anon'):
+            res['anon'].append({'query': q, 'rows': a.get('rows'), 'ms': am, 'runs': a.get('runs'), 'node': a.get('node'),
+                                'before_ms': bm, 'before_runs': b.get('runs'), 'before_node': b.get('node'), 'before_err': b.get('err'),
+                                'ratio': None if ratio is None else round(ratio, 2), 'slow': slow})
+            runs = lambda xs: '·'.join(str(int(x)) for x in (xs or []))
+            after = f'후 {int(am)}ms({runs(a.get("runs"))}) · {a.get("node")}' if am is not None else '후 — 못 잼'
+            if bm is None:
+                speed = f'{after} · 전 — 못 잼({str(b.get("err", "기록 없음"))[:120]})'
+            else:
+                speed = f'전 {int(bm)}ms({runs(b.get("runs"))}) · {b.get("node")} → {after} · **{ratio:.2f}배**'
+            lines.append(f'- {"✅" if good else "❌"} anon 역할 {speed} · {a.get("rows")}행 — `{q[:160]}`'
+                         f' (한도 {ANON_LIMIT_MS}ms · 실패 = {ANON_RATIO_FAIL}배 넘음 ∧ {ANON_DELTA_MIN_MS}ms 넘게 늘어남 · 중앙값 {ANON_RUNS}회)')
+            if b.get('node') and a.get('node') == 'Function Scan' and b.get('node') != 'Function Scan':
+                lines.append(f'  - ⚠️ 최상위 노드가 `{b.get("node")}` → `Function Scan` — SQL 함수가 인라인되지 않게 됐다(SET 절 · STRICT · SECURITY DEFINER 등). 속도 비율을 함께 본다')
+        if not anon_all:
             lines.append('- ℹ️ anon 확인 줄(`-- zipfit:anon …`) 없음 — 화면이 부르는 함수를 바꿨다면 더한다')
         info = {}
         for r in res['functions']:

@@ -6,6 +6,7 @@
 //   「활성 LH 공고 중 6시간 넘게 상세조회를 시도하지 않은 수」(지금 3)로 잰다.
 // 🔴 첫 주는 넉넉하게 — 오탐이 잦으면 알림이 읽히지 않는다.
 import { sqlRead, anonRpc, report, recordFindings, SITE, PROJECT_REF } from './lib.mjs'
+import { YEARLY_SQL, judgeYearly } from './yearly.mjs'
 import { readdirSync, readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 
@@ -498,6 +499,13 @@ try {
       '정보 — 판정하지 않는다(closeMapAsMultiRegion 거울: 세대 행 0 ∧ 정밀주소 없음 ∧ 폴백 시·구 수준 ∧ region_names 2곳 이상)')
   } catch (e) {
     add('map_approx', '열린 카드 중 상세 지도 대략 핀(시·군·구 중심)', 'warn', String(e).slice(0, 200), 'MAP_SQL 을 읽는다(경고만 — 읽기 실패)')
+  }
+  // ⑮ 해마다 바뀌는 밑값 표 — 새 연도 경고(yearly.mjs 머리 주석 · 2026-10-14). 전부 ⚠️ 경고만 · 읽기 실패도 ⚠️.
+  try {
+    const [y] = await sqlRead(YEARLY_SQL)
+    for (const c of judgeYearly(y.j)) add(c.id, c.name, c.status, c.value, c.rule)
+  } catch (e) {
+    add('yearly_base', '해마다 바뀌는 밑값 표 — 새 연도', 'warn', String(e).slice(0, 200), 'YEARLY_SQL 을 읽는다(경고만 — 읽기 실패)')
   }
 } catch (e) {
   add('runner', '점검 실행', 'fail', String(e).slice(0, 300), '점검 스크립트가 끝까지 돈다')
