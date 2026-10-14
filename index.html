@@ -4334,6 +4334,8 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
     const closingSoon = !isClosed && isClosingSoon(zfWithSoonestEnd(n));
     const convBadges = buildConvBadges(n['mymy_applicable'], n['supply_form'], n['application_method'], n['recruit_multiplier'], n['is_relaxed_recruitment'], n['selection_method']);
     const pairKey    = n['pair_announcement_key']||'';
+    // 정정 사유는 펼친 안 「📝 정정 사유」에만 보인다 — 겉의 「ℹ️ 정정사유」 마우스 올리기 칩은 터치에선 안 뜨고
+    // 「🔄 정정」 배지와 같은 말이라 뺐다(2026-10-14 · 공고 탭·매칭 카드·그룹 뒤늦은 끼워 넣기 셋 다).
     const revisionNoteEsc = (n['revision_note']||'').replace(/"/g,'&quot;');
     const applyStart = n['신청시작일']||n['apply_start']||'';
     const applyEnd   = zfSoonestOpenEnd(n);
@@ -4404,7 +4406,6 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
         ${hasCancel?cancelNoticeBadge(n['공고명']||'', n['apply_end']):''}
         ${n['building_name']?`<span class="chip" style="cursor:default;padding:4px 10px;font-size:11px">🏢 ${zfBuildingLabel(n['building_name'], zfComplexCount(n))}</span>`:''}
         ${isAmended?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#7B5EA7;border-color:#7B5EA7">🔄 정정</span>':''}
-        ${(isAmended && revisionNoteEsc)?`<span title="${revisionNoteEsc}" style="cursor:help;font-size:11px;color:#666;border:1px solid #ccc;border-radius:10px;padding:1px 6px">ℹ️ 정정사유</span>`:''}
         ${isNew?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
         ${closingSoon?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
         ${applyUnknownChip(n)}
@@ -6641,7 +6642,6 @@ function loadGroupRevisionNote(cardEl, id){
     const note = pickGroupRevisionNote(rows);
     if(note){
       cardEl.dataset.revisionNoteFull = note;
-      injectRevisionNoteChip(cardEl, note);
       fillStaleSourceNotes(id, note);
     }
     appendSpecialNoteItem(id, revisionNoteItemHtml(note));
@@ -6656,20 +6656,6 @@ function revisionNoteItemHtml(note){
     : `<div class="policy-item"><div class="policy-category">📝 정정 사유</div><div class="policy-content">${escapeHtml(REVISION_NOTE_ABSENT_MSG)}</div></div>`;
 }
 
-// 카드의 "🔄 정정" 배지 옆 ℹ️ 툴팁 칩은 목록 렌더링 시점에 사유가 있어야만 만들어진다.
-// 그룹에서 뒤늦게 사유를 찾았으면 같은 자리에 칩을 끼워 넣어 배지·툴팁·아코디언을 일치시킨다.
-function injectRevisionNoteChip(cardEl, note){
-  const row = cardEl.querySelector('.chip-row');
-  if(!row || row.querySelector('[data-revision-chip]')) return;
-  const badge = Array.from(row.children).find(el => (el.textContent||'').includes('정정'));
-  if(!badge) return;
-  const chip = document.createElement('span');
-  chip.setAttribute('data-revision-chip', '1');
-  chip.title = note;
-  chip.style.cssText = 'cursor:help;font-size:11px;color:#666;border:1px solid #ccc;border-radius:10px;padding:1px 6px';
-  chip.textContent = 'ℹ️ 정정사유';
-  badge.insertAdjacentElement('afterend', chip);
-}
 
 // 카드 data-* 속성(접수기간/서류제출대상자발표일/서류접수기간/당첨자발표일/계약기간)을 읽어
 // 값이 있는 항목만 순서대로 "공급일정" 섹션으로 렌더링 (별도 fetch 없이 동기 렌더링, renderSpecialNotes와 동일 패턴)
@@ -9219,7 +9205,6 @@ function renderMatchResults(rows){
         ${hasCancel?cancelNoticeBadge(n.title||'', n.apply_end):''}
         ${n.building_name?`<span class="chip" style="cursor:default;padding:4px 10px;font-size:11px">🏢 ${zfBuildingLabel(n.building_name, zfComplexCount(n))}</span>`:''}
         ${isAmended?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#7B5EA7;border-color:#7B5EA7">🔄 정정</span>':''}
-        ${(isAmended && revisionNoteEscM)?`<span title="${revisionNoteEscM}" style="cursor:help;font-size:11px;color:#666;border:1px solid #ccc;border-radius:10px;padding:1px 6px">ℹ️ 정정사유</span>`:''}
         ${isNew?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
         ${closingSoon?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
         ${applyUnknownChip(n)}
