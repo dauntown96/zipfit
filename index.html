@@ -9165,13 +9165,17 @@ function searchPoi(id,coords,catCode){
   const rule=POI_FILTER[catCode]||null;
   const opts={location:coords,radius:1000,sort:kakao.maps.services.SortBy.DISTANCE};
   const got=[];
+  // 늦게 온 결과(다음 쪽 · 지도 다시 그리기 전 검색)가 다른 탭의 목록을 덮지 않게 — 이 목록의 마지막 검색만 그린다.
+  const tok=String(Date.now())+Math.random(); listEl.dataset.poiTok=tok;
   const done=()=>{
+    if(listEl.dataset.poiTok!==tok) return;
     if(!got.length){ listEl.innerHTML='<div class="poi-loading">반경 내 결과가 없어요</div>'; return; }
     got.sort((a,b)=>Number(a.distance)-Number(b.distance));
     // 장소 이름은 카카오(가게가 등록하는) 바깥 글자다 — HTML 로 해석하지 않게 이스케이프한다.
     listEl.innerHTML=got.slice(0,5).map(p=>`<div class="poi-item"><span>${escapeHtml(p.place_name)}</span><span class="poi-dist">${Math.round(p.distance)}m</span></div>`).join('');
   };
   const cb=(data,status,pg)=>{
+    if(listEl.dataset.poiTok!==tok) return;
     if(status===kakao.maps.services.Status.OK && data && data.length){
       (rule&&rule.head ? data.filter(p=>String(p.category_name||'').startsWith(rule.head)) : data).forEach(p=>got.push(p));
     }
