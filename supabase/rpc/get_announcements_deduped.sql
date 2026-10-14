@@ -2,8 +2,11 @@ CREATE OR REPLACE FUNCTION public.get_announcements_deduped(p_region text DEFAUL
  RETURNS TABLE(id bigint, source text, announcement_id text, title text, region text, region_top text, sido_nm text, sigungu_nm text, housing_type text, supply_org text, announcement_date date, apply_start date, apply_end date, status text, status_normalized text, url text, is_revised boolean, area_min numeric, area_max numeric, rent_min integer, rent_max integer, deposit_min bigint, deposit_max bigint, total_units integer, move_in_date text, target_type text, heating_type text, created_at timestamp with time zone, updated_at timestamp with time zone, mymy_applicable boolean, supply_form text, application_method text, recruit_multiplier text, pair_announcement_key text, housing_change_allowed boolean, precise_address text, is_relaxed_recruitment boolean, relaxation_detail text, selection_method text, subscription_months_required integer, subscription_payments_required integer, contract_before_verification boolean, rent_exemption_until date, rent_exemption_note text, revision_note text, revised_at timestamp with time zone, special_notes jsonb, revised_at_source text, first_seen_at timestamp with time zone, doc_submit_announce_date date, doc_submit_start date, doc_submit_end date, winner_announce_date date, contract_start date, contract_end date, building_name text, attachment_urls jsonb, has_cancel_notice boolean, region_names text[], block_count integer, first_announcement_date date, schedule_varies boolean, apply_end_confirmed date, apply_period_check boolean, last_seen_at timestamp with time zone)
  LANGUAGE sql
  STABLE
- SET search_path TO 'public', 'pg_temp'
 AS $function$
+-- 🔴 2026-10-14(코드 — LH 카드 발표일 A 후속) — search_path 는 SET 절이 아니라 본문 스키마 이름으로 고정한다(public.announcements ·
+--   public.announcement_dedup_key — 나머지 표는 이미 public. · 연산자·내장 함수는 pg_catalog 가 먼저 찾힌다).
+--   SET 절이 붙은 SQL 함수는 인라인되지 않아 anon 실행이 약 330ms → 약 815ms 로 늘었다(2026-10-14 실측 · Function Scan) — 그래서 뺐다.
+--   보안 점검 function_search_path_mutable 은 SET 절만 보므로 이 함수 항목이 다시 선다(알고 둔 것).
 -- 🔴 2026-09-30(코드 — 같은 게시물은 LH 카드 한 장) — 같은 게시물 링크 표(announcement_post_links · 규칙 v2 = 같은 날짜 ∧ panId)에
 --   있는 MYHOME 행은 **제목 키 대신 LH 행의 제목 키**를 쓴다 → LH 카드 그룹에 붙는다(목록에 따로 서지 않는다).
 --   🔴 링크 표에 없는 행은 그대로다 — 같은 panId 라도 다른 회차(천안쌍용5-2 · 김제·정읍)는 표에 없어 붙지 않는다.
@@ -13,7 +16,7 @@ AS $function$
 --   더해지는 것은 region_names · block_count · 단지명 셈(complex_name) · 그룹 산물이다.
 WITH link_map AS MATERIALIZED (
   SELECT DISTINCT ON (l.linked_announcement_id)
-    l.linked_announcement_id AS aid, announcement_dedup_key(lh.title) AS lh_key
+    l.linked_announcement_id AS aid, public.announcement_dedup_key(lh.title) AS lh_key
   FROM public.announcement_post_links l
   JOIN public.announcements lh ON lh.announcement_id = l.lh_announcement_id
   WHERE lh.title IS NOT NULL AND lh.hidden_from_listing IS NOT TRUE
@@ -21,12 +24,12 @@ WITH link_map AS MATERIALIZED (
 ),
 raw_base AS (
   SELECT a.*,
-    COALESCE(lm.lh_key, announcement_dedup_key(a.title)) AS title_key,
+    COALESCE(lm.lh_key, public.announcement_dedup_key(a.title)) AS title_key,
     (lm.aid IS NOT NULL) AS linked_in,
     CASE WHEN source = 'MYHOME' THEN split_part(announcement_id, '_', 1) ELSE NULL END AS own_pblanc_id,
     -- 회차 날짜 — 정정이면 첫 공고일, 아니면 공고일(get_announcement_price_summary·화면 zfNoticeDate 와 같은 규칙)
     CASE WHEN is_revised AND first_announcement_date IS NOT NULL THEN first_announcement_date ELSE announcement_date END AS round_date
-  FROM announcements a
+  FROM public.announcements a
   LEFT JOIN link_map lm ON lm.aid = a.announcement_id
   WHERE title IS NOT NULL
     AND hidden_from_listing IS NOT TRUE
@@ -43,7 +46,7 @@ raw_base AS (
 ),
 superseded_pblanc_ids AS (
   SELECT DISTINCT before_pblanc_id AS pblanc_id
-  FROM announcements
+  FROM public.announcements
   WHERE before_pblanc_id IS NOT NULL AND before_pblanc_id <> ''
 ),
 -- 🔴 2026-09-25(B26 · P1) — 열린 지난 회차를 목록에 되살린다.
