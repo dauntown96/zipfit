@@ -2,6 +2,7 @@ CREATE OR REPLACE FUNCTION public.get_announcements_deduped(p_region text DEFAUL
  RETURNS TABLE(id bigint, source text, announcement_id text, title text, region text, region_top text, sido_nm text, sigungu_nm text, housing_type text, supply_org text, announcement_date date, apply_start date, apply_end date, status text, status_normalized text, url text, is_revised boolean, area_min numeric, area_max numeric, rent_min integer, rent_max integer, deposit_min bigint, deposit_max bigint, total_units integer, move_in_date text, target_type text, heating_type text, created_at timestamp with time zone, updated_at timestamp with time zone, mymy_applicable boolean, supply_form text, application_method text, recruit_multiplier text, pair_announcement_key text, housing_change_allowed boolean, precise_address text, is_relaxed_recruitment boolean, relaxation_detail text, selection_method text, subscription_months_required integer, subscription_payments_required integer, contract_before_verification boolean, rent_exemption_until date, rent_exemption_note text, revision_note text, revised_at timestamp with time zone, special_notes jsonb, revised_at_source text, first_seen_at timestamp with time zone, doc_submit_announce_date date, doc_submit_start date, doc_submit_end date, winner_announce_date date, contract_start date, contract_end date, building_name text, attachment_urls jsonb, has_cancel_notice boolean, region_names text[], block_count integer, first_announcement_date date, schedule_varies boolean, apply_end_confirmed date, apply_period_check boolean, last_seen_at timestamp with time zone)
  LANGUAGE sql
  STABLE
+ SET search_path TO 'public', 'pg_temp'
 AS $function$
 -- 🔴 2026-09-30(코드 — 같은 게시물은 LH 카드 한 장) — 같은 게시물 링크 표(announcement_post_links · 규칙 v2 = 같은 날짜 ∧ panId)에
 --   있는 MYHOME 행은 **제목 키 대신 LH 행의 제목 키**를 쓴다 → LH 카드 그룹에 붙는다(목록에 따로 서지 않는다).
@@ -350,7 +351,13 @@ SELECT
   COALESCE(w.doc_submit_announce_date, bs.best_doc_submit_announce_date) AS doc_submit_announce_date,
   COALESCE(w.doc_submit_start, bs.best_doc_submit_start) AS doc_submit_start,
   COALESCE(w.doc_submit_end, bs.best_doc_submit_end) AS doc_submit_end,
-  COALESCE(w.winner_announce_date, bs.best_winner_announce_date) AS winner_announce_date,
+  -- 🔴 2026-10-14(코드 — LH 카드 발표일 A) — LH 카드의 발표일은 LH 원문이 먼저다. LH 상세 일정이 한 벌로 들어온 LH 대표
+  --   (schedule_varies = false)인데 자기 발표일이 비었으면 LH 가 날짜를 주지 않은 것으로 보고 형제(MYHOME) 값으로 채우지 않는다
+  --   (화면 「원문 확인」 — 틀린 날짜를 보이느니 맞는 날짜를 잠시 숨긴다 · …20768 은 공고문 「개별 통보」인데 형제 12-31).
+  --   대가: …20880 은 공고문의 10-28 을 잠시 잃는다 — 일정 표 발표 단계 값이 먼저인 판(v10.0 뒤)에서 되살린다.
+  --   상세가 없을 때(NULL · 목록만)와 다단지(true)는 종전대로 같은 회차 형제 값. 서류·계약 칸은 같은 조건에서 형제가 채운 칸이 0이라 걸지 않았다.
+  CASE WHEN w.source = 'LH' AND w.schedule_varies IS FALSE AND w.winner_announce_date IS NULL THEN NULL
+       ELSE COALESCE(w.winner_announce_date, bs.best_winner_announce_date) END AS winner_announce_date,
   COALESCE(w.contract_start, bs.best_contract_start) AS contract_start,
   COALESCE(w.contract_end, bs.best_contract_end) AS contract_end,
   -- 🔴 2026-09-29(코드 회차 3) — 같은 회차 세대 행으로 다시 센 단지명이 있으면 그것(complex_name 주석).
