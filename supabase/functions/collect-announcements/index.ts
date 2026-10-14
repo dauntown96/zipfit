@@ -82,6 +82,7 @@ type SplScdlItem = {
   PZWR_ANC_DT?: string; CTRT_ST_DT?: string; CTRT_ED_DT?: string
   // 🔵 2026-10-11(3-B ①) — 전세임대(13/17) 상세는 접수 기간을 이 두 칸에 「2026-03-24 10:00」 꼴로 준다(SBSC_ACP_* 없음 · probe 실측 4건).
   UST_ACP_ST_DTTM?: string; UST_ACP_CLSG_DTTM?: string
+  SBD_LGO_NM?: string   // 단지명 — 일정 원소가 어느 단지 것인가(2026-10-14 scheduleVariesOf)
 }
 type EtcInfoItem = { ETC_CTS?: string; CRC_RSN?: string }
 type AhflInfoItem = { AHFL_URL?: string; SL_PAN_AHFL_DS_CD_NM?: string; CMN_AHFL_NM?: string }
@@ -413,8 +414,28 @@ const acpStartOf = (x: SplScdlItem | null): string | null =>
   x ? (parseDate(x.SBSC_ACP_ST_DT) ?? parseDate(san(x.UST_ACP_ST_DTTM)?.slice(0, 10))) : null
 
 // 원소가 없으면 null(모름) — false가 아니다. 가드가 기존 값을 지키게 하려면 null이어야 한다.
+// 🔴 2026-10-14(우편함 「코드 — 공급대상 판정 · 지도 · 다단지 오판(처방 B) …」 3) — 「여러 벌」은 **단지가 둘 이상**일 때만이다.
+//   음성금왕1 `…20879`: dsSplScdl 2원소가 같은 단지(SBD_LGO_NM 「음성금왕1」)이고 둘째만 서류 접수 두 칸이 비어 키가 갈렸다 →
+//   「단지마다 일정이 달라요」가 떴다. 단지명이 하나면 한 벌로 보고 칸마다 빈 칸 아닌 값을 모은다(scdlMerged).
+//   빈 칸을 비교에서 빼는 안은 고르지 않았다 — 부산 영구 `…20818`은 다섯 단지 중 장안A-BL만 서류 접수가 있어 정말 단지마다 다르다.
+//   2026-10-14 실측(true 12건 probe): 이 규칙으로 바뀌는 공고는 `…20879` 하나 · 진짜 다단지가 false 로 떨어지는 것 0.
+const SCDL_DATE_KEYS = ['SBSC_ACP_ST_DT', 'SBSC_ACP_CLSG_DT', 'PPR_SBM_OPE_ANC_DT', 'PPR_ACP_ST_DT', 'PPR_ACP_CLSG_DT',
+  'PZWR_ANC_DT', 'CTRT_ST_DT', 'CTRT_ED_DT', 'UST_ACP_ST_DTTM', 'UST_ACP_CLSG_DTTM'] as const
+const scdlSiteNames = (scdls: SplScdlItem[]): string[] =>
+  [...new Set(scdls.map(x => san(x.SBD_LGO_NM)).filter((v): v is string => !!v))]
 const scheduleVariesOf = (scdls: SplScdlItem[]): boolean | null =>
-  scdls.length === 0 ? null : new Set(scdls.map(scdlKey)).size >= 2
+  scdls.length === 0 ? null : (new Set(scdls.map(scdlKey)).size >= 2 && scdlSiteNames(scdls).length >= 2)
+// 한 벌(단지 하나)일 때 칸마다 빈 칸 아닌 값을 모은 원소 — 값끼리 다르면 그 칸은 비운다(어느 쪽인지 말할 수 없다).
+const scdlMerged = (scdls: SplScdlItem[]): SplScdlItem | null => {
+  if (scdls.length === 0) return null
+  if (scdls.length === 1) return scdls[0]
+  const out: Record<string, unknown> = { ...scdls[0] }
+  for (const k of SCDL_DATE_KEYS) {
+    const vals = [...new Set(scdls.map(x => san((x as Record<string, unknown>)[k] as string | undefined)).filter((v): v is string => !!v))]
+    out[k] = vals.length === 1 ? vals[0] : ''
+  }
+  return out as SplScdlItem
+}
 
 // 여러 벌일 때만 쓴다 — 가장 이른 접수 시작.
 const earliestApplyStart = (scdls: SplScdlItem[]): string | null => {
@@ -452,7 +473,7 @@ function mapLHRow(item: NoticeItem, sbds: SbdItem[], scdls: SplScdlItem[], ahflI
   // 접수 시작만 「가장 이른 값」으로 두고(마감은 목록 CLSG_DT가 이미 가장 늦은 값이다),
   // 나머지 scdl 파생은 null로 보내 가드가 기존 값을 지키게 한다.
   const varies  = scheduleVariesOf(scdls)
-  const scdl    = scdls[0] ?? null
+  const scdl    = varies === false ? scdlMerged(scdls) : (scdls[0] ?? null)
   const oneKind = varies === false
   return {
     source:            'LH',

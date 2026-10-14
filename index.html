@@ -5903,7 +5903,55 @@ function zfTargetClassHit(b, f){
   const t = `${b['대상'] || ''} ${b['확인필요'] || ''}`;
   return ZF_TARGET_CLASS.some(([k, , re]) => f.classes.has(k) && re.test(t));
 }
+// 🔵 2026-10-14(우편함 「코드 — 공급대상 판정(v10.1 D-2 화면 먼저) …」 1) — 키 꼴 v10.1 D-1 의 `조건` 새 키 셋을 읽는다.
+//    혼인(「미혼」|「혼인 중 아님」|「혼인 중」) · 계층_중_하나(배열) · 가구원수_최대(정수). 🔴 셋 중 하나도 없는 갈래는 종전 함수 그대로다(순수 확장).
+//    있으면 갈래 상태 = 대상 판정 ∧ 조건마다 — 하나라도 no → no · 모두 ok → ok(확인필요가 있으면 check) · 그 밖 check.
+//    고르지 않은 계층 칸 · 비어 있는 혼인·가구원 칸은 「모름」이라 check 다(no 로 빼지 않는다 — 2026-10-13 N7 원칙).
+const ZF_TARGET_NEW_KEYS = ['혼인', '계층_중_하나', '가구원수_최대'];
+const ZF_TARGET_MARRIED_ANY = ['married_7', 'newborn', 'pre', 'married_child6', 'married'];
+// 계층_중_하나 값 → 진단 특수 계층 칸 값. 「수급자」는 생계·의료·주거 셋 중 아무것.
+const ZF_TARGET_CLASS_OF = { '생계급여수급자': ['livelihood'], '의료급여수급자': ['medical'], '주거급여수급자': ['housing'],
+  '수급자': ['livelihood', 'medical', 'housing'], '차상위': ['nearpoor'], '장애인': ['disabled'], '국가유공자': ['veteran'], '한부모': ['singleparent'] };
+function zfTargetCondState(k, v, f){
+  if(k === '혼인'){
+    const m = f.marital || '';
+    if(!m || m === 'single_parent') return 'check';
+    const married = ZF_TARGET_MARRIED_ANY.includes(m);
+    if(v === '미혼')       return m === 'single' ? 'ok' : (married ? 'no' : 'check');   // 이혼·사별이 「미혼」에 드는지 원문 정의 없음 → check
+    if(v === '혼인 중 아님') return (m === 'single' || m === 'divorced_widowed') ? 'ok' : (married ? 'no' : 'check');
+    if(v === '혼인 중')    return married ? 'ok' : ((m === 'single' || m === 'divorced_widowed') ? 'no' : 'check');
+    return 'check';
+  }
+  if(k === '계층_중_하나'){
+    const want = (Array.isArray(v) ? v : []).flatMap(x => ZF_TARGET_CLASS_OF[String(x).replace(/\s/g, '')] || []);
+    if(!f.classes || !f.classes.size || !want.length) return 'check';
+    return want.some(c => f.classes.has(c)) ? 'ok' : 'check';
+  }
+  if(k === '가구원수_최대'){
+    const n = Number(v), m = Number(f.members);
+    if(!(n >= 1) || !(m >= 1)) return 'check';
+    return m > n ? 'no' : 'ok';
+  }
+  return 'check';
+}
+// 대상 판정(새 키가 있는 갈래만) — 대상이 비면 대상 축은 묻지 않는다(「그 밖의 혼인가구」 = {조건:{혼인:"혼인 중"}}) ·
+//    「계층」 대상은 계층_중_하나 키가 대신 판정한다 · 그 밖은 종전 대상 판정(확인필요 글자는 아래에서 따로 본다).
+function zfTargetSubjectState(b, c, f){
+  const t = b['대상'];
+  if(!t) return 'ok';
+  if(t === '계층' && c['계층_중_하나'] != null) return 'ok';
+  return zfTargetBranchBase(Object.assign({}, b, { '확인필요': undefined, '조건': Object.fromEntries(Object.entries(c).filter(([k]) => !ZF_TARGET_NEW_KEYS.includes(k))) }), f);
+}
 function zfTargetBranchState(b, f){
+  const c = (b && typeof b === 'object' && b['조건'] && typeof b['조건'] === 'object') ? b['조건'] : {};
+  const keys = ZF_TARGET_NEW_KEYS.filter(k => c[k] != null);
+  if(!keys.length) return zfTargetBranchBase(b, f);
+  const st = [zfTargetSubjectState(b, c, f), ...keys.map(k => zfTargetCondState(k, c[k], f))];
+  if(st.includes('no')) return 'no';
+  if(st.every(s => s === 'ok')) return b['확인필요'] ? 'check' : 'ok';
+  return 'check';
+}
+function zfTargetBranchBase(b, f){
   if(zfTargetClassHit(b, f)) return 'ok';
   if(!b || typeof b !== 'object' || b['확인필요']) return 'check';
   const c = (b['조건'] && typeof b['조건'] === 'object') ? b['조건'] : {};
@@ -5929,16 +5977,16 @@ function zfTargetBranchState(b, f){
 //    원문을 읽어 판정하지 않는다 — 「갈래에 없는 축의 조건 낱말이 원문에 있다」만 가려 그 행을 「확인 필요」로 둔다(no 로 빼지 않는다).
 //    낱말은 키 46종(2026-10-13 실측)에서 갈래 밖 조건으로 쓰인 것만 골랐다. 그 축의 갈래가 있으면 그 낱말은 이미 담긴 것이라 보지 않는다.
 const ZF_TARGET_UNCOVERED = [
-  { re: /혼인\s*중이\s*아닌|미혼/, label: '혼인 여부', covered: ['신혼·신생아', '한부모'] },
-  { re: /\d\s*순위\s*유형/, label: '순위 유형', covered: [] },
+  { re: /혼인\s*중이\s*아닌|미혼/, label: '혼인 여부', covered: ['신혼·신생아', '한부모'], keys: ['혼인'] },
+  { re: /\d\s*순위\s*유형/, label: '순위 유형', covered: [], keys: ['계층_중_하나'] },
   { re: /창업|예술인|유튜버/, label: '직업', covered: ['창업', '계층'] },
   { re: /주거약자/, label: '주거약자 요건', covered: ['고령자', '장애인'] },
   // 🔵 2026-10-13(우편함 「코드 — 한글 중복 입력 · 매칭 「맞음」 낱말 확장 …」 2 · run 197) — `SH_311349` 은평구 은빛주택
   //    「은평구에 거주 … 만 65세 이상 … 생계·의료급여 또는 주거급여 수급자 중 무주택 홀몸 어르신」(갈래 = 고령자 나이뿐) → 65세 이상 누구나 「맞음」이었다.
   //    키 119행(2026-10-13 · 「맞음」을 낼 수 있는 행 전수) 중 이 셋이 갈래 밖에 남은 것은 이 행뿐이다 — 다른 「맞음」은 그대로.
   { re: /에\s*거주/, label: '거주 지역', covered: [] },
-  { re: /수급자|수급권자|차상위/, label: '수급·차상위', covered: ['계층'] },
-  { re: /홀몸|독거|1인\s*가구/, label: '홀몸(1인 가구)', covered: [] },
+  { re: /수급자|수급권자|차상위/, label: '수급·차상위', covered: ['계층'], keys: ['계층_중_하나'] },
+  { re: /홀몸|독거|1인\s*가구/, label: '홀몸(1인 가구)', covered: [], keys: ['가구원수_최대'] },
 ];
 function zfTargetUncovered(g){
   const w = String((g && g['원문']) || '');
@@ -5946,7 +5994,9 @@ function zfTargetUncovered(g){
   const kinds = new Set(((g && g['갈래']) || []).map(b => b && b['대상']).filter(Boolean));
   // 갈래의 확인필요 글자가 이미 그 조건을 말하면(`…20880` 「1인가구」) 다시 세지 않는다 — 같은 조건이 두 번 나오지 않게.
   const said = ((g && g['갈래']) || []).map(b => (b && b['확인필요']) || '').join(' ');
-  return ZF_TARGET_UNCOVERED.filter(u => u.re.test(w) && !u.covered.some(k => kinds.has(k)) && !u.re.test(said)).map(u => u.label);
+  // 🔵 2026-10-14(v10.1 D-2) — 갈래 `조건`에 그 축의 새 키(혼인 · 계층_중_하나 · 가구원수_최대)가 있으면 그 낱말은 이미 담긴 것이다.
+  const condKeys = new Set(((g && g['갈래']) || []).flatMap(b => (b && b['조건'] && typeof b['조건'] === 'object') ? Object.keys(b['조건']) : []));
+  return ZF_TARGET_UNCOVERED.filter(u => u.re.test(w) && !u.covered.some(k => kinds.has(k)) && !(u.keys || []).some(k => condKeys.has(k)) && !u.re.test(said)).map(u => u.label);
 }
 function zfTargetRowState(g, f){
   const br = (g && Array.isArray(g['갈래'])) ? g['갈래'] : [];
@@ -5979,12 +6029,13 @@ function zfTargetVerdict(rows, f){
 function zfTargetDiagFacts(){
   const by = parseInt(document.getElementById('birthYear')?.value) || 0;
   const ch = document.getElementById('children')?.value;
-  return { marital: diagMarital || document.getElementById('marital')?.value || '', children: (ch == null || ch === '') ? null : (parseInt(ch) || 0), birthYear: by, classes: zfDiagClasses() };
+  const mb = parseInt(document.getElementById('members')?.value) || 0;
+  return { marital: diagMarital || document.getElementById('marital')?.value || '', children: (ch == null || ch === '') ? null : (parseInt(ch) || 0), birthYear: by, classes: zfDiagClasses(), members: mb };
 }
 function zfTargetProfileFacts(){
   const u = currentUser || {};
   const ch = u.children;
-  return { marital: u.marital || '', children: (ch == null || ch === '') ? null : (parseInt(ch) || 0), birthYear: parseInt(u.birth_year || u.birthYear) || 0 };
+  return { marital: u.marital || '', children: (ch == null || ch === '') ? null : (parseInt(ch) || 0), birthYear: parseInt(u.birth_year || u.birthYear) || 0, members: parseInt(u.members) || 0 };
 }
 // 공급대상 키를 가진 공고의 자격 행(공급대상 칸만)을 한 번 받아 둔다 — 키 있는 공고는 수십 장이라 목록 전체를 부르지 않는다.
 // 🔵 키 행은 대표 카드 ID 자신에 있다(2026-10-08 실측 19공고 전부). 그래서 카드 ID 하나로 먼저 찾는다.
@@ -9102,18 +9153,33 @@ function buildPoiTabs(id,coords){
   searchPoi(id,coords,POI_CATS.subway.code);
 }
 
+// 🔴 2026-10-14(우편함 「코드 — 공급대상 판정 · 지도 탭 분류 결함 …」 2) — 카카오 분류 코드가 탭 이름과 다른 것을 섞는다(실측 2026-10-14):
+//    AT4(관광명소)는 계곡·산·전망대·고궁을 「공원」으로 내고, HP8(병원)은 「가정,생활 > 반려동물 > 동물병원」을 섞는다.
+//    그래서 탭마다 category_name 머리로 거른다 — 공원은 분류 코드가 없어 키워드 「공원」 + 「여행 > 공원」 · 병원은 HP8 + 「의료,건강」.
+//    거른 뒤 다섯이 안 되면 다음 쪽까지(최대 3쪽 — 카카오 한 검색 45건) 본다. 반경·탭 구성은 그대로다(재편은 런칭 직후 지도 판).
+const POI_FILTER={ 'AT4':{keyword:'공원', head:'여행 > 공원'}, 'HP8':{head:'의료,건강'} };
 function searchPoi(id,coords,catCode){
   const listEl=document.getElementById('poilist-'+id);
   listEl.innerHTML='<div class="poi-loading">검색 중...</div>';
   const places=new kakao.maps.services.Places();
-  places.categorySearch(catCode,(data,status)=>{
-    if(status!==kakao.maps.services.Status.OK || !data.length){
-      listEl.innerHTML='<div class="poi-loading">반경 내 결과가 없어요</div>';
-      return;
+  const rule=POI_FILTER[catCode]||null;
+  const opts={location:coords,radius:1000,sort:kakao.maps.services.SortBy.DISTANCE};
+  const got=[];
+  const done=()=>{
+    if(!got.length){ listEl.innerHTML='<div class="poi-loading">반경 내 결과가 없어요</div>'; return; }
+    got.sort((a,b)=>Number(a.distance)-Number(b.distance));
+    // 장소 이름은 카카오(가게가 등록하는) 바깥 글자다 — HTML 로 해석하지 않게 이스케이프한다.
+    listEl.innerHTML=got.slice(0,5).map(p=>`<div class="poi-item"><span>${escapeHtml(p.place_name)}</span><span class="poi-dist">${Math.round(p.distance)}m</span></div>`).join('');
+  };
+  const cb=(data,status,pg)=>{
+    if(status===kakao.maps.services.Status.OK && data && data.length){
+      (rule&&rule.head ? data.filter(p=>String(p.category_name||'').startsWith(rule.head)) : data).forEach(p=>got.push(p));
     }
-    const top=data.slice(0,5);
-    listEl.innerHTML=top.map(p=>`<div class="poi-item"><span>${p.place_name}</span><span class="poi-dist">${Math.round(p.distance)}m</span></div>`).join('');
-  },{location:coords,radius:1000,sort:kakao.maps.services.SortBy.DISTANCE});
+    if(rule && got.length<5 && pg && pg.hasNextPage && pg.current<3){ pg.nextPage(); return; }
+    done();
+  };
+  if(rule&&rule.keyword) places.keywordSearch(rule.keyword,cb,opts);
+  else places.categorySearch(catCode,cb,opts);
 }
 
 function showMore(){
