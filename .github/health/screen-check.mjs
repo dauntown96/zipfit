@@ -376,7 +376,10 @@ try {
     const got = await page.evaluate(ss => {
       if (typeof zfTargetRowState !== 'function') return { err: 'zfTargetRowState 없음' }
       const y = new Date().getFullYear()
-      return { list: ss.map(s => zfTargetRowState(s.key, { marital: s.facts.marital, children: null, birthYear: y - s.facts.age, classes: new Set(s.facts.classes), members: s.facts.members })) }
+      // members "diag_untouched" — 진단 칸에 이벤트 없이 2를 넣고(사용자가 안 건드린 기본값과 같은 꼴) 화면 zfTargetDiagFacts 가 내는 값을 쓴다(2026-10-15).
+      const diagMembers = () => { const el = document.getElementById('members'); if (el) el.value = '2'; return typeof zfTargetDiagFacts === 'function' ? zfTargetDiagFacts().members : NaN }
+      return { list: ss.map(s => zfTargetRowState(s.key, { marital: s.facts.marital, children: null, birthYear: y - s.facts.age, classes: new Set(s.facts.classes),
+        members: s.facts.members === 'diag_untouched' ? diagMembers() : s.facts.members })) }
     }, samples)
     const bad = got.err ? [] : samples.map((s, i) => got.list[i] === s.expect ? null : `${s.id}: ${got.list[i]}≠${s.expect}`).filter(Boolean)
     add('target_samples', '매칭 공급대상 갈래 판정 — 표본 키 기대값', !got.err && bad.length === 0 ? 'pass' : 'fail',
