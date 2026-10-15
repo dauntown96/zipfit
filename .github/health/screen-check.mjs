@@ -469,6 +469,45 @@ try {
     add('route_gap', '차수 사이 카드 — 접수 중이 아니고 열린 목록에 있고 다음 창 시작일을 말한다', ok ? 'pass' : 'fail', value,
       'DB 로 따로 계산한 창 사이 카드(경로 표 창 둘 이상 · 오늘이 창 밖 · 카드 기간 안) — 다음 창이 있으면 열린 목록 · 상태 ≠ 접수 중 · 알약 「다음 접수 MM-DD」 / 없으면 닫힘')
   }
+  // ⑦-1b 완화 배지 글자(2026-10-15 · 우편함 「표시층 — 완화 배지 글자 …」 1 · 원칙 33) — 완화 공고 배지가 원문에 없는 모집 꼴을 말하지 않는가.
+  //    종전에는 완화 카드 전부가 「🔓 자격완화 추가모집」이었다(열린 완화 12 중 제목에 「추가모집」 1). 기대 갈래는 DB 에서 **따로** — 목록 RPC 완화 행의
+  //    제목·relaxation_detail 로 「추가모집」(제목에 추가 모집) / 「거주지 제한 완화」(모집권역·거주지역 완화이면서 소득·자산·무주택 말 없음) / 「자격완화」.
+  //    화면 쪽은 지금 보이는 완화 칩(data-zf-relax)과 완화 행 전부를 화면 배지 함수로 그린 글자 둘 다 잰다.
+  //    SIMULATE=relax_badge 이면 기대 갈래 하나를 「자격완화 추가모집」으로 바꿔 잰다(실패해야 맞다).
+  {
+    const rq = await sqlRead(`
+      select coalesce(json_agg(json_build_object('aid', d.announcement_id,
+        'label', case when (d.title || ' ' || coalesce(d.relaxation_detail, '')) ~ '(모집권역|거주지역|거주지)[^.。]*완화|완화[^.。]*(모집권역|거주지역)'
+                       and (d.title || ' ' || coalesce(d.relaxation_detail, '')) !~ '소득|자산|무주택' then '거주지 제한 완화'
+                      when d.title ~ '추가\\s*모집' then '자격완화 추가모집' else '자격완화' end) order by d.announcement_id), '[]'::json) j
+      from get_announcements_deduped() d where d.is_relaxed_recruitment is true`)
+    const want = rq[0].j || []
+    if (process.env.SIMULATE === 'relax_badge' && want.length) want[0].label = want[0].label === '자격완화 추가모집' ? '자격완화' : '자격완화 추가모집'
+    const got = await page.evaluate(() => {
+      if (typeof buildConvBadges !== 'function') return { err: 'buildConvBadges 없음' }
+      const all = {}
+      noticeData.filter(n => n.is_relaxed_recruitment === true).forEach(n => {
+        const m = buildConvBadges(n.mymy_applicable, n.supply_form, n.application_method, n.recruit_multiplier, true, n.selection_method, n['공고명'], n.relaxation_detail).match(/🔓\s*([^<]*)/)
+        all[String(n.announcement_id)] = m ? m[1].trim() : '(없음)'
+      })
+      const vis = [...document.querySelectorAll('.hcard [data-zf-relax]')].filter(e => e.offsetParent !== null)
+        .map(e => [e.closest('.hcard').getAttribute('data-announcement-id'), e.textContent.replace(/^🔓\s*/, '').trim()])
+      return { all, vis }
+    })
+    let ok = false, value
+    if (!got.err) {
+      const exp = new Map(want.map(x => [x.aid, x.label]))
+      const bad = []
+      for (const [aid, l] of Object.entries(got.all)) if (exp.get(aid) !== l) bad.push(`${aid}: 화면 「${l}」 ↔ DB 「${exp.get(aid)}」`)
+      for (const [aid, l] of got.vis) if (exp.get(aid) !== l) bad.push(`보이는 ${aid}: 「${l}」 ↔ DB 「${exp.get(aid)}」`)
+      const cnt = {}; want.forEach(x => { cnt[x.label] = (cnt[x.label] || 0) + 1 })
+      ok = bad.length === 0 && Object.keys(got.all).length === want.length
+      value = `완화 행 ${want.length}(${Object.entries(cnt).map(([k, v]) => `${k} ${v}`).join(' · ')}) · 화면 ${Object.keys(got.all).length} · 보이는 칩 ${got.vis.length} · 어긋남 ${bad.length}${bad.length ? ': ' + bad.slice(0, 3).join(' / ') : ''}`
+      extra.relax_badge = { want, bad }
+    } else value = `못 잼(${got.err})`
+    add('relax_badge', '완화 배지 — 원문(제목·완화 내용)에 없는 모집 꼴을 말하지 않는다', ok ? 'pass' : 'fail', value,
+      'DB 로 따로 가른 갈래(제목 「추가 모집」 · 모집권역·거주지역만 완화 · 그 밖 자격완화) = 화면 배지 글자(완화 행 전부 · 보이는 칩)')
+  }
   // ⑦-2 한글 조합 입력(2026-10-13 · 우편함 「코드 — 한글 중복 입력 …」 1 · 원칙 33) — 공고 검색 칸에 실제 조합 이벤트(CDP Input.imeSetComposition →
   //    insertText)로 「부산」을 친다. 두 꼴을 본다:
   //    ⓐ 단어 조합(모바일 입력기처럼 ㅂ → 부 → 붓 → 부사 → 부산을 한 조합으로 · 확정 전) — 확정하기 전에 공고 탭 머리 「조건에 맞는 N건」과 시트 머리줄 수가
