@@ -1,0 +1,44 @@
+# PR 「⑩ 단원:」 점검 — 구현을 바꾼 PR 이 ⑩(시스템 구조)을 따라오는지 보이게 한다(2026-10-15 신설 · 우편함 「코드 — 공고 탭 쪽 넘김 · PR 「⑩ 단원:」 점검 · …」 2).
+# 백로그 「구현을 바꾼 PR이 ⑩을 따라오지 않아도 아무도 모른다」 — 2026-10-14 구현 PR 6개가 ⑩ 0줄이었다.
+# 바뀐 경로에 구현 파일이 있는데 PR 본문에 「⑩ 단원:」 줄이 없으면 ⚠️(경고 주석 · 작업 요약) — 🔴 실패로 내지 않는다(필수 체크 아님 · Notion 은 읽지 않는다).
+#   구현 파일 = index.html · supabase/functions/** · supabase/migrations/** · .github/db/** · .github/health/**
+#   줄 꼴 = 「⑩ 단원: <고친 단원 이름>」 또는 「⑩ 단원: 없음」(CLAUDE.md 원칙 22 ④ 「⑩ 단원」과 같은 줄).
+# 본문을 고치면(edited) 다시 돈다 — 줄을 더하면 그 자리에서 조용해진다. 비밀값 0 · DB 호출 0.
+name: PR — ⑩ 단원
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  unit10:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    concurrency:
+      group: pr-unit10-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: 구현 파일 · 「⑩ 단원:」 줄
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          files=$(git diff --name-only "$BASE_SHA"...HEAD | grep -E '^(index\.html$|supabase/functions/|supabase/migrations/|\.github/db/|\.github/health/)' || true)
+          if [ -z "$files" ]; then
+            echo "구현 파일 변경 없음 — 해당 없음" | tee -a "$GITHUB_STEP_SUMMARY"; exit 0
+          fi
+          line=$(printf '%s\n' "$PR_BODY" | grep -m1 -E '⑩[[:space:]]*단원[[:space:]]*:' || true)
+          n=$(printf '%s\n' "$files" | wc -l)
+          if [ -n "$line" ]; then
+            { echo "## ✅ ⑩ 단원 줄 있음"; echo; echo "구현 파일 ${n}개 · 본문: \`$(printf '%s' "$line" | tr -d '`' | cut -c1-200)\`"; } >> "$GITHUB_STEP_SUMMARY"
+            echo "통과 — $line"; exit 0
+          fi
+          echo "::warning title=⑩ 단원 줄 없음::구현 파일 ${n}개를 바꿨는데 PR 본문에 「⑩ 단원:」 줄이 없다 — 고친 ⑩ 단원 이름 또는 「⑩ 단원: 없음」을 적는다(CLAUDE.md 원칙 22 ④)"
+          { echo "## ⚠️ ⑩ 단원 줄 없음"; echo; echo "구현 파일 ${n}개:"; echo; printf '%s\n' "$files" | sed 's/^/- `/; s/$/`/'; echo; echo "PR 본문에 「⑩ 단원: <단원 이름>」 또는 「⑩ 단원: 없음」을 적으면 다시 돌아 조용해진다."; } >> "$GITHUB_STEP_SUMMARY"
+          exit 0

@@ -4461,9 +4461,17 @@ function noticePagerHtml(pageCount, page){
 function noticeGoPage(n){
   noticePage = n;
   renderNoticeList(noticeFiltered, noticeData.length);
-  // 쪽을 넘기면 목록 맨 위로 — 안 그러면 새 쪽의 한가운데를 보고 있게 된다.
-  const el = document.getElementById('notice-status');
-  if(el && el.scrollIntoView) el.scrollIntoView({ behavior:'smooth', block:'start' });
+  // 쪽을 넘기면 목록 머리로 — 안 그러면 새 쪽의 한가운데를 보고 있게 된다.
+  // 🔵 2026-10-15 — 목표를 #notice-status 에서 #notice-list 로: d3 에서 #notice-status.ok 는 display:none 이라
+  //    scrollIntoView 가 움직이지 않았다(claude.ai 배포본 실측 scrollY 3689 → 3689). 위에 붙는 탭 줄(.maintabs 가
+  //    sticky·top 고정일 때 — 넓은 화면) 높이만큼 띄운다. 좁은 화면은 탭 줄이 아래 고정(top:auto)이라 띄우지 않는다.
+  const el = document.getElementById('notice-list');
+  if(!el) return;
+  const tabs = document.querySelector('.maintabs');
+  const cs = tabs ? getComputedStyle(tabs) : null;
+  const atTop = cs && (cs.position === 'sticky' || (cs.position === 'fixed' && tabs.getBoundingClientRect().top < innerHeight / 2));
+  const over = atTop ? tabs.offsetHeight + (parseFloat(cs.top) || 0) : 0;
+  window.scrollTo({ top: Math.max(0, window.scrollY + el.getBoundingClientRect().top - over - 8), behavior:'smooth' });
 }
 function noticeSetPageSize(v){
   const n = Number(v);

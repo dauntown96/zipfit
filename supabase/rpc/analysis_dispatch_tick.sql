@@ -30,6 +30,10 @@ AS $function$
 --   followup 회차는 「진전」 판정(되돌림 · 이어 보내기 · 연속 0건 멈춤)에서 빠진다 — 분석 몫이 없어서다. 연속 3실패 멈춤 · 스위치 · 잠금은 그대로 따른다.
 --   만든 지 60분 넘게 도는 followup 회차는 닫는다(잡힘과 무관 — 2026-10-06 1-B 뒤로는 잡힌 회차도 끝 호출이 없으면 여기서 닫힌다 ·
 --   대기열 공고가 없어 이중 쓰기 위험이 없다 · 문구 2026-10-06 1-C ④ — 동작 변경 0).
+--   🔵 2026-10-15(우편함 「코드 — … 후속 자동 닫힘 되돌리기 …」 5) — 그 회차에 실린 요청 중 아무도 잡지도 결과를 적지도 않은 것
+--   (picked_at · result 둘 다 빔 — run 201 · 요청 #37)은 done 이 아니라 대기(waiting)로 되돌려 같은 판정이 다시 보낸다.
+--   되돌림은 요청마다 2번까지(auto_returns) — 셋째로 자동 닫히면 done · result 「실패」(health-ops followup_unreported ⚠️ 가 잡는다).
+--   잡힌(picked_at 있음) 요청 · 결과를 적은 요청은 종전대로 done. 분석 몫 대기열(analysis_dispatch_queue)은 건드리지 않는다.
 -- 🔵 정정본 후보(2026-10-06 · 우편함 「코드 — Z-1 원문 키 사이클(DB) …」 PR-A A1 · run 119 고령다산2 …20809):
 --   같은 제목 키·마감 구성원에 완료 계열 분석이 있어 후보에서 빠지는 대표라도, 그 대표가 정정 행(is_revised)이고
 --   정정본 분석이 없으면(get_revision_analysis_done 거짓 — 화면 「정정 전 공고 기준」 배너와 같은 판정) 후보로 올린다.
@@ -97,7 +101,16 @@ begin
                           || case when rr.claimed_at is null then '잡기 없음' else '잡힌 뒤 끝 호출 없음' end || ')'
      where id = rr.id;
     update public.analysis_followup_requests
-       set state = 'done', state_at = now(), note = 'run ' || rr.id || ' 자동으로 닫음'
+       set state = 'waiting', run_id = null, state_at = now(), auto_returns = auto_returns + 1,
+           note = 'run ' || rr.id || ' 자동 닫힘(잡기·결과 없음) → 대기로 되돌림 ' || (auto_returns + 1) || '/2'
+     where run_id = rr.id and state = 'sent' and picked_at is null and result is null and auto_returns < 2;
+    update public.analysis_followup_requests
+       set state = 'done', state_at = now(), note = 'run ' || rr.id || ' 자동으로 닫음',
+           result = case when picked_at is null and result is null then '실패' else result end,
+           result_note = case when picked_at is null and result is null
+                              then '후속 전용 회차가 잡기·결과 없이 자동으로 닫힘 — 대기로 2번 되돌린 뒤 세 번째(run ' || rr.id || ') · 사람 손 필요'
+                              else result_note end,
+           reported_at = case when picked_at is null and result is null then now() else reported_at end
      where run_id = rr.id and state = 'sent';
     n_resolved := n_resolved + 1;
   end loop;

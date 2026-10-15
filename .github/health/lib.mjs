@@ -82,9 +82,11 @@ export function report(kind, title, checks, extra = {}) {
   const cell = v => String(v ?? '').replace(/\u001b\[[0-9;]*m/g, '').replace(/\s*\n\s*/g, ' ').replace(/\|/g, '/').slice(0, 400)
   const icon = s => (s === 'pass' ? '✅' : s === 'fail' ? '❌' : s === 'skip' ? '⏭' : s === 'warn' ? '⚠️' : 'ℹ️')
   const head = (result.ok ? '통과' : `실패 ${failed.length}`) + (warned.length ? ` · 경고 ${warned.length}` : '')
-  const lines = [`## ${title} — ${head}`, '',
+  // 🔵 2026-10-15(관문 항목별 4) — ops 는 실패마다 gate(hard 🛑 멈춤 · soft 안 멈춤 · blind 점검 불능)를 단다(ops-check · gate.mjs).
+  const gateLine = extra.failed_hard ? [`멈춤(🛑 health-ops) ${extra.failed_hard.length} · 안 멈춤(health-ops-soft) ${(extra.failed_soft || []).length}`, ''] : []
+  const lines = [`## ${title} — ${head}`, '', ...gateLine,
     '| | 점검 | 값 | 기준 |', '|---|---|---|---|',
-    ...checks.map(c => `| ${icon(c.status)} | ${c.name} | ${cell(c.value)} | ${cell(c.rule)} |`)]
+    ...checks.map(c => `| ${icon(c.status)}${c.gate === 'hard' ? ' 🛑' : ''} | ${c.name} | ${cell(c.value)} | ${cell(c.rule)} |`)]
   const md = lines.join('\n') + '\n'
   writeFileSync('health-summary.md', md)
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, md)

@@ -53,11 +53,20 @@ const listUrl = (cp: number) => `${BASE}${LIST_PATH}?cp=${cp}&supplyType=publicL
 //    받기 주소는 같은 게시판의 innoFD.do — fetch-attachment 허용목록(www.i-sh.co.kr)에 이미 있다.
 const SH_FILE_BASE = 'https://www.i-sh.co.kr/main/com/file/innoFD.do'
 const DETAIL_CAP = 30            // 한 런에서 상세를 여는 상한(열린 공고는 보통 한 자리 수)
+// 🔵 2026-10-15(우편함 「코드 — … SH 18:00 수집 546 조사·감시 …」 3) — 요청 하나의 시간 제한 · 런 전체의 외부 요청 예산.
+//    10-13·10-14 18:00 KST 회차가 함수 로그 0줄 · CPU 87~92ms 로 150초 벽시계(WallClockTime)에 끊겨 546 —
+//    응답 없는 외부 요청 하나가 끝없이 기다렸다(fetch 에 시간 제한이 없었다). 끊기면 sh_collection_run_log 행도 못 남긴다.
+//    이제 요청마다 FETCH_TIMEOUT_MS 에서 끊고, 런 시작 뒤 RUN_FETCH_BUDGET_MS 가 지나면 남은 목록 쪽·상세를 열지 않는다
+//    (목록 쪽은 pages_failed·errors 로 남겨 sh_close_missing 이 「다 봤다」로 세지 않게 · 상세는 detail.failed 로만).
+//    정상 런(약 40초)에서는 아무것도 바뀌지 않는다 — 수집 대상·저장 규칙 불변.
+const FETCH_TIMEOUT_MS = 20000
+const RUN_FETCH_BUDGET_MS = 105000   // 150초 벽시계 − upsert·자치구 채움·런 로그 여유
+const MIN_FETCH_MS = 3000            // 예산이 이만큼도 안 남았으면 새 요청을 열지 않는다
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
-async function fetchText(url: string): Promise<{ status: number; contentType: string | null; utf8: string; euckr: string }> {
-  const res = await fetch(url, { headers: { 'User-Agent': UA } })
+async function fetchText(url: string, timeoutMs = FETCH_TIMEOUT_MS): Promise<{ status: number; contentType: string | null; utf8: string; euckr: string }> {
+  const res = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(timeoutMs) })
   const buf = await res.arrayBuffer()
   const dec = (enc: string) => { try { return new TextDecoder(enc).decode(buf) } catch { return '' } }
   return { status: res.status, contentType: res.headers.get('content-type'), utf8: dec('utf-8'), euckr: dec('euc-kr') }
@@ -256,10 +265,15 @@ async function collect() {
   const allRows: ShRow[] = []
   allRows.push(...parseListPage(firstHtml))
 
+  // 예산에서 남은 시간 — MIN_FETCH_MS 미만이면 열지 않는다 · 다음 요청의 시간 제한은 min(FETCH_TIMEOUT_MS, 남은 시간).
+  const remain = () => RUN_FETCH_BUDGET_MS - (Date.now() - startedAt)
+  const left = () => Math.min(FETCH_TIMEOUT_MS, remain())
+
   for (let cp = 2; cp <= totalPages; cp++) {
     await sleep(PAGE_DELAY_MS)
+    if (remain() < MIN_FETCH_MS) { errors.push(`목록 cp=${cp}~${totalPages}: 시간 예산 넘음(${RUN_FETCH_BUDGET_MS}ms) — 열지 않음`); pagesFailed += totalPages - cp + 1; break }
     try {
-      const r = await fetchText(listUrl(cp))
+      const r = await fetchText(listUrl(cp), left())
       if (r.status !== 200) { errors.push(`목록 cp=${cp}: status=${r.status}`); pagesFailed++; continue }
       allRows.push(...parseListPage(pickDecoded(r.utf8, r.euckr).text))
     } catch (e) { errors.push(`목록 cp=${cp}: ${e}`); pagesFailed++ }
@@ -277,9 +291,10 @@ async function collect() {
   const detail = { tried: 0, with_files: 0, files: 0, failed: [] as string[] }
   for (const r of rows.filter(r => !r.hidden_from_listing && r.status !== '접수마감').slice(0, DETAIL_CAP)) {
     await sleep(PAGE_DELAY_MS)
+    if (remain() < MIN_FETCH_MS) { detail.failed.push(`시간 예산 넘음 — 남은 상세 열지 않음(${r.announcement_id}부터)`); break }
     detail.tried++
     try {
-      const d = await fetchText(r.url)
+      const d = await fetchText(r.url, left())
       if (d.status !== 200) { detail.failed.push(`${r.announcement_id}: status=${d.status}`); continue }
       const files = parseDownList(pickDecoded(d.utf8, d.euckr).text)
       if (!files) { detail.failed.push(`${r.announcement_id}: downList 없음`); continue }
@@ -321,6 +336,8 @@ async function collect() {
     errors,
   }
   await logRun(result)
+  // 🔵 2026-10-15 — 함수 로그에도 한 줄(상세·자치구 실패는 런 로그 표 칸이 아니라 응답에만 있어, cron 응답이 지워지면 사라졌다).
+  console.log(`[SH] ${JSON.stringify({ ...result, detail, gu })}`)
   return { ...result, detail, gu }   // detail · gu 는 런 로그 표 칸이 아니라 응답에만 싣는다
 
   } catch (e) {

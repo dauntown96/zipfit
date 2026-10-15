@@ -7,6 +7,8 @@
 // 🔴 첫 주는 넉넉하게 — 오탐이 잦으면 알림이 읽히지 않는다.
 import { sqlRead, anonRpc, report, recordFindings, SITE, PROJECT_REF } from './lib.mjs'
 import { YEARLY_SQL, judgeYearly } from './yearly.mjs'
+import { SH_RUN_SQL, judgeShRun } from './sh-run.mjs'
+import { HARD, splitFailed } from './gate.mjs'
 import { readdirSync, readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 
@@ -507,6 +509,13 @@ try {
   } catch (e) {
     add('yearly_base', '해마다 바뀌는 밑값 표 — 새 연도', 'warn', String(e).slice(0, 200), 'YEARLY_SQL 을 읽는다(경고만 — 읽기 실패)')
   }
+  // ⑯ SH 수집 회차가 런 로그를 남겼나 · SH 런 140초(sh-run.mjs 머리 주석 · 2026-10-15). 읽기 실패는 ❌(sh_fresh 와 같은 축 — 안 멈춤).
+  try {
+    const [x] = await sqlRead(SH_RUN_SQL)
+    for (const c of judgeShRun(x.j)) add(c.id, c.name, c.status, c.value, c.rule)
+  } catch (e) {
+    add('sh_run', 'SH 수집 회차가 런 로그를 남겼나', 'fail', String(e).slice(0, 200), 'SH_RUN_SQL 을 읽는다')
+  }
 } catch (e) {
   add('runner', '점검 실행', 'fail', String(e).slice(0, 300), '점검 스크립트가 끝까지 돈다')
 }
@@ -538,7 +547,9 @@ try {
   add('sec_advisor', 'Supabase 보안 권고 — 허용 목록 밖 새 지적', 'warn', String(e).slice(0, 200), '관리 API advisors/security 를 읽는다(경고만)')
 }
 
-if (process.env.SIMULATE === 'fail') add('simulate', '실패 흉내(수동 입력 simulate=fail)', 'fail', '시험', '알림 경로 확인용 — 평소에는 없다')
+if (process.env.SIMULATE === 'fail') add('simulate', '실패 흉내(수동 입력 simulate=fail) — 안 멈추는 실패', 'fail', '시험', '알림 경로 확인용 — 평소에는 없다 · 라벨 health-ops-soft')
+// 🔵 2026-10-15(관문 항목별 4) — 멈추는 실패 흉내: gate.mjs HARD 의 simulate_hard → 라벨 health-ops.
+if (process.env.SIMULATE === 'fail_hard') add('simulate_hard', '실패 흉내(수동 입력 simulate=fail_hard) — 멈추는 실패', 'fail', '시험', '관문 시험용 — 평소에는 없다 · 라벨 health-ops')
 // 🔵 2026-10-08(우편함 「운영 기반 묶음」 4) — notify: 실제 장치와 같은 경로(github-actions 봇 · 라벨 health-ops)로 시험 이슈를 연다 · 다음 통과 실행이 닫는다.
 if (process.env.SIMULATE === 'notify') add('simulate', '시험 — 알림 확인(수동 입력 simulate=notify)', 'fail', '다운님 휴대폰 알림 확인용', '알림 경로 확인용 — 다음 통과 실행이 이 이슈를 닫는다')
 
@@ -559,5 +570,8 @@ if (process.env.SIMULATE === 'notify') add('simulate', '시험 — 알림 확인
   }
 }
 
-const r = report('ops', 'B. 운영 건강 점검', checks, { daytime: DAYTIME })
+// 🔵 2026-10-15(관문 항목별 4) — 실패를 멈춤(HARD)·안 멈춤으로 가른다 · issue.sh 가 failed_hard 로 라벨을 고른다(gate.mjs 머리 주석).
+for (const c of checks) if (c.status === 'fail') c.gate = c.id === 'runner' ? 'blind' : HARD.has(c.id) ? 'hard' : 'soft'
+const g = splitFailed(checks.filter(c => c.status === 'fail').map(c => c.id))
+const r = report('ops', 'B. 운영 건강 점검', checks, { daytime: DAYTIME, failed_hard: g.hard, failed_soft: g.soft })
 process.exitCode = 0     // 판정은 결과 파일로 넘긴다 — 이슈 단계가 그것을 읽는다
