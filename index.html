@@ -685,6 +685,13 @@ html[data-ui="d3"] .zf3-vline .policy-item.next .policy-category::after{content:
 html[data-ui="d3"] .zf3-vline .policy-item.now::before{background:linear-gradient(var(--ln,var(--ink)) 0 12px,var(--rail) 12px)}
 html[data-ui="d3"] .zf3-vline .policy-item.now::after{background:var(--ln,var(--ink));border-color:var(--ln,var(--ink));box-shadow:0 0 0 3px var(--surface-2)}
 html[data-ui="d3"] .zf3-vline .policy-item.now .policy-category::after{content:" · 진행 중";color:var(--ink);font-weight:700}
+/* 🔵 2026-10-15 상세 세로 노선(일정 표) — 범위 단추 · 범위 글자 · 출처 꼬리표 */
+.zf-sch .zf-sch-src{font-size:11px;font-weight:600;color:var(--ink-3,#777);margin-left:6px}
+.zf-sch .zf-sch-scope{display:inline-block;font-size:11px;font-weight:600;color:var(--ink-2,#555);background:var(--surface-2,#f1f1ee);border-radius:6px;padding:0 6px;margin-left:4px}
+.zf-sch .zf-sch-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px}
+.zf-sch .zf-sch-tabs button{font:inherit;font-size:12px;font-weight:600;padding:5px 10px;min-height:32px;border-radius:999px;border:1px solid var(--line,#ddd);background:var(--paper,#fff);color:var(--ink-2,#555);cursor:pointer}
+.zf-sch .zf-sch-tabs button[aria-selected="true"]{background:var(--ink,#222);border-color:var(--ink,#222);color:var(--paper,#fff)}
+html[data-ui="d3"] .zf-sch .policy-content{white-space:normal;overflow-wrap:anywhere}
 .zf3-none{margin:8px 0;padding:10px 12px;font-size:12px;color:var(--ink-2);background:var(--surface-2);border-radius:var(--r-1);word-break:keep-all;line-height:1.5}
 .zf3-maplbl{margin-left:14px;padding:2px 8px;font:700 12px/18px var(--f-ui);color:var(--paper);background:var(--ink);border-radius:999px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.18);max-width:60vw;overflow:hidden;text-overflow:ellipsis}
 .zf3-maplbl.left{margin-left:0;margin-right:14px}
@@ -4154,8 +4161,13 @@ function moveInUnreal(v){
   return !!m && Number(m[1]) > new Date().getFullYear() + MOVE_IN_MAX_YEARS_AHEAD;
 }
 // 상세 표의 [라벨, 값] 한 쌍을 만든다. 비현실 값이면 날짜를 내보내지 않는다.
+// 🔴 2026-10-15(우편함 「표시층 — 상세 세로 노선 …」 4) — 이 값은 LH 공고 페이지 「공급정보」의 단지 칸 「입주예정월」(소재지 · 전용면적 ·
+//    총 세대수 · 난방방식과 나란히)이다 — 기존 단지의 준공·입주 연월이지 신청자 입주 일정이 아니다(schedule.md 1절).
+//    그래서 이름표는 LH 칸 이름 그대로에 단지 기준임을 붙인다(값은 LH 출처뿐 — 2026-10-15 실측 161건 전부 LH).
+//    종전 「입주」/「입주예정」(moveInLabel)은 신청자 일정처럼 읽혀 쓰지 않는다(함수는 남긴다 — 지우지 않는다).
+const ZF_MOVEIN_LABEL = '단지 입주예정월 (LH 공급정보)';
 function moveInRow(v){
-  return moveInUnreal(v) ? ['입주시기', '확인 필요'] : [moveInLabel(v), v];
+  return moveInUnreal(v) ? [ZF_MOVEIN_LABEL, '확인 필요'] : [ZF_MOVEIN_LABEL, v];
 }
 
 // ===== 1층 요약 한 줄 (보증금 · 월세 · 전용면적) =====
@@ -6503,6 +6515,7 @@ function toggleDetail(id, card, from){
     detailEl.appendChild(slots);
     renderSpecialNotes(cardEl, id);
     renderSupplySchedule(cardEl, id);
+    loadScheduleLine(cardEl.dataset.announcementId || '', cardEl, id);
     renderAttachments(cardEl, id);
   }
   // 🔵 2026-10-13 — MYHOME 다구 묶음의 머리 「모집 세대수」를 같은 회차 분할 행 합으로(zfRecruitBundleSum 주석).
@@ -6890,6 +6903,99 @@ function renderSupplySchedule(cardEl, id){
     items.map(([label,value]) => `<div class="policy-item" data-zf-d="${zfAttr((/\d{4}-\d{2}-\d{2}/.exec(value) || [''])[0])}" data-zf-e="${zfAttr((String(value).match(/\d{4}-\d{2}-\d{2}/g) || ['']).pop())}"><div class="policy-category">${label}</div><div class="policy-content">${escapeHtml(value)}</div></div>`).join('');
   const slot = document.getElementById('schedule-slot-'+id);
   if(slot) slot.appendChild(wrap);
+}
+// 🔵 2026-10-15(우편함 「표시층 — 상세 세로 노선(일정 표 …)」 1~3) — 공고문 일정 표(announcement_schedule)가 이 카드 회차에 있으면
+//    「🗓️ 공급일정」을 그 행으로 다시 그린다(공고 → 접수 → 서류 → 발표 → 계약 → 입주 · 원문 순서 sort_order).
+//    🔴 글자는 원문 그대로 — stage_text · period_text · scope_text 를 우리 말로 바꾸지 않는다(stage 코드는 아이콘 갈래에만).
+//    🔴 회차를 섞지 않는다 — 그룹 ID(get_announcement_group_ids) 중 행의 공고 apply_end = 카드 apply_end 인 것만(정책 안내 B46 과 같은 축).
+//       형제가 여럿인데 회차를 못 받으면 그리지 않고 종전 칸 그대로 둔다(섞일 수 있는 것을 보이지 않는다).
+//    🔴 일정 행이 있으면 수집 칸(서류·당첨자 발표·계약)으로 빈 역을 채우지 않는다(⚠️로 뺀 단계가 있다 · 수집 칸이 틀린 날일 수 있다).
+//       접수 행이 없는 공고(첫날/2일차 꼴)만 카드 접수기간(확정값)을 종전 이름 그대로 한 역으로 둔다.
+//    범위(scope_text): 같은 범위 글자가 두 단계 이상에 걸치면(순위별로 일정이 통째로 한 벌씩 — …0706) 범위마다 노선을 나눠 단추로 고른다.
+//       한 단계 안에서만 갈리면(경로별 접수 — …20669) 한 노선에 그 역을 범위 글자와 함께 줄줄이 둔다.
+const ZF_STAGE_ICON = { '공고': '📢', '대상주택게시': '🏘️', '주택열람': '👀', '접수': '📅', '서류대상발표': '📋', '서류제출': '📑', '자격검증': '🔎', '결과발표': '🏆', '동호배정': '🔢', '계약': '✍️', '입주': '🔑', '기타': '' };   // 기타는 아이콘 없이(원문 글머리 「•」가 이미 붙은 줄이 있다)
+const ZF_STAGE_AFTER_APPLY = ['서류대상발표', '서류제출', '자격검증', '결과발표', '동호배정', '계약', '입주'];
+function zfScheduleItemHTML(r, showScope){
+  const d1 = r.start_date || r.end_date || '', d2 = r.end_date || r.start_date || '';
+  const sc = [showScope ? r.scope_text : '', r.site_label].filter(Boolean).map(escapeHtml).join(' · ');
+  return `<div class="policy-item" data-zf-d="${zfAttr(d1)}" data-zf-e="${zfAttr(d2)}"${r.id != null ? ` data-sch-id="${zfAttr(r.id)}"` : ''}><div class="policy-category">${ZF_STAGE_ICON[r.stage] ? ZF_STAGE_ICON[r.stage] + ' ' : ''}${escapeHtml(r.stage_text || '')}${sc ? ` <span class="zf-sch-scope">${sc}</span>` : ''}</div><div class="policy-content">${escapeHtml(r.period_text || '')}</div></div>`;
+}
+function zfScheduleMarkLine(box){
+  const today = zf3Today();
+  const items = [...box.querySelectorAll(':scope > .policy-item')];
+  const nextI = items.findIndex(it => (it.dataset.zfD || '') > today);
+  items.forEach((it, i) => it.classList.add(!it.dataset.zfD ? 'unk' : it.dataset.zfD <= today ? ((it.dataset.zfE || '') >= today ? 'now' : 'past') : i === nextI ? 'next' : 'fut'));
+  return items.some(it => (it.dataset.zfE || '') >= today);
+}
+function zfScheduleTab(btn){
+  const w = btn.closest('details'); if(!w) return;
+  w.querySelectorAll('[data-sch-tab]').forEach(b => b.setAttribute('aria-selected', b === btn ? 'true' : 'false'));
+  w.querySelectorAll('[data-sch-panel]').forEach(p => { p.hidden = p.dataset.schPanel !== btn.dataset.schTab; });
+}
+function loadScheduleLine(annId, cardEl, id){
+  if(!annId || !cardEl) return;
+  const ownerAnn = zfCardAnn(id);
+  resolveAnnouncementIds(annId, true).then(ids => Promise.all([
+    fetch(`${SUPABASE_URL}/rest/v1/announcement_schedule?select=id,announcement_id,stage,stage_text,period_text,start_date,end_date,scope_text,site_label,sort_order&${idFilterFor(ids)}&order=announcement_id,sort_order`, { headers: zfAnonHeaders() })
+      .then(r => r.ok ? r.json() : null).catch(() => null),
+    fetchGroupRounds(ids, Array.isArray(ids) && ids.length >= 2),
+    Promise.resolve(ids)
+  ])).then(([rows, roundMap, ids]) => {
+    if(!zfStillOurs(id, ownerAnn) || !Array.isArray(rows) || !rows.length) return;
+    const cardEnd = cardEl.dataset.applyEnd || '';
+    let cur = rows;
+    if(ids.length >= 2){
+      if(!roundMap || !cardEnd) return;
+      cur = rows.filter(r => { const a = roundMap[r.announcement_id]; return !!a && (a.apply_end || '') === cardEnd; });
+    }
+    // 같은 회차의 두 ID 가 같은 줄을 가지면 하나만(원문 순서 그대로)
+    const seen = new Set();
+    cur = cur.filter(r => { const k = [r.stage_text, r.period_text, r.scope_text || '', r.site_label || ''].join('|'); if(seen.has(k)) return false; seen.add(k); return true; });
+    if(!cur.length) return;
+    const ord = new Map(); cur.forEach((r, i) => ord.set(r, i));
+    // 접수 행이 없으면 카드 접수기간(확정값)을 첫 「접수 뒤」 단계 앞에 종전 이름으로
+    const aS = cardEl.dataset.applyStart || '', aE = cardEl.dataset.applyEnd || '';
+    const extraApply = !cur.some(r => r.stage === '접수') && (aS || aE)
+      ? `<div class="policy-item" data-zf-d="${zfAttr(aS || aE)}" data-zf-e="${zfAttr(aE || aS)}"><div class="policy-category">📅 접수기간</div><div class="policy-content">${escapeHtml(`${aS || '-'} ~ ${aE || '-'}`)}</div></div>` : '';
+    const withApply = list => {
+      if(!extraApply) return list.map(r => zfScheduleItemHTML(r.r, r.s)).join('');
+      const k = list.findIndex(x => ZF_STAGE_AFTER_APPLY.includes(x.r.stage));
+      const parts = list.map(x => zfScheduleItemHTML(x.r, x.s));
+      parts.splice(k < 0 ? parts.length : k, 0, extraApply);
+      return parts.join('');
+    };
+    const stagesOf = {};
+    cur.forEach(r => { if(r.scope_text){ (stagesOf[r.scope_text] = stagesOf[r.scope_text] || new Set()).add(r.stage); } });
+    const lines = Object.keys(stagesOf).filter(s => stagesOf[s].size >= 2)
+      .sort((a, b) => Math.min(...cur.filter(r => r.scope_text === a).map(r => ord.get(r))) - Math.min(...cur.filter(r => r.scope_text === b).map(r => ord.get(r))));
+    let body;
+    if(lines.length >= 2){
+      // 범위마다 한 노선 — 공통 줄(범위 없음 · 한 단계에만 걸린 범위)은 노선마다 함께
+      body = `<div class="zf-sch-tabs" role="tablist" aria-label="일정 범위">${lines.map((s, i) => `<button type="button" role="tab" data-sch-tab="${i}" aria-selected="false" onclick="zfScheduleTab(this)">${escapeHtml(s)}</button>`).join('')}</div>`
+        + lines.map((s, i) => `<div class="zf-sch-panel" data-sch-panel="${i}" role="tabpanel" hidden>${withApply(cur.filter(r => !lines.includes(r.scope_text) || r.scope_text === s).map(r => ({ r, s: !lines.includes(r.scope_text) })))}</div>`).join('');
+    } else {
+      body = `<div class="zf-sch-panel">${withApply(cur.map(r => ({ r, s: true })))}</div>`;
+    }
+    const wrap = document.createElement('details');
+    wrap.className = 'policy-wrap zf3-vline zf-sch';
+    wrap.dataset.zf3 = '1'; wrap.dataset.sch = '1'; wrap.open = true;
+    wrap.innerHTML = `<summary class="policy-title">🗓️ 공급일정 <span class="zf-sch-src">공고문 일정</span></summary>` + body;
+    const panels = [...wrap.querySelectorAll('.zf-sch-panel')];
+    const live = panels.map(p => zfScheduleMarkLine(p));
+    if(lines.length >= 2){
+      // 처음 고르는 노선 = 접수 창이 지금이거나 가장 먼저 오는 범위(우선 순위 접수가 끝난 뒤 일반 순위 신청자가 「끝났다」로 읽지 않게) ·
+      //    접수 창이 모두 지났으면 아직 남은 역이 있는 첫 노선 · 다 지났으면 마지막 노선.
+      const today = zf3Today();
+      const apEnd = lines.map(s => cur.filter(r => r.scope_text === s && r.stage === '접수').map(r => r.end_date || r.start_date || '').filter(d => d >= today).sort()[0] || '');
+      let pick = apEnd.reduce((b, d, i) => d && (b < 0 || d < apEnd[b]) ? i : b, -1);
+      if(pick < 0) pick = live.findIndex(Boolean);
+      zfScheduleTab(wrap.querySelectorAll('[data-sch-tab]')[pick < 0 ? panels.length - 1 : pick]);
+    }
+    const slot = document.getElementById('schedule-slot-' + id);
+    if(!slot) return;
+    slot.innerHTML = '';
+    slot.appendChild(wrap);
+  }).catch(() => {});
 }
 
 // 카드 data-attachment-urls(LH 상세조회 dsAhflInfo 원문)를 읽어 "공고문 원문" 섹션으로 렌더링.
