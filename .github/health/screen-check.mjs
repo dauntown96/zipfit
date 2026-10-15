@@ -300,7 +300,7 @@ try {
   //       모든 행의 모든 갈래가 이 입력으로 「아님」이어야 한다(확인필요 갈래 · 모르는 대상은 아님이 아니다). 하나라도 어긋나면 실패 = 근거 없이 뺐다.
   //       🔵 2026-10-13(PR #491 뒤 · 이슈 #493) — 카드 ID에 키 행이 없으면 화면처럼 같은 그룹 키(announcement_dedup_key = 화면 zfDedupKey) 형제 중
   //       키 행을 가진 ID 가장 큰 공고 하나의 행으로 잰다(정정 카드 …20876 ← …20840).
-  //    ⓑ 매칭 표시 문구는 다섯 갈래(맞음 · 확인필요 · 확인필요-only 원문 대상 · 유형 기준 없음 · 👥 상자 제목) 중 하나여야 하고, 상자 수 = 뺀 공고 수.
+  //    ⓑ 매칭 표시 문구는 일곱 갈래(맞음 · 이름 없는 맞음 · 확인필요 · 이름 없는 확인필요 · 확인필요-only 원문 대상 · 유형 기준 없음 · 👥 상자 제목) 중 하나여야 하고, 상자 수 = 뺀 공고 수(2026-10-15 이름 없는 두 갈래 더함).
   //    SIMULATE=target_out 이면 키 없는 남은 카드 하나를 뺀 목록에 끼워 넣는다(실패해야 맞다).
   const tgt = await page.evaluate(async sim => {
     if (typeof diagnose !== 'function' || typeof matchHouses !== 'function') return { err: '화면 함수 없음' }
@@ -319,6 +319,8 @@ try {
   {
     const PH = [
       /^👥 .+ 대상 모집 — 입력하신 정보로는 대상 조건에 맞아요$/,
+      /^👥 입력하신 정보로는 대상 조건에 맞아요$/,   // 대상 이름 없는 갈래만으로 맞음(2026-10-15 · 이름을 짓지 않는다)
+      /^📄 대상 조건이 있는 공고예요( \(.+\))? — 신청할 수 있는지 공고문에서 확인해 주세요$/,
       /^📄 이 공고는 .+ 대상 모집이에요( \(.+\))? — 신청할 수 있는지 공고문에서 확인해 주세요$/,
       /^📄 이 공고의 모집 대상은 「.+」이에요( \(.+\))? — 신청할 수 있는지 공고문에서 확인해 주세요$/,
       /^📄 자격 진단에 이 유형\(.+\) 기준이 없어요 — 신청할 수 있는지 공고문에서 확인해 주세요$/,
@@ -375,7 +377,7 @@ try {
       extra.target_out = { out: tgt.out, bad, unknown }
     } else value = `못 잼(${tgt.err})`
     add('target_out', '매칭 2단계 — 공급 대상이 달라 뺀 공고 근거 · 표시 문구 갈래', ok ? 'pass' : 'fail', value,
-      '시험 사용자 (가) — 뺀 공고 전부 DB 로 따로 계산한 「모든 행 키 · 모든 갈래 아님」(카드 ID에 키 행이 없으면 같은 그룹 키 형제) · 문구 다섯 갈래 · 상자 수 = 뺀 수')
+      '시험 사용자 (가) — 뺀 공고 전부 DB 로 따로 계산한 「모든 행 키 · 모든 갈래 아님」(카드 ID에 키 행이 없으면 같은 그룹 키 형제) · 문구 일곱 갈래 · 상자 수 = 뺀 수')
   }
   // ⑥-2 공급대상 갈래 판정 표본(2026-10-15 · 우편함 「코드 — 공급대상 갈래 판정(D-2 …)」 · 원칙 33).
   //    키 객체 × 진단 입력 → 기대 ok/no/check 를 코드 밖 표(target-samples.json)에 두고 배포본 zfTargetRowState 로 잰다.
@@ -394,11 +396,14 @@ try {
       const fx = s => ({ marital: s.facts.marital, children: null, birthYear: y - s.facts.age, classes: new Set(s.facts.classes),
         members: s.facts.members === 'diag_untouched' ? diagMembers() : s.facts.members })
       // 카드 표본(2026-10-15 · 우편함 「코드 — 공급대상 갈래 「no 먼저」 …」) — zfTargetVerdict 의 state 와 checks(안내 괄호 안 낱말 · 순서까지).
-      const v = vs.map(s => { const r = zfTargetVerdict(s.rows, fx(s)) || {}; return { state: r.state || null, checks: r.checks || [] } })
+      const v = vs.map(s => { const r = zfTargetVerdict(s.rows, fx(s)) || {}
+        let note = null
+        if (s.note != null && typeof zfTargetNoteHtml === 'function') { const box = document.createElement('div'); box.innerHTML = zfTargetNoteHtml(r.state ? r : null); note = box.textContent.replace(/\s+/g, ' ').trim() }
+        return { state: r.state || null, checks: r.checks || [], note } })
       return { list: ss.map(s => zfTargetRowState(s.key, fx(s))), v }
     }, [samples, vsamples])
     const bad = got.err ? [] : samples.map((s, i) => got.list[i] === s.expect ? null : `${s.id}: ${got.list[i]}≠${s.expect}`).filter(Boolean)
-      .concat(vsamples.map((s, i) => { const g = got.v[i]; return g.state === s.expect && JSON.stringify(g.checks) === JSON.stringify(s.checks) ? null : `${s.id}: ${g.state}(${g.checks.join(' · ')})≠${s.expect}(${s.checks.join(' · ')})` }).filter(Boolean))
+      .concat(vsamples.map((s, i) => { const g = got.v[i]; return g.state === s.expect && JSON.stringify(g.checks) === JSON.stringify(s.checks) && (s.note == null || g.note === s.note) ? null : `${s.id}: ${g.state}(${g.checks.join(' · ')})${s.note != null ? `「${g.note}」` : ''}≠${s.expect}(${s.checks.join(' · ')})${s.note != null ? `「${s.note}」` : ''}` }).filter(Boolean))
     const total = samples.length + vsamples.length
     add('target_samples', '매칭 공급대상 갈래 판정 — 표본 키 기대값', !got.err && bad.length === 0 ? 'pass' : 'fail',
       got.err ? `못 잼(${got.err})` : `${total - bad.length}/${total}${bad.length ? ' · ' + bad.slice(0, 3).join(' / ') : ''}`,
