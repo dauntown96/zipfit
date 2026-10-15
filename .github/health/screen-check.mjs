@@ -10,6 +10,7 @@
 //   DB 의 링크 표(announcement_post_links)·공고 행 날짜로 따로 계산해 맞춘다(붙은 카드만 · 오늘 = KST).
 import { chromium } from 'playwright'
 import { sqlRead, report, SITE } from './lib.mjs'
+import { readFileSync } from 'node:fs'
 
 const VIEWPORT = { width: 390, height: 844 }
 const MAX_PAGES = 30
@@ -364,6 +365,23 @@ try {
     } else value = `못 잼(${tgt.err})`
     add('target_out', '매칭 2단계 — 공급 대상이 달라 뺀 공고 근거 · 표시 문구 갈래', ok ? 'pass' : 'fail', value,
       '시험 사용자 (가) — 뺀 공고 전부 DB 로 따로 계산한 「모든 행 키 · 모든 갈래 아님」(카드 ID에 키 행이 없으면 같은 그룹 키 형제) · 문구 다섯 갈래 · 상자 수 = 뺀 수')
+  }
+  // ⑥-2 공급대상 갈래 판정 표본(2026-10-15 · 우편함 「코드 — 공급대상 갈래 판정(D-2 …)」 · 원칙 33).
+  //    키 객체 × 진단 입력 → 기대 ok/no/check 를 코드 밖 표(target-samples.json)에 두고 배포본 zfTargetRowState 로 잰다.
+  //    표본: SH_311349 홀몸어르신 꼴 · …19376 청년 전세임대 꼴 · 혼인 · 대상 없는 갈래 · 모르는 조건 키(종전 ok → check) · 옛 키 회귀.
+  //    SIMULATE=target_samples 이면 첫 표본의 기대값을 뒤집어 잰다(실패해야 맞다).
+  {
+    const samples = JSON.parse(readFileSync(new URL('./target-samples.json', import.meta.url), 'utf8')).samples
+    if (process.env.SIMULATE === 'target_samples' && samples.length) samples[0].expect = samples[0].expect === 'ok' ? 'no' : 'ok'
+    const got = await page.evaluate(ss => {
+      if (typeof zfTargetRowState !== 'function') return { err: 'zfTargetRowState 없음' }
+      const y = new Date().getFullYear()
+      return { list: ss.map(s => zfTargetRowState(s.key, { marital: s.facts.marital, children: null, birthYear: y - s.facts.age, classes: new Set(s.facts.classes), members: s.facts.members })) }
+    }, samples)
+    const bad = got.err ? [] : samples.map((s, i) => got.list[i] === s.expect ? null : `${s.id}: ${got.list[i]}≠${s.expect}`).filter(Boolean)
+    add('target_samples', '매칭 공급대상 갈래 판정 — 표본 키 기대값', !got.err && bad.length === 0 ? 'pass' : 'fail',
+      got.err ? `못 잼(${got.err})` : `${samples.length - bad.length}/${samples.length}${bad.length ? ' · ' + bad.slice(0, 3).join(' / ') : ''}`,
+      '전부 기대값 — .github/health/target-samples.json(코드 밖 표) · 배포본 zfTargetRowState')
   }
   // ⑦ 숫자가 말하는 「지금」(2026-10-08 · 우편함 「표시층 — 숫자가 말하는 「지금」」 · 원칙 33).
   //    공고 탭 머리(기본 거름 — 신청할 수 없는 공고 숨기기)와 인사이트 머리의 「지금 열린 공고 M건」이 화면 정의(zfOpenNotices) 한 값과 같은가 ·

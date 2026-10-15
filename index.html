@@ -6032,8 +6032,12 @@ function zfTargetSubjectState(b, c, f){
   if(t === '계층' && c['계층_중_하나'] != null) return 'ok';
   return zfTargetBranchBase(Object.assign({}, b, { '확인필요': undefined, '조건': Object.fromEntries(Object.entries(c).filter(([k]) => !ZF_TARGET_NEW_KEYS.includes(k))) }), f);
 }
+// 🔴 2026-10-15(우편함 「코드 — 공급대상 갈래 판정(D-2 …)」 1 · 재량 「그대로」) — 판정이 아는 조건 키는 옛 셋 + 새 셋뿐이다.
+//    그 밖의 키가 하나라도 있으면 그 갈래는 check — 모르는 조건을 건너뛰고 나머지만으로 「맞음」을 내지 않는다(다음 판에 키가 늘어도 같다).
+const ZF_TARGET_OLD_KEYS = ['나이_최소', '나이_최대', '미성년자녀_최소'];
 function zfTargetBranchState(b, f){
   const c = (b && typeof b === 'object' && b['조건'] && typeof b['조건'] === 'object') ? b['조건'] : {};
+  if(Object.keys(c).some(k => !ZF_TARGET_OLD_KEYS.includes(k) && !ZF_TARGET_NEW_KEYS.includes(k))) return 'check';
   const keys = ZF_TARGET_NEW_KEYS.filter(k => c[k] != null);
   if(!keys.length) return zfTargetBranchBase(b, f);
   const st = [zfTargetSubjectState(b, c, f), ...keys.map(k => zfTargetCondState(k, c[k], f))];
