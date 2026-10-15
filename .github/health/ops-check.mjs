@@ -8,6 +8,7 @@
 import { sqlRead, anonRpc, report, recordFindings, SITE, PROJECT_REF } from './lib.mjs'
 import { YEARLY_SQL, judgeYearly } from './yearly.mjs'
 import { SH_RUN_SQL, judgeShRun } from './sh-run.mjs'
+import { BACKLOG_SQL, judgeBacklog } from './collect-backlog.mjs'
 import { HARD, splitFailed } from './gate.mjs'
 import { readdirSync, readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
@@ -515,6 +516,13 @@ try {
     for (const c of judgeShRun(x.j)) add(c.id, c.name, c.status, c.value, c.rule)
   } catch (e) {
     add('sh_run', 'SH 수집 회차가 런 로그를 남겼나', 'fail', String(e).slice(0, 200), 'SH_RUN_SQL 을 읽는다')
+  }
+  // ⑰ 홍보물·단지 이미지 목록 수집 — cron 두 번 지나도록 처리 안 된 대상(collect-backlog.mjs 머리 주석 · 2026-10-15). 읽기 실패는 ❌(안 멈춤).
+  try {
+    const [x] = await sqlRead(BACKLOG_SQL)
+    for (const c of judgeBacklog(x.j)) add(c.id, c.name, c.status, c.value, c.rule)
+  } catch (e) {
+    add('promo_backlog', '홍보물·단지 이미지 목록 수집 — 처리 안 된 대상', 'fail', String(e).slice(0, 200), 'BACKLOG_SQL 을 읽는다')
   }
 } catch (e) {
   add('runner', '점검 실행', 'fail', String(e).slice(0, 300), '점검 스크립트가 끝까지 돈다')
