@@ -6123,7 +6123,12 @@ function zfTargetVerdict(rows, f){
 function zfTargetDiagFacts(){
   const by = parseInt(document.getElementById('birthYear')?.value) || 0;
   const ch = document.getElementById('children')?.value;
-  const mb = parseInt(document.getElementById('members')?.value) || 0;
+  // 🔴 2026-10-15(우편함 「코드 — 가구원수 칸 안 건드림 = check …」 1단계) — 가구원 수 칸은 기본값 「2인」이 선택돼 있어 빈 값이 없다.
+  //    사용자가 만졌거나(zfMatchTouched) 저장 조건에서 채운 값 그대로일 때(zfMatchFilledVals)만 그 값 · 아니면 0 = 모름 → 가구원수_최대는 check.
+  //    이 값은 공급대상 판정에만 쓴다(소득 기준 등 다른 판정은 칸 값을 그대로 읽는다).
+  const mbEl = document.getElementById('members');
+  const mbKnown = !!mbEl && (zfMatchTouched.has('members') || (zfMatchFilledVals.members != null && mbEl.value === zfMatchFilledVals.members));
+  const mb = mbKnown ? (parseInt(mbEl.value) || 0) : 0;
   return { marital: diagMarital || document.getElementById('marital')?.value || '', children: (ch == null || ch === '') ? null : (parseInt(ch) || 0), birthYear: by, classes: zfDiagClasses(), members: mb };
 }
 function zfTargetProfileFacts(){
