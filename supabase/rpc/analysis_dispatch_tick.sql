@@ -46,6 +46,14 @@ AS $function$
 --   대기열 키만 가상으로 둔다: group_key = 묶음 키 || ' #접수기간 없음 ' || 공고일 · apply_end = 9999-12-31(몫 순서 맨 뒤).
 --   🔴 이 가상 값은 analysis_dispatch_queue 밖으로 나가지 않는다 — announcements · 화면 · RPC 의 날짜는 그대로 NULL 이고,
 --   접수기간은 분석이 원문으로 *_confirmed 에 채운다. 채워진 뒤 같은 공고는 같은 공고 ID 의 완료 분석으로 후보에서 빠진다(SH 만의 자기 일치).
+-- 🔵 자동 회수(2026-10-15 · 우편함 「코드 — 루틴 자동 회수(안 A …)」 1 · 설계 PR #517 회신 ⓪(b)) — ①-3:
+--   running ∧ reason ≠ followup ∧ 잡힘(claimed_at) ∧ 마지막 심장박동(heartbeat_at)이 30분 넘게 조용 ∧ 만든 지 90분 넘은 회차는
+--   루틴 세션이 끊긴 것으로 보고 released 로 옮긴다(note 「자동 회수 …」) · 실린 몫 → waiting · returned · 실린 후속 요청 → waiting.
+--   그 회차 표지의 분석 행(batch_label 「…자동runN」 또는 실린 몫 공고 ID · 회차 만든 뒤 분석)이 있으면 후속 요청 「run N 마감 정리」를 대기에 넣는다
+--   (분석은 커밋됐는데 우편함 회신·이력 PR 이 없는 꼴 — 새 회차가 그 둘만 한다 · 분석 몫은 ② 후보 판정이 완료 분석을 보고 뺀다).
+--   겹침 방지: 루틴은 단계 경계마다 analysis_run_heartbeat(N) · 분석 DB 쓰기 트랜잭션 맨 앞에 analysis_run_alive(N)(거짓이면 예외로 롤백 ·
+--   참이면 회차 행을 잠가 그 트랜잭션이 끝날 때까지 회수가 기다린다) · released 회차의 analysis_queue_finish 는 쓰기 없이 released 를 돌려준다.
+--   ①-3 은 ② 앞이다 — 되돌린 몫이 같은 판정에서 바로 후보 대조(완료 분석이면 dropped)를 거치고, 잠금이 풀렸으니 이번 판정이 새 회차를 보낼 수 있다.
 -- 비밀값: Vault zipfit_routine_fire_url · zipfit_routine_fire_token(값은 표·반환에 싣지 않는다).
 declare
   cfg public.analysis_dispatch_config%rowtype;
@@ -56,6 +64,7 @@ declare
   n_sent int := 0; n_fu int := 0; n_fu_sent int := 0;
   v_reason text; v_url text; v_tok text; v_run bigint; v_rid bigint;
   v_promo_ids text;
+  n_reclaim int := 0; v_back text[]; v_has_aa boolean;
 begin
   perform pg_advisory_xact_lock(hashtext('zipfit_analysis_dispatch'));
   select * into cfg from public.analysis_dispatch_config where id = 1;
@@ -116,6 +125,43 @@ begin
   end loop;
 
   -- ② 후보 → 대기열
+  -- ①-3 자동 회수(2026-10-15) — 루틴 세션이 끊긴 분석 회차(심장박동 30분 없음 ∧ 만든 지 90분)를 released 로 옮기고 실린 몫·후속을 대기로 되돌린다.
+  --      🔴 심장박동이 한 번도 없는 회차(heartbeat_at NULL — 루틴 v2.6 까지)는 회수하지 않는다(claude.ai 판정 (가) 2026-10-15):
+  --      v2.6 은 심장박동·쓰기 앞 가드를 부르지 않아, 오래 돌다 끝내 쓰는 회차(run 101 233분 · 186 670분)를 거두면 같은 공고를 두 회차가 쓴다.
+  --      그런 회차는 종전대로 health-ops stale_lock ❌ + 사람 풀기(analysis_run_release). 루틴 v2.7 이 잡기 직후 심장박동을 부른 회차부터 대상이다.
+  for rr in select r.id, r.created_at, r.claimed_at, r.heartbeat_at from public.analysis_dispatch_runs r
+             where r.state = 'running' and r.reason <> 'followup' and r.claimed_at is not null
+               and r.heartbeat_at is not null and r.heartbeat_at < now() - interval '30 minutes'
+               and r.created_at < now() - interval '90 minutes'
+             order by r.id for update loop
+    update public.analysis_dispatch_runs
+       set state = 'released', finished_at = now(),
+           finish_note = '자동 회수 — 심장박동 30분 없음(마지막 '
+                         || to_char(rr.heartbeat_at at time zone 'Asia/Seoul', 'MM-DD HH24:MI') || ' KST)'
+     where id = rr.id and state = 'running';
+    with u as (
+      update public.analysis_dispatch_queue
+         set state = 'waiting', returned = true, run_id = null, state_at = now(), note = '자동 회수 run ' || rr.id
+       where run_id = rr.id and state in ('sent', 'claimed')
+      returning announcement_id
+    )
+    select array_agg(announcement_id) into v_back from u;
+    update public.analysis_followup_requests
+       set state = 'waiting', run_id = null, state_at = now(), note = '자동 회수 run ' || rr.id
+     where run_id = rr.id and state = 'sent';
+    select exists (select 1 from public.announcement_analysis aa
+                    where aa.analyzed_at >= rr.created_at
+                      and (aa.batch_label ~ ('자동\s*run\s*' || rr.id || '(\D|$)') or aa.announcement_id = any(coalesce(v_back, '{}'::text[]))))
+      into v_has_aa;
+    if v_has_aa then
+      insert into public.analysis_followup_requests (page_ref, note)
+      values ('run ' || rr.id || ' 마감 정리',
+              '자동 회수된 run ' || rr.id || ' 에 분석 행이 있다 — 분석하지 말고 그 회차 우편함 페이지 「## 회신」과 이력 PR 만 한다(분석 몫은 완료 분석이라 대기열에서 빠진다)')
+      on conflict (page_ref) where state = 'waiting' do nothing;
+    end if;
+    n_reclaim := n_reclaim + 1;
+  end loop;
+
   with link_map as (
     select distinct on (l.linked_announcement_id)
       l.linked_announcement_id as aid, announcement_dedup_key(lh.title) as lh_key
@@ -217,7 +263,7 @@ begin
 
   -- ③ 보낼지
   if exists (select 1 from public.analysis_dispatch_runs where state in ('firing', 'running')) then
-    return jsonb_build_object('result', 'locked', 'new', n_new, 'dropped', n_drop, 'resolved', n_resolved);
+    return jsonb_build_object('result', 'locked', 'new', n_new, 'dropped', n_drop, 'resolved', n_resolved, 'reclaimed', n_reclaim);
   end if;
   select (select count(*) from public.analysis_dispatch_queue q where q.run_id = r.id and q.state = 'done')
     into last_done
@@ -235,7 +281,7 @@ begin
     from public.analysis_dispatch_queue where state = 'waiting';
   select count(*) into n_fu from public.analysis_followup_requests where state = 'waiting';
   if n_ready = 0 and n_fu = 0 then
-    return jsonb_build_object('result', 'empty', 'new', n_new, 'dropped', n_drop, 'resolved', n_resolved);
+    return jsonb_build_object('result', 'empty', 'new', n_new, 'dropped', n_drop, 'resolved', n_resolved, 'reclaimed', n_reclaim);
   end if;
   if n_ready > 0 then
     v_reason := case when p_force then 'manual'
@@ -248,26 +294,26 @@ begin
     v_reason := 'followup';
   end if;
   if v_reason is null then
-    return jsonb_build_object('result', 'waiting', 'ready', n_ready, 'new', n_new, 'dropped', n_drop,
+    return jsonb_build_object('result', 'waiting', 'ready', n_ready, 'new', n_new, 'dropped', n_drop, 'reclaimed', n_reclaim,
                               'grace_left_min', round(extract(epoch from cfg.grace - (now() - w_last)) / 60));
   end if;
   if not p_force and not cfg.enabled then
-    return jsonb_build_object('result', 'disabled', 'would', v_reason, 'ready', n_ready, 'followups', n_fu, 'new', n_new, 'dropped', n_drop);
+    return jsonb_build_object('result', 'disabled', 'would', v_reason, 'ready', n_ready, 'followups', n_fu, 'new', n_new, 'dropped', n_drop, 'reclaimed', n_reclaim);
   end if;
   if not p_force and (select count(*) = 3 and bool_and(state = 'failed')
                         from (select state from public.analysis_dispatch_runs order by id desc limit 3) z) then
-    return jsonb_build_object('result', 'failing', 'would', v_reason, 'ready', n_ready);
+    return jsonb_build_object('result', 'failing', 'would', v_reason, 'ready', n_ready, 'reclaimed', n_reclaim);
   end if;
   if not p_force and (select count(*) = 3 and bool_and(state = 'finished' and done = 0)
                         from (select r.state, (select count(*) from public.analysis_dispatch_queue q
                                                 where q.run_id = r.id and q.state = 'done') as done
                                 from public.analysis_dispatch_runs r where r.reason <> 'followup' order by r.id desc limit 3) z) then
-    return jsonb_build_object('result', 'stalled', 'would', v_reason, 'ready', n_ready);
+    return jsonb_build_object('result', 'stalled', 'would', v_reason, 'ready', n_ready, 'reclaimed', n_reclaim);
   end if;
   select decrypted_secret into v_url from vault.decrypted_secrets where name = 'zipfit_routine_fire_url';
   select decrypted_secret into v_tok from vault.decrypted_secrets where name = 'zipfit_routine_fire_token';
   if coalesce(v_url, '') = '' or coalesce(v_tok, '') = '' then
-    return jsonb_build_object('result', 'no_secret', 'would', v_reason, 'ready', n_ready);
+    return jsonb_build_object('result', 'no_secret', 'would', v_reason, 'ready', n_ready, 'reclaimed', n_reclaim);
   end if;
 
   insert into public.analysis_dispatch_runs (reason, items) values (v_reason, 0) returning id into v_run;
@@ -302,6 +348,6 @@ begin
     timeout_milliseconds := 30000);
   update public.analysis_dispatch_runs set net_request_id = v_rid where id = v_run;
   return jsonb_build_object('result', 'fired', 'run', v_run, 'reason', v_reason, 'items', n_sent, 'left', n_ready - n_sent,
-                            'followups', n_fu_sent, 'new', n_new, 'dropped', n_drop);
+                            'followups', n_fu_sent, 'new', n_new, 'dropped', n_drop, 'reclaimed', n_reclaim);
 end
 $function$
