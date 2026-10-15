@@ -275,7 +275,16 @@ try {
            where a.is_revised and a.revised_at < now() - interval '60 minutes' and d.apply_end >= current_date)
          select coalesce(json_agg(rv.announcement_id), '[]'::json) from rv where not get_revision_analysis_done(rv.announcement_id)
            and exists (select 1 from announcement_analysis aa where aa.announcement_id in (select g.announcement_id from get_announcement_group_ids(rv.announcement_id) g)
-                       and aa.status in ('완료', '완료(보조 누락)', '완료(판정 대기)', '완료(소급)')))
+                       and aa.status in ('완료', '완료(보조 누락)', '완료(판정 대기)', '완료(소급)'))),
+      -- 🔵 2026-10-15(우편함 「코드 — 불변식 … · health-ops-soft 「판정완료인데 판정 대기」 감지」 2) — 판정 대기 잔존.
+      --    done = 상태 「완료(판정 대기)」인데 pending_fields 에 「[판정완료] YYYY-MM-DD …」 줄(2026-10-15 규약 — 판정이 난 날 · 근거 페이지)이 있는 공고.
+      --    「[판정완료]」 바로 뒤 날짜로 가린다 — 2026-09 분석들의 「[판정완료] <설명>」(분석자가 스스로 정한 것을 적은 옛 꼴)은 세지 않는다.
+      --    old = 「완료(판정 대기)」로 분석(analyzed_at) 뒤 7일 넘게 남은 공고(판정이 아직 안 끝난 것 — 정보).
+      'pending_done', (select coalesce(json_agg(a.announcement_id order by a.analyzed_at), '[]'::json) from announcement_analysis a
+           where a.status = '완료(판정 대기)' and exists (select 1 from unnest(a.pending_fields) e where e ~ '^\\s*\\[판정완료\\]\\s*[0-9]{4}-[0-9]{2}-[0-9]{2}')),
+      'pending_old', (select coalesce(json_agg(json_build_object('id', a.announcement_id, 'days', floor(extract(epoch from now() - a.analyzed_at) / 86400)::int)
+             order by a.analyzed_at), '[]'::json) from announcement_analysis a
+           where a.status = '완료(판정 대기)' and a.analyzed_at < now() - interval '7 days')
     ) j`)
   const d = db.j
 
@@ -358,6 +367,20 @@ try {
     add('revision_gap', '열린 정정공고 중 정정본 분석 없음(정정 60분 넘음)', ids.length === 0 ? 'pass' : 'warn',
       ids.length ? `${ids.length}: ${ids.slice(0, 5).join(', ')}` : 0,
       '0 — 대표 ∧ is_revised ∧ 정정 60분 넘음 ∧ 열림(apply_end ≥ 오늘) ∧ 정정 전 분석 있음 ∧ get_revision_analysis_done 거짓 · 넘으면 ⚠️ 경고만(이슈를 열지 않는다 — 루틴 착수를 막지 않게)')
+  }
+  // ⑧-2b 판정 대기 잔존(2026-10-15 · 우편함 「코드 — 불변식 … · health-ops-soft 「판정완료인데 판정 대기」 감지」 2).
+  //    🔴 ⚠️ 경고만이다(이슈를 열지 않는다 — revision_gap·followup_unreported 와 같은 처리) — 고치는 길이 코드가 아니라 「운영 — 데이터 쓰기」(상태만)라
+  //    이슈로 열면 판정과 데이터 쓰기 사이 내내 열린 채 회차마다 ②에 걸린다. 결과 파일·요약 표·ops_health_findings 에 남는다.
+  //    정보 한 줄(pending_old)은 판정하지 않는다(ℹ️ — 판정이 오래 안 끝난 공고 수).
+  {
+    const ids = d.pending_done || []
+    add('pending_done', '판정이 났는데 「완료(판정 대기)」로 남은 공고', ids.length === 0 ? 'pass' : 'warn',
+      ids.length ? `${ids.length}: ${ids.slice(0, 5).join(', ')}` : 0,
+      '0 — 상태 「완료(판정 대기)」 ∧ pending_fields 에 「[판정완료] YYYY-MM-DD …」 줄 · 넘으면 ⚠️ 경고만(상태 정리는 운영 데이터 쓰기 몫 · 이슈를 열지 않는다)')
+    const old = d.pending_old || []
+    add('pending_old', '「완료(판정 대기)」로 분석 뒤 7일 넘은 공고(정보)', 'info',
+      old.length ? `${old.length}: ${old.slice(0, 5).map(x => `${x.id}(${x.days}일)`).join(', ')}` : 0,
+      '정보 — 판정하지 않는다(판정이 오래 안 끝난 공고 수 · analyzed_at 기준)')
   }
   // ⑧-3 후속 처리 결과(2026-10-06 · 우편함 「코드 — 1-B 후속 처리가 실제로 일했는가」 4) — 루틴이 analysis_queue_finish 넷째 인자로 남긴 결과.
   //    🔴 실패가 아니라 ⚠️ 경고다 — 이슈를 열면 루틴이 착수하지 않아(열린 health-ops 이슈) 스스로 풀리지 않는다(#328 · revision_gap 과 같은 처리).
