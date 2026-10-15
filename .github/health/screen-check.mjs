@@ -547,6 +547,57 @@ try {
     add('relax_badge', '완화 배지 — 원문(제목·완화 내용)에 없는 모집 꼴을 말하지 않는다', ok ? 'pass' : 'fail', value,
       'DB 로 따로 가른 갈래(제목 「추가 모집」 · 모집권역·거주지역만 완화 · 그 밖 자격완화) = 화면 배지 글자(완화 행 전부 · 보이는 칩)')
   }
+  // ⑦-1c 상세 세로 노선(2026-10-15 · 우편함 「표시층 — 상세 세로 노선(일정 표 …)」 · 원칙 33) — 펼친 상세 「🗓️ 공급일정」이
+  //    공고문 일정 표(announcement_schedule)의 이 카드 회차 행을 빠짐없이 · 다른 회차 없이 그리는가.
+  //    기대값은 DB 에서 **따로** — 목록 RPC 카드마다 같은 제목 키(announcement_dedup_key)의 공고 중 apply_end = 카드 apply_end 인 공고의 일정 행 id
+  //    (그룹에 공고가 하나뿐이면 그 공고 행 전부). 화면은 역마다 data-sch-id 를 단다 — 범위 단추로 나뉜 노선(순위별 두 벌)은 모든 노선의 id 를 모은다.
+  //    열린 카드 중 범위가 갈리는 공고를 먼저 넣어 최대 8장을 실제로 펼쳐 잰다. SIMULATE=sched_line 이면 기대 id 하나를 더해 잰다(실패해야 맞다).
+  {
+    const [sq] = await sqlRead(`
+      with today as (select (now() at time zone 'Asia/Seoul')::date d),
+      c as (select d.announcement_id aid, d.title, d.apply_end e from get_announcements_deduped() d, today t where d.apply_end >= t.d),
+      g as (select c.aid, c.e, a.announcement_id gid, a.apply_end ge from c join announcements a on announcement_dedup_key(a.title) = announcement_dedup_key(c.title)),
+      n as (select aid, count(*) ng from g group by aid),
+      s as (select g.aid, sc.id, sc.scope_text from g join n using (aid) join announcement_schedule sc on sc.announcement_id = g.gid
+             where n.ng = 1 or g.ge is not distinct from g.e),
+      a as (select aid, json_agg(id order by id) ids, count(distinct scope_text) nsc from s group by aid)
+      select coalesce(json_agg(json_build_object('aid', aid, 'ids', ids) order by nsc desc, aid), '[]'::json) j, count(*) n from a`)
+    const want = (sq.j || []).slice(0, 8)
+    if (process.env.SIMULATE === 'sched_line' && want.length) want[0].ids = want[0].ids.concat([-1])
+    const got = []
+    let err = null
+    try {
+      await page.evaluate(() => goMain(2))
+      for (const w of want) {
+        await page.evaluate(aid => { const rows = noticeData.filter(n => String(n.announcement_id) === aid); renderNoticeList(rows, rows.length, 0) }, w.aid)
+        const card = await page.$('.hcard[data-announcement-id]')
+        if (!card) { got.push({ aid: w.aid, ids: null }); continue }
+        await card.click()
+        await page.waitForFunction(() => !!document.querySelector('[id^="schedule-slot-"] .zf-sch'), null, { timeout: 15000 }).catch(() => {})
+        got.push(await page.evaluate(aid => {
+          const slot = document.querySelector('[id^="schedule-slot-"]')
+          const items = slot ? [...slot.querySelectorAll('.zf-sch .policy-item')] : []
+          return { aid, ids: slot && slot.querySelector('.zf-sch') ? [...new Set(items.map(i => Number(i.dataset.schId)).filter(n => !isNaN(n)))].sort((a, b) => a - b) : null,
+            bad: ((slot ? slot.innerText : '').match(/�|\[object|undefined/g) || []).length }
+        }, w.aid))
+      }
+      await page.evaluate(() => { try { applyNoticeFiltersAndRender() } catch (e) {} })
+    } catch (e) { err = String(e.message || e).slice(0, 120) }
+    let ok = false, value
+    if (!err) {
+      const bad = want.map((w, i) => {
+        const g = got[i] || {}
+        if (!g.ids) return `${w.aid}: 노선 없음`
+        const ws = [...w.ids].sort((a, b) => a - b)
+        return JSON.stringify(ws) === JSON.stringify(g.ids) && !g.bad ? null : `${w.aid}: 화면 ${g.ids.length}역 ≠ DB ${ws.length}행${g.bad ? ' · 깨진 글자' : ''}`
+      }).filter(Boolean)
+      ok = bad.length === 0
+      value = `일정 행 있는 열린 카드 ${sq.n} 중 ${want.length}장 펼침 · 역 ${got.reduce((s, g) => s + ((g && g.ids) || []).length, 0)} · 어긋남 ${bad.length}${bad.length ? ': ' + bad.slice(0, 3).join(' / ') : ''}`
+      extra.sched_line = { want, got, bad }
+    } else value = `못 잼(${err})`
+    add('sched_line', '상세 세로 노선 — 공고문 일정 표의 이 카드 회차 행을 빠짐없이 · 다른 회차 없이', ok ? 'pass' : 'fail', value,
+      'DB 로 따로 계산한 일정 행 id(같은 제목 키 · apply_end = 카드 apply_end) = 펼친 상세 노선 역의 id(범위 노선 모두) · 깨진 글자 0')
+  }
   // ⑦-2 한글 조합 입력(2026-10-13 · 우편함 「코드 — 한글 중복 입력 …」 1 · 원칙 33) — 공고 검색 칸에 실제 조합 이벤트(CDP Input.imeSetComposition →
   //    insertText)로 「부산」을 친다. 두 꼴을 본다:
   //    ⓐ 단어 조합(모바일 입력기처럼 ㅂ → 부 → 붓 → 부사 → 부산을 한 조합으로 · 확정 전) — 확정하기 전에 공고 탭 머리 「조건에 맞는 N건」과 시트 머리줄 수가
