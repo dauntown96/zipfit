@@ -34,6 +34,12 @@ begin
     return jsonb_build_object('run', p_run_id, 'done', 0, 'returned', 0, 'followups', n_fu,
                               'note', '후속 전용 회차 — 이미 닫힘' || case when n_fu > 0 then ' · 결과만 남김' else '' end);
   end if;
+  -- 🔵 2026-10-15(우편함 「코드 — 루틴 자동 회수(안 A …)」 1) — 회수된(released — 발송기 자동 회수 ①-3 · 사람 잠금 풀기) 회차의 늦은 끝 호출은
+  --   쓰기 없이 released 를 돌려준다. 몫·후속은 이미 대기로 돌아가 새 회차가 맡았다 — 옛 세션은 「회수됨」만 회신하고 끝낸다.
+  if exists (select 1 from public.analysis_dispatch_runs where id = p_run_id and state = 'released') then
+    return jsonb_build_object('run', p_run_id, 'released', true, 'done', 0, 'returned', 0, 'followups', 0,
+                              'note', '회수된 회차 — 쓰기 0 · 「회수됨」만 회신한다');
+  end if;
   if not exists (select 1 from public.analysis_dispatch_runs where id = p_run_id and state in ('firing', 'running')) then
     raise exception '발송 회차 % 가 도는 중이 아니다', p_run_id;
   end if;
