@@ -343,14 +343,25 @@ try {
                   from src s left join public.eligibility_criteria e on e.announcement_id = s.sid),
           b as (select r.aid, r.id, x.b from r left join lateral jsonb_array_elements(
                   case when jsonb_typeof(r.g) = 'object' and jsonb_typeof(r.g->'갈래') = 'array' then r.g->'갈래' else '[]'::jsonb end) x(b) on true),
+          -- 🔵 2026-10-15(우편함 「코드 — 공급대상 갈래 「no 먼저」 …」 · 이슈 #527) — 화면 규칙을 따로 옮긴다:
+          --    ① 나이·자녀 수 축(다자녀 · 고령자 · 청년 대상)이 no면 확인필요가 있어도 no(no 먼저 · ZF_TARGET_NO_FIRST)
+          --    ② 신혼·신생아 · 한부모 대상은 확인필요 없는 갈래, 또는 새 키(혼인 · 계층_중_하나 · 가구원수_최대) 갈래에서만 no(새 키 갈래는 대상 축을 확인필요와 따로 본다)
+          --    ③ 새 키 혼인 「혼인 중」은 시험 사용자(미혼)에게 no · 계층·가구원수는 시험 사용자가 고르지·만지지 않아 모름(no 아님)
+          --    ④ 모르는 조건 키가 있으면 그 갈래는 check(no 아님).
+          bk as (select aid, id, b,
+                  (b is not null and jsonb_typeof(b->'조건') = 'object' and (b->'조건') ?| array['혼인','계층_중_하나','가구원수_최대']) as has_new,
+                  (b is not null and jsonb_typeof(b->'조건') = 'object' and exists (select 1 from jsonb_object_keys(b->'조건') k
+                     where k not in ('나이_최소','나이_최대','미성년자녀_최소','혼인','계층_중_하나','가구원수_최대'))) as unk
+                from b),
           bs as (select aid, id, b,
-                  (b is not null and not (b ? '확인필요') and (
+                  (b is not null and not unk and (
                     (b->>'대상' = '다자녀' and coalesce((b->'조건'->>'미성년자녀_최소')::int, 0) > 0)
-                    or b->>'대상' in ('신혼·신생아', '한부모')
+                    or (b->>'대상' in ('신혼·신생아', '한부모') and (has_new or not (b ? '확인필요')))
                     or (b->>'대상' in ('고령자', '청년') and ((b->'조건') ? '나이_최소' or (b->'조건') ? '나이_최대')
                         and (${y} - ${by} < coalesce((b->'조건'->>'나이_최소')::int, -999) or ${y} - ${by} - 1 > coalesce((b->'조건'->>'나이_최대')::int, 999)))
+                    or (has_new and b->'조건'->>'혼인' = '혼인 중')
                   )) as no
-                from b),
+                from bk),
           rs as (select aid, id, count(b) nb, bool_and(no) all_no from bs group by aid, id)
           select i.aid,
                  (select count(*) from r where r.aid = i.aid and r.id is not null) n_rows,
