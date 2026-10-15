@@ -419,6 +419,56 @@ try {
     add('open_count', '숫자가 말하는 「지금」 — 열린 공고 수 한 정의 · 누적 표기', ok ? 'pass' : 'fail', value,
       '공고 탭 기본 머리 = 「열린 공고 M건」 + 「접수 중 a · 예정 b[ · 미상 k]」 · a+b+k = M · a = 인사이트 「접수 중」 KPI · 인사이트 머리 「지금 열린 공고 M건」 · M = zfOpenNotices(noticeData) · 누적 T·기간 = DB')
   }
+  // ⑦-1 차수 사이 카드(2026-10-15 · 우편함 「표시층 — 차수 사이 카드 상태」 · 원칙 33) — 경로 표 창이 둘 이상 끊긴 카드에서 오늘이 창 사이면
+  //    「접수 중」도 닫힘도 아니고 다음 창 시작일을 말해야 한다(…0769 · …19241 「접수 중」 · …0706 · …0713 · …0737 닫혀 목록에서 빠짐 — 같은 꼴 네 번째).
+  //    기대값은 DB 에서 **따로** 계산한다 — 목록 RPC 카드 기간 안 · 같은 제목 키(announcement_dedup_key)의 경로 행 창(하루 차로 붙거나 겹치면 한 창)이
+  //    둘 이상 · 오늘이 어느 창에도 없음 · 기간 확인 대상·조기 마감 알림·당첨발표 지남·날짜 없는 경로 행이면 뺀다. 다음 창이 있으면 화면은
+  //    ⓐ 열린 목록(zfOpenNotices)에 있고 ⓑ 상태가 「접수 중」이 아니고 ⓒ 알약이 「다음 접수 MM-DD」로 시작해야 한다 · 다음 창이 없으면(마지막 창 뒤) 닫힘.
+  //    SIMULATE=route_gap 이면 경로 행을 안 본 종전 판정으로 잰다(차수 사이 카드가 있는 날 실패해야 맞다).
+  {
+    const [gq] = await sqlRead(`
+      with today as (select (now() at time zone 'Asia/Seoul')::date d),
+      c as (select d.announcement_id aid, d.title, d.apply_start s, d.apply_end e
+              from get_announcements_deduped() d, today t
+             where d.apply_period_check is not true and d.apply_start <= t.d and t.d <= d.apply_end
+               and (d.winner_announce_date is null or d.winner_announce_date >= t.d)
+               and not (d.title ~ '^\\s*(\\[[^]]*\\]\\s*)*\\[\\s*조기\\s*(접수)?\\s*마감\\s*\\]' or coalesce(d.revision_note, '') ~ '조기\\s*(접수\\s*)?마감')),
+      rt as (select c.aid, c.s, c.e, r.start_date x, r.end_date y
+               from c join announcements a on announcement_dedup_key(a.title) = announcement_dedup_key(c.title)
+               join announcement_apply_routes r on r.announcement_id = a.announcement_id),
+      w as (select aid, x, y from rt where aid not in (select aid from rt where x is null or y is null) and y >= s and x <= e),
+      o as (select aid, x, y, max(y) over (partition by aid order by x, y rows between unbounded preceding and 1 preceding) py from w),
+      g as (select aid, x, y, sum(case when py is null or x > py + 1 then 1 else 0 end) over (partition by aid order by x, y) gid from o),
+      isl as (select aid, gid, min(x) x, max(y) y from g group by aid, gid),
+      agg as (select aid, count(*) n, bool_or(x <= t.d and t.d <= y) inwin, min(x) filter (where x > t.d) nxt from isl, today t group by aid)
+      select coalesce(json_agg(json_build_object('aid', aid, 'next', nxt) order by aid), '[]'::json) j from agg where n >= 2 and not inwin`)
+    const want = gq.j || []
+    const got = await page.evaluate(([want, sim]) => {
+      if (typeof zfRouteGap !== 'function') return { err: 'zfRouteGap 없음' }
+      if (sim) zfSide.routesReady = false
+      const open = new Set(zfOpenNotices(noticeData).map(r => String(r.announcement_id)))
+      const out = want.map(x => {
+        const r = noticeData.find(n => String(n.announcement_id) === x.aid)
+        return r ? [x.aid, open.has(x.aid), applyWindowState(r), zf3Pill(r).t] : [x.aid, null, null, null]
+      })
+      if (sim) zfSide.routesReady = true
+      return { out }
+    }, [want, process.env.SIMULATE === 'route_gap'])
+    let ok = false, value
+    if (!got.err) {
+      const md = d => String(d).slice(5, 10)
+      const bad = got.out.filter(([aid, open, st, pill], i) => {
+        const nx = want[i].next
+        if (open === null) return true
+        return nx ? !(open && st !== 'open' && pill.startsWith('다음 접수 ' + md(nx))) : open
+      }).map(([aid, open, st, pill]) => `${aid}: ${open === null ? '목록 행 없음' : `${open ? '열림' : '닫힘'} · ${st} · 「${pill}」`}`)
+      ok = bad.length === 0
+      value = `차수 사이 카드 ${want.length}${want.length ? ` (${want.map(x => x.aid.slice(-5) + (x.next ? '→' + md(x.next) : '·끝')).join(' ')})` : ''} · 어긋남 ${bad.length}${bad.length ? ': ' + bad.slice(0, 3).join(' / ') : ''}`
+      extra.route_gap = { want, out: got.out, bad }
+    } else value = `못 잼(${got.err})`
+    add('route_gap', '차수 사이 카드 — 접수 중이 아니고 열린 목록에 있고 다음 창 시작일을 말한다', ok ? 'pass' : 'fail', value,
+      'DB 로 따로 계산한 창 사이 카드(경로 표 창 둘 이상 · 오늘이 창 밖 · 카드 기간 안) — 다음 창이 있으면 열린 목록 · 상태 ≠ 접수 중 · 알약 「다음 접수 MM-DD」 / 없으면 닫힘')
+  }
   // ⑦-2 한글 조합 입력(2026-10-13 · 우편함 「코드 — 한글 중복 입력 …」 1 · 원칙 33) — 공고 검색 칸에 실제 조합 이벤트(CDP Input.imeSetComposition →
   //    insertText)로 「부산」을 친다. 두 꼴을 본다:
   //    ⓐ 단어 조합(모바일 입력기처럼 ㅂ → 부 → 붓 → 부사 → 부산을 한 조합으로 · 확정 전) — 확정하기 전에 공고 탭 머리 「조건에 맞는 N건」과 시트 머리줄 수가
