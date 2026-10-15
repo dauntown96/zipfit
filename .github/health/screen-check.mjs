@@ -570,18 +570,19 @@ try {
       // 앞 점검이 다른 탭·지도 보기·시트에 화면을 둔 채일 수 있다 — 공고 탭 목록 보기로 돌리고, 펼치기는 DOM 클릭으로(보이는지에 기대지 않는다 · 이슈 #535).
       await page.evaluate(() => { goMain(2); if (typeof zf3SetView === 'function') zf3SetView('list'); document.getElementById('noticeFilterPanel')?.classList.add('hidden') })
       for (const w of want) {
-        const has = await page.evaluate(aid => {
+        // 🔴 슬롯은 펼친 그 카드의 것(schedule-slot-<카드 id>)만 읽는다 — 앞 점검(매칭 결과)이 펼쳐 둔 다른 카드 슬롯이 문서에 먼저 있다(run 108).
+        const cid = await page.evaluate(aid => {
           const rows = noticeData.filter(n => String(n.announcement_id) === aid); renderNoticeList(rows, rows.length, 0)
-          const c = document.querySelector('.hcard[data-announcement-id]'); if (c) c.click(); return !!c
+          const c = document.querySelector(`#notice-list .hcard[data-announcement-id="${CSS.escape(aid)}"]`); if (c) c.click(); return c ? c.dataset.cardId : null
         }, w.aid)
-        if (!has) { got.push({ aid: w.aid, ids: null }); continue }
-        await page.waitForFunction(() => !!document.querySelector('[id^="schedule-slot-"] .zf-sch'), null, { timeout: 15000 }).catch(() => {})
-        got.push(await page.evaluate(aid => {
-          const slot = document.querySelector('[id^="schedule-slot-"]')
+        if (!cid) { got.push({ aid: w.aid, ids: null }); continue }
+        await page.waitForFunction(cid => !!document.querySelector(`#schedule-slot-${CSS.escape(cid)} .zf-sch`), cid, { timeout: 15000 }).catch(() => {})
+        got.push(await page.evaluate(([aid, cid]) => {
+          const slot = document.getElementById('schedule-slot-' + cid)
           const items = slot ? [...slot.querySelectorAll('.zf-sch .policy-item')] : []
           return { aid, ids: slot && slot.querySelector('.zf-sch') ? [...new Set(items.map(i => Number(i.dataset.schId)).filter(n => !isNaN(n)))].sort((a, b) => a - b) : null,
             bad: ((slot ? slot.innerText : '').match(/�|\[object|undefined/g) || []).length }
-        }, w.aid))
+        }, [w.aid, cid]))
       }
       await page.evaluate(() => { try { applyNoticeFiltersAndRender() } catch (e) {} })
     } catch (e) { err = String(e.message || e).slice(0, 120) }
