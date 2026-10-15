@@ -1798,6 +1798,7 @@ const ZF_FRESH_DAYS = 3;
 function isClosingSoon(row){
   // 🔴 B62 ③ — 접수기간을 믿을 수 없는 행에는 날짜에서 나오는 배지를 달지 않는다.
   if(row['apply_period_check'] === true) return false;
+  if(zfRouteGap(row)) return false;   // 🔴 2026-10-15 — 차수 사이(다음 창을 기다리는 카드)는 마감 임박이 아니다(zfRouteGap)
   const d = parseNoticeDate(row['신청마감일']||row['apply_end']||'');
   if(!d) return false;
   // 🔴 시각을 비교에서 제거한다 — 양쪽 다 「로컬 날짜의 00:00」으로 맞춘 뒤 일수 차를 센다.
@@ -1841,7 +1842,39 @@ function zfLhSpanIsUnion(row, pn){
   const minS = Math.min(...ss.map(x => startOfLocalDay(x).getTime())), maxE = Math.max(...es.map(x => startOfLocalDay(x).getTime()));
   return startOfLocalDay(s).getTime() >= minS && startOfLocalDay(e).getTime() <= maxE;
 }
+// 🔴 2026-10-15(우편함 「표시층 — 차수 사이 카드 상태」) — 경로 표(announcement_apply_routes)의 창이 둘 이상 끊겨 있으면 창 사이는 「접수 예정」이다.
+//    카드 기간(apply_start~apply_end)은 스킬 「전체 창」 규칙대로 첫 창 시작 ~ 마지막 창 끝이라, 날짜만 보면 창 사이에 「접수 중」이 서고(…0769 · …19241)
+//    LH 가 첫 차수 뒤 「접수마감」을 달면 닫혀 열린 목록에서 빠졌다(…0706 · …0713 · …0737 — 다음 창 10-20 · 11-02). 데이터는 맞다 — 화면 판정만 고친다.
+//    창 사이 = 'before' + 다음 창 시작일(닫지 않는다) · 마지막 창 끝 뒤(카드 기간 안) = 'closed' · 창 안 = 종전 판정 그대로(LH 「…마감」 포함).
+//    보지 않는 것: 경로 행이 아직 안 왔거나(zfSide.routesReady) · 기간 확인 대상 · 조기 마감 알림 · 당첨발표가 지남 · 오늘이 카드 기간 밖 ·
+//    기간 모르는 경로 행이 섞임 · 창(겹치거나 하루 차로 붙은 행은 한 창)이 하나뿐 — 모두 종전 그대로다.
+function zfRouteGap(row){
+  if(!row || !zfSide.routesReady || row['apply_period_check'] === true || zfEarlyClosed(row)) return null;
+  const S = parseNoticeDate(row['신청시작일'] || row['apply_start'] || ''), E = parseNoticeDate(row['신청마감일'] || row['apply_end'] || '');
+  if(!S || !E) return null;
+  const day = d => startOfLocalDay(d).getTime(), s0 = day(S), e0 = day(E), today = day(new Date());
+  if(today < s0 || today > e0) return null;
+  const w = parseNoticeDate(row['winner_announce_date'] || '');
+  if(w && day(w) < today) return null;
+  const rows = zfSide.routesByKey.get(zfDedupKey(row['공고명'] ?? row.title)) || [];
+  const wins = [];
+  for(const r of rows){
+    const a = parseNoticeDate(r.start_date || ''), b = parseNoticeDate(r.end_date || '');
+    if(!a || !b) return null;
+    const x = day(a), y = day(b);
+    if(y < s0 || x > e0) continue;   // 카드 기간 밖 창(같은 제목의 다른 회차)은 보지 않는다
+    wins.push({ x, y, d: String(r.start_date).slice(0, 10) });
+  }
+  wins.sort((p, q) => p.x - q.x);
+  const merged = [];
+  wins.forEach(c => { const m = merged[merged.length - 1]; if(m && c.x <= m.y + 864e5) m.y = Math.max(m.y, c.y); else merged.push(Object.assign({}, c)); });
+  if(merged.length < 2 || merged.some(m => m.x <= today && today <= m.y)) return null;
+  const nxt = merged.find(m => m.x > today);
+  return nxt ? { state: 'before', next: nxt.d } : { state: 'closed' };
+}
 function applyWindowState(row){
+  const gap = zfRouteGap(row);
+  if(gap) return gap.state;
   const st = zfWindowStateOne(row);
   const pn = zfPostNoticeFor(row);
   if(!pn || zfLhPostClosed(row) || zfEarlyClosed(row)) return st;
@@ -2052,7 +2085,10 @@ function zfStatusTag(row){
   let text = raw;
   if(st === 'open') text = '접수중';
   else if(st === 'closed') text = zfEarlyClosed(row) ? '조기 마감' : (/마감$/.test(raw) ? raw : '접수마감');
-  else if(st === 'before') text = (!raw || raw === '접수중' || /마감$/.test(raw)) ? '공고중' : raw;
+  else if(st === 'before'){
+    const gap = zfRouteGap(row);   // 🔴 2026-10-15 — 차수 사이는 다음 창 시작일을 말한다
+    text = gap && gap.next ? `다음 접수 ${zfMd(gap.next)}` : (!raw || raw === '접수중' || /마감$/.test(raw)) ? '공고중' : raw;
+  }
   return { text: text || '-', closed: /마감$/.test(text) };
 }
 // 🔴 문구는 「없음」이 아니라 「미상」이다 — 「접수기간 없음」은 상시모집으로 읽힌다.
@@ -2123,6 +2159,7 @@ function applyDateLine(row, annDate, applyStart, applyEnd, url){
 // 🔴 실패는 조용히 끝낸다 — 곁 데이터가 없어도 카드는 종전 그대로다(한 줄·칩·링크가 안 붙을 뿐).
 const zfSide = {
   loaded: false,
+  routesReady: false,       // 🔴 2026-10-15 — 경로 행이 붙었나(카드 상태가 창 사이를 본다 · zfRouteGap) — 가격 요약을 기다리지 않고 먼저 선다
   routesByKey: new Map(),   // 제목 키 → 경로 행[]
   linkByKey: new Map(),     // MYHOME 제목 키 → { lhKey, lhTitle, lhUrl }
   rentLowByKey: new Map(),  // 제목 키 → 하위 3분의 1 단지 행[]
@@ -2164,6 +2201,7 @@ function zfLoadCardSide(){
       if(!zfSide.routesByKey.has(k)) zfSide.routesByKey.set(k, []);
       zfSide.routesByKey.get(k).push(r);
     });
+    zfRoutesReadyMark();
     links.forEach(l => {
       const lh = annById.get(l.lh_announcement_id);
       if(!lh || !l.linked_group_key) return;
@@ -2184,6 +2222,23 @@ function zfLoadCardSide(){
     return zfSide;
   });
   return zfSidePromise;
+}
+// 🔴 2026-10-15 — 경로 행이 오면 카드 상태(창 사이 · zfRouteGap)가 바뀔 수 있다 — 같은 게시물 공고문(zfLoadPostNotices)처럼
+//    상태가 바뀐 카드가 있으면 목록·추천을 다시 거른다. 인사이트·매칭·전광판은 zfLoadRoutes() 를 기다린 뒤 센다(실패해도 풀린다 — 그때는 종전 판정).
+let zfRoutesReadyResolve = null;
+const zfRoutesReadyP = new Promise(r => { zfRoutesReadyResolve = r; });
+function zfRoutesReadyMark(){
+  if(zfSide.routesReady) return;
+  const rows = typeof noticeData !== 'undefined' ? noticeData : [];
+  const before = rows.map(n => applyWindowState(n));
+  zfSide.routesReady = true;
+  zfRoutesReadyResolve();
+  const changed = rows.some((n, i) => applyWindowState(n) !== before[i]);
+  if(changed && noticeLoaded) applyNoticeFiltersAndRender(noticePage);
+  if(changed) zfRerenderRecIfVisible();
+}
+function zfLoadRoutes(){
+  return Promise.race([zfRoutesReadyP, zfLoadCardSide().then(() => {}, () => {})]);
 }
 // 카드를 그린 뒤 부른다 — 곁 데이터가 이미 있으면 바로 채우고, 없으면 로드를 건다(도착하면 다시 채운다).
 function zfAfterCardsRender(){
@@ -2738,6 +2793,7 @@ function zfFetchAllNoticeRows(){
 // ── 필터 칩 목록: 첫 로드 시 region_top·status_normalized 사용 (중복 없음) ──
 async function initNoticeFilters(){
   zfLoadPostNotices();   // 🔵 2026-09-30 — 목록 RPC 와 겹쳐 받는다(카드 상태·숨기기 재료)
+  zfLoadRoutes();        // 🔴 2026-10-15 — 경로 표도 겹쳐 받는다(창 사이 카드 상태 · zfRouteGap)
   // 🔴 중복 가드 — 추천 탭(첫 화면)과 공고 탭이 둘 다 이 입구를 쓴다.
   //    noticeLoaded 만으로는 모자라다: 로드가 도는 동안에는 아직 false라 탭을 오가면
   //    같은 질의가 두 번 나간다. 「끝났나」와 「도는 중인가」를 따로 본다.
@@ -4861,7 +4917,7 @@ async function loadInsightData(){
     //    여기만 먼저 세면 「지금 열린 공고」 수가 탭마다 갈린다(isHiddenAsClosed 가 붙은 공고문 상태를 본다). 실패해도 약속은 풀린다.
     const [rows, , statsRes] = await Promise.all([
       zfFetchAllNoticeRows(),
-      zfLoadPostNotices(),
+      Promise.all([zfLoadPostNotices(), zfLoadRoutes()]),   // 🔴 2026-10-15 — 창 사이 카드 상태(zfRouteGap)도 같은 정의로 센다
       fetch(`${SUPABASE_URL}/rest/v1/rpc/get_rental_stats_summary`,
         {method:'POST', headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY,'Content-Type':'application/json'}, body:'{}'}).catch(()=>null)
     ]);
@@ -6149,7 +6205,7 @@ async function matchHouses(){
     // 🔴 2026-10-01 — 같은 게시물 공고문(zfLoadPostNotices)이 온 뒤에 거른다. 카드 상태(applyWindowState)가 붙은 공고문까지 보므로,
     //    먼저 거르면 공고 탭과 상태가 어긋난다(아산 …0726 — LH 행은 닫혀도 붙은 공고문이 열려 있으면 카드가 남는다).
     //    실패해도 약속은 풀린다(zfLoadPostNotices 가 잡는다) — 그때는 종전처럼 LH 행만으로 판정한다.
-    await zfLoadPostNotices();
+    await Promise.all([zfLoadPostNotices(), zfLoadRoutes()]);   // 🔴 2026-10-15 — 경로 표(창 사이 카드 상태)도 기다린다
     rows = rows.filter(r => !isHiddenAsClosed(r));
     // 🔴 공고 탭과 같은 판정 함수를 쓴다(2026-09-16) — 짝 있는 [취소공고] 행은 여기서도 뺀다.
     const dropCancelM = zfPairedCancelIds(rows,
@@ -10227,7 +10283,7 @@ function zf3DayTo(str){
 let zf3Rows = null, zf3RowsP = null;
 function zf3LoadRows(){
   if(zf3RowsP) return zf3RowsP;
-  zf3RowsP = Promise.all([zfFetchAllNoticeRows(), Promise.resolve(zfLoadPostNotices()).catch(() => null)]).then(([rows]) => {
+  zf3RowsP = Promise.all([zfFetchAllNoticeRows(), Promise.resolve(zfLoadPostNotices()).catch(() => null), zfLoadRoutes()]).then(([rows]) => {
     const keep = noticeLoadedAt;
     const mapped = zfMapNoticeRows(rows);
     noticeLoadedAt = keep;   // 목록의 「기준 시각」은 공고 탭이 받은 때 그대로
@@ -10476,10 +10532,19 @@ function zf3Pill(n){
     const d = end ? zf3Days(today, end) : null;
     return { cls: 'open' + (d != null && d <= 1 ? ' hot' : ''), t: d === 0 ? '오늘 마감' : '접수 중' + (d != null ? ' · D-' + d : '') };
   }
-  if(st === 'before') return { cls: 'before', t: start ? '접수 예정 · D-' + zf3Days(today, start) : '접수 예정' };
+  if(st === 'before'){
+    const gap = zfRouteGap(n);   // 🔴 2026-10-15 — 차수 사이는 다음 창 시작일(카드 시작일은 이미 지났다)
+    if(gap && gap.next) return zf3NextPill(gap.next);
+    return { cls: 'before', t: start ? '접수 예정 · D-' + zf3Days(today, start) : '접수 예정' };
+  }
   if(st === 'closed') return { cls: 'closed', t: zfEarlyClosed(n) ? '조기 마감' : '마감' };   // 🔵 2026-10-13 — 공급기관이 알린 조기 접수마감(zfEarlyClosed)
   if(end && end >= today) return { cls: 'unknown', t: '시작일 미상 · 마감 D-' + zf3Days(today, end) };
   return { cls: 'unknown', t: APPLY_UNKNOWN_LABEL };
+}
+// 다음 창을 기다리는 알약 — 차수 사이(zfRouteGap)와 반복 접수 창(⑤)이 같은 글자를 쓴다.
+function zf3NextPill(d){
+  const n = zf3Days(zf3Today(), d);
+  return { cls: 'before', t: '다음 접수 ' + zf3Md(d).replace(/\(.\)$/, '') + (n > 0 ? ' · D-' + n : '') };
 }
 // 가로 노선 — 역 간격은 같게, 「오늘」 깃발만 실제 경과에 비례(시안 D-2 4차 그대로).
 function zf3LineHTML(stns, label){
@@ -10686,7 +10751,7 @@ function zf3DecorateIn(list, rowsMap, isMatch){
         const cur = wins.find(w => w.s <= today && today <= w.e), nxt = wins.find(w => w.s > today), w = cur || nxt, began = wins.some(w0 => w0.e < today);
         const pill = card.querySelector('.zf3-dpill');
         if(pill && cur){ const d = zf3Days(today, cur.e); pill.className = 'zf3-dpill open' + (d <= 1 ? ' hot' : ''); pill.textContent = d === 0 ? '오늘 창 마감' : '접수 중 · 이번 창 D-' + d; }
-        else if(pill && nxt && began){ pill.className = 'zf3-dpill before'; pill.textContent = '다음 창 대기 · ' + zf3Md(nxt.s).replace(/\(.\)$/, ''); }
+        else if(pill && nxt && began){ const p = zf3NextPill(nxt.s); pill.className = 'zf3-dpill ' + p.cls; pill.textContent = p.t; }
         const route = card.querySelector('.zf3-route');
         if(route && w && card.dataset.zf3Branch !== '1'){
           const st = zf3Stations(n);
