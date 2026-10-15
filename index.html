@@ -6045,9 +6045,19 @@ function zfTargetBranchState(b, f){
   if(st.every(s => s === 'ok')) return b['확인필요'] ? 'check' : 'ok';
   return 'check';
 }
+// 🔴 2026-10-15(우편함 「코드 — 공급대상 갈래 「no 먼저」 …」 1단계 1) — `확인필요`가 있어도 나이·자녀 수가 no면 no가 먼저다
+//    (`SH_311087` 45세 — 원문 「19세 이상 ~ 39세 이하」) · 그 밖일 때만 `확인필요` → check.
+//    🔴 혼인 축(신혼·신생아 · 한부모 대상)에는 걸지 않는다 — `확인필요` 갈래의 대상 이름이 원문 대상과 넓이가 다를 수 있다
+//    (Ⅱ 5순위 「그 밖의 혼인가구」 = `{대상:"신혼·신생아", 확인필요:"그 밖의 혼인가구"}` — 걸면 일반 기혼이 「뺌」이 된다 · 2026-10-15 실측).
+const ZF_TARGET_NO_FIRST = ['다자녀', '고령자', '청년'];
 function zfTargetBranchBase(b, f){
   if(zfTargetClassHit(b, f)) return 'ok';
-  if(!b || typeof b !== 'object' || b['확인필요']) return 'check';
+  if(!b || typeof b !== 'object') return 'check';
+  const s = zfTargetBranchCore(b, f);
+  if(!b['확인필요']) return s;
+  return (s === 'no' && ZF_TARGET_NO_FIRST.includes(b['대상'])) ? 'no' : 'check';
+}
+function zfTargetBranchCore(b, f){
   const c = (b['조건'] && typeof b['조건'] === 'object') ? b['조건'] : {};
   switch(b['대상']){
     case '다자녀': {
@@ -6085,6 +6095,11 @@ const ZF_TARGET_UNCOVERED = [
 function zfTargetUncovered(g){
   const w = String((g && g['원문']) || '');
   if(!w) return [];
+  // 🔵 2026-10-15(우편함 「코드 — 공급대상 갈래 「no 먼저」 …」 1단계 3) — 그 행의 갈래가 모두 `확인필요`를 가지면 키가 이미 그 조건을
+  //    원문 낱말로 담는다(`SH_311087` 「청년 유튜브 크리에이터」 → 「직업」을 또 붙이지 않는다). 🔴 「하나라도」가 아니라 「모두」다 —
+  //    `확인필요` 없는 갈래가 하나라도 있으면 그 갈래가 「맞음」을 낼 수 있어 안전망이 남아야 한다(매입 청년 `…20838` 나이 갈래 + 대학생 갈래 → 「혼인 여부」).
+  const brs = ((g && g['갈래']) || []).filter(b => b && typeof b === 'object');
+  if(brs.length && brs.every(b => b['확인필요'])) return [];
   const kinds = new Set(((g && g['갈래']) || []).map(b => b && b['대상']).filter(Boolean));
   // 갈래의 확인필요 글자가 이미 그 조건을 말하면(`…20880` 「1인가구」) 다시 세지 않는다 — 같은 조건이 두 번 나오지 않게.
   const said = ((g && g['갈래']) || []).map(b => (b && b['확인필요']) || '').join(' ');
@@ -6099,6 +6114,20 @@ function zfTargetRowState(g, f){
   if(st.includes('ok')) return zfTargetUncovered(g).length ? 'check' : 'ok';
   return st.every(s => s === 'no') ? 'no' : 'check';
 }
+// 「 · 」로 가르되 괄호 안은 가르지 않는다(「대학생(19세 미만 · 39세 초과 포함)」은 한 낱말).
+function zfTargetSplitWords(s){
+  const out = []; let d = 0, cur = '';
+  const t = String(s || '');
+  for(let i = 0; i < t.length; i++){
+    const ch = t[i];
+    if(ch === '(' || ch === '（') d++;
+    else if((ch === ')' || ch === '）') && d > 0) d--;
+    if(d === 0 && t.startsWith(' · ', i)){ out.push(cur); cur = ''; i += 2; continue; }
+    cur += ch;
+  }
+  out.push(cur);
+  return out.map(x => x.trim()).filter(Boolean);
+}
 // rows = 그 카드 자신의 자격 행 공급대상 칸 배열(객체가 아니면 「키 없음」). 판정하지 않으면 null.
 function zfTargetVerdict(rows, f){
   if(!Array.isArray(rows) || !rows.length) return null;
@@ -6109,7 +6138,8 @@ function zfTargetVerdict(rows, f){
   const quotes = [...new Set(rows.map(g => g['원문']).filter(Boolean))];
   if(st.every(s => s === 'no')) return { state: 'no', names: names('*'), quotes };
   if(st.includes('ok')) return { state: 'ok', names: names('ok'), quotes };
-  const checks = [...new Set(rows.flatMap(g => (g['갈래'] || []).map(b => b && b['확인필요']).filter(Boolean).concat(zfTargetUncovered(g))))];
+  // 🔵 2026-10-15(우편함 「코드 — 공급대상 갈래 「no 먼저」 …」 1단계 2) — 확인필요 글자를 「 · 」로 갈라 같은 낱말은 한 번만(`…19376` 「1순위 유형(가구 단위)」 두 갈래).
+  const checks = [...new Set(rows.flatMap(g => (g['갈래'] || []).map(b => b && b['확인필요']).filter(Boolean).flatMap(zfTargetSplitWords).concat(zfTargetUncovered(g))))];
   // 🔵 2026-10-13(우편함 「코드 — 한글 중복 입력 · 매칭 「맞음」 낱말 확장 …」 3 ②) — 대상 이름 없이 「확인필요」만 있는 갈래가 있으면
   //    「○○ 대상 모집」으로 묶지 않는다(`…20880` 장애인 · 1인가구 → 「장애인 대상 모집」은 1인가구를 지웠다). 갈래마다 원문 대상 글자를 그대로 낸다.
   if(rows.some(g => (g['갈래'] || []).some(b => b && b['확인필요'] && !b['대상']))){
