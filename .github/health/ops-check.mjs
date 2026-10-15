@@ -56,6 +56,34 @@ select jsonb_build_object(
              from public.ops_uptime_log
             where at < now() - interval '12 minutes' and at > now() - interval '24 hours') r), '[]'::jsonb)
 ) as j;`
+// ⑧ 분석 발송기 잠금 — 90분 넘게 도는 회차를 심장박동 유무로 가른다(2026-10-15 · 우편함 「코드 — health-ops stale_lock 갈래 …」 1).
+//    발송기 자동 회수(analysis_dispatch_tick ①-3 · 마이그레이션 2026-10-15_02)는 running ∧ reason ≠ followup ∧ 잡힘 ∧ 심장박동 있음 ∧
+//    마지막 심장박동 30분 조용 ∧ 만든 지 90분인 회차를 거둔다 — 이 점검은 그 조건을 거울한다(바뀌면 여기도).
+//    why: hb = 심장박동 있는 회차가 잡은 지 90분 넘음(자동 회수 대상 · ⚠️) ·
+//         reclaim_missed = 회수 조건(조용 30분 ∧ 생성 90분)을 넘고도 tick 두 번(20분)이 지나도록 running(회수가 안 돈다 · ❌) ·
+//         no_hb = 심장박동 없는 회차(첫 심장박동 전에 끊김 · 판정 (가)로 회수 밖) 또는 후속 전용 회차(①-2 가 60분에 닫는다)가 90분 넘음(❌ · 사람 풀기).
+//    롤백 시험이 이 문자열을 그대로 떠서 쓴다(가짜 회차를 넣고 같은 판정이 나오는지) — 바꾸면 시험도 다시 돈다.
+const STALE_LOCK_SQL = `(select json_build_object(
+         'hard', coalesce(json_agg(json_build_object('id', r.id, 'why', z.why, 'age_min', round(extract(epoch from now() - coalesce(r.claimed_at, r.created_at)) / 60),
+                    'hb_min', round(extract(epoch from now() - r.heartbeat_at) / 60)) order by r.id) filter (where z.why <> 'hb'), '[]'::json),
+         'hb', coalesce(json_agg(json_build_object('id', r.id, 'age_min', round(extract(epoch from now() - coalesce(r.claimed_at, r.created_at)) / 60),
+                    'hb_min', round(extract(epoch from now() - r.heartbeat_at) / 60)) order by r.id) filter (where z.why = 'hb'), '[]'::json))
+       from analysis_dispatch_runs r
+       cross join lateral (select case
+           when r.reason <> 'followup' and r.heartbeat_at is not null
+                and r.heartbeat_at < now() - interval '50 minutes' and r.created_at < now() - interval '110 minutes' then 'reclaim_missed'
+           when coalesce(r.claimed_at, r.created_at) >= now() - interval '90 minutes' then null
+           when r.reason <> 'followup' and r.heartbeat_at is not null then 'hb'
+           else 'no_hb' end as why) z
+      where r.state in ('firing', 'running') and z.why is not null)`
+// ⑧-5 자동 회수 본 횟수(2026-10-15 · 같은 우편함 2) — 지난 24시간 발송기가 거둔 회차. 사람 풀기(analysis_run_release)는 finish_note 「잠금 풀기: …」 ·
+//    자동 회수는 「자동 회수 — …」로 갈린다. 공고 = 그 회차에서 되돌린 대기열 행(note 「자동 회수 run N」) · 후속 = 「run N 마감 정리」 요청의 마지막 상태.
+const AUTO_RECLAIM_SQL = `(select coalesce(json_agg(json_build_object('id', r.id, 'at', to_char(r.finished_at at time zone 'Asia/Seoul', 'MM-DD HH24:MI'),
+         'ann', (select string_agg(q.announcement_id, ', ' order by q.announcement_id) from analysis_dispatch_queue q where q.note = '자동 회수 run ' || r.id),
+         'fu', (select f.state || coalesce('/' || f.result, '') from analysis_followup_requests f where f.page_ref = 'run ' || r.id || ' 마감 정리' order by f.id desc limit 1))
+         order by r.id), '[]'::json)
+       from analysis_dispatch_runs r
+      where r.state = 'released' and r.finish_note like '자동 회수%' and r.finished_at > now() - interval '24 hours')`
 // ⑭ 상세 지도 끝 상태(2026-10-13 · 우편함 「코드 — 지도 감시」) — 열린 카드마다 화면(index.html)이 지도를 어떻게 끝내는지를 DB 로 거울한다.
 //    거울하는 화면 규칙(배포본 b242914 기준 — 바뀌면 여기도): toggleDetail(정밀주소 있으면 그 주소로 핀 · 없으면 pickRegionAddr 폴백) ·
 //    loadAnnouncementBlocks(블록 2개 이상이면 블록마다 핀) · loadHousingUnits(세대 행 있으면 세대 주소로 핀 · 없으면 폴백이 시·구 수준 ∧
@@ -208,7 +236,8 @@ try {
            and coalesce((select max(created_at) from analysis_dispatch_runs where reason <> 'followup'), '-infinity') < now() - (c.grace + c.max_wait)),  -- 몫 상한(한 발송 batch_size건)이라 긴 대기열은 정상 — 그동안 발송이 하나도 없을 때만 센다(2026-10-01 · 후속 전용 followup 회차는 세지 않는다 2026-10-02)
          'batch_size', c.batch_size,
          'not_ready_24h', (select count(*) from analysis_dispatch_queue where state = 'waiting' and ready_at is null and enqueued_at < now() - interval '24 hours'),
-         'stale_lock', (select count(*) from analysis_dispatch_runs where state in ('firing','running') and coalesce(claimed_at, created_at) < now() - interval '90 minutes'),
+         'stale_lock', ${STALE_LOCK_SQL},
+         'auto_reclaim_24h', ${AUTO_RECLAIM_SQL},
          'fail_streak', (select count(*) = 3 and bool_and(state = 'failed') from (select state from analysis_dispatch_runs order by id desc limit 3) z),
          'zero_streak', (select count(*) = 3 and bool_and(state = 'finished' and done = 0) from (select r.state,
            (select count(*) from analysis_dispatch_queue q where q.run_id = r.id and q.state = 'done') as done
@@ -293,14 +322,32 @@ try {
       if (x.not_ready_24h > 0) bad.push(`홍보물 목록을 24시간 넘게 기다리는 매입 ${x.not_ready_24h}`)
       // 🔵 2026-10-02 — 6시간 → 90분 · 기준 coalesce(claimed_at, created_at)(정상 회차 15~34분 · run 101 은 3시간 53분이었다).
       //    걸리면 Notion ⑥ 「발송 회차 잠금 풀기」 절차로 analysis_run_release(run_id, 사유)를 부른다.
-      if (x.stale_lock > 0) bad.push(`90분 넘게 안 풀린 잠금 ${x.stale_lock} — 세션 확인 뒤 analysis_run_release`)
+      // 🔵 2026-10-15(우편함 「코드 — health-ops stale_lock 갈래 …」 1) — 심장박동 있는 회차의 90분은 ⚠️(아래 stale_lock_hb · 자동 회수 대상).
+      //    ❌ 는 둘만 — 심장박동 없는 회차(회수 밖 · 사람 풀기) · 회수 조건을 넘고 tick 두 번(20분) 지나도록 도는 회차(회수가 안 돈다).
+      const hard = (x.stale_lock && x.stale_lock.hard) || []
+      const noHb = hard.filter(s => s.why === 'no_hb'), missed = hard.filter(s => s.why === 'reclaim_missed')
+      if (noHb.length) bad.push(`자동 회수 밖 회차(심장박동 없음 · 후속 전용) 90분 넘게 안 풀린 잠금 ${noHb.map(s => `run ${s.id}(${s.age_min}분${s.hb_min == null ? ' · 심장박동 없음' : ''})`).join(', ')} — 세션 확인 뒤 analysis_run_release`)
+      if (missed.length) bad.push(`자동 회수 조건(조용 30분 ∧ 생성 90분)을 20분 넘게 지났는데 도는 회차 ${missed.map(s => `run ${s.id}(심장박동 ${s.hb_min}분 전)`).join(', ')} — 발송기 회수가 안 돈다(zipfit-analysis-dispatch 확인)`)
       if (x.fail_streak) bad.push('연속 3번 발송 실패(자동 발송 멈춤)')
       if (x.zero_streak) bad.push('연속 3회차 끝낸 공고 0건(자동 발송 멈춤 — 공통 원인 확인)')
       // 🔵 2026-10-02 — 우편함 후속 처리 요청(analysis_followup_request)이 120분 넘게 루틴에 실리지 않음(잠금 · 멈춤 · 스위치).
       if (x.followup_stuck > 0) bad.push(`120분 넘게 실리지 않은 후속 처리 요청 ${x.followup_stuck}`)
       add('dispatch', '분석 발송기', bad.length ? 'fail' : 'pass', bad.length ? bad.join(' · ') : `대기 ${x.waiting} · 이상 없음`,
-        '켜짐: grace+max_wait 동안 발송 0인데 그보다 오래 기다린 대기 0(몫 상한 — 한 발송 batch_size건) · 홍보물 24시간 대기 0 · 90분 넘은 잠금(잡은 때 기준) 0 · 연속 3실패 아님 · 연속 3회차 0건 끝 아님(후속 전용 회차 제외) · 120분 넘은 후속 처리 요청 0')
+        '켜짐: grace+max_wait 동안 발송 0인데 그보다 오래 기다린 대기 0(몫 상한 — 한 발송 batch_size건) · 홍보물 24시간 대기 0 · 심장박동 없는(또는 후속 전용) 회차 90분 넘은 잠금(잡은 때 기준) 0 · 자동 회수 조건 넘고 20분 지난 회차 0 · 연속 3실패 아님 · 연속 3회차 0건 끝 아님(후속 전용 회차 제외) · 120분 넘은 후속 처리 요청 0')
     }
+  }
+  // ⑧-1 심장박동 있는 회차의 긴 잠금 · ⑧-5 자동 회수 본 횟수(2026-10-15 · 우편함 「코드 — health-ops stale_lock 갈래 …」 1·2).
+  //    🔴 둘 다 ⚠️ 경고만이다(이슈를 열지 않는다) — 발송기가 스스로 거두는 길 위에 있다. 회수가 안 돌면 위 dispatch ❌ 가 잡는다.
+  //    스위치와 무관하게 본다(①-3 회수는 스위치가 꺼져도 tick 이 돈다).
+  {
+    const hb = (d.dispatch && d.dispatch.stale_lock && d.dispatch.stale_lock.hb) || []
+    add('stale_lock_hb', '심장박동 있는 분석 회차 90분 넘게 도는 중(자동 회수 대상)', hb.length === 0 ? 'pass' : 'warn',
+      hb.length ? hb.map(s => `run ${s.id} 잡은 지 ${s.age_min}분 · 심장박동 ${s.hb_min}분 전`).join(', ') : 0,
+      '0 — 심장박동이 30분 넘게 조용 ∧ 만든 지 90분이면 발송기가 거둔다(analysis_dispatch_tick ①-3) · 넘으면 ⚠️ 경고만 · 회수 조건을 20분 넘기면 dispatch ❌')
+    const rc = (d.dispatch && d.dispatch.auto_reclaim_24h) || []
+    add('auto_reclaim_24h', '24시간 안 발송기 자동 회수(루틴 세션이 끊긴 흔적)', rc.length === 0 ? 'pass' : 'warn',
+      rc.length ? rc.map(x => `run ${x.id} ${x.at} KST · 공고 ${x.ann || '—'} · 마감 정리 ${x.fu || '없음(분석 행 없음)'}`).join(', ') : 0,
+      '0 — finish_note 「자동 회수 …」(사람 풀기는 「잠금 풀기: …」) · ⚠️ 경고만 · 「run N 마감 정리」가 120분 넘게 안 실리면 dispatch ❌ · 실린 뒤 결과 없음·실패는 followup_unreported ⚠️')
   }
   // ⑧-2 정정본 분석 없음(2026-10-06 · 우편함 「코드 — Z-1 …」 PR-A A3 · run 119 고령다산2 …20809) — 감시 SQL 첫 항목.
   //    🔴 실패(❌)가 아니라 ⚠️ 경고다 — 루틴은 열린 health-ops 이슈가 있으면 착수하지 않는데, 이 항목이 걸렸다는 것은 루틴이 정정본을
