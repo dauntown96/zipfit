@@ -47,7 +47,7 @@ AS $function$
 --   🔴 이 가상 값은 analysis_dispatch_queue 밖으로 나가지 않는다 — announcements · 화면 · RPC 의 날짜는 그대로 NULL 이고,
 --   접수기간은 분석이 원문으로 *_confirmed 에 채운다. 채워진 뒤 같은 공고는 같은 공고 ID 의 완료 분석으로 후보에서 빠진다(SH 만의 자기 일치).
 -- 🔵 자동 회수(2026-10-15 · 우편함 「코드 — 루틴 자동 회수(안 A …)」 1 · 설계 PR #517 회신 ⓪(b)) — ①-3:
---   running ∧ reason ≠ followup ∧ 잡힘(claimed_at) ∧ 마지막 심장박동(heartbeat_at · 없으면 claimed_at)이 30분 넘게 조용 ∧ 만든 지 90분 넘은 회차는
+--   running ∧ reason ≠ followup ∧ 잡힘(claimed_at) ∧ 마지막 심장박동(heartbeat_at)이 30분 넘게 조용 ∧ 만든 지 90분 넘은 회차는
 --   루틴 세션이 끊긴 것으로 보고 released 로 옮긴다(note 「자동 회수 …」) · 실린 몫 → waiting · returned · 실린 후속 요청 → waiting.
 --   그 회차 표지의 분석 행(batch_label 「…자동runN」 또는 실린 몫 공고 ID · 회차 만든 뒤 분석)이 있으면 후속 요청 「run N 마감 정리」를 대기에 넣는다
 --   (분석은 커밋됐는데 우편함 회신·이력 PR 이 없는 꼴 — 새 회차가 그 둘만 한다 · 분석 몫은 ② 후보 판정이 완료 분석을 보고 뺀다).
@@ -126,15 +126,18 @@ begin
 
   -- ② 후보 → 대기열
   -- ①-3 자동 회수(2026-10-15) — 루틴 세션이 끊긴 분석 회차(심장박동 30분 없음 ∧ 만든 지 90분)를 released 로 옮기고 실린 몫·후속을 대기로 되돌린다.
+  --      🔴 심장박동이 한 번도 없는 회차(heartbeat_at NULL — 루틴 v2.6 까지)는 회수하지 않는다(claude.ai 판정 (가) 2026-10-15):
+  --      v2.6 은 심장박동·쓰기 앞 가드를 부르지 않아, 오래 돌다 끝내 쓰는 회차(run 101 233분 · 186 670분)를 거두면 같은 공고를 두 회차가 쓴다.
+  --      그런 회차는 종전대로 health-ops stale_lock ❌ + 사람 풀기(analysis_run_release). 루틴 v2.7 이 잡기 직후 심장박동을 부른 회차부터 대상이다.
   for rr in select r.id, r.created_at, r.claimed_at, r.heartbeat_at from public.analysis_dispatch_runs r
              where r.state = 'running' and r.reason <> 'followup' and r.claimed_at is not null
-               and coalesce(r.heartbeat_at, r.claimed_at) < now() - interval '30 minutes'
+               and r.heartbeat_at is not null and r.heartbeat_at < now() - interval '30 minutes'
                and r.created_at < now() - interval '90 minutes'
              order by r.id for update loop
     update public.analysis_dispatch_runs
        set state = 'released', finished_at = now(),
            finish_note = '자동 회수 — 심장박동 30분 없음(마지막 '
-                         || to_char(coalesce(rr.heartbeat_at, rr.claimed_at) at time zone 'Asia/Seoul', 'MM-DD HH24:MI') || ' KST)'
+                         || to_char(rr.heartbeat_at at time zone 'Asia/Seoul', 'MM-DD HH24:MI') || ' KST)'
      where id = rr.id and state = 'running';
     with u as (
       update public.analysis_dispatch_queue

@@ -221,7 +221,10 @@ try {
          from analysis_followup_requests f join analysis_dispatch_runs r on r.id = f.run_id
         where f.requested_at >= coalesce((select min(applied_at) from zipfit_ops.schema_migrations where filename = '2026-10-06_06_followup_result_health_findings.sql'), 'infinity')
           and r.created_at > now() - interval '24 hours'
-          and ((f.result is null and r.created_at < now() - interval '30 minutes') or f.result in ('미착수', '실패'))),
+          and ((f.result is null and r.created_at < now() - interval '30 minutes') or f.result in ('미착수', '실패'))
+          -- 🔵 2026-10-15(우편함 「코드 — 루틴 자동 회수 …」 판정 ② 제안 채택) — 같은 page_ref 의 뒤 요청이 「처리」면 앞 요청은 뺀다
+          --    (재요청으로 이미 처리된 요청이 24시간 내내 ⚠️ 를 내 경고가 무뎌졌다 — #37 미착수 ↔ #38 처리 · 10-14 12:25 ~ 10-15 11:25 KST).
+          and not exists (select 1 from analysis_followup_requests g where g.page_ref = f.page_ref and g.id > f.id and g.result = '처리')),
       -- 🔵 2026-10-08 원문 키 정기 대조(3-B ③ 1단계) — 마지막으로 끝까지 돈 실행(오류 없음) · 키마다 26시간 안 마지막 대조 중 아직 열린 카드의 어긋남.
       'source_check', (select json_build_object(
          'runs', (select count(*) from source_page_check_runs),
@@ -315,7 +318,7 @@ try {
     const xs = d.followup_unreported || []
     add('followup_unreported', '후속 처리 요청 결과 없음(실린 지 30분 넘음) · 미착수 · 실패', xs.length === 0 ? 'pass' : 'warn',
       xs.length ? xs.slice(0, 5).map(x => `#${x.id} run ${x.run} ${x.result || '결과 없음'}`).join(', ') : 0,
-      '0 — 24시간 안 실린 요청 중 (결과 빈 채 실린 지 30분 넘음 ∨ 결과 미착수·실패) · 2026-10-06_06 적용 뒤 요청만 · 넘으면 ⚠️ 경고만(이슈를 열지 않는다)')
+      '0 — 24시간 안 실린 요청 중 (결과 빈 채 실린 지 30분 넘음 ∨ 결과 미착수·실패) · 같은 페이지의 뒤 요청이 처리면 뺀다 · 2026-10-06_06 적용 뒤 요청만 · 넘으면 ⚠️ 경고만(이슈를 열지 않는다)')
   }
   // ⑧-4 원문 키 정기 대조(2026-10-08 · 우편함 「코드 — 3-B ③ …」 3) — 하루 두 회차(UTC 11:30 · 21:30 · 5분 간격 다섯 번).
   //    🔴 cron 이 26시간 넘게 끝까지 돈 실행이 없으면 실패 · 어긋남 둘은 ⚠️ 경고만(이슈를 열지 않는다 — 루틴 착수를 막지 않게 · revision_gap 과 같은 처리).

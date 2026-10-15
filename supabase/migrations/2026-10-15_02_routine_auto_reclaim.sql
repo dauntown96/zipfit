@@ -9,7 +9,8 @@
 --   ① analysis_dispatch_runs.heartbeat_at — 루틴의 마지막 심장박동.
 --   ② analysis_run_heartbeat(run) — 단계 경계마다 · 도는 회차면 heartbeat_at = 지금 · alive 참 / 아니면 쓰기 0 · alive 거짓.
 --   ③ analysis_run_alive(run) — 분석 쓰기 트랜잭션 맨 앞 가드 · 참이면 회차 행을 고쳐 잠근다(쓰는 동안 회수가 기다린다) / 거짓이면 루틴이 예외로 롤백.
---   ④ analysis_dispatch_tick ①-3 — running ∧ reason ≠ followup ∧ 잡힘 ∧ 심장박동(없으면 claimed_at) 30분 조용 ∧ 만든 지 90분 → released ·
+--   ④ analysis_dispatch_tick ①-3 — running ∧ reason ≠ followup ∧ 잡힘 ∧ 심장박동 있음 ∧ 30분 조용 ∧ 만든 지 90분 → released ·
+--      (심장박동이 한 번도 없는 회차 — 루틴 v2.6 — 는 회수하지 않는다 · claude.ai 판정 (가) · 그런 회차는 종전 stale_lock ❌ + 사람 풀기)
 --      실린 몫 waiting·returned · 실린 후속 waiting · 그 회차 분석 행이 있으면 후속 「run N 마감 정리」 1행 · 반환에 reclaimed.
 --   ⑤ analysis_queue_finish — released 회차는 쓰기 없이 released 를 돌려준다(늦은 끝 호출 거부).
 --   분석 몫 대기열 규칙(후보 · 유예 · 이어 보내기 · 멈춤)은 그대로다.
@@ -67,7 +68,7 @@ AS $function$
 --   🔴 이 가상 값은 analysis_dispatch_queue 밖으로 나가지 않는다 — announcements · 화면 · RPC 의 날짜는 그대로 NULL 이고,
 --   접수기간은 분석이 원문으로 *_confirmed 에 채운다. 채워진 뒤 같은 공고는 같은 공고 ID 의 완료 분석으로 후보에서 빠진다(SH 만의 자기 일치).
 -- 🔵 자동 회수(2026-10-15 · 우편함 「코드 — 루틴 자동 회수(안 A …)」 1 · 설계 PR #517 회신 ⓪(b)) — ①-3:
---   running ∧ reason ≠ followup ∧ 잡힘(claimed_at) ∧ 마지막 심장박동(heartbeat_at · 없으면 claimed_at)이 30분 넘게 조용 ∧ 만든 지 90분 넘은 회차는
+--   running ∧ reason ≠ followup ∧ 잡힘(claimed_at) ∧ 마지막 심장박동(heartbeat_at)이 30분 넘게 조용 ∧ 만든 지 90분 넘은 회차는
 --   루틴 세션이 끊긴 것으로 보고 released 로 옮긴다(note 「자동 회수 …」) · 실린 몫 → waiting · returned · 실린 후속 요청 → waiting.
 --   그 회차 표지의 분석 행(batch_label 「…자동runN」 또는 실린 몫 공고 ID · 회차 만든 뒤 분석)이 있으면 후속 요청 「run N 마감 정리」를 대기에 넣는다
 --   (분석은 커밋됐는데 우편함 회신·이력 PR 이 없는 꼴 — 새 회차가 그 둘만 한다 · 분석 몫은 ② 후보 판정이 완료 분석을 보고 뺀다).
@@ -146,15 +147,18 @@ begin
 
   -- ② 후보 → 대기열
   -- ①-3 자동 회수(2026-10-15) — 루틴 세션이 끊긴 분석 회차(심장박동 30분 없음 ∧ 만든 지 90분)를 released 로 옮기고 실린 몫·후속을 대기로 되돌린다.
+  --      🔴 심장박동이 한 번도 없는 회차(heartbeat_at NULL — 루틴 v2.6 까지)는 회수하지 않는다(claude.ai 판정 (가) 2026-10-15):
+  --      v2.6 은 심장박동·쓰기 앞 가드를 부르지 않아, 오래 돌다 끝내 쓰는 회차(run 101 233분 · 186 670분)를 거두면 같은 공고를 두 회차가 쓴다.
+  --      그런 회차는 종전대로 health-ops stale_lock ❌ + 사람 풀기(analysis_run_release). 루틴 v2.7 이 잡기 직후 심장박동을 부른 회차부터 대상이다.
   for rr in select r.id, r.created_at, r.claimed_at, r.heartbeat_at from public.analysis_dispatch_runs r
              where r.state = 'running' and r.reason <> 'followup' and r.claimed_at is not null
-               and coalesce(r.heartbeat_at, r.claimed_at) < now() - interval '30 minutes'
+               and r.heartbeat_at is not null and r.heartbeat_at < now() - interval '30 minutes'
                and r.created_at < now() - interval '90 minutes'
              order by r.id for update loop
     update public.analysis_dispatch_runs
        set state = 'released', finished_at = now(),
            finish_note = '자동 회수 — 심장박동 30분 없음(마지막 '
-                         || to_char(coalesce(rr.heartbeat_at, rr.claimed_at) at time zone 'Asia/Seoul', 'MM-DD HH24:MI') || ' KST)'
+                         || to_char(rr.heartbeat_at at time zone 'Asia/Seoul', 'MM-DD HH24:MI') || ' KST)'
      where id = rr.id and state = 'running';
     with u as (
       update public.analysis_dispatch_queue
@@ -452,7 +456,7 @@ AS $function$
 -- 루틴 회차의 심장박동(2026-10-15 · 우편함 「코드 — 루틴 자동 회수(안 A …)」 1 · 설계 PR #517 회신 ⓪(b)).
 -- 🔴 service_role(관리 API)만 부른다 — 루틴이 잡기 직후와 단계 경계마다 부른다(원문 읽기 · 분석 · DB 쓰기 · 회신 사이).
 -- 도는 회차(firing·running)면 heartbeat_at 을 지금으로 남기고 alive 참을 돌려준다 — 발송기 자동 회수(analysis_dispatch_tick ①-3)는
--- 마지막 심장박동(없으면 claimed_at)이 30분 넘게 조용하고 만든 지 90분 넘은 회차만 released 로 옮긴다.
+-- 마지막 심장박동이 30분 넘게 조용하고 만든 지 90분 넘은 회차만 released 로 옮긴다 — 심장박동이 한 번도 없는 회차(v2.6)는 회수하지 않는다.
 -- 이미 회수된(released) · 끝난 회차면 아무것도 쓰지 않고 alive 거짓을 돌려준다 — 루틴은 그 자리에서 멈추고 「회수됨」만 회신한다.
 -- 잠금: advisory 잠금을 잡지 않는다 — 회차 행 UPDATE 의 행 잠금이 자동 회수 UPDATE 와 줄을 세운다(먼저 커밋한 쪽을 다른 쪽이 다시 본다).
 declare
