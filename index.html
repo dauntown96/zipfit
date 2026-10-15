@@ -477,6 +477,9 @@ html[data-ui="d3"] body.theme-dark .zf-target-out{background:var(--surface-2)!im
 .zf3-badge{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 4px;border-radius:6px;background:var(--ln,var(--ln-gi));color:var(--ln-ink);font-size:12px;font-weight:700}   /* 노선 배지 부품 — 단계 b 카드에서 쓴다 */
 .zf3-top{display:flex;align-items:center;gap:10px;padding:10px 2px;background:transparent}
 .zf3-brand{display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:var(--t-l);color:var(--ink)}
+/* 🔵 2026-10-15 — 앱 머리 「꼭집」 = 첫 화면으로 가는 단추(로고 그림은 상표 뒤 · 자리와 동작만) · 누름 칸 44px */
+button.zf3-brand{background:none;border:0;padding:0 6px 0 0;margin:0;font-family:inherit;min-height:var(--hit);cursor:pointer;-webkit-tap-highlight-color:transparent}
+button.zf3-brand:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:6px}
 .zf3-mark{display:inline-block;width:26px;height:26px;border-radius:50%;border:4px solid var(--ink)}
 .zf3-ai{margin-left:auto;font:inherit;font-size:var(--t-xs);color:var(--ink-2);background:none;border:0;min-height:var(--hit);padding:0 2px 0 8px;display:inline-flex;align-items:center;gap:4px;cursor:pointer;text-align:right}
 .zf3-ai-ic{font-size:13px;color:var(--ink-3)}
@@ -1001,7 +1004,7 @@ html[data-ui="d3"] body.theme-dark{color-scheme:dark}
 <div class="wrap">
   <!-- 🔵 D-3 a — 앱 머리. 줄인 AI 표시는 누르면 전체 문장과 이용약관 제3조(D-2 4차 검증 ③ ⑵). ui=d3 일 때만 보인다. -->
   <div id="zf3Top" class="zf3-top" hidden>
-    <span class="zf3-brand"><span class="zf3-mark" aria-hidden="true"></span>꼭집</span>
+    <button type="button" class="zf3-brand" id="zf3Home" aria-label="꼭집 — 첫 화면으로"><span class="zf3-mark" aria-hidden="true"></span>꼭집</button>
     <button type="button" class="zf3-ai" id="zf3AiBtn" aria-expanded="false" aria-controls="zf3AiFull">AI 정리 · 신청 전 원문 확인<span aria-hidden="true" class="zf3-ai-ic">ⓘ</span></button>
   </div>
   <p id="zf3AiFull" class="zf3-ai-full" hidden>꼭집의 공고 정보는 AI가 공고문 원문을 읽고 정리했어요. 신청 전에는 공고 원문을 꼭 확인해 주세요. <a href="./terms.html#art3">이용약관 제3조 보기</a></p>
@@ -1679,14 +1682,26 @@ function classifyDemographics(typeText, nameText){
   return tags;
 }
 
+// 🔴 2026-10-15(우편함 「표시층 — 완화 배지 글자 …」 1) — 완화 공고 배지는 원문에 있는 말만 한다. 종전에는 모두 「🔓 자격완화 추가모집」이었는데
+//    열린 완화 대표 12 중 제목에 「추가모집」이 있는 것은 하나뿐이었다(익산제3일반산단 …20850) · 경남 4차 든든전세 …20901 은 소득·자산이 아니라
+//    거주지 모집권역 완화였다. 재료는 제목과 relaxation_detail 둘뿐 — 「추가모집」은 제목에 있을 때만 · 모집권역·거주지역 완화이면서 소득·자산 말이
+//    없으면 「거주지 제한 완화」 · 그 밖(가를 수 없는 것 포함)은 「자격완화」. 배지와 펼친 상세 「🔓 …」 줄이 이 한 벌을 쓴다.
+function zfRelaxKind(title, detail){
+  const t = String(title || ''), d = String(detail || ''), all = t + ' ' + d;
+  if(/(모집권역|거주지역|거주지)[^.。]*완화|완화[^.。]*(모집권역|거주지역)/.test(all) && !/소득|자산|무주택/.test(all)){
+    return { label: '거주지 제한 완화', text: '이 공고는 거주지(모집권역) 제한을 완화해 모집합니다.' };
+  }
+  if(/추가\s*모집/.test(t)) return { label: '자격완화 추가모집', text: '이 공고는 입주자격을 완화한 추가모집입니다.' };
+  return { label: '자격완화', text: '이 공고는 입주자격을 완화해 모집합니다.' };
+}
 // 신청 편의도 미니뱃지 생성 (mymy/supply_form/application_method/recruit_multiplier/완화모집/선정방식)
-function buildConvBadges(mymy, supplyForm, appMethod, recruitMult, isRelaxed, selectionMethod){
+function buildConvBadges(mymy, supplyForm, appMethod, recruitMult, isRelaxed, selectionMethod, title, relaxDetail){
   const badges = [];
   if(mymy === true || mymy === 'true'){
     badges.push('<span class="chip sel" style="cursor:default;padding:3px 8px;font-size:10px;background:#0F6E56;border-color:#0F6E56">📱 MyMy가능</span>');
   }
   if(isRelaxed === true || isRelaxed === 'true'){
-    badges.push('<span class="chip sel" style="cursor:default;padding:3px 8px;font-size:10px;background:#1D9E75;border-color:#1D9E75">🔓 자격완화 추가모집</span>');
+    badges.push(`<span class="chip sel" data-zf-relax="1" style="cursor:default;padding:3px 8px;font-size:10px;background:#1D9E75;border-color:#1D9E75">🔓 ${zfRelaxKind(title, relaxDetail).label}</span>`);
   }
   if(supplyForm && supplyForm !== '일반'){
     const sfMap = {'전세형':'🏠 전세형','기숙사형':'🏢 기숙사형','공동거주형':'👥 공동거주형','건설형':'🏗 건설형','분양전환형':'🔑 분양전환형'};
@@ -1863,14 +1878,14 @@ function zfRouteGap(row){
     if(!a || !b) return null;
     const x = day(a), y = day(b);
     if(y < s0 || x > e0) continue;   // 카드 기간 밖 창(같은 제목의 다른 회차)은 보지 않는다
-    wins.push({ x, y, d: String(r.start_date).slice(0, 10) });
+    wins.push({ x, y, d: String(r.start_date).slice(0, 10), de: String(r.end_date).slice(0, 10) });
   }
   wins.sort((p, q) => p.x - q.x);
   const merged = [];
-  wins.forEach(c => { const m = merged[merged.length - 1]; if(m && c.x <= m.y + 864e5) m.y = Math.max(m.y, c.y); else merged.push(Object.assign({}, c)); });
+  wins.forEach(c => { const m = merged[merged.length - 1]; if(m && c.x <= m.y + 864e5){ if(c.y > m.y){ m.y = c.y; m.de = c.de; } } else merged.push(Object.assign({}, c)); });
   if(merged.length < 2 || merged.some(m => m.x <= today && today <= m.y)) return null;
   const nxt = merged.find(m => m.x > today);
-  return nxt ? { state: 'before', next: nxt.d } : { state: 'closed' };
+  return nxt ? { state: 'before', next: nxt.d, nextEnd: nxt.de } : { state: 'closed' };
 }
 function applyWindowState(row){
   const gap = zfRouteGap(row);
@@ -4312,7 +4327,7 @@ async function zfEnsurePriceSummaries(ids){
 
 // ⚠️ 특이사항을 1층 배지로 — 경고는 접히면 안 된다.
 // 🔴 「특이사항 안내」 아코디언은 그대로 둔다(설명 전문이 거기 있다). 배지는 더하기만 한다.
-// 🔴 자격완화는 여기서 만들지 않는다 — buildConvBadges()가 이미 「🔓 자격완화 추가모집」을
+// 🔴 자격완화는 여기서 만들지 않는다 — buildConvBadges()가 이미 「🔓 자격완화 …」(zfRelaxKind)를
 // 1층에 붙이고 있었다(2026-09-14 로컬 렌더로 확인, 배지가 두 개로 겹쳤다).
 // 같은 이유로 선계약후검증도 selection_method 쪽에서 이미 배지가 나왔으면 붙이지 않는다.
 function zfWarnBadges(o){
@@ -4388,7 +4403,7 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
     const demoTags   = classifyDemographics(n['공급유형'], n['공고명']);
     const isNew      = !isClosed && isNewNotice(n);
     const closingSoon = !isClosed && isClosingSoon(zfWithSoonestEnd(n));
-    const convBadges = buildConvBadges(n['mymy_applicable'], n['supply_form'], n['application_method'], n['recruit_multiplier'], n['is_relaxed_recruitment'], n['selection_method']);
+    const convBadges = buildConvBadges(n['mymy_applicable'], n['supply_form'], n['application_method'], n['recruit_multiplier'], n['is_relaxed_recruitment'], n['selection_method'], n['공고명'], n['relaxation_detail']);
     const pairKey    = n['pair_announcement_key']||'';
     // 정정 사유는 펼친 안 「📝 정정 사유」에만 보인다 — 겉의 「ℹ️ 정정사유」 마우스 올리기 칩은 터치에선 안 뜨고
     // 「🔄 정정」 배지와 같은 말이라 뺐다(2026-10-14 · 공고 탭·매칭 카드·그룹 뒤늦은 끼워 넣기 셋 다).
@@ -4527,7 +4542,18 @@ function noticeGoPage(n){
   const cs = tabs ? getComputedStyle(tabs) : null;
   const atTop = cs && (cs.position === 'sticky' || (cs.position === 'fixed' && tabs.getBoundingClientRect().top < innerHeight / 2));
   const over = atTop ? tabs.offsetHeight + (parseFloat(cs.top) || 0) : 0;
-  window.scrollTo({ top: Math.max(0, window.scrollY + el.getBoundingClientRect().top - over - 8), behavior:'smooth' });
+  // 🔴 2026-10-15(우편함 「표시층 — … 쪽 넘김 재현」 4) — 부드러운 스크롤을 걷고 바로 옮긴다 · 늦게 차는 위쪽 자리에 밀리면 한 번 더 맞춘다.
+  //    배포본 v212 실제 클릭 15번(390·958·1280 · 새 탭마다): 0.25초엔 15번 모두 아직 4,000px 위를 지나는 중(그때 재면 「안 움직였다」로 보인다) ·
+  //    1.75초 뒤 14번 목록 머리 · 1번(1280)은 스크롤 도중 위쪽 자리가 62px 늘어 목록 머리 top 115px 에서 멈췄다(목표를 한 번만 셌다).
+  //    0.6초 안에 사용자가 직접 굴리거나 누르면 다시 맞추지 않는다.
+  const go = () => window.scrollTo({ top: Math.max(0, window.scrollY + el.getBoundingClientRect().top - over - 8), behavior:'auto' });
+  go();
+  const ac = new AbortController();
+  ['wheel', 'touchstart', 'keydown', 'mousedown'].forEach(t => addEventListener(t, () => ac.abort(), { once: true, passive: true, signal: ac.signal }));
+  setTimeout(() => {
+    if(!ac.signal.aborted && Math.abs(el.getBoundingClientRect().top - over - 8) > 4) go();
+    ac.abort();
+  }, 600);
 }
 function noticeSetPageSize(v){
   const n = Number(v);
@@ -6605,7 +6631,8 @@ function renderSpecialNotes(cardEl, id){
 
   const items = [];
   if(isRelaxed){
-    items.push(`<div class="policy-item"><div class="policy-category">🔓 자격완화 추가모집</div><div class="policy-content">이 공고는 입주자격을 완화한 추가모집입니다.${relaxationDetail?'<br>'+escapeHtml(relaxationDetail):''}</div></div>`);
+    const rk = zfRelaxKind(cardEl.dataset.title, relaxationDetail);   // 🔴 2026-10-15 — 배지와 같은 한 벌(zfRelaxKind)
+    items.push(`<div class="policy-item"><div class="policy-category">🔓 ${rk.label}</div><div class="policy-content">${rk.text}${relaxationDetail?'<br>'+escapeHtml(relaxationDetail):''}</div></div>`);
   }
   if(contractVerify){
     items.push(`<div style="font-size:12px;color:#A32D2D;background:#FFF3F3;border:1px solid #F5C2C2;border-radius:8px;padding:8px 10px;margin-bottom:8px">⚠️ 이 공고는 자격 검증 전에 먼저 계약을 체결합니다. 계약 후 부적격으로 판명되면 계약이 직권 해제될 수 있으니 신청 전 자격을 반드시 스스로 확인하세요.</div>`);
@@ -9282,7 +9309,7 @@ function renderMatchResults(rows){
     const demoTags    = classifyDemographics(n.housing_type||'', n.title||'');
     const isNew       = !isClosed && isNewNotice({'created_at': n.created_at||'', 'apply_end': n.apply_end||''});
     const closingSoon = !isClosed && isClosingSoon({'apply_end': zfSoonestOpenEnd(n), 'apply_period_check': n.apply_period_check});
-    const convBadgesM = buildConvBadges(n.mymy_applicable, n.supply_form, n.application_method, n.recruit_multiplier, n.is_relaxed_recruitment, n.selection_method);
+    const convBadgesM = buildConvBadges(n.mymy_applicable, n.supply_form, n.application_method, n.recruit_multiplier, n.is_relaxed_recruitment, n.selection_method, n.title, n.relaxation_detail);
     const pairKeyM    = n.pair_announcement_key||'';
     const revisionNoteEscM = (n.revision_note||'').replace(/"/g,'&quot;');
     const applyStart  = n.apply_start||'';
@@ -10759,6 +10786,17 @@ function zf3DecorateIn(list, rowsMap, isMatch){
           route.innerHTML = zf3LineHTML(st);
         }
       }
+      // 🔵 2026-10-15(우편함 「표시층 — … 차수 사이 카드 노선 접수 역」 3) — 차수 사이 카드(zfRouteGap · 순위·차수로 갈린 창 포함)도 접수 역 = 다음 창.
+      //    알약은 「다음 접수 MM-DD」인데 노선은 지난 첫 차수 시작을 그렸다(…0706 9-29 ↔ 10-20). 반복 창(위)이 이미 그린 카드는 건너뛴다.
+      else {
+        const gap = n['apply_period_check'] !== true ? zfRouteGap(n) : null;
+        const route = card.querySelector('.zf3-route');
+        if(gap && gap.next && route && card.dataset.zf3Branch !== '1'){
+          const st = zf3Stations(n);
+          st[1] = { k: '접수', d: gap.next, sub: '다음 창' + (gap.nextEnd && gap.nextEnd !== gap.next ? ' ~' + zf3Md(gap.nextEnd).replace(/\(.\)$/, '') : '') };
+          route.innerHTML = zf3LineHTML(st);
+        }
+      }
     }
   });
 }
@@ -11577,10 +11615,22 @@ function zf3StickyHead(){
   new MutationObserver(upd).observe(head, { childList: true });
   window.zf3StickyUpd = upd;
 }
+// 첫 화면 = 페이지를 처음 열 때 서는 화면(아래 첫 goMain — d3 는 공고 탭) · 1쪽 · 맨 위. 새로고침하지 않는다 — 로그인 세션 · 공고 탭 조건(지역·유형·검색)은 그대로 두고,
+//    펼친 조건 시트와 펼친 공고 상세만 접는다. 「첫 화면」이 바뀌면 여기와 첫 goMain 을 함께 고친다.
+function zfGoHome(){
+  if(typeof zf3ToggleSheet === 'function') zf3ToggleSheet(false);
+  goMain(2);
+  document.querySelectorAll('#notice-list .hcard.zf3-open').forEach(c => c.click());
+  if(noticeLoaded && noticePage !== 1){ noticePage = 1; renderNoticeList(noticeFiltered, noticeData.length); }
+  window.scrollTo({ top: 0, behavior: 'auto' });
+}
 function zf3Init(){
   if(!zf3On()) return;
   const top = document.getElementById('zf3Top');
   if(top) top.hidden = false;
+  // 🔵 2026-10-15(우편함 「표시층 — … 앱 머리 「꼭집」 → 시작 화면」 2 · 다운님 제안) — 「꼭집」을 누르면 처음 들어왔을 때 보이는 화면(zfGoHome).
+  const home = document.getElementById('zf3Home');
+  if(home) home.addEventListener('click', zfGoHome);
   const aiBtn = document.getElementById('zf3AiBtn'), aiFull = document.getElementById('zf3AiFull');
   if(aiBtn && aiFull) aiBtn.addEventListener('click', () => {
     const open = aiBtn.getAttribute('aria-expanded') !== 'true';
