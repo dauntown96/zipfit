@@ -6009,7 +6009,9 @@ function zfTargetCondState(k, v, f){
     const married = ZF_TARGET_MARRIED_ANY.includes(m);
     if(v === '미혼')       return m === 'single' ? 'ok' : (married ? 'no' : 'check');   // 이혼·사별이 「미혼」에 드는지 원문 정의 없음 → check
     if(v === '혼인 중 아님') return (m === 'single' || m === 'divorced_widowed') ? 'ok' : (married ? 'no' : 'check');
-    if(v === '혼인 중')    return married ? 'ok' : ((m === 'single' || m === 'divorced_widowed') ? 'no' : 'check');
+    // 🔴 2026-10-15(우편함 「코드 — 혼인 중 × 예비신혼 확인 …」 1단계 1) — 예비신혼(`pre`)은 아직 혼인 중이 아니다.
+    //    「혼인 중」 갈래에 드는지는 그 공고 원문이 밝혀야 하므로 check(모르는 것은 check) — ok로 넣지 않는다.
+    if(v === '혼인 중')    return m === 'pre' ? 'check' : (married ? 'ok' : ((m === 'single' || m === 'divorced_widowed') ? 'no' : 'check'));
     return 'check';
   }
   if(k === '계층_중_하나'){
