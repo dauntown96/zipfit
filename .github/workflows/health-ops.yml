@@ -4,6 +4,7 @@
 #    예외 하나(2026-10-06 · 1-B 6): 경고·실패를 public.ops_health_record(jsonb) 한 함수로 ops_health_findings 에 남긴다(30일).
 # 비밀값: 기존 Actions Secret SUPABASE_ACCESS_TOKEN 하나 · 공개 anon 키. 새 비밀값 0.
 # 알림: 실패면 라벨 health-ops 이슈를 하나 열고(열려 있으면 댓글), 통과하면 스스로 닫는다(.github/health/issue.sh).
+#   🔵 2026-10-15(관문 항목별) — 루틴을 멈추는 실패(.github/health/gate.mjs HARD)만 health-ops · 나머지는 health-ops-soft(루틴 v2.6 이 보지 않는다).
 name: Health — Ops (B)
 
 on:
@@ -16,9 +17,9 @@ on:
   workflow_dispatch:
     inputs:
       simulate:
-        description: '알림 경로 시험 — fail 이면 실패 점검 하나를 일부러 더한다 · gap 이면 직전 점검 뒤 경과에 180분을 더한다 · runner 면 DB 점검을 처음에 끊는다(점검 불능 — health-ops-blind) · sec 면 보안 권고 허용 목록에서 한 줄을 뺀다(⚠️ 시험) · notify 면 제목 「시험 — 알림 확인」 이슈를 연다(휴대폰 알림 시험) · dispatch_bad 면 「24시간 안 204 아닌 발송」에 가짜 한 줄을 더한다(⚠️ 시험)'
+        description: '알림 경로 시험 — fail 이면 안 멈추는 실패 점검 하나를(health-ops-soft) · fail_hard 면 멈추는 실패 점검 하나를(health-ops) 일부러 더한다 · gap 이면 직전 점검 뒤 경과에 180분을 더한다 · runner 면 DB 점검을 처음에 끊는다(점검 불능 — health-ops-blind) · sec 면 보안 권고 허용 목록에서 한 줄을 뺀다(⚠️ 시험) · notify 면 제목 「시험 — 알림 확인」 이슈를 연다(휴대폰 알림 시험) · dispatch_bad 면 「24시간 안 204 아닌 발송」에 가짜 한 줄을 더한다(⚠️ 시험)'
         type: choice
-        options: [none, fail, gap, runner, sec, notify, dispatch_bad]
+        options: [none, fail, fail_hard, gap, runner, sec, notify, dispatch_bad]
         default: none
 
 permissions:
@@ -60,4 +61,4 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           DRY_RUN: ${{ github.ref != 'refs/heads/main' && '1' || '' }}
           ISSUE_TITLE: ${{ inputs.simulate == 'notify' && '[자동 점검 B] 시험 — 알림 확인' || '[자동 점검 B] 운영 건강 점검 실패' }}
-        run: bash .github/health/issue.sh health-ops "$ISSUE_TITLE" health-ops-blind "[자동 점검 B] 점검 불능 — 점검 도구가 못 돌았다(루틴은 막지 않음)"
+        run: bash .github/health/issue.sh health-ops "$ISSUE_TITLE" health-ops-blind "[자동 점검 B] 점검 불능 — 점검 도구가 못 돌았다(루틴은 막지 않음)" health-ops-soft "[자동 점검 B] 운영 점검 실패 — 루틴은 막지 않음(수집·화면·발송 등)"
