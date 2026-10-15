@@ -368,23 +368,30 @@ try {
   }
   // ⑥-2 공급대상 갈래 판정 표본(2026-10-15 · 우편함 「코드 — 공급대상 갈래 판정(D-2 …)」 · 원칙 33).
   //    키 객체 × 진단 입력 → 기대 ok/no/check 를 코드 밖 표(target-samples.json)에 두고 배포본 zfTargetRowState 로 잰다.
-  //    표본: SH_311349 홀몸어르신 꼴 · …19376 청년 전세임대 꼴 · 혼인 · 대상 없는 갈래 · 모르는 조건 키(종전 ok → check) · 옛 키 회귀.
+  //    표본: SH_311349 홀몸어르신 꼴 · …19376 청년 전세임대 꼴 · 혼인 · 대상 없는 갈래 · 모르는 조건 키(종전 ok → check) · 옛 키 회귀 ·
+  //    카드 표본 verdict_samples(state + 안내 괄호 안 낱말 — 같은 낱말 두 번 0 · 안전망 낱말 · 2026-10-15).
   //    SIMULATE=target_samples 이면 첫 표본의 기대값을 뒤집어 잰다(실패해야 맞다).
   {
-    const samples = JSON.parse(readFileSync(new URL('./target-samples.json', import.meta.url), 'utf8')).samples
+    const tsj = JSON.parse(readFileSync(new URL('./target-samples.json', import.meta.url), 'utf8'))
+    const samples = tsj.samples, vsamples = tsj.verdict_samples || []
     if (process.env.SIMULATE === 'target_samples' && samples.length) samples[0].expect = samples[0].expect === 'ok' ? 'no' : 'ok'
-    const got = await page.evaluate(ss => {
+    const got = await page.evaluate(([ss, vs]) => {
       if (typeof zfTargetRowState !== 'function') return { err: 'zfTargetRowState 없음' }
       const y = new Date().getFullYear()
       // members "diag_untouched" — 진단 칸에 이벤트 없이 2를 넣고(사용자가 안 건드린 기본값과 같은 꼴) 화면 zfTargetDiagFacts 가 내는 값을 쓴다(2026-10-15).
       const diagMembers = () => { const el = document.getElementById('members'); if (el) el.value = '2'; return typeof zfTargetDiagFacts === 'function' ? zfTargetDiagFacts().members : NaN }
-      return { list: ss.map(s => zfTargetRowState(s.key, { marital: s.facts.marital, children: null, birthYear: y - s.facts.age, classes: new Set(s.facts.classes),
-        members: s.facts.members === 'diag_untouched' ? diagMembers() : s.facts.members })) }
-    }, samples)
+      const fx = s => ({ marital: s.facts.marital, children: null, birthYear: y - s.facts.age, classes: new Set(s.facts.classes),
+        members: s.facts.members === 'diag_untouched' ? diagMembers() : s.facts.members })
+      // 카드 표본(2026-10-15 · 우편함 「코드 — 공급대상 갈래 「no 먼저」 …」) — zfTargetVerdict 의 state 와 checks(안내 괄호 안 낱말 · 순서까지).
+      const v = vs.map(s => { const r = zfTargetVerdict(s.rows, fx(s)) || {}; return { state: r.state || null, checks: r.checks || [] } })
+      return { list: ss.map(s => zfTargetRowState(s.key, fx(s))), v }
+    }, [samples, vsamples])
     const bad = got.err ? [] : samples.map((s, i) => got.list[i] === s.expect ? null : `${s.id}: ${got.list[i]}≠${s.expect}`).filter(Boolean)
+      .concat(vsamples.map((s, i) => { const g = got.v[i]; return g.state === s.expect && JSON.stringify(g.checks) === JSON.stringify(s.checks) ? null : `${s.id}: ${g.state}(${g.checks.join(' · ')})≠${s.expect}(${s.checks.join(' · ')})` }).filter(Boolean))
+    const total = samples.length + vsamples.length
     add('target_samples', '매칭 공급대상 갈래 판정 — 표본 키 기대값', !got.err && bad.length === 0 ? 'pass' : 'fail',
-      got.err ? `못 잼(${got.err})` : `${samples.length - bad.length}/${samples.length}${bad.length ? ' · ' + bad.slice(0, 3).join(' / ') : ''}`,
-      '전부 기대값 — .github/health/target-samples.json(코드 밖 표) · 배포본 zfTargetRowState')
+      got.err ? `못 잼(${got.err})` : `${total - bad.length}/${total}${bad.length ? ' · ' + bad.slice(0, 3).join(' / ') : ''}`,
+      '전부 기대값 — .github/health/target-samples.json(코드 밖 표 · 행 표본 + 카드 표본) · 배포본 zfTargetRowState · zfTargetVerdict')
   }
   // ⑦ 숫자가 말하는 「지금」(2026-10-08 · 우편함 「표시층 — 숫자가 말하는 「지금」」 · 원칙 33).
   //    공고 탭 머리(기본 거름 — 신청할 수 없는 공고 숨기기)와 인사이트 머리의 「지금 열린 공고 M건」이 화면 정의(zfOpenNotices) 한 값과 같은가 ·
