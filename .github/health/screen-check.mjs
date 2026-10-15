@@ -567,12 +567,14 @@ try {
     const got = []
     let err = null
     try {
-      await page.evaluate(() => goMain(2))
+      // 앞 점검이 다른 탭·지도 보기·시트에 화면을 둔 채일 수 있다 — 공고 탭 목록 보기로 돌리고, 펼치기는 DOM 클릭으로(보이는지에 기대지 않는다 · 이슈 #535).
+      await page.evaluate(() => { goMain(2); if (typeof zf3SetView === 'function') zf3SetView('list'); document.getElementById('noticeFilterPanel')?.classList.add('hidden') })
       for (const w of want) {
-        await page.evaluate(aid => { const rows = noticeData.filter(n => String(n.announcement_id) === aid); renderNoticeList(rows, rows.length, 0) }, w.aid)
-        const card = await page.$('.hcard[data-announcement-id]')
-        if (!card) { got.push({ aid: w.aid, ids: null }); continue }
-        await card.click()
+        const has = await page.evaluate(aid => {
+          const rows = noticeData.filter(n => String(n.announcement_id) === aid); renderNoticeList(rows, rows.length, 0)
+          const c = document.querySelector('.hcard[data-announcement-id]'); if (c) c.click(); return !!c
+        }, w.aid)
+        if (!has) { got.push({ aid: w.aid, ids: null }); continue }
         await page.waitForFunction(() => !!document.querySelector('[id^="schedule-slot-"] .zf-sch'), null, { timeout: 15000 }).catch(() => {})
         got.push(await page.evaluate(aid => {
           const slot = document.querySelector('[id^="schedule-slot-"]')
