@@ -162,9 +162,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-10-16 | **표시층 — 매칭 정확성: ✓는 소득도 본 뒤에만 · 늦은 응답 버리기 · 받는 중 표시** — 매칭 ✓는 진단 소득이 「맞음」 행 소득 기준 안일 때만(`zfTargetIncomeGate` · 한도는 진단과 한 벌 `zfLimitsFor`) · 모르거나 넘으면 「요건 확인 필요」+이유 · `matchHouses`·`loadNoticeData` 요청 번호 · 대상 계층 칩 받는 동안 「찾는 중」 · `zipfit-v226` · PR #571 |
 | 2026-10-16 | **자동 — run 250: 제주시 든든전세 분양전환형(호반써밋) 48호 완료** — `…20922` · 세대 48 · 정책 66 · 일정 7 · 자격 2 · 지난 회차 `…20835`와 줄 단위 diff로 이어 씀(날짜 · 「총 48」 단위 결손 · 5배수→4배수 · 80㎡이상 하나) · 모집권역 ⚠️ 선례 따름 · 분석률 63/63 · 이력 PR |
 | 2026-10-16 | **코드 — 백업에 zipfit_ops 담기 + 복원 리허설이 잼** — [zipfit-backup] `zipfit_ops`를 `dumps/ops/`·`schema/ops/`에 따로 덤프(public 그대로) · `ops_scope.py --check` · `schema_guard` ops 따로 · 생존 신호 `ops` 행 수·기록 표 감소 경보 · 리허설 같은 날짜 ops 복원·개수·행 수·권한(허용 오류 0) · 수동 발송 1회 행 1/0/55/2089 = SQL · zipfit-backup PR #28 |
-| 2026-10-16 | **표시층 — 「AI 정리」는 분석 있을 때만 · 관리자 전용 「이 묶음 숨기기」** — `zfAiOff`로 카드·저장 목록·체크리스트·첨부 0 상자의 「AI 정리 · 」 접음(분석된 카드 그대로) · 상세 맨 아래 관리자 단추(`ops_is_admin` 참일 때만 · 사유 필수 · 확인 · `ops_listing_hide`) · health-screen `phrase` 조건 · `zipfit-v225` · PR #567 |
 ---
 
 ## 🚫 코딩 원칙
