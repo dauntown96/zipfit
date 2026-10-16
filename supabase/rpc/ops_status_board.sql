@@ -1,0 +1,91 @@
+CREATE OR REPLACE FUNCTION public.ops_status_board()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+-- 🔵 2026-10-16(우편함 「코드 — 관리자 페이지 (가) 첫 판 …」 2 · 다운님 승인 2026-10-16) — 설정 탭 「운영」 구역의 상태판 한 덩이.
+--   관리자(auth.uid() ∈ zipfit_ops.admins)가 아니면 예외(42501) — 빈 결과로 거부하지 않는다(「권한 없음」과 「0건」을 섞지 않는다).
+--   칸 다섯: coverage(14일 접수분 커버율 — zipfit_ops.metric_coverage_14d 한 정의) · dispatch(분석 발송기 한 줄 · 「지금 무엇을 기다리나」 규칙은 여기)
+--   · health(운영 점검 마지막 결과 · 점검 발송 기록 — 멈춤(HARD) 갈래는 .github/health/gate.mjs 한 곳이라 화면이 열린 이슈 라벨로 가른다)
+--   · collected(get_last_collected_at 그대로) · followups_unreported(결과 칸 도입 — 2026-10-06_06 적용 — 뒤 요청 중 done ∧ result NULL).
+--   덧: hides(지금 숨긴 묶음 — zipfit_ops.listing_hides). 비밀값·분석률 정본·출처별·추이는 넣지 않는다(다음 판).
+declare
+  v_uid uuid := auth.uid();
+  cfg public.analysis_dispatch_config%rowtype;
+  v_cov jsonb; v_disp jsonb; v_health jsonb; v_col jsonb; v_fu jsonb; v_hides jsonb;
+  v_run record; v_last record;
+  n_wait int; n_ready int; n_promo int; n_sent int; n_fu_wait int; n_reclaim int; v_failing boolean; v_wait text;
+  v_fu_since timestamptz;
+begin
+  if v_uid is null or not exists (select 1 from zipfit_ops.admins a where a.user_id = v_uid) then
+    raise exception '관리자만 볼 수 있습니다' using errcode = '42501';
+  end if;
+  select * into cfg from public.analysis_dispatch_config where id = 1;
+
+  select to_jsonb(c) into v_cov from zipfit_ops.metric_coverage_14d() c;
+
+  select count(*) filter (where state = 'waiting'),
+         count(*) filter (where state = 'waiting' and ready_at is not null),
+         count(*) filter (where state = 'waiting' and ready_at is null and needs_promo),
+         count(*) filter (where state in ('sent', 'claimed'))
+    into n_wait, n_ready, n_promo, n_sent
+    from public.analysis_dispatch_queue;
+  select count(*) into n_fu_wait from public.analysis_followup_requests where state = 'waiting';
+  select count(*) into n_reclaim from public.analysis_dispatch_runs
+   where state = 'released' and finish_note like '자동 회수%' and finished_at > now() - interval '24 hours';
+  select r.id, r.reason, r.state, r.created_at, r.claimed_at, r.heartbeat_at into v_run
+    from public.analysis_dispatch_runs r where r.state in ('firing', 'running') order by r.id desc limit 1;
+  select r.id, r.reason, r.finished_at,
+         (select count(*) from public.analysis_dispatch_queue q where q.run_id = r.id and q.state = 'done') as done
+    into v_last
+    from public.analysis_dispatch_runs r where r.state = 'finished' order by r.finished_at desc nulls last, r.id desc limit 1;
+  select count(*) = 3 and bool_and(state = 'failed') into v_failing
+    from (select state from public.analysis_dispatch_runs order by id desc limit 3) z;
+  v_wait := case
+    when cfg.enabled is not true then '자동 발송 꺼짐(스위치)'
+    when v_failing then '연속 3회 발송 실패 — 자동 발송 멈춤'
+    when v_run.id is not null and v_run.claimed_at is null then format('run %s 발송함 · 루틴이 잡기 전', v_run.id)
+    when v_run.id is not null then format('run %s %s · 마지막 심장박동 %s', v_run.id,
+                                         case when v_run.reason = 'followup' then '후속 처리 중' else '분석 중' end,
+                                         coalesce(to_char(v_run.heartbeat_at at time zone 'Asia/Seoul', 'MM-DD HH24:MI') || ' KST', '없음'))
+    when n_promo > 0 then format('매입 홍보물 목록 수집 기다림 %s건', n_promo)
+    when n_ready > 0 then format('다음 발송 기다림 %s건', n_ready)
+    when n_fu_wait > 0 then format('후속 요청 %s건 발송 기다림', n_fu_wait)
+    else '기다리는 일 없음' end;
+  v_disp := jsonb_build_object(
+    'enabled', cfg.enabled, 'waiting', n_wait, 'ready', n_ready, 'needs_promo', n_promo, 'in_run', n_sent,
+    'followups_waiting', n_fu_wait, 'reclaimed_24h', n_reclaim, 'waiting_for', v_wait,
+    'running', case when v_run.id is null then null else jsonb_build_object('id', v_run.id, 'reason', v_run.reason, 'state', v_run.state,
+               'created_at', v_run.created_at, 'claimed_at', v_run.claimed_at, 'heartbeat_at', v_run.heartbeat_at) end,
+    'last_finished', case when v_last.id is null then null else jsonb_build_object('id', v_last.id, 'reason', v_last.reason,
+               'finished_at', v_last.finished_at, 'done', v_last.done) end);
+
+  select jsonb_build_object(
+    'last_run', (select jsonb_build_object('run_at', h.run_at, 'ok', h.ok, 'n_fail', h.n_fail, 'n_warn', h.n_warn,
+                                           'failed', to_jsonb(h.failed), 'warned', to_jsonb(h.warned), 'run_url', h.run_url)
+                   from public.ops_health_runs h where h.ref = 'main' order by h.run_at desc limit 1),
+    'dispatch_log', (select coalesce(jsonb_agg(jsonb_build_object('target', z.target, 'at', z.at, 'status_code', z.status_code) order by z.target), '[]'::jsonb)
+                       from (select distinct on (l.target) l.target, l.at, l.status_code from public.ops_dispatch_log l
+                              order by l.target, l.at desc) z),
+    'backup_poll', (select jsonb_build_object('at', p.at, 'status_code', p.status_code, 'runs_seen', p.runs_seen, 'status_note', p.status_note)
+                      from public.ops_backup_poll p order by p.at desc limit 1))
+    into v_health;
+
+  select coalesce(jsonb_agg(jsonb_build_object('source', c.source, 'at', c.last_collected_at) order by c.source), '[]'::jsonb)
+    into v_col from public.get_last_collected_at() c;
+
+  select m.applied_at into v_fu_since from zipfit_ops.schema_migrations m
+   where m.filename = '2026-10-06_06_followup_result_health_findings.sql';
+  select coalesce(jsonb_agg(jsonb_build_object('id', f.id, 'page_ref', left(f.page_ref, 120), 'run_id', f.run_id, 'state_at', f.state_at) order by f.id), '[]'::jsonb)
+    into v_fu from public.analysis_followup_requests f
+   where f.state = 'done' and f.result is null and f.requested_at > coalesce(v_fu_since, 'infinity'::timestamptz);
+
+  select coalesce(jsonb_agg(jsonb_build_object('id', h.id, 'group_key', h.group_key, 'announcement_id', h.announcement_id,
+                                               'reason', h.reason, 'hidden_at', h.hidden_at) order by h.hidden_at desc), '[]'::jsonb)
+    into v_hides from zipfit_ops.listing_hides h where h.released_at is null;
+
+  return jsonb_build_object('now', now(), 'coverage', v_cov, 'dispatch', v_disp, 'health', v_health,
+                            'collected', v_col, 'followups_unreported', v_fu, 'hides', v_hides);
+end
+$function$
