@@ -693,6 +693,14 @@ html[data-ui="d3"] .zf3-vline .policy-item.now .policy-category::after{content:"
 .zf-sch .zf-sch-tabs button[aria-selected="true"]{background:var(--ink,#222);border-color:var(--ink,#222);color:var(--paper,#fff)}
 html[data-ui="d3"] .zf-sch .policy-content{white-space:normal;overflow-wrap:anywhere}
 .zf-sch-stop>summary{list-style:none;cursor:pointer;display:block}
+.hcard.zf-ana-pending :is(.zf3-dpill,.htag,.chip-row,.zf-dateline,.zf-rec-date,.zf3-route,.zf3-dl-tags,.zf-route-slot,.zf-notices-slot,.zf-dcell-date,[id^="schedule-slot-"]){display:none!important}
+.zf-ana-box{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:12px;color:#6B6B63;background:#F6F6F2;border:1px solid #E8E8E0;border-radius:8px;padding:6px 10px;margin-bottom:6px;line-height:1.5}
+.zf-ana-pill{font-weight:700;color:#fff;background:#6B6B63;border-radius:999px;padding:1px 8px}
+.zf-ana-org{font-weight:600;color:#333}
+html[data-ui="d3"] .zf-ana-box{background:var(--surface-2);border-color:var(--line-2);color:var(--ink-2)}
+html[data-ui="d3"] .zf-ana-pill{background:var(--ink);color:var(--paper)}
+html[data-ui="d3"] .zf-ana-org{color:var(--ink)}
+html[data-ui="d3"] .zf-ana-box a{color:var(--ink)!important}
 .zf-sch-stop>summary::-webkit-details-marker{display:none}
 .zf-sch-stop>summary>.policy-category,.zf-sch-stop>summary>.policy-content{display:block}
 .zf-sch-stop .zf-sch-more{font-family:inherit;font-size:11px;font-weight:600;color:var(--ink-3,#777);margin-left:8px;white-space:nowrap}
@@ -1829,7 +1837,9 @@ function isClosingSoon(row){
   // 🔴 B62 ③ — 접수기간을 믿을 수 없는 행에는 날짜에서 나오는 배지를 달지 않는다.
   if(row['apply_period_check'] === true) return false;
   if(zfRouteGap(row)) return false;   // 🔴 2026-10-15 — 차수 사이(다음 창을 기다리는 카드)는 마감 임박이 아니다(zfRouteGap)
-  const d = parseNoticeDate(row['신청마감일']||row['apply_end']||'');
+  // 🔵 2026-10-16 — 창 안 차수 카드는 지금 창 끝까지 잰다(zfRouteCurEnd · 알약 「이번 차수 마감 D-n」과 같은 축).
+  const own = row['신청마감일']||row['apply_end']||'', cur = zfRouteCurEnd(row);
+  const d = parseNoticeDate(cur && (!own || cur < String(own).slice(0, 10)) ? cur : own);
   if(!d) return false;
   // 🔴 시각을 비교에서 제거한다 — 양쪽 다 「로컬 날짜의 00:00」으로 맞춘 뒤 일수 차를 센다.
   // 예전에는 마감일 23:59(UTC 자정 파싱분이라 KST 09:00 기준)와 「지금 시각」을 뺐다.
@@ -1878,7 +1888,7 @@ function zfLhSpanIsUnion(row, pn){
 //    창 사이 = 'before' + 다음 창 시작일(닫지 않는다) · 마지막 창 끝 뒤(카드 기간 안) = 'closed' · 창 안 = 종전 판정 그대로(LH 「…마감」 포함).
 //    보지 않는 것: 경로 행이 아직 안 왔거나(zfSide.routesReady) · 기간 확인 대상 · 조기 마감 알림 · 당첨발표가 지남 · 오늘이 카드 기간 밖 ·
 //    기간 모르는 경로 행이 섞임 · 창(겹치거나 하루 차로 붙은 행은 한 창)이 하나뿐 — 모두 종전 그대로다.
-function zfRouteGap(row){
+function zfRouteWins(row){
   if(!row || !zfSide.routesReady || row['apply_period_check'] === true || zfEarlyClosed(row)) return null;
   const S = parseNoticeDate(row['신청시작일'] || row['apply_start'] || ''), E = parseNoticeDate(row['신청마감일'] || row['apply_end'] || '');
   if(!S || !E) return null;
@@ -1898,9 +1908,28 @@ function zfRouteGap(row){
   wins.sort((p, q) => p.x - q.x);
   const merged = [];
   wins.forEach(c => { const m = merged[merged.length - 1]; if(m && c.x <= m.y + 864e5){ if(c.y > m.y){ m.y = c.y; m.de = c.de; } } else merged.push(Object.assign({}, c)); });
-  if(merged.length < 2 || merged.some(m => m.x <= today && today <= m.y)) return null;
-  const nxt = merged.find(m => m.x > today);
+  return merged.length < 2 ? null : { merged, today };
+}
+function zfRouteGap(row){
+  const W = zfRouteWins(row);
+  if(!W || W.merged.some(m => m.x <= W.today && W.today <= m.y)) return null;
+  const nxt = W.merged.find(m => m.x > W.today);
   return nxt ? { state: 'before', next: nxt.d, nextEnd: nxt.de } : { state: 'closed' };
+}
+// 🔵 2026-10-16(우편함 「표시층 — 차수 카드 마감 표시 …」 2) — 창이 둘 이상인 카드가 지금 창 **안**이고 그 창이 마지막 창이 아니면
+//    그 창의 끝(YYYY-MM-DD). 알약 D-day · 마감임박(isClosingSoon) · 「오늘 마감」 셈은 카드 끝(마지막 창 끝)이 아니라 이 날까지 센다
+//    (…19241 · 11-08에 「접수 중 · D-53」 → 이번 창 11-10). 마지막 창 안 · 창 하나 · 경로 행 전 · 차수 사이는 null(종전 그대로).
+//    🔴 「마감 임박순」 정렬과 카드 날짜 줄은 종전 값(zfSoonestOpenEnd) 그대로다.
+function zfRouteCurEnd(row){
+  const W = zfRouteWins(row);
+  if(!W) return null;
+  const i = W.merged.findIndex(m => m.x <= W.today && W.today <= m.y);
+  return i >= 0 && i < W.merged.length - 1 ? W.merged[i].de : null;
+}
+// 마감까지 셀 날 — 지금 창 끝(zfRouteCurEnd)이 카드의 열린 마감(zfSoonestOpenEnd)보다 이르면 그 날.
+function zfDeadline(row){
+  const own = zfSoonestOpenEnd(row), cur = zfRouteCurEnd(row);
+  return cur && (!own || cur < String(own).slice(0, 10)) ? cur : own;
 }
 function applyWindowState(row){
   const gap = zfRouteGap(row);
@@ -2263,7 +2292,8 @@ function zfRoutesReadyMark(){
   const before = rows.map(n => applyWindowState(n));
   zfSide.routesReady = true;
   zfRoutesReadyResolve();
-  const changed = rows.some((n, i) => applyWindowState(n) !== before[i]);
+  // 🔵 2026-10-16 — 지금 창 끝(zfRouteCurEnd)이 생긴 카드도 다시 그린다(알약 「이번 차수 마감 D-n」 · 마감임박).
+  const changed = rows.some((n, i) => applyWindowState(n) !== before[i] || !!zfRouteCurEnd(n));
   if(changed && noticeLoaded) applyNoticeFiltersAndRender(noticePage);
   if(changed) zfRerenderRecIfVisible();
 }
@@ -4292,6 +4322,22 @@ function zfCardEmptyKindFor(annId){
   return zfCardEmptyKind(zfPriceCache.get(aid), el ? el.getAttribute('data-sum-key') : '');
 }
 
+// 🔵 2026-10-16(우편함 「표시층 — 차수 카드 마감 표시 … + 분석 전 공고 「분석 중」」 3) — 카드 회차에 완료 계열 분석이 없고(analysis_done=false)
+//    분석할 첨부가 있는(has_attachments≠false) 카드는 「분석 중」이다 — 제목 · 유형 · 공급 주체 · 원문 링크만 두고 수집값 날짜·접수 상태·
+//    마감임박·D-day 를 접는다(.zf-ana-pending — 날짜 줄 · 알약 · 노선 · 칩 줄 · 경로/공고문 자리 · 상세 공고일·접수기간 칸 · 공급일정).
+//    🔴 판정은 카드 요약 상자와 같은 RPC 칸(get_announcement_price_summary)뿐 — 대기열 표는 읽지 않는다. 첨부 0(link_only)은 분석될 길이 없으니
+//    「분석 중」이라 하지 않고, 같은 게시물 링크가 있는 카드(B62 ④)는 그 링크를 그대로 둔다(종전 안내). 분석이 끝나면 다음 조회에서 일반 카드로 돌아온다.
+//    판정·거름·정렬·셈은 바꾸지 않는다(표시만).
+const ZF_DCELL_DATE = /^(공고일|접수기간)$/;
+function zfAnaPending(s, key){
+  return !!(s && s.analysis_done === false && s.has_attachments !== false && zfPostLinkOrganized(key) === null);
+}
+function zfAnaPendingHtml(url, org){
+  const link = url
+    ? ` <a href="${url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:#0F6E56;font-weight:600;text-decoration:underline">AI 정리 · 원문 보기 →</a>`
+    : '';
+  return `<div class="zf-ana-box"><span class="zf-ana-pill">분석 중</span>${org ? `<span class="zf-ana-org">${escapeHtml(org)}</span>` : ''}<span class="zf-ana-t">공고 원문을 정리하고 있어요 · 일정·자격은 원문에서 확인해 주세요</span>${link}</div>`;
+}
 function zfFillSummarySlots(){
   document.querySelectorAll('[data-sum-for]').forEach(el => {
     const id = el.getAttribute('data-sum-for');
@@ -4299,6 +4345,9 @@ function zfFillSummarySlots(){
     const s = zfPriceCache.get(id);
     if(s === undefined) return;                    // 조회 중 — 아직 아무것도 적지 않는다
     const url = el.getAttribute('data-sum-url') || '';
+    const pend = zfAnaPending(s, el.getAttribute('data-sum-key')), card = el.closest('.hcard');
+    if(card) card.classList.toggle('zf-ana-pending', pend);
+    if(pend){ el.innerHTML = zfAnaPendingHtml(url, el.getAttribute('data-sum-org') || ''); return; }
     const line = s ? zfSummaryLine(s) : '';
     // 🔵 이번 회차 값이 아니면 상자 색도 함께 바꾼다 — 칩만 달면 초록 상자가 「확인됨」처럼 읽힌다.
     const stale = !!(s && (s.round_state === 'past' || s.round_state === 'unknown'));
@@ -4470,7 +4519,7 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
     const detailHTML = detailRows.length
       ? `<div id="${cardId}" data-ann-id="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px;transition:all 0.2s" onclick="event.stopPropagation()">
           <div class="detail-grid">
-            ${detailRows.map(([k,v])=>`<div style="font-size:12px"><span style="color:#999">${k}</span><br><span style="color:#333;font-weight:500">${v}</span></div>`).join('')}
+            ${detailRows.map(([k,v])=>`<div${ZF_DCELL_DATE.test(k)?' class="zf-dcell-date"':''} style="font-size:12px"><span style="color:#999">${k}</span><br><span style="color:#333;font-weight:500">${v}</span></div>`).join('')}
           </div>
           ${zfPlacesLine(n['region_names'], n['announcement_id'])}
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
@@ -4506,7 +4555,7 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
         ${zfWarnBadges({contractVerify:n['contract_before_verification']===true, selectionMethod:n['selection_method'], rentExemptUntil:n['rent_exemption_until'], rentExemptNote:n['rent_exemption_note'], specialNotes:n['special_notes']})}
       `}</div>
       ${(pairKey && !isCancelRow)?`<div style="font-size:11px;color:#A32D2D;background:#FFF3F3;border:1px solid #F5C2C2;border-radius:8px;padding:5px 10px;margin-bottom:6px">⚠️ 동일 회차 짝공고와 <b>중복 신청 시 자동 탈락</b>될 수 있어요. 공고문을 반드시 확인하세요.</div>`:''}
-      ${isCancelRow?'':`<div data-sum-for="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" data-sum-url="${(n['공고URL']||'').replace(/"/g,'&quot;')}" data-sum-key="${zfAttr(zfDedupKey(n['공고명']))}"></div>`}
+      ${isCancelRow?'':`<div data-sum-for="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" data-sum-url="${(n['공고URL']||'').replace(/"/g,'&quot;')}" data-sum-key="${zfAttr(zfDedupKey(n['공고명']))}" data-sum-org="${zfAttr(n['공급기관'] || n['source'] || '')}"></div>`}
       <p class="zf-dateline" style="font-size:12px;color:#888;margin-bottom:8px">${dateLine}</p>
       ${isCancelRow?'':zfRouteSlotHtml(n, n['공고명'])}
       ${isCancelRow?'':zfNoticesSlotHtml(n)}
@@ -4902,8 +4951,8 @@ function renderPersonalizedRecommendations(){
         ${applyUnknownChip(n)}
         ${zfRentLowSlotHtml(n, n['공고명']||n['name'])}
       </div>
-      <div data-sum-for="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" data-sum-url="${(n['공고URL']||n['url']||'').replace(/"/g,'&quot;')}" data-sum-key="${zfAttr(zfDedupKey(n['공고명']||n['name']))}"></div>
-      <p style="font-size:12px;color:#888;margin-bottom:8px">${dateLine}</p>
+      <div data-sum-for="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" data-sum-url="${(n['공고URL']||n['url']||'').replace(/"/g,'&quot;')}" data-sum-key="${zfAttr(zfDedupKey(n['공고명']||n['name']))}" data-sum-org="${zfAttr(n['공급기관'] || n['source'] || '')}"></div>
+      <p class="zf-rec-date" style="font-size:12px;color:#888;margin-bottom:8px">${dateLine}</p>
       ${n._zfTarget ? zfTargetNoteHtml(n._zfTarget) : zfCheckNoteHtml(zfSupplyCheckLabels(n['공고명']||n['name'], zfProfileFacts()), '')}
       ${zfRouteSlotHtml(n, n['공고명']||n['name'])}
       ${zfNoticesSlotHtml(n)}
@@ -9494,7 +9543,7 @@ function renderMatchResults(rows){
     const isAmended   = (n.title||'').includes('[정정공고]') || n.is_revised;
     const demoTags    = classifyDemographics(n.housing_type||'', n.title||'');
     const isNew       = !isClosed && isNewNotice({'created_at': n.created_at||'', 'apply_end': n.apply_end||''});
-    const closingSoon = !isClosed && isClosingSoon({'apply_end': zfSoonestOpenEnd(n), 'apply_period_check': n.apply_period_check});
+    const closingSoon = !isClosed && isClosingSoon(zfWithSoonestEnd(n));   // 🔴 2026-10-16 — 행 전체(시작일·제목)를 넘긴다: 일부만 넘기면 zfRouteGap 이 null 이라 차수 사이에 「⏰ 마감임박」이 섰다
     const convBadgesM = buildConvBadges(n.mymy_applicable, n.supply_form, n.application_method, n.recruit_multiplier, n.is_relaxed_recruitment, n.selection_method, n.title, n.relaxation_detail);
     const pairKeyM    = n.pair_announcement_key||'';
     const revisionNoteEscM = (n.revision_note||'').replace(/"/g,'&quot;');
@@ -9531,7 +9580,7 @@ function renderMatchResults(rows){
     const detailHTML = detailRows.length
       ? `<div id="${cardId}" data-ann-id="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px" onclick="event.stopPropagation()">
           <div class="detail-grid">
-            ${detailRows.map(([k,v])=>`<div style="font-size:12px"><span style="color:#999">${k}</span><br><span style="color:#333;font-weight:500">${v}</span></div>`).join('')}
+            ${detailRows.map(([k,v])=>`<div${ZF_DCELL_DATE.test(k)?' class="zf-dcell-date"':''} style="font-size:12px"><span style="color:#999">${k}</span><br><span style="color:#333;font-weight:500">${v}</span></div>`).join('')}
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
             ${n.url?`<a class="detail-link" href="${n.url}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">AI 정리 · 원문 보기 →</a>`:''}
@@ -9561,7 +9610,7 @@ function renderMatchResults(rows){
         ${zfWarnBadges({contractVerify:n.contract_before_verification===true, selectionMethod:n.selection_method, rentExemptUntil:n.rent_exemption_until, rentExemptNote:n.rent_exemption_note, specialNotes:n.special_notes})}
       </div>
       ${pairKeyM?`<div style="font-size:11px;color:#A32D2D;background:#FFF3F3;border:1px solid #F5C2C2;border-radius:8px;padding:5px 10px;margin-bottom:6px">⚠️ 동일 회차 짝공고와 <b>중복 신청 시 자동 탈락</b>될 수 있어요. 공고문을 반드시 확인하세요.</div>`:''}
-      <div data-sum-for="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" data-sum-url="${(n.url||'').replace(/"/g,'&quot;')}" data-sum-key="${zfAttr(zfDedupKey(n.title))}"></div>
+      <div data-sum-for="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" data-sum-url="${(n.url||'').replace(/"/g,'&quot;')}" data-sum-key="${zfAttr(zfDedupKey(n.title))}" data-sum-org="${zfAttr(n.supply_org || n.source || '')}"></div>
       <p class="zf-dateline" style="font-size:12px;color:#888;margin-bottom:8px">${dateLine}</p>
       ${n._zfTarget ? zfTargetNoteHtml(n._zfTarget) + zfCheckNoteHtml([], n._zfTypeCheck) : zfCheckNoteHtml(n._zfSupplyCheck, n._zfTypeCheck)}
       ${zfRouteSlotHtml(n, n.title)}
@@ -10530,8 +10579,8 @@ function zf3Mine(n, p){
 const ZF3_LINES = [['young', '영', /영구/], ['kuk', '국', /국민/], ['hang', '행', /행복/], ['mae', '매', /매입/], ['jeon', '전', /전세/], ['gong', '공', /공공임대|통합/], ['gi', '기', /./]];
 function zf3LineOf(label){ return ZF3_LINES.find(x => x[2].test(String(label || ''))) || ZF3_LINES[6]; }
 const ZF3_EVENTS = [
-  { k: 'close', quota: 3, label: d => d === 0 ? '오늘 마감' : d === 1 ? '내일 마감' : `마감 D-${d}`,
-    test: n => { if(n['apply_period_check'] === true || applyWindowState(n) !== 'open') return null; const d = zf3DayTo(zfSoonestOpenEnd(n)); return d != null && d >= 0 && d <= 3 ? d : null; } },
+  { k: 'close', quota: 3, label: (d, n) => (n && zfRouteCurEnd(n) ? '이번 차수 ' : '') + (d === 0 ? '오늘 마감' : d === 1 ? '내일 마감' : `마감 D-${d}`),
+    test: n => { if(n['apply_period_check'] === true || applyWindowState(n) !== 'open') return null; const d = zf3DayTo(zfDeadline(n)); return d != null && d >= 0 && d <= 3 ? d : null; } },
   { k: 'start', quota: 3, label: d => d === 0 ? '오늘 접수 시작' : d === 1 ? '내일 접수 시작' : `접수 시작 D-${d}`,
     test: n => { if(n['apply_period_check'] === true) return null; const st = applyWindowState(n); if(st !== 'before' && st !== 'open') return null; const d = zf3DayTo(n['신청시작일'] || n['apply_start']); return d != null && d >= 0 && d <= 3 ? d : null; } },
   { k: 'fresh', quota: 2, label: () => '새 공고',
@@ -10569,7 +10618,7 @@ function zf3BoardItems(rows){
   cand.forEach(x => { if(out.length < ZF3_LOOP_MAX && !out.includes(x)) out.push(x); });   // 몫을 채우고도 자리가 남으면 차례대로
   const items = [];
   out.forEach(x => {
-    const it = { type: 'card', id: String(x.n['announcement_id'] || ''), ev: x.E.k, tag: x.E.label(x.d), name: zf3ShortName(x.n), place: zf3Place(x.n), n: 1 };
+    const it = { type: 'card', id: String(x.n['announcement_id'] || ''), ev: x.E.k, tag: x.E.label(x.d, x.n), name: zf3ShortName(x.n), place: zf3Place(x.n), n: 1 };
     const same = items.find(y => y.tag === it.tag && y.name === it.name && y.place === it.place);
     if(same) same.n++; else items.push(it);
   });
@@ -10742,6 +10791,11 @@ function zf3Pill(n){
   const st = applyWindowState(n), today = zf3Today();
   const end = zf3Real(zfSoonestOpenEnd(n)), start = zf3Real(n['신청시작일'] || n['apply_start']);
   if(st === 'open'){
+    const cur = zf3Real(zfRouteCurEnd(n));   // 🔵 2026-10-16 — 창 안 차수 카드는 이번 창 끝까지(카드 끝까지 D-day 를 세지 않는다)
+    if(cur){
+      const c = zf3Days(today, cur);
+      return { cls: 'open' + (c <= 1 ? ' hot' : ''), t: c === 0 ? '이번 차수 오늘 마감' : '이번 차수 마감 D-' + c };
+    }
     const d = end ? zf3Days(today, end) : null;
     return { cls: 'open' + (d != null && d <= 1 ? ' hot' : ''), t: d === 0 ? '오늘 마감' : '접수 중' + (d != null ? ' · D-' + d : '') };
   }
@@ -11416,7 +11470,7 @@ function zf3StatChips(all){
   const today = zf3Today(), open = (all || []).filter(n => !isHiddenAsClosed(n));
   let d0 = 0, d3 = 0, st = 0, nw = 0;
   open.forEach(n => {
-    const end = zf3Real(zfSoonestOpenEnd(n)), sta = applyWindowState(n), start = zf3Real(n['신청시작일'] || n['apply_start']), ann = zf3Real(zfNoticeDate(n) || n['announcement_date']);
+    const end = zf3Real(zfDeadline(n)), sta = applyWindowState(n), start = zf3Real(n['신청시작일'] || n['apply_start']), ann = zf3Real(zfNoticeDate(n) || n['announcement_date']);
     if(sta === 'open' && end === today) d0++;
     if(isClosingSoon(zfWithSoonestEnd(n))) d3++;
     if(sta === 'before' && start && zf3Days(today, start) <= 6) st++;
@@ -11577,7 +11631,7 @@ function zf3SetPlace(key, name){
 function zf3MapGroups(){
   const G = new Map(), today = zf3Today();
   (zf3PrePlace || []).forEach(n => {
-    const st = applyWindowState(n), end = zf3Real(zfSoonestOpenEnd(n));
+    const st = applyWindowState(n), end = zf3Real(zfDeadline(n));
     const hot = st === 'open' && end && zf3Days(today, end) <= 1;
     zf3PlacesOfRow(n).forEach(pl => {
       const g = G.get(pl.key) || Object.assign({ n: 0, hot: false, open: false }, pl);
