@@ -1322,9 +1322,9 @@ html[data-ui="d3"] .pg-btn{min-width:var(--hit);height:var(--hit);font-size:var(
          모바일 입력기는 단어를 다 칠 때까지 조합을 이어 가 input 이 전부 건너뛰어졌다. 중복 입력(#491)의 원인은 그리는 쪽이 칸 value 를 다시 쓴 것이었고
          그 줄은 걷혀 있다 — 그리는 쪽은 칸 value 를 쓰지 않는다(applyNoticeSubFilters 의 q 인자). -->
     <div style="display:flex;gap:8px;margin-bottom:0.75rem">
-      <input type="text" id="noticeSearchInput" placeholder="공고명, 지역 등으로 검색" oninput="applyNoticeFiltersAndRender();zfLogSearchSoon(this.value)"
+      <input type="text" id="noticeSearchInput" placeholder="공고명, 지역 등으로 검색" aria-label="공고 검색" oninput="applyNoticeFiltersAndRender();zfLogSearchSoon(this.value)"
         style="flex:1;min-width:0;padding:9px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px">
-      <select id="noticeSearchScopeSel" onchange="applyNoticeFiltersAndRender()"
+      <select id="noticeSearchScopeSel" aria-label="검색 범위" onchange="applyNoticeFiltersAndRender()"
         style="font-size:13px;padding:5px 8px;border:1px solid #e0e0e0;border-radius:8px;background:#fff;color:#333;cursor:pointer">
         <option value="title">제목만</option>
         <option value="title-region" selected>제목+지역</option>
