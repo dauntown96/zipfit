@@ -902,7 +902,12 @@ html.zf3-mapview[data-ui="d3"] #notice-list{display:none}
 .zf3-radar .lbl{font-size:14px;font-family:var(--f-ui);font-weight:700;fill:var(--ink);paint-order:stroke;stroke:var(--map-land);stroke-width:3.5px;stroke-linejoin:round;pointer-events:none}
 .zf3-radar .cap{position:absolute;left:8px;bottom:6px;font-size:var(--t-xs);color:var(--ink-2);background:var(--paper);padding:1px 6px;border-radius:4px}
 /* 🔵 2026-10-16(다듬기 묶음 A1) — 확대·이동: 선 굵기는 배율과 무관(non-scaling) · 확대했을 때만 끌기(그 밖에는 세로 스크롤 그대로) · 확대 단추 44 */
-.zf3-radar :is(.land,.dot,.ring,.pulse,.inset){vector-effect:non-scaling-stroke}
+.zf3-radar :is(.land,.dot,.ring,.pulse,.inset,.bd){vector-effect:non-scaling-stroke}
+.zf3-radar .bd{fill:none;stroke:var(--map-line);stroke-linejoin:round;stroke-linecap:round;pointer-events:none}
+.zf3-radar .bd.sgg{stroke-width:1}
+.zf3-radar .bd.emd{stroke-width:.6;opacity:.6}
+.zf3-radar:is([data-level="sgg"],[data-level="emd"]) .land{stroke:var(--ink-3);stroke-width:1.4}   /* 시·도 경계는 시·군·구 선보다 진하게 */
+.zf3-radar .cap .src{display:block;color:var(--ink-3)}
 .zf3-radar svg{touch-action:pan-y}
 .zf3-radar.zoomed svg{touch-action:none;cursor:grab}
 .zf3-radar .inset{fill:none;stroke:var(--ink-3);stroke-width:1;stroke-dasharray:3 2}
@@ -3073,7 +3078,8 @@ const ZF_SIGUNGU_ALIASES = {
 // (대전·충남은 통합 미법제화라 대상이 아니다.)
 const ZF_SIDO_ALIASES = {
   '전남광주통합특별시': ['광주광역시','전라남도'],
-  '강원특별자치도':     ['강원도']
+  '강원특별자치도':     ['강원도'],
+  '전북특별자치도':     ['전라북도']   // 2026-10-16 — 지도 쪽 시·도 표(ZF3_PROV)를 걷으며 거기만 있던 옛 이름을 이리로(한 벌)
 };
 
 // 이 행이 검색으로 잡혀야 하는 추가 지역 표기들.
@@ -11636,8 +11642,8 @@ function zf3RenderSheetPlaces(){
   if(!activeNoticeRegion){ msg('시·도를 고르면 시·군·구로 더 좁힐 수 있어요'); return; }
   if(!zf3Geo){ msg('시·군·구를 불러오는 중…'); zf3LoadGeo().then(g => { if(g) applyNoticeFiltersAndRender(noticePage); else msg('시·군·구를 불러오지 못했어요'); }); return; }
   zfEnsurePriceSummaries((zf3PrePlace || []).map(n => n['announcement_id'])).then(ok => { if(ok){ applyNoticeFiltersAndRender(noticePage); zfFillSummarySlots(); } });
-  const pc = ZF3_PROV[activeNoticeRegion];   // 목록 RPC 가 이미 그 시·도로 걸렀다 — 이름이 표에 없는 시·도(통합 시·도 등)면 걸린 행의 곳 전부
-  const pcs = ZF3_PROV_SPLIT[activeNoticeRegion] || (pc ? [pc] : null);
+  const pc = zf3Pc(activeNoticeRegion);   // 목록 RPC 가 이미 그 시·도로 걸렀다 — 이름이 경계 파일에 없는 시·도면 걸린 행의 곳 전부
+  const pcs = pc ? [pc] : null;
   const gs = zf3MapGroups().filter(g => !pcs || pcs.includes(g.pc));
   if(!gs.length){ msg('이 시·도에는 시·군·구로 나눌 공고가 없어요'); return; }
   const inHere = zf3PlaceSel && gs.some(g => g.key === zf3PlaceSel);
@@ -11869,7 +11875,7 @@ function zf3MinePcs(){
   const p = zf3Prefs();
   if(!p || !p.regions.length) return new Set();
   const out = new Set();
-  p.regions.forEach(rg => { const r = String(rg).trim(); Object.entries(ZF3_PROV).forEach(([nm, pc]) => { if(nm === r || nm.includes(r) || r.includes(zf3ShortSido(nm))) out.add(pc); }); });
+  p.regions.forEach(rg => { const r = String(rg).trim(); Object.entries(zf3ProvTable()).forEach(([nm, pc]) => { if(nm === r || nm.includes(r) || r.includes(zf3ShortSido(nm))) out.add(pc); }); });
   return out;
 }
 // ④ 공고 탭 머리 한 줄 요약 — 오늘 마감 · 3일 안 마감 · 7일 안 접수 시작 · 새 공고(3일). 누르면 그 순서로 줄 세운다(정렬 칸 noticeSortSel 그대로).
@@ -11961,37 +11967,43 @@ function zf3RecSaved(){
 //    밝은 지도 위에 열린 공고가 걸친 시군구마다 점 하나(점 크기 = 공고 수 · 오늘·내일 마감이 있으면 빨강 맥박 두 번 · 접수 예정만이면 빈 점).
 //    🔴 점은 단지 위치가 아니라 시군구 중심점이다(캡션에 밝힌다). 재료는 zf3PlacesOfRow — 그룹 행 region_names ∪ 세대 행 시군구(가격 요약 unit_places) → 둘 다 없으면 sido_nm·sigungu_nm(2026-10-13 N3).
 //    전국 보기는 시·도 점, 확대하면 시·군·구 점(2026-10-16 · zf3MapPaint).
-//    경계는 국가데이터처 SGIS 2025년 2분기 기준(geo/kr-2025.json · 2026-10-12 2013 자료에서 바꿈 — 미추홀구 · 청주 서원구·청원구 · 대구 군위군이 제 이름으로 들어왔다).
-//    거기 없는 이름은 ① 부모 시(화성시 ○○구 → 화성시) ② 시도가 바뀐 이름(이름이 하나뿐일 때만) ③ 그래도 없으면 시도 가운데 점선 고리(「인천 제물포구」 · 「서울(시군구 미상)」).
-//    점·지역 단추를 누르면 목록이 그 시군구 공고로 좁혀진다(📍 칩 · ✕로 뺀다 · 메모리만 — 새 저장 0). 지도 자료는 같은 출처 파일 하나를 처음 열 때만 받는다(외부 요청 0).
+//    🔵 2026-10-16(우편함 「표시층 — 지도 2026-07-01 개편 반영」 1) — 경계는 2026-07-01 기준(geo/kr-2026-07.json · 원자료 SGIS · 가공 vuski/admdongkor ·
+//    만드는 법 scripts/geo-build.py). 전남광주통합특별시가 한 장 · 인천 제물포·영종·서해·검단구 · 화성 만세·효행·병점·동탄구가 제 점이다(종전 2025년 2분기 판은 광주·전남 두 장 · 부모 시·고리로 대신).
+//    거기 없는 이름(옛 이름 · 다음 개편)은 ① 부모 시 ② 같은 이름이 전국에 하나뿐이면 그 점 ③ 그래도 없으면 시도 가운데 점선 고리(「인천 중구」 · 「서울(시군구 미상)」).
+//    점·지역 단추를 누르면 목록이 그 시군구 공고로 좁혀진다(📍 칩 · ✕로 뺀다 · 메모리만 — 새 저장 0). 지도 자료는 같은 출처 파일을 처음 열 때만 받는다(외부 요청 0).
 let zf3Geo = null, zf3GeoP = null, zf3View = 'list', zf3PlaceSel = null, zf3PlaceName = '', zf3PrePlace = [];
-const ZF3_PROV = { 서울특별시: '11', 부산광역시: '21', 대구광역시: '22', 인천광역시: '23', 광주광역시: '24', 대전광역시: '25', 울산광역시: '26', 세종특별자치시: '29', 경기도: '31', 강원특별자치도: '32', 강원도: '32', 충청북도: '33', 충청남도: '34', 전북특별자치도: '35', 전라북도: '35', 전라남도: '36', 경상북도: '37', 경상남도: '38', 제주특별자치도: '39', 전남광주통합특별시: '36' };
-// 🔵 2026-10-13(우편함 「코드 — 한글 중복 입력 · 매칭 「맞음」 낱말 확장 …」 4) — 수집 시·도 이름 「전남광주통합특별시」(공고 325행 · 목록 69그룹 — 전부 접수마감)가
-//    위 표에 없어 지도·시트 시·군·구에서 통째로 빠졌다(zf3PlaceOf 가 null). 경계 그림(2025)은 광주(24)·전남(36) 두 장 그대로 —
-//    시·군·구가 광주 구(광산·동·서·남·북구)면 24, 아니면 36 으로 그린다. 시·도 이름표·단추는 그 그림의 이름(광주 · 전남)을 쓴다.
-const ZF3_PROV_SPLIT = { 전남광주통합특별시: ['24', '36'] };
-const ZF3_SGG_ALIAS = {};   // 이름만 바뀐 구(경계 같음) — 2025 경계에는 남은 것이 없다(2013 「남구 → 미추홀구」는 걷음)
-const ZF3_METRO = new Set(['11', '21', '22', '23', '24', '25', '26']);
+const ZF3_GEO = './geo/kr-2026-07';   // 판 갈이 때 여기 · 캡션(ZF3_GEO_SRC) · sw.js 를 함께 바꾼다
+const ZF3_GEO_SRC = '경계 2026-07-01 · 국가데이터처 SGIS(공공누리 1유형) · 가공 vuski/admdongkor(CC BY 4.0)';
+// 🔵 시·도 이름 → 경계 코드는 표를 따로 두지 않는다 — 경계 파일의 시·도 이름(paths[].name)이 정본이고, 옛 이름(광주광역시·전라남도 · 강원도 · 전라북도)은
+//    검색·카드와 같은 ZF_SIDO_ALIASES 한 벌로 새 이름에 잇는다(백로그 「시·도 이름 표가 셋」 — 지도 쪽 ZF3_PROV · 분할 표(ZF3_PROV_SPLIT) · 광역 표(ZF3_METRO)를 걷음).
+//    코드는 행정안전부 체계다(전남광주 12 · 인천 28 · 경기 41 …) — 종전 SGIS 코드(23 · 31 …)는 쓰지 않는다.
+let zf3ProvIdx = null;
+function zf3ProvTable(){
+  if(!zf3ProvIdx && zf3Geo){ zf3ProvIdx = {}; zf3Geo.paths.forEach(p => { zf3ProvIdx[p.name] = p.code; (ZF_SIDO_ALIASES[p.name] || []).forEach(o => { zf3ProvIdx[o] = p.code; }); }); }
+  return zf3ProvIdx || {};
+}
+const zf3Pc = sd => zf3ProvTable()[String(sd || '').trim()] || null;
+function zf3ProvName(pc){ const p = zf3Geo && zf3Geo.paths.find(x => x.code === pc); return p ? p.name : String(pc || ''); }
+const zf3Metro = pc => /(특별|광역)시$/.test(zf3ProvName(pc));   // 「북구」는 어느 시의 북구인지 — 특별·광역시(전남광주통합특별시 포함) 구는 시·도 이름을 앞에
+const ZF3_SGG_ALIAS = {};   // 이름만 바뀐 구(경계 같음) — 2026-07-01 경계에는 남은 것이 없다
 // 🔵 2026-10-13(우편함 「표시층 — 공고 탭 다듬기」 4) — 지역 단추 두 층: 처음엔 시·도 단추(공고 수) → 누르면 그 시·도의 시·군·구 → 누르면 그곳 공고만.
 //    zf3PlaceSido = 펼친 시·도 코드(null 이면 시·도 목록). 시·군·구 단추·점·좁히는 규칙은 종전 그대로(zf3PlaceOf · zf3SetPlace).
 let zf3PlaceSido = null;
-const ZF3_PROV_NAME = Object.entries(ZF3_PROV).reduce((m, [k, v]) => (m[v] || (m[v] = k), m), {});
-const zf3ShortSido = t => String(t || '').replace(/특별자치시|특별자치도|특별시|광역시/, '').replace(/^(충청|전라|경상)(남|북)도$/, (m, a, b) => a[0] + b).replace(/도$/, '');
+const zf3ShortSido = t => String(t || '').replace(/통합특별시|특별자치시|특별자치도|특별시|광역시/, '').replace(/^(충청|전라|경상)(남|북)도$/, (m, a, b) => a[0] + b).replace(/도$/, '');
 function zf3LoadGeo(){
-  if(!zf3GeoP) zf3GeoP = fetch('./geo/kr-2025.json', { cache: 'force-cache' }).then(r => r.ok ? r.json() : null).then(g => { zf3Geo = g && g.cent ? g : null; return zf3Geo; }).catch(() => { zf3GeoP = null; return null; });
+  if(!zf3GeoP) zf3GeoP = fetch(ZF3_GEO + '.json', { cache: 'force-cache' }).then(r => r.ok ? r.json() : null).then(g => { zf3Geo = g && g.cent ? g : null; zf3ProvIdx = null; return zf3Geo; }).catch(() => { zf3GeoP = null; return null; });
   return zf3GeoP;
 }
 function zf3PlaceOf(sido, sgg){
   const G = zf3Geo, sd = String(sido || '').trim();
-  let pc = ZF3_PROV[sd];
+  const pc = zf3Pc(sd);
   if(!G || !pc) return null;
   const sg = String(sgg || '').replace(/\s+/g, '');
-  if(sg && ZF3_PROV_SPLIT[sd]) pc = ZF3_PROV_SPLIT[sd].find(p => G.cent[p + '|' + sg] || G.cent[p + '|' + sg.replace(/^(\S+?시)\S+구$/, '$1')]) || pc;
   if(sg){
     const k0 = pc + '|' + sg, k = ZF3_SGG_ALIAS[k0] || k0;
-    if(G.cent[k]) return { key: k0, name: (ZF3_METRO.has(pc) ? zf3ShortSido(ZF3_PROV_NAME[pc] || sd) + ' ' : '') + String(sgg).trim(), xy: G.cent[k], exact: true, pc };   // 「북구」는 어느 시의 북구인지 — 특별·광역시 구는 시 이름을 앞에
+    if(G.cent[k]) return { key: k0, name: (zf3Metro(pc) ? zf3ShortSido(zf3ProvName(pc)) + ' ' : '') + String(sgg).trim(), xy: G.cent[k], exact: true, pc };   // 「북구」는 어느 시의 북구인지 — 특별·광역시 구는 시 이름을 앞에
     const city = sg.replace(/^(\S+?시)\S+구$/, '$1');
-    // 🔵 2026-10-13(N3) — 세대 주소가 구 없이 「고양시」처럼 오면(2025 경계엔 구 단위만 있는 시) 구 가운데들의 평균을 쓴다(아래 같은 규칙).
+    // 🔵 2026-10-13(N3) — 세대 주소가 구 없이 「고양시」처럼 오면(경계엔 구 단위만 있는 시) 구 가운데들의 평균을 쓴다(아래 같은 규칙).
     if(city !== sg || /시$/.test(sg)){
       if(G.cent[pc + '|' + city]) return { key: pc + '|' + city, name: city, xy: G.cent[pc + '|' + city], exact: true, pc };
       const kids = Object.keys(G.cent).filter(x => x.startsWith(pc + '|' + city));
@@ -12000,18 +12012,25 @@ function zf3PlaceOf(sido, sgg){
     }
     const same = Object.keys(G.cent).filter(x => x.split('|')[1] === sg);
     if(same.length === 1) return { key: k0, name: String(sgg).trim(), xy: G.cent[same[0]], exact: true, pc };
-    return { key: pc + '|*' + sg, name: zf3ShortSido(ZF3_PROV_NAME[pc] || sd) + ' ' + String(sgg).trim(), xy: G.prov[pc], exact: false, pc, note: '2025 경계에 없는 구 — 시도 가운데 고리' };
+    return { key: pc + '|*' + sg, name: zf3ShortSido(zf3ProvName(pc)) + ' ' + String(sgg).trim(), xy: G.prov[pc], exact: false, pc, note: '경계 파일에 없는 구 — 시도 가운데 고리' };
   }
-  return { key: pc + '|*', name: zf3ShortSido(ZF3_PROV_NAME[pc] || sd) + '(시군구 미상)', xy: G.prov[pc], exact: false, pc, note: '시군구 없음 — 시도 가운데 고리' };
+  return { key: pc + '|*', name: zf3ShortSido(zf3ProvName(pc)) + '(시군구 미상)', xy: G.prov[pc], exact: false, pc, note: '시군구 없음 — 시도 가운데 고리' };
 }
 // 🔴 2026-10-13(우편함 「코드 — 열린 카드 오표시·오답·놓침」 3 · N3) — 곳의 재료는 카드 상세 「이 공고의 주택이 있는 지역」과 같다:
 //    그룹 행 시군구(region_names) ∪ 세대 행 시군구(가격 요약 RPC unit_places — zfMergeUnitPlaces). 공고 행 sido_nm·sigungu_nm 은 둘 다 없을 때만.
 //    종전에는 region_names(없으면 공고 행 sigungu_nm)만 봐서 SH 신혼 매입 Ⅰ·Ⅱ(공고 행 시군구 없음 · 세대 주소 관악·성동 등)가 「서울(시군구 미상)」에,
 //    경기남부 든든전세(세대 주소 화성 등 8곳)가 경기 고리에만 섰다. 세대 행 지역은 zf3RenderMap 이 목록 전체 몫을 한 번에 받는다.
+// 🔵 2026-10-16(우편함 「표시층 — 지도 2026-07-01 개편 반영」 4) — 전국 단위 공고(전국 전세임대 — 지역 칸 「서울특별시 외」 · 시·군·구 없음 · 세대 지역 없음,
+//    또는 시·도 「전국」)는 서울 미상 고리에 세우지 않는다 — 「서울에 위치 모르는 공고」로 읽혔다(틀린 정보). 지역이 서울인데 구만 없는 공고(SH 재개발임대 「서울」)는 서울 미상 그대로.
+function zf3WideRow(n){
+  if(String(n['sido_nm'] || '').trim() === '전국') return true;
+  return !String(n['sigungu_nm'] || '').trim() && /\s외$/.test(String(n['지역'] || n['region'] || '').trim());   // 화면 행은 매핑을 거친 「지역」(zfMapNoticeRows)
+}
 function zf3PlacesOfRow(n){
   const out = new Map();
   let names = zfMergeUnitPlaces(n['region_names'], zfUnitPlacesFor(n['announcement_id'])).map(x => String(x || '').trim()).filter(Boolean);
   names = names.filter(x => !names.some(y => y !== x && y.startsWith(x + ' ')));   // 「창원시」와 「창원시 마산회원구」가 함께면 구만
+  if(!names.length && zf3WideRow(n)) return [];   // 전국 단위 공고는 어느 곳에도 세우지 않는다(지도 아래 한 줄로 센다)
   const parts = names.length ? names.map(x => { const i = x.indexOf(' '); return i < 0 ? [x, ''] : [x.slice(0, i), x.slice(i + 1)]; }) : [[n['sido_nm'], n['sigungu_nm']]];
   parts.forEach(([sd, sg]) => { const pl = zf3PlaceOf(sd, sg); if(pl && !out.has(pl.key)) out.set(pl.key, pl); });
   return [...out.values()];
@@ -12057,7 +12076,7 @@ function zf3MapGroups(){
 //    점의 색 갈래는 그 시·도 안 시·군·구 중 가장 급한 것(오늘·내일 마감 > 접수 중 > 접수 예정). 시군구 미상(고리)도 그 시·도 안에 든다.
 // 🔵 2026-10-13(N5) — 시·도 층 안의 단추는 시·도 이름을 떼고 쓴다(머리에 이미 있다) — 경기 「김포시」와 서울 「서울 강동구」로 꼴이 갈리던 것.
 //    📍 칩(zf3PlaceName)은 시·도를 붙인 이름 그대로 — 목록 위에서 어느 시·도인지가 보여야 한다.
-function zf3PlaceShort(g){ const p = zf3ShortSido(ZF3_PROV_NAME[g.pc] || g.pc) + ' '; return String(g.name).startsWith(p) ? String(g.name).slice(p.length) : String(g.name); }
+function zf3PlaceShort(g){ const p = zf3ShortSido(zf3ProvName(g.pc)) + ' '; return String(g.name).startsWith(p) ? String(g.name).slice(p.length) : String(g.name); }
 // 시·도 묶음(단추 층과 지도 전국 보기가 함께 쓴다 — 한 벌). n = 그 시·도에 걸친 공고 수(한 공고가 여러 시군구에 걸쳐도 한 번).
 function zf3SidoGroups(gs, mine){
   const pcs = [...new Set(gs.map(g => g.pc))];
@@ -12065,13 +12084,13 @@ function zf3SidoGroups(gs, mine){
     const kids = gs.filter(g => g.pc === pc);
     const n = (zf3PrePlace || []).filter(r => zf3PlacesOfRow(r).some(p => p.pc === pc)).length;
     const cls = kids.some(g => g.hot) ? 'hot' : kids.some(g => g.open) ? '' : 'soon';
-    return { pc, n, cls, name: zf3ShortSido(ZF3_PROV_NAME[pc] || pc) };
+    return { pc, n, cls, name: zf3ShortSido(zf3ProvName(pc)) };
   }).sort((a, b) => (mine.has(b.pc) ? 1 : 0) - (mine.has(a.pc) ? 1 : 0) || b.n - a.n || a.name.localeCompare(b.name, 'ko'));
 }
 function zf3PlacesHTML(gs, mine){
   const pcs = [...new Set(gs.map(g => g.pc))];
   if(zf3PlaceSido && !pcs.includes(zf3PlaceSido)) zf3PlaceSido = null;   // 조건이 바뀌어 그 시·도에 공고가 없으면 시·도 목록으로
-  const sidoName = pc => zf3ShortSido(ZF3_PROV_NAME[pc] || pc);
+  const sidoName = pc => zf3ShortSido(zf3ProvName(pc));
   const btn = g => `<button type="button" data-place="${zfAttr(g.key)}" data-name="${zfAttr(g.name)}" aria-pressed="${zf3PlaceSel === g.key}"><i class="${g.exact ? g.cls : 'ring'}" aria-hidden="true"></i>${mine.has(g.pc) ? '<span class="zf3-pmine" aria-label="내 희망 지역">★</span>' : ''}${escapeHtml(zf3PlaceShort(g))} <b>${g.n}</b></button>`;
   if(zf3PlaceSido){
     const kids = gs.filter(g => g.pc === zf3PlaceSido);
@@ -12086,9 +12105,9 @@ function zf3PlacesHTML(gs, mine){
 //    전국 보기(배율 < ZF3_ZOOM_SGG)는 시·도 점(그 시·도에 걸친 공고 수 · 시·도 이름)만 — 수도권 시·군·구가 겹쳐 이름 없이 읽히던 것 · 시·도 없는 「동구 2」.
 //    확대하면 시·군·구 점과 이름(같은 이름의 구는 시·도를 붙인다 — 「대구 동구」). 확대 = ＋·− 단추 · 「전국」 · 끌기(확대했을 때) · 두 손가락 · ctrl+휠.
 //    시·도 점·단추를 누르면 그 시·도로 확대하고 시·군·구 단추 층을 연다 · 「← 시·도 전체」는 전국으로.
-//    지금 자료(시도 윤곽 + 시군구 중심점 · geo/kr-2025.json)만 쓴다 — 새 요청·새 호스트 0. 점·글자는 배율을 나눠 화면 크기를 지킨다.
+//    첫 화면은 시도 윤곽 + 시군구 중심점(ZF3_GEO) · 확대하면 같은 판의 경계선(zf3LinesFor) — 새 호스트 0. 점·글자는 배율을 나눠 화면 크기를 지킨다.
 let zf3Zoom = null, zf3ProvBoxC = null, zf3MapLast = null, zf3MapDrag = null, zf3MapMoved = false, zf3DupSgg = null;
-const ZF3_ZOOM_SGG = 1.8, ZF3_ZOOM_MAX = 10, ZF3_SIDO_AT = { '31': '31|이천시' };
+const ZF3_ZOOM_SGG = 1.8, ZF3_ZOOM_MAX = 10, ZF3_SIDO_AT = { 경기도: '이천시' };
 function zf3FullVb(){ return (zf3Geo && zf3Geo.vb) ? zf3Geo.vb.slice() : [0, 0, 461, 565]; }
 function zf3CurVb(){ return zf3Zoom || zf3FullVb(); }
 function zf3MapK(){ return zf3FullVb()[2] / zf3CurVb()[2]; }
@@ -12118,7 +12137,7 @@ function zf3ZoomTo(bx){
   if(!bx) return;
   const [, , W, H] = zf3FullVb();
   let w = (bx[2] - bx[0]) * 1.3, h = (bx[3] - bx[1]) * 1.3;
-  w = Math.max(w, h * W / H);
+  w = Math.min(Math.max(w, h * W / H), W / ZF3_ZOOM_SGG);   // 시·도로 들어가면 늘 시·군·구 단계 — 큰 시·도(전남광주 · 강원)도 시·도 점으로 남지 않게
   zf3Zoom = zf3ClampVb([(bx[0] + bx[2]) / 2 - w / 2, (bx[1] + bx[3]) / 2 - w * H / W / 2, w, w * H / W]);
 }
 function zf3ZoomBy(f, cx, cy){
@@ -12133,28 +12152,47 @@ function zf3InVb(xy){
   const x = Math.min(W - m, Math.max(m, xy[0])), y = Math.min(H - m, Math.max(m, xy[1]));
   return { x, y, moved: x !== xy[0] || y !== xy[1] };
 }
+// 🔵 2026-10-16(우편함 「표시층 — 지도 2026-07-01 개편 반영」 2·3) — 확대하면 같은 판의 경계선을 보이는 시·도만 따로 받는다:
+//    시·군·구 단계(배율 ≥ ZF3_ZOOM_SGG) = 시·군·구 사이 선 · 더 확대(≥ ZF3_ZOOM_EMD) = 읍면동 사이 선(가늘게). 점은 시·군·구 가운데 그대로(공고 지역이 시·군·구까지).
+//    첫 화면 무게는 그대로(윤곽 + 가운데 점) · 시·도 하나 gzip 시·군·구 3.5 KB · 읍면동 16.5 KB 안(2026-07 판 실측) · 같은 출처(새 호스트 0) · 받은 것은 메모리에.
+const ZF3_ZOOM_EMD = 4, zf3Lines = {};
+function zf3LinesFor(lay, pcs){
+  return pcs.map(pc => {
+    const k = lay + '-' + pc, v = zf3Lines[k];
+    if(typeof v === 'string') return v;
+    if(v === undefined){
+      zf3Lines[k] = null;   // 받는 중 — 다 받으면 다시 그린다 · 못 받으면 다음 그리기에 다시 묻는다
+      fetch(`${ZF3_GEO}/${k}.json`, { cache: 'force-cache' }).then(r => r.ok ? r.json() : null)
+        .then(j => { zf3Lines[k] = j && typeof j.d === 'string' ? j.d : ''; zf3MapPaint(); }).catch(() => { delete zf3Lines[k]; });
+    }
+    return '';
+  }).join('');
+}
 function zf3MapPaint(){
   const box = document.getElementById('zf3Map'), svg = box && box.querySelector('.zf3-radar svg');
   if(!svg || !zf3MapLast || !zf3Geo) return;
-  const G = zf3Geo, { gs, mine } = zf3MapLast, v = zf3CurVb(), k = zf3MapK(), s = 1 / k, lv2 = k >= ZF3_ZOOM_SGG;
+  const G = zf3Geo, { gs, mine } = zf3MapLast, v = zf3CurVb(), k = zf3MapK(), s = 1 / k, lv2 = k >= ZF3_ZOOM_SGG, lv3 = k >= ZF3_ZOOM_EMD;
   svg.setAttribute('viewBox', v.map(x => +x.toFixed(2)).join(' '));
   const radar = svg.closest('.zf3-radar');
   radar.classList.toggle('zoomed', !!zf3Zoom);
-  radar.dataset.level = lv2 ? 'sgg' : 'sido';
+  radar.dataset.level = lv3 ? 'emd' : lv2 ? 'sgg' : 'sido';
   const cap = radar.querySelector('.cap');
-  if(cap) cap.textContent = lv2 ? '점 = 시군구 가운데(단지 위치 아님) · 경계 2025 국가데이터처 SGIS' : '시·도별 공고 수 · 누르거나 확대하면 시·군·구 · 경계 2025 국가데이터처 SGIS';
+  if(cap) cap.innerHTML = `<span>${lv3 ? '점 = 시군구 가운데(단지 위치 아님) · 가는 선 = 읍면동' : lv2 ? '점 = 시군구 가운데(단지 위치 아님) · 더 확대하면 읍면동 경계' : '시·도별 공고 수 · 누르거나 확대하면 시·군·구'}</span><span class="src">${escapeHtml(ZF3_GEO_SRC)}</span>`;
+  // 보이는 시·도(상자가 지금 보이는 칸과 겹치는 것)만 경계선을 받는다
+  const vis = lv2 ? G.paths.map(p => p.code).filter(pc => { const b = zf3ProvBox(pc); return b && !(b[2] < v[0] || b[0] > v[0] + v[2] || b[3] < v[1] || b[1] > v[1] + v[3]); }) : [];
+  const bd = (lv3 ? `<path class="bd emd" d="${zf3LinesFor('emd', vis)}"/>` : '') + (lv2 ? `<path class="bd sgg" d="${zf3LinesFor('sgg', vis)}"/>` : '');
   const on = new Set(gs.map(g => g.pc));
   // 그릴 점 — 전국 보기는 시·도 묶음, 확대는 시·군·구(+ 시군구 미상 고리)
   let items;
   if(!lv2){
-    // 경기(31)의 면 중심은 서울 바로 옆이라 두 점이 겹친다 — 전국 보기의 경기 점만 경기 안 시군구 중심점(이천시)에 둔다(시·군·구 단계는 종전 그대로).
-    const at = pc => (ZF3_SIDO_AT[pc] && G.cent[ZF3_SIDO_AT[pc]]) || G.prov[pc];
+    // 경기의 면 중심은 서울 바로 옆이라 두 점이 겹친다 — 전국 보기의 경기 점만 경기 안 시군구 중심점(이천시)에 둔다(시·군·구 단계는 종전 그대로).
+    const at = pc => (ZF3_SIDO_AT[zf3ProvName(pc)] && G.cent[pc + '|' + ZF3_SIDO_AT[zf3ProvName(pc)]]) || G.prov[pc];
     items = zf3SidoGroups(gs, mine).map(x => ({ key: 'sido:' + x.pc, pc: x.pc, xy: at(x.pc), n: x.n, cls: x.cls, exact: true, sido: true, name: x.name, text: `${x.name} ${x.n}` }));
   } else {
-    const shortOf = g => g.exact ? (ZF3_METRO.has(g.pc) ? zf3PlaceShort(g) : String(g.name).replace(/^\S+시\s(\S+구)$/, '$1')) : g.name;
+    const shortOf = g => g.exact ? (zf3Metro(g.pc) ? zf3PlaceShort(g) : String(g.name).replace(/^\S+시\s(\S+구)$/, '$1')) : g.name;
     // 경계 자료 전체에서 둘 이상의 시·도에 있는 이름(동구 · 남구 · 강서구 · 고성군 …)은 시·도를 붙인다 — 보이는 점끼리만 세면 「남구」가 홀로 남았다.
     if(!zf3DupSgg){ const c = {}; Object.keys(G.cent).forEach(x => { const [pc, nm] = x.split('|'); (c[nm] = c[nm] || new Set()).add(pc); }); zf3DupSgg = new Set(Object.keys(c).filter(nm => c[nm].size > 1)); }
-    items = gs.map(g => { const t = shortOf(g); const nm = (g.exact && zf3DupSgg.has(t)) ? `${zf3ShortSido(ZF3_PROV_NAME[g.pc] || g.pc)} ${t}` : t; return Object.assign({}, g, { text: `${nm} ${g.n}` }); });
+    items = gs.map(g => { const t = shortOf(g); const nm = (g.exact && zf3DupSgg.has(t)) ? `${zf3ShortSido(zf3ProvName(g.pc))} ${t}` : t; return Object.assign({}, g, { text: `${nm} ${g.n}` }); });
   }
   items = items.filter(g => g.xy);
   const rOf = g => g.sido ? 7 + Math.min(9, Math.sqrt(g.n) * 1.6) : g.exact ? 5 + Math.min(7, g.n - 1) : 20 + Math.min(14, g.n);
@@ -12187,7 +12225,7 @@ function zf3MapPaint(){
     const inset = p.moved ? `<rect class="inset" x="${(p.x - r - 4 * s).toFixed(2)}" y="${(p.y - r - 4 * s).toFixed(2)}" width="${(2 * r + 8 * s).toFixed(2)}" height="${(2 * r + 8 * s).toFixed(2)}" rx="${(3 * s).toFixed(2)}"/>` : '';
     return `<g class="pt${sel}" style="--i:${Math.min(i, 30)}" ${act}>${inset}${g.exact ? `${g.hot || g.cls === 'hot' ? `<circle class="pulse" cx="${x}" cy="${y}" r="${r.toFixed(2)}"/>` : ''}<circle class="dot ${g.cls}" cx="${x}" cy="${y}" r="${r.toFixed(2)}"/>` : `<circle class="ring${sel}" cx="${x}" cy="${y}" r="${r.toFixed(2)}"/>`}<circle class="hit" cx="${x}" cy="${y}" r="${(22 * s).toFixed(2)}"/></g>`;
   }).join('');
-  svg.innerHTML = G.paths.map(p => `<path class="land${on.has(p.code) ? ' on' : ''}${mine.has(p.code) ? ' mine' : ''}" d="${p.d}"/>`).join('') + pts + labels;
+  svg.innerHTML = G.paths.map(p => `<path class="land${on.has(p.code) ? ' on' : ''}${mine.has(p.code) ? ' mine' : ''}" d="${p.d}"/>`).join('') + bd + pts + labels;
   const zb = radar.querySelector('.zf3-zoom');
   if(zb){ zb.querySelector('[data-zoom="in"]').disabled = k >= ZF3_ZOOM_MAX * 0.99; zb.querySelector('[data-zoom="out"]').disabled = !zf3Zoom; zb.querySelector('[data-zoom="all"]').disabled = !zf3Zoom; }
 }
@@ -12274,12 +12312,13 @@ function zf3RenderMap(){
   zfEnsurePriceSummaries((zf3PrePlace || []).map(n => n['announcement_id'])).then(ok => { if(ok){ applyNoticeFiltersAndRender(noticePage); zfFillSummarySlots(); } });
   const mine = zf3MinePcs(), gs = zf3MapGroups().sort((a, b) => (mine.has(b.pc) ? 1 : 0) - (mine.has(a.pc) ? 1 : 0));
   zf3MapLast = { gs, mine };
-  const nOpen = (zf3PrePlace || []).length;
+  const nWide = (zf3PrePlace || []).filter(n => zf3WideRow(n) && !zf3PlacesOfRow(n).length).length, nOpen = (zf3PrePlace || []).filter(n => zf3PlacesOfRow(n).length).length;
   box.innerHTML = `<div class="zf3-radar"><div class="zf3-mapw"><svg viewBox="${zf3FullVb().join(' ')}" aria-hidden="true" focusable="false"></svg>`
     + `<div class="zf3-zoom" role="group" aria-label="지도 확대·축소"><button type="button" data-zoom="in" aria-label="지도 확대">＋</button><button type="button" data-zoom="out" aria-label="지도 축소">−</button><button type="button" data-zoom="all" aria-label="전국 보기로">전국</button></div></div>`
     + `<span class="cap"></span></div>`
     + `<div class="zf3-legend"><span><i></i>접수 중</span><span><i class="hot"></i>오늘·내일 마감</span><span><i class="soon"></i>접수 예정</span><span><i class="ring"></i>시군구 미상</span>${mine.size ? '<span><i class="mine"></i>내 희망 지역</span>' : ''}</div>`
-    + `<p class="zf3-map-n">${gs.length ? `공고 ${nOpen.toLocaleString()}건이 걸친 ${gs.length}곳 · 시·도 → 시·군·구를 누르면 그곳 공고만` : '지금 조건에 맞는 공고가 없어요'}</p>`
+    + `<p class="zf3-map-n">${gs.length ? `공고 ${nOpen.toLocaleString()}건이 걸친 ${gs.length}곳 · 시·도 → 시·군·구를 누르면 그곳 공고만` : (nWide ? '지도에 세울 공고가 없어요' : '지금 조건에 맞는 공고가 없어요')}</p>`
+    + (nWide ? `<p class="zf3-map-n">전국 단위 공고 ${nWide.toLocaleString()}건은 지도에 표시하지 않아요</p>` : '')
     + zf3PlacesHTML(gs, mine);
   zf3MapPaint();
   try{ if(!matchMedia('(prefers-reduced-motion: reduce)').matches) box.querySelector('.zf3-radar').classList.add('live'); }catch(e){}
