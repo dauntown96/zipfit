@@ -694,6 +694,7 @@ html[data-ui="d3"] .zf3-vline .policy-item.now .policy-category::after{content:"
 html[data-ui="d3"] .zf-sch .policy-content{white-space:normal;overflow-wrap:anywhere}
 .zf-sch-stop>summary{list-style:none;cursor:pointer;display:block}
 .hcard.zf-ana-pending :is(.zf3-dpill,.htag,.chip-row,.zf-dateline,.zf-rec-date,.zf3-route,.zf3-dl-tags,.zf-route-slot,.zf-notices-slot,.zf-dcell-date,[id^="schedule-slot-"]){display:none!important}
+.hcard.zf-ana-pending .zf-ai-lbl{display:none}
 .zf-ana-box{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:12px;color:#6B6B63;background:#F6F6F2;border:1px solid #E8E8E0;border-radius:8px;padding:6px 10px;margin-bottom:6px;line-height:1.5}
 .zf-ana-pill{font-weight:700;color:#fff;background:#6B6B63;border-radius:999px;padding:1px 8px}
 .zf-ana-org{font-weight:600;color:#333}
@@ -1944,9 +1945,14 @@ function zfRouteCurEnd(row){
   return i >= 0 && i < W.merged.length - 1 ? W.merged[i].de : null;
 }
 // 마감까지 셀 날 — 지금 창 끝(zfRouteCurEnd)이 카드의 열린 마감(zfSoonestOpenEnd)보다 이르면 그 날.
+//    「마감 임박순」 정렬도 이 날을 본다(2026-10-16). 카드 날짜 줄은 종전(zfSoonestOpenEnd) 그대로.
 function zfDeadline(row){
   const own = zfSoonestOpenEnd(row), cur = zfRouteCurEnd(row);
   return cur && (!own || cur < String(own).slice(0, 10)) ? cur : own;
+}
+function zfWithDeadline(row){
+  const e = zfDeadline(row), own = (row && (row['신청마감일'] || row['apply_end'])) || '';
+  return e === own ? row : Object.assign({}, row, { '신청마감일': e, 'apply_end': e });
 }
 function applyWindowState(row){
   const gap = zfRouteGap(row);
@@ -3562,9 +3568,17 @@ function applyNoticeFiltersAndRender(keepPage){
     //    앞: 마감일 ≥ 오늘 오름차순 / 뒤: 지난 마감일(역시 오름차순) / 맨 뒤: 마감일 없음.
     if(sortVal==='end-asc'){
       // 🔵 2026-10-07(표시층 긴급 5) — 묶인 카드는 가장 이른 열린 공고문 마감(zfSoonestOpenEnd)으로 선다.
-      const ga = applyDateGroup(zfWithSoonestEnd(a),'신청마감일','apply_end'), gb = applyDateGroup(zfWithSoonestEnd(b),'신청마감일','apply_end');
+      // 🔵 2026-10-16(우편함 「표시층 — 「마감 임박순」도 이번 차수 마감 축으로 …」 1) — 창 안 차수 카드는 이번 차수 끝(zfDeadline)으로 선다 —
+      //    머리 칩 「오늘 마감」·「3일 안 마감」 셈 · 알약 · 마감임박이 보는 날과 같은 날(칩을 누르면 셈에 든 카드가 앞에 온다).
+      //    앞으로 올 마감 묶음 안에서는 머리 칩 「3일 안 마감」 셈(isClosingSoon)에 든 카드가 먼저다 — 차수 사이 카드(다음 창을 기다림 · 마감임박 아님)와
+      //    기간 확인 대상 카드는 마감 날짜가 가까워도 셈에 들지 않으니 그 뒤로(칩을 누르면 셈에 든 카드가 맨 앞 n장).
+      const ga = applyDateGroup(zfWithDeadline(a),'신청마감일','apply_end'), gb = applyDateGroup(zfWithDeadline(b),'신청마감일','apply_end');
       if(ga !== gb) return ga - gb;
-      return nullLast(a,b,n=>zfSoonestOpenEnd(n),false);
+      if(ga === 0){
+        const sa = isClosingSoon(zfWithSoonestEnd(a)) ? 0 : 1, sb = isClosingSoon(zfWithSoonestEnd(b)) ? 0 : 1;
+        if(sa !== sb) return sa - sb;
+      }
+      return nullLast(a,b,n=>zfDeadline(n),false);
     }
     // 🔴 접수 시작순도 같은 3분기를 탄다(2026-09-16) — 종전에는 맨 위가 작년 시작일 공고였다
     //    (apply_start 가 있는 594건 중 518건이 이미 지난 날짜, 최솟값 2025-07-28).
@@ -4352,9 +4366,10 @@ const ZF_DCELL_DATE = /^(공고일|접수기간)$/;
 function zfAnaPending(s, key){
   return !!(s && s.analysis_done === false && s.has_attachments !== false && zfPostLinkOrganized(key) === null);
 }
+// 🔵 2026-10-16 — 아직 정리 전이라 「AI 정리」라고 말하지 않는다(링크는 「원문 보기」만 · 카드 안 다른 원문 링크의 「AI 정리 · 」도 .zf-ana-pending 에서 접는다).
 function zfAnaPendingHtml(url, org){
   const link = url
-    ? ` <a href="${url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:#0F6E56;font-weight:600;text-decoration:underline">AI 정리 · 원문 보기 →</a>`
+    ? ` <a href="${url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:#0F6E56;font-weight:600;text-decoration:underline">원문 보기 →</a>`
     : '';
   return `<div class="zf-ana-box"><span class="zf-ana-pill">분석 중</span>${org ? `<span class="zf-ana-org">${escapeHtml(org)}</span>` : ''}<span class="zf-ana-t">공고 원문을 정리하고 있어요 · 일정·자격은 원문에서 확인해 주세요</span>${link}</div>`;
 }
@@ -4543,12 +4558,12 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
           </div>
           ${zfPlacesLine(n['region_names'], n['announcement_id'])}
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
-            ${n['공고URL']?`<a class="detail-link" href="${n['공고URL']}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">AI 정리 · 원문 보기 →</a>`:''}
+            ${n['공고URL']?`<a class="detail-link" href="${n['공고URL']}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`:''}
             ${shareBtn}
             ${saveBtn}
           </div>
         </div>`
-      : `<div id="${cardId}" data-ann-id="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px" onclick="event.stopPropagation()"><div style="display:flex;gap:8px;flex-wrap:wrap">${n['공고URL']?`<a class="detail-link" href="${n['공고URL']}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">AI 정리 · 원문 보기 →</a>`:''} ${shareBtn} ${saveBtn}</div></div>`;
+      : `<div id="${cardId}" data-ann-id="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px" onclick="event.stopPropagation()"><div style="display:flex;gap:8px;flex-wrap:wrap">${n['공고URL']?`<a class="detail-link" href="${n['공고URL']}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`:''} ${shareBtn} ${saveBtn}</div></div>`;
 
     html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n['지역']||'').replace(/"/g,'&quot;')}" data-sido="${(n['sido_nm']||'').replace(/"/g,'&quot;')}" data-sigungu="${(n['sigungu_nm']||'').replace(/"/g,'&quot;')}" data-title="${(n['공고명']||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" data-housing-type="${(n['공급유형']||'').replace(/"/g,'&quot;')}" data-precise-address="${(n['precise_address']||'').replace(/"/g,'&quot;')}" data-relaxed="${n['is_relaxed_recruitment']===true?'1':''}" data-relaxation-detail="${(n['relaxation_detail']||'').replace(/"/g,'&quot;')}" data-contract-verify="${n['contract_before_verification']===true?'1':''}" data-rent-exempt-until="${(n['rent_exemption_until']||'').replace(/"/g,'&quot;')}" data-rent-exempt-note="${(n['rent_exemption_note']||'').replace(/"/g,'&quot;')}" data-revised="${isAmended?'1':''}" data-revision-note-full="${revisionNoteEsc}" data-special-notes="${n['special_notes']?JSON.stringify(n['special_notes']).replace(/"/g,'&quot;'):''}" data-apply-start="${(n['apply_start']||'').replace(/"/g,'&quot;')}" data-apply-end="${(n['apply_end']||'').replace(/"/g,'&quot;')}" data-announcement-date="${(n['announcement_date']||'').replace(/"/g,'&quot;')}" data-round-date="${zfNoticeDate(n).replace(/"/g,'&quot;')}" data-complex-count="${zfComplexCount(n)}" data-doc-submit-announce="${(n['doc_submit_announce_date']||'').replace(/"/g,'&quot;')}" data-doc-submit-start="${(n['doc_submit_start']||'').replace(/"/g,'&quot;')}" data-doc-submit-end="${(n['doc_submit_end']||'').replace(/"/g,'&quot;')}" data-winner-announce="${(n['winner_announce_date']||'').replace(/"/g,'&quot;')}" data-contract-start="${(n['contract_start']||'').replace(/"/g,'&quot;')}" data-contract-end="${(n['contract_end']||'').replace(/"/g,'&quot;')}" data-attachment-urls="${n['attachment_urls']?JSON.stringify(n['attachment_urls']).replace(/"/g,'&quot;'):''}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this,'notice')" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
       <div class="htop">
@@ -4976,7 +4991,7 @@ function renderPersonalizedRecommendations(){
       ${n._zfTarget ? zfTargetNoteHtml(n._zfTarget) : zfCheckNoteHtml(zfSupplyCheckLabels(n['공고명']||n['name'], zfProfileFacts()), '')}
       ${zfRouteSlotHtml(n, n['공고명']||n['name'])}
       ${zfNoticesSlotHtml(n)}
-      ${(n['공고URL']||n['url'])?`<a class="detail-link" href="${n['공고URL']||n['url']}" target="_blank" rel="noopener" style="display:block" onclick="zfLog('recommend_click',{rank:${idx+1}},'${(n['announcement_id']||'').toString().replace(/'/g,'')}')">AI 정리 · 원문 보기 →</a>`:''}
+      ${(n['공고URL']||n['url'])?`<a class="detail-link" href="${n['공고URL']||n['url']}" target="_blank" rel="noopener" style="display:block" onclick="zfLog('recommend_click',{rank:${idx+1}},'${(n['announcement_id']||'').toString().replace(/'/g,'')}')"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`:''}
     </div>`;
   });
   if(filtered.length>5) html+=`<p style="font-size:12px;color:#888;text-align:center;margin-top:8px">외 ${filtered.length-5}건 더 — 공고 탭에서 전체 확인</p>`;
@@ -6465,7 +6480,7 @@ function sortMatchRows(rows, sortVal){
     if(sortVal==='date-desc')     return nullLast(a,b,n=>zfSortDate(n),true)
       || nullLast(a,b,n=>n.apply_start,true)
       || nullLast(a,b,n=>n.first_seen_at,true);
-    if(sortVal==='end-asc')       return nullLast(a,b,n=>zfSoonestOpenEnd(n),false);   // 🔵 2026-10-07(표시층 긴급 5) — 묶인 카드는 가장 이른 열린 공고문 마감
+    if(sortVal==='end-asc')       return nullLast(a,b,n=>zfDeadline(n),false);   // 🔵 2026-10-07(표시층 긴급 5) — 묶인 카드는 가장 이른 열린 공고문 마감 · 2026-10-16 창 안 차수 카드는 이번 차수 끝(zfDeadline)
     if(sortVal==='start-asc')     return nullLast(a,b,n=>n.apply_start,false);
     // 🔵 공고 탭과 **같은 zfNumOrNull** 을 부른다 — 사본을 두지 않는다.
     if(sortVal==='units-desc')    return nullLast(a,b,n=>zfNumOrNull(n.total_units),true);
@@ -9233,7 +9248,7 @@ function closeMapAsSidoOnly(id){
   return closeMapBox(id,
     '<p class="map-closed"><strong>📍 위치 정보가 시·도까지만 있어 지도를 표시하지 않았어요</strong>'
     + '<span class="sub">청년신혼부부매입임대리츠처럼 단지가 아직 정해지지 않은 유형일 수 있어요. '
-    + '정확한 위치는 아래 「AI 정리 · 원문 보기」의 공고 원문에서 확인하세요.</span></p>');
+    + '정확한 위치는 아래 「<span class="zf-ai-lbl">AI 정리 · </span>원문 보기」의 공고 원문에서 확인하세요.</span></p>');
 }
 
 // 🔴 전세임대는 위치가 **모자란** 것이 아니라 **성립하지 않는다.**
@@ -9273,7 +9288,7 @@ function closeMapAsMultiRegion(id, names){
   return closeMapBox(id,
     '<p class="map-closed"><strong>📍 여러 지역에 걸친 공고라 지도를 표시하지 않았어요</strong>'
     + '<span class="sub">대상 지역: ' + names.map(escapeHtml).join(' · ') + '. 주택마다 위치가 달라요 — '
-    + '주소는 아래 「AI 정리 · 원문 보기」의 공고 원문에서 확인하세요.</span></p>');
+    + '주소는 아래 「<span class="zf-ai-lbl">AI 정리 · </span>원문 보기」의 공고 원문에서 확인하세요.</span></p>');
 }
 
 function initMapForHouse(h,id){
@@ -9603,12 +9618,12 @@ function renderMatchResults(rows){
             ${detailRows.map(([k,v])=>`<div${ZF_DCELL_DATE.test(k)?' class="zf-dcell-date"':''} style="font-size:12px"><span style="color:#999">${k}</span><br><span style="color:#333;font-weight:500">${v}</span></div>`).join('')}
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
-            ${n.url?`<a class="detail-link" href="${n.url}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">AI 정리 · 원문 보기 →</a>`:''}
+            ${n.url?`<a class="detail-link" href="${n.url}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`:''}
             ${mShareBtn}
             ${mSaveBtn}
           </div>
         </div>`
-      : `<div id="${cardId}" data-ann-id="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px" onclick="event.stopPropagation()"><div style="display:flex;gap:8px;flex-wrap:wrap">${n.url?`<a class="detail-link" href="${n.url}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block">AI 정리 · 원문 보기 →</a>`:''} ${mShareBtn} ${mSaveBtn}</div></div>`;
+      : `<div id="${cardId}" data-ann-id="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px" onclick="event.stopPropagation()"><div style="display:flex;gap:8px;flex-wrap:wrap">${n.url?`<a class="detail-link" href="${n.url}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`:''} ${mShareBtn} ${mSaveBtn}</div></div>`;
 
     html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n.region||'').replace(/"/g,'&quot;')}" data-sido="${(n.sido_nm||'').replace(/"/g,'&quot;')}" data-sigungu="${(n.sigungu_nm||'').replace(/"/g,'&quot;')}" data-title="${(n.title||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" data-housing-type="${(n.housing_type||'').replace(/"/g,'&quot;')}" data-precise-address="${(n.precise_address||'').replace(/"/g,'&quot;')}" data-relaxed="${n.is_relaxed_recruitment===true?'1':''}" data-relaxation-detail="${(n.relaxation_detail||'').replace(/"/g,'&quot;')}" data-contract-verify="${n.contract_before_verification===true?'1':''}" data-rent-exempt-until="${(n.rent_exemption_until||'').replace(/"/g,'&quot;')}" data-rent-exempt-note="${(n.rent_exemption_note||'').replace(/"/g,'&quot;')}" data-revised="${isAmended?'1':''}" data-revision-note-full="${revisionNoteEscM}" data-special-notes="${n.special_notes?JSON.stringify(n.special_notes).replace(/"/g,'&quot;'):''}" data-apply-start="${(n.apply_start||'').replace(/"/g,'&quot;')}" data-apply-end="${(n.apply_end||'').replace(/"/g,'&quot;')}" data-announcement-date="${(n.announcement_date||'').replace(/"/g,'&quot;')}" data-round-date="${zfNoticeDate(n).replace(/"/g,'&quot;')}" data-complex-count="${zfComplexCount(n)}" data-doc-submit-announce="${(n.doc_submit_announce_date||'').replace(/"/g,'&quot;')}" data-doc-submit-start="${(n.doc_submit_start||'').replace(/"/g,'&quot;')}" data-doc-submit-end="${(n.doc_submit_end||'').replace(/"/g,'&quot;')}" data-winner-announce="${(n.winner_announce_date||'').replace(/"/g,'&quot;')}" data-contract-start="${(n.contract_start||'').replace(/"/g,'&quot;')}" data-contract-end="${(n.contract_end||'').replace(/"/g,'&quot;')}" data-attachment-urls="${n.attachment_urls?JSON.stringify(n.attachment_urls).replace(/"/g,'&quot;'):''}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this,'match')" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
       <div class="htop">
