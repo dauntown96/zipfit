@@ -162,9 +162,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-10-16 | **표시층 — 「AI 정리」는 분석 있을 때만 · 관리자 전용 「이 묶음 숨기기」** — `zfAiOff`로 카드·저장 목록·체크리스트·첨부 0 상자의 「AI 정리 · 」 접음(분석된 카드 그대로) · 상세 맨 아래 관리자 단추(`ops_is_admin` 참일 때만 · 사유 필수 · 확인 · `ops_listing_hide`) · health-screen `phrase` 조건 · `zipfit-v225` · PR #567 |
 | 2026-10-16 | **코드 — 관리자 페이지 (가) 첫 판** — `zipfit_ops.admins`·`listing_hides`(GRANT 0) · `ops_is_admin`·`ops_status_board`(칸 다섯)·`ops_listing_hide`(authenticated만 · 비관리자 예외) · 목록 RPC 묶음 숨김 조건(반환형 그대로) · 14일 커버율 한 정의 · 설정 탭 「운영」 구역 · 불변식 v3.15 · `zipfit-v224` · PR #564 |
 | 2026-10-16 | **운영 — 자동 run 249 · 후속 1(분석 몫 0)** — …0880 김포 여기가 「완료(판정 대기)」 → 「완료」(v10.2 — 원문 그대로 둔 갈림은 ⚠️ + 완료 · 자격 asset·car NULL 유지 · ⚠️ 4 유지) · `pending_fields` [판정완료] 1줄 · 산물 변화 0 · 판정 대기 전체 0 · 분석률 62/62 |
-| 2026-10-16 | **표시층 — 「마감 임박순」도 이번 차수 마감 축 · 분석 전 카드 「AI 정리」 빼기** — 공고 탭·추천 정렬 `zfDeadline` · 공고 탭은 칩 「3일 안 마감」 셈 카드 먼저(차수 사이 카드가 끼던 자리) · 분석 전 카드 원문 링크 「원문 보기」만 · health-screen `route_cur`·`ana_pending` 조건 · `zipfit-v223` · PR #561 |
 ---
 
 ## 🚫 코딩 원칙
