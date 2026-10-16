@@ -170,6 +170,31 @@
    "key": "function_search_path_mutable_public_get_announcements_deduped",
    "kind": "known",
    "why": "search_path 미고정 — 계획만(2026-10-08 운영 기반 묶음 2-③) · 고치는 회차에 이 줄을 지운다"
+  },
+  {
+   "key": "anon_security_definer_function_executable_public_listing_hidden_keys_",
+   "kind": "intended",
+   "why": "목록 RPC get_announcements_deduped 가 anon 으로 부르는 열린 숨김 묶음 키 목록(rpc/listing_hidden_keys · 2026-10-16 관리자 페이지 (가)) · 기록 표 zipfit_ops.listing_hides(GRANT 0)에서 키만 낸다 — 사유·누가 없음 · 개인정보 없음 · search_path 고정"
+  },
+  {
+   "key": "authenticated_security_definer_function_executable_public_listing_hidden_keys_",
+   "kind": "intended",
+   "why": "목록 RPC 가 로그인 사용자로 부를 때 같은 키 목록(위와 같다) · search_path 고정"
+  },
+  {
+   "key": "authenticated_security_definer_function_executable_public_ops_is_admin_",
+   "kind": "intended",
+   "why": "설정 탭 「운영」 구역을 그릴지(참/거짓 하나 · auth.uid() ∈ zipfit_ops.admins · 인자 없음 · 2026-10-16) · anon 닫힘 · search_path 고정"
+  },
+  {
+   "key": "authenticated_security_definer_function_executable_public_ops_status_board_",
+   "kind": "intended",
+   "why": "관리자 상태판(2026-10-16 · 관리자 페이지 (가)) · auth.uid() ∈ zipfit_ops.admins 가 아니면 예외 42501 · 운영 표(클라이언트 권한 0)를 읽어야 해 정의자 · anon 닫힘 · search_path 고정"
+  },
+  {
+   "key": "authenticated_security_definer_function_executable_public_ops_listing_hide_p_announcement_id text, p_reason text, p_release_id bigint",
+   "kind": "intended",
+   "why": "관리자 목록 숨김 쓰기(2026-10-16) · auth.uid() ∈ zipfit_ops.admins 가 아니면 예외 42501 · 누가 = auth.uid()(인자로 받지 않는다) · 기록 표 GRANT 0 · anon 닫힘 · search_path 고정"
   }
  ]
 }
