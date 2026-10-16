@@ -1563,6 +1563,10 @@ html[data-ui="d3"] body.theme-dark{color-scheme:dark}
           <p id="zfDeleteMsg" style="font-size:12px;margin:8px 0 0;line-height:1.5"></p>
         </div>
       </div>
+
+      <!-- 🔵 2026-10-16 관리자 페이지 (가) 첫 판 — 「운영」 구역. 관리자(ops_is_admin 참)일 때만 zfOpsLoad 가 채우고 보인다.
+           🔴 관문은 DB 다(zipfit_ops.admins · 관리자 함수가 아니면 예외) — 일반 사용자에게는 이 자리가 비어 있고 숨겨져 있다. -->
+      <div id="zfOpsZone" class="panel hidden" style="margin-top:1rem" aria-live="polite"></div>
     </div>
   </div> <!-- /main5 -->
 
@@ -10304,6 +10308,7 @@ async function renderSettingsGate(){
       const { data } = await zfAuth.auth.getSession();
       if(data && data.session){
         await zfApplySession(data.session);
+        zfOpsLoad();   // 🔵 관리자면 「운영」 구역(기다리지 않는다 · 비관리자는 아무것도 그리지 않는다)
         return;
       }
     }catch(err){
@@ -10320,6 +10325,116 @@ async function renderSettingsGate(){
   document.getElementById('settingsBody').classList.add('hidden');
   // 🔴 링크를 눌렀다가 되돌아온 사람에게 **왜** 로그인이 안 됐는지 말한다.
   zfShowAuthUrlErrorIfAny();
+}
+
+// ── 🔵 2026-10-16 관리자 페이지 (가) 첫 판 — 설정 탭 맨 아래 「운영」 구역(우편함 「코드 — 관리자 페이지 (가) 첫 판 …」 · 다운님 승인 2026-10-16)
+//    관문은 DB 다: ops_is_admin()(참/거짓) → 참일 때만 ops_status_board()(관리자가 아니면 예외) · 숨김 쓰기는 ops_listing_hide() 하나.
+//    ?ops=1 표지는 관문이 아니다(누구나 켤 수 있다). 꼴은 최소(글자 · 색 세 단계) — 다듬기는 표시층 세션 몫.
+//    열린 점검 이슈는 화면이 GitHub 공개 API(zipfit · 익명)를 연 때 한 번 + 「새로 고침」 — 관리자 브라우저만 부른다(이용자 정보 0).
+const ZF_OPS_ISSUE_LABELS = ['health-ops', 'health-ops-soft', 'health-screen', 'db-apply'];
+const ZF_OPS_COLOR = { red: '#C0392B', orange: '#D35400', yellow: '#9A7D0A', ok: '#2E7D32' };
+let zfOpsBusy = false;
+function zfOpsEsc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function zfOpsTime(t){
+  if(!t) return '—';
+  const d = new Date(t);
+  return isNaN(d) ? '—' : d.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }) + ' KST';
+}
+async function zfOpsRpc(fn, body){
+  const tok = await zfAccessToken();
+  if(!tok) return { ok: false, data: null };
+  try{
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, { method: 'POST',
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {}) });
+    let data = null; try{ data = await r.json(); }catch(e){}
+    return { ok: r.ok, data };
+  }catch(e){ return { ok: false, data: null }; }
+}
+async function zfOpsIssues(){
+  try{
+    const r = await fetch('https://api.github.com/repos/dauntown96/zipfit/issues?state=open&per_page=100', { headers: { Accept: 'application/vnd.github+json' } });
+    if(!r.ok) return null;
+    const rows = await r.json();
+    return (Array.isArray(rows) ? rows : []).filter(i => !i.pull_request)
+      .map(i => ({ n: i.number, t: i.title, url: i.html_url, labels: (i.labels || []).map(l => l.name).filter(l => ZF_OPS_ISSUE_LABELS.includes(l)) }))
+      .filter(i => i.labels.length);
+  }catch(e){ return null; }
+}
+async function zfOpsLoad(){
+  const zone = document.getElementById('zfOpsZone');
+  if(!zone || zfOpsBusy) return;
+  zfOpsBusy = true;
+  try{
+    const is = await zfOpsRpc('ops_is_admin');
+    if(!(is.ok && is.data === true)){ zone.classList.add('hidden'); zone.innerHTML = ''; return; }
+    const [board, issues] = await Promise.all([zfOpsRpc('ops_status_board'), zfOpsIssues()]);
+    zone.classList.remove('hidden');
+    zone.innerHTML = board.ok && board.data ? zfOpsHtml(board.data, issues)
+      : `<p class="slabel" style="margin:0 0 0.5rem">🛠 운영</p><p style="font-size:13px;color:${ZF_OPS_COLOR.red}">상태판을 읽지 못했어요${board.data && board.data.message ? ' — ' + zfOpsEsc(board.data.message) : ''}</p>`;
+  }finally{ zfOpsBusy = false; }
+}
+function zfOpsHtml(b, issues){
+  const line = (color, label, text) => `<div style="padding:6px 0;border-top:1px solid #eee;font-size:13px;line-height:1.55">`
+    + `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:${ZF_OPS_COLOR[color] || ZF_OPS_COLOR.ok}"></span>`
+    + `<strong>${label}</strong> · ${text}</div>`;
+  const out = [];
+  // ⓐ 14일 접수분 커버율
+  const c = b.coverage || {};
+  out.push(line(Number(c.numerator) < Number(c.denominator) ? 'yellow' : 'ok', '14일 접수분 분석',
+    `${c.numerator ?? '—'}/${c.denominator ?? '—'}(첨부 있음 ${c.with_attachments ?? '—'})${c.not_done ? ' · 미완 ' + zfOpsEsc(c.not_done) : ''}`));
+  // ⓑ 분석 발송기
+  const d = b.dispatch || {};
+  const run = d.running, last = d.last_finished;
+  const dColor = d.enabled !== true || /멈춤/.test(d.waiting_for || '') ? 'red' : (Number(d.reclaimed_24h) > 0 ? 'yellow' : 'ok');
+  out.push(line(dColor, '분석 발송기', `${zfOpsEsc(d.waiting_for)} · 대기 ${d.waiting ?? 0}(실을 것 ${d.ready ?? 0}) · 회차에 실림 ${d.in_run ?? 0}`
+    + (run ? ` · 도는 회차 run ${run.id}(${zfOpsTime(run.created_at)} 시작)` : '')
+    + (last ? ` · 마지막 끝 run ${last.id} ${zfOpsTime(last.finished_at)}(끝낸 공고 ${last.done})` : '')
+    + ` · 24시간 자동 회수 ${d.reclaimed_24h ?? 0}`));
+  // ⓒ 운영 점검 — 멈춤(HARD) 갈래는 gate.mjs 한 곳이 이슈 라벨로 낸다: 열린 health-ops = 빨강 · 실패 = 주황 · 경고 = 노랑
+  const h = (b.health || {}).last_run || {};
+  const hasHard = Array.isArray(issues) && issues.some(i => i.labels.includes('health-ops'));
+  const hColor = hasHard ? 'red' : (Number(h.n_fail) > 0 ? 'orange' : (Number(h.n_warn) > 0 ? 'yellow' : 'ok'));
+  const logs = ((b.health || {}).dispatch_log || []).map(l => `${zfOpsEsc(l.target)} ${zfOpsTime(l.at)}${l.status_code && l.status_code >= 300 ? '(' + l.status_code + ')' : ''}`).join(' · ');
+  out.push(line(hColor, '운영 점검', `마지막 ${zfOpsTime(h.run_at)} · 실패 ${h.n_fail ?? '—'}${(h.failed || []).length ? '(' + zfOpsEsc(h.failed.join(', ')) + ')' : ''}`
+    + ` · 경고 ${h.n_warn ?? '—'}${(h.warned || []).length ? '(' + zfOpsEsc(h.warned.join(', ')) + ')' : ''}`
+    + (hasHard ? ' · 멈춤 이슈 열림' : '') + (logs ? `<br><span style="color:#888">점검 발송: ${logs}</span>` : '')));
+  // ⓓ 수집 마지막 시각
+  out.push(line('ok', '수집', (b.collected || []).map(x => `${zfOpsEsc(x.source)} ${zfOpsTime(x.at)}`).join(' · ') || '—'));
+  // ⓔ 결과 없이 닫힌 후속 요청(결과 칸 도입 뒤 요청만)
+  const fu = b.followups_unreported || [];
+  out.push(line(fu.length ? 'orange' : 'ok', '결과 없이 닫힌 후속 요청', fu.length ? fu.map(f => `#${f.id} ${zfOpsEsc(f.page_ref)}`).join(' / ') : '0'));
+  // 열린 점검 이슈(GitHub · zipfit)
+  out.push(line(issues === null ? 'yellow' : (issues.length ? (hasHard ? 'red' : 'orange') : 'ok'), '열린 점검 이슈',
+    issues === null ? 'GitHub 를 읽지 못했어요' : (issues.length ? issues.map(i => `<a href="${zfOpsEsc(i.url)}" target="_blank" rel="noopener">#${i.n}</a> ${zfOpsEsc(i.t)}(${zfOpsEsc(i.labels.join(', '))})`).join('<br>') : '없음')));
+  // 숨긴 묶음(열린 것 · 풀기) + 숨기기 입력
+  const hides = b.hides || [];
+  const hideRows = hides.length ? hides.map(x => `<div style="font-size:13px;padding:4px 0">${zfOpsEsc(x.group_key)} <span style="color:#888">— ${zfOpsEsc(x.reason)} · ${zfOpsTime(x.hidden_at)} · ${zfOpsEsc(x.announcement_id || '')}</span>`
+    + ` <button class="btn btn-sec" style="padding:2px 8px;font-size:12px" onclick="zfOpsRelease(${Number(x.id)})">풀기</button></div>`).join('') : '<div style="font-size:13px;color:#888">숨긴 묶음 없음</div>';
+  return `<p class="slabel" style="margin:0 0 0.5rem">🛠 운영 <span style="font-size:12px;color:#888;font-weight:400">${zfOpsTime(b.now)}</span>`
+    + ` <button class="btn btn-sec" style="padding:2px 8px;font-size:12px;margin-left:6px" onclick="zfOpsLoad()">새로 고침</button></p>`
+    + out.join('')
+    + `<div style="border-top:1px solid #eee;padding-top:8px;margin-top:4px"><p style="font-size:13px;font-weight:600;margin:0 0 4px">목록에서 숨긴 묶음</p>${hideRows}`
+    + `<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">`
+    + `<input id="zfOpsHideId" placeholder="공고 ID" style="flex:1 1 140px;min-width:0" aria-label="숨길 공고 ID">`
+    + `<input id="zfOpsHideReason" placeholder="숨기는 사유(필수)" style="flex:2 1 200px;min-width:0" aria-label="숨기는 사유">`
+    + `<button class="btn btn-sec" onclick="zfOpsHide()">묶음 숨기기</button></div>`
+    + `<p id="zfOpsHideMsg" style="font-size:12px;color:#888;margin:6px 0 0">같은 제목 묶음(LH·마이홈 행 · 나중에 들어오는 같은 제목)이 목록·분석 대기열에서 함께 빠져요.</p></div>`;
+}
+async function zfOpsHide(){
+  const id = (document.getElementById('zfOpsHideId') || {}).value || '', reason = (document.getElementById('zfOpsHideReason') || {}).value || '';
+  const msg = document.getElementById('zfOpsHideMsg');
+  if(!id.trim() || !reason.trim()){ if(msg) msg.textContent = '공고 ID와 사유를 모두 적어 주세요'; return; }
+  if(!confirm(`공고 ${id.trim()} 의 묶음을 목록에서 숨길까요?`)) return;
+  const r = await zfOpsRpc('ops_listing_hide', { p_announcement_id: id.trim(), p_reason: reason.trim() });
+  if(!r.ok){ if(msg) msg.textContent = '숨기지 못했어요 — ' + ((r.data && r.data.message) || '오류'); return; }
+  await zfOpsLoad();
+}
+async function zfOpsRelease(hid){
+  if(!confirm('이 묶음을 목록에 다시 보일까요?')) return;
+  const r = await zfOpsRpc('ops_listing_hide', { p_release_id: hid });
+  if(!r.ok){ const msg = document.getElementById('zfOpsHideMsg'); if(msg) msg.textContent = '풀지 못했어요 — ' + ((r.data && r.data.message) || '오류'); return; }
+  await zfOpsLoad();
 }
 
 function applySettingsToUI(p){

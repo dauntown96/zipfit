@@ -314,7 +314,7 @@ raw_base AS (
     --   묶음 단위라 같은 키의 LH·MYHOME 행·나중에 들어오는 같은 제목 행이 함께 빠지고, SH 수집 upsert 가 덮어쓰지 못한다.
     --   키 목록은 SECURITY DEFINER listing_hidden_keys() 가 한 번(InitPlan) 준다 — 기록 표는 GRANT 0. 반환형·다른 칸은 그대로다.
     --   대표 모수를 이 RPC 로 받는 발송기 후보 · 분석률 · 재분석 큐 · 원문 키 대조 대상이 함께 따라 뺀다.
-    AND NOT (COALESCE(lm.lh_key, public.announcement_dedup_key(a.title)) = ANY ((SELECT public.listing_hidden_keys())))
+    AND NOT (COALESCE(lm.lh_key, public.announcement_dedup_key(a.title)) = ANY ((SELECT public.listing_hidden_keys())::text[]))
     -- 🔴 2026-09-28(B53) — 비주택 유형을 목록에서 뺀다. 거주자 모집이 아니다(가정어린이집 운영예정자
     --   모집 …020085 · …020812). 수집은 그대로다 — 행은 남고 목록·그룹 대표에만 안 선다.
     --   ⚠️ 분석률·재분석 큐가 이 RPC 를 모수로 쓰므로 같은 제외가 저절로 따라간다.
