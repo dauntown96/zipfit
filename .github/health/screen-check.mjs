@@ -563,10 +563,10 @@ try {
       c as (select d.announcement_id aid, d.title, d.apply_end e from get_announcements_deduped() d, today t where d.apply_end >= t.d),
       g as (select c.aid, c.e, a.announcement_id gid, a.apply_end ge from c join announcements a on announcement_dedup_key(a.title) = announcement_dedup_key(c.title)),
       n as (select aid, count(*) ng from g group by aid),
-      s as (select g.aid, sc.id, sc.scope_text from g join n using (aid) join announcement_schedule sc on sc.announcement_id = g.gid
+      s as (select g.aid, sc.id, sc.scope_text, sc.period_text from g join n using (aid) join announcement_schedule sc on sc.announcement_id = g.gid
              where n.ng = 1 or g.ge is not distinct from g.e),
-      a as (select aid, json_agg(id order by id) ids, count(distinct scope_text) nsc from s group by aid)
-      select coalesce(json_agg(json_build_object('aid', aid, 'ids', ids) order by nsc desc, aid), '[]'::json) j, count(*) n from a`)
+      a as (select aid, json_agg(id order by id) ids, json_object_agg(id, coalesce(period_text, '')) txt, count(distinct scope_text) nsc from s group by aid)
+      select coalesce(json_agg(json_build_object('aid', aid, 'ids', ids, 'txt', txt) order by nsc desc, aid), '[]'::json) j, count(*) n from a`)
     const want = (sq.j || []).slice(0, 8)
     if (process.env.SIMULATE === 'sched_line' && want.length) want[0].ids = want[0].ids.concat([-1])
     const got = []
@@ -582,10 +582,17 @@ try {
         }, w.aid)
         if (!cid) { got.push({ aid: w.aid, ids: null }); continue }
         await page.waitForFunction(cid => !!document.querySelector(`#schedule-slot-${CSS.escape(cid)} .zf-sch`), cid, { timeout: 15000 }).catch(() => {})
+        // 🔵 2026-10-15(우편함 「표시층 — 공급일정 아코디언 기본 접음 …」) — 노선은 기본 접힘(closed)이어야 한다. 잰 뒤 노선과 역을 모두 펼쳐
+        //    깨진 글자를 보이는 글(innerText)로 재고, 역마다 원문 글(「원문」 줄 · 날짜 없는 역은 첫 줄) = DB period_text 글자 그대로인지 본다(깎인 글자 0).
         got.push(await page.evaluate(([aid, cid]) => {
           const slot = document.getElementById('schedule-slot-' + cid)
+          const wrap = slot && slot.querySelector('.zf-sch')
           const items = slot ? [...slot.querySelectorAll('.zf-sch .policy-item')] : []
-          return { aid, ids: slot && slot.querySelector('.zf-sch') ? [...new Set(items.map(i => Number(i.dataset.schId)).filter(n => !isNaN(n)))].sort((a, b) => a - b) : null,
+          const closed = !!wrap && !wrap.open
+          if (wrap) { wrap.open = true; wrap.querySelectorAll('details.zf-sch-stop').forEach(d => { d.open = true }) }
+          const raw = {}
+          items.forEach(i => { if (i.dataset.schId) { const el = i.querySelector('.zf-sch-raw') || i.querySelector('.zf-sch-nd'); raw[i.dataset.schId] = el ? el.textContent : null } })
+          return { aid, closed, raw, ids: wrap ? [...new Set(items.map(i => Number(i.dataset.schId)).filter(n => !isNaN(n)))].sort((a, b) => a - b) : null,
             bad: ((slot ? slot.innerText : '').match(/�|\[object|undefined/g) || []).length }
         }, [w.aid, cid]))
       }
@@ -597,14 +604,17 @@ try {
         const g = got[i] || {}
         if (!g.ids) return `${w.aid}: 노선 없음`
         const ws = [...w.ids].sort((a, b) => a - b)
-        return JSON.stringify(ws) === JSON.stringify(g.ids) && !g.bad ? null : `${w.aid}: 화면 ${g.ids.length}역 ≠ DB ${ws.length}행${g.bad ? ' · 깨진 글자' : ''}`
+        const rawBad = Object.keys(g.raw || {}).filter(k => (w.txt || {})[k] !== undefined && g.raw[k] !== w.txt[k]).length
+        const sameIds = JSON.stringify(ws) === JSON.stringify(g.ids)
+        return sameIds && !g.bad && g.closed && !rawBad ? null
+          : `${w.aid}: ${sameIds ? '' : `화면 ${g.ids.length}역 ≠ DB ${ws.length}행 · `}${g.closed ? '' : '기본 펼침 · '}${rawBad ? `원문 다름 ${rawBad}역 · ` : ''}${g.bad ? '깨진 글자' : ''}`.replace(/ · $/, '')
       }).filter(Boolean)
       ok = bad.length === 0
       value = `일정 행 있는 열린 카드 ${sq.n} 중 ${want.length}장 펼침 · 역 ${got.reduce((s, g) => s + ((g && g.ids) || []).length, 0)} · 어긋남 ${bad.length}${bad.length ? ': ' + bad.slice(0, 3).join(' / ') : ''}`
       extra.sched_line = { want, got, bad }
     } else value = `못 잼(${err})`
     add('sched_line', '상세 세로 노선 — 공고문 일정 표의 이 카드 회차 행을 빠짐없이 · 다른 회차 없이', ok ? 'pass' : 'fail', value,
-      'DB 로 따로 계산한 일정 행 id(같은 제목 키 · apply_end = 카드 apply_end) = 펼친 상세 노선 역의 id(범위 노선 모두) · 깨진 글자 0')
+      'DB 로 따로 계산한 일정 행 id(같은 제목 키 · apply_end = 카드 apply_end) = 펼친 상세 노선 역의 id(범위 노선 모두) · 노선 기본 접힘 · 역 원문 글 = DB period_text · 깨진 글자 0')
   }
   // ⑦-2 한글 조합 입력(2026-10-13 · 우편함 「코드 — 한글 중복 입력 …」 1 · 원칙 33) — 공고 검색 칸에 실제 조합 이벤트(CDP Input.imeSetComposition →
   //    insertText)로 「부산」을 친다. 두 꼴을 본다:

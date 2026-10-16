@@ -692,6 +692,14 @@ html[data-ui="d3"] .zf3-vline .policy-item.now .policy-category::after{content:"
 .zf-sch .zf-sch-tabs button{font:inherit;font-size:12px;font-weight:600;padding:5px 10px;min-height:32px;border-radius:999px;border:1px solid var(--line,#ddd);background:var(--paper,#fff);color:var(--ink-2,#555);cursor:pointer}
 .zf-sch .zf-sch-tabs button[aria-selected="true"]{background:var(--ink,#222);border-color:var(--ink,#222);color:var(--paper,#fff)}
 html[data-ui="d3"] .zf-sch .policy-content{white-space:normal;overflow-wrap:anywhere}
+.zf-sch-stop>summary{list-style:none;cursor:pointer;display:block}
+.zf-sch-stop>summary::-webkit-details-marker{display:none}
+.zf-sch-stop>summary>.policy-category,.zf-sch-stop>summary>.policy-content{display:block}
+.zf-sch-stop .zf-sch-more{font-family:inherit;font-size:11px;font-weight:600;color:var(--ink-3,#777);margin-left:8px;white-space:nowrap}
+.zf-sch-stop .zf-sch-more::after{content:" ▾"}
+.zf-sch-stop[open] .zf-sch-more::after{content:" ▴"}
+.zf-sch-stop:not([open]) .zf-sch-nd{white-space:nowrap!important;overflow:hidden;text-overflow:ellipsis}
+.zf-sch-stop .zf-sch-raw{margin-top:4px;font-size:12px;line-height:1.55;color:var(--ink-2,#555);white-space:normal;overflow-wrap:anywhere}
 .zf3-none{margin:8px 0;padding:10px 12px;font-size:12px;color:var(--ink-2);background:var(--surface-2);border-radius:var(--r-1);word-break:keep-all;line-height:1.5}
 .zf3-maplbl{margin-left:14px;padding:2px 8px;font:700 12px/18px var(--f-ui);color:var(--paper);background:var(--ink);border-radius:999px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.18);max-width:60vw;overflow:hidden;text-overflow:ellipsis}
 .zf3-maplbl.left{margin-left:0;margin-right:14px}
@@ -719,7 +727,7 @@ html[data-ui="d3"] .maintabs.zf3-ind-on .maintab.active{box-shadow:none}
 .zf3-st-t{font-weight:700;font-size:var(--t-s);color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @keyframes zf3slide{from{transform:translate(-50%,-100%)}}
 /* 카드 첫 등장(⑥) · 상세 펼침(⑦) · 마감 임박 깃발(⑧) · 「상세」 꺾쇠(⑪) */
-.zf3-in{animation:zf3up 360ms var(--ease) both;animation-delay:var(--d,0ms)}
+.zf3-in{animation:zf3up 360ms var(--ease) backwards;animation-delay:var(--d,0ms)}
 @keyframes zf3up{from{opacity:0;transform:translateY(10px)}}
 html[data-ui="d3"] .zf3-card.zf3-open > [data-ann-id]{animation:zf3open 260ms var(--ease)}
 @keyframes zf3open{from{opacity:0;transform:translateY(-6px)}}
@@ -6923,10 +6931,33 @@ function renderSupplySchedule(cardEl, id){
 //       한 단계 안에서만 갈리면(경로별 접수 — …20669) 한 노선에 그 역을 범위 글자와 함께 줄줄이 둔다.
 const ZF_STAGE_ICON = { '공고': '📢', '대상주택게시': '🏘️', '주택열람': '👀', '접수': '📅', '서류대상발표': '📋', '서류제출': '📑', '자격검증': '🔎', '결과발표': '🏆', '동호배정': '🔢', '계약': '✍️', '입주': '🔑', '기타': '' };   // 기타는 아이콘 없이(원문 글머리 「•」가 이미 붙은 줄이 있다)
 const ZF_STAGE_AFTER_APPLY = ['서류대상발표', '서류제출', '자격검증', '결과발표', '동호배정', '계약', '입주'];
+// 🔵 2026-10-15(우편함 「표시층 — 공급일정 아코디언 기본 접음 · 역 첫 줄 = 단계·날짜·범위」 2) — 역의 첫 줄 = 단계 이름 + 날짜(start_date ~ end_date · 요일) + 범위만.
+//    원문 글(period_text — 시각·게시처·점심시간·ARS·주소)은 그 역을 누르면 펼치는 「원문」 줄로. 🔴 period_text 를 깎지 않는다(정규식으로 다듬지 않는다).
+//    날짜 없는 역(start_date · end_date 둘 다 NULL — 「개별안내」·「’26.12월 중」)은 글이 곧 내용이라 첫 줄에 원문 글을 그대로(길면 한 줄로 보이고 누르면 전부 — 글자는 같고 보이는 길이만).
+//    끝만 있는 역 = 「~ MM-DD(요일)」 · 시작만 있는 역 = 「MM-DD(요일) ~」(원문이 「~ 모집완료시까지」 꼴) · 올해가 아닌 날은 연도를 붙인다.
+const ZF_WD = ['일', '월', '화', '수', '목', '금', '토'];
+function zfSchDay(d){
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(d || ''));
+  if(!m) return '';
+  const wd = ZF_WD[new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).getUTCDay()];
+  return `${m[1] === zf3Today().slice(0, 4) ? '' : m[1] + '-'}${m[2]}-${m[3]}(${wd})`;
+}
+function zfSchDateLine(r){
+  const a = zfSchDay(r.start_date), b = zfSchDay(r.end_date);
+  if(a && b) return r.start_date === r.end_date ? a : `${a} ~ ${b}`;
+  if(b) return `~ ${b}`;
+  if(a) return `${a} ~`;
+  return '';
+}
 function zfScheduleItemHTML(r, showScope){
   const d1 = r.start_date || r.end_date || '', d2 = r.end_date || r.start_date || '';
   const sc = [showScope ? r.scope_text : '', r.site_label].filter(Boolean).map(escapeHtml).join(' · ');
-  return `<div class="policy-item" data-zf-d="${zfAttr(d1)}" data-zf-e="${zfAttr(d2)}"${r.id != null ? ` data-sch-id="${zfAttr(r.id)}"` : ''}><div class="policy-category">${ZF_STAGE_ICON[r.stage] ? ZF_STAGE_ICON[r.stage] + ' ' : ''}${escapeHtml(r.stage_text || '')}${sc ? ` <span class="zf-sch-scope">${sc}</span>` : ''}</div><div class="policy-content">${escapeHtml(r.period_text || '')}</div></div>`;
+  const head = `<span class="policy-category">${ZF_STAGE_ICON[r.stage] ? ZF_STAGE_ICON[r.stage] + ' ' : ''}${escapeHtml(r.stage_text || '')}${sc ? ` <span class="zf-sch-scope">${sc}</span>` : ''}</span>`;
+  const dl = zfSchDateLine(r), raw = escapeHtml(r.period_text || '');
+  const inner = dl
+    ? `<summary>${head}<span class="policy-content">${escapeHtml(dl)}<span class="zf-sch-more" aria-hidden="true">원문</span></span></summary><div class="zf-sch-raw">${raw}</div>`
+    : `<summary>${head}<span class="policy-content zf-sch-nd">${raw}</span></summary>`;
+  return `<div class="policy-item" data-zf-d="${zfAttr(d1)}" data-zf-e="${zfAttr(d2)}"${r.id != null ? ` data-sch-id="${zfAttr(r.id)}"` : ''}><details class="zf-sch-stop">${inner}</details></div>`;
 }
 function zfScheduleMarkLine(box){
   const today = zf3Today();
@@ -6986,7 +7017,7 @@ function loadScheduleLine(annId, cardEl, id){
     }
     const wrap = document.createElement('details');
     wrap.className = 'policy-wrap zf3-vline zf-sch';
-    wrap.dataset.zf3 = '1'; wrap.dataset.sch = '1'; wrap.open = true;
+    wrap.dataset.zf3 = '1'; wrap.dataset.sch = '1';   // 기본 접음(제목만 · 누르면 펼침 — 2026-10-15 공급일정 접음 회차 1)
     wrap.innerHTML = `<summary class="policy-title">🗓️ 공급일정 <span class="zf-sch-src">공고문 일정</span></summary>` + body;
     const panels = [...wrap.querySelectorAll('.zf-sch-panel')];
     const live = panels.map(p => zfScheduleMarkLine(p));
@@ -11041,11 +11072,11 @@ function zf3MapLabel(map, coords, name, boxEl){
     return { setMap: m => cur.ov.setMap(m) };
   }catch(e){ return null; }
 }
-// 공급일정 세로 노선 — 항목의 첫 날짜(data-zf-d)로 지난 역 · 다음 역 · 날짜 없는 역을 가른다. 처음부터 펼친다.
+// 공급일정 세로 노선 — 항목의 첫 날짜(data-zf-d)로 지난 역 · 다음 역 · 날짜 없는 역을 가른다. 기본 접음(2026-10-15 — 제목만 · 누르면 펼침).
 function zf3EnhanceSchedule(root){
   const today = zf3Today();
   root.querySelectorAll('[id^="schedule-slot-"] details.policy-wrap:not([data-zf3])').forEach(w => {
-    w.dataset.zf3 = '1'; w.classList.add('zf3-vline'); w.open = true;
+    w.dataset.zf3 = '1'; w.classList.add('zf3-vline');
     const items = [...w.querySelectorAll('.policy-item')];
     const nextI = items.findIndex(it => (it.dataset.zfD || '') > today);
     items.forEach((it, i) => it.classList.add(!it.dataset.zfD ? 'unk' : it.dataset.zfD <= today ? ((it.dataset.zfE || '') >= today ? 'now' : 'past') : i === nextI ? 'next' : 'fut'));
