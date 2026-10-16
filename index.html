@@ -1796,11 +1796,28 @@ function zfNoticeDate(row){
     ? f
     : (row['announcement_date'] || row['모집공고일'] || '');
 }
-// 정정 행이면서 게시일이 원공고일보다 **뒤**일 때만 그 게시일을 돌려준다(아니면 빈 문자열).
+// 🔴 정정일 한 벌 — 정정 행이고 회차 날짜(zfNoticeDate)보다 **뒤**인 날만 돌려준다(아니면 빈 문자열).
+//    고르는 순서(2026-10-16 · 우편함 「코드 — 관측 정정일 …(…0877)」 · 다운님 승인 — 2026-09-21 「수집일로 대체하지 않는다」를 바꿈):
+//    ① 다운님이 원문으로 확인한 정정 게시일(revised_at_source = 'user_verified' 의 revised_at · KST 날짜 · 원칙 10)
+//    ② LH 가 준 정정 게시일(announcement_date > first_announcement_date — LH 는 정정 게시 시각을 PAN_NT_ST_DT 한 칸에만 준다)
+//    ③ 관측 정정일(RPC revision_seen_date) — LH 가 ② 칸을 원공고일로 둔 정정(…0877 은 10-06/10-06)을 우리가 처음 본 날.
+//       원공고 LH 행을 먼저 본 경우에만 DB 가 준다(같은 수집 회차에 함께 본 …19312 는 NULL) — 화면의 first_seen_at 으로는 못 가른다.
+// 🔴 이 함수를 보는 자리: 정렬(zfSortDate) · 카드 표지(zfAnnDateLabel) · 노선 「정정 MM-DD」(zf3Stations) · 전광판 「정정」 사건.
+//    NEW · 「새 공고」 · 회차 대조는 zfNoticeDate 그대로다(물음이 다르다).
+function zfKstDateOf(ts){
+  const t = Date.parse(ts || '');
+  return isNaN(t) ? '' : new Date(t + 9 * 3600000).toISOString().slice(0, 10);
+}
 function zfRevisedDate(row){
+  if(row['is_revised'] !== true) return '';
+  const base = zfNoticeDate(row);
+  const later = d => (d && (!base || d > base)) ? d : '';
+  const uv = row['revised_at_source'] === 'user_verified' ? later(zfKstDateOf(row['revised_at'])) : '';
+  if(uv) return uv;
   const f = row['first_announcement_date'];
   const a = row['announcement_date'] || row['모집공고일'] || '';
-  return (row['is_revised'] === true && f && a && a > f) ? a : '';
+  if(f && a && a > f) return a;
+  return later(row['revision_seen_date'] || '');
 }
 // 🔴 「목록에서 얼마나 위에 둘까」 — **정렬 전용 축**이다 (2026-09-21, 다운님 확정).
 //    위 주석의 「사본을 두지 않는다」는 **같은 물음에 두 답을 두지 말라**는 뜻이고, 여기서는
@@ -1808,9 +1825,9 @@ function zfRevisedDate(row){
 //    둘까」다. 정정공고는 정정된 날에 다시 올라온 것이므로 **정렬에서만** 그 날을 쓴다.
 // 🔴 바꾸는 곳은 정렬 비교 두 곳뿐이다 — `isNewNotice()`·카드 표지(`zfAnnDateLabel`)·
 //    「이번주 신규」 집계는 종전 그대로 zfNoticeDate 를 본다.
-// 🔵 한계: LH 가 정정공고의 게시일을 원공고일과 같게 주면 zfRevisedDate 가 빈 문자열이라
-//    자리가 그대로다(칠곡왜관4 `…020810` 은 둘 다 2026-09-15). 수집일(created_at)로
-//    대체하지 않는다 — 그것은 게시일이 아니다.
+// 🔵 2026-10-16 — LH 가 정정공고의 게시일을 원공고일과 같게 줘도(칠곡왜관4 `…020810` 09-15/09-15 · 대구경북 `…0877` 10-06/10-06)
+//    원공고를 먼저 본 정정이면 관측 정정일(우리가 정정 행을 처음 본 날)로 정정된 날 자리에 온다(zfRevisedDate ③).
+//    원공고와 같은 수집 회차에 처음 본 정정(장기 창·수집 시작 일괄)은 관측값이 없어 종전 자리다.
 function zfSortDate(row){
   return zfRevisedDate(row) || zfNoticeDate(row);
 }
@@ -3653,6 +3670,9 @@ function zfMapNoticeRows(rows){
     // 🔵 2026-09-29(EF 회차 4) — 그룹을 수집이 원천에서 마지막으로 다시 본 시각. **매핑만** 한다(표시는 다음 표시층).
     //    없으면 null 그대로 — SH 행·오래전 마감 그룹은 값이 없고, 「없음」과 「빈 문자열」을 섞지 않는다(원칙 26).
     'last_seen_at': r.last_seen_at ?? null,
+    // 🔵 2026-10-16(관측 정정일) — zfRevisedDate ①·③ 재료. 매핑에 없으면 화면이 영영 못 본다(원칙 26).
+    'revised_at_source': r.revised_at_source ?? null,
+    'revision_seen_date': r.revision_seen_date ?? null,
     'contract_start': r.contract_start||'',
     'contract_end': r.contract_end||'',
     'building_name': r.building_name||'',
@@ -10586,7 +10606,7 @@ const ZF3_EVENTS = [
   { k: 'fresh', quota: 2, label: () => '새 공고',
     test: n => { const d = zf3DayTo(zfNoticeDate(n)); return d != null && d <= 0 && d >= -3 ? -d : null; } },
   { k: 'rev', quota: 1, label: () => '정정',
-    test: n => { if(n['is_revised'] !== true) return null; const d = zf3DayTo(n['announcement_date']); return d != null && d <= 0 && d >= -7 ? -d : null; } }
+    test: n => { if(n['is_revised'] !== true) return null; const d = zf3DayTo(zfRevisedDate(n) || n['announcement_date']); return d != null && d <= 0 && d >= -7 ? -d : null; } }
 ];
 const ZF3_LOOP_MAX = 8;
 function zf3ShortName(n){
