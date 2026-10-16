@@ -10410,9 +10410,9 @@ function zfOpsHtml(b, issues){
   // 숨긴 묶음(열린 것 · 풀기) + 숨기기 입력
   const hides = b.hides || [];
   const hideRows = hides.length ? hides.map(x => `<div style="font-size:13px;padding:4px 0">${zfOpsEsc(x.group_key)} <span style="color:#888">— ${zfOpsEsc(x.reason)} · ${zfOpsTime(x.hidden_at)} · ${zfOpsEsc(x.announcement_id || '')}</span>`
-    + ` <button class="btn btn-sec" style="padding:2px 8px;font-size:12px" onclick="zfOpsRelease(${Number(x.id)})">풀기</button></div>`).join('') : '<div style="font-size:13px;color:#888">숨긴 묶음 없음</div>';
+    + ` <button class="btn btn-sec" style="width:auto;padding:2px 8px;font-size:12px" onclick="zfOpsRelease(${Number(x.id)})">풀기</button></div>`).join('') : '<div style="font-size:13px;color:#888">숨긴 묶음 없음</div>';
   return `<p class="slabel" style="margin:0 0 0.5rem">🛠 운영 <span style="font-size:12px;color:#888;font-weight:400">${zfOpsTime(b.now)}</span>`
-    + ` <button class="btn btn-sec" style="padding:2px 8px;font-size:12px;margin-left:6px" onclick="zfOpsLoad()">새로 고침</button></p>`
+    + ` <button class="btn btn-sec" style="width:auto;padding:2px 8px;font-size:12px;margin-left:6px" onclick="zfOpsLoad()">새로 고침</button></p>`
     + out.join('')
     + `<div style="border-top:1px solid #eee;padding-top:8px;margin-top:4px"><p style="font-size:13px;font-weight:600;margin:0 0 4px">목록에서 숨긴 묶음</p>${hideRows}`
     + `<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">`
