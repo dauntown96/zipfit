@@ -568,6 +568,53 @@ try {
     add('route_cur', '차수 카드 마감 — 차수 사이 매칭 마감임박 없음 · 창 안은 이번 창 끝까지', ok ? 'pass' : 'fail', value,
       'DB 로 따로 계산한 창(route_gap 과 같은 식) — 차수 사이: 매칭 경로 마감임박 거짓 / 마지막 아닌 창 안: 알약 「이번 차수 마감 D-n」 · 마감임박 = 0≤n≤3(매칭·공고 둘 다)')
   }
+  // ⑦-1a1 정정일(2026-10-16 · 우편함 「코드 — 관측 정정일 …(…0877)」 4 · 원칙 33) — 열린 정정 대표 전부를 꼴로 잰다(특정 공고 기대값을 박지 않는다).
+  //    기대 정정일은 DB 에서 **따로**: ① user_verified revised_at(KST 날짜) ② LH 게시일(announcement_date > first_announcement_date)
+  //    ③ 관측 — LH ∧ 두 날짜 같음 ∧ 같은 제목 키·같은 원공고일의 다른 LH 행을 5분 넘게 먼저 봄 → 정정 행 첫 수집(KST 날짜) · 셋 다 회차 날짜보다 뒤인 날만.
+  //    화면: zfAnnDateLabel = 「회차 날짜 · 정정 MM-DD」(정정일 있을 때) / 회차 날짜(없을 때) · zfSortDate = 정정일 ∨ 회차 날짜.
+  //    SIMULATE=rev_date 이면 행에서 revision_seen_date 를 지우고 잰다(종전 화면 — 관측 정정 카드가 열린 날 실패해야 맞다).
+  {
+    const [rq] = await sqlRead(`
+      with r as (select d.announcement_id aid, d.source src, d.title, d.announcement_date ad, d.first_announcement_date fd, d.created_at ca,
+                        d.revised_at ra, d.revised_at_source rs,
+                        case when d.first_announcement_date is not null then d.first_announcement_date else d.announcement_date end rd
+                   from get_announcements_deduped() d
+                  where d.is_revised and d.status is distinct from '접수마감' and (d.apply_end is null or d.apply_end >= (now() at time zone 'Asia/Seoul')::date)),
+      x as (select r.*,
+              case when rs = 'user_verified' and ra is not null and (ra at time zone 'Asia/Seoul')::date > rd then (ra at time zone 'Asia/Seoul')::date end uv,
+              case when fd is not null and ad > fd then ad end lh,
+              case when src = 'LH' and fd is not null and ad = fd and (ca at time zone 'Asia/Seoul')::date > fd
+                        and exists (select 1 from announcements o where o.source = 'LH' and o.announcement_id <> r.aid and o.hidden_from_listing is not true
+                                     and announcement_dedup_key(o.title) = announcement_dedup_key(r.title) and o.first_announcement_date = r.fd
+                                     and o.created_at < r.ca - interval '5 minutes')
+                   then (ca at time zone 'Asia/Seoul')::date end obs
+            from r)
+      select coalesce(json_agg(json_build_object('aid', aid, 'rd', rd, 'rev', coalesce(uv, lh, obs), 'obs', obs is not null and uv is null and lh is null) order by aid), '[]'::json) j from x`)
+    const want = rq.j || []
+    const got = await page.evaluate(([want, sim]) => {
+      if (typeof zfRevisedDate !== 'function' || typeof zfAnnDateLabel !== 'function') return { err: 'zfRevisedDate·zfAnnDateLabel 없음' }
+      return { out: want.map(x => {
+        const r0 = noticeData.find(n => String(n.announcement_id) === x.aid)
+        if (!r0) return [x.aid, null, null]
+        const r = sim ? Object.assign({}, r0, { revision_seen_date: null }) : r0
+        return [x.aid, zfAnnDateLabel(r), zfSortDate(r)]
+      }) }
+    }, [want, process.env.SIMULATE === 'rev_date'])
+    let ok = false, value
+    if (!got.err) {
+      const bad = got.out.filter(([aid, label, sort], i) => {
+        const w = want[i], rd = String(w.rd || ''), rv = w.rev ? String(w.rev) : ''
+        if (label === null) return false   // 목록 행 없음(취소공고 짝 등 목록에서 뺀 대표) — 이 점검이 답할 물음이 아니다
+        return label !== (rv ? `${rd} · 정정 ${rv.slice(5)}` : rd) || sort !== (rv || rd)
+      }).map(([aid, label, sort]) => `${aid}: 「${label}」 · 정렬 ${sort}`)
+      ok = bad.length === 0
+      const obs = want.filter(x => x.obs)
+      value = `열린 정정 대표 ${want.length} · 정정일 ${want.filter(x => x.rev).length}(관측 ${obs.length}${obs.length ? ': ' + obs.map(x => x.aid.slice(-5) + '→' + String(x.rev).slice(5)).join(' ') : ''}) · 어긋남 ${bad.length}${bad.length ? ': ' + bad.slice(0, 3).join(' / ') : ''}`
+      extra.rev_date = { want, out: got.out, bad }
+    } else value = `못 잼(${got.err})`
+    add('rev_date', '정정일 — 카드 표지 「· 정정 MM-DD」와 최신순 자리가 DB 로 따로 셈한 정정일과 같다', ok ? 'pass' : 'fail', value,
+      '열린 정정 대표 전부 — 정정일 = user_verified ∨ LH 게시일(공고일 > 원공고일) ∨ 관측(원공고 LH 행을 5분 넘게 먼저 본 정정의 첫 수집일) · 회차 날짜보다 뒤만 · 표지·정렬이 그 값')
+  }
   // ⑦-1a2 분석 전 카드(2026-10-16 · 같은 우편함 3·4) — 열린 대표 중 카드 회차 분석이 없고(analysis_done=false) 첨부가 있고 같은 게시물 링크가 없는 카드는
   //    「분석 중」 상자만 말하고 수집값 날짜·접수 상태·D-day·마감을 보이지 않는다(제목 글자는 빼고 잰다 — 제목에 날짜가 든 공고가 있다).
   //    기대 목록은 DB 에서 따로 — phrase 의 「분석중」 갈래와 같은 식. 0장이면 해당 없음(통과).

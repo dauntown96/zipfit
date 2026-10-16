@@ -1,5 +1,5 @@
 CREATE OR REPLACE FUNCTION public.get_announcements_deduped(p_region text DEFAULT NULL::text, p_type text DEFAULT NULL::text, p_status text DEFAULT NULL::text)
- RETURNS TABLE(id bigint, source text, announcement_id text, title text, region text, region_top text, sido_nm text, sigungu_nm text, housing_type text, supply_org text, announcement_date date, apply_start date, apply_end date, status text, status_normalized text, url text, is_revised boolean, area_min numeric, area_max numeric, rent_min integer, rent_max integer, deposit_min bigint, deposit_max bigint, total_units integer, move_in_date text, target_type text, heating_type text, created_at timestamp with time zone, updated_at timestamp with time zone, mymy_applicable boolean, supply_form text, application_method text, recruit_multiplier text, pair_announcement_key text, housing_change_allowed boolean, precise_address text, is_relaxed_recruitment boolean, relaxation_detail text, selection_method text, subscription_months_required integer, subscription_payments_required integer, contract_before_verification boolean, rent_exemption_until date, rent_exemption_note text, revision_note text, revised_at timestamp with time zone, special_notes jsonb, revised_at_source text, first_seen_at timestamp with time zone, doc_submit_announce_date date, doc_submit_start date, doc_submit_end date, winner_announce_date date, contract_start date, contract_end date, building_name text, attachment_urls jsonb, has_cancel_notice boolean, region_names text[], block_count integer, first_announcement_date date, schedule_varies boolean, apply_end_confirmed date, apply_period_check boolean, last_seen_at timestamp with time zone)
+ RETURNS TABLE(id bigint, source text, announcement_id text, title text, region text, region_top text, sido_nm text, sigungu_nm text, housing_type text, supply_org text, announcement_date date, apply_start date, apply_end date, status text, status_normalized text, url text, is_revised boolean, area_min numeric, area_max numeric, rent_min integer, rent_max integer, deposit_min bigint, deposit_max bigint, total_units integer, move_in_date text, target_type text, heating_type text, created_at timestamp with time zone, updated_at timestamp with time zone, mymy_applicable boolean, supply_form text, application_method text, recruit_multiplier text, pair_announcement_key text, housing_change_allowed boolean, precise_address text, is_relaxed_recruitment boolean, relaxation_detail text, selection_method text, subscription_months_required integer, subscription_payments_required integer, contract_before_verification boolean, rent_exemption_until date, rent_exemption_note text, revision_note text, revised_at timestamp with time zone, special_notes jsonb, revised_at_source text, first_seen_at timestamp with time zone, doc_submit_announce_date date, doc_submit_start date, doc_submit_end date, winner_announce_date date, contract_start date, contract_end date, building_name text, attachment_urls jsonb, has_cancel_notice boolean, region_names text[], block_count integer, first_announcement_date date, schedule_varies boolean, apply_end_confirmed date, apply_period_check boolean, last_seen_at timestamp with time zone, revision_seen_date date)
  LANGUAGE sql
  STABLE
 AS $function$
@@ -385,7 +385,23 @@ SELECT
    AND w.apply_start_confirmed IS NULL AND w.apply_end_confirmed IS NULL
    AND (pt.period_trust = 'check' OR w.apply_end = w.winner_announce_date)) IS TRUE AS apply_period_check,
   -- 🔴 2026-09-29(EF 회차 4) 칸 추가뿐 — 행 집합·다른 칸은 그대로다.
-  fs.last_seen_at
+  fs.last_seen_at,
+  -- 🔵 2026-10-16(우편함 「코드 — 관측 정정일 …(…0877)」) 칸 추가뿐 — 행 집합·다른 칸은 그대로다.
+  --   관측 정정일 = LH 가 정정 게시일을 따로 주지 않은 정정 대표(announcement_date = first_announcement_date — LH 는 정정 게시 시각을
+  --   PAN_NT_ST_DT 한 칸에만 주고 그것을 원공고일로 둘 수 있다 · …0877 10-06)의 「우리가 정정 행을 처음 본 날」(created_at 의 KST 날짜).
+  --   🔴 원공고를 먼저 본 경우만 — 같은 묶음 · 같은 원공고일(first_announcement_date)의 다른 LH 행(붙은 행 제외)을 5분 넘게 먼저 봤을 때.
+  --   (수집 주기는 10분 — 같은 수집 회차에 함께 들어온 원공고·정정은 거른다: …19312 장기 창 첫 수집 10-11 은 원공고 …19308 과 같은 순간이다.)
+  --   「비정정 행」으로 걸지 않는다 — 정정본이 들어오면 원공고 행도 is_revised 가 참이 된다(…0875).
+  --   원공고일보다 뒤인 날만 낸다(같은 날 정정 …20920 은 NULL — 표지·자리가 그대로다). 화면 정정일 순서: 사용자 확인 → LH 게시일 → 이것.
+  CASE WHEN w.source = 'LH' AND w.is_revised IS TRUE AND w.first_announcement_date IS NOT NULL
+        AND w.announcement_date = w.first_announcement_date
+        AND (w.created_at AT TIME ZONE 'Asia/Seoul')::date > w.first_announcement_date
+        AND EXISTS (SELECT 1 FROM base o
+                     WHERE o.dedup_key = w.dedup_key AND o.source = 'LH' AND NOT o.linked_in
+                       AND o.announcement_id <> w.announcement_id
+                       AND o.first_announcement_date = w.first_announcement_date
+                       AND o.created_at < w.created_at - interval '5 minutes')
+       THEN (w.created_at AT TIME ZONE 'Asia/Seoul')::date END AS revision_seen_date
 FROM winner w
 JOIN best_location bl ON bl.dedup_key = w.dedup_key
 JOIN best_schedule bs ON bs.dedup_key = w.dedup_key
