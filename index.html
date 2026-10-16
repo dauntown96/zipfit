@@ -1053,7 +1053,16 @@ html[data-ui="d3"] body.theme-dark{color-scheme:dark}
 html[data-ui="d3"] :is(.policy-title,.elig-title,.hu-title,.extras-title,.docs-title){padding:12px 0;line-height:20px;margin-bottom:0}
 html[data-ui="d3"] .policy-item>summary,html[data-ui="d3"] .zf-sch-stop>summary{min-height:var(--hit);box-sizing:border-box}
 html[data-ui="d3"] .hu-ug>summary{min-height:var(--hit);box-sizing:border-box}
-html[data-ui="d3"] .pol-chip,html[data-ui="d3"] .poi-tab{min-height:var(--hit);box-sizing:border-box;display:inline-flex;align-items:center}
+/* 🔵 2026-10-16(우편함 「표시층 — 생활시설 칩 작게 …」 1 · 다운님 휴대폰 「너무 크다」) — 보이는 알약은 28(::before) · 누름 칸은 위아래 투명 8을 더한 44 그대로.
+   생활시설 칩은 한 줄(넘치면 옆으로 넘김) · 정책 칩도 같은 이유로 커졌던 것이라 같은 꼴. */
+html[data-ui="d3"] :is(.pol-chip,.poi-tab){position:relative;z-index:0;min-height:var(--hit);box-sizing:border-box;display:inline-flex;align-items:center;flex:0 0 auto;padding:0 10px;margin:0;border:0!important;background:transparent!important;border-radius:0;font-size:var(--t-xs);line-height:1;white-space:nowrap;font-family:inherit}
+html[data-ui="d3"] :is(.pol-chip,.poi-tab)::before{content:"";position:absolute;inset:8px 0;z-index:-1;border-radius:999px;border:1px solid var(--line);background:var(--paper)}
+html[data-ui="d3"] .poi-tab.active::before{background:#1D9E75;border-color:#1D9E75}
+html[data-ui="d3"] .pol-chip.sel::before{background:#0F6E56;border-color:#0F6E56}
+html[data-ui="d3"] :is(.pol-chip,.poi-tab):focus-visible{outline:2px solid var(--focus);outline-offset:-4px;border-radius:999px}
+html[data-ui="d3"] .poi-tabs{flex-wrap:nowrap;overflow-x:auto;gap:4px;margin:-8px 0 0;padding-right:16px;scrollbar-width:none;-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 16px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 16px),transparent)}
+html[data-ui="d3"] .poi-tabs::-webkit-scrollbar{display:none}
+html[data-ui="d3"] .pol-chips{gap:0 4px;margin:-8px 0 0}
 html[data-ui="d3"] .pol-search{min-height:var(--hit)}
 html[data-ui="d3"] .pol-toggle-all{min-height:var(--hit);display:inline-flex;align-items:center}
 html[data-ui="d3"] :is(.zf-sch-src,.zf-sch-scope,.zf-sch-more){font-size:var(--t-xs)}
@@ -5057,9 +5066,15 @@ function renderPersonalizedRecommendations(){
     const lo = (s && s.deposit_min != null) ? Number(s.deposit_min) : null;
     return !(lo != null && lo > recMaxDep * 10000);
   };
+  // 🔵 2026-10-16(우편함 「표시층 — 생활시설 칩 작게 · 추천 탭 … 소득 관문」 2) — 추천 「대상 조건에 맞아요」도 소득을 본 뒤에만(매칭 ✓와 같은 zfTargetIncomeGate · zfLimitsFor 한 벌).
+  //    저장 조건에는 맞벌이·출산 가산 입력이 없어 가산 없는 기본 기준으로 잰다(기준이 낮게 잡히는 보수 방향 — 틀린 「맞아요」는 생기지 않는다).
+  //    기준액 표를 아직 안 받았으면 받은 뒤 한 번 다시 그린다(받지 못하면 「계산하지 못했어요」 쪽).
+  if(!_urbanIncome || !_medianIncome){ if(!zfRecIncomeAsked){ zfRecIncomeAsked = true; Promise.all([loadUrbanIncome(), loadMedianIncome()]).then(([u, m]) => { if(u && m) renderPersonalizedRecommendations(); }); } }
+  const recM = { src: 'profile', income: (parseFloat(currentUser.income) || 0) * 10000, members: Math.min(parseInt(currentUser.members) || 0, 8), dualApplied: false, birthTierApplied: 0 };
+  const recTables = (_urbanIncome && _medianIncome) ? { '도시근로자': _urbanIncome, '기준중위소득': _medianIncome } : null;
   const recKeep = n => {
     if(!recDepOk(n)) return false;
-    const v = zfTargetVerdictFor(n['announcement_id'], recTf, n['공고명'] || n['name']);
+    const v = zfTargetIncomeGate(zfTargetVerdictFor(n['announcement_id'], recTf, n['공고명'] || n['name']), n['announcement_id'], n['공고명'] || n['name'], recTf, recM, recTables);
     n._zfTarget = v;
     if(v && v.state === 'no'){ recOut.push({ id: n['announcement_id'], title: n['공고명'] || n['name'], v }); return false; }
     return true;
@@ -5516,6 +5531,7 @@ function goStep(n){
 // 🔴 이 표가 소득 한도의 밑값이다. eligibility_criteria의 income_pct 계열은 이 값에 곱하는 비율일 뿐이다.
 // 표는 해마다 바뀐다 — 새 연도 행을 넣으면 아래 로직이 가장 큰 standard_year를 자동으로 고른다.
 let _urbanIncome = null;
+let zfRecIncomeAsked = false;   // 추천 소득 관문 — 기준액 표를 한 번만 받아 다시 그린다
 async function loadUrbanIncome(){
   if(_urbanIncome) return _urbanIncome;
   try {
@@ -6501,7 +6517,7 @@ function zfTargetIncomeGate(v, annId, title, f, m, tables){
   if(!(m && m.income > 0)) why = 'unknown';
   else if(lims.some(l => m.income <= l)) return v;
   else why = lims.length ? 'over' : 'nocalc';
-  return Object.assign({}, v, { state: 'check', income: { why, lim: lims.length ? Math.max(...lims) : null } });
+  return Object.assign({}, v, { state: 'check', income: { why, lim: lims.length ? Math.max(...lims) : null, src: (m && m.src) || 'diag' } });
 }
 // 문구 — 다운님 승인 2026-10-08(우편함 「표시층 — 추천 매칭 2단계」 「## 승인」). 맞음 줄은 공급 대상만 본 판정이라
 //    「신청 자격 전체가 맞다」로 읽히지 않게 「대상 조건」이라고 쓴다.
@@ -6514,8 +6530,10 @@ function zfTargetNoteHtml(v){
   if(v.state === 'check' && v.income){
     // 🔵 2026-10-16(N12) — 대상 조건은 맞는데 소득을 볼 수 없거나 넘는 카드. 금액은 만원 단위 반올림(「약」)이다.
     const lim = v.income.lim != null ? `월 약 ${Math.round(v.income.lim / 10000).toLocaleString()}만 원` : '';
-    const tail = v.income.why === 'over' ? `입력하신 소득이 이 공고 소득 기준(${lim})을 넘어요`
-      : v.income.why === 'unknown' ? '소득을 입력하지 않아 소득 기준은 보지 못했어요'
+    const prof = v.income.src === 'profile';
+    const tail = v.income.why === 'over'
+        ? (prof ? `저장한 소득이 이 공고 기본 소득 기준(${lim} · 맞벌이·출산 가산 전)보다 많아요` : `입력하신 소득이 이 공고 소득 기준(${lim})을 넘어요`)
+      : v.income.why === 'unknown' ? (prof ? '저장한 조건에 소득이 없어 소득 기준은 보지 못했어요' : '소득을 입력하지 않아 소득 기준은 보지 못했어요')
       : '이 공고 소득 기준을 화면에서 계산하지 못했어요';
     return `<p class="zf-check-note" style="font-size:12px;color:#8A5A12;background:#FBF0DC;border-radius:8px;padding:6px 10px;margin:0 0 8px">📄 ${nm ? `${nm} ` : ''}대상 조건은 맞지만 ${tail} — 신청할 수 있는지 공고문에서 확인해 주세요</p>`;
   }
