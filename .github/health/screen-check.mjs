@@ -549,17 +549,19 @@ try {
         const m = { announcement_id: r.announcement_id, title: r['공고명'] ?? r.title, apply_start: r['신청시작일'] || r.apply_start, apply_end: r['신청마감일'] || r.apply_end,
           apply_period_check: r.apply_period_check, winner_announce_date: r.winner_announce_date, revision_note: r.revision_note, source: r.source, status: r['처리상태'] ?? r.status }
         const soonM = sim ? isClosingSoon({ apply_end: zfSoonestOpenEnd(m), apply_period_check: m.apply_period_check }) : isClosingSoon(zfWithSoonestEnd(m))
-        return [x.aid, soonM, isClosingSoon(zfWithSoonestEnd(r)), zf3Pill(r).t]
+        return [x.aid, soonM, isClosingSoon(zfWithSoonestEnd(r)), zf3Pill(r).t, typeof zfDeadline === 'function' ? zfDeadline(r) : null]
       }) }
     }, [want, process.env.SIMULATE === 'route_cur'])
     let ok = false, value
     if (!got.err) {
-      const bad = got.out.map(([aid, soonM, soonN, pill], i) => {
+      const bad = got.out.map(([aid, soonM, soonN, pill, dl], i) => {
         const w = want[i]
         if (soonM === null) return `${aid}: 목록 행 없음`
         if (w.kind === 'gap') return soonM ? `${aid}: 차수 사이인데 매칭 경로 마감임박` : null
         const wantPill = w.days === 0 ? '이번 차수 오늘 마감' : '이번 차수 마감 D-' + w.days, wantSoon = w.days >= 0 && w.days <= 3
-        return pill === wantPill && soonM === wantSoon && soonN === wantSoon ? null : `${aid}: 「${pill}」(기대 「${wantPill}」) · 마감임박 매칭 ${soonM}/공고 ${soonN}(기대 ${wantSoon})`
+        // 2026-10-16 — 「마감 임박순」 정렬 축(zfDeadline)도 이번 차수 끝
+        return pill === wantPill && soonM === wantSoon && soonN === wantSoon && String(dl || '').slice(0, 10) === w.cur ? null
+          : `${aid}: 「${pill}」(기대 「${wantPill}」) · 마감임박 매칭 ${soonM}/공고 ${soonN}(기대 ${wantSoon}) · 정렬 축 ${dl}(기대 ${w.cur})`
       }).filter(Boolean)
       ok = bad.length === 0
       value = `차수 사이 ${want.filter(x => x.kind === 'gap').length} · 창 안(마지막 아닌 창) ${want.filter(x => x.kind === 'in').length} · 어긋남 ${bad.length}${bad.length ? ': ' + bad.slice(0, 3).join(' / ') : ''}`
@@ -641,7 +643,9 @@ try {
           const clone = c.cloneNode(true); clone.querySelectorAll('.hname, [id^="ncard-"]').forEach(e => e.remove())
           document.body.appendChild(clone); clone.style.position = 'absolute'; clone.style.left = '-9999px'
           const txt = clone.innerText; clone.remove()
-          return { aid, pending: c.classList.contains('zf-ana-pending'), box: /분석 중/.test(c.innerText),
+          // 2026-10-16 — 분석 전 카드는 「AI 정리」라고 말하지 않는다(요약 상자 링크 · 상세 원문 링크 · 지도 안내의 「AI 정리 · 」 접힘)
+          const ai = /AI 정리/.test((c.querySelector('[data-sum-for]') || {}).textContent || '') || [...c.querySelectorAll('.zf-ai-lbl')].some(e => getComputedStyle(e).display !== 'none')
+          return { aid, ai, pending: c.classList.contains('zf-ana-pending'), box: /분석 중/.test(c.innerText),
             dates: (txt.match(/\d{1,4}\s*[-./]\s*\d{1,2}|D-\d+|접수 ?중|마감|접수 예정/g) || []).slice(0, 4) }
         }, aid))
       }
@@ -649,13 +653,13 @@ try {
     } catch (e) { err = String(e.message || e).slice(0, 120) }
     let ok = false, value
     if (!err) {
-      const bad = got.map(g => g.none ? `${g.aid}: 목록 행 없음` : (g.pending && g.box && !g.dates.length) ? null : `${g.aid}: ${g.pending ? '' : '분석 중 아님 · '}${g.dates.length ? '날짜·상태 글자 ' + g.dates.join(',') : ''}`).filter(Boolean)
+      const bad = got.map(g => g.none ? `${g.aid}: 목록 행 없음` : (g.pending && g.box && !g.dates.length && !g.ai) ? null : `${g.aid}: ${g.pending ? '' : '분석 중 아님 · '}${g.ai ? '「AI 정리」 글자 · ' : ''}${g.dates.length ? '날짜·상태 글자 ' + g.dates.join(',') : ''}`).filter(Boolean)
       ok = bad.length === 0
       value = `분석 전 열린 카드 ${want.length}${want.length ? ` (${want.map(a => a.slice(-5)).join(' ')})` : ''} · 어긋남 ${bad.length}${bad.length ? ': ' + bad.slice(0, 3).join(' / ') : ''}`
       extra.ana_pending = { want, got, bad }
     } else value = `못 잼(${err})`
-    add('ana_pending', '분석 전 카드 — 「분석 중」만 · 수집값 날짜·상태 글자 0', ok ? 'pass' : 'fail', value,
-      'DB 로 따로 고른 분석 전 열린 카드(분석 없음 · 첨부 있음 · 같은 게시물 링크 없음) — 카드 「분석 중」 · 제목 밖 날짜·D-day·접수 상태 글자 0')
+    add('ana_pending', '분석 전 카드 — 「분석 중」만 · 수집값 날짜·상태 글자 0 · 「AI 정리」 0', ok ? 'pass' : 'fail', value,
+      'DB 로 따로 고른 분석 전 열린 카드(분석 없음 · 첨부 있음 · 같은 게시물 링크 없음) — 카드 「분석 중」 · 제목 밖 날짜·D-day·접수 상태 글자 0 · 보이는 「AI 정리」 0')
   }
   // ⑦-1a3 1280 상세 패널(2026-10-16 · 같은 우편함 4 ① — v219 패널 가림을 점검이 못 잡았다: .zf3-in 애니메이션 fill 이 남긴 transform 이
   //    position:fixed 패널을 카드 안에 가뒀다). 새 문맥 1280×900 · 움직임 켬(줄이기 아님) · 실제 마우스로 첫 카드 꺾쇠를 눌러
