@@ -24,6 +24,7 @@ const phraseOf = t =>
   /함께 정리돼 있어요|같은 게시물에 올라왔어요/.test(t) ? '④링크'
   : /세대별 목록이 없어요/.test(t) ? '목록없음'
   : /링크만 제공/.test(t) ? '링크만'
+  : /공고 원문을 정리하고 있어요/.test(t) ? '분석중'   // 2026-10-16 — 분석 전 카드(zfAnaPending)
   : /정리하지 못했어요/.test(t) ? '미정리'
   : /(보증금|월세|월 |전용)/.test(t) ? '요약'
   : t.trim() === '' ? '빈칸' : '알수없음'
@@ -168,6 +169,7 @@ try {
                              and announcement_dedup_key(l.linked_group_key) = announcement_dedup_key(a.title)) then '④링크'
              when p.analysis_done then '목록없음'
              when p.has_attachments = false then '링크만'
+             when p.analysis_done is false then '분석중'
              else '미정리' end)) j
       from t left join p on p.announcement_id = t.aid`)
     const expected = new Map((row.j || []).map(x => [x.aid, x.expected]))
@@ -512,6 +514,137 @@ try {
     } else value = `못 잼(${got.err})`
     add('route_gap', '차수 사이 카드 — 접수 중이 아니고 열린 목록에 있고 다음 창 시작일을 말한다', ok ? 'pass' : 'fail', value,
       'DB 로 따로 계산한 창 사이 카드(경로 표 창 둘 이상 · 오늘이 창 밖 · 카드 기간 안) — 다음 창이 있으면 열린 목록 · 상태 ≠ 접수 중 · 알약 「다음 접수 MM-DD」 / 없으면 닫힘')
+  }
+  // ⑦-1a 차수 카드 마감 표시(2026-10-16 · 우편함 「표시층 — 차수 카드 마감 표시 …」 1·2·4 · 원칙 33) — 기대값은 DB 에서 **따로**(route_gap 과 같은 창 계산).
+  //    ⓐ 차수 사이 카드: 매칭 결과 경로(renderMatchResults 가 넘기는 꼴 — 목록 RPC 행 그대로)로 잰 마감임박이 거짓이어야 한다
+  //       (종전에는 마감일만 떼어 넘겨 zfRouteGap 이 못 보고 「⏰ 마감임박」이 섰다).
+  //    ⓑ 창 안 차수 카드(창 둘 이상 · 오늘이 마지막이 아닌 창 안): 알약 = 「이번 차수 마감 D-n」(n = 그 창 끝 − 오늘 · 0이면 「이번 차수 오늘 마감」) ·
+  //       마감임박 = (0 ≤ n ≤ 3). 마지막 창 안은 종전 그대로(알약에 「이번 차수」 없음).
+  //    SIMULATE=route_cur 이면 매칭 경로를 종전 꼴(마감일만)로 잰다(차수 사이 카드가 있는 날 마감 3일 안이면 실패해야 맞다).
+  {
+    const [cq] = await sqlRead(`
+      with today as (select (now() at time zone 'Asia/Seoul')::date d),
+      c as (select d.announcement_id aid, d.title, d.apply_start s, d.apply_end e
+              from get_announcements_deduped() d, today t
+             where d.apply_period_check is not true and d.apply_start <= t.d and t.d <= d.apply_end
+               and (d.winner_announce_date is null or d.winner_announce_date >= t.d)
+               and not (d.title ~ '^\\s*(\\[[^]]*\\]\\s*)*\\[\\s*조기\\s*(접수)?\\s*마감\\s*\\]' or coalesce(d.revision_note, '') ~ '조기\\s*(접수\\s*)?마감')),
+      rt as (select c.aid, c.s, c.e, r.start_date x, r.end_date y
+               from c join announcements a on announcement_dedup_key(a.title) = announcement_dedup_key(c.title)
+               join announcement_apply_routes r on r.announcement_id = a.announcement_id),
+      w as (select aid, x, y from rt where aid not in (select aid from rt where x is null or y is null) and y >= s and x <= e),
+      o as (select aid, x, y, max(y) over (partition by aid order by x, y rows between unbounded preceding and 1 preceding) py from w),
+      g as (select aid, x, y, sum(case when py is null or x > py + 1 then 1 else 0 end) over (partition by aid order by x, y) gid from o),
+      isl as (select aid, gid, min(x) x, max(y) y from g group by aid, gid),
+      agg as (select aid, count(*) n, bool_or(x <= t.d and t.d <= y) inwin, max(y) filter (where x <= t.d and t.d <= y) cur, max(y) lst, (select d from today) td from isl, today t group by aid)
+      select coalesce(json_agg(json_build_object('aid', aid, 'kind', case when inwin then 'in' else 'gap' end, 'cur', cur, 'days', cur - td) order by aid), '[]'::json) j
+        from agg where n >= 2 and (not inwin or cur < lst)`)
+    const want = cq.j || []
+    const got = await page.evaluate(([want, sim]) => {
+      if (typeof zfRouteCurEnd !== 'function') return { err: 'zfRouteCurEnd 없음' }
+      return { out: want.map(x => {
+        const r = noticeData.find(n => String(n.announcement_id) === x.aid)
+        if (!r) return [x.aid, null, null, null]
+        // 매칭 결과 행 = 목록 RPC 행 꼴(영문 칸) — renderMatchResults 와 같은 식으로 잰다
+        const m = { announcement_id: r.announcement_id, title: r['공고명'] ?? r.title, apply_start: r['신청시작일'] || r.apply_start, apply_end: r['신청마감일'] || r.apply_end,
+          apply_period_check: r.apply_period_check, winner_announce_date: r.winner_announce_date, revision_note: r.revision_note, source: r.source, status: r['처리상태'] ?? r.status }
+        const soonM = sim ? isClosingSoon({ apply_end: zfSoonestOpenEnd(m), apply_period_check: m.apply_period_check }) : isClosingSoon(zfWithSoonestEnd(m))
+        return [x.aid, soonM, isClosingSoon(zfWithSoonestEnd(r)), zf3Pill(r).t]
+      }) }
+    }, [want, process.env.SIMULATE === 'route_cur'])
+    let ok = false, value
+    if (!got.err) {
+      const bad = got.out.map(([aid, soonM, soonN, pill], i) => {
+        const w = want[i]
+        if (soonM === null) return `${aid}: 목록 행 없음`
+        if (w.kind === 'gap') return soonM ? `${aid}: 차수 사이인데 매칭 경로 마감임박` : null
+        const wantPill = w.days === 0 ? '이번 차수 오늘 마감' : '이번 차수 마감 D-' + w.days, wantSoon = w.days >= 0 && w.days <= 3
+        return pill === wantPill && soonM === wantSoon && soonN === wantSoon ? null : `${aid}: 「${pill}」(기대 「${wantPill}」) · 마감임박 매칭 ${soonM}/공고 ${soonN}(기대 ${wantSoon})`
+      }).filter(Boolean)
+      ok = bad.length === 0
+      value = `차수 사이 ${want.filter(x => x.kind === 'gap').length} · 창 안(마지막 아닌 창) ${want.filter(x => x.kind === 'in').length} · 어긋남 ${bad.length}${bad.length ? ': ' + bad.slice(0, 3).join(' / ') : ''}`
+      extra.route_cur = { want, out: got.out, bad }
+    } else value = `못 잼(${got.err})`
+    add('route_cur', '차수 카드 마감 — 차수 사이 매칭 마감임박 없음 · 창 안은 이번 창 끝까지', ok ? 'pass' : 'fail', value,
+      'DB 로 따로 계산한 창(route_gap 과 같은 식) — 차수 사이: 매칭 경로 마감임박 거짓 / 마지막 아닌 창 안: 알약 「이번 차수 마감 D-n」 · 마감임박 = 0≤n≤3(매칭·공고 둘 다)')
+  }
+  // ⑦-1a2 분석 전 카드(2026-10-16 · 같은 우편함 3·4) — 열린 대표 중 카드 회차 분석이 없고(analysis_done=false) 첨부가 있고 같은 게시물 링크가 없는 카드는
+  //    「분석 중」 상자만 말하고 수집값 날짜·접수 상태·D-day·마감을 보이지 않는다(제목 글자는 빼고 잰다 — 제목에 날짜가 든 공고가 있다).
+  //    기대 목록은 DB 에서 따로 — phrase 의 「분석중」 갈래와 같은 식. 0장이면 해당 없음(통과).
+  {
+    const [aq] = await sqlRead(`
+      with c as (select d.announcement_id aid, d.title from get_announcements_deduped() d where d.apply_end >= (now() at time zone 'Asia/Seoul')::date),
+      p as (select * from get_announcement_price_summary((select array_agg(aid) from c)))
+      select coalesce(json_agg(c.aid order by c.aid), '[]'::json) j from c join p on p.announcement_id = c.aid
+       where p.analysis_done is false and p.has_attachments is not false
+         and p.deposit_min is null and p.rent_min is null and p.area_min is null
+         and not exists (select 1 from announcement_post_links l where l.linked_group_key is not null
+                          and announcement_dedup_key(l.linked_group_key) = announcement_dedup_key(c.title))`)
+    const want = aq.j || []
+    const got = []
+    let err = null
+    try {
+      await page.evaluate(() => { goMain(2); if (typeof zf3SetView === 'function') zf3SetView('list'); document.getElementById('noticeFilterPanel')?.classList.add('hidden') })
+      for (const aid of want) {
+        const ok1 = await page.evaluate(aid => { const rows = noticeData.filter(n => String(n.announcement_id) === aid); if (!rows.length) return false; renderNoticeList(rows, rows.length, 0); return true }, aid)
+        if (!ok1) { got.push({ aid, none: true }); continue }
+        await page.waitForFunction(aid => { const c = document.querySelector(`#notice-list .hcard[data-announcement-id="${CSS.escape(aid)}"]`); const s = c && c.querySelector('[data-sum-for]'); return !!(s && s.innerHTML.trim()) }, aid, { timeout: 15000 }).catch(() => {})
+        got.push(await page.evaluate(aid => {
+          const c = document.querySelector(`#notice-list .hcard[data-announcement-id="${CSS.escape(aid)}"]`)
+          const clone = c.cloneNode(true); clone.querySelectorAll('.hname, [id^="ncard-"]').forEach(e => e.remove())
+          document.body.appendChild(clone); clone.style.position = 'absolute'; clone.style.left = '-9999px'
+          const txt = clone.innerText; clone.remove()
+          return { aid, pending: c.classList.contains('zf-ana-pending'), box: /분석 중/.test(c.innerText),
+            dates: (txt.match(/\d{1,4}\s*[-./]\s*\d{1,2}|D-\d+|접수 ?중|마감|접수 예정/g) || []).slice(0, 4) }
+        }, aid))
+      }
+      await page.evaluate(() => { try { applyNoticeFiltersAndRender() } catch (e) {} })
+    } catch (e) { err = String(e.message || e).slice(0, 120) }
+    let ok = false, value
+    if (!err) {
+      const bad = got.map(g => g.none ? `${g.aid}: 목록 행 없음` : (g.pending && g.box && !g.dates.length) ? null : `${g.aid}: ${g.pending ? '' : '분석 중 아님 · '}${g.dates.length ? '날짜·상태 글자 ' + g.dates.join(',') : ''}`).filter(Boolean)
+      ok = bad.length === 0
+      value = `분석 전 열린 카드 ${want.length}${want.length ? ` (${want.map(a => a.slice(-5)).join(' ')})` : ''} · 어긋남 ${bad.length}${bad.length ? ': ' + bad.slice(0, 3).join(' / ') : ''}`
+      extra.ana_pending = { want, got, bad }
+    } else value = `못 잼(${err})`
+    add('ana_pending', '분석 전 카드 — 「분석 중」만 · 수집값 날짜·상태 글자 0', ok ? 'pass' : 'fail', value,
+      'DB 로 따로 고른 분석 전 열린 카드(분석 없음 · 첨부 있음 · 같은 게시물 링크 없음) — 카드 「분석 중」 · 제목 밖 날짜·D-day·접수 상태 글자 0')
+  }
+  // ⑦-1a3 1280 상세 패널(2026-10-16 · 같은 우편함 4 ① — v219 패널 가림을 점검이 못 잡았다: .zf3-in 애니메이션 fill 이 남긴 transform 이
+  //    position:fixed 패널을 카드 안에 가뒀다). 새 문맥 1280×900 · 움직임 켬(줄이기 아님) · 실제 마우스로 첫 카드 꺾쇠를 눌러
+  //    펼친 상세가 화면 안에 있고(너비·높이 > 200 · 화면 밖으로 넘치지 않음) 그 가운데 점을 누르면 그 상세 안 요소가 잡히는가.
+  {
+    let value = '', ok = false
+    const dctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: 'no-preference', serviceWorkers: 'block', locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+    try {
+      await dctx.route(/\/rest\/v1\/usage_events(\?|$)/, r => r.fulfill({ status: 201, body: '' }))
+      const dp = await dctx.newPage()
+      await dp.goto(SITE + '?wide=' + Date.now(), { waitUntil: 'networkidle', timeout: 90000 })
+      await dp.waitForFunction(() => typeof noticeData !== 'undefined' && noticeData.length > 0 && noticeLoaded, null, { timeout: 60000 })
+      await dp.evaluate(() => { goMain(2); if (typeof zf3SetView === 'function') zf3SetView('list') })
+      await dp.waitForTimeout(1500)
+      const go = dp.locator('#notice-list .hcard .zf3-go').first()
+      await go.scrollIntoViewIfNeeded()
+      await go.click()
+      await dp.waitForTimeout(1500)
+      const r = await dp.evaluate(() => {
+        const card = document.querySelector('#notice-list .hcard.zf3-open')
+        const det = card && card.querySelector('[data-ann-id]')
+        if (!det) return { err: '펼친 상세 없음' }
+        const b = det.getBoundingClientRect(), W = innerWidth, H = innerHeight
+        const cx = Math.min(b.left + b.width / 2, W - 2), cy = Math.min(b.top + Math.min(b.height, H) / 2, H - 2)
+        const hit = document.elementFromPoint(cx, cy)
+        return { x: Math.round(b.left), y: Math.round(b.top), w: Math.round(b.width), h: Math.round(b.height), W, H, inside: !!(hit && det.contains(hit)) }
+      })
+      if (r.err) value = r.err
+      else {
+        ok = r.w > 200 && r.h > 200 && r.x >= 0 && r.x + r.w <= r.W + 1 && r.y >= 0 && r.y < r.H - 100 && r.inside
+        value = `상세 ${r.x},${r.y} ${r.w}×${r.h} · 화면 ${r.W}×${r.H} · 가운데 점 ${r.inside ? '상세 안' : '상세 밖'}`
+      }
+    } catch (e) { value = '못 잼: ' + String(e.message || e).slice(0, 120) }
+    await dctx.close()
+    add('detail_1280', '1280 · 움직임 켬 — 펼친 상세 패널이 화면 안에 보인다', ok ? 'pass' : 'fail', value,
+      '첫 카드 꺾쇠 클릭 → 상세 너비·높이 > 200 · 화면 안 · 가운데 점 = 상세 안 요소')
   }
   // ⑦-1b 완화 배지 글자(2026-10-15 · 우편함 「표시층 — 완화 배지 글자 …」 1 · 원칙 33) — 완화 공고 배지가 원문에 없는 모집 꼴을 말하지 않는가.
   //    종전에는 완화 카드 전부가 「🔓 자격완화 추가모집」이었다(열린 완화 12 중 제목에 「추가모집」 1). 기대 갈래는 DB 에서 **따로** — 목록 RPC 완화 행의
