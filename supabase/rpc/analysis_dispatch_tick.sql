@@ -39,6 +39,13 @@ AS $function$
 --   정정본 분석이 없으면(get_revision_analysis_done 거짓 — 화면 「정정 전 공고 기준」 배너와 같은 판정) 후보로 올린다.
 --   대기열 키 = 묶음 키 || ' #정정 ' || 정정 시각(KST 분) — 원공고의 끝난(done) 행과 겹치지 않고, 다시 정정되면 새 몫이 된다.
 --   루틴은 잡은 몫의 group_key 에 ' #정정 ' 이 있으면 신규 분석이 아니라 reverify 스킬 「정정공고」 갈래로 처리한다.
+--   🔵 2026-10-16(우편함 「코드 — 정정 몫 누락 …」 · …0877 대구경북 기존주택매입) — 「같은 회차」를 지금 apply_end 하나로만 대조하면
+--   분석이 확정창(apply_end_confirmed → 보호 트리거)으로 원공고의 apply_end 를 옮긴 묶음(…0875 10-21 → 11-04)의 정정본(10-21)이 빠졌다.
+--   그래서 정정본 후보는 「그 구성원이 이 묶음 키 · 이 마감으로 대기열에서 끝난(done) 행」도 같은 회차로 본다 — 발송 때의 마감이라
+--   회차 축(같은 제목 다른 회차는 마감이 달라 잡히지 않는다)은 그대로다. 정정본 후보로 간 공고는 일반 후보(cand)에서 뺀다
+--   (cand 는 analysis_rate.sql 과 같은 규칙이라 그대로 둔다 — 종전에는 cand 로 원공고의 done 행과 충돌해 아무 표시 없이 사라졌다).
+--   대기열 키 충돌: 더는 후보가 아니라 뺐던(dropped) 행이 다시 후보면 대기(waiting)로 되살린다 · 끝난(done) 행과 충돌하는 후보는
+--   health-ops dispatch_orphan ❌(health-ops-soft)가 잡는다.
 -- 🔵 접수기간 없는 SH 공고(2026-10-12 · 우편함 「코드·운영 — 부산 첨부 등록 · SH 접수기간 없는 열린 공고 대기열 진입」 2):
 --   SH 목록에는 접수기간이 없어 apply_end 가 NULL 인 열린 SH 대표가 「apply_end ≥ 오늘+3」과 대기열 PK(apply_end NOT NULL)에서 빠졌다.
 --   대표의 apply_end 가 NULL ∧ SH ∧ status 가 접수마감이 아님 ∧ 최근 원문 키 대조(source_page_checks)의 SH 목록 모집상태가 「모집중」이면 후보로 올린다.
@@ -206,7 +213,11 @@ begin
             where g.k = r.k and jsonb_typeof(g.attachment_urls) = 'array') > 0
       and exists (select 1 from keyed g
             join public.announcement_analysis aa on aa.announcement_id = g.announcement_id
-           where g.k = r.k and (g.apply_end = r.apply_end or g.linked)
+           where g.k = r.k
+             and (g.apply_end = r.apply_end or g.linked
+                  or exists (select 1 from public.analysis_dispatch_queue dq
+                              where dq.state = 'done' and dq.group_key = r.k and dq.apply_end = r.apply_end
+                                and dq.announcement_id = g.announcement_id))
              and aa.status in ('완료', '완료(보조 누락)', '완료(판정 대기)', '완료(소급)'))
       and not public.get_revision_analysis_done(r.announcement_id)
   ),
@@ -216,18 +227,25 @@ begin
            case when c.apply_end is null then c.k || ' #접수기간 없음 ' || coalesce(c.announcement_date::text, '공고일 없음') else c.k end as k,
            false as rev, (c.apply_end is null) as noend
     from cand c
+    where not exists (select 1 from rcand x where x.announcement_id = c.announcement_id)
     union all
     select x.announcement_id, x.title, x.source, x.housing_type, x.apply_start, x.apply_end, x.k, true, false from rcand x
   ),
   ins as (
     insert into public.analysis_dispatch_queue (group_key, apply_end, announcement_id, title, apply_start, phase, needs_promo, note)
-    select c.k, c.apply_end, c.announcement_id, c.title, c.apply_start,
+    select distinct on (c.k, c.apply_end) c.k, c.apply_end, c.announcement_id, c.title, c.apply_start,
            case when c.noend then '접수기간 없음' when c.apply_start > current_date then '접수 전' else '접수 중' end,
            (c.source = 'LH' and c.housing_type = '주거복지 - 매입임대'),
            case when c.rev then '정정본 — reverify 스킬 「정정공고」 갈래'
                 when c.noend then '접수기간 없음(SH 목록 모집중) — apply_end 9999-12-31 은 대기열 키 전용 · 접수기간은 원문으로 확정' end
     from allc c
-    on conflict (group_key, apply_end) do nothing
+    order by c.k, c.apply_end, c.announcement_id
+    on conflict (group_key, apply_end) do update
+       set state = 'waiting', announcement_id = excluded.announcement_id, title = excluded.title,
+           apply_start = excluded.apply_start, phase = excluded.phase, needs_promo = excluded.needs_promo,
+           enqueued_at = now(), ready_at = null, returned = false, run_id = null, state_at = now(),
+           note = coalesce(excluded.note || ' · ', '') || '다시 후보 — 뺐던(dropped) 행을 되살림'
+     where public.analysis_dispatch_queue.state = 'dropped'
     returning 1
   ),
   drp as (
