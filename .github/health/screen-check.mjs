@@ -180,12 +180,14 @@ try {
       counts[got] = (counts[got] || 0) + 1
       const exp = expected.get(aid)
       if (exp !== got) mism.push(`${aid}: 화면 ${got} ↔ DB ${exp} 「${t}」`)
+      // 2026-10-16 — 분석 없는 갈래(첨부 0 · 분석 전)의 요약 상자는 「AI 정리」라고 말하지 않는다(보이는 글자 · 「원문 보기」만)
+      else if ((got === '링크만' || got === '분석중') && /AI 정리/.test(t)) mism.push(`${aid}: ${got} 상자에 「AI 정리」 「${t}」`)
     }
     extra.phrase_counts = counts
     extra.phrase_mismatch = mism
     add('phrase', '카드 문구 ↔ DB 상태', mism.length === 0 ? 'pass' : 'fail',
       `${cards.length}장 · ${Object.entries(counts).map(([k, v]) => `${k} ${v}`).join(' · ')}${mism.length ? ` · 어긋남 ${mism.length}: ${mism.slice(0, 3).join(' / ')}` : ''}`,
-      '카드마다 화면 문구 갈래 = DB 로 따로 계산한 갈래')
+      '카드마다 화면 문구 갈래 = DB 로 따로 계산한 갈래 · 링크만·분석중 상자에 보이는 「AI 정리」 0')
   }
   // ①-2 공고문 자리 ↔ DB (2026-10-01) — 화면 코드를 쓰지 않고 SQL 로 따로 계산한다.
   //   공고문 = 링크 표로 이 LH 카드에 붙은 MYHOME 행을 제목 키로 묶은 것(한 MYHOME 행이 LH 둘에 걸리면 id 가 작은 LH) —

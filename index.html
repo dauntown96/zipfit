@@ -694,7 +694,10 @@ html[data-ui="d3"] .zf3-vline .policy-item.now .policy-category::after{content:"
 html[data-ui="d3"] .zf-sch .policy-content{white-space:normal;overflow-wrap:anywhere}
 .zf-sch-stop>summary{list-style:none;cursor:pointer;display:block}
 .hcard.zf-ana-pending :is(.zf3-dpill,.htag,.chip-row,.zf-dateline,.zf-rec-date,.zf3-route,.zf3-dl-tags,.zf-route-slot,.zf-notices-slot,.zf-dcell-date,[id^="schedule-slot-"]){display:none!important}
-.hcard.zf-ana-pending .zf-ai-lbl{display:none}
+.hcard.zf-ana-pending .zf-ai-lbl,.hcard.zf-ana-no .zf-ai-lbl,.zf-ai-off .zf-ai-lbl{display:none}
+.zf-ops-hide{margin-top:14px;padding:10px 12px;border:1px dashed #C0392B;border-radius:8px;font-size:13px;background:#fff}
+.zf-ops-hide input{width:100%;box-sizing:border-box;margin:6px 0;padding:8px;font:inherit;font-size:13px}
+.zf-ops-hide .zf-ops-hide-msg{font-size:12px;color:#888;margin:4px 0 0}
 .zf-ana-box{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:12px;color:#6B6B63;background:#F6F6F2;border:1px solid #E8E8E0;border-radius:8px;padding:6px 10px;margin-bottom:6px;line-height:1.5}
 .zf-ana-pill{font-weight:700;color:#fff;background:#6B6B63;border-radius:999px;padding:1px 8px}
 .zf-ana-org{font-weight:600;color:#333}
@@ -4184,11 +4187,12 @@ function renderSavedNotices(){
         ? `<div style="margin-top:6px">${cancelNoticeBadge(s.title||'', s.apply_end)}</div>` : ''}
       ${dateStr?`<p style="font-size:11px;color:#bbb;margin-top:4px">저장일: ${dateStr}</p>`:''}
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
-        ${s.url?`<a class="detail-link" href="${s.url}" target="_blank">AI 정리 · 원문 보기 →</a>`:''}
+        ${s.url?`<a class="detail-link" href="${s.url}" target="_blank" data-ai-for="${zfAttr(s.id)}" data-ai-key="${zfAttr(zfDedupKey(s.title||''))}"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`:''}
       </div>
     </div>`;
   });
   el.innerHTML = html;
+  zfAiLabelSync();   // 🔵 2026-10-16 — 분석 없는 공고는 「원문 보기」만
   if(typeof zf3MyRoute === 'function') zf3MyRoute();
 }
 
@@ -4332,7 +4336,7 @@ function zfSummaryLine(s){
 // 🔵 2026-09-29 코드 회차 2 잔여 — 문구만 갈아 끼울 수 있게 text 를 받는다(없으면 종전 문구). 상자·링크는 그대로.
 function zfNotAnalyzedHtml(url, text){
   const link = url
-    ? ` <a href="${url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:#0F6E56;font-weight:600;text-decoration:underline">AI 정리 · 원문 보기 →</a>`
+    ? ` <a href="${url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:#0F6E56;font-weight:600;text-decoration:underline"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`
     : '';
   return `<div style="font-size:12px;color:#6B6B63;background:#F6F6F2;border:1px solid #E8E8E0;border-radius:8px;padding:6px 10px;margin-bottom:6px">${text || '아직 공고 원문을 정리하지 못했어요 · 보증금·면적은 원문에서 확인해 주세요'}${link}</div>`;
 }
@@ -4367,6 +4371,23 @@ function zfCardEmptyKindFor(annId){
 //    「분석 중」이라 하지 않고, 같은 게시물 링크가 있는 카드(B62 ④)는 그 링크를 그대로 둔다(종전 안내). 분석이 끝나면 다음 조회에서 일반 카드로 돌아온다.
 //    판정·거름·정렬·셈은 바꾸지 않는다(표시만).
 const ZF_DCELL_DATE = /^(공고일|접수기간)$/;
+// 🔵 2026-10-16(우편함 「표시층 — 「AI 정리」는 분석 있을 때만 …」 1) — 카드 회차 분석이 없으면(analysis_done 거짓) 원문 링크는 「원문 보기」만.
+//    분석 전(zfAnaPending) · 첨부 0(「원문 링크만 제공해요」) · 같은 게시물 링크만 있는 카드 · 저장 목록 · 체크리스트 모두 같은 판정이다.
+//    같은 게시물 LH 카드에 함께 정리된 카드(zfPostLinkOrganized 참 — 정리가 그쪽에 있다)는 그대로 · 모르면(요약 전·실패) 그대로.
+//    「AI 정리 · 」는 <span class="zf-ai-lbl"> 로 감싸 두고 카드(.zf-ana-no)나 링크(.zf-ai-off)에 표지를 달아 접는다 — 분석된 카드 글자 변화 0.
+function zfAiOff(s, key){
+  return !!(s && s.analysis_done === false && zfPostLinkOrganized(key) !== true);
+}
+// 카드 밖 원문 링크(저장 목록 · 체크리스트 — data-ai-for=공고 ID)는 요약을 물어 본 뒤 표지를 단다.
+async function zfAiLabelSync(){
+  const els = [...document.querySelectorAll('[data-ai-for]')];
+  if(!els.length) return;
+  const ids = [...new Set(els.map(e => e.getAttribute('data-ai-for')).filter(Boolean))];
+  await zfEnsurePriceSummaries(ids);
+  // 다른 자리가 같은 id 를 이미 묻는 중이면(캐시 값 undefined) 답이 올 때까지 잠깐 기다린다(최대 10초)
+  for(let i = 0; i < 20 && ids.some(id => zfPriceCache.has(id) && zfPriceCache.get(id) === undefined); i++) await new Promise(r => setTimeout(r, 500));
+  els.forEach(e => { if(zfPriceCache.has(e.getAttribute('data-ai-for'))) e.classList.toggle('zf-ai-off', zfAiOff(zfPriceCache.get(e.getAttribute('data-ai-for')), e.getAttribute('data-ai-key') || '')); });
+}
 function zfAnaPending(s, key){
   return !!(s && s.analysis_done === false && s.has_attachments !== false && zfPostLinkOrganized(key) === null);
 }
@@ -4386,6 +4407,7 @@ function zfFillSummarySlots(){
     const url = el.getAttribute('data-sum-url') || '';
     const pend = zfAnaPending(s, el.getAttribute('data-sum-key')), card = el.closest('.hcard');
     if(card) card.classList.toggle('zf-ana-pending', pend);
+    if(card) card.classList.toggle('zf-ana-no', zfAiOff(s, el.getAttribute('data-sum-key')));   // 🔵 2026-10-16 — 분석 없으면 「AI 정리 · 」 접음
     if(pend){ el.innerHTML = zfAnaPendingHtml(url, el.getAttribute('data-sum-org') || ''); return; }
     const line = s ? zfSummaryLine(s) : '';
     // 🔵 이번 회차 값이 아니면 상자 색도 함께 바꾼다 — 칩만 달면 초록 상자가 「확인됨」처럼 읽힌다.
@@ -6620,6 +6642,7 @@ function toggleDetail(id, card, from){
     renderSpecialNotes(cardEl, id);
     renderSupplySchedule(cardEl, id);
     loadScheduleLine(cardEl.dataset.announcementId || '', cardEl, id);
+    zfOpsDetailHide(cardEl, id, detailEl);   // 🔵 2026-10-16 — 관리자에게만 「이 묶음 숨기기」(비관리자는 아무것도 그리지 않는다)
     renderAttachments(cardEl, id);
   }
   // 🔵 2026-10-13 — MYHOME 다구 묶음의 머리 「모집 세대수」를 같은 회차 분할 행 합으로(zfRecruitBundleSum 주석).
@@ -9891,8 +9914,9 @@ function buildChecklist(){
   document.getElementById('checklist-apply-btn').innerHTML = `
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:1.25rem">
       <button class="btn btn-sec" onclick="window.open('${applyUrl}','_blank')">${applyLabel}</button>
-      ${sel.url?`<a class="detail-link" href="${sel.url}" target="_blank">AI 정리 · 원문 보기 →</a>`:''}
+      ${sel.url?`<a class="detail-link" href="${sel.url}" target="_blank" data-ai-for="${zfAttr(sel.id)}" data-ai-key="${zfAttr(zfDedupKey(sel.title||''))}"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`:''}
     </div>`;
+  zfAiLabelSync();   // 🔵 2026-10-16 — 분석 없는 공고는 「원문 보기」만
 }
 
 loadRegionsFromSupabase(); // ② 전국 지역 동적 로드 후 buildChipOptions() 호출
@@ -10429,6 +10453,47 @@ async function zfOpsHide(){
   const r = await zfOpsRpc('ops_listing_hide', { p_announcement_id: id.trim(), p_reason: reason.trim() });
   if(!r.ok){ if(msg) msg.textContent = '숨기지 못했어요 — ' + ((r.data && r.data.message) || '오류'); return; }
   await zfOpsLoad();
+}
+// 🔵 2026-10-16(우편함 「표시층 — … · 관리자 전용 「이 묶음 숨기기」 단추」 2) — 공고 상세 맨 아래, ops_is_admin() 참일 때만 단추.
+//    누르면 사유 칸(필수) → 「숨기기」 → 확인 한 번 → ops_listing_hide(같은 함수 · 같은 인자) → 그 묶음(같은 제목 키)을 화면 목록에서 뺀다.
+//    되돌리기는 설정 탭 「운영」 구역의 「풀기」. 관문은 DB 다 — 화면의 판정은 단추를 그릴지 말지뿐(토큰이 바뀌면 다시 묻는다).
+let zfOpsAdminCache = { tok: null, val: false };
+async function zfOpsIsAdmin(){
+  const tok = await zfAccessToken();
+  if(!tok) return false;
+  if(zfOpsAdminCache.tok === tok) return zfOpsAdminCache.val;
+  const r = await zfOpsRpc('ops_is_admin');
+  zfOpsAdminCache = { tok, val: !!(r.ok && r.data === true) };
+  return zfOpsAdminCache.val;
+}
+async function zfOpsDetailHide(cardEl, id, detailEl){
+  const aid = cardEl && cardEl.dataset ? String(cardEl.dataset.announcementId || '') : '';
+  if(!aid || !detailEl || !(await zfOpsIsAdmin())) return;
+  if(detailEl.querySelector('.zf-ops-hide')) return;
+  const box = document.createElement('div');
+  box.className = 'zf-ops-hide';
+  box.innerHTML = `<button type="button" class="btn btn-sec" style="width:auto;padding:4px 10px;font-size:12px" data-act="open">🛠 관리자 · 이 묶음 숨기기</button>`
+    + `<div data-form hidden><input type="text" placeholder="숨기는 사유(필수)" aria-label="숨기는 사유">`
+    + `<button type="button" class="btn btn-sec" style="width:auto;padding:4px 10px;font-size:12px" data-act="hide">숨기기</button></div>`
+    + `<p class="zf-ops-hide-msg">같은 제목 묶음이 목록·분석 대기열에서 함께 빠져요 · 되돌리기는 설정 탭 「운영」의 「풀기」</p>`;
+  box.addEventListener('click', ev => ev.stopPropagation());
+  box.querySelector('[data-act="open"]').addEventListener('click', () => { const f = box.querySelector('[data-form]'); f.hidden = false; f.querySelector('input').focus(); });
+  box.querySelector('[data-act="hide"]').addEventListener('click', async () => {
+    const msg = box.querySelector('.zf-ops-hide-msg'), reason = box.querySelector('input').value.trim();
+    if(!reason){ msg.textContent = '숨기는 사유를 적어 주세요'; return; }
+    if(!confirm(`「${cardEl.dataset.title || aid}」 묶음을 목록에서 숨길까요?`)) return;
+    const r = await zfOpsRpc('ops_listing_hide', { p_announcement_id: aid, p_reason: reason });
+    if(!r.ok){ msg.textContent = '숨기지 못했어요 — ' + ((r.data && r.data.message) || '오류'); return; }
+    msg.textContent = '숨겼어요 — 설정 탭 「운영」에서 풀 수 있어요';
+    box.querySelector('[data-form]').hidden = true; box.querySelector('[data-act="open"]').disabled = true;
+    const key = zfDedupKey(cardEl.dataset.title || '');
+    if(key && typeof noticeData !== 'undefined' && Array.isArray(noticeData)){
+      noticeData = noticeData.filter(n => zfDedupKey(n['공고명'] ?? n.title) !== key);
+      setTimeout(() => { try{ applyNoticeFiltersAndRender(noticePage); }catch(e){} }, 1200);
+    }
+    if(document.getElementById('zfOpsZone')) zfOpsLoad();
+  });
+  detailEl.appendChild(box);
 }
 async function zfOpsRelease(hid){
   if(!confirm('이 묶음을 목록에 다시 보일까요?')) return;
