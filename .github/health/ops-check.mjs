@@ -276,6 +276,28 @@ try {
          select coalesce(json_agg(rv.announcement_id), '[]'::json) from rv where not get_revision_analysis_done(rv.announcement_id)
            and exists (select 1 from announcement_analysis aa where aa.announcement_id in (select g.announcement_id from get_announcement_group_ids(rv.announcement_id) g)
                        and aa.status in ('완료', '완료(보조 누락)', '완료(판정 대기)', '완료(소급)'))),
+      -- 🔵 2026-10-16(우편함 「코드 — 정정 몫 누락 …」 4) — 대기열에서 조용히 사라진 후보(발송기 결함).
+      --    열린 대표(apply_end ≥ 오늘+3 · 들어온 지/정정된 지 60분 넘음) ∧ 묶음 첨부 > 0 ∧ 아직 분석할 것이 있음
+      --      (정정 행 ∧ 정정본 분석 없음 ∧ 같은 제목 묶음에 정정 전 분석 있음 — revision_gap 과 같은 판정 · 또는 같은 회차(같은 마감 · 링크)에 완료 분석 없음 — 발송기 cand 와 같은 판정)
+      --    ∧ 그 공고의 대기열 행이 waiting·sent·claimed 어디에도 없음. 발송기는 10분마다 후보를 넣으므로 이 꼴은 넣다가 충돌로 사라진 것이다(…0877 · 10-15~16).
+      'dispatch_orphan', (with lm as (select distinct on (l.linked_announcement_id) l.linked_announcement_id aid, announcement_dedup_key(lh.title) lh_key
+             from announcement_post_links l join announcements lh on lh.announcement_id = l.lh_announcement_id
+            where lh.title is not null and lh.hidden_from_listing is not true order by l.linked_announcement_id, l.lh_announcement_id),
+           kd as materialized (select a.announcement_id, a.apply_end, a.attachment_urls, coalesce(lm.lh_key, announcement_dedup_key(a.title)) k, (lm.aid is not null) linked
+             from announcements a left join lm on lm.aid = a.announcement_id where a.title is not null and a.hidden_from_listing is not true),
+           rp as materialized (select d.announcement_id, d.apply_end, kd.k, a.is_revised, a.revised_at, a.created_at
+             from get_announcements_deduped() d join kd using (announcement_id) join announcements a using (announcement_id)
+            where d.apply_end >= current_date + 3)
+         select coalesce(json_agg(rp.announcement_id order by rp.announcement_id), '[]'::json) from rp
+          where greatest(rp.created_at, coalesce(rp.revised_at, rp.created_at)) < now() - interval '60 minutes'
+            and (select coalesce(sum(jsonb_array_length(g.attachment_urls)), 0) from kd g where g.k = rp.k and jsonb_typeof(g.attachment_urls) = 'array') > 0
+            and ((rp.is_revised and rp.revised_at is not null and not get_revision_analysis_done(rp.announcement_id)
+                  and exists (select 1 from kd g join announcement_analysis aa using (announcement_id)
+                               where g.k = rp.k and aa.status in ('완료', '완료(보조 누락)', '완료(판정 대기)', '완료(소급)')))
+                 or not exists (select 1 from kd g join announcement_analysis aa using (announcement_id)
+                               where g.k = rp.k and (g.apply_end = rp.apply_end or g.linked)
+                                 and aa.status in ('완료', '완료(보조 누락)', '완료(판정 대기)', '완료(소급)')))
+            and not exists (select 1 from analysis_dispatch_queue q where q.announcement_id = rp.announcement_id and q.state in ('waiting', 'sent', 'claimed'))),
       -- 🔵 2026-10-15(우편함 「코드 — 불변식 … · health-ops-soft 「판정완료인데 판정 대기」 감지」 2) — 판정 대기 잔존.
       --    done = 상태 「완료(판정 대기)」인데 pending_fields 에 「[판정완료] YYYY-MM-DD …」 줄(2026-10-15 규약 — 판정이 난 날 · 근거 페이지)이 있는 공고.
       --    「[판정완료]」 바로 뒤 날짜로 가린다 — 2026-09 분석들의 「[판정완료] <설명>」(분석자가 스스로 정한 것을 적은 옛 꼴)은 세지 않는다.
@@ -367,6 +389,17 @@ try {
     add('revision_gap', '열린 정정공고 중 정정본 분석 없음(정정 60분 넘음)', ids.length === 0 ? 'pass' : 'warn',
       ids.length ? `${ids.length}: ${ids.slice(0, 5).join(', ')}` : 0,
       '0 — 대표 ∧ is_revised ∧ 정정 60분 넘음 ∧ 열림(apply_end ≥ 오늘) ∧ 정정 전 분석 있음 ∧ get_revision_analysis_done 거짓 · 넘으면 ⚠️ 경고만(이슈를 열지 않는다 — 루틴 착수를 막지 않게)')
+  }
+  // ⑧-2a 대기열에서 조용히 사라진 후보(2026-10-16 · 우편함 「코드 — 정정 몫 누락 …」 4 · …0877).
+  //    revision_gap ⚠️ 는 「루틴이 아직 안 했다」(대기열에 있으면 정상)와 「발송기가 넣지 못했다」(결함)를 가르지 못해 14시간 아무도 안 봤다.
+  //    여기는 후자만 — 분석할 것이 있는 열린 대표인데 대기열에 산 행(waiting·sent·claimed)이 없다 → ❌.
+  //    🔴 gate.mjs HARD 에 넣지 않는다(안 멈춤 → health-ops-soft) — 루틴을 멈추면 정정본·후보가 더 늦어질 뿐이고 분석이 틀린 값을 쓰게 되지는 않는다.
+  //    오탐 가능: 대표가 바뀐 지 10분 안(발송기 다음 틱 전) — 60분 문턱은 들어온·정정된 시각 기준이라 대표 교체만으로는 걸릴 수 있다(다음 점검에 풀린다).
+  {
+    const ids = d.dispatch_orphan || []
+    add('dispatch_orphan', '분석할 것이 있는 열린 대표인데 대기열에 없음(발송기 누락)', ids.length === 0 ? 'pass' : 'fail',
+      ids.length ? `${ids.length}: ${ids.slice(0, 5).join(', ')}` : 0,
+      '0 — 대표 ∧ apply_end ≥ 오늘+3 ∧ 들어온·정정된 지 60분 ∧ 묶음 첨부 > 0 ∧ (정정본 분석 없음 ∨ 같은 회차 완료 분석 없음) ∧ 대기열 waiting·sent·claimed 행 없음 · 넘으면 ❌(health-ops-soft — 루틴 착수를 막지 않는다)')
   }
   // ⑧-2b 판정 대기 잔존(2026-10-15 · 우편함 「코드 — 불변식 … · health-ops-soft 「판정완료인데 판정 대기」 감지」 2).
   //    🔴 ⚠️ 경고만이다(이슈를 열지 않는다 — revision_gap·followup_unreported 와 같은 처리) — 고치는 길이 코드가 아니라 「운영 — 데이터 쓰기」(상태만)라
