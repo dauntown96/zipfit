@@ -5,7 +5,8 @@
 //   「상세조회 마감 … 미시도」 오류는 441런 중 193런(하루 최대 59런)이라 런 단위로는 기준이 되지 않는다 →
 //   「활성 LH 공고 중 6시간 넘게 상세조회를 시도하지 않은 수」(지금 3)로 잰다.
 // 🔴 첫 주는 넉넉하게 — 오탐이 잦으면 알림이 읽히지 않는다.
-import { sqlRead, anonRpc, report, recordFindings, SITE, PROJECT_REF, ANON_KEY } from './lib.mjs'
+import { sqlRead, anonRpc, report, recordFindings, recordInstanceMetrics, SITE, PROJECT_REF, ANON_KEY } from './lib.mjs'
+import { METRICS_PATH, pickMetrics, judgeInstance } from './instance.mjs'
 import { YEARLY_SQL, judgeYearly } from './yearly.mjs'
 import { SH_RUN_SQL, judgeShRun } from './sh-run.mjs'
 import { BACKLOG_SQL, judgeBacklog } from './collect-backlog.mjs'
@@ -175,9 +176,6 @@ const EXPECTED_JOBS = [
   'zipfit-net-purge-secrets',    // 2026-10-17 pg_net 응답 표 비밀값 응답 거두기(마이그레이션 2026-10-17_01 · ⑮ net_secret)
   'zipfit-list-rpc-probe',       // 2026-10-17 공개 목록 RPC anon 실행 시간 기록(마이그레이션 2026-10-17_01 · ⑭ list_rpc_time)
 ]
-// 🔵 2026-10-03 — workflow_dispatch 토큰(Vault github_actions_dispatch_token · fine-grained · zipfit · zipfit-backup(2026-10-08 더함) · Actions 읽기·쓰기) 만료일.
-//    토큰을 갈면 이 날짜도 함께 고친다(다운님이 알려 준 값 · 값 자체는 Vault 에만 있다).
-const DISPATCH_TOKEN_EXPIRES = '2027-10-03'
 
 // ③④ 관리 API 가 필요 없는 점검(비로그인 목록·요약 · 배포 사이트)은 DB 점검과 다른 try 로 먼저 돈다
 //    (2026-10-06 · 우편함 「코드 — 1-C …」 2) — 관리 API 가 죽어 DB 점검이 「점검 실행」(runner) 하나로 끝나도 화면 쪽 결과는 남는다.
@@ -566,9 +564,6 @@ try {
       const ok = b.age_min <= 25 * 60 && (b.pending ? b.age_min <= 5 : b.status === 204)
       add(id, name, ok ? 'pass' : 'fail', `${Math.round(b.age_min)}분 전 · ${b.pending ? '응답 대기' : `HTTP ${b.status}`}${b.err ? ' · ' + b.err : ''}`, `≤ 25시간(${when}) · 응답 204(GitHub workflow_dispatch)`)
     }
-    const daysLeft = (Date.parse(DISPATCH_TOKEN_EXPIRES + 'T00:00:00Z') - now.getTime()) / 86400000
-    add('ops_dispatch_token', '발송 토큰 만료까지(일)', daysLeft > 30 ? 'pass' : daysLeft > 0 ? 'warn' : 'fail', Math.floor(daysLeft),
-      `> 30일(만료 ${DISPATCH_TOKEN_EXPIRES} · 30일 안이면 ⚠️ · 지나면 실패 — 토큰을 갈면 Vault github_actions_dispatch_token 과 이 날짜를 함께)`)
   }
   // ⑬ 바깥 감시 1단계(2026-10-08 · 우편함 「운영 기반 묶음」 5) — cron zipfit-uptime-ping 이 10분마다 배포 사이트·공개 REST 를 부르고
   //    응답은 다음 회차가 ops_uptime_log 로 옮긴다. 대상마다 부른 지 12분 지난 최근 기록을 새것부터 보아
@@ -754,6 +749,55 @@ try {
     '사람 브라우저 0 — 1건 이상이면 ⚠️(❌ 없음 · 기준선이 있어 안정화 안이 선 뒤 문턱을 다시 본다) · 자동 브라우저(HeadlessChrome)는 세기만 한다')
 } catch (e) {
   add('list_user_fail', '목록 RPC 사용자 실패(5xx · 57014) 24시간', 'warn', String(e).slice(0, 200), '관리 API 로그(postgrest_logs)를 읽는다(경고만)')
+}
+
+// ⑱ 비밀값 만료(2026-10-17 · 우편함 「코드·운영 — 인스턴스 지표 정기 기록 · Vault 밖 만료 표 · 비밀값 30일 전 ⚠️ …」 3) — zipfit_ops.secret_expiry_list() 한 정의
+//    (Vault 설명칸 「expires=…」 + Vault 밖 표 zipfit_ops.secret_expiry_external · 관리자 상태판 secrets 와 같다)를 읽는다.
+//    날짜 있는 것 중 남은 날 ≤ 30 = ⚠️(이름·날짜) · 지난 것 = ❌(안 멈춤 — gate.mjs HARD 밖) · 설명칸 꼴이 없는 Vault 비밀(missing) = ⚠️.
+//    종전 ops_dispatch_token(GitHub 발송 토큰 하나 · 파일 상수 날짜)을 이 항목이 대신한다 — 토큰을 갈면 Vault 설명칸이나 표 한 줄만 고친다.
+try {
+  const [x] = await sqlRead(`select coalesce(json_agg(json_build_object('source', source, 'name', name, 'state', state, 'expires', expires, 'days_left', days_left)), '[]'::json) as j
+    from zipfit_ops.secret_expiry_list()`)
+  const rows = x.j
+  const dated = rows.filter(r => r.state === 'date')
+  const soon = dated.filter(r => r.days_left <= 30)
+  const gone = soon.filter(r => r.days_left < 0)
+  const missing = rows.filter(r => r.state === 'missing')
+  const first = dated[0]
+  const fmt = r => `${r.name} ${r.expires}(${r.days_left}일)`
+  add('secret_expiry', '비밀값 만료(30일 안 ⚠️)', gone.length ? 'fail' : soon.length || missing.length ? 'warn' : 'pass',
+    soon.length || missing.length
+      ? [soon.length ? `30일 안 ${soon.length}: ${soon.map(fmt).join(', ')}` : '', missing.length ? `설명칸 expires= 없음 ${missing.length}: ${missing.map(r => r.name).join(', ')}` : ''].filter(Boolean).join(' · ')
+      : `가장 이른 ${first ? fmt(first) : '없음'} · 날짜 ${dated.length} · 만료 없음 ${rows.filter(r => r.state === 'none').length} · 모름 ${rows.filter(r => r.state === 'unknown').length}`,
+    '남은 날 > 30(KST) — 30일 안 ⚠️ · 지나면 ❌(안 멈춤) · Vault 설명칸 꼴 없음 ⚠️ · 정의 zipfit_ops.secret_expiry_list()')
+} catch (e) {
+  add('secret_expiry', '비밀값 만료(30일 안 ⚠️)', 'warn', String(e).slice(0, 200), 'zipfit_ops.secret_expiry_list() 를 읽는다(못 읽으면 ⚠️)')
+}
+
+// ⑲ 인스턴스 메모리(2026-10-17 · 같은 우편 1 · 조사 「인스턴스 지표 경로」 ⓑ) — 관리 API 지표 끝점(베타)에서 숫자만 골라(instance.mjs) zipfit_ops.instance_metrics_log 에 한 행.
+//    🔴 본문 원문은 어디에도 남기지 않는다(값 칸은 고른 숫자 요약뿐 · 실패하면 HTTP 상태만). ⚠️만(❌ 없음 · 문턱 잠정 — instance.mjs).
+//    베타 끝점이라 받기·고르기·기록이 실패하면 이 항목만 ℹ️ — 점검 전체를 막지 않는다.
+try {
+  const token = process.env.SUPABASE_ACCESS_TOKEN
+  if (!token) throw new Error('SUPABASE_ACCESS_TOKEN 이 없다')
+  const ctl = new AbortController()
+  const timer = setTimeout(() => ctl.abort(), 30000)
+  let res, text
+  try {
+    res = await fetch(`https://api.supabase.com/v1/projects/${PROJECT_REF}${METRICS_PATH}`, { headers: { Authorization: `Bearer ${token}` }, signal: ctl.signal })
+    text = await res.text()
+  } finally { clearTimeout(timer) }
+  if (!res.ok) throw new Error(`지표 끝점 HTTP ${res.status}`)
+  const scraped_at = new Date().toISOString()
+  const { values, missing } = pickMetrics(text)
+  text = null
+  if (values.mem_total == null) throw new Error(`지표 끝점 200 · 고를 계열 없음(${missing.length}/${missing.length + Object.keys(values).length})`)
+  const id = await recordInstanceMetrics({ scraped_at, ...values })
+  const j = judgeInstance(values)
+  add('instance_mem', '인스턴스 메모리(swap · commit)', j.status,
+    `${j.value} · 계열 ${Object.keys(values).length}개${missing.length ? `(없음 ${missing.join(',')})` : ''} · 기록 #${id}`, j.rule)
+} catch (e) {
+  add('instance_mem', '인스턴스 메모리(swap · commit)', 'info', String(e).slice(0, 200), '관리 API 지표 끝점(베타) — 실패면 ℹ️만(점검을 막지 않는다)')
 }
 
 if (process.env.SIMULATE === 'fail') add('simulate', '실패 흉내(수동 입력 simulate=fail) — 안 멈추는 실패', 'fail', '시험', '알림 경로 확인용 — 평소에는 없다 · 라벨 health-ops-soft')
