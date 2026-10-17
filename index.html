@@ -10586,6 +10586,8 @@ async function zfOpsIssues(){
       .filter(i => i.labels.length);
   }catch(e){ return null; }
 }
+// 🔵 2026-10-17(우편함 「표시층 — 상태판 … 분석률 두 셈 · 열린 카드 출처별 · 최근 회차 다섯」 2) — 상태판 함수가 관리자 호출 약 1.35 s 로 느려졌다(PR #585).
+//    관리자임이 확인되면 구역을 바로 열고 「받는 중」을 말한 뒤, 상태판과 열린 점검 이슈(GitHub)를 따로 기다려 온 것부터 그린다(서로 막지 않는다).
 async function zfOpsLoad(){
   const zone = document.getElementById('zfOpsZone');
   if(!zone || zfOpsBusy) return;
@@ -10593,11 +10595,42 @@ async function zfOpsLoad(){
   try{
     const is = await zfOpsRpc('ops_is_admin');
     if(!(is.ok && is.data === true)){ zone.classList.add('hidden'); zone.innerHTML = ''; return; }
-    const [board, issues] = await Promise.all([zfOpsRpc('ops_status_board'), zfOpsIssues()]);
     zone.classList.remove('hidden');
-    zone.innerHTML = board.ok && board.data ? zfOpsHtml(board.data, issues)
-      : `<p class="slabel" style="margin:0 0 0.5rem">🛠 운영</p><p style="font-size:13px;color:${ZF_OPS_COLOR.red}">상태판을 읽지 못했어요${board.data && board.data.message ? ' — ' + zfOpsEsc(board.data.message) : ''}</p>`;
+    let board = null, issues;   // issues: undefined = 받는 중 · null = 못 읽음
+    const paint = () => {
+      zone.innerHTML = board === null
+        ? `<p class="slabel" style="margin:0 0 0.5rem">🛠 운영</p><p style="font-size:13px;color:#888">상태판을 받는 중…</p>`
+        : board.ok && board.data ? zfOpsHtml(board.data, issues)
+        : `<p class="slabel" style="margin:0 0 0.5rem">🛠 운영</p><p style="font-size:13px;color:${ZF_OPS_COLOR.red}">상태판을 읽지 못했어요${board.data && board.data.message ? ' — ' + zfOpsEsc(board.data.message) : ''}</p>`;
+    };
+    paint();
+    const pb = zfOpsRpc('ops_status_board').then(r => { board = r; paint(); });
+    const pi = zfOpsIssues().then(r => { issues = r; if(board) paint(); });
+    await Promise.all([pb, pi]);
   }finally{ zfOpsBusy = false; }
+}
+// 분석 회차 이유(analysis_dispatch_tick 의 reason) — 화면 이름
+const ZF_OPS_RUN_REASON = { grace: '분석 · 유예 끝', next: '분석 · 이어서', returned: '분석 · 되돌린 것', max_wait: '분석 · 오래 기다림', manual: '분석 · 수동', followup: '후속 처리' };
+const ZF_OPS_RUN_STATE = { firing: '발송함', running: '도는 중', finished: '끝', released: '풀림(되돌림)', failed: '발송 실패' };
+// 분석률 두 셈 나란히(다운님 결정 2026-10-02) — 왼쪽 루틴 분모(정본 · 접수 중 · 접수 전) · 오른쪽 열린 카드 출처별(LH · SH · MYHOME 단독).
+function zfOpsRatesHtml(rates){
+  const r = rates || {}, rt = Array.isArray(r.routine) ? r.routine : [], ob = Array.isArray(r.open_by_source) ? r.open_by_source : [];
+  const short = x => Number(x.numerator) < Number(x.denominator);
+  const row = (k, x, extra) => `<div style="display:flex;justify-content:space-between;gap:6px"><span>${zfOpsEsc(k)}</span><b style="font-variant-numeric:tabular-nums;color:${short(x) ? ZF_OPS_COLOR.yellow : 'inherit'}">${x.numerator ?? '—'}/${x.denominator ?? '—'}</b></div>${extra || ''}`;
+  const col = (title, rows) => `<div style="flex:1 1 140px;min-width:0;padding:6px 8px;border:1px solid #eee;border-radius:8px"><div style="font-size:12px;color:#888;margin-bottom:2px">${title}</div>${rows || '<div style="color:#888">—</div>'}</div>`;
+  const left = rt.map(x => row(x.phase, x, x.not_done ? `<div style="font-size:12px;color:${ZF_OPS_COLOR.yellow};word-break:break-all">미완 ${zfOpsEsc(x.not_done)}</div>` : '')).join('');
+  const right = ob.map(x => row(x.source_group, x, Number(x.with_attachments) < Number(x.denominator) ? `<div style="font-size:12px;color:#888">첨부 있음 ${x.with_attachments ?? '—'}</div>` : '')).join('');
+  const color = rt.concat(ob).some(short) ? 'yellow' : 'ok';
+  return { color, html: `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">${col('루틴 분모(정본)', left)}${col('열린 카드 · 출처별', right)}</div>` };
+}
+// 최근 분석 회차 다섯 — 회차마다 한 줄(이유 · 상태 · 끝난 시각 · 걸린 분 · 끝낸 대기열 행) + 끝 메모 앞 80자.
+function zfOpsRunsHtml(runs){
+  const rs = Array.isArray(runs) ? runs : [];
+  if(!rs.length) return '<div style="color:#888">회차 없음</div>';
+  return rs.map(x => `<div style="padding:3px 0">run ${zfOpsEsc(x.id)} · ${zfOpsEsc(ZF_OPS_RUN_REASON[x.reason] || x.reason)} · ${zfOpsEsc(ZF_OPS_RUN_STATE[x.state] || x.state)}`
+    + (x.finished_at ? ` ${zfOpsTime(x.finished_at)}${x.minutes != null ? ` · ${x.minutes}분` : ''}` : ` · 시작 ${zfOpsTime(x.claimed_at || x.created_at)}`)
+    + ` · 끝낸 공고 ${x.done ?? 0}`
+    + (x.note ? `<br><span style="color:#888;font-size:12px;word-break:break-all">${zfOpsEsc(x.note)}</span>` : '') + `</div>`).join('');
 }
 function zfOpsHtml(b, issues){
   const line = (color, label, text) => `<div style="padding:6px 0;border-top:1px solid #eee;font-size:13px;line-height:1.55">`
@@ -10608,6 +10641,8 @@ function zfOpsHtml(b, issues){
   const c = b.coverage || {};
   out.push(line(Number(c.numerator) < Number(c.denominator) ? 'yellow' : 'ok', '14일 접수분 분석',
     `${c.numerator ?? '—'}/${c.denominator ?? '—'}(첨부 있음 ${c.with_attachments ?? '—'})${c.not_done ? ' · 미완 ' + zfOpsEsc(c.not_done) : ''}`));
+  // ⓐ-2 분석률 두 셈(정본 루틴 분모 · 열린 카드 출처별 — 2026-10-17 상태판 칸)
+  if(b.rates){ const rr = zfOpsRatesHtml(b.rates); out.push(line(rr.color, '분석률', '두 셈 나란히' + rr.html)); }
   // ⓑ 분석 발송기
   const d = b.dispatch || {};
   const run = d.running, last = d.last_finished;
@@ -10616,6 +10651,8 @@ function zfOpsHtml(b, issues){
     + (run ? ` · 도는 회차 run ${run.id}(${zfOpsTime(run.created_at)} 시작)` : '')
     + (last ? ` · 마지막 끝 run ${last.id} ${zfOpsTime(last.finished_at)}(끝낸 공고 ${last.done})` : '')
     + ` · 24시간 자동 회수 ${d.reclaimed_24h ?? 0}`));
+  // ⓑ-2 최근 분석 회차 다섯
+  if(b.recent_runs) out.push(line(b.recent_runs.some(x => x.state === 'failed') ? 'orange' : 'ok', '최근 회차', zfOpsRunsHtml(b.recent_runs)));
   // ⓒ 운영 점검 — 멈춤(HARD) 갈래는 gate.mjs 한 곳이 이슈 라벨로 낸다: 열린 health-ops = 빨강 · 실패 = 주황 · 경고 = 노랑
   const h = (b.health || {}).last_run || {};
   const hasHard = Array.isArray(issues) && issues.some(i => i.labels.includes('health-ops'));
@@ -10630,8 +10667,8 @@ function zfOpsHtml(b, issues){
   const fu = b.followups_unreported || [];
   out.push(line(fu.length ? 'orange' : 'ok', '결과 없이 닫힌 후속 요청', fu.length ? fu.map(f => `#${f.id} ${zfOpsEsc(f.page_ref)}`).join(' / ') : '0'));
   // 열린 점검 이슈(GitHub · zipfit)
-  out.push(line(issues === null ? 'yellow' : (issues.length ? (hasHard ? 'red' : 'orange') : 'ok'), '열린 점검 이슈',
-    issues === null ? 'GitHub 를 읽지 못했어요' : (issues.length ? issues.map(i => `<a href="${zfOpsEsc(i.url)}" target="_blank" rel="noopener">#${i.n}</a> ${zfOpsEsc(i.t)}(${zfOpsEsc(i.labels.join(', '))})`).join('<br>') : '없음')));
+  out.push(line(issues === undefined ? 'ok' : issues === null ? 'yellow' : (issues.length ? (hasHard ? 'red' : 'orange') : 'ok'), '열린 점검 이슈',
+    issues === undefined ? '받는 중…' : issues === null ? 'GitHub 를 읽지 못했어요' : (issues.length ? issues.map(i => `<a href="${zfOpsEsc(i.url)}" target="_blank" rel="noopener">#${i.n}</a> ${zfOpsEsc(i.t)}(${zfOpsEsc(i.labels.join(', '))})`).join('<br>') : '없음')));
   // 숨긴 묶음(열린 것 · 풀기) + 숨기기 입력
   const hides = b.hides || [];
   const hideRows = hides.length ? hides.map(x => `<div style="font-size:13px;padding:4px 0">${zfOpsEsc(x.group_key)} <span style="color:#888">— ${zfOpsEsc(x.reason)} · ${zfOpsTime(x.hidden_at)} · ${zfOpsEsc(x.announcement_id || '')}</span>`
