@@ -2921,12 +2921,28 @@ function resetNoticeFilters(){
 //    여기를 쓰지 않는다. 실패는 담아 두지 않는다(다음 호출이 다시 묻는다).
 const ZF_ALL_ROWS_TTL = 60000;
 let zfAllRowsP = null, zfAllRowsAt = 0;
+// 🔵 2026-10-17(우편함 「표시층 — 목록 RPC 실패 때 한 번 다시 부르기(안 다)」 1 · 백로그 「공개 목록 RPC가 anon에서 다시 한 번 500 …」) —
+//    목록 RPC 가 5xx(3초 한도 57014 포함)·네트워크 오류면 **한 번만** 잠깐 기다렸다 다시 부른다. 4xx(요청이 틀림)는 다시 부르지 않는다.
+//    정상이면 요청 하나 그대로 · 두 번째도 실패면 종전 오류 그대로(부른 쪽이 안내) · 직전 목록을 대신 보여 주지 않는다.
+//    목록 RPC 를 부르는 세 곳(전량 zfFetchAllNoticeRows · 칩 고른 목록 loadNoticeData · 매칭 matchHouses)만 쓴다 — 다른 호출에는 번지지 않는다.
+const ZF_LIST_RETRY_MS = 800;
+async function zfListRpc(body){
+  const go = () => fetch(`${SUPABASE_URL}/rest/v1/rpc/get_announcements_deduped`,
+      {method:'POST', headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY,'Content-Type':'application/json'}, body});
+  let res = null, netErr = null;
+  try{ res = await go(); }catch(e){ netErr = e; }
+  if(netErr || res.status >= 500){
+    console.warn('ZipFit 목록 RPC 한 번 다시 부름:', netErr ? String(netErr) : 'HTTP ' + res.status);
+    await new Promise(r => setTimeout(r, ZF_LIST_RETRY_MS));
+    res = await go();
+  }
+  if(!res.ok) throw new Error('HTTP '+res.status);
+  return res.json();
+}
 function zfFetchAllNoticeRows(){
   if(zfAllRowsP && Date.now() - zfAllRowsAt < ZF_ALL_ROWS_TTL) return zfAllRowsP;
   zfAllRowsAt = Date.now();
-  const p = fetch(`${SUPABASE_URL}/rest/v1/rpc/get_announcements_deduped`,
-      {method:'POST', headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY,'Content-Type':'application/json'}, body:'{}'})
-    .then(res => { if(!res.ok) throw new Error('HTTP '+res.status); return res.json(); })
+  const p = zfListRpc('{}')
     .then(rows => {
       if(!Array.isArray(rows)) throw new Error('Supabase 오류: ' + (rows?.message || rows?.error || JSON.stringify(rows)));
       return rows;
@@ -3833,10 +3849,7 @@ async function loadNoticeData(keepPage){
 
   try{
     // 인자가 하나도 없으면(지역·유형 칩 해제) 전량 — 함께 쓰는 약속을 탄다(zfFetchAllNoticeRows).
-    const rows = body === '{}' ? await zfFetchAllNoticeRows() : await fetch(
-      `${SUPABASE_URL}/rest/v1/rpc/get_announcements_deduped`,
-      {method:'POST', headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY,'Content-Type':'application/json'}, body}
-    ).then(res => { if(!res.ok) throw new Error('HTTP '+res.status); return res.json(); });
+    const rows = body === '{}' ? await zfFetchAllNoticeRows() : await zfListRpc(body);
     if(!Array.isArray(rows)){
       const msg = rows?.message || rows?.error || JSON.stringify(rows);
       throw new Error('Supabase 오류: ' + msg);
@@ -6587,17 +6600,7 @@ async function matchHouses(){
   });
 
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_announcements_deduped`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
-      },
-      body: JSON.stringify(body)
-    });
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    let rows = await res.json();
+    let rows = await zfListRpc(JSON.stringify(body));
     if(!Array.isArray(rows)){
       const msg = rows?.message || rows?.error || JSON.stringify(rows);
       throw new Error('Supabase 오류: ' + msg);
@@ -10661,6 +10664,13 @@ function zfOpsHtml(b, issues){
   out.push(line(hColor, '운영 점검', `마지막 ${zfOpsTime(h.run_at)} · 실패 ${h.n_fail ?? '—'}${(h.failed || []).length ? '(' + zfOpsEsc(h.failed.join(', ')) + ')' : ''}`
     + ` · 경고 ${h.n_warn ?? '—'}${(h.warned || []).length ? '(' + zfOpsEsc(h.warned.join(', ')) + ')' : ''}`
     + (hasHard ? ' · 멈춤 이슈 열림' : '') + (logs ? `<br><span style="color:#888">점검 발송: ${logs}</span>` : '')));
+  // ⓒ-2 목록 RPC 사용자 실패 24시간(health-ops list_user_fail — 2026-10-17) · 사람 브라우저 1 이상이면 주황(눈에 띄게)
+  const luf = (b.health || {}).list_user_fail;
+  if(luf){
+    const human = Number((/사람 브라우저 (\d+)/.exec(luf.value || '') || [])[1] || 0);
+    const txt = luf.warned ? zfOpsEsc(String(luf.value || '경고').replace(/^목록 RPC 사용자 실패[^—]*—\s*/, '')) : '24시간 0';
+    out.push(line(luf.warned ? (human > 0 ? 'orange' : 'yellow') : 'ok', '목록 사용자 실패', (human > 0 ? `<b>${txt}</b>` : txt) + ` <span style="color:#888">(점검 ${zfOpsTime(luf.run_at)})</span>`));
+  }
   // ⓓ 수집 마지막 시각
   out.push(line('ok', '수집', (b.collected || []).map(x => `${zfOpsEsc(x.source)} ${zfOpsTime(x.at)}`).join(' · ') || '—'));
   // ⓔ 결과 없이 닫힌 후속 요청(결과 칸 도입 뒤 요청만)
