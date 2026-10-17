@@ -72,9 +72,30 @@ try {
     consoleErrors.push(`${text.slice(0, 160)}${where ? ' @ ' + where.slice(0, 80) : ''}`)
   })
   page.on('pageerror', e => consoleErrors.push('pageerror: ' + String(e.message).slice(0, 160)))
+  // ⑩ 첫 로드 요청 장부(2026-10-18 · 우편함 「표시층 — 첫 로드 가볍게」 4 · 조사 「페이지 첫 로드 요청 묶음 실측」 ⑦) — 비로그인 첫 로드의
+  //    요청 수 · 바이트 합(응답 머리+본문) · 같은 50 ms 안에 시작한 요청 최대를 **기록만** 한다(ℹ️ · 판정 없음 · 이슈 없음).
+  //    병합 때 곁 요청이 늘면 결과 표에서 보이게. 창 = goto 부터 목록이 처음 찬 때(noticeData > 0)까지.
+  const t0 = Date.now()
+  const flReq = []
+  let flOpen = true
+  page.on('request', r => { if (flOpen) flReq.push({ r, t: Date.now() - t0, url: r.url() }) })
 
   await page.goto(SITE + '?health=' + Date.now(), { waitUntil: 'networkidle', timeout: 90000 })
   await page.waitForFunction(() => typeof noticeData !== 'undefined' && noticeData.length > 0, null, { timeout: 60000 })
+  flOpen = false
+  try {
+    const sizes = await Promise.all(flReq.map(x => x.r.sizes().then(s => s.responseHeadersSize + s.responseBodySize).catch(() => 0)))
+    const ts = flReq.map(x => x.t).sort((a, b) => a - b)
+    let max50 = 0
+    for (let i = 0, j = 0; i < ts.length; i++) { while (ts[i] - ts[j] > 50) j++; max50 = Math.max(max50, i - j + 1) }
+    const bytes = sizes.reduce((a, b) => a + b, 0)
+    extra.first_load = { n: flReq.length, bytes, max50, ms: Date.now() - t0,
+      list: flReq.map((x, i) => ({ t: x.t, b: sizes[i], u: x.url.replace(/\?.*$/, '').slice(0, 120) })) }
+    add('first_load', '첫 로드 요청 장부(비로그인 · 기록만)', 'info',
+      `요청 ${flReq.length} · ${Math.round(bytes / 1024).toLocaleString()} KB · 같은 50 ms 안 최대 ${max50}`, '기록만 — 판정 없음 · 이슈 없음(병합 때 곁 요청이 늘면 보이게)')
+  } catch (e) {
+    add('first_load', '첫 로드 요청 장부(비로그인 · 기록만)', 'info', '못 잼: ' + String(e).slice(0, 160), '기록만')
+  }
   // 공고 탭으로
   await page.evaluate(() => { const b = [...document.querySelectorAll('nav button, [role=tab]')].find(b => b.offsetParent !== null && b.innerText.includes('공고')); b && b.click() })
   await page.waitForTimeout(3000)
