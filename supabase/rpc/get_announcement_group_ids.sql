@@ -4,6 +4,7 @@ CREATE OR REPLACE FUNCTION public.get_announcement_group_ids(p_announcement_id t
  STABLE SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
 AS $function$
+-- 🔵 2026-10-17(우편함 「코드·운영 — 목록 RPC 가볍게 …」 1) — announcements 행의 묶음 키는 title_dedup_key(저장 생성 칸 = announcement_dedup_key(title))를 읽는다(행마다 함수 호출 없음 · 결과 같음).
 -- 🔴 STABLE이다(2026-09-12 강등). 본문이 순수 SELECT 하나이고 쓰기·now()·난수·nextval이
 -- 전부 0건이라 VOLATILE이어야 할 이유가 없었다. 같은 계열 get_announcement_blocks·
 -- get_announcements_deduped가 이미 STABLE이라 이 함수만 달랐다.
@@ -25,7 +26,7 @@ AS $function$
 --   목록 RPC get_announcements_deduped 의 link_map 과 같은 규칙이다(함께 바꾼다). LH 카드를 열면 붙은 공고문의 산물이 함께 온다.
 WITH link_map AS (
   SELECT DISTINCT ON (l.linked_announcement_id)
-    l.linked_announcement_id AS aid, announcement_dedup_key(lh.title) AS lh_key
+    l.linked_announcement_id AS aid, lh.title_dedup_key AS lh_key
   FROM public.announcement_post_links l
   JOIN public.announcements lh ON lh.announcement_id = l.lh_announcement_id
   WHERE lh.title IS NOT NULL AND lh.hidden_from_listing IS NOT TRUE
@@ -33,7 +34,7 @@ WITH link_map AS (
 ),
 keyed AS (
   SELECT a.announcement_id, a.title, a.hidden_from_listing,
-    COALESCE(lm.lh_key, announcement_dedup_key(a.title)) AS dedup_key
+    COALESCE(lm.lh_key, a.title_dedup_key) AS dedup_key
   FROM announcements a
   LEFT JOIN link_map lm ON lm.aid = a.announcement_id
 ),
