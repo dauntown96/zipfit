@@ -162,9 +162,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-10-18 | **표시층 — 첫 로드 2차** — 첫 목록 응답 신호(`zfAfterFirstList` · 4초 상한) 뒤로 동네 가격·결과발표 일정만 미룸(판정 재료 경로·링크·유형표는 그대로) · 같은 게시물 링크 표 한 번(`zfPostLinksAll`) · 매핑만 남은 2칸 줄 걷기 · 목록 도는 동안 곁 요청 12→8 · 50 ms 최대 10→7 · `zipfit-v236` · PR #612 |
 | 2026-10-18 | **코드·운영 — 원칙 13 한 줄 · ⑩ 덧 셋** — 원칙 13의 squash 뒤 재push 줄을 고쳐 씀(diff가 비지 않으면 그것만으로 force 금지 · 원격 head = 병합된 PR head sha 증명 뒤에만 다시 떠서 민다 · 안 서면 새 브랜치/지정 브랜치는 멈춤) · ⑩ 주택 매칭 `Promise.all`(PR #514) · 공고 일정 근거 #534 · 운영 감시 오타 · PR #611 |
 | 2026-10-18 | **코드·운영 — 목록 RPC 안 쓰는 칸 9개 걷기(66 → 57칸)** — `id`·`status_normalized`·`rent_max`·`deposit_max`·`target_type`·`heating_type`·`updated_at`·`subscription_*` 둘(읽는 자리 0 전수 grep) · drop → create → 같은 ACL · SET 절 없음 · 남는 칸 md5 7조합 같음 · 응답 2.11 → 1.88 MB · 마이그레이션 `2026-10-18_01` · PR #609 |
-| 2026-10-18 | **표시층 — 첫 로드 가볍게** — `zfApplySession` 같은 세션(id+토큰)이면 진입 한 번(15초 안 재사용 · 토큰 바뀜·설정 탭 진입·로그아웃은 새로) · 숨은 추천 탭은 열 때 그림(전광판은 보증금 후보만 가격 요약) · 목록 매핑 한 번(공고 탭·전광판 같은 배열) · health-screen `first_load` ℹ️ · 로그인 대역 프로필 2→1 · 가격 id 953→38 · `zipfit-v235` · PR #607 |
 ---
 
 ## 🚫 코딩 원칙
