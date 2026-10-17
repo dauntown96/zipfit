@@ -162,9 +162,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-10-18 | **코드·운영 — 원칙 13 한 줄 · ⑩ 덧 셋** — 원칙 13의 squash 뒤 재push 줄을 고쳐 씀(diff가 비지 않으면 그것만으로 force 금지 · 원격 head = 병합된 PR head sha 증명 뒤에만 다시 떠서 민다 · 안 서면 새 브랜치/지정 브랜치는 멈춤) · ⑩ 주택 매칭 `Promise.all`(PR #514) · 공고 일정 근거 #534 · 운영 감시 오타 · PR #611 |
 | 2026-10-18 | **코드·운영 — 목록 RPC 안 쓰는 칸 9개 걷기(66 → 57칸)** — `id`·`status_normalized`·`rent_max`·`deposit_max`·`target_type`·`heating_type`·`updated_at`·`subscription_*` 둘(읽는 자리 0 전수 grep) · drop → create → 같은 ACL · SET 절 없음 · 남는 칸 md5 7조합 같음 · 응답 2.11 → 1.88 MB · 마이그레이션 `2026-10-18_01` · PR #609 |
 | 2026-10-18 | **표시층 — 첫 로드 가볍게** — `zfApplySession` 같은 세션(id+토큰)이면 진입 한 번(15초 안 재사용 · 토큰 바뀜·설정 탭 진입·로그아웃은 새로) · 숨은 추천 탭은 열 때 그림(전광판은 보증금 후보만 가격 요약) · 목록 매핑 한 번(공고 탭·전광판 같은 배열) · health-screen `first_load` ℹ️ · 로그인 대역 프로필 2→1 · 가격 id 953→38 · `zipfit-v235` · PR #607 |
-| 2026-10-17 | **표시층 — 상태판 새 칸 셋(「발송부터」 표지 · 비밀값 만료 · 인스턴스 메모리)** — 최근 회차 `minutes_from=sent`면 걸린 분 옆 「발송부터」 · 비밀값 남은 날 오름차순(지남 빨강 · 30일 이하·missing 주황) · 메모리 가용·swap·commit(MiB · 색은 점검 `instance_mem`) · 관리자만 · RPC 0 · `zipfit-v234` · PR #605 |
 ---
 
 ## 🚫 코딩 원칙
@@ -190,7 +190,7 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 - push 전에 **반드시 `git fetch origin main`** — 세션 시작 시 `origin/main` 원격추적 ref가 낡은 채로 seeding된다. 이걸 안 하면 `non-fast-forward` 거부를 환경 차단으로 오판한다.
 - push 검증은 로컬이 아니라 **원격 blob으로** — `git show origin/main:<파일>`.
 - 🔴 **누적 파일에 새 줄을 쓰기 전에 `origin/main`을 세션 브랜치에 먼저 머지한다**(2026-09-17 신설 — ⑦ 「2026-09-17 개정」 반영) — `docs/history.md`·`CLAUDE.md`처럼 맨 위에 append 하는 파일이 대상이다. **리베이스가 아니라 머지다.** 계기: squash 병합으로 세션 브랜치가 `main`과 갈려 같은 이력 줄을 두 쪽이 따로 갖게 됐고, PR 병합이 충돌로 거절됐다(PR #154·#155). 먼저 머지하면 그 자리에서 나던 충돌이 아예 생기지 않는다.
-- 🔴 **squash 병합 뒤 같은 브랜치에 다시 push할 때는 `git diff <원격 브랜치 head> origin/main`이 비었음을 먼저 증명하고, 그 증명이 선 뒤에만 `--force-with-lease=<브랜치>:<원격 head>`를 쓴다. 증명 없이 force 하지 않는다**(2026-09-22 신설 — ⑦ 2026-09-22 개정 반영).
+- 🔴 **squash 병합 뒤 같은 브랜치에 다시 push할 때는 `git diff <원격 브랜치 head> origin/main`이 비었음을 먼저 증명하고, 그 증명이 선 뒤에만 `--force-with-lease=<브랜치>:<원격 head>`를 쓴다. 증명 없이 force 하지 않는다**(2026-09-22 신설 — ⑦ 2026-09-22 개정 반영). 🔴 **비지 않으면(그사이 다른 세션 병합이 main에 끼었으면) 그것만으로 force하지 않는다** — 원격 head가 **이미 병합된 PR의 head sha와 같음**(GitHub `pull_request_read` — `merged: true` · `head.sha`)을 증명해야 남은 커밋이 없으므로 `origin/main`에서 다시 떠서 민다 · 그 증명이 서지 않으면 밀지 않고 `origin/main`에서 새 브랜치를 떠서 잇는다(지정 브랜치 세션은 이름을 바꾸지 못하니 멈추고 회신 ②)(2026-10-18 — 2026-10-17 병렬 병합이 낀 순간 증명 전 force 두 번 · 잃은 것 0).
 - 예외(다운님 확인 후 진행): 되돌리기 어려운 변경(인증·로그인 경로, 컬럼 DROP, RLS 적용). 이때도 **PR 생성은 Claude Code가 한다**.
 - 🔴 **사용자에게 보이는 변경 PR 본문에는 요청서의 「사용자에게 보이는 변경 — 다운님 승인: 날짜」 줄을 옮긴다** — 자동 모드 분류기는 다운님 메시지만 의도로 읽는다(2026-10-15 PR #514 — 승인 줄 없이 병합이 「검토 없는 병합」으로 거부됐다 · ⑦ 요청서 표준 칸 · L0 도구 제약).
 - ⚠️ 원격 브랜치 삭제는 이 환경에서 프록시 403으로 막혀 있다. 정리는 다운님이 GitHub 웹에서 한다.
