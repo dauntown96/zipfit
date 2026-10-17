@@ -2432,6 +2432,7 @@ function zfAfterCardsRender(){
 // 🔴 실패는 조용히 끝낸다 — 공고문 목록이 없어도 카드는 LH 행만으로 종전처럼 선다.
 const zfPostNotices = { loaded: false, byLhId: new Map() };   // LH id → { own: {title}|null, linked: [{ key, title, start, end, row }] }
 let zfPostNoticesPromise = null;
+const ZF_SAMEDAY_KEY_URL_MAX = 6000;   // 같은 날 MYHOME 을 제목 키로 좁힐 때 키 목록(인코딩 뒤) 상한 — 넘으면 날짜만으로 받는다(첫 로드 ③차)
 // 🔵 2026-10-02 — 같은 게시물로 묶인 카드인가(LH 대표 id 기준). 묶인 카드에서만 단지 칩·「공통」·블록 단지명을 단다 —
 //    묶이지 않은 카드 화면은 그대로 둔다. 링크를 아직 못 받았으면 false(종전 화면).
 function zfIsPostMerged(annId){
@@ -2455,13 +2456,20 @@ function zfLoadPostNotices(){
       const lhIds = [...new Set(links.map(l => String(l.lh_announcement_id || '')).filter(Boolean))];
       const myIds = [...new Set(links.map(l => String(l.linked_announcement_id || '')).filter(Boolean))];
       const [lhs, mys] = await Promise.all([
-        get(`announcements?select=announcement_id,title,announcement_date,hidden_from_listing&${idFilterFor(lhIds)}`),
+        get(`announcements?select=announcement_id,title,announcement_date,hidden_from_listing,title_dedup_key&${idFilterFor(lhIds)}`),
         get(`announcements?select=${cols}&${idFilterFor(myIds)}`)
       ]);
       const live = a => a && a.title && a.hidden_from_listing !== true;
       const lhById = new Map(lhs.filter(live).map(a => [String(a.announcement_id), a]));
       const dates = [...new Set([...lhById.values()].map(a => a.announcement_date).filter(Boolean))];
-      const sameDay = dates.length ? await get(`announcements?select=${cols}&source=eq.MYHOME&announcement_date=in.(${dates.join(',')})`) : [];
+      // 🔵 2026-10-18(우편함 「표시층 — 첫 로드 ③차: 같은 날 MYHOME 요청을 제목 키로 좁히기」) — 아래 ownRow 는 「LH 와 같은 날 · 같은 제목 키」
+      //    MYHOME 행의 제목만 쓴다. 그래서 같은 날 MYHOME 전부(761행 · 250 KB) 대신 LH 행의 DB 제목 키(title_dedup_key)로 좁히고
+      //    칸도 그 판정에 드는 넷만 받는다(15행 · 3 KB · 2026-10-18 실측 — 쓰는 행 15 = 15). 🔴 DB 키와 화면 거울(zfDedupKey)이 갈리면
+      //    후보가 빠질 수 있다(실측 다름 0 — 판정은 종전대로 화면 키로 한 번 더 한다). LH 행에 키가 없거나 주소가 너무 길면 종전 꼴(날짜만)로 받는다.
+      const lhKeys = [...new Set([...lhById.values()].map(a => a.title_dedup_key))];
+      const keyIn = encodeURIComponent(lhKeys.map(k => '"' + String(k || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"').join(','));
+      const keyQ = lhKeys.length && lhKeys.every(Boolean) && keyIn.length <= ZF_SAMEDAY_KEY_URL_MAX ? `&title_dedup_key=in.(${keyIn})` : '';
+      const sameDay = dates.length ? await get(`announcements?select=announcement_id,title,announcement_date,hidden_from_listing&source=eq.MYHOME&announcement_date=in.(${dates.join(',')})${keyQ}`) : [];
       const myById = new Map(mys.filter(live).map(a => [String(a.announcement_id), a]));
       const lhOf = new Map();   // MYHOME id → LH id (id 가 작은 LH)
       links.forEach(l => {
