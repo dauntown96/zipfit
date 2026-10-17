@@ -162,9 +162,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-10-18 | **코드·운영 — 목록 RPC 안 쓰는 칸 9개 걷기(66 → 57칸)** — `id`·`status_normalized`·`rent_max`·`deposit_max`·`target_type`·`heating_type`·`updated_at`·`subscription_*` 둘(읽는 자리 0 전수 grep) · drop → create → 같은 ACL · SET 절 없음 · 남는 칸 md5 7조합 같음 · 응답 2.11 → 1.88 MB · 마이그레이션 `2026-10-18_01` · PR #609 |
 | 2026-10-18 | **표시층 — 첫 로드 가볍게** — `zfApplySession` 같은 세션(id+토큰)이면 진입 한 번(15초 안 재사용 · 토큰 바뀜·설정 탭 진입·로그아웃은 새로) · 숨은 추천 탭은 열 때 그림(전광판은 보증금 후보만 가격 요약) · 목록 매핑 한 번(공고 탭·전광판 같은 배열) · health-screen `first_load` ℹ️ · 로그인 대역 프로필 2→1 · 가격 id 953→38 · `zipfit-v235` · PR #607 |
 | 2026-10-17 | **표시층 — 상태판 새 칸 셋(「발송부터」 표지 · 비밀값 만료 · 인스턴스 메모리)** — 최근 회차 `minutes_from=sent`면 걸린 분 옆 「발송부터」 · 비밀값 남은 날 오름차순(지남 빨강 · 30일 이하·missing 주황) · 메모리 가용·swap·commit(MiB · 색은 점검 `instance_mem`) · 관리자만 · RPC 0 · `zipfit-v234` · PR #605 |
-| 2026-10-17 | **코드·운영 — 인스턴스 지표 기록 · Vault 밖 만료 표 · 비밀값 30일 전 ⚠️** — health-ops가 관리 API 지표 끝점(기존 토큰)에서 숫자 16개만 `zipfit_ops.instance_metrics_log`에(`instance_mem` ⚠️만 · 첫 회차 swap 49% · commit 1.32배) · `secret_expiry_list()` 한 정의 + 표 `secret_expiry_external` · `secret_expiry` 30일 ⚠️ · PR #603 |
 ---
 
 ## 🚫 코딩 원칙
