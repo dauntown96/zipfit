@@ -339,6 +339,7 @@ const requireEnv = (key: string): string => {
 - 🔵 **`check`는 모든 PR에서 결과를 낸다**(2026-09-30 · PR #281) — DB 파일(다섯 경로)을 안 건드린 PR은 「해당 없음」으로 즉시 통과(DB 호출 0). `main` 필수 체크다(룰셋 `main-db-check` — `check`가 초록이어야 병합된다).
 - 🔵 **사본 = DB는 매시 검사된다**(2026-09-30) — `health-ops`가 public·`zipfit_ops` 함수 전수 「DB 정의 md5 = `supabase/rpc/` 사본(`zipfit_ops`는 `supabase/rpc/zipfit_ops/`)」을 읽기만 해서 대조한다(`migrate.py`와 같은 규칙 · 끝 줄바꿈 무시). 사본 없는 새 함수·함수 없는 사본도 실패 → `health-ops` 이슈.
 - 🔴 **긴급 되돌리기** — 이전 정의로 되돌리는 새 마이그레이션 PR(적용된 파일은 고치지 않는다). 화면이 멈춘 급한 경우만 다운님 확인 뒤 관리 API로 직접 보내고, 같은 SQL을 곧바로 이 경로로 저장소에 올린다.
+  - 🔴 **적용 직후 공개 REST가 전부 실패하면(사용자 화면이 깨짐) 다운님 확인을 기다리지 않고 되돌림을 먼저 하고 사후 보고한다**(다운님 승인 2026-10-17 — 같은 날 20:37 KST 역할 `work_mem` 적용 뒤 공개 REST 약 2분 400 · 우편함 「목록 RPC 가볍게」) — 되돌림은 **전 상태로만**(새 변경을 섞지 않는다) · 같은 SQL을 곧바로 PR로 저장소에 · 회신 ②에 사고 보고. apply 끝의 공개 REST 확인(anon 키 목록 RPC 200 ∧ 행 수 > 0 — 실패면 `db-apply` 이슈)이 그 신호다 · 역할·DB 설정(`ALTER ROLE` 등)을 담은 파일은 check가 ⚠️로 표시한다(2026-10-17 · 우편함 「DB 반영 뒤 공개 REST 자동 확인」).
 
 33. **화면 문구 갈래를 바꾸는 회차는 `health-screen` 판정표를 같은 PR에서 고친다** (2026-09-30 신설 — 이슈 #283)
 - 대상: 카드 요약 자리(`[data-sum-for]`)의 문구를 더하거나 바꾸는 변경 → `.github/health/screen-check.mjs`의 `phraseOf`(화면 문구 → 갈래)와 DB 기대값(갈래 계산 SQL).
