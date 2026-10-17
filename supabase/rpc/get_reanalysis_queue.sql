@@ -4,7 +4,7 @@ CREATE OR REPLACE FUNCTION public.get_reanalysis_queue()
  STABLE
  SET search_path TO 'public', 'pg_temp'
 AS $function$
--- 🔵 2026-10-17(우편함 「코드·운영 — 목록 RPC 가볍게 …」 1) — dedup 키는 announcements.dedup_key(저장 칸 = announcement_dedup_key(title)) 를 읽는다(행마다 함수 호출 없음 · 결과 같음).
+-- 🔵 2026-10-17(우편함 「코드·운영 — 목록 RPC 가볍게 …」 1) — announcements 행의 묶음 키는 title_dedup_key(저장 생성 칸 = announcement_dedup_key(title))를 읽는다(행마다 함수 호출 없음 · 결과 같음).
 -- (e) 선별 재분석 큐 — 「winner 자식 0 + 그룹 자식 >0」인 대표행 목록.
 -- 🔴 winner 산출을 재현하지 않는다. get_announcements_deduped()를 그대로 호출해 재사용한다.
 -- 🔴 분류·우선순위 점수를 만들지 않는다(사유 텍스트는 원문 그대로 반환하고, 순서는 호출 측이 정한다).
@@ -14,7 +14,7 @@ AS $function$
 --   (아산 …0726 · 대구연호 …0855 — 공고문마다 접수일이 다르다). 그래서 붙은 공고문만 완료여도 그 게시물은 큐에 오르지 않는다.
 WITH link_map AS (
   SELECT DISTINCT ON (l.linked_announcement_id)
-    l.linked_announcement_id AS aid, lh.dedup_key AS lh_key
+    l.linked_announcement_id AS aid, lh.title_dedup_key AS lh_key
   FROM public.announcement_post_links l
   JOIN public.announcements lh ON lh.announcement_id = l.lh_announcement_id
   WHERE lh.title IS NOT NULL AND lh.hidden_from_listing IS NOT TRUE
@@ -40,7 +40,7 @@ child_counts AS (
 ),
 group_rows AS (
   SELECT a.announcement_id,
-         COALESCE(lm.lh_key, a.dedup_key) AS dedup_key,
+         COALESCE(lm.lh_key, a.title_dedup_key) AS dedup_key,
          COALESCE(cc.n, 0) AS child_count
   FROM announcements a
   LEFT JOIN link_map lm ON lm.aid = a.announcement_id
@@ -75,7 +75,7 @@ WHERE COALESCE(cw.n, 0) = 0
     LEFT JOIN link_map ml ON ml.aid = m.announcement_id
     WHERE m.title IS NOT NULL
       AND m.hidden_from_listing IS NOT TRUE
-      AND COALESCE(ml.lh_key, m.dedup_key) = w.dedup_key
+      AND COALESCE(ml.lh_key, m.title_dedup_key) = w.dedup_key
       AND (m.apply_end = w.apply_end OR ml.aid IS NOT NULL)
       AND aa.status IN ('완료', '완료(보조 누락)', '완료(판정 대기)', '완료(소급)')
   )

@@ -3,7 +3,7 @@ CREATE OR REPLACE FUNCTION public.get_announcements_deduped(p_region text DEFAUL
  LANGUAGE sql
  STABLE
 AS $function$
--- 🔵 2026-10-17(우편함 「코드·운영 — 목록 RPC 가볍게 …」 1) — dedup 키는 announcements.dedup_key(저장 칸 = announcement_dedup_key(title)) 를 읽는다(행마다 함수 호출 없음 · 결과 같음).
+-- 🔵 2026-10-17(우편함 「코드·운영 — 목록 RPC 가볍게 …」 1) — announcements 행의 묶음 키는 title_dedup_key(저장 생성 칸 = announcement_dedup_key(title))를 읽는다(행마다 함수 호출 없음 · 결과 같음).
 -- 🔴 2026-10-14(코드 — LH 카드 발표일 A 후속) — search_path 는 SET 절이 아니라 본문 스키마 이름으로 고정한다(public.announcements ·
 --   public.announcement_dedup_key — 나머지 표는 이미 public. · 연산자·내장 함수는 pg_catalog 가 먼저 찾힌다).
 --   SET 절이 붙은 SQL 함수는 인라인되지 않아 anon 실행이 약 330ms → 약 815ms 로 늘었다(2026-10-14 실측 · Function Scan) — 그래서 뺐다.
@@ -17,7 +17,7 @@ AS $function$
 --   더해지는 것은 region_names · block_count · 단지명 셈(complex_name) · 그룹 산물이다.
 WITH link_map AS MATERIALIZED (
   SELECT DISTINCT ON (l.linked_announcement_id)
-    l.linked_announcement_id AS aid, lh.dedup_key AS lh_key
+    l.linked_announcement_id AS aid, lh.title_dedup_key AS lh_key
   FROM public.announcement_post_links l
   JOIN public.announcements lh ON lh.announcement_id = l.lh_announcement_id
   WHERE lh.title IS NOT NULL AND lh.hidden_from_listing IS NOT TRUE
@@ -25,7 +25,7 @@ WITH link_map AS MATERIALIZED (
 ),
 raw_base AS (
   SELECT a.*,
-    COALESCE(lm.lh_key, a.dedup_key) AS title_key,
+    COALESCE(lm.lh_key, a.title_dedup_key) AS title_key,
     (lm.aid IS NOT NULL) AS linked_in,
     CASE WHEN source = 'MYHOME' THEN split_part(announcement_id, '_', 1) ELSE NULL END AS own_pblanc_id,
     -- 회차 날짜 — 정정이면 첫 공고일, 아니면 공고일(get_announcement_price_summary·화면 zfNoticeDate 와 같은 규칙)
@@ -38,7 +38,7 @@ raw_base AS (
     --   묶음 단위라 같은 키의 LH·MYHOME 행·나중에 들어오는 같은 제목 행이 함께 빠지고, SH 수집 upsert 가 덮어쓰지 못한다.
     --   키 목록은 SECURITY DEFINER listing_hidden_keys() 가 한 번(InitPlan) 준다 — 기록 표는 GRANT 0. 반환형·다른 칸은 그대로다.
     --   대표 모수를 이 RPC 로 받는 발송기 후보 · 분석률 · 재분석 큐 · 원문 키 대조 대상이 함께 따라 뺀다.
-    AND NOT (COALESCE(lm.lh_key, a.dedup_key) = ANY ((SELECT public.listing_hidden_keys())::text[]))
+    AND NOT (COALESCE(lm.lh_key, a.title_dedup_key) = ANY ((SELECT public.listing_hidden_keys())::text[]))
     -- 🔴 2026-09-28(B53) — 비주택 유형을 목록에서 뺀다. 거주자 모집이 아니다(가정어린이집 운영예정자
     --   모집 …020085 · …020812). 수집은 그대로다 — 행은 남고 목록·그룹 대표에만 안 선다.
     --   ⚠️ 분석률·재분석 큐가 이 RPC 를 모수로 쓰므로 같은 제외가 저절로 따라간다.

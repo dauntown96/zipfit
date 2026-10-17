@@ -4,7 +4,7 @@ CREATE OR REPLACE FUNCTION public.get_announcement_price_summary(p_ids text[])
  STABLE SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
 AS $function$
--- 🔵 2026-10-17(우편함 「코드·운영 — 목록 RPC 가볍게 …」 1) — dedup 키는 announcements.dedup_key(저장 칸 = announcement_dedup_key(title)) 를 읽는다(행마다 함수 호출 없음 · 결과 같음).
+-- 🔵 2026-10-17(우편함 「코드·운영 — 목록 RPC 가볍게 …」 1) — announcements 행의 묶음 키는 title_dedup_key(저장 생성 칸 = announcement_dedup_key(title))를 읽는다(행마다 함수 호출 없음 · 결과 같음).
   -- 🔴 2026-09-29 코드 회차 2 — SECURITY DEFINER 로 바꿨다. analysis_done 이 announcement_analysis 를 읽는데
   --   그 표는 anon·authenticated 에 SELECT 가 없다(RLS 켜짐 · 정책 0 · 권한 service_role 만). INVOKER 그대로 두면
   --   anon 호출이 permission denied 로 죽는다(2026-09-29 적용 직후 실측 → 즉시 되돌렸다).
@@ -38,7 +38,7 @@ AS $function$
   ),
   link_map as materialized (
     select distinct on (l.linked_announcement_id)
-      l.linked_announcement_id as aid, lh.dedup_key as lh_key
+      l.linked_announcement_id as aid, lh.title_dedup_key as lh_key
     from public.announcement_post_links l
     join public.announcements lh on lh.announcement_id = l.lh_announcement_id
     where lh.title is not null and lh.hidden_from_listing is not true
@@ -47,7 +47,7 @@ AS $function$
   -- 목록에 실릴 수 있는 전 공고의 dedup_key를 한 번만 만든다
   keyed as materialized (
     select a.announcement_id as gid,
-           coalesce(lm.lh_key, a.dedup_key) as dedup_key,
+           coalesce(lm.lh_key, a.title_dedup_key) as dedup_key,
            (lm.aid is not null) as linked_in,
            case when coalesce(a.is_revised, false) and a.first_announcement_date is not null
                 then a.first_announcement_date
@@ -67,7 +67,7 @@ AS $function$
   ),
   -- 🔴 대상 행에는 hidden 필터를 걸지 않는다 — get_announcement_group_ids의 target CTE와 같다
   target as (
-    select distinct i.aid, coalesce(lm.lh_key, a.dedup_key) as dedup_key, a.apply_end
+    select distinct i.aid, coalesce(lm.lh_key, a.title_dedup_key) as dedup_key, a.apply_end
     from ids i
     join public.announcements a on a.announcement_id = i.aid
     left join link_map lm on lm.aid = a.announcement_id

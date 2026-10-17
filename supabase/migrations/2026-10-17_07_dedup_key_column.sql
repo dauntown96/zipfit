@@ -13,14 +13,14 @@
 -- zipfit:anon select * from get_announcement_price_summary(array(select announcement_id from get_announcements_deduped()))
 -- 목록 RPC 가볍게 1(2026-10-17 · 우편함 「코드·운영 — 목록 RPC 가볍게(안 나① dedup_key 저장 칸 · …)」 · 직전 회신 실측: announcement_dedup_key() 는 SET search_path 로
 --   인라인되지 않아 행마다 불려 목록 함수 시간의 약 35%(약 140 ms)를 먹었다).
---   ① announcements.dedup_key — 저장 생성 칸 = announcement_dedup_key(title)(IMMUTABLE). 🔴 announcement_dedup_key 정의를 바꾸면 이 칸은 저절로 다시 계산되지 않는다 —
+--   ① announcements.title_dedup_key — 저장 생성 칸 = announcement_dedup_key(title)(IMMUTABLE). 🔴 announcement_dedup_key 정의를 바꾸면 이 칸은 저절로 다시 계산되지 않는다 —
 --      함수를 바꾸는 마이그레이션에서 칸을 drop·add 하거나 `update announcements set title = title` 로 다시 채운다.
 --   ② announcements 행의 제목으로 키를 계산하던 읽기 함수 8개가 칸을 읽는다(목록 함수 · get_announcement_blocks · get_announcement_group_ids ·
 --      get_announcement_price_summary · get_reanalysis_queue · zipfit_ops.metric_*). 목록 함수 출력(d.title)·링크 제목 등 announcements 행이 아닌 자리는 그대로 함수를 부른다.
 --      쓰는 함수(analysis_dispatch_tick · ops_listing_hide · refresh_announcement_post_links)는 이번에 두지 않는다(결과 같음을 읽기로 증명할 수 없어서 — 회신).
 --   🔴 가드: 바꾸기 전·뒤 같은 트랜잭션에서 위 함수들의 출력 md5(인자 조합 20개)를 견주고 하나라도 다르면 예외 — 적용 자체가 되돌려진다(검사·적용 둘 다).
 --   목록 함수에 SET 절은 걸지 않는다(PR #507 → #508 인라인 함정).
--- 되돌리기: git show <이 PR 앞 커밋>:supabase/rpc/<여덟 사본> 으로 create or replace 뒤 alter table public.announcements drop column dedup_key;
+-- 되돌리기: git show <이 PR 앞 커밋>:supabase/rpc/<여덟 사본> 으로 create or replace 뒤 alter table public.announcements drop column title_dedup_key;
 create temp table zf_dedup_guard (k text primary key, q text not null, before_md5 text, after_md5 text) on commit drop;
 insert into zf_dedup_guard (k, q) values
   ($k$list_null$k$, $q$select md5(coalesce(string_agg(t::text, E'\n' order by t::text), '')) from public.get_announcements_deduped(null,null,null) t$q$),
@@ -52,8 +52,8 @@ begin
   end loop;
 end $$;
 
-alter table public.announcements add column dedup_key text generated always as (public.announcement_dedup_key(title)) stored;
-comment on column public.announcements.dedup_key is
+alter table public.announcements add column title_dedup_key text generated always as (public.announcement_dedup_key(title)) stored;
+comment on column public.announcements.title_dedup_key is
   '묶음 제목 키(2026-10-17) = announcement_dedup_key(title) 저장 생성 칸 — 목록 RPC 와 읽기 함수들이 행마다 함수를 부르지 않고 읽는다. 함수 정의를 바꾸면 이 칸을 다시 채워야 한다.';
 
 CREATE OR REPLACE FUNCTION public.get_announcements_deduped(p_region text DEFAULT NULL::text, p_type text DEFAULT NULL::text, p_status text DEFAULT NULL::text)
@@ -61,7 +61,7 @@ CREATE OR REPLACE FUNCTION public.get_announcements_deduped(p_region text DEFAUL
  LANGUAGE sql
  STABLE
 AS $function$
--- 🔵 2026-10-17(우편함 「코드·운영 — 목록 RPC 가볍게 …」 1) — dedup 키는 announcements.dedup_key(저장 칸 = announcement_dedup_key(title)) 를 읽는다(행마다 함수 호출 없음 · 결과 같음).
+-- 🔵 2026-10-17(우편함 「코드·운영 — 목록 RPC 가볍게 …」 1) — announcements 행의 묶음 키는 title_dedup_key(저장 생성 칸 = announcement_dedup_key(title))를 읽는다(행마다 함수 호출 없음 · 결과 같음).
 -- 🔴 2026-10-14(코드 — LH 카드 발표일 A 후속) — search_path 는 SET 절이 아니라 본문 스키마 이름으로 고정한다(public.announcements ·
 --   public.announcement_dedup_key — 나머지 표는 이미 public. · 연산자·내장 함수는 pg_catalog 가 먼저 찾힌다).
 --   SET 절이 붙은 SQL 함수는 인라인되지 않아 anon 실행이 약 330ms → 약 815ms 로 늘었다(2026-10-14 실측 · Function Scan) — 그래서 뺐다.
@@ -75,7 +75,7 @@ AS $function$
 --   더해지는 것은 region_names · block_count · 단지명 셈(complex_name) · 그룹 산물이다.
 WITH link_map AS MATERIALIZED (
   SELECT DISTINCT ON (l.linked_announcement_id)
-    l.linked_announcement_id AS aid, lh.dedup_key AS lh_key
+    l.linked_announcement_id AS aid, lh.title_dedup_key AS lh_key
   FROM public.announcement_post_links l
   JOIN public.announcements lh ON lh.announcement_id = l.lh_announcement_id
   WHERE lh.title IS NOT NULL AND lh.hidden_from_listing IS NOT TRUE
@@ -83,7 +83,7 @@ WITH link_map AS MATERIALIZED (
 ),
 raw_base AS (
   SELECT a.*,
-    COALESCE(lm.lh_key, a.dedup_key) AS title_key,
+    COALESCE(lm.lh_key, a.title_dedup_key) AS title_key,
     (lm.aid IS NOT NULL) AS linked_in,
     CASE WHEN source = 'MYHOME' THEN split_part(announcement_id, '_', 1) ELSE NULL END AS own_pblanc_id,
     -- 회차 날짜 — 정정이면 첫 공고일, 아니면 공고일(get_announcement_price_summary·화면 zfNoticeDate 와 같은 규칙)
@@ -96,7 +96,7 @@ raw_base AS (
     --   묶음 단위라 같은 키의 LH·MYHOME 행·나중에 들어오는 같은 제목 행이 함께 빠지고, SH 수집 upsert 가 덮어쓰지 못한다.
     --   키 목록은 SECURITY DEFINER listing_hidden_keys() 가 한 번(InitPlan) 준다 — 기록 표는 GRANT 0. 반환형·다른 칸은 그대로다.
     --   대표 모수를 이 RPC 로 받는 발송기 후보 · 분석률 · 재분석 큐 · 원문 키 대조 대상이 함께 따라 뺀다.
-    AND NOT (COALESCE(lm.lh_key, a.dedup_key) = ANY ((SELECT public.listing_hidden_keys())::text[]))
+    AND NOT (COALESCE(lm.lh_key, a.title_dedup_key) = ANY ((SELECT public.listing_hidden_keys())::text[]))
     -- 🔴 2026-09-28(B53) — 비주택 유형을 목록에서 뺀다. 거주자 모집이 아니다(가정어린이집 운영예정자
     --   모집 …020085 · …020812). 수집은 그대로다 — 행은 남고 목록·그룹 대표에만 안 선다.
     --   ⚠️ 분석률·재분석 큐가 이 RPC 를 모수로 쓰므로 같은 제외가 저절로 따라간다.
@@ -547,7 +547,7 @@ CREATE OR REPLACE FUNCTION public.get_announcement_blocks(p_announcement_id text
  STABLE
  SET search_path TO 'public', 'pg_temp'
 AS $function$
--- 🔵 2026-10-17(우편함 「코드·운영 — 목록 RPC 가볍게 …」 1) — dedup 키는 announcements.dedup_key(저장 칸 = announcement_dedup_key(title)) 를 읽는다(행마다 함수 호출 없음 · 결과 같음).
+-- 🔵 2026-10-17(우편함 「코드·운영 — 목록 RPC 가볍게 …」 1) — announcements 행의 묶음 키는 title_dedup_key(저장 생성 칸 = announcement_dedup_key(title))를 읽는다(행마다 함수 호출 없음 · 결과 같음).
 -- 🔴 target에서 LIMIT 1을 걷어냈다(2026-09-12) — get_announcement_group_ids와 같은 처리다.
 -- announcement_id 단독에는 유니크 제약이 없다(제약은 UNIQUE (source, announcement_id)).
 -- 중복이 생기면 LIMIT 1이 둘 중 하나를 조용히 골라 다른 공고의 블록을 돌려준다.
@@ -557,21 +557,21 @@ AS $function$
 --   LH 카드의 블록 목록에 붙은 공고문의 단지가 함께 선다.
 WITH link_map AS (
   SELECT DISTINCT ON (l.linked_announcement_id)
-    l.linked_announcement_id AS aid, lh.dedup_key AS lh_key
+    l.linked_announcement_id AS aid, lh.title_dedup_key AS lh_key
   FROM public.announcement_post_links l
   JOIN public.announcements lh ON lh.announcement_id = l.lh_announcement_id
   WHERE lh.title IS NOT NULL AND lh.hidden_from_listing IS NOT TRUE
   ORDER BY l.linked_announcement_id, l.lh_announcement_id
 ),
 target AS (
-  SELECT DISTINCT COALESCE(lm.lh_key, a.dedup_key) AS dedup_key
+  SELECT DISTINCT COALESCE(lm.lh_key, a.title_dedup_key) AS dedup_key
   FROM announcements a
   LEFT JOIN link_map lm ON lm.aid = a.announcement_id
   WHERE a.announcement_id = p_announcement_id
 ),
 base AS (
   SELECT a.*,
-    COALESCE(lm.lh_key, a.dedup_key) AS dedup_key,
+    COALESCE(lm.lh_key, a.title_dedup_key) AS dedup_key,
     trim(regexp_replace(a.precise_address, '\s*\([^)]*\)\s*$', '')) AS addr_core
   FROM announcements a
   LEFT JOIN link_map lm ON lm.aid = a.announcement_id
@@ -662,7 +662,7 @@ CREATE OR REPLACE FUNCTION public.get_announcement_group_ids(p_announcement_id t
  STABLE SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
 AS $function$
--- 🔵 2026-10-17(우편함 「코드·운영 — 목록 RPC 가볍게 …」 1) — dedup 키는 announcements.dedup_key(저장 칸 = announcement_dedup_key(title)) 를 읽는다(행마다 함수 호출 없음 · 결과 같음).
+-- 🔵 2026-10-17(우편함 「코드·운영 — 목록 RPC 가볍게 …」 1) — announcements 행의 묶음 키는 title_dedup_key(저장 생성 칸 = announcement_dedup_key(title))를 읽는다(행마다 함수 호출 없음 · 결과 같음).
 -- 🔴 STABLE이다(2026-09-12 강등). 본문이 순수 SELECT 하나이고 쓰기·now()·난수·nextval이
 -- 전부 0건이라 VOLATILE이어야 할 이유가 없었다. 같은 계열 get_announcement_blocks·
 -- get_announcements_deduped가 이미 STABLE이라 이 함수만 달랐다.
@@ -684,7 +684,7 @@ AS $function$
 --   목록 RPC get_announcements_deduped 의 link_map 과 같은 규칙이다(함께 바꾼다). LH 카드를 열면 붙은 공고문의 산물이 함께 온다.
 WITH link_map AS (
   SELECT DISTINCT ON (l.linked_announcement_id)
-    l.linked_announcement_id AS aid, lh.dedup_key AS lh_key
+    l.linked_announcement_id AS aid, lh.title_dedup_key AS lh_key
   FROM public.announcement_post_links l
   JOIN public.announcements lh ON lh.announcement_id = l.lh_announcement_id
   WHERE lh.title IS NOT NULL AND lh.hidden_from_listing IS NOT TRUE
@@ -692,7 +692,7 @@ WITH link_map AS (
 ),
 keyed AS (
   SELECT a.announcement_id, a.title, a.hidden_from_listing,
-    COALESCE(lm.lh_key, a.dedup_key) AS dedup_key
+    COALESCE(lm.lh_key, a.title_dedup_key) AS dedup_key
   FROM announcements a
   LEFT JOIN link_map lm ON lm.aid = a.announcement_id
 ),
@@ -715,7 +715,7 @@ CREATE OR REPLACE FUNCTION public.get_announcement_price_summary(p_ids text[])
  STABLE SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
 AS $function$
--- 🔵 2026-10-17(우편함 「코드·운영 — 목록 RPC 가볍게 …」 1) — dedup 키는 announcements.dedup_key(저장 칸 = announcement_dedup_key(title)) 를 읽는다(행마다 함수 호출 없음 · 결과 같음).
+-- 🔵 2026-10-17(우편함 「코드·운영 — 목록 RPC 가볍게 …」 1) — announcements 행의 묶음 키는 title_dedup_key(저장 생성 칸 = announcement_dedup_key(title))를 읽는다(행마다 함수 호출 없음 · 결과 같음).
   -- 🔴 2026-09-29 코드 회차 2 — SECURITY DEFINER 로 바꿨다. analysis_done 이 announcement_analysis 를 읽는데
   --   그 표는 anon·authenticated 에 SELECT 가 없다(RLS 켜짐 · 정책 0 · 권한 service_role 만). INVOKER 그대로 두면
   --   anon 호출이 permission denied 로 죽는다(2026-09-29 적용 직후 실측 → 즉시 되돌렸다).
@@ -749,7 +749,7 @@ AS $function$
   ),
   link_map as materialized (
     select distinct on (l.linked_announcement_id)
-      l.linked_announcement_id as aid, lh.dedup_key as lh_key
+      l.linked_announcement_id as aid, lh.title_dedup_key as lh_key
     from public.announcement_post_links l
     join public.announcements lh on lh.announcement_id = l.lh_announcement_id
     where lh.title is not null and lh.hidden_from_listing is not true
@@ -758,7 +758,7 @@ AS $function$
   -- 목록에 실릴 수 있는 전 공고의 dedup_key를 한 번만 만든다
   keyed as materialized (
     select a.announcement_id as gid,
-           coalesce(lm.lh_key, a.dedup_key) as dedup_key,
+           coalesce(lm.lh_key, a.title_dedup_key) as dedup_key,
            (lm.aid is not null) as linked_in,
            case when coalesce(a.is_revised, false) and a.first_announcement_date is not null
                 then a.first_announcement_date
@@ -778,7 +778,7 @@ AS $function$
   ),
   -- 🔴 대상 행에는 hidden 필터를 걸지 않는다 — get_announcement_group_ids의 target CTE와 같다
   target as (
-    select distinct i.aid, coalesce(lm.lh_key, a.dedup_key) as dedup_key, a.apply_end
+    select distinct i.aid, coalesce(lm.lh_key, a.title_dedup_key) as dedup_key, a.apply_end
     from ids i
     join public.announcements a on a.announcement_id = i.aid
     left join link_map lm on lm.aid = a.announcement_id
@@ -906,7 +906,7 @@ CREATE OR REPLACE FUNCTION public.get_reanalysis_queue()
  STABLE
  SET search_path TO 'public', 'pg_temp'
 AS $function$
--- 🔵 2026-10-17(우편함 「코드·운영 — 목록 RPC 가볍게 …」 1) — dedup 키는 announcements.dedup_key(저장 칸 = announcement_dedup_key(title)) 를 읽는다(행마다 함수 호출 없음 · 결과 같음).
+-- 🔵 2026-10-17(우편함 「코드·운영 — 목록 RPC 가볍게 …」 1) — announcements 행의 묶음 키는 title_dedup_key(저장 생성 칸 = announcement_dedup_key(title))를 읽는다(행마다 함수 호출 없음 · 결과 같음).
 -- (e) 선별 재분석 큐 — 「winner 자식 0 + 그룹 자식 >0」인 대표행 목록.
 -- 🔴 winner 산출을 재현하지 않는다. get_announcements_deduped()를 그대로 호출해 재사용한다.
 -- 🔴 분류·우선순위 점수를 만들지 않는다(사유 텍스트는 원문 그대로 반환하고, 순서는 호출 측이 정한다).
@@ -916,7 +916,7 @@ AS $function$
 --   (아산 …0726 · 대구연호 …0855 — 공고문마다 접수일이 다르다). 그래서 붙은 공고문만 완료여도 그 게시물은 큐에 오르지 않는다.
 WITH link_map AS (
   SELECT DISTINCT ON (l.linked_announcement_id)
-    l.linked_announcement_id AS aid, lh.dedup_key AS lh_key
+    l.linked_announcement_id AS aid, lh.title_dedup_key AS lh_key
   FROM public.announcement_post_links l
   JOIN public.announcements lh ON lh.announcement_id = l.lh_announcement_id
   WHERE lh.title IS NOT NULL AND lh.hidden_from_listing IS NOT TRUE
@@ -942,7 +942,7 @@ child_counts AS (
 ),
 group_rows AS (
   SELECT a.announcement_id,
-         COALESCE(lm.lh_key, a.dedup_key) AS dedup_key,
+         COALESCE(lm.lh_key, a.title_dedup_key) AS dedup_key,
          COALESCE(cc.n, 0) AS child_count
   FROM announcements a
   LEFT JOIN link_map lm ON lm.aid = a.announcement_id
@@ -977,7 +977,7 @@ WHERE COALESCE(cw.n, 0) = 0
     LEFT JOIN link_map ml ON ml.aid = m.announcement_id
     WHERE m.title IS NOT NULL
       AND m.hidden_from_listing IS NOT TRUE
-      AND COALESCE(ml.lh_key, m.dedup_key) = w.dedup_key
+      AND COALESCE(ml.lh_key, m.title_dedup_key) = w.dedup_key
       AND (m.apply_end = w.apply_end OR ml.aid IS NOT NULL)
       AND aa.status IN ('완료', '완료(보조 누락)', '완료(판정 대기)', '완료(소급)')
   )
@@ -1015,7 +1015,7 @@ CREATE OR REPLACE FUNCTION zipfit_ops.metric_analysis_rate()
  STABLE
  SET search_path TO 'public', 'pg_temp'
 AS $function$
--- 🔵 2026-10-17(우편함 「코드·운영 — 목록 RPC 가볍게 …」 1) — dedup 키는 announcements.dedup_key(저장 칸 = announcement_dedup_key(title)) 를 읽는다(행마다 함수 호출 없음 · 결과 같음).
+-- 🔵 2026-10-17(우편함 「코드·운영 — 목록 RPC 가볍게 …」 1) — announcements 행의 묶음 키는 title_dedup_key(저장 생성 칸 = announcement_dedup_key(title))를 읽는다(행마다 함수 호출 없음 · 결과 같음).
 -- 🔵 2026-10-17(우편함 「코드·운영 — … 상태판 칸 …」 6) — 분석률 정본(⑨ 6장 · 루틴 분모) 한 정의.
 --   supabase/metrics/analysis_rate.sql 첫 문장을 여기로 옮겼다 — 그 파일과 관리자 상태판(ops_status_board)이 이 함수 하나를 부른다(산식 사본 없음).
 --   분모 = 대표 ∧ 묶음 첨부 > 0 ∧ apply_end ≥ 오늘+3 · 국면(접수 전 apply_start > 오늘 · 접수 중 그 밖) · 분자 = 같은 묶음 키·같은 회차(같은 마감 · 링크) 완료 계열 분석.
@@ -1023,7 +1023,7 @@ AS $function$
 --   옮기며 묶음별 첨부 합(att)·완료 회차(fin)를 대표 키에 한해 한 번씩 모으는 꼴로 바꿨다 — 결과는 종전 문장과 같고(2026-10-17 대조 같음) 1.95초 → 0.35초.
 with link_map as (
   select distinct on (l.linked_announcement_id)
-    l.linked_announcement_id as aid, lh.dedup_key as lh_key
+    l.linked_announcement_id as aid, lh.title_dedup_key as lh_key
   from public.announcement_post_links l
   join public.announcements lh on lh.announcement_id = l.lh_announcement_id
   where lh.title is not null and lh.hidden_from_listing is not true
@@ -1031,7 +1031,7 @@ with link_map as (
 ),
 keyed as materialized (
   select a.announcement_id, a.apply_end, a.attachment_urls,
-         coalesce(lm.lh_key, a.dedup_key) as k,
+         coalesce(lm.lh_key, a.title_dedup_key) as k,
          (lm.aid is not null) as linked
   from public.announcements a
   left join link_map lm on lm.aid = a.announcement_id
@@ -1073,14 +1073,14 @@ CREATE OR REPLACE FUNCTION zipfit_ops.metric_coverage_14d()
  STABLE
  SET search_path TO 'public', 'pg_temp'
 AS $function$
--- 🔵 2026-10-17(우편함 「코드·운영 — 목록 RPC 가볍게 …」 1) — dedup 키는 announcements.dedup_key(저장 칸 = announcement_dedup_key(title)) 를 읽는다(행마다 함수 호출 없음 · 결과 같음).
+-- 🔵 2026-10-17(우편함 「코드·운영 — 목록 RPC 가볍게 …」 1) — announcements 행의 묶음 키는 title_dedup_key(저장 생성 칸 = announcement_dedup_key(title))를 읽는다(행마다 함수 호출 없음 · 결과 같음).
 -- 🔵 2026-10-16(우편함 「코드 — 관리자 페이지 (가) 첫 판 …」 2 ⓐ) — 14일 접수분 커버율 한 정의.
 --   supabase/metrics/analysis_rate.sql 둘째 문장을 여기로 옮겼다 — 그 파일과 상태판(ops_status_board)이 이 함수 하나를 부른다(산식 사본 없음).
 --   열린 대표(get_announcements_deduped · apply_end ≥ 오늘 ∧ apply_start ≤ 오늘+14) 중 같은 묶음 키·같은 회차(같은 마감 · 링크)에 완료 계열 분석이 있는 것.
 --   묶음 키(link_map)는 get_announcements_deduped · get_announcement_group_ids · analysis_dispatch_tick 과 같다 — 한쪽을 바꾸면 함께 바꾼다.
 with link_map as (
   select distinct on (l.linked_announcement_id)
-    l.linked_announcement_id as aid, lh.dedup_key as lh_key
+    l.linked_announcement_id as aid, lh.title_dedup_key as lh_key
   from public.announcement_post_links l
   join public.announcements lh on lh.announcement_id = l.lh_announcement_id
   where lh.title is not null and lh.hidden_from_listing is not true
@@ -1088,7 +1088,7 @@ with link_map as (
 ),
 keyed as materialized (
   select a.announcement_id, a.apply_end, a.attachment_urls,
-         coalesce(lm.lh_key, a.dedup_key) as k,
+         coalesce(lm.lh_key, a.title_dedup_key) as k,
          (lm.aid is not null) as linked
   from public.announcements a
   left join link_map lm on lm.aid = a.announcement_id
@@ -1125,14 +1125,14 @@ CREATE OR REPLACE FUNCTION zipfit_ops.metric_open_by_source()
  STABLE
  SET search_path TO 'public', 'pg_temp'
 AS $function$
--- 🔵 2026-10-17(우편함 「코드·운영 — 목록 RPC 가볍게 …」 1) — dedup 키는 announcements.dedup_key(저장 칸 = announcement_dedup_key(title)) 를 읽는다(행마다 함수 호출 없음 · 결과 같음).
+-- 🔵 2026-10-17(우편함 「코드·운영 — 목록 RPC 가볍게 …」 1) — announcements 행의 묶음 키는 title_dedup_key(저장 생성 칸 = announcement_dedup_key(title))를 읽는다(행마다 함수 호출 없음 · 결과 같음).
 -- 🔵 2026-10-17(우편함 「코드·운영 — … 상태판 칸 …」 6 · 다운님 결정 2026-10-02 「분석률 둘을 나란히」) — 열린 카드 기준 분석률(출처별).
 --   분모 = 목록에 보이는 열린 대표(get_announcements_deduped · status ≠ 접수마감) 전부(첨부·마감 거리로 거르지 않는다 — 「사용자가 보는 카드」 중 비율).
 --   갈래 = 대표 출처: LH · MYHOME 단독(대표가 MYHOME = 같은 묶음에 LH 행이 없다) · SH · 그 밖은 출처 이름 그대로.
 --   분자·묶음 규칙(link_map · 같은 회차 = 같은 마감(둘 다 비면 같음) ∨ 링크)은 metric_analysis_rate 와 같다. with_attachments = 분모 중 묶음에 첨부가 있는 수.
 with link_map as (
   select distinct on (l.linked_announcement_id)
-    l.linked_announcement_id as aid, lh.dedup_key as lh_key
+    l.linked_announcement_id as aid, lh.title_dedup_key as lh_key
   from public.announcement_post_links l
   join public.announcements lh on lh.announcement_id = l.lh_announcement_id
   where lh.title is not null and lh.hidden_from_listing is not true
@@ -1140,7 +1140,7 @@ with link_map as (
 ),
 keyed as materialized (
   select a.announcement_id, a.apply_end, a.attachment_urls,
-         coalesce(lm.lh_key, a.dedup_key) as k,
+         coalesce(lm.lh_key, a.title_dedup_key) as k,
          (lm.aid is not null) as linked
   from public.announcements a
   left join link_map lm on lm.aid = a.announcement_id

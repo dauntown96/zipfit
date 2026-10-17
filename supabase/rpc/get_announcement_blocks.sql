@@ -4,7 +4,7 @@ CREATE OR REPLACE FUNCTION public.get_announcement_blocks(p_announcement_id text
  STABLE
  SET search_path TO 'public', 'pg_temp'
 AS $function$
--- 🔵 2026-10-17(우편함 「코드·운영 — 목록 RPC 가볍게 …」 1) — dedup 키는 announcements.dedup_key(저장 칸 = announcement_dedup_key(title)) 를 읽는다(행마다 함수 호출 없음 · 결과 같음).
+-- 🔵 2026-10-17(우편함 「코드·운영 — 목록 RPC 가볍게 …」 1) — announcements 행의 묶음 키는 title_dedup_key(저장 생성 칸 = announcement_dedup_key(title))를 읽는다(행마다 함수 호출 없음 · 결과 같음).
 -- 🔴 target에서 LIMIT 1을 걷어냈다(2026-09-12) — get_announcement_group_ids와 같은 처리다.
 -- announcement_id 단독에는 유니크 제약이 없다(제약은 UNIQUE (source, announcement_id)).
 -- 중복이 생기면 LIMIT 1이 둘 중 하나를 조용히 골라 다른 공고의 블록을 돌려준다.
@@ -14,21 +14,21 @@ AS $function$
 --   LH 카드의 블록 목록에 붙은 공고문의 단지가 함께 선다.
 WITH link_map AS (
   SELECT DISTINCT ON (l.linked_announcement_id)
-    l.linked_announcement_id AS aid, lh.dedup_key AS lh_key
+    l.linked_announcement_id AS aid, lh.title_dedup_key AS lh_key
   FROM public.announcement_post_links l
   JOIN public.announcements lh ON lh.announcement_id = l.lh_announcement_id
   WHERE lh.title IS NOT NULL AND lh.hidden_from_listing IS NOT TRUE
   ORDER BY l.linked_announcement_id, l.lh_announcement_id
 ),
 target AS (
-  SELECT DISTINCT COALESCE(lm.lh_key, a.dedup_key) AS dedup_key
+  SELECT DISTINCT COALESCE(lm.lh_key, a.title_dedup_key) AS dedup_key
   FROM announcements a
   LEFT JOIN link_map lm ON lm.aid = a.announcement_id
   WHERE a.announcement_id = p_announcement_id
 ),
 base AS (
   SELECT a.*,
-    COALESCE(lm.lh_key, a.dedup_key) AS dedup_key,
+    COALESCE(lm.lh_key, a.title_dedup_key) AS dedup_key,
     trim(regexp_replace(a.precise_address, '\s*\([^)]*\)\s*$', '')) AS addr_core
   FROM announcements a
   LEFT JOIN link_map lm ON lm.aid = a.announcement_id
