@@ -126,6 +126,24 @@ first_seen AS (
 -- 제외: sigungu_nm NULL · '외'(지역본부명 오인 잔존분) · sido_nm NULL.
 -- 🔴 시·도와 짝지어 담는다 — 「군위군」이 대구인지 경북인지 갈리지 않으면 안 된다.
 -- 「시 구」 두 마디(부천시 소사구)는 첫 마디(부천시)도 함께 담아 시 단위로 찾는 사용자를 잡는다.
+-- 🔵 2026-10-17(우편함 「코드·운영 — … 형제 없는 LH 카드 시·군·구 …」 4) — 그룹의 어느 행에도 시·군·구가 없으면(형제 MYHOME 없는 LH 단독 ·
+--   LH 원본 sigungu_nm NULL — 여러 구 공고) 그 그룹 행들의 세대 행(housing_units) 주소 앞머리 「시도 시군구 [구]」로 채운다(…0911 창원 행복 —
+--   노산·가포1 = 창원시 마산합포구 · 석동 = 창원시 진해구 → 지도 「경남(시군구 미상)」). 원문(공고문 세대 표)을 읽은 분석 산물이라 출처는 공고문이다.
+--   🔴 형제 행 시·군·구가 하나라도 있는 그룹은 건드리지 않는다(종전 그대로) · 시·도는 행 값이 먼저(주소 시·도가 다르면 그 행은 쓰지 않는다).
+--   🔴 저장하지 않고 조회 때 계산한다(region_set 과 같은 이유 — 수집이 덮어쓰는 칸에 쓰지 않는다).
+unit_region AS (
+  SELECT b.dedup_key, COALESCE(b.sido_nm, m[1]) AS sido, m[2] AS si, m[3] AS gu,
+         m[2] || COALESCE(' ' || m[3], '') AS sgg
+  FROM base b
+  JOIN public.housing_units h ON h.announcement_id = b.announcement_id
+  CROSS JOIN LATERAL regexp_match(h.address, '^(\S+[도시])\s+(\S+[시군구])(?:\s+(\S+구)(?=\s|$))?') m
+  WHERE NOT EXISTS (SELECT 1 FROM base b2
+                     WHERE b2.dedup_key = b.dedup_key AND b2.sido_nm IS NOT NULL AND b2.sigungu_nm IS NOT NULL AND b2.sigungu_nm <> '외')
+    AND (b.sido_nm IS NULL OR b.sido_nm = m[1])
+),
+unit_best AS (
+  SELECT dedup_key, min(sgg) AS best_sigungu FROM unit_region GROUP BY dedup_key
+),
 region_set AS (
   SELECT dedup_key, array_agg(DISTINCT nm ORDER BY nm) AS region_names
   FROM (
@@ -137,6 +155,10 @@ region_set AS (
     FROM base b
     WHERE b.sido_nm IS NOT NULL AND b.sigungu_nm IS NOT NULL AND b.sigungu_nm <> '외'
       AND b.sigungu_nm LIKE '% %'
+    UNION
+    SELECT ur.dedup_key, ur.sido || ' ' || ur.sgg FROM unit_region ur
+    UNION
+    SELECT ur.dedup_key, ur.sido || ' ' || ur.si FROM unit_region ur WHERE ur.gu IS NOT NULL
   ) rn
   GROUP BY dedup_key
 ),
@@ -337,7 +359,7 @@ SELECT
     ELSE COALESCE(SUBSTRING(w.region FROM '^\S+?[시도]'), SPLIT_PART(w.region, ' ', 1))
   END AS region_top,
   bl.best_sido AS sido_nm,
-  bl.best_sigungu AS sigungu_nm,
+  COALESCE(bl.best_sigungu, ub.best_sigungu) AS sigungu_nm,
   w.housing_type, w.supply_org, w.announcement_date,
   COALESCE(w.apply_start, bs.best_apply_start) AS apply_start,
   w.apply_end,
@@ -412,6 +434,7 @@ JOIN best_location bl ON bl.dedup_key = w.dedup_key
 JOIN best_schedule bs ON bs.dedup_key = w.dedup_key
 JOIN first_seen fs ON fs.dedup_key = w.dedup_key
 LEFT JOIN region_set rs ON rs.dedup_key = w.dedup_key
+LEFT JOIN unit_best ub ON ub.dedup_key = w.dedup_key
 LEFT JOIN block_count bc ON bc.dedup_key = w.dedup_key
 LEFT JOIN complex_name cn ON cn.dedup_key = w.dedup_key
 LEFT JOIN public.supply_org_period_trust pt ON pt.supply_org = w.supply_org

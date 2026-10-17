@@ -871,7 +871,7 @@ GRANT SELECT ON public.collection_run_log TO anon, authenticated;   -- 되돌릴
 **무엇을.** `winner` CTE에 `d.apply_end`를 더하고, 맨 끝 `WHERE`에 `NOT EXISTS` 하나를 더했다 —
 대표와 **같은 `apply_end`**의 그룹 구성원(`announcement_dedup_key(title)` 같음 · 숨김 제외)이 완료 계열
 `announcement_analysis`(`완료`·`완료(보조 누락)`·`완료(판정 대기)`·`완료(소급)`)를 가지면 큐에서 뺀다.
-⑨ 5장 분석률 산식(2026-09-23 개정 — 대표와 같은 `apply_end` 구성원)과 같은 축이다.
+⑨ 6장 분석률 산식(2026-09-23 개정 — 대표와 같은 `apply_end` 구성원)과 같은 축이다.
 대표 `apply_end`가 NULL이면 `=`가 성립하지 않아 종전대로 남는다.
 
 **실측(2026-09-23).** 적용 전 12건(16:03Z) → 적용 후 4건(16:04Z). 빠진 8건은 donor가 전부 같은 회차인
