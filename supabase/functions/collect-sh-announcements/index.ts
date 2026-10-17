@@ -12,6 +12,7 @@
 // robots.txt 실측(2026-08-19): `User-agent: * / Allow: /` — 전면 허용, Disallow 없음.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2.116.0'
+import { bodyLines, applyWindow } from './parse.ts'
 
 // 코딩원칙 16번: `Deno.env.get()!`는 타입 단언일 뿐 런타임 검사가 아니라서
 // 미설정 시 undefined로 조용히 잘못 동작한다. 없으면 명시적으로 throw 한다.
@@ -227,8 +228,10 @@ function mapRow(row: ShRow) {
     //    upsert 뒤 따로 「비어 있는 행만」 채운다(collect · fillGu). 목록·상세에 자치구 칸은 없다.
     announcement_date:    row.announceDate,
     winner_announce_date: row.winnerDate,
-    apply_start:          null,   // 목록에 접수기간이 없다. 상세 파싱은 이번 범위 밖.
-    apply_end:            null,
+    // 목록에 접수기간이 없다 — 열린 공고는 아래 상세 본문에서 접수 창이 하나로 읽힐 때만 채운다(parse.ts · 2026-10-17).
+    // null 은 저장값을 지우지 않는다(트리거 protect_detail_columns 가 이전 값을 지킨다 · 확정값 *_confirmed 가 있으면 그것이 이긴다).
+    apply_start:          null as string | null,
+    apply_end:            null as string | null,
     status:               mapStatus(row.status),
     // SH는 수정본 접두를 '(수정) '뿐 아니라 '[수정] '·'[정정]'·'[재정정_배점표 등 수정]'처럼
     // 대괄호로도 붙인다(실측). 괄호만 보면 대괄호 수정본이 is_revised=false로 남아,
@@ -288,7 +291,13 @@ async function collect() {
 
   // 🔵 열린(보이고 마감 아닌) 공고만 상세를 연다 — 첨부 목록. 🔴 상세 실패는 errors 에 넣지 않는다:
   //    errors 가 비지 않은 런은 sh_close_missing 의 「봤다」 판정에서 빠진다(목록을 다 봤는지와 상세는 다른 물음).
-  const detail = { tried: 0, with_files: 0, files: 0, failed: [] as string[] }
+  const detail = { tried: 0, with_files: 0, files: 0, failed: [] as string[],
+    windows: [] as { id: string; start: string; end: string; closed: boolean }[], unread: [] as string[] }
+  // 🔵 2026-10-17(우편함 「코드·운영 — SH 게시물 본문의 접수 날짜 읽기 …」 1 · 다운님 승인 2026-10-17) — 같은 상세 HTML 의 본문에서 접수 창을 읽는다
+  //    (새 요청 0 — 첨부 목록을 읽으려고 이미 여는 페이지). 하나로 읽힐 때만 apply_start·apply_end 를 싣고, 끝 날짜가 오늘(KST)보다 앞이면
+  //    「접수마감」으로 싣는다 — 목록이 아직 「모집중」이어도 접수가 끝난 후속 공지(SH_311200 「2순위 청약접수 안내」 10-08 하루)가 열린 목록에 남지 않게.
+  //    (그렇게 하지 않으면 매 SH 런이 「공고중」으로 되돌리고 collect-announcements markExpired 가 다시 닫는 일이 하루 네 번 반복된다.)
+  const todayKst = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10)
   for (const r of rows.filter(r => !r.hidden_from_listing && r.status !== '접수마감').slice(0, DETAIL_CAP)) {
     await sleep(PAGE_DELAY_MS)
     if (remain() < MIN_FETCH_MS) { detail.failed.push(`시간 예산 넘음 — 남은 상세 열지 않음(${r.announcement_id}부터)`); break }
@@ -296,7 +305,17 @@ async function collect() {
     try {
       const d = await fetchText(r.url, left())
       if (d.status !== 200) { detail.failed.push(`${r.announcement_id}: status=${d.status}`); continue }
-      const files = parseDownList(pickDecoded(d.utf8, d.euckr).text)
+      const html = pickDecoded(d.utf8, d.euckr).text
+      const lines = bodyLines(html)
+      const aw = lines ? applyWindow(lines) : { window: null, why: '본문 칸 없음' }
+      if (aw.window) {
+        r.apply_start = aw.window.start
+        r.apply_end = aw.window.end
+        const closed = aw.window.end < todayKst
+        if (closed) r.status = '접수마감'
+        detail.windows.push({ id: r.announcement_id, start: aw.window.start, end: aw.window.end, closed })
+      } else detail.unread.push(`${r.announcement_id}: ${aw.why}`)
+      const files = parseDownList(html)
       if (!files) { detail.failed.push(`${r.announcement_id}: downList 없음`); continue }
       r.attachment_urls = files
       detail.with_files++; detail.files += files.length
@@ -383,7 +402,9 @@ async function probe(probeSeq: string | null) {
     try {
       const r = await fetchText(`https://www.i-sh.co.kr/main/lay2/program/S1T294C295/www/brd/m_241/view.do?seq=${encodeURIComponent(seq)}`)
       const p = pickDecoded(r.utf8, r.euckr)
-      out.detail = { status: r.status, encoding_guess: p.encoding, html_length: p.text.length, files: parseDownList(p.text) }
+      const lines = bodyLines(p.text)
+      out.detail = { status: r.status, encoding_guess: p.encoding, html_length: p.text.length, files: parseDownList(p.text),
+        apply_window: lines ? applyWindow(lines) : { window: null, why: '본문 칸 없음' } }
     } catch (e) { out.detail = { error: String(e) } }
   }
 
