@@ -4,13 +4,14 @@ CREATE OR REPLACE FUNCTION zipfit_ops.metric_coverage_14d()
  STABLE
  SET search_path TO 'public', 'pg_temp'
 AS $function$
+-- 🔵 2026-10-17(우편함 「코드·운영 — 목록 RPC 가볍게 …」 1) — dedup 키는 announcements.dedup_key(저장 칸 = announcement_dedup_key(title)) 를 읽는다(행마다 함수 호출 없음 · 결과 같음).
 -- 🔵 2026-10-16(우편함 「코드 — 관리자 페이지 (가) 첫 판 …」 2 ⓐ) — 14일 접수분 커버율 한 정의.
 --   supabase/metrics/analysis_rate.sql 둘째 문장을 여기로 옮겼다 — 그 파일과 상태판(ops_status_board)이 이 함수 하나를 부른다(산식 사본 없음).
 --   열린 대표(get_announcements_deduped · apply_end ≥ 오늘 ∧ apply_start ≤ 오늘+14) 중 같은 묶음 키·같은 회차(같은 마감 · 링크)에 완료 계열 분석이 있는 것.
 --   묶음 키(link_map)는 get_announcements_deduped · get_announcement_group_ids · analysis_dispatch_tick 과 같다 — 한쪽을 바꾸면 함께 바꾼다.
 with link_map as (
   select distinct on (l.linked_announcement_id)
-    l.linked_announcement_id as aid, announcement_dedup_key(lh.title) as lh_key
+    l.linked_announcement_id as aid, lh.dedup_key as lh_key
   from public.announcement_post_links l
   join public.announcements lh on lh.announcement_id = l.lh_announcement_id
   where lh.title is not null and lh.hidden_from_listing is not true
@@ -18,7 +19,7 @@ with link_map as (
 ),
 keyed as materialized (
   select a.announcement_id, a.apply_end, a.attachment_urls,
-         coalesce(lm.lh_key, announcement_dedup_key(a.title)) as k,
+         coalesce(lm.lh_key, a.dedup_key) as k,
          (lm.aid is not null) as linked
   from public.announcements a
   left join link_map lm on lm.aid = a.announcement_id
