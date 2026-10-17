@@ -1,8 +1,11 @@
 CREATE OR REPLACE FUNCTION public.get_announcements_deduped(p_region text DEFAULT NULL::text, p_type text DEFAULT NULL::text, p_status text DEFAULT NULL::text)
- RETURNS TABLE(id bigint, source text, announcement_id text, title text, region text, region_top text, sido_nm text, sigungu_nm text, housing_type text, supply_org text, announcement_date date, apply_start date, apply_end date, status text, status_normalized text, url text, is_revised boolean, area_min numeric, area_max numeric, rent_min integer, rent_max integer, deposit_min bigint, deposit_max bigint, total_units integer, move_in_date text, target_type text, heating_type text, created_at timestamp with time zone, updated_at timestamp with time zone, mymy_applicable boolean, supply_form text, application_method text, recruit_multiplier text, pair_announcement_key text, housing_change_allowed boolean, precise_address text, is_relaxed_recruitment boolean, relaxation_detail text, selection_method text, subscription_months_required integer, subscription_payments_required integer, contract_before_verification boolean, rent_exemption_until date, rent_exemption_note text, revision_note text, revised_at timestamp with time zone, special_notes jsonb, revised_at_source text, first_seen_at timestamp with time zone, doc_submit_announce_date date, doc_submit_start date, doc_submit_end date, winner_announce_date date, contract_start date, contract_end date, building_name text, attachment_urls jsonb, has_cancel_notice boolean, region_names text[], block_count integer, first_announcement_date date, schedule_varies boolean, apply_end_confirmed date, apply_period_check boolean, last_seen_at timestamp with time zone, revision_seen_date date)
+ RETURNS TABLE(source text, announcement_id text, title text, region text, region_top text, sido_nm text, sigungu_nm text, housing_type text, supply_org text, announcement_date date, apply_start date, apply_end date, status text, url text, is_revised boolean, area_min numeric, area_max numeric, rent_min integer, deposit_min bigint, total_units integer, move_in_date text, created_at timestamp with time zone, mymy_applicable boolean, supply_form text, application_method text, recruit_multiplier text, pair_announcement_key text, housing_change_allowed boolean, precise_address text, is_relaxed_recruitment boolean, relaxation_detail text, selection_method text, contract_before_verification boolean, rent_exemption_until date, rent_exemption_note text, revision_note text, revised_at timestamp with time zone, special_notes jsonb, revised_at_source text, first_seen_at timestamp with time zone, doc_submit_announce_date date, doc_submit_start date, doc_submit_end date, winner_announce_date date, contract_start date, contract_end date, building_name text, attachment_urls jsonb, has_cancel_notice boolean, region_names text[], block_count integer, first_announcement_date date, schedule_varies boolean, apply_end_confirmed date, apply_period_check boolean, last_seen_at timestamp with time zone, revision_seen_date date)
  LANGUAGE sql
  STABLE
 AS $function$
+-- 🔵 2026-10-18(우편함 「코드·운영 — 목록 RPC 응답에서 화면이 안 쓰는 칸 걷기」) — 화면·점검·다른 DB 함수가 읽지 않는 출력 칸 9개를 뺐다
+--   (id · status_normalized · rent_max · deposit_max · target_type · heating_type · updated_at · subscription_months_required ·
+--   subscription_payments_required — 행 집합·남는 칸 값은 그대로 · 표 칸은 그대로). 다시 읽게 하려면 출력 칸을 되돌리는 마이그레이션이 먼저다.
 -- 🔵 2026-10-17(우편함 「코드·운영 — 목록 RPC 가볍게 …」 1) — announcements 행의 묶음 키는 title_dedup_key(저장 생성 칸 = announcement_dedup_key(title))를 읽는다(행마다 함수 호출 없음 · 결과 같음).
 -- 🔴 2026-10-14(코드 — LH 카드 발표일 A 후속) — search_path 는 SET 절이 아니라 본문 스키마 이름으로 고정한다(public.announcements ·
 --   public.announcement_dedup_key — 나머지 표는 이미 public. · 연산자·내장 함수는 pg_catalog 가 먼저 찾힌다).
@@ -353,7 +356,7 @@ complex_name AS MATERIALIZED (
          OR NOT lead_found)
 )
 SELECT
-  w.id, w.source, w.announcement_id, w.title, w.region,
+  w.source, w.announcement_id, w.title, w.region,
   CASE
     WHEN bl.best_sido IS NOT NULL THEN bl.best_sido
     WHEN w.region = '서울' THEN '서울특별시'
@@ -365,17 +368,15 @@ SELECT
   COALESCE(w.apply_start, bs.best_apply_start) AS apply_start,
   w.apply_end,
   w.status,
-  w.status AS status_normalized,
   w.url, w.is_revised,
-  w.area_min, w.area_max, w.rent_min, w.rent_max,
-  w.deposit_min, w.deposit_max, w.total_units,
-  w.move_in_date, w.target_type, w.heating_type,
-  w.created_at, w.updated_at,
+  w.area_min, w.area_max, w.rent_min,
+  w.deposit_min, w.total_units,
+  w.move_in_date,
+  w.created_at,
   w.mymy_applicable, w.supply_form, w.application_method,
   w.recruit_multiplier, w.pair_announcement_key, w.housing_change_allowed,
   COALESCE(w.precise_address, bl.best_precise) AS precise_address,
   w.is_relaxed_recruitment, w.relaxation_detail, w.selection_method,
-  w.subscription_months_required, w.subscription_payments_required,
   w.contract_before_verification, w.rent_exemption_until, w.rent_exemption_note,
   w.revision_note, w.revised_at, w.special_notes, w.revised_at_source,
   fs.first_seen_at,
