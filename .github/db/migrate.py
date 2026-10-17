@@ -119,6 +119,15 @@ FORBIDDEN = [
     (re.compile(r'\b(set|reset)\s+(local\s+|session\s+)?(role|session\s+authorization)\b', re.I), '역할 바꾸기 — 검사가 쓰는 자리다'),
     (re.compile(r'\bzipfit\.check\b|\bzipfit_ops\.schema_migrations\b', re.I), '적용 기록·검사 자리를 직접 건드림'),
 ]
+# 🔵 2026-10-17(우편함 「코드·운영 — DB 반영 뒤 공개 REST 자동 확인 …」 1) — 역할·DB 단위 설정을 바꾸는 꼴은 ⚠️(실패 아님).
+#    PostgREST 는 요청마다 역할 설정을 다시 거는데(값을 소문자로 — 「4MB」→「4mb」→ 22023) 이 체크·apply 는 관리 API 로 돌아 그 길을 타지 않는다.
+#    2026-10-17 `alter role anon … set work_mem = '4MB'` 가 check·apply 초록인 채 공개 REST 를 2분 동안 전부 400 으로 만들었다(2026-10-17_08 → _09).
+#    그래서 apply 끝의 공개 REST 확인(rest_probe)이 잡는다 — 여기서는 표시만 한다.
+ROLE_SETTING_WARN = [
+    (re.compile(r'\balter\s+(role|user|group)\b', re.I), 'ALTER ROLE/USER'),
+    (re.compile(r'\balter\s+database\b[^;]*\b(set|reset)\b', re.I), 'ALTER DATABASE … SET'),
+    (re.compile(r'\bpg_db_role_setting\b', re.I), 'pg_db_role_setting'),
+]
 # 🔵 2026-10-07(Z-2 9) — 함수 이름 키: public 은 이름 그대로 · zipfit_ops 는 「zipfit_ops.이름」(사본 supabase/rpc/zipfit_ops/<이름>.sql).
 TOUCH_RE = re.compile(r'(?<!execute\s)\b(?:function|procedure)\s+(?:if\s+exists\s+)?(?:(public|zipfit_ops)\.)?"?([a-z_][a-z0-9_]*)"?\s*\(', re.I)
 DIRECTIVE_FN_RE = re.compile(r'^--\s*zipfit:function\s+(?:public\.)?((?:zipfit_ops\.)?[a-z_][a-z0-9_]*\([^)]*\))\s+acl=(\{[^}]*\}|null)\s+secdef=(true|false)\s*$', re.I | re.M)
@@ -158,8 +167,12 @@ def parse(path):
     undeclared = [f'{name}: 함수 {t} 를 건드리는데 머리에 「-- zipfit:function {t}(인자) acl={{…}} secdef=true|false」 선언이 없다'
                   for t in touched if t not in declared]
     anon = DIRECTIVE_ANON_RE.findall(raw)
+    warns = [f'{name}: {what} — 역할·DB 설정은 PostgREST 가 요청마다 다시 걸어 이 체크(관리 API)로 재지 못한다 · 적용 뒤 공개 REST 확인이 잡는다'
+             f' · 값은 단위 없는 수로(예 work_mem = 4096)'
+             for rx, what in ROLE_SETTING_WARN if rx.search(code)]
     return {'name': name, 'path': path, 'sql': raw, 'sha256': hashlib.sha256(raw.encode('utf-8')).hexdigest(),
-            'touched': touched, 'functions': fns, 'dropped': sorted(dropped), 'anon': anon, 'errors': errs, 'undeclared': undeclared}
+            'touched': touched, 'functions': fns, 'dropped': sorted(dropped), 'anon': anon, 'errors': errs, 'undeclared': undeclared,
+            'warnings': warns}
 
 
 def pending_errors(pending):
@@ -461,6 +474,8 @@ def cmd_check():
     errs += e2 + pending_errors(pending)
     data['pending'] = [f['name'] for f in pending]
     lines.append(f'- 변경 파일 {len(files)}개 · 적용 기록 {len(led)}개 · **이번에 적용될 것 {len(pending)}개**: ' + (', '.join(f'`{f["name"]}`' for f in pending) or '없음'))
+    data['warnings'] = [w for f in pending for w in f['warnings']]
+    lines += [f'- ⚠️ {w}' for w in data['warnings']]
     if errs:
         lines += ['', '### 파일 규칙 위반', *[f'- ❌ {e}' for e in errs]]
         return report('check', 'DB 변경 PR 체크', False, lines, data)
@@ -552,6 +567,56 @@ def cmd_check():
     return report('check', 'DB 변경 PR 체크', ok, lines, data)
 
 
+# ───────────────────────── apply 뒤 공개 REST 확인 ─────────────────────────
+# 🔵 2026-10-17(우편함 「코드·운영 — DB 반영 뒤 공개 REST 자동 확인 …」 1 · CLAUDE.md 원칙 29 「적용 뒤에는 공개 REST(anon 키)로 200과 행 수」를 장치로).
+#    관리 API 는 PostgREST 를 거치지 않아, PostgREST 가 요청마다 거는 것(역할 설정 등)이 깨져도 apply 가 초록이다(2026-10-17_08 사고).
+#    apply 가 끝나면 화면과 같은 길(anon 키 · 공개 REST)로 목록 RPC 를 한 번 부른다 — 200 ∧ 행 수 > 0 이 아니면 실패 → db-apply 이슈.
+#    잠깐 끊김(목록 함수 3초 한도 500 등)으로 이슈가 열리지 않게 REST_PROBE_WAIT_S 쉬고 최대 REST_PROBE_TRIES 번 — 한 번이라도 통과면 통과.
+#    🔴 anon 키는 공개 키다(index.html · .github/health/lib.mjs 에 이미 있음) — 서비스 키는 쓰지 않는다.
+SUPABASE_URL = f'https://{PROJECT_REF}.supabase.co'
+ANON_KEY = ('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtoZHBqanlzcG1scXR6cGVyb3FnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxMTYyNDUsImV4cCI6MjA5NzY5MjI0NX0'
+            '.XwSOuOk2UJiR8vTnwwqDZayJWOUstzD2DeB1COG4azs')
+REST_PROBE_PATH = '/rest/v1/rpc/get_announcements_deduped'
+REST_PROBE_TRIES = 3
+REST_PROBE_WAIT_S = 5
+
+
+def rest_probe():
+    last = {}
+    for i in range(REST_PROBE_TRIES):
+        time.sleep(REST_PROBE_WAIT_S)
+        req = urllib.request.Request(SUPABASE_URL + REST_PROBE_PATH, data=b'{}', method='POST',
+                                     headers={'apikey': ANON_KEY, 'Authorization': 'Bearer ' + ANON_KEY, 'Content-Type': 'application/json'})
+        t0 = time.time()
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:
+                st, body = r.status, r.read()
+        except urllib.error.HTTPError as e:
+            st, body = e.code, e.read()
+        except urllib.error.URLError as e:
+            st, body = None, str(e.reason).encode('utf-8')
+        rows = None
+        if st == 200:
+            try:
+                rows = len(json.loads(body))
+            except ValueError:
+                pass
+        last = {'status': st, 'rows': rows, 'ms': int((time.time() - t0) * 1000), 'tries': i + 1,
+                'error': None if st == 200 else body[:200].decode('utf-8', 'replace')}
+        if st == 200 and rows:
+            return dict(last, ok=True)
+    return dict(last, ok=False)
+
+
+def rest_probe_lines(data):
+    r = rest_probe()
+    data['rest_probe'] = r
+    if r['ok']:
+        return True, [f'- ✅ 적용 뒤 공개 REST(anon 키) `{REST_PROBE_PATH}` — HTTP {r["status"]} · {r["rows"]}행 · {r["ms"]}ms · {r["tries"]}번째']
+    return False, [f'- ❌ **적용 뒤 공개 REST(anon 키) `{REST_PROBE_PATH}` 실패** — {r["tries"]}번 모두: HTTP {r["status"]} · 행 {r["rows"]} · `{r["error"]}`',
+                   '  - 사용자 화면(비로그인 목록)이 깨졌을 수 있다. CLAUDE.md 원칙 32 「긴급 되돌리기」 — 전 상태로 되돌리고 같은 SQL을 PR로']
+
+
 # ───────────────────────── apply ─────────────────────────
 def cmd_apply():
     files = load_files()
@@ -566,8 +631,9 @@ def cmd_apply():
         lines += ['', '### 파일 규칙 위반 — 아무것도 적용하지 않았다', *[f'- ❌ {e}' for e in errs]]
         return report('apply', 'DB 변경 적용', False, lines, data)
     if not pending:
-        lines.append('- 적용할 파일이 없다(같은 커밋 재실행이면 정상) — 통과')
-        return report('apply', 'DB 변경 적용', True, lines, data)
+        lines.append('- 적용할 파일이 없다(같은 커밋 재실행이면 정상)')
+        ok, more = rest_probe_lines(data)
+        return report('apply', 'DB 변경 적용', ok, lines + more, data)
     commit = os.environ.get('GITHUB_SHA', '')
     run_url = (f"{os.environ.get('GITHUB_SERVER_URL')}/{os.environ.get('GITHUB_REPOSITORY')}/actions/runs/{os.environ.get('GITHUB_RUN_ID')}"
                if os.environ.get('GITHUB_RUN_ID') else '')
@@ -610,7 +676,9 @@ end
             ok = False
             lines.append(f'- ❌ `{f["name"]}` 적용 뒤 대조 실패 — DB에는 이미 들어갔다. 되돌리기는 README 「긴급 되돌리기」')
             break
-    return report('apply', 'DB 변경 적용', ok, lines, data)
+    # 적용이 중간에 멈췄어도(앞 파일은 이미 들어갔을 수 있다) 공개 REST 는 본다.
+    rest_ok, more = rest_probe_lines(data)
+    return report('apply', 'DB 변경 적용', ok and rest_ok, lines + more, data)
 
 
 if __name__ == '__main__':
@@ -622,7 +690,7 @@ if __name__ == '__main__':
     if mode == 'lint':
         fs = load_files()
         es = [e for f in fs for e in f['errors']]
-        print(json.dumps([{k: f[k] for k in ('name', 'touched', 'functions', 'dropped', 'anon', 'errors')} for f in fs], ensure_ascii=False, indent=1))
+        print(json.dumps([{k: f[k] for k in ('name', 'touched', 'functions', 'dropped', 'anon', 'errors', 'warnings')} for f in fs], ensure_ascii=False, indent=1))
         sys.exit(1 if es else 0)
     print(__doc__)
     sys.exit(2)
