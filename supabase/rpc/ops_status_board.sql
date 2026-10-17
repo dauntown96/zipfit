@@ -9,11 +9,15 @@ AS $function$
 --   칸 다섯: coverage(14일 접수분 커버율 — zipfit_ops.metric_coverage_14d 한 정의) · dispatch(분석 발송기 한 줄 · 「지금 무엇을 기다리나」 규칙은 여기)
 --   · health(운영 점검 마지막 결과 · 점검 발송 기록 — 멈춤(HARD) 갈래는 .github/health/gate.mjs 한 곳이라 화면이 열린 이슈 라벨로 가른다)
 --   · collected(get_last_collected_at 그대로) · followups_unreported(결과 칸 도입 — 2026-10-06_06 적용 — 뒤 요청 중 done ∧ result NULL).
---   덧: hides(지금 숨긴 묶음 — zipfit_ops.listing_hides). 비밀값·분석률 정본·출처별·추이는 넣지 않는다(다음 판).
+--   덧: hides(지금 숨긴 묶음 — zipfit_ops.listing_hides).
+-- 🔵 2026-10-17(우편함 「코드·운영 — … 상태판 칸 …」 6 · 백로그 「관리자 페이지 (가)」 본문 후보) — 칸 둘 더:
+--   rates(분석률 두 셈 나란히 — routine = 정본 · 루틴 분모 zipfit_ops.metric_analysis_rate() · open_by_source = 열린 카드 출처별 zipfit_ops.metric_open_by_source())
+--   · recent_runs(최근 분석 회차 다섯 — 잡기·끝·걸린 분·끝낸 대기열 행 수·끝 메모 앞 80자 · 💡 회차별 한 줄).
+--   비밀값 D-day 는 넣지 않는다 — Vault 설명칸이 비어 있어 읽을 날짜가 없다(2026-10-17 조회) · 추이는 다음 판.
 declare
   v_uid uuid := auth.uid();
   cfg public.analysis_dispatch_config%rowtype;
-  v_cov jsonb; v_disp jsonb; v_health jsonb; v_col jsonb; v_fu jsonb; v_hides jsonb;
+  v_cov jsonb; v_disp jsonb; v_health jsonb; v_col jsonb; v_fu jsonb; v_hides jsonb; v_rates jsonb; v_runs jsonb;
   v_run record; v_last record;
   n_wait int; n_ready int; n_promo int; n_sent int; n_fu_wait int; n_reclaim int; v_failing boolean; v_wait text;
   v_fu_since timestamptz;
@@ -85,7 +89,21 @@ begin
                                                'reason', h.reason, 'hidden_at', h.hidden_at) order by h.hidden_at desc), '[]'::jsonb)
     into v_hides from zipfit_ops.listing_hides h where h.released_at is null;
 
+  v_rates := jsonb_build_object(
+    'routine', (select coalesce(jsonb_agg(to_jsonb(r) order by r.phase desc), '[]'::jsonb) from zipfit_ops.metric_analysis_rate() r),
+    'open_by_source', (select coalesce(jsonb_agg(to_jsonb(o) order by o.denominator desc, o.source_group), '[]'::jsonb) from zipfit_ops.metric_open_by_source() o));
+
+  select coalesce(jsonb_agg(jsonb_build_object('id', z.id, 'reason', z.reason, 'state', z.state, 'created_at', z.created_at,
+                                               'claimed_at', z.claimed_at, 'finished_at', z.finished_at,
+                                               'minutes', round(extract(epoch from z.finished_at - coalesce(z.claimed_at, z.created_at)) / 60),
+                                               'done', z.done, 'note', left(z.finish_note, 80)) order by z.id desc), '[]'::jsonb)
+    into v_runs
+    from (select r.id, r.reason, r.state, r.created_at, r.claimed_at, r.finished_at, r.finish_note,
+                 (select count(*) from public.analysis_dispatch_queue q where q.run_id = r.id and q.state = 'done') as done
+            from public.analysis_dispatch_runs r order by r.id desc limit 5) z;
+
   return jsonb_build_object('now', now(), 'coverage', v_cov, 'dispatch', v_disp, 'health', v_health,
-                            'collected', v_col, 'followups_unreported', v_fu, 'hides', v_hides);
+                            'collected', v_col, 'followups_unreported', v_fu, 'hides', v_hides,
+                            'rates', v_rates, 'recent_runs', v_runs);
 end
 $function$
