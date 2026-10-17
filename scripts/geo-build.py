@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # 꼭집 「지도로 보기」 경계 파일 만들기 — 행정구역 개편(판 갈이) 때 한 번 돌린다(2026-10-16 · 우편함 「표시층 — 지도 2026-07-01 개편 반영」).
 #
-# 원자료: vuski/admdongkor 의 행정동 경계 GeoJSON(WGS84) — 통계청 SGIS 행정동 경계(공공누리 1유형)에 개편 이력을 보정한 판 · CC BY 4.0.
+# 원자료: vuski/admdongkor 의 행정동 경계 GeoJSON(WGS84) — 국가데이터처 SGIS 행정동 경계(공공누리 1유형)에 개편 이력을 보정한 판 · CC BY 4.0.
 #   예) https://raw.githubusercontent.com/vuski/admdongkor/master/ver20260701/HangJeongDong_ver20260701.geojson
 # 도구: mapshaper(npm · 저장소 밖에 설치 — 원칙 6 은 화면 코드 이야기다) — 투영(UTM-K)·단순화·합치기·안쪽 경계선만.
 #
@@ -199,7 +199,7 @@ def main():
         sgg = sorted(load('sgg.json')['features'], key=lambda f: f['properties']['sgg'])
         base = {
             'about': (f'꼭집 지도로 보기 — 시·도 윤곽 {len(sido)}(단순화) · 시·군·구 가운데 {len(sgg)}. 경계 {day} 기준. '
-                      '원자료: 통계청 SGIS 행정구역 경계(공공누리 1유형) · 가공: vuski/admdongkor(CC BY 4.0 — 개편 이력 보정). '
+                      '원자료: 국가데이터처 SGIS 행정구역 경계(공공누리 1유형) · 가공: vuski/admdongkor(CC BY 4.0 — 개편 이력 보정). '
                       '좌표는 화면용으로 줄인 값이다(UTM-K 를 이 viewBox 에 맞춘 1차 변환 · 윤곽 단순화 · 작은 섬 생략). '
                       '시·군·구 가운데는 면 중심이고, 중심이 바다에 떨어지는 곳(섬이 많은 군)은 가장 큰 땅의 중심을 쓴다. '
                       '점은 단지 위치가 아니라 시·군·구 가운데다. 확대하면 같은 판의 시·군·구(sgg-) · 읍면동(emd-) 경계선을 시·도별로 따로 받는다.'),
