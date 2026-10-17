@@ -10631,9 +10631,43 @@ function zfOpsRunsHtml(runs){
   const rs = Array.isArray(runs) ? runs : [];
   if(!rs.length) return '<div style="color:#888">회차 없음</div>';
   return rs.map(x => `<div style="padding:3px 0">run ${zfOpsEsc(x.id)} · ${zfOpsEsc(ZF_OPS_RUN_REASON[x.reason] || x.reason)} · ${zfOpsEsc(ZF_OPS_RUN_STATE[x.state] || x.state)}`
-    + (x.finished_at ? ` ${zfOpsTime(x.finished_at)}${x.minutes != null ? ` · ${x.minutes}분` : ''}` : ` · 시작 ${zfOpsTime(x.claimed_at || x.created_at)}`)
+    + (x.finished_at ? ` ${zfOpsTime(x.finished_at)}${x.minutes != null ? ` · ${x.minutes}분` + (x.minutes_from === 'sent' ? ` <span style="font-size:12px;color:${ZF_OPS_COLOR.yellow};border:1px solid currentColor;border-radius:4px;padding:0 4px;white-space:nowrap" title="잡은 시각이 없어 발송 시각부터 셌어요 — 대기 시간이 섞였어요">발송부터</span>` : '') : ''}` : ` · ${x.claimed_at ? '시작' : '발송'} ${zfOpsTime(x.claimed_at || x.created_at)}`)
     + ` · 끝낸 공고 ${x.done ?? 0}`
     + (x.note ? `<br><span style="color:#888;font-size:12px;word-break:break-all">${zfOpsEsc(x.note)}</span>` : '') + `</div>`).join('');
+}
+// 인스턴스 메모리(ops_status_board().instance — 2026-10-17 health-ops 기록) · 단위 MiB(대시보드와 같게).
+//    색은 화면에 문턱을 두지 않고 같은 시각 운영 점검의 instance_mem 경고를 따른다(문턱 정본 .github/health/instance.mjs).
+function zfOpsInstanceHtml(it, warned){
+  if(!it || it.mem_total == null) return { color: 'yellow', html: '기록 없음 <span style="color:#888">(운영 점검이 아직 남기지 않았어요)</span>' };
+  const mib = v => v == null ? '—' : Math.round(Number(v) / 1048576);
+  const parts = [`가용 ${mib(it.mem_available)}/${mib(it.mem_total)} MiB`];
+  if(it.swap_used != null) parts.push(`swap ${mib(it.swap_used)}${it.swap_total ? `/${mib(it.swap_total)} MiB(${Math.round(Number(it.swap_used) / Number(it.swap_total) * 100)}%)` : ' MiB'}`);
+  if(it.committed_as != null && Number(it.commit_limit) > 0) parts.push(`commit ${(Number(it.committed_as) / Number(it.commit_limit)).toFixed(2)}배`);
+  if(it.swapin_24h_pages != null || it.swapout_24h_pages != null) parts.push(`24시간 swap 들어옴 ${it.swapin_24h_pages ?? '—'} · 나감 ${it.swapout_24h_pages ?? '—'}쪽`);
+  return { color: warned ? 'yellow' : 'ok', html: zfOpsEsc(parts.join(' · ')) + ` <span style="color:#888">(기록 ${zfOpsTime(it.scraped_at)}${warned ? ' · 점검 ⚠️' : ''})</span>` };
+}
+// 비밀값 만료(ops_status_board().secrets = zipfit_ops.secret_expiry_list() 한 정의) — 이름만(값은 반환에 없다).
+//    날짜 있는 것을 남은 날 오름차순으로: 지난 것 빨강 · 30일 이하 주황(health-ops secret_expiry 와 같은 30) · missing(설명칸 꼴 없음) 주황.
+const ZF_OPS_SECRET_SOON_DAYS = 30;
+function zfOpsSecretsHtml(secrets){
+  const rs = Array.isArray(secrets) ? secrets : [];
+  if(!rs.length) return { color: 'yellow', html: '목록 없음' };
+  const dated = rs.filter(r => r.state === 'date').sort((a, c) => Number(a.days_left) - Number(c.days_left));
+  const missing = rs.filter(r => r.state === 'missing');
+  const cOf = r => r.state === 'missing' ? 'orange' : Number(r.days_left) < 0 ? 'red' : Number(r.days_left) <= ZF_OPS_SECRET_SOON_DAYS ? 'orange' : null;
+  const src = r => `<span style="color:#888;font-size:12px">${r.source === 'vault' ? 'Vault' : 'Vault 밖'}</span>`;
+  const row = r => { const c = cOf(r);
+    const when = r.state === 'missing' ? '설명칸 expires= 없음' : `${zfOpsEsc(r.expires)} · ${Number(r.days_left) < 0 ? `${-Number(r.days_left)}일 지남` : `D-${Number(r.days_left)}`}`;
+    return `<div style="display:flex;justify-content:space-between;gap:8px;padding:2px 0"><span style="min-width:0;word-break:break-all">${zfOpsEsc(r.name)} ${src(r)}</span>`
+      + `<b style="flex:none;font-variant-numeric:tabular-nums;color:${c ? ZF_OPS_COLOR[c] : 'inherit'}">${when}</b></div>`; };
+  const urgent = missing.concat(dated.filter(r => cOf(r)));
+  const shown = urgent.concat(dated.filter(r => !cOf(r)).slice(0, Math.max(0, 3 - urgent.length)));
+  const rest = dated.filter(r => !shown.includes(r));
+  const nNone = rs.filter(r => r.state === 'none').length, nUnknown = rs.filter(r => r.state === 'unknown').length;
+  const color = dated.some(r => Number(r.days_left) < 0) ? 'red' : urgent.length ? 'orange' : 'ok';
+  return { color, html: `<div style="margin-top:4px">${shown.map(row).join('')}`
+    + (rest.length ? `<details><summary style="cursor:pointer;color:#888;font-size:12px">날짜 있는 나머지 ${rest.length}</summary>${rest.map(row).join('')}</details>` : '')
+    + `<div style="color:#888;font-size:12px">만료 없음 ${nNone} · 모름 ${nUnknown}</div></div>` };
 }
 function zfOpsHtml(b, issues){
   const line = (color, label, text) => `<div style="padding:6px 0;border-top:1px solid #eee;font-size:13px;line-height:1.55">`
@@ -10671,6 +10705,9 @@ function zfOpsHtml(b, issues){
     const txt = luf.warned ? zfOpsEsc(String(luf.value || '경고').replace(/^목록 RPC 사용자 실패[^—]*—\s*/, '')) : '24시간 0';
     out.push(line(luf.warned ? (human > 0 ? 'orange' : 'yellow') : 'ok', '목록 사용자 실패', (human > 0 ? `<b>${txt}</b>` : txt) + ` <span style="color:#888">(점검 ${zfOpsTime(luf.run_at)})</span>`));
   }
+  // ⓒ-3 인스턴스 메모리 · ⓒ-4 비밀값 만료(2026-10-17 상태판 새 칸 — PR #603 instance · secrets)
+  if('instance' in b){ const im = zfOpsInstanceHtml(b.instance, (h.warned || []).includes('instance_mem')); out.push(line(im.color, '인스턴스 메모리', im.html)); }
+  if(b.secrets){ const sx = zfOpsSecretsHtml(b.secrets); out.push(line(sx.color, '비밀값 만료', sx.html)); }
   // ⓓ 수집 마지막 시각
   out.push(line('ok', '수집', (b.collected || []).map(x => `${zfOpsEsc(x.source)} ${zfOpsTime(x.at)}`).join(' · ') || '—'));
   // ⓔ 결과 없이 닫힌 후속 요청(결과 칸 도입 뒤 요청만)
