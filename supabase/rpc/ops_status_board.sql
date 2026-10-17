@@ -13,13 +13,19 @@ AS $function$
 -- 🔵 2026-10-17(우편함 「코드·운영 — … 상태판 칸 …」 6 · 백로그 「관리자 페이지 (가)」 본문 후보) — 칸 둘 더:
 --   rates(분석률 두 셈 나란히 — routine = 정본 · 루틴 분모 zipfit_ops.metric_analysis_rate() · open_by_source = 열린 카드 출처별 zipfit_ops.metric_open_by_source())
 --   · recent_runs(최근 분석 회차 다섯 — 잡기·끝·걸린 분·끝낸 대기열 행 수·끝 메모 앞 80자 · 💡 회차별 한 줄).
---   비밀값 D-day 는 넣지 않는다 — Vault 설명칸이 비어 있어 읽을 날짜가 없다(2026-10-17 조회) · 추이는 다음 판.
+--   추이는 다음 판.
 -- 🔵 2026-10-17(우편함 「코드·운영 — 목록 RPC 안정화 …」 2) — health.list_user_fail: 마지막 운영 점검(main)의 「목록 RPC 사용자 실패 24시간」 항목
 --   (health-ops list_user_fail — 관리 API 로그에서 센 값이라 DB 에는 그 점검의 경고 기록만 있다) · warned = 그 실행에서 ⚠️였나 · value = ⚠️일 때 그 기록 문구.
+-- 🔵 2026-10-17(우편함 「코드·운영 — DB 반영 뒤 공개 REST 자동 확인 · … · 상태판 DB 칸」 3 · 백로그 「관리자 페이지 (가)」 ②③):
+--   recent_runs.minutes_from — minutes 를 어디서부터 셌나: claimed(루틴이 잡은 시각) · sent(잡은 시각이 비어 발송 시각부터 — 대기 포함 · run 252 꼴).
+--   secrets — 비밀값 만료: vault 줄 = vault.secrets 의 이름·설명칸 머리 「expires=YYYY-MM-DD|none|unknown」만 읽는다(🔴 secret 칸·decrypted_secrets 는 읽지 않는다)
+--   · fixed 줄 = Vault 밖 만료(백로그 「자동화가 기대는 비밀값의 만료」 2026-10-11 다운님 확인 표 — 바뀌면 이 함수의 그 줄을 고친다).
+--   한 줄 = source(vault|fixed) · name · state(date|none|unknown|missing) · expires · days_left(KST 오늘부터) — 날짜 있는 것부터 남은 날 오름차순.
 declare
   v_uid uuid := auth.uid();
   cfg public.analysis_dispatch_config%rowtype;
-  v_cov jsonb; v_disp jsonb; v_health jsonb; v_col jsonb; v_fu jsonb; v_hides jsonb; v_rates jsonb; v_runs jsonb;
+  v_cov jsonb; v_disp jsonb; v_health jsonb; v_col jsonb; v_fu jsonb; v_hides jsonb; v_rates jsonb; v_runs jsonb; v_secrets jsonb;
+  v_today date := (now() at time zone 'Asia/Seoul')::date;
   v_run record; v_last record;
   n_wait int; n_ready int; n_promo int; n_sent int; n_fu_wait int; n_reclaim int; v_failing boolean; v_wait text;
   v_fu_since timestamptz;
@@ -102,14 +108,32 @@ begin
   select coalesce(jsonb_agg(jsonb_build_object('id', z.id, 'reason', z.reason, 'state', z.state, 'created_at', z.created_at,
                                                'claimed_at', z.claimed_at, 'finished_at', z.finished_at,
                                                'minutes', round(extract(epoch from z.finished_at - coalesce(z.claimed_at, z.created_at)) / 60),
+                                               'minutes_from', case when z.claimed_at is not null then 'claimed' else 'sent' end,
                                                'done', z.done, 'note', left(z.finish_note, 80)) order by z.id desc), '[]'::jsonb)
     into v_runs
     from (select r.id, r.reason, r.state, r.created_at, r.claimed_at, r.finished_at, r.finish_note,
                  (select count(*) from public.analysis_dispatch_queue q where q.run_id = r.id and q.state = 'done') as done
             from public.analysis_dispatch_runs r order by r.id desc limit 5) z;
 
+  select coalesce(jsonb_agg(jsonb_build_object('source', s.source, 'name', s.name, 'state', s.state, 'expires', s.expires,
+                                               'days_left', s.expires - v_today)
+                            order by s.expires nulls last, s.source desc, s.name), '[]'::jsonb)
+    into v_secrets
+    from (select 'vault' as source, v.name,
+                 case when m.tok ~ '^\d{4}-\d{2}-\d{2}$' then 'date' when m.tok in ('none', 'unknown') then m.tok else 'missing' end as state,
+                 case when m.tok ~ '^\d{4}-\d{2}-\d{2}$' then m.tok::date end as expires
+            from vault.secrets v
+            cross join lateral (select lower(trim(substring(coalesce(v.description, '') from '^\s*expires=([^;]*)'))) as tok) m
+          union all
+          select 'fixed', f.name, 'date', f.expires
+            from (values ('Supabase 개인 액세스 토큰 zipfit-claude-code(Claude Code 관리 API)', date '2026-12-27'),
+                         ('공공데이터포털 LH 공고·상세(개발 계정)', date '2028-06-19'),
+                         ('공공데이터포털 마이홈 공공주택 모집공고(개발 계정)', date '2028-06-21'),
+                         ('공공데이터포털 마이홈 단지정보·대기현황(개발 계정)', date '2028-06-23'),
+                         ('공공데이터포털 아파트 전월세 실거래가(개발 계정)', date '2028-09-28')) f(name, expires)) s;
+
   return jsonb_build_object('now', now(), 'coverage', v_cov, 'dispatch', v_disp, 'health', v_health,
                             'collected', v_col, 'followups_unreported', v_fu, 'hides', v_hides,
-                            'rates', v_rates, 'recent_runs', v_runs);
+                            'rates', v_rates, 'recent_runs', v_runs, 'secrets', v_secrets);
 end
 $function$
