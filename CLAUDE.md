@@ -162,9 +162,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
-| 2026-10-16 | **코드 — 백업에 zipfit_ops 담기 + 복원 리허설이 잼** — [zipfit-backup] `zipfit_ops`를 `dumps/ops/`·`schema/ops/`에 따로 덤프(public 그대로) · `ops_scope.py --check` · `schema_guard` ops 따로 · 생존 신호 `ops` 행 수·기록 표 감소 경보 · 리허설 같은 날짜 ops 복원·개수·행 수·권한(허용 오류 0) · 수동 발송 1회 행 1/0/55/2089 = SQL · zipfit-backup PR #28 |
-| 2026-10-16 | **표시층 — 「AI 정리」는 분석 있을 때만 · 관리자 전용 「이 묶음 숨기기」** — `zfAiOff`로 카드·저장 목록·체크리스트·첨부 0 상자의 「AI 정리 · 」 접음(분석된 카드 그대로) · 상세 맨 아래 관리자 단추(`ops_is_admin` 참일 때만 · 사유 필수 · 확인 · `ops_listing_hide`) · health-screen `phrase` 조건 · `zipfit-v225` · PR #567 |
-| 2026-10-16 | **코드 — 관리자 페이지 (가) 첫 판** — `zipfit_ops.admins`·`listing_hides`(GRANT 0) · `ops_is_admin`·`ops_status_board`(칸 다섯)·`ops_listing_hide`(authenticated만 · 비관리자 예외) · 목록 RPC 묶음 숨김 조건(반환형 그대로) · 14일 커버율 한 정의 · 설정 탭 「운영」 구역 · 불변식 v3.15 · `zipfit-v224` · PR #564 |
+| 2026-10-17 | **자동 run 251 — SH 서리풀 청년아트타운(수요자맞춤형) 잔여세대 `SH_311521` 완료** — 정책 38 · 세대 6 · 자격 1(청년 + 예술인·서울 주민등록 확인필요) · 일정 11 · 경로 1 · 확정값 10-26~10-30 · ⚠️ 자동차가액 4.542↔4,542 · 불변식 v3.15 위반 0 · PR #582 |
+| 2026-10-16 | **표시층 — 지도 2026-07-01 개편 반영 · 확대 경계선 · 전국 공고 고리 빼기** — 경계 `geo/kr-2026-07.json`(SGIS · 가공 admdongkor) · 전남광주 한 장 · 인천·화성 새 구 제 점 · 지도 시·도 표 걷음(경계 파일 이름 + `ZF_SIDO_ALIASES`) · 확대하면 시·군·구(≥1.8)·읍면동(≥4) 선 시·도별 · 전국 단위 공고는 지도 밖 한 줄 · health `geo_names` ⚠️ · `zipfit-v230` · PR #580 |
+| 2026-10-16 | **표시층 — 생활시설 칩 작게 · 추천 「맞아요」에도 소득 관문** — 생활시설·정책 칩 보이는 알약 28(`::before`) · 누름 칸 44 그대로 · 생활시설 한 줄 · 추천도 `zfTargetIncomeGate`(저장 조건 · 가산 없는 기본 기준 · 넘거나 소득 없으면 「대상은 맞지만 …」) · `zipfit-v229` · PR #578 |
 ---
 
 ## 🚫 코딩 원칙

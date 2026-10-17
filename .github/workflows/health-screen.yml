@@ -16,12 +16,13 @@ on:
       - 'index.html'
       - 'sw.js'
       - 'CNAME'
+      - 'geo/**'
   workflow_dispatch:
     inputs:
       simulate:
-        description: '알림 경로 시험 — fail 이면 카드 하나의 기대 문구를 없는 문구로 · notice 면 공고문 기대 마감일을 하루 옮긴다 · zipfit 이면 보이는 글자에 「ZipFit」을 하나 넣는다 · stale_date 면 히어로에 지난 날짜가 든 옛 배지를 넣는다 · objobj 면 보이는 글자에 「[object Object]」를 하나 넣는다 · target_out 이면 매칭 「대상이 달라 뺀 공고」에 키 없는 카드 하나를 끼워 넣는다 · open_count 면 공고 탭 머리의 열린 공고 수에 1을 더해 잰다 · route_gap 이면 차수 사이 카드를 경로 표 없이(종전 판정) 잰다 · relax_badge 면 완화 배지 기대 갈래 하나를 바꿔 잰다 · sched_line 이면 상세 노선 기대 일정 행 id 하나를 더해 잰다 · rev_date 면 행에서 관측 정정일(revision_seen_date)을 지우고 정정일 표지·자리를 잰다'
+        description: '알림 경로 시험 — fail 이면 카드 하나의 기대 문구를 없는 문구로 · notice 면 공고문 기대 마감일을 하루 옮긴다 · zipfit 이면 보이는 글자에 「ZipFit」을 하나 넣는다 · stale_date 면 히어로에 지난 날짜가 든 옛 배지를 넣는다 · objobj 면 보이는 글자에 「[object Object]」를 하나 넣는다 · target_out 이면 매칭 「대상이 달라 뺀 공고」에 키 없는 카드 하나를 끼워 넣는다 · open_count 면 공고 탭 머리의 열린 공고 수에 1을 더해 잰다 · route_gap 이면 차수 사이 카드를 경로 표 없이(종전 판정) 잰다 · relax_badge 면 완화 배지 기대 갈래 하나를 바꿔 잰다 · sched_line 이면 상세 노선 기대 일정 행 id 하나를 더해 잰다 · rev_date 면 행에서 관측 정정일(revision_seen_date)을 지우고 정정일 표지·자리를 잰다 · geo_names 면 열린 카드에 없는 구 이름 하나를 붙여 경계 판 갈이 점검을 잰다(경고)'
         type: choice
-        options: [none, fail, notice, zipfit, stale_date, objobj, target_out, open_count, route_gap, relax_badge, sched_line, rev_date]
+        options: [none, fail, notice, zipfit, stale_date, objobj, target_out, open_count, route_gap, relax_badge, sched_line, rev_date, geo_names]
         default: none
 
 permissions:

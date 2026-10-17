@@ -304,7 +304,7 @@ try {
   //       모든 행의 모든 갈래가 이 입력으로 「아님」이어야 한다(확인필요 갈래 · 모르는 대상은 아님이 아니다). 하나라도 어긋나면 실패 = 근거 없이 뺐다.
   //       🔵 2026-10-13(PR #491 뒤 · 이슈 #493) — 카드 ID에 키 행이 없으면 화면처럼 같은 그룹 키(announcement_dedup_key = 화면 zfDedupKey) 형제 중
   //       키 행을 가진 ID 가장 큰 공고 하나의 행으로 잰다(정정 카드 …20876 ← …20840).
-  //    ⓑ 매칭 표시 문구는 일곱 갈래(맞음 · 이름 없는 맞음 · 확인필요 · 이름 없는 확인필요 · 확인필요-only 원문 대상 · 유형 기준 없음 · 👥 상자 제목) 중 하나여야 하고, 상자 수 = 뺀 공고 수(2026-10-15 이름 없는 두 갈래 더함).
+  //    ⓑ 매칭 표시 문구는 여덟 갈래(맞음 · 이름 없는 맞음 · 확인필요 · 이름 없는 확인필요 · 확인필요-only 원문 대상 · 유형 기준 없음 · 소득 관문 · 👥 상자 제목) 중 하나여야 하고, 상자 수 = 뺀 공고 수(2026-10-15 이름 없는 두 갈래 더함 · 2026-10-16 소득 관문 「대상 조건은 맞지만 …」 더함).
   //    SIMULATE=target_out 이면 키 없는 남은 카드 하나를 뺀 목록에 끼워 넣는다(실패해야 맞다).
   const tgt = await page.evaluate(async sim => {
     if (typeof diagnose !== 'function' || typeof matchHouses !== 'function') return { err: '화면 함수 없음' }
@@ -328,6 +328,7 @@ try {
       /^📄 이 공고는 .+ 대상 모집이에요( \(.+\))? — 신청할 수 있는지 공고문에서 확인해 주세요$/,
       /^📄 이 공고의 모집 대상은 「.+」이에요( \(.+\))? — 신청할 수 있는지 공고문에서 확인해 주세요$/,
       /^📄 자격 진단에 이 유형\(.+\) 기준이 없어요 — 신청할 수 있는지 공고문에서 확인해 주세요$/,
+      /^📄 (.+ )?대상 조건은 맞지만 .+ — 신청할 수 있는지 공고문에서 확인해 주세요$/,   // 대상은 맞는데 소득을 못 봤거나 넘음(2026-10-16 · N12 ✓ 소득 관문)
     ]
     let ok = !tgt.err, value = '', bad = []
     if (!tgt.err) {
@@ -381,7 +382,7 @@ try {
       extra.target_out = { out: tgt.out, bad, unknown }
     } else value = `못 잼(${tgt.err})`
     add('target_out', '매칭 2단계 — 공급 대상이 달라 뺀 공고 근거 · 표시 문구 갈래', ok ? 'pass' : 'fail', value,
-      '시험 사용자 (가) — 뺀 공고 전부 DB 로 따로 계산한 「모든 행 키 · 모든 갈래 아님」(카드 ID에 키 행이 없으면 같은 그룹 키 형제) · 문구 일곱 갈래 · 상자 수 = 뺀 수')
+      '시험 사용자 (가) — 뺀 공고 전부 DB 로 따로 계산한 「모든 행 키 · 모든 갈래 아님」(카드 ID에 키 행이 없으면 같은 그룹 키 형제) · 문구 여덟 갈래 · 상자 수 = 뺀 수')
   }
   // ⑥-2 공급대상 갈래 판정 표본(2026-10-15 · 우편함 「코드 — 공급대상 갈래 판정(D-2 …)」 · 원칙 33).
   //    키 객체 × 진단 입력 → 기대 ok/no/check 를 코드 밖 표(target-samples.json)에 두고 배포본 zfTargetRowState 로 잰다.
@@ -466,6 +467,46 @@ try {
     } else value = `못 잼(${oc.err})`
     add('open_count', '숫자가 말하는 「지금」 — 열린 공고 수 한 정의 · 누적 표기', ok ? 'pass' : 'fail', value,
       '공고 탭 기본 머리 = 「열린 공고 M건」 + 「접수 중 a · 예정 b[ · 미상 k]」 · a+b+k = M · a = 인사이트 「접수 중」 KPI · 인사이트 머리 「지금 열린 공고 M건」 · M = zfOpenNotices(noticeData) · 누적 T·기간 = DB')
+  }
+  // ⑦-0 경계 판 갈이(2026-10-16 · 우편함 「표시층 — 지도 2026-07-01 개편 반영」 6) — 열린 카드가 말하는 시·군·구 이름 중 지도 경계 파일(배포본 ZF3_GEO)에 없는 것.
+  //    행정구역이 바뀌면(통합·분할·새 구) 수집 이름이 먼저 바뀌고 지도만 옛 판에 남는다 — 2026-07-01 개편을 다운님이 먼저 찾았다(전남광주 · 인천 4구 · 화성 4구).
+  //    0 이 아니면 경고만(멈춤 아님 · 이슈를 열지 않는다) — 새 판(vuski/admdongkor)을 받아 scripts/geo-build.py 를 돌릴 때다.
+  //    셈은 화면 함수(zf3PlaceOf — 부모 시·고리로 대신해 버린다)를 쓰지 않는다: 카드 지역 칸(region_names · sido_nm·sigungu_nm) ∪ 세대 행 지역을 경계 파일 이름과 바로 맞춘다
+  //    (같은 이름 · 또는 구 단위만 있는 시의 시 이름). 시·군·구 「외」(수집 자리표시) · 경계 파일에 없는 시·도(「전국」)는 셈 밖. 2026-07 판 기대값 0.
+  //    SIMULATE=geo_names 면 없는 구 이름 하나를 열린 카드에 붙여 잰다(경고가 떠야 맞다).
+  {
+    const gn = await page.evaluate(async sim => {
+      if (typeof ZF3_GEO === 'undefined' || typeof zfOpenNotices !== 'function') return { err: 'ZF3_GEO 없음' }
+      const G = await fetch(ZF3_GEO + '.json', { cache: 'no-store' }).then(r => r.json())
+      const sido = {}
+      G.paths.forEach(p => { sido[p.name] = p.code; (ZF_SIDO_ALIASES[p.name] || []).forEach(o => { sido[o] = p.code }) })
+      const keys = Object.keys(G.cent)
+      const open = zfOpenNotices(noticeData)
+      await zfEnsurePriceSummaries(open.map(n => n['announcement_id']))
+      const miss = new Map()
+      let names = 0
+      open.forEach((n, i) => {
+        const all = [...(Array.isArray(n['region_names']) ? n['region_names'] : []), ...zfUnitPlacesFor(n['announcement_id'])]
+        if (n['sigungu_nm']) all.push(n['sido_nm'] + ' ' + n['sigungu_nm'])
+        if (sim && i === 0) all.push(n['sido_nm'] + ' 가상구(시험)')
+        new Set(all.map(x => String(x || '').trim()).filter(Boolean)).forEach(x => {
+          const j = x.indexOf(' ')
+          const sd = j < 0 ? x : x.slice(0, j), sg = j < 0 ? '' : x.slice(j + 1).replace(/\s+/g, '')
+          const pc = sido[sd]
+          if (!pc || !sg || sg === '외') return
+          names++
+          const k = pc + '|' + sg
+          if (G.cent[k] || (/시$/.test(sg) && keys.some(y => y.startsWith(k)))) return
+          if (!miss.has(x)) miss.set(x, [])
+          miss.get(x).push(n['announcement_id'])
+        })
+      })
+      return { ed: G.ed, open: open.length, names, miss: [...miss].map(([x, ids]) => `${x}(${ids.length})`) }
+    }, process.env.SIMULATE === 'geo_names')
+    extra.geo_names = gn
+    add('geo_names', '경계 판 갈이 — 열린 카드 시·군·구 중 지도 경계 파일에 없는 이름', gn.err ? 'warn' : gn.miss.length ? 'warn' : 'pass',
+      gn.err ? `못 잼(${gn.err})` : `${gn.miss.length}${gn.miss.length ? ' · ' + gn.miss.slice(0, 5).join(' · ') : ''} · 경계 ${gn.ed} · 열린 카드 ${gn.open} · 맞춘 이름 ${gn.names}`,
+      '0(2026-07 판 기대값) — 넘으면 경고만(새 판으로 scripts/geo-build.py · 멈춤 아님)')
   }
   // ⑦-1 차수 사이 카드(2026-10-15 · 우편함 「표시층 — 차수 사이 카드 상태」 · 원칙 33) — 경로 표 창이 둘 이상 끊긴 카드에서 오늘이 창 사이면
   //    「접수 중」도 닫힘도 아니고 다음 창 시작일을 말해야 한다(…0769 · …19241 「접수 중」 · …0706 · …0713 · …0737 닫혀 목록에서 빠짐 — 같은 꼴 네 번째).

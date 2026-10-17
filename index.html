@@ -417,6 +417,13 @@ body.theme-dark .hu-ug-name,body.theme-dark .hu-ug-target,body.theme-dark .hu-ug
 body.theme-dark .zf-ai-note{color:#9aa0aa}
 .zf-ops-badge{position:fixed;left:8px;bottom:calc(8px + env(safe-area-inset-bottom, 0px));z-index:130;padding:4px 10px;border-radius:999px;background:#3d424a;color:#fff;font-size:11px;font-weight:700;line-height:1.6;box-shadow:0 2px 8px rgba(0,0,0,.2)}
 .zf-ops-badge a{color:#fff;text-decoration:underline;margin-left:4px;display:inline-block;min-height:24px;min-width:24px}
+.zf-ops-dot-w{position:relative;display:inline-flex;align-items:center}
+.zf-ops-dot{all:unset;box-sizing:border-box;width:var(--hit,44px);height:var(--hit,44px);margin-left:-8px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;border-radius:50%}
+.zf-ops-dot i{width:10px;height:10px;border-radius:50%;background:#3d424a;box-shadow:0 0 0 3px rgba(61,66,74,.18)}
+.zf-ops-dot:focus-visible{outline:2px solid var(--focus,#3d424a);outline-offset:-4px}
+.zf-ops-pop{position:absolute;left:0;top:calc(100% - 4px);z-index:140;white-space:nowrap;padding:0 4px 0 10px;border-radius:10px;background:#3d424a;color:#fff;font-size:12px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.2);display:inline-flex;align-items:center}
+.zf-ops-pop[hidden]{display:none}
+.zf-ops-pop a{color:#fff;text-decoration:underline;margin-left:4px;display:inline-flex;align-items:center;min-height:var(--hit,44px);padding:0 6px}
 .zf-footer a{font-size:12px;color:#888;text-decoration:none}
 body.theme-dark .zf-footer{border-top-color:#2c2f38}
 body.theme-dark .zf-footer a{color:#9aa0aa}
@@ -515,6 +522,10 @@ span.zf3-mi{cursor:default}
 .zf3-pl{color:var(--board-ink-2);text-shadow:none;font-weight:400;font-size:13px;font-family:var(--f-ui)}
 .zf3-ntc{display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
 .zf3-ntc .zf3-nm{color:var(--led-white);text-shadow:0 0 5px rgba(242,241,236,.35)}
+/* 🔵 2026-10-16(우편함 「표시층 — 실사용 2회차 다듬기 묶음」 A2 · S4 ②) — 공지는 공고와 같은 LED 줄로 흘러 같은 무게로 보였다 → 청록 테두리 상자 + 일반 글꼴(빛 번짐 없음)로 「안내」임을 가른다. */
+.zf3-ntc{border:1px solid rgba(143,220,255,.55);background:rgba(143,220,255,.10);border-radius:8px;padding:0 2px 0 6px}
+.zf3-ntc .zf3-nm{font-family:var(--f-ui);font-weight:600;color:#E3F6FF;text-shadow:none}
+.zf3-ntc .zf3-nl{font-family:var(--f-ui)}
 .zf3-nl{color:var(--led-white);text-decoration:underline;text-underline-offset:3px;font-weight:400;font-size:13px;display:inline-flex;align-items:center;min-height:var(--hit);text-shadow:none}
 .zf3-nx{all:unset;box-sizing:border-box;display:inline-grid;place-items:center;min-width:var(--hit);min-height:var(--hit);color:var(--board-ink-2);cursor:pointer;font-family:var(--f-ui);font-size:13px}
 .zf3-sep{color:#8A8E97;font-size:9px;text-shadow:none}
@@ -555,7 +566,7 @@ span.zf3-mi{cursor:default}
 .zf3-fbtn b{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 5px;box-sizing:border-box;border-radius:999px;background:var(--ink);color:var(--paper);font-size:12px;font-family:var(--f-led)}
 .zf3-sortsel{position:relative;display:inline-flex;align-items:center;min-height:var(--hit);border:1px solid var(--line);border-radius:999px;background:var(--paper);color:var(--ink)}
 .zf3-sortsel .ic{position:absolute;left:13px;pointer-events:none;color:var(--ink-3)}
-.zf3-sortsel .cv{position:absolute;right:13px;pointer-events:none;font-size:11px;color:var(--ink-3)}
+.zf3-sortsel .cv{position:absolute;right:13px;pointer-events:none;font-size:var(--t-xs);color:var(--ink-3)}
 .zf3-sortsel select{appearance:none;-webkit-appearance:none;field-sizing:content;box-sizing:border-box;min-height:var(--hit);margin:0;padding:0 32px 0 36px;border:0;border-radius:999px;background:transparent;color:inherit;font:inherit;font-family:var(--f-ui);font-size:var(--t-s);font-weight:600;cursor:pointer}
 .zf3-sortsel select:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 .zf3-sortsel select option{color:#1a1a1a;background:#fff}
@@ -890,6 +901,23 @@ html.zf3-mapview[data-ui="d3"] #notice-list{display:none}
 @keyframes zf3ptin{from{opacity:0;transform:scale(.4)}}
 .zf3-radar .lbl{font-size:14px;font-family:var(--f-ui);font-weight:700;fill:var(--ink);paint-order:stroke;stroke:var(--map-land);stroke-width:3.5px;stroke-linejoin:round;pointer-events:none}
 .zf3-radar .cap{position:absolute;left:8px;bottom:6px;font-size:var(--t-xs);color:var(--ink-2);background:var(--paper);padding:1px 6px;border-radius:4px}
+/* 🔵 2026-10-16(다듬기 묶음 A1) — 확대·이동: 선 굵기는 배율과 무관(non-scaling) · 확대했을 때만 끌기(그 밖에는 세로 스크롤 그대로) · 확대 단추 44 */
+.zf3-radar :is(.land,.dot,.ring,.pulse,.inset,.bd){vector-effect:non-scaling-stroke}
+.zf3-radar .bd{fill:none;stroke:var(--map-line);stroke-linejoin:round;stroke-linecap:round;pointer-events:none}
+.zf3-radar .bd.sgg{stroke-width:1}
+.zf3-radar .bd.emd{stroke-width:.6;opacity:.6}
+.zf3-radar:is([data-level="sgg"],[data-level="emd"]) .land{stroke:var(--ink-3);stroke-width:1.4}   /* 시·도 경계는 시·군·구 선보다 진하게 */
+.zf3-radar .cap .src{display:block;color:var(--ink-3)}
+.zf3-radar svg{touch-action:pan-y}
+.zf3-radar.zoomed svg{touch-action:none;cursor:grab}
+.zf3-radar .inset{fill:none;stroke:var(--ink-3);stroke-width:1;stroke-dasharray:3 2}
+.zf3-radar .cap{position:static;display:block;border-radius:0;border-top:1px solid var(--line);padding:4px 8px}   /* 지도 위에 겹치지 않는다 — 390 에서 두 줄이 되며 제주 점을 덮었다 */
+.zf3-mapw{position:relative}
+.zf3-zoom{position:absolute;right:8px;bottom:8px;display:flex;gap:4px}   /* 오른쪽 아래(동해 바다) — 위쪽은 울릉군 점 자리 */
+.zf3-zoom button{all:unset;box-sizing:border-box;width:var(--hit);height:var(--hit);display:inline-flex;align-items:center;justify-content:center;background:var(--paper);border:1px solid var(--line);border-radius:var(--r-2);color:var(--ink);font-size:var(--t-l);font-weight:700;font-family:var(--f-ui);cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.zf3-zoom button[data-zoom="all"]{font-size:var(--t-xs)}
+.zf3-zoom button:disabled{opacity:.4;cursor:default}
+.zf3-zoom button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 .zf3-legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--ink-2);margin:8px 2px 0}
 .zf3-legend i,.zf3-places i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px;background:var(--map-dot);box-sizing:border-box}
 .zf3-legend i.soon,.zf3-places i.soon{background:var(--map-land);border:2px solid var(--map-dot)}
@@ -1024,6 +1052,34 @@ html[data-ui="d3"] body.theme-dark{color-scheme:dark}
 @keyframes zf3breath{from{opacity:.55}to{opacity:1}}
 @keyframes zf3grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
 @keyframes zf3flag{from{opacity:0;transform:translate(-50%,-4px)}to{opacity:1;transform:translateX(-50%)}}
+/* 🔵 2026-10-16(우편함 「표시층 — 실사용 2회차 다듬기 묶음」 B3 · N20·D2 잔여) — 펼친 상세 안쪽 누름 칸을 hit(44)로: 단원 머리(공급일정·정책 안내·특이사항·자격·세대·사진·서류) 19 →
+   위아래 안쪽 여백 · 정책 항목·공급일정 역·세대 묶음 머리 34~42 → min-height · 정책 칩 27 · 정책 검색 31 · 「모두 펼치기」 21 · 생활시설 칩 29 · 쪽 넘김 28×30.
+   D1 잔여 — 공급일정 「공고문 일정」·「원문」·대상 표지 11px → t-xs(12). 모양(글자·색·테두리)은 그대로 · 칸만 넓힌다. */
+html[data-ui="d3"] :is(.policy-title,.elig-title,.hu-title,.extras-title,.docs-title){padding:12px 0;line-height:20px;margin-bottom:0}
+html[data-ui="d3"] .policy-item>summary,html[data-ui="d3"] .zf-sch-stop>summary{min-height:var(--hit);box-sizing:border-box}
+html[data-ui="d3"] .hu-ug>summary{min-height:var(--hit);box-sizing:border-box}
+/* 🔵 2026-10-16(우편함 「표시층 — 생활시설 칩 작게 …」 1 · 다운님 휴대폰 「너무 크다」) — 보이는 알약은 28(::before) · 누름 칸은 위아래 투명 8을 더한 44 그대로.
+   생활시설 칩은 한 줄(넘치면 옆으로 넘김) · 정책 칩도 같은 이유로 커졌던 것이라 같은 꼴. */
+html[data-ui="d3"] :is(.pol-chip,.poi-tab){position:relative;z-index:0;min-height:var(--hit);box-sizing:border-box;display:inline-flex;align-items:center;flex:0 0 auto;padding:0 10px;margin:0;border:0!important;background:transparent!important;border-radius:0;font-size:var(--t-xs);line-height:1;white-space:nowrap;font-family:inherit}
+html[data-ui="d3"] :is(.pol-chip,.poi-tab)::before{content:"";position:absolute;inset:8px 0;z-index:-1;border-radius:999px;border:1px solid var(--line);background:var(--paper)}
+html[data-ui="d3"] .poi-tab.active::before{background:#1D9E75;border-color:#1D9E75}
+html[data-ui="d3"] .pol-chip.sel::before{background:#0F6E56;border-color:#0F6E56}
+html[data-ui="d3"] :is(.pol-chip,.poi-tab):focus-visible{outline:2px solid var(--focus);outline-offset:-4px;border-radius:999px}
+html[data-ui="d3"] .poi-tabs{flex-wrap:nowrap;overflow-x:auto;gap:4px;margin:-8px 0 0;padding-right:16px;scrollbar-width:none;-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 16px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 16px),transparent)}
+html[data-ui="d3"] .poi-tabs::-webkit-scrollbar{display:none}
+html[data-ui="d3"] .pol-chips{gap:0 4px;margin:-8px 0 0}
+html[data-ui="d3"] .pol-search{min-height:var(--hit)}
+html[data-ui="d3"] .pol-toggle-all{min-height:var(--hit);display:inline-flex;align-items:center}
+html[data-ui="d3"] :is(.zf-sch-src,.zf-sch-scope,.zf-sch-more){font-size:var(--t-xs)}
+html[data-ui="d3"] .zf3-gotop{width:var(--hit);height:var(--hit);margin:-7px}
+html[data-ui="d3"] .zf3-gotop::before{inset:0}
+html[data-ui="d3"] .pg-bar{gap:2px}
+/* A3 · N16 — 공고 탭 머리 위 검색 줄(시트에서 옮김 · 같은 칸) */
+.zf3-search{display:flex;gap:8px;margin:2px 0 10px}
+.zf3-search input{flex:1;min-width:0;min-height:var(--hit);box-sizing:border-box;padding:0 12px 0 36px;border:1px solid var(--line);border-radius:var(--r-2);background:var(--paper) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='8.5' cy='8.5' r='5.5'/%3E%3Cpath d='M13 13l4 4'/%3E%3C/svg%3E") no-repeat 12px center/16px;font-size:var(--t-m);color:var(--ink);font-family:var(--f-ui)}
+.zf3-search input:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+.zf3-search select{flex:0 0 auto;min-height:var(--hit);box-sizing:border-box;padding:0 8px;border:1px solid var(--line);border-radius:var(--r-2);background:var(--paper);color:var(--ink-2);font-size:var(--t-s);font-family:var(--f-ui);cursor:pointer}
+html[data-ui="d3"] .pg-btn{min-width:var(--hit);height:var(--hit);font-size:var(--t-s)}
 @media (prefers-reduced-motion:reduce){html[data-ui="d3"] .zf3-done,html[data-ui="d3"] .zf3-today,html[data-ui="d3"] .zf3-sk,html[data-ui="d3"] .zf3-go span{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -1280,9 +1336,9 @@ html[data-ui="d3"] body.theme-dark{color-scheme:dark}
          모바일 입력기는 단어를 다 칠 때까지 조합을 이어 가 input 이 전부 건너뛰어졌다. 중복 입력(#491)의 원인은 그리는 쪽이 칸 value 를 다시 쓴 것이었고
          그 줄은 걷혀 있다 — 그리는 쪽은 칸 value 를 쓰지 않는다(applyNoticeSubFilters 의 q 인자). -->
     <div style="display:flex;gap:8px;margin-bottom:0.75rem">
-      <input type="text" id="noticeSearchInput" placeholder="공고명, 지역 등으로 검색" oninput="applyNoticeFiltersAndRender();zfLogSearchSoon(this.value)"
+      <input type="text" id="noticeSearchInput" placeholder="공고명, 지역 등으로 검색" aria-label="공고 검색" oninput="applyNoticeFiltersAndRender();zfLogSearchSoon(this.value)"
         style="flex:1;min-width:0;padding:9px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px">
-      <select id="noticeSearchScopeSel" onchange="applyNoticeFiltersAndRender()"
+      <select id="noticeSearchScopeSel" aria-label="검색 범위" onchange="applyNoticeFiltersAndRender()"
         style="font-size:13px;padding:5px 8px;border:1px solid #e0e0e0;border-radius:8px;background:#fff;color:#333;cursor:pointer">
         <option value="title">제목만</option>
         <option value="title-region" selected>제목+지역</option>
@@ -3022,7 +3078,8 @@ const ZF_SIGUNGU_ALIASES = {
 // (대전·충남은 통합 미법제화라 대상이 아니다.)
 const ZF_SIDO_ALIASES = {
   '전남광주통합특별시': ['광주광역시','전라남도'],
-  '강원특별자치도':     ['강원도']
+  '강원특별자치도':     ['강원도'],
+  '전북특별자치도':     ['전라북도']   // 2026-10-16 — 지도 쪽 시·도 표(ZF3_PROV)를 걷으며 거기만 있던 옛 이름을 이리로(한 벌)
 };
 
 // 이 행이 검색으로 잡혀야 하는 추가 지역 표기들.
@@ -3510,13 +3567,24 @@ function zfLoadTierTags(){
       zfTierTagsReady = true;
       return true;
     });
-  }).catch(err => { zfTierTagsP = null; console.warn('ZipFit: 대상 계층 원문 칸 로드 실패 — 제목으로만 거릅니다', err); return false; });
+  }).catch(err => { zfTierTagsP = null; zfTierTagsFailed = true; console.warn('ZipFit: 대상 계층 원문 칸 로드 실패 — 제목으로만 거릅니다', err); return false; });
   return zfTierTagsP;
 }
+// 🔵 2026-10-16(우편함 「표시층 — 매칭 정확성 …」 3 · N18) — 두 표를 받는 동안(첫 누름 뒤 1~4초)은 제목만으로 거른 결과(「⚠ 조건에 맞는 공고가 없어요」 ·
+//    「빼면 N건」)를 그리지 않고 「불러오는 중」이다. 받으면 다시 그리고, 받지 못했으면 종전대로 제목만으로 거른다(zfTierTagsFailed).
+let zfTierTagsFailed = false;
+function zfTierTagsPending(){ return !!activeNoticeTarget && !zfTierTagsReady && !zfTierTagsFailed; }
 function zfTierTagsOf(n){
   const s = zfTierByKey.get(zfDedupKey(n['공고명'] || ''));
   return s ? [...s] : [];
 }
+let zfSearchComposing = false;
+(function(){
+  const q = document.getElementById('noticeSearchInput');
+  if(!q) return;
+  q.addEventListener('compositionstart', () => { zfSearchComposing = true; });
+  q.addEventListener('compositionend', () => { zfSearchComposing = false; applyNoticeFiltersAndRender(); });
+})();
 function applyNoticeSubFilters(rows, opts){
   let out = rows;
   if(activeNoticeTarget){
@@ -3527,7 +3595,8 @@ function applyNoticeSubFilters(rows, opts){
     });
   }
   // opts.q — 검색어를 칸 대신 넘길 때(0건 화면 「빼면 N건」 · 칸 value 를 건드리지 않게)
-  const searchQuery = (opts && opts.q != null) ? opts.q : (document.getElementById('noticeSearchInput')?.value || '');
+  // 🔵 2026-10-16(A3 · N16) — 한글 조합 중에는 끝의 낱자모(「장ㅇ」의 ㅇ)를 떼고 거른다 — 칠 때마다 「0건」이 깜빡이던 자리. 조합이 끝나거나 음절이 되면 그대로.
+  const searchQuery = (opts && opts.q != null) ? opts.q : (document.getElementById('noticeSearchInput')?.value || '').replace(zfSearchComposing ? /[\u3131-\u318E]+$/ : /$^/, '');
   const searchScope = document.getElementById('noticeSearchScopeSel')?.value || 'title-region';
   return searchFilterNotices(out, searchQuery, searchScope);
 }
@@ -3544,6 +3613,17 @@ function showClosedNotices(){
 
 // keepPage — 재질의 경로만 넘긴다. 그 밖에는 언제나 1쪽이다(위 관문 주석 참조).
 function applyNoticeFiltersAndRender(keepPage){
+  if(zfTierTagsPending()){
+    const statusEl = document.getElementById('notice-status'), listEl = document.getElementById('notice-list');
+    statusEl.className = 'rbox warn';
+    statusEl.innerHTML = `<p class="rtitle">⏳ ${escapeHtml(activeNoticeTarget)} 대상 공고를 찾는 중...</p>`;
+    if(listEl) listEl.innerHTML = '';
+    if(typeof zf3Skeleton === 'function') zf3Skeleton();
+    const sn = document.querySelector('[data-zf3-sheetcount]');
+    if(sn) sn.textContent = '찾는 중...';
+    zfLoadTierTags().then(() => applyNoticeFiltersAndRender(keepPage));
+    return;
+  }
   const hideClosed = document.getElementById('hideClosedChk')?.checked;
   // status 칩을 직접 고른 경우엔 칩이 우선이라 마감 숨기기가 개입하지 않는다.
   const closedHidden = !!hideClosed && !activeNoticeStatus;
@@ -3723,7 +3803,11 @@ function zfMapNoticeRows(rows){
 function zfRpcArgs(o){
   return Object.fromEntries(Object.entries(o || {}).filter(([, v]) => v != null));
 }
+// 🔵 2026-10-16(우편함 「표시층 — 매칭 정확성 …」 2 · N11과 같은 꼴) — 지역·유형 칩을 빠르게 바꾸면 앞 요청 응답이 뒤 요청보다 늦게 와
+//    고른 칩과 다른 목록을 덮어쓸 수 있다. 가장 나중 요청(zfNoticeSeq)의 응답만 화면에 쓴다.
+let zfNoticeSeq = 0;
 async function loadNoticeData(keepPage){
+  const seq = ++zfNoticeSeq;
   noticeLoading = true;
   const statusEl = document.getElementById('notice-status');
   const listEl   = document.getElementById('notice-list');
@@ -3758,6 +3842,7 @@ async function loadNoticeData(keepPage){
       throw new Error('Supabase 오류: ' + msg);
     }
 
+    if(seq !== zfNoticeSeq) return;   // 늦게 온 앞 요청 — 버린다(뒤 요청이 그린다)
     // 마감 숨기기는 status 칩 미선택 시 클라이언트에서 최종 처리
     noticeData = zfMapNoticeRows(rows);
 
@@ -3765,14 +3850,17 @@ async function loadNoticeData(keepPage){
     applyNoticeFiltersAndRender(keepPage);
     updateFilterToggleBtn();
   }catch(err){
+    if(seq !== zfNoticeSeq) return;
     noticeError = true;
     statusEl.className = 'rbox err';
     { const l = document.getElementById('notice-list'); if(l && l.querySelector('.zf3-skel')) l.innerHTML = ''; }   // 🔵 D-3 b — 못 불러오면 빈 노선을 걷는다
     statusEl.innerHTML = '<p class="rtitle">⚠️ 공고 데이터를 불러오지 못했어요</p><p class="rdesc">잠시 후 다시 시도해주세요.</p><button class="btn btn-sec btn-sm" style="margin-top:8px" onclick="zfRetryNoticeData()">새로고침</button>';
     console.error('ZipFit 공고 로드 실패:', err);
   }finally{
-    noticeLoading = false;
-    zfRerenderRecIfVisible();
+    if(seq === zfNoticeSeq){
+      noticeLoading = false;
+      zfRerenderRecIfVisible();
+    }
   }
 }
 
@@ -3858,6 +3946,20 @@ function zfOpsOn(){
 }
 function zfOpsBadge(){
   if(!zfOpsOn() || document.getElementById('zfOpsBadge')) return;
+  // 🔵 2026-10-16(우편함 「표시층 — 실사용 2회차 다듬기 묶음」 A4 · N19) — d3 에서는 앱 머리 「꼭집」 옆 작은 점(누름 칸 44). 누르면 「운영 기기 · … 끄기」가 열린다.
+  //    바닥 고정 띠가 390 에서 고지 링크(이용약관 · 개인정보처리방침)를 덮었다. 운영 기기(?ops=1)에만 생긴다 — 일반 화면 변화 0.
+  const top = document.getElementById('zf3Top'), home = document.getElementById('zf3Home');
+  if(top && !top.hidden && home){
+    const w = document.createElement('span');
+    w.id = 'zfOpsBadge'; w.className = 'zf-ops-dot-w';
+    w.innerHTML = '<button type="button" class="zf-ops-dot" aria-expanded="false" aria-controls="zfOpsPop" aria-label="운영 기기 표지 — 눌러서 끄기"><i aria-hidden="true"></i></button>'
+      + '<span id="zfOpsPop" class="zf-ops-pop" role="note" hidden>운영 기기 · 이용 기록에 운영 표지 <a href="?ops=0">끄기</a></span>';
+    home.after(w);
+    const btn = w.querySelector('button'), pop = w.querySelector('#zfOpsPop');
+    btn.addEventListener('click', () => { const open = pop.hidden; pop.hidden = !open; btn.setAttribute('aria-expanded', String(open)); });
+    document.addEventListener('click', e => { if(!pop.hidden && !w.contains(e.target)){ pop.hidden = true; btn.setAttribute('aria-expanded', 'false'); } });
+    return;
+  }
   const b = document.createElement('div');
   b.id = 'zfOpsBadge'; b.className = 'zf-ops-badge'; b.setAttribute('role', 'note');
   b.innerHTML = '운영 기기 · 이용 기록에 운영 표지 <a href="?ops=0">끄기</a>';
@@ -4640,7 +4742,11 @@ function noticePageWindow(page, pageCount){
   const keep = new Set([1, pageCount, page - 1, page, page + 1]);
   const nums = [...keep].filter(n => n >= 1 && n <= pageCount).sort((a, b) => a - b);
   const out = [];
-  nums.forEach((n, i) => { if(i > 0 && n - nums[i-1] > 1) out.push('…'); out.push(n); });
+  // 🔵 2026-10-16(우편함 「표시층 — 실사용 2회차 다듬기 묶음」 A5 · N17) — 「…」가 숨기는 쪽이 하나뿐이면 그 번호를 그대로 쓴다(「1 2 … 4」 → 「1 2 3 4」).
+  //    단추가 44(hit)라 좁은 화면(480 미만)에서는 번호 단추 5개까지만 — 넘으면 종전대로 「…」(가로 넘침 0).
+  const cap = (typeof innerWidth === 'number' && innerWidth < 480) ? 5 : 9;
+  const fill = nums.length + nums.filter((n, i) => i > 0 && n - nums[i-1] === 2).length <= cap;
+  nums.forEach((n, i) => { if(i > 0 && fill && n - nums[i-1] === 2) out.push(n - 1); else if(i > 0 && n - nums[i-1] > 1) out.push('…'); out.push(n); });
   return out;
 }
 function noticePagerHtml(pageCount, page){
@@ -4966,9 +5072,15 @@ function renderPersonalizedRecommendations(){
     const lo = (s && s.deposit_min != null) ? Number(s.deposit_min) : null;
     return !(lo != null && lo > recMaxDep * 10000);
   };
+  // 🔵 2026-10-16(우편함 「표시층 — 생활시설 칩 작게 · 추천 탭 … 소득 관문」 2) — 추천 「대상 조건에 맞아요」도 소득을 본 뒤에만(매칭 ✓와 같은 zfTargetIncomeGate · zfLimitsFor 한 벌).
+  //    저장 조건에는 맞벌이·출산 가산 입력이 없어 가산 없는 기본 기준으로 잰다(기준이 낮게 잡히는 보수 방향 — 틀린 「맞아요」는 생기지 않는다).
+  //    기준액 표를 아직 안 받았으면 받은 뒤 한 번 다시 그린다(받지 못하면 「계산하지 못했어요」 쪽).
+  if(!_urbanIncome || !_medianIncome){ if(!zfRecIncomeAsked){ zfRecIncomeAsked = true; Promise.all([loadUrbanIncome(), loadMedianIncome()]).then(([u, m]) => { if(u && m) renderPersonalizedRecommendations(); }); } }
+  const recM = { src: 'profile', income: (parseFloat(currentUser.income) || 0) * 10000, members: Math.min(parseInt(currentUser.members) || 0, 8), dualApplied: false, birthTierApplied: 0 };
+  const recTables = (_urbanIncome && _medianIncome) ? { '도시근로자': _urbanIncome, '기준중위소득': _medianIncome } : null;
   const recKeep = n => {
     if(!recDepOk(n)) return false;
-    const v = zfTargetVerdictFor(n['announcement_id'], recTf, n['공고명'] || n['name']);
+    const v = zfTargetIncomeGate(zfTargetVerdictFor(n['announcement_id'], recTf, n['공고명'] || n['name']), n['announcement_id'], n['공고명'] || n['name'], recTf, recM, recTables);
     n._zfTarget = v;
     if(v && v.state === 'no'){ recOut.push({ id: n['announcement_id'], title: n['공고명'] || n['name'], v }); return false; }
     return true;
@@ -5425,6 +5537,7 @@ function goStep(n){
 // 🔴 이 표가 소득 한도의 밑값이다. eligibility_criteria의 income_pct 계열은 이 값에 곱하는 비율일 뿐이다.
 // 표는 해마다 바뀐다 — 새 연도 행을 넣으면 아래 로직이 가장 큰 standard_year를 자동으로 고른다.
 let _urbanIncome = null;
+let zfRecIncomeAsked = false;   // 추천 소득 관문 — 기준액 표를 한 번만 받아 다시 그린다
 async function loadUrbanIncome(){
   if(_urbanIncome) return _urbanIncome;
   try {
@@ -5520,8 +5633,50 @@ function ageStateFor(row, birthYear){
   return 'check';                               // 경계에 걸침 — 생일 경과 여부에 따라 갈린다
 }
 
-async function diagnose(){
-  const marital=document.getElementById('marital').value;
+// 🔵 2026-10-16(우편함 「표시층 — 매칭 정확성 …」 1 · N12) — 한 행의 소득·자산·자동차 한도. 진단(diagnose 의 limitsFor)과
+//    매칭 ✓ 소득 관문(zfTargetIncomeGate)이 함께 부른다(사본 0). members = 가구원 수(1~8) · tables = { 도시근로자, 기준중위소득 } 표.
+function zfLimitsFor(c, tier, dual, members, tables){
+  const incomeBaseOf = c => { const t = tables[(c && c.income_base) || ''] || null; return t ? t.table[members] : null; };
+  const num = v => (v==null || v==='') ? null : Number(v);
+  const pick = (base, b1, b2) => {
+    const b = num(base), v = num(tier===2 ? b2 : (tier===1 ? b1 : null));
+    if(v==null) return b;
+    if(b==null) return v;
+    return Math.max(b, v);
+  };
+  const basePct = num(c.income_pct);
+  let pct = basePct;
+  if(pct != null){
+    const hhBonus = members===1 ? num(c.income_pct_household1_bonus)
+                  : members===2 ? num(c.income_pct_household2_bonus) : null;
+    pct += (hhBonus ?? 0);
+    const dualPct = num(c.income_pct_dual_income);
+    if(dual && dualPct != null) pct += dualPct - basePct;
+    const birthPct = tier===1 ? num(c.income_pct_birth1) : tier===2 ? num(c.income_pct_birth2) : null;
+    if(birthPct != null) pct += birthPct - basePct;
+  }
+  // 🔴 가구원수별 상한(2026-09-23 B22) — 원문 표가 가구원 수마다 최종 소득·자산 기준을 못 박은 유형이 있다
+  //    (행복주택/청년 20647_1 p.8 《청년 계층 출생자녀 수에 따른 가산 소득·자산 기준》). 가산을 합산하면
+  //    표에 없는 조합(1인·출산자녀 1인, 2인·출산자녀 2인)이 표 최대를 넘는다. 그 행은 DB
+  //    verification_requirements['가구원수별_가산상한']에 표를 들고 있고, 여기서는 같은 가구원 수의 최대로만 자른다.
+  //    값을 코드에 두지 않는다 — 키가 없는 행의 식은 종전 그대로다.
+  const capTbl = c.verification_requirements && c.verification_requirements['가구원수별_가산상한'];
+  const cap = capTbl ? (capTbl[String(Math.min(members, 3))] || null) : null;
+  const clip = (v, k) => (v == null || !cap || cap[k] == null) ? v : Math.min(v, Number(cap[k]));
+  if(pct != null) pct = clip(pct, '소득_pct');
+  return {
+    // 🔴 정수 pct를 먼저 곱하고 100으로 나눈다. base*(pct/100)로 쓰면 부동소수 오차로 반올림이
+    // 한 원씩 어긋난다 — 9,326,985 × 70%가 정확히 6,528,889.5라 경계에 걸린다(공고 게시값 6,528,890).
+    // 🔴 밑값 표가 없으면(income_base NULL) incLim 도 null 이다 — 0 으로 떨어뜨리지 않는다.
+    incLim:   (pct==null || incomeBaseOf(c)==null) ? null : Math.round(incomeBaseOf(c) * pct / 100),
+    assetLim: clip(pick(c.asset_limit,  c.asset_limit_birth1,  c.asset_limit_birth2), '자산'),
+    carLim:   clip(pick(c.car_limit,    c.car_limit_birth1,    c.car_limit_birth2), '자동차')
+  };
+}
+
+// 🔵 2026-10-16(우편함 「표시층 — 매칭 정확성 …」 1 · N12) — 진단의 소득 축 입력을 한 곳에서 읽는다. 진단(diagnose)과
+//    매칭 ✓ 소득 관문(zfTargetIncomeGate)이 같은 값을 쓴다(사본 0).
+function zfDiagMoneyInputs(){
   const children=parseInt(document.getElementById('children').value)||0;
   const members=Math.min(parseInt(document.getElementById('members').value)||2,8);
   // 🔴 사용자 입력이다 — 2026-09-11 이전에는 문구 문자열에서 되짚어 추정했다.
@@ -5536,6 +5691,11 @@ async function diagnose(){
   const birthInput=document.getElementById('birthAfterBase')?.value||'unknown';
   const birthTierApplied = birthInput==='yes' ? Math.max(1, Math.min(children, 2)) : 0;
   const income=(parseFloat(document.getElementById('income').value)||0)*10000;
+  return { children, members, dualInput, dualApplied, birthInput, birthTierApplied, income };
+}
+async function diagnose(){
+  const marital=document.getElementById('marital').value;
+  const { children, members, dualInput, dualApplied, birthInput, birthTierApplied, income } = zfDiagMoneyInputs();
   const assets=(parseFloat(document.getElementById('assets').value)||0)*10000;
   const owned=document.getElementById('owned').value;
   const hasSavings=document.getElementById('hasSavings')?.value||'unknown';
@@ -5592,43 +5752,8 @@ async function diagnose(){
   // 한부모 2인가구 1자녀 120%(= 100 + 10 + 10), 영구임대 일반입주자 2인가구 1자녀 70%(= 50 + 10 + 10).
   // 종전에는 축마다 Math.max로 「느슨한 쪽 하나만」 썼는데, 그것은 코드의 안전측 설계였지 제도 규칙이 아니었다.
   // DB의 *_dual_income·*_birth1/2는 절대 비율(기본 + 가산)이므로 기본값을 빼서 가산분(%p)으로 되돌려 더한다.
-  function limitsFor(c, tier, dual){
-    const num = v => (v==null || v==='') ? null : Number(v);
-    const pick = (base, b1, b2) => {
-      const b = num(base), v = num(tier===2 ? b2 : (tier===1 ? b1 : null));
-      if(v==null) return b;
-      if(b==null) return v;
-      return Math.max(b, v);
-    };
-    const basePct = num(c.income_pct);
-    let pct = basePct;
-    if(pct != null){
-      const hhBonus = members===1 ? num(c.income_pct_household1_bonus)
-                    : members===2 ? num(c.income_pct_household2_bonus) : null;
-      pct += (hhBonus ?? 0);
-      const dualPct = num(c.income_pct_dual_income);
-      if(dual && dualPct != null) pct += dualPct - basePct;
-      const birthPct = tier===1 ? num(c.income_pct_birth1) : tier===2 ? num(c.income_pct_birth2) : null;
-      if(birthPct != null) pct += birthPct - basePct;
-    }
-    // 🔴 가구원수별 상한(2026-09-23 B22) — 원문 표가 가구원 수마다 최종 소득·자산 기준을 못 박은 유형이 있다
-    //    (행복주택/청년 20647_1 p.8 《청년 계층 출생자녀 수에 따른 가산 소득·자산 기준》). 가산을 합산하면
-    //    표에 없는 조합(1인·출산자녀 1인, 2인·출산자녀 2인)이 표 최대를 넘는다. 그 행은 DB
-    //    verification_requirements['가구원수별_가산상한']에 표를 들고 있고, 여기서는 같은 가구원 수의 최대로만 자른다.
-    //    값을 코드에 두지 않는다 — 키가 없는 행의 식은 종전 그대로다.
-    const capTbl = c.verification_requirements && c.verification_requirements['가구원수별_가산상한'];
-    const cap = capTbl ? (capTbl[String(Math.min(members, 3))] || null) : null;
-    const clip = (v, k) => (v == null || !cap || cap[k] == null) ? v : Math.min(v, Number(cap[k]));
-    if(pct != null) pct = clip(pct, '소득_pct');
-    return {
-      // 🔴 정수 pct를 먼저 곱하고 100으로 나눈다. base*(pct/100)로 쓰면 부동소수 오차로 반올림이
-      // 한 원씩 어긋난다 — 9,326,985 × 70%가 정확히 6,528,889.5라 경계에 걸린다(공고 게시값 6,528,890).
-      // 🔴 밑값 표가 없으면(income_base NULL) incLim 도 null 이다 — 0 으로 떨어뜨리지 않는다.
-      incLim:   (pct==null || incomeBaseOf(c)==null) ? null : Math.round(incomeBaseOf(c) * pct / 100),
-      assetLim: clip(pick(c.asset_limit,  c.asset_limit_birth1,  c.asset_limit_birth2), '자산'),
-      carLim:   clip(pick(c.car_limit,    c.car_limit_birth1,    c.car_limit_birth2), '자동차')
-    };
-  }
+  // 🔵 2026-10-16(N12) — 본문은 zfLimitsFor 한 벌이다(매칭 ✓ 소득 관문이 같은 함수를 부른다).
+  function limitsFor(c, tier, dual){ return zfLimitsFor(c, tier, dual, members, INCOME_BASE_TABLES); }
   // 소득·자산·자동차 세 축을 한 곳에서 판정한다. 입력이 0이면 그 축은 묻지 않은 것이다.
   // 자동차만 규칙이 다르다: 한도 정보가 없는 행(carLim==null)은 탈락시키지 않는다 —
   // 자산과 달리 이 축은 값이 비어 있는 행이 실제로 있고(행복주택/대학생), 없는 요건으로 떨어뜨리면
@@ -6266,6 +6391,35 @@ function zfTargetSplitWords(s){
   out.push(cur);
   return out.map(x => x.trim()).filter(Boolean);
 }
+// 🔵 2026-10-16(우편함 「표시층 — 실사용 2회차 다듬기 묶음」 B1 · N14) — 안내 괄호 안 낱말은 여러 갈래(신혼·신생아 · 한부모)의 확인필요를 합친 것이라
+//    같은 조건이 두 번 나왔다(`…0886` 「6세(자격완화 9세) 이하 자녀」 · `…0920` 「만 6세 이하 자녀(태아 포함)」 — 갈래 값마다 원문 그대로이고 한 값 안에는 겹침 0).
+//    완화 괄호와 띄어쓰기를 뺀 꼴이 다른 낱말 안에 「또는 ○○」(갈래 하나의 다른 길)로 그대로 들어 있으면 짧은 쪽을 뺀다 · 같은 꼴은 한 번만.
+//    🔴 단순 포함으로는 빼지 않는다 — 「청년창업가」와 「4차 산업 … 청년 창업가」는 다른 모집 갈래다(`SH_311087`).
+const zfTargetWordKey = w => String(w || '').replace(/\((?:【?완화조건】?|자격완화)[^)]*\)/g, '').replace(/\s+/g, '');
+function zfTargetDedupWords(list){
+  const ks = list.map(zfTargetWordKey);
+  return list.filter((w, i) => ks.indexOf(ks[i]) === i && !ks.some((k, j) => j !== i && k.includes('또는' + ks[i])));
+}
+// 🔵 2026-10-16(같은 요청서 B2 · N15) — 새 조건 키(혼인 · 계층_중_하나 · 가구원수_최대)가 입력을 몰라(가구원 수 칸을 안 건드림 · 계층 칸을 안 고름 · 예비신혼 혼인)
+//    「확인 필요」가 된 갈래는 그 조건도 이유에 낸다 — 종전에는 확인필요 글자만 나와 `SH_311349`가 「은평구에 거주」만 들고 1인가구 조건이 빠졌다.
+//    판정은 그대로(zfTargetBranchState · zfTargetCondState) · 글자는 키 값 그대로(우리 말로 짓지 않는다 — 가구원수만 「1인 가구」·「가구원 N명 이하」).
+function zfTargetCondLabel(k, v){
+  if(k === '가구원수_최대') return Number(v) === 1 ? '1인 가구' : `가구원 ${Number(v)}명 이하`;
+  if(k === '계층_중_하나') return (Array.isArray(v) ? v : [v]).map(String).join('·');
+  return String(v);
+}
+function zfTargetUnknownConds(g, f){
+  const out = [];
+  // 그 행의 확인필요 글자가 이미 그 조건을 말하면 붙이지 않는다(`…20880` 「1인가구 — 본인 세대주」에 「1인 가구」를 또 붙이지 않게).
+  const said = zfTargetWordKey(((g && g['갈래']) || []).map(b => (b && b['확인필요']) || '').join(' '));
+  ((g && g['갈래']) || []).forEach(b => {
+    if(!b || typeof b !== 'object' || zfTargetBranchState(b, f) !== 'check') return;
+    const c = (b['조건'] && typeof b['조건'] === 'object') ? b['조건'] : {};
+    if(Object.keys(c).some(k => !ZF_TARGET_OLD_KEYS.includes(k) && !ZF_TARGET_NEW_KEYS.includes(k))) return;   // 모르는 키가 있는 갈래는 그 키 때문에 check — 아는 조건 글자로 이유를 대신하지 않는다
+    ZF_TARGET_NEW_KEYS.forEach(k => { if(c[k] == null || zfTargetCondState(k, c[k], f) !== 'check') return; const l = zfTargetCondLabel(k, c[k]); if(!said.includes(zfTargetWordKey(l))) out.push(l); });
+  });
+  return out;
+}
 // rows = 그 카드 자신의 자격 행 공급대상 칸 배열(객체가 아니면 「키 없음」). 판정하지 않으면 null.
 function zfTargetVerdict(rows, f){
   if(!Array.isArray(rows) || !rows.length) return null;
@@ -6277,13 +6431,13 @@ function zfTargetVerdict(rows, f){
   if(st.every(s => s === 'no')) return { state: 'no', names: names('*'), quotes };
   if(st.includes('ok')) return { state: 'ok', names: names('ok'), quotes };
   // 🔵 2026-10-15(우편함 「코드 — 공급대상 갈래 「no 먼저」 …」 1단계 2) — 확인필요 글자를 「 · 」로 갈라 같은 낱말은 한 번만(`…19376` 「1순위 유형(가구 단위)」 두 갈래).
-  const checks = [...new Set(rows.flatMap(g => (g['갈래'] || []).map(b => b && b['확인필요']).filter(Boolean).flatMap(zfTargetSplitWords).concat(zfTargetUncovered(g))))];
+  const checks = zfTargetDedupWords([...new Set(rows.flatMap(g => (g['갈래'] || []).map(b => b && b['확인필요']).filter(Boolean).flatMap(zfTargetSplitWords).concat(zfTargetUncovered(g), zfTargetUnknownConds(g, f))))]);
   // 🔵 2026-10-13(우편함 「코드 — 한글 중복 입력 · 매칭 「맞음」 낱말 확장 …」 3 ②) — 대상 이름 없이 「확인필요」만 있는 갈래가 있으면
   //    「○○ 대상 모집」으로 묶지 않는다(`…20880` 장애인 · 1인가구 → 「장애인 대상 모집」은 1인가구를 지웠다). 갈래마다 원문 대상 글자를 그대로 낸다.
   if(rows.some(g => (g['갈래'] || []).some(b => b && b['확인필요'] && !b['대상']))){
     const targets = [...new Set(rows.flatMap(g => (g['갈래'] || []).map(b => !b ? '' :
       (b['대상'] && b['확인필요']) ? `${b['대상']}(${b['확인필요']})` : (b['확인필요'] || b['대상'] || '')).filter(Boolean)))];
-    const extra = [...new Set(rows.flatMap(g => zfTargetUncovered(g)))];
+    const extra = zfTargetDedupWords([...new Set(rows.flatMap(g => zfTargetUncovered(g).concat(zfTargetUnknownConds(g, f))))]);
     return { state: 'check', names: names('*'), checks: extra, targets, quotes };
   }
   return { state: 'check', names: names('*'), checks, quotes };
@@ -6312,6 +6466,8 @@ function zfTargetProfileFacts(){
 let zfTargetRowsP = null;
 const zfTargetRowsByAnn = new Map();
 const zfTargetRowsByKey = new Map();
+const zfTargetMoneyOf = new WeakMap();   // 키 배열 → 같은 순서의 소득 칸 행(N12)
+const ZF_TARGET_MONEY_COLS = 'income_base,income_pct,income_pct_dual_income,income_pct_household1_bonus,income_pct_household2_bonus,income_pct_birth1,income_pct_birth2,income_limit_exempt,cap:verification_requirements->가구원수별_가산상한';
 function zfLoadTargetRows(){
   if(zfTargetRowsP) return zfTargetRowsP;
   const h = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
@@ -6320,9 +6476,16 @@ function zfLoadTargetRows(){
     .then(rows => {
       const ids = [...new Set((rows || []).filter(r => r && r.gk && typeof r.gk === 'object' && !Array.isArray(r.gk)).map(r => r.announcement_id))];
       if(!ids.length) return true;
-      return fetch(`${SUPABASE_URL}/rest/v1/eligibility_criteria?select=announcement_id,gk:verification_requirements->공급대상&${idFilterFor(ids)}&limit=10000`, { headers: h })
+      // 🔵 2026-10-16(N12) — 같은 행의 소득 칸도 함께 받는다(✓ 소득 관문 zfTargetIncomeGate · 한도 계산은 zfLimitsFor 한 벌). 키 배열과 같은 순서로 zfTargetMoneyOf 에 둔다.
+      return fetch(`${SUPABASE_URL}/rest/v1/eligibility_criteria?select=announcement_id,gk:verification_requirements->공급대상,${ZF_TARGET_MONEY_COLS}&${idFilterFor(ids)}&limit=10000`, { headers: h })
         .then(r => r.ok ? r.json() : [])
-        .then(all => { (all || []).forEach(r => { const a = String(r.announcement_id); if(!zfTargetRowsByAnn.has(a)) zfTargetRowsByAnn.set(a, []); zfTargetRowsByAnn.get(a).push(r.gk ?? null); }); })
+        .then(all => { (all || []).forEach(r => {
+          const a = String(r.announcement_id);
+          if(!zfTargetRowsByAnn.has(a)){ const g = []; zfTargetRowsByAnn.set(a, g); zfTargetMoneyOf.set(g, []); }
+          const g = zfTargetRowsByAnn.get(a);
+          g.push(r.gk ?? null);
+          zfTargetMoneyOf.get(g).push(Object.assign({}, r, { gk: undefined, verification_requirements: r.cap ? { '가구원수별_가산상한': r.cap } : null }));
+        }); })
         .then(() => fetch(`${SUPABASE_URL}/rest/v1/announcements?select=announcement_id,title&${idFilterFor(ids)}&limit=10000`, { headers: h }))
         .then(r => r && r.ok ? r.json() : [])
         .then(ts => {
@@ -6339,9 +6502,28 @@ function zfLoadTargetRows(){
     .catch(() => { zfTargetRowsP = null; return false; });
   return zfTargetRowsP;
 }
+function zfTargetRowsFor(annId, title){
+  return zfTargetRowsByAnn.get(String(annId)) || (title ? zfTargetRowsByKey.get(zfDedupKey(title)) : undefined);
+}
 function zfTargetVerdictFor(annId, f, title){
-  const own = zfTargetRowsByAnn.get(String(annId));
-  return zfTargetVerdict(own || (title ? zfTargetRowsByKey.get(zfDedupKey(title)) : undefined), f);
+  return zfTargetVerdict(zfTargetRowsFor(annId, title), f);
+}
+// 🔴 2026-10-16(우편함 「표시층 — 매칭 정확성 …」 1 · N12 · 재량 「그대로」: 소득을 모르거나 넘으면 ✓ 아님) — 공급대상 키는 소득을 담지 않는다.
+//    그래서 「맞음」(✓ 대상 조건 맞음)은 진단 소득이 그 카드의 「맞음」 행 가운데 하나라도 소득 기준 안일 때만 남긴다.
+//    한도는 진단과 같은 zfLimitsFor(가구원 수 · 맞벌이 · 출산 가산 · 가구원수별 상한) — 소득 기준 배제(income_limit_exempt) 행은 소득을 보지 않는다.
+//    소득을 넣지 않았거나 · 넘거나 · 기준을 계산할 수 없으면(밑값 미상 · 표를 못 받음) 「요건 확인 필요」로 내린다(이유에 소득). 「아님」으로 빼지는 않는다.
+//    m = zfDiagMoneyInputs() · tables = { 도시근로자, 기준중위소득 } 표(null 이면 계산 불가).
+function zfTargetIncomeGate(v, annId, title, f, m, tables){
+  if(!v || v.state !== 'ok') return v;
+  const gk = zfTargetRowsFor(annId, title), money = gk && zfTargetMoneyOf.get(gk);
+  const okRows = (gk && money) ? gk.map((g, i) => zfTargetRowState(g, f) === 'ok' ? money[i] : null).filter(Boolean) : [];
+  if(okRows.some(c => c.income_limit_exempt === true)) return v;
+  const lims = (m && tables) ? okRows.map(c => zfLimitsFor(c, m.birthTierApplied, m.dualApplied, m.members, tables).incLim).filter(x => x != null) : [];
+  let why;
+  if(!(m && m.income > 0)) why = 'unknown';
+  else if(lims.some(l => m.income <= l)) return v;
+  else why = lims.length ? 'over' : 'nocalc';
+  return Object.assign({}, v, { state: 'check', income: { why, lim: lims.length ? Math.max(...lims) : null, src: (m && m.src) || 'diag' } });
 }
 // 문구 — 다운님 승인 2026-10-08(우편함 「표시층 — 추천 매칭 2단계」 「## 승인」). 맞음 줄은 공급 대상만 본 판정이라
 //    「신청 자격 전체가 맞다」로 읽히지 않게 「대상 조건」이라고 쓴다.
@@ -6351,6 +6533,16 @@ function zfTargetNoteHtml(v){
   // 🔵 2026-10-15(우편함 「코드 — 공급대상 안내 이름 빈칸 …」 1) — 대상 이름이 없는 갈래(`{조건:{혼인:"혼인 중"}}` — Ⅱ 5순위 「그 밖의 혼인가구」)만으로
   //    판정되면 이름 자리를 뺀다(우리 말로 이름을 짓지 않는다). 종전에는 「👥 대상 모집 — …」처럼 빈 이름이 그대로 그려졌다.
   if(v.state === 'ok') return `<p class="zf-target-ok" style="font-size:12px;color:#0F6E56;background:#E6F4EE;border-radius:8px;padding:6px 10px;margin:0 0 8px">👥 ${nm ? `${nm} 대상 모집 — ` : ''}입력하신 정보로는 대상 조건에 맞아요</p>`;
+  if(v.state === 'check' && v.income){
+    // 🔵 2026-10-16(N12) — 대상 조건은 맞는데 소득을 볼 수 없거나 넘는 카드. 금액은 만원 단위 반올림(「약」)이다.
+    const lim = v.income.lim != null ? `월 약 ${Math.round(v.income.lim / 10000).toLocaleString()}만 원` : '';
+    const prof = v.income.src === 'profile';
+    const tail = v.income.why === 'over'
+        ? (prof ? `저장한 소득이 이 공고 기본 소득 기준(${lim} · 맞벌이·출산 가산 전)보다 많아요` : `입력하신 소득이 이 공고 소득 기준(${lim})을 넘어요`)
+      : v.income.why === 'unknown' ? (prof ? '저장한 조건에 소득이 없어 소득 기준은 보지 못했어요' : '소득을 입력하지 않아 소득 기준은 보지 못했어요')
+      : '이 공고 소득 기준을 화면에서 계산하지 못했어요';
+    return `<p class="zf-check-note" style="font-size:12px;color:#8A5A12;background:#FBF0DC;border-radius:8px;padding:6px 10px;margin:0 0 8px">📄 ${nm ? `${nm} ` : ''}대상 조건은 맞지만 ${tail} — 신청할 수 있는지 공고문에서 확인해 주세요</p>`;
+  }
   if(v.state === 'check'){
     const why = (v.checks || []).length ? ` (${escapeHtml(v.checks.join(' · '))})` : '';
     if((v.targets || []).length) return `<p class="zf-check-note" style="font-size:12px;color:#8A5A12;background:#FBF0DC;border-radius:8px;padding:6px 10px;margin:0 0 8px">📄 이 공고의 모집 대상은 ${v.targets.map(t => `「${escapeHtml(t)}」`).join(' · ')}이에요${why} — 신청할 수 있는지 공고문에서 확인해 주세요</p>`;
@@ -6374,7 +6566,11 @@ function zfTargetExcludedHtml(list){
   </details>`;
 }
 
+// 🔴 2026-10-16(우편함 「표시층 — 매칭 정확성 …」 2 · N11) — 「주택 매칭하러 가기」의 첫 요청(지역 없음) 응답이 지역 칩을 고른 뒤 보낸
+//    요청보다 늦게 오면 결과를 덮어썼다(칩 「경기도」 · 결과 전국). 가장 나중 요청(zfMatchSeq)만 화면에 쓴다.
+let zfMatchSeq = 0;
 async function matchHouses(){
+  const seq = ++zfMatchSeq;
   const regions = [...selectedRegions];
   const activeTypes = [...selectedTypes].filter(t => t !== '전체');
   const eligibleTypes = window.eligibleTypes || [];
@@ -6411,6 +6607,7 @@ async function matchHouses(){
     //    먼저 거르면 공고 탭과 상태가 어긋난다(아산 …0726 — LH 행은 닫혀도 붙은 공고문이 열려 있으면 카드가 남는다).
     //    실패해도 약속은 풀린다(zfLoadPostNotices 가 잡는다) — 그때는 종전처럼 LH 행만으로 판정한다.
     await Promise.all([zfLoadPostNotices(), zfLoadRoutes()]);   // 🔴 2026-10-15 — 경로 표(창 사이 카드 상태)도 기다린다
+    if(seq !== zfMatchSeq) return;   // 늦게 온 앞 요청 — 아래 전역(matchNoTypeFilter)도 건드리지 않는다(N11)
     rows = rows.filter(r => !isHiddenAsClosed(r));
     // 🔴 공고 탭과 같은 판정 함수를 쓴다(2026-09-16) — 짝 있는 [취소공고] 행은 여기서도 뺀다.
     const dropCancelM = zfPairedCancelIds(rows,
@@ -6470,11 +6667,14 @@ async function matchHouses(){
     const facts = zfDiagFacts();
     rows.forEach(r => { r._zfSupplyCheck = zfSupplyCheckLabels(r.title, facts); });
     // 🔵 2026-10-08(매칭 2단계 · 시안) — 공급대상 키가 판정한 카드는 제목 📄 대신 키 판정을 쓴다 · 모두 no 면 👥 상자로 뺀다.
-    await zfLoadTargetRows();
+    const [, urbanT, medianT] = await Promise.all([zfLoadTargetRows(), loadUrbanIncome(), loadMedianIncome()]);
+    if(seq !== zfMatchSeq) return;   // 늦게 온 앞 요청 — 버린다(N11)
     const tf = zfTargetDiagFacts();
+    const tm = zfDiagMoneyInputs();
+    const tTables = (urbanT && medianT) ? { '도시근로자': urbanT, '기준중위소득': medianT } : null;
     lastTargetOut = [];
     rows = rows.filter(r => {
-      const v = zfTargetVerdictFor(r.announcement_id, tf, r.title);
+      const v = zfTargetIncomeGate(zfTargetVerdictFor(r.announcement_id, tf, r.title), r.announcement_id, r.title, tf, tm, tTables);
       r._zfTarget = v;
       if(v && v.state === 'no'){ lastTargetOut.push({ id: r.announcement_id, title: r.title, v }); return false; }
       return true;
@@ -6484,6 +6684,7 @@ async function matchHouses(){
     visibleCount = 5;
     applyMatchSortAndRender();
   } catch(err) {
+    if(seq !== zfMatchSeq) return;
     r.innerHTML = '<div class="rbox err"><p class="rtitle">⚠️ 매칭 중 오류가 발생했어요</p><p class="rdesc">잠시 후 다시 시도해주세요.</p><button class="btn btn-sec btn-sm" style="margin-top:8px" onclick="matchHouses()">다시 시도</button></div>';
     console.error('matchHouses 오류:', err);
   }
@@ -11441,8 +11642,8 @@ function zf3RenderSheetPlaces(){
   if(!activeNoticeRegion){ msg('시·도를 고르면 시·군·구로 더 좁힐 수 있어요'); return; }
   if(!zf3Geo){ msg('시·군·구를 불러오는 중…'); zf3LoadGeo().then(g => { if(g) applyNoticeFiltersAndRender(noticePage); else msg('시·군·구를 불러오지 못했어요'); }); return; }
   zfEnsurePriceSummaries((zf3PrePlace || []).map(n => n['announcement_id'])).then(ok => { if(ok){ applyNoticeFiltersAndRender(noticePage); zfFillSummarySlots(); } });
-  const pc = ZF3_PROV[activeNoticeRegion];   // 목록 RPC 가 이미 그 시·도로 걸렀다 — 이름이 표에 없는 시·도(통합 시·도 등)면 걸린 행의 곳 전부
-  const pcs = ZF3_PROV_SPLIT[activeNoticeRegion] || (pc ? [pc] : null);
+  const pc = zf3Pc(activeNoticeRegion);   // 목록 RPC 가 이미 그 시·도로 걸렀다 — 이름이 경계 파일에 없는 시·도면 걸린 행의 곳 전부
+  const pcs = pc ? [pc] : null;
   const gs = zf3MapGroups().filter(g => !pcs || pcs.includes(g.pc));
   if(!gs.length){ msg('이 시·도에는 시·군·구로 나눌 공고가 없어요'); return; }
   const inHere = zf3PlaceSel && gs.some(g => g.key === zf3PlaceSel);
@@ -11674,7 +11875,7 @@ function zf3MinePcs(){
   const p = zf3Prefs();
   if(!p || !p.regions.length) return new Set();
   const out = new Set();
-  p.regions.forEach(rg => { const r = String(rg).trim(); Object.entries(ZF3_PROV).forEach(([nm, pc]) => { if(nm === r || nm.includes(r) || r.includes(zf3ShortSido(nm))) out.add(pc); }); });
+  p.regions.forEach(rg => { const r = String(rg).trim(); Object.entries(zf3ProvTable()).forEach(([nm, pc]) => { if(nm === r || nm.includes(r) || r.includes(zf3ShortSido(nm))) out.add(pc); }); });
   return out;
 }
 // ④ 공고 탭 머리 한 줄 요약 — 오늘 마감 · 3일 안 마감 · 7일 안 접수 시작 · 새 공고(3일). 누르면 그 순서로 줄 세운다(정렬 칸 noticeSortSel 그대로).
@@ -11764,57 +11965,72 @@ function zf3RecSaved(){
 }
 // ── 지도로 보기(레이더 · D-3 단계 d · 2026-10-12) ─────────────────────────────────────────────
 //    밝은 지도 위에 열린 공고가 걸친 시군구마다 점 하나(점 크기 = 공고 수 · 오늘·내일 마감이 있으면 빨강 맥박 두 번 · 접수 예정만이면 빈 점).
-//    🔴 점은 단지 위치가 아니라 시군구 중심점이다(캡션에 밝힌다). 재료는 RPC 행의 region_names(그룹이 걸친 시군구 전부) → 없으면 sido_nm·sigungu_nm.
-//    경계는 국가데이터처 SGIS 2025년 2분기 기준(geo/kr-2025.json · 2026-10-12 2013 자료에서 바꿈 — 미추홀구 · 청주 서원구·청원구 · 대구 군위군이 제 이름으로 들어왔다).
-//    거기 없는 이름은 ① 부모 시(화성시 ○○구 → 화성시) ② 시도가 바뀐 이름(이름이 하나뿐일 때만) ③ 그래도 없으면 시도 가운데 점선 고리(「인천 제물포구」 · 「서울(시군구 미상)」).
-//    점·지역 단추를 누르면 목록이 그 시군구 공고로 좁혀진다(📍 칩 · ✕로 뺀다 · 메모리만 — 새 저장 0). 지도 자료는 같은 출처 파일 하나를 처음 열 때만 받는다(외부 요청 0).
+//    🔴 점은 단지 위치가 아니라 시군구 중심점이다(캡션에 밝힌다). 재료는 zf3PlacesOfRow — 그룹 행 region_names ∪ 세대 행 시군구(가격 요약 unit_places) → 둘 다 없으면 sido_nm·sigungu_nm(2026-10-13 N3).
+//    전국 보기는 시·도 점, 확대하면 시·군·구 점(2026-10-16 · zf3MapPaint).
+//    🔵 2026-10-16(우편함 「표시층 — 지도 2026-07-01 개편 반영」 1) — 경계는 2026-07-01 기준(geo/kr-2026-07.json · 원자료 SGIS · 가공 vuski/admdongkor ·
+//    만드는 법 scripts/geo-build.py). 전남광주통합특별시가 한 장 · 인천 제물포·영종·서해·검단구 · 화성 만세·효행·병점·동탄구가 제 점이다(종전 2025년 2분기 판은 광주·전남 두 장 · 부모 시·고리로 대신).
+//    거기 없는 이름(옛 이름 · 다음 개편)은 ① 부모 시 ② 같은 이름이 전국에 하나뿐이면 그 점 ③ 그래도 없으면 시도 가운데 점선 고리(「인천 중구」 · 「서울(시군구 미상)」).
+//    점·지역 단추를 누르면 목록이 그 시군구 공고로 좁혀진다(📍 칩 · ✕로 뺀다 · 메모리만 — 새 저장 0). 지도 자료는 같은 출처 파일을 처음 열 때만 받는다(외부 요청 0).
 let zf3Geo = null, zf3GeoP = null, zf3View = 'list', zf3PlaceSel = null, zf3PlaceName = '', zf3PrePlace = [];
-const ZF3_PROV = { 서울특별시: '11', 부산광역시: '21', 대구광역시: '22', 인천광역시: '23', 광주광역시: '24', 대전광역시: '25', 울산광역시: '26', 세종특별자치시: '29', 경기도: '31', 강원특별자치도: '32', 강원도: '32', 충청북도: '33', 충청남도: '34', 전북특별자치도: '35', 전라북도: '35', 전라남도: '36', 경상북도: '37', 경상남도: '38', 제주특별자치도: '39', 전남광주통합특별시: '36' };
-// 🔵 2026-10-13(우편함 「코드 — 한글 중복 입력 · 매칭 「맞음」 낱말 확장 …」 4) — 수집 시·도 이름 「전남광주통합특별시」(공고 325행 · 목록 69그룹 — 전부 접수마감)가
-//    위 표에 없어 지도·시트 시·군·구에서 통째로 빠졌다(zf3PlaceOf 가 null). 경계 그림(2025)은 광주(24)·전남(36) 두 장 그대로 —
-//    시·군·구가 광주 구(광산·동·서·남·북구)면 24, 아니면 36 으로 그린다. 시·도 이름표·단추는 그 그림의 이름(광주 · 전남)을 쓴다.
-const ZF3_PROV_SPLIT = { 전남광주통합특별시: ['24', '36'] };
-const ZF3_SGG_ALIAS = {};   // 이름만 바뀐 구(경계 같음) — 2025 경계에는 남은 것이 없다(2013 「남구 → 미추홀구」는 걷음)
-const ZF3_METRO = new Set(['11', '21', '22', '23', '24', '25', '26']);
+const ZF3_GEO = './geo/kr-2026-07';   // 판 갈이 때 여기 · 캡션(ZF3_GEO_SRC) · sw.js 를 함께 바꾼다
+const ZF3_GEO_SRC = '경계 2026-07-01 · 국가데이터처 SGIS(공공누리 1유형) · 가공 vuski/admdongkor(CC BY 4.0)';
+// 🔵 시·도 이름 → 경계 코드는 표를 따로 두지 않는다 — 경계 파일의 시·도 이름(paths[].name)이 정본이고, 옛 이름(광주광역시·전라남도 · 강원도 · 전라북도)은
+//    검색·카드와 같은 ZF_SIDO_ALIASES 한 벌로 새 이름에 잇는다(백로그 「시·도 이름 표가 셋」 — 지도 쪽 ZF3_PROV · 분할 표(ZF3_PROV_SPLIT) · 광역 표(ZF3_METRO)를 걷음).
+//    코드는 행정안전부 체계다(전남광주 12 · 인천 28 · 경기 41 …) — 종전 SGIS 코드(23 · 31 …)는 쓰지 않는다.
+let zf3ProvIdx = null;
+function zf3ProvTable(){
+  if(!zf3ProvIdx && zf3Geo){ zf3ProvIdx = {}; zf3Geo.paths.forEach(p => { zf3ProvIdx[p.name] = p.code; (ZF_SIDO_ALIASES[p.name] || []).forEach(o => { zf3ProvIdx[o] = p.code; }); }); }
+  return zf3ProvIdx || {};
+}
+const zf3Pc = sd => zf3ProvTable()[String(sd || '').trim()] || null;
+function zf3ProvName(pc){ const p = zf3Geo && zf3Geo.paths.find(x => x.code === pc); return p ? p.name : String(pc || ''); }
+const zf3Metro = pc => /(특별|광역)시$/.test(zf3ProvName(pc));   // 「북구」는 어느 시의 북구인지 — 특별·광역시(전남광주통합특별시 포함) 구는 시·도 이름을 앞에
+const ZF3_SGG_ALIAS = {};   // 이름만 바뀐 구(경계 같음) — 2026-07-01 경계에는 남은 것이 없다
 // 🔵 2026-10-13(우편함 「표시층 — 공고 탭 다듬기」 4) — 지역 단추 두 층: 처음엔 시·도 단추(공고 수) → 누르면 그 시·도의 시·군·구 → 누르면 그곳 공고만.
 //    zf3PlaceSido = 펼친 시·도 코드(null 이면 시·도 목록). 시·군·구 단추·점·좁히는 규칙은 종전 그대로(zf3PlaceOf · zf3SetPlace).
 let zf3PlaceSido = null;
-const ZF3_PROV_NAME = Object.entries(ZF3_PROV).reduce((m, [k, v]) => (m[v] || (m[v] = k), m), {});
-const zf3ShortSido = t => String(t || '').replace(/특별자치시|특별자치도|특별시|광역시/, '').replace(/^(충청|전라|경상)(남|북)도$/, (m, a, b) => a[0] + b).replace(/도$/, '');
+const zf3ShortSido = t => String(t || '').replace(/통합특별시|특별자치시|특별자치도|특별시|광역시/, '').replace(/^(충청|전라|경상)(남|북)도$/, (m, a, b) => a[0] + b).replace(/도$/, '');
 function zf3LoadGeo(){
-  if(!zf3GeoP) zf3GeoP = fetch('./geo/kr-2025.json', { cache: 'force-cache' }).then(r => r.ok ? r.json() : null).then(g => { zf3Geo = g && g.cent ? g : null; return zf3Geo; }).catch(() => { zf3GeoP = null; return null; });
+  if(!zf3GeoP) zf3GeoP = fetch(ZF3_GEO + '.json', { cache: 'force-cache' }).then(r => r.ok ? r.json() : null).then(g => { zf3Geo = g && g.cent ? g : null; zf3ProvIdx = null; return zf3Geo; }).catch(() => { zf3GeoP = null; return null; });
   return zf3GeoP;
 }
 function zf3PlaceOf(sido, sgg){
   const G = zf3Geo, sd = String(sido || '').trim();
-  let pc = ZF3_PROV[sd];
+  const pc = zf3Pc(sd);
   if(!G || !pc) return null;
   const sg = String(sgg || '').replace(/\s+/g, '');
-  if(sg && ZF3_PROV_SPLIT[sd]) pc = ZF3_PROV_SPLIT[sd].find(p => G.cent[p + '|' + sg] || G.cent[p + '|' + sg.replace(/^(\S+?시)\S+구$/, '$1')]) || pc;
   if(sg){
     const k0 = pc + '|' + sg, k = ZF3_SGG_ALIAS[k0] || k0;
-    if(G.cent[k]) return { key: k0, name: (ZF3_METRO.has(pc) ? zf3ShortSido(ZF3_PROV_NAME[pc] || sd) + ' ' : '') + String(sgg).trim(), xy: G.cent[k], exact: true, pc };   // 「북구」는 어느 시의 북구인지 — 특별·광역시 구는 시 이름을 앞에
+    if(G.cent[k]) return { key: k0, name: (zf3Metro(pc) ? zf3ShortSido(zf3ProvName(pc)) + ' ' : '') + String(sgg).trim(), xy: G.cent[k], exact: true, pc };   // 「북구」는 어느 시의 북구인지 — 특별·광역시 구는 시 이름을 앞에
     const city = sg.replace(/^(\S+?시)\S+구$/, '$1');
-    // 🔵 2026-10-13(N3) — 세대 주소가 구 없이 「고양시」처럼 오면(2025 경계엔 구 단위만 있는 시) 구 가운데들의 평균을 쓴다(아래 같은 규칙).
+    // 🔵 2026-10-13(N3) — 세대 주소가 구 없이 「고양시」처럼 오면(경계엔 구 단위만 있는 시) 구 가운데들의 평균을 쓴다(아래 같은 규칙).
     if(city !== sg || /시$/.test(sg)){
       if(G.cent[pc + '|' + city]) return { key: pc + '|' + city, name: city, xy: G.cent[pc + '|' + city], exact: true, pc };
       const kids = Object.keys(G.cent).filter(x => x.startsWith(pc + '|' + city));
-      if(kids.length) return { key: pc + '|' + city, name: city, xy: [0, 1].map(i => kids.reduce((a, x) => a + G.cent[x][i], 0) / kids.length), exact: true, pc };
+      // 🔵 2026-10-16(A1 · N5 잔여) — 구가 있는 시인데 구를 모르면 「수원시(구 미상)」 — 같은 시의 「수원시 권선구」와 한 목록에서 꼴이 섞여 보이던 것.
+      if(kids.length) return { key: pc + '|' + city, name: city + '(구 미상)', xy: [0, 1].map(i => kids.reduce((a, x) => a + G.cent[x][i], 0) / kids.length), exact: true, pc };
     }
     const same = Object.keys(G.cent).filter(x => x.split('|')[1] === sg);
     if(same.length === 1) return { key: k0, name: String(sgg).trim(), xy: G.cent[same[0]], exact: true, pc };
-    return { key: pc + '|*' + sg, name: zf3ShortSido(ZF3_PROV_NAME[pc] || sd) + ' ' + String(sgg).trim(), xy: G.prov[pc], exact: false, pc, note: '2025 경계에 없는 구 — 시도 가운데 고리' };
+    return { key: pc + '|*' + sg, name: zf3ShortSido(zf3ProvName(pc)) + ' ' + String(sgg).trim(), xy: G.prov[pc], exact: false, pc, note: '경계 파일에 없는 구 — 시도 가운데 고리' };
   }
-  return { key: pc + '|*', name: zf3ShortSido(ZF3_PROV_NAME[pc] || sd) + '(시군구 미상)', xy: G.prov[pc], exact: false, pc, note: '시군구 없음 — 시도 가운데 고리' };
+  return { key: pc + '|*', name: zf3ShortSido(zf3ProvName(pc)) + '(시군구 미상)', xy: G.prov[pc], exact: false, pc, note: '시군구 없음 — 시도 가운데 고리' };
 }
 // 🔴 2026-10-13(우편함 「코드 — 열린 카드 오표시·오답·놓침」 3 · N3) — 곳의 재료는 카드 상세 「이 공고의 주택이 있는 지역」과 같다:
 //    그룹 행 시군구(region_names) ∪ 세대 행 시군구(가격 요약 RPC unit_places — zfMergeUnitPlaces). 공고 행 sido_nm·sigungu_nm 은 둘 다 없을 때만.
 //    종전에는 region_names(없으면 공고 행 sigungu_nm)만 봐서 SH 신혼 매입 Ⅰ·Ⅱ(공고 행 시군구 없음 · 세대 주소 관악·성동 등)가 「서울(시군구 미상)」에,
 //    경기남부 든든전세(세대 주소 화성 등 8곳)가 경기 고리에만 섰다. 세대 행 지역은 zf3RenderMap 이 목록 전체 몫을 한 번에 받는다.
+// 🔵 2026-10-16(우편함 「표시층 — 지도 2026-07-01 개편 반영」 4) — 전국 단위 공고(전국 전세임대 — 지역 칸 「서울특별시 외」 · 시·군·구 없음 · 세대 지역 없음,
+//    또는 시·도 「전국」)는 서울 미상 고리에 세우지 않는다 — 「서울에 위치 모르는 공고」로 읽혔다(틀린 정보). 지역이 서울인데 구만 없는 공고(SH 재개발임대 「서울」)는 서울 미상 그대로.
+function zf3WideRow(n){
+  if(String(n['sido_nm'] || '').trim() === '전국') return true;
+  return !String(n['sigungu_nm'] || '').trim() && /\s외$/.test(String(n['지역'] || n['region'] || '').trim());   // 화면 행은 매핑을 거친 「지역」(zfMapNoticeRows)
+}
 function zf3PlacesOfRow(n){
   const out = new Map();
   let names = zfMergeUnitPlaces(n['region_names'], zfUnitPlacesFor(n['announcement_id'])).map(x => String(x || '').trim()).filter(Boolean);
   names = names.filter(x => !names.some(y => y !== x && y.startsWith(x + ' ')));   // 「창원시」와 「창원시 마산회원구」가 함께면 구만
+  if(!names.length && zf3WideRow(n)) return [];   // 전국 단위 공고는 어느 곳에도 세우지 않는다(지도 아래 한 줄로 센다)
   const parts = names.length ? names.map(x => { const i = x.indexOf(' '); return i < 0 ? [x, ''] : [x.slice(0, i), x.slice(i + 1)]; }) : [[n['sido_nm'], n['sigungu_nm']]];
   parts.forEach(([sd, sg]) => { const pl = zf3PlaceOf(sd, sg); if(pl && !out.has(pl.key)) out.set(pl.key, pl); });
   return [...out.values()];
@@ -11860,11 +12076,21 @@ function zf3MapGroups(){
 //    점의 색 갈래는 그 시·도 안 시·군·구 중 가장 급한 것(오늘·내일 마감 > 접수 중 > 접수 예정). 시군구 미상(고리)도 그 시·도 안에 든다.
 // 🔵 2026-10-13(N5) — 시·도 층 안의 단추는 시·도 이름을 떼고 쓴다(머리에 이미 있다) — 경기 「김포시」와 서울 「서울 강동구」로 꼴이 갈리던 것.
 //    📍 칩(zf3PlaceName)은 시·도를 붙인 이름 그대로 — 목록 위에서 어느 시·도인지가 보여야 한다.
-function zf3PlaceShort(g){ const p = zf3ShortSido(ZF3_PROV_NAME[g.pc] || g.pc) + ' '; return String(g.name).startsWith(p) ? String(g.name).slice(p.length) : String(g.name); }
+function zf3PlaceShort(g){ const p = zf3ShortSido(zf3ProvName(g.pc)) + ' '; return String(g.name).startsWith(p) ? String(g.name).slice(p.length) : String(g.name); }
+// 시·도 묶음(단추 층과 지도 전국 보기가 함께 쓴다 — 한 벌). n = 그 시·도에 걸친 공고 수(한 공고가 여러 시군구에 걸쳐도 한 번).
+function zf3SidoGroups(gs, mine){
+  const pcs = [...new Set(gs.map(g => g.pc))];
+  return pcs.map(pc => {
+    const kids = gs.filter(g => g.pc === pc);
+    const n = (zf3PrePlace || []).filter(r => zf3PlacesOfRow(r).some(p => p.pc === pc)).length;
+    const cls = kids.some(g => g.hot) ? 'hot' : kids.some(g => g.open) ? '' : 'soon';
+    return { pc, n, cls, name: zf3ShortSido(zf3ProvName(pc)) };
+  }).sort((a, b) => (mine.has(b.pc) ? 1 : 0) - (mine.has(a.pc) ? 1 : 0) || b.n - a.n || a.name.localeCompare(b.name, 'ko'));
+}
 function zf3PlacesHTML(gs, mine){
   const pcs = [...new Set(gs.map(g => g.pc))];
   if(zf3PlaceSido && !pcs.includes(zf3PlaceSido)) zf3PlaceSido = null;   // 조건이 바뀌어 그 시·도에 공고가 없으면 시·도 목록으로
-  const sidoName = pc => zf3ShortSido(ZF3_PROV_NAME[pc] || pc);
+  const sidoName = pc => zf3ShortSido(zf3ProvName(pc));
   const btn = g => `<button type="button" data-place="${zfAttr(g.key)}" data-name="${zfAttr(g.name)}" aria-pressed="${zf3PlaceSel === g.key}"><i class="${g.exact ? g.cls : 'ring'}" aria-hidden="true"></i>${mine.has(g.pc) ? '<span class="zf3-pmine" aria-label="내 희망 지역">★</span>' : ''}${escapeHtml(zf3PlaceShort(g))} <b>${g.n}</b></button>`;
   if(zf3PlaceSido){
     const kids = gs.filter(g => g.pc === zf3PlaceSido);
@@ -11872,13 +12098,188 @@ function zf3PlacesHTML(gs, mine){
     return `<p class="zf3-places-h" id="zf3PlacesH">${escapeHtml(sidoName(zf3PlaceSido))}<small>공고 ${n.toLocaleString()}건 · ${kids.length}곳</small></p>`
       + `<div class="zf3-places" role="group" aria-labelledby="zf3PlacesH"><button type="button" class="zf3-pback" data-act="sidos" data-pc="${zfAttr(zf3PlaceSido)}">← 시·도 전체</button>${kids.map(btn).join('')}</div>`;
   }
-  const sd = pcs.map(pc => {
-    const kids = gs.filter(g => g.pc === pc);
-    const n = (zf3PrePlace || []).filter(r => zf3PlacesOfRow(r).some(p => p.pc === pc)).length;
-    const cls = kids.some(g => g.hot) ? 'hot' : kids.some(g => g.open) ? '' : 'soon';
-    return { pc, n, cls, name: sidoName(pc) };
-  }).sort((a, b) => (mine.has(b.pc) ? 1 : 0) - (mine.has(a.pc) ? 1 : 0) || b.n - a.n || a.name.localeCompare(b.name, 'ko'));
+  const sd = zf3SidoGroups(gs, mine);
   return `<div class="zf3-places" role="group" aria-label="지역으로 좁히기 — 시·도를 누르면 시·군·구">${sd.map(s => `<button type="button" data-act="sido" data-pc="${zfAttr(s.pc)}" aria-expanded="false"><i class="${s.cls}" aria-hidden="true"></i>${mine.has(s.pc) ? '<span class="zf3-pmine" aria-label="내 희망 지역">★</span>' : ''}${escapeHtml(s.name)} <b>${s.n}</b></button>`).join('')}</div>`;
+}
+// 🔵 2026-10-16(우편함 「표시층 — 실사용 2회차 다듬기 묶음」 A1 · 백로그 「지도로 보기 2판」 ①② · 다운님 고름 2026-10-16) — 확대·이동 + 두 단계.
+//    전국 보기(배율 < ZF3_ZOOM_SGG)는 시·도 점(그 시·도에 걸친 공고 수 · 시·도 이름)만 — 수도권 시·군·구가 겹쳐 이름 없이 읽히던 것 · 시·도 없는 「동구 2」.
+//    확대하면 시·군·구 점과 이름(같은 이름의 구는 시·도를 붙인다 — 「대구 동구」). 확대 = ＋·− 단추 · 「전국」 · 끌기(확대했을 때) · 두 손가락 · ctrl+휠.
+//    시·도 점·단추를 누르면 그 시·도로 확대하고 시·군·구 단추 층을 연다 · 「← 시·도 전체」는 전국으로.
+//    첫 화면은 시도 윤곽 + 시군구 중심점(ZF3_GEO) · 확대하면 같은 판의 경계선(zf3LinesFor) — 새 호스트 0. 점·글자는 배율을 나눠 화면 크기를 지킨다.
+let zf3Zoom = null, zf3ProvBoxC = null, zf3MapLast = null, zf3MapDrag = null, zf3MapMoved = false, zf3DupSgg = null;
+const ZF3_ZOOM_SGG = 1.8, ZF3_ZOOM_MAX = 10, ZF3_SIDO_AT = { 경기도: '이천시' };
+function zf3FullVb(){ return (zf3Geo && zf3Geo.vb) ? zf3Geo.vb.slice() : [0, 0, 461, 565]; }
+function zf3CurVb(){ return zf3Zoom || zf3FullVb(); }
+function zf3MapK(){ return zf3FullVb()[2] / zf3CurVb()[2]; }
+function zf3ClampVb(v){
+  const [, , W, H] = zf3FullVb();
+  let w = Math.min(W, Math.max(W / ZF3_ZOOM_MAX, v[2]));
+  if(w >= W * 0.999) return null;
+  const h = w * H / W;
+  const x = Math.min(W - w, Math.max(0, v[0] + (v[2] - w) / 2)), y = Math.min(H - h, Math.max(0, v[1] + (v[3] - h) / 2));
+  return [x, y, w, h];
+}
+function zf3ProvBox(pc){
+  if(!zf3ProvBoxC){
+    zf3ProvBoxC = {};
+    (zf3Geo.paths || []).forEach(p => {
+      const n = String(p.d).match(/-?\d+(?:\.\d+)?/g) || [];
+      const a = [1e9, 1e9, -1e9, -1e9];
+      for(let i = 0; i + 1 < n.length; i += 2){ const x = +n[i], y = +n[i + 1]; a[0] = Math.min(a[0], x); a[1] = Math.min(a[1], y); a[2] = Math.max(a[2], x); a[3] = Math.max(a[3], y); }
+      zf3ProvBoxC[p.code] = a;
+    });
+    // 윤곽에서 빠진 섬의 중심점(울릉군)도 상자에 넣는다 — 그 시·도로 확대했을 때 점이 화면 밖에 남지 않게(당긴 자리 기준).
+    Object.entries(zf3Geo.cent || {}).forEach(([k, xy]) => { const a = zf3ProvBoxC[k.split('|')[0]]; if(!a) return; const q = zf3InVb(xy); a[0] = Math.min(a[0], q.x); a[1] = Math.min(a[1], q.y); a[2] = Math.max(a[2], q.x); a[3] = Math.max(a[3], q.y); });
+  }
+  return zf3ProvBoxC[pc] || null;
+}
+function zf3ZoomTo(bx){
+  if(!bx) return;
+  const [, , W, H] = zf3FullVb();
+  let w = (bx[2] - bx[0]) * 1.3, h = (bx[3] - bx[1]) * 1.3;
+  w = Math.min(Math.max(w, h * W / H), W / ZF3_ZOOM_SGG);   // 시·도로 들어가면 늘 시·군·구 단계 — 큰 시·도(전남광주 · 강원)도 시·도 점으로 남지 않게
+  zf3Zoom = zf3ClampVb([(bx[0] + bx[2]) / 2 - w / 2, (bx[1] + bx[3]) / 2 - w * H / W / 2, w, w * H / W]);
+}
+function zf3ZoomBy(f, cx, cy){
+  const v = zf3CurVb();
+  if(cx == null){ cx = v[0] + v[2] / 2; cy = v[1] + v[3] / 2; }
+  const w = v[2] / f, h = v[3] / f;
+  zf3Zoom = zf3ClampVb([cx - (cx - v[0]) / f, cy - (cy - v[1]) / f, w, h]);
+}
+// 울릉군처럼 중심점이 그림(viewBox) 밖이면 안쪽 끝으로 당기고 점선 칸으로 「자리를 옮긴 점」임을 보인다.
+function zf3InVb(xy){
+  const [, , W, H] = zf3FullVb(), m = 10;
+  const x = Math.min(W - m, Math.max(m, xy[0])), y = Math.min(H - m, Math.max(m, xy[1]));
+  return { x, y, moved: x !== xy[0] || y !== xy[1] };
+}
+// 🔵 2026-10-16(우편함 「표시층 — 지도 2026-07-01 개편 반영」 2·3) — 확대하면 같은 판의 경계선을 보이는 시·도만 따로 받는다:
+//    시·군·구 단계(배율 ≥ ZF3_ZOOM_SGG) = 시·군·구 사이 선 · 더 확대(≥ ZF3_ZOOM_EMD) = 읍면동 사이 선(가늘게). 점은 시·군·구 가운데 그대로(공고 지역이 시·군·구까지).
+//    첫 화면 무게는 그대로(윤곽 + 가운데 점) · 시·도 하나 gzip 시·군·구 3.5 KB · 읍면동 16.5 KB 안(2026-07 판 실측) · 같은 출처(새 호스트 0) · 받은 것은 메모리에.
+const ZF3_ZOOM_EMD = 4, zf3Lines = {};
+function zf3LinesFor(lay, pcs){
+  return pcs.map(pc => {
+    const k = lay + '-' + pc, v = zf3Lines[k];
+    if(typeof v === 'string') return v;
+    if(v === undefined){
+      zf3Lines[k] = null;   // 받는 중 — 다 받으면 다시 그린다 · 못 받으면 다음 그리기에 다시 묻는다
+      fetch(`${ZF3_GEO}/${k}.json`, { cache: 'force-cache' }).then(r => r.ok ? r.json() : null)
+        .then(j => { zf3Lines[k] = j && typeof j.d === 'string' ? j.d : ''; zf3MapPaint(); }).catch(() => { delete zf3Lines[k]; });
+    }
+    return '';
+  }).join('');
+}
+function zf3MapPaint(){
+  const box = document.getElementById('zf3Map'), svg = box && box.querySelector('.zf3-radar svg');
+  if(!svg || !zf3MapLast || !zf3Geo) return;
+  const G = zf3Geo, { gs, mine } = zf3MapLast, v = zf3CurVb(), k = zf3MapK(), s = 1 / k, lv2 = k >= ZF3_ZOOM_SGG, lv3 = k >= ZF3_ZOOM_EMD;
+  svg.setAttribute('viewBox', v.map(x => +x.toFixed(2)).join(' '));
+  const radar = svg.closest('.zf3-radar');
+  radar.classList.toggle('zoomed', !!zf3Zoom);
+  radar.dataset.level = lv3 ? 'emd' : lv2 ? 'sgg' : 'sido';
+  const cap = radar.querySelector('.cap');
+  if(cap) cap.innerHTML = `<span>${lv3 ? '점 = 시군구 가운데(단지 위치 아님) · 가는 선 = 읍면동' : lv2 ? '점 = 시군구 가운데(단지 위치 아님) · 더 확대하면 읍면동 경계' : '시·도별 공고 수 · 누르거나 확대하면 시·군·구'}</span><span class="src">${escapeHtml(ZF3_GEO_SRC)}</span>`;
+  // 보이는 시·도(상자가 지금 보이는 칸과 겹치는 것)만 경계선을 받는다
+  const vis = lv2 ? G.paths.map(p => p.code).filter(pc => { const b = zf3ProvBox(pc); return b && !(b[2] < v[0] || b[0] > v[0] + v[2] || b[3] < v[1] || b[1] > v[1] + v[3]); }) : [];
+  const bd = (lv3 ? `<path class="bd emd" d="${zf3LinesFor('emd', vis)}"/>` : '') + (lv2 ? `<path class="bd sgg" d="${zf3LinesFor('sgg', vis)}"/>` : '');
+  const on = new Set(gs.map(g => g.pc));
+  // 그릴 점 — 전국 보기는 시·도 묶음, 확대는 시·군·구(+ 시군구 미상 고리)
+  let items;
+  if(!lv2){
+    // 경기의 면 중심은 서울 바로 옆이라 두 점이 겹친다 — 전국 보기의 경기 점만 경기 안 시군구 중심점(이천시)에 둔다(시·군·구 단계는 종전 그대로).
+    const at = pc => (ZF3_SIDO_AT[zf3ProvName(pc)] && G.cent[pc + '|' + ZF3_SIDO_AT[zf3ProvName(pc)]]) || G.prov[pc];
+    items = zf3SidoGroups(gs, mine).map(x => ({ key: 'sido:' + x.pc, pc: x.pc, xy: at(x.pc), n: x.n, cls: x.cls, exact: true, sido: true, name: x.name, text: `${x.name} ${x.n}` }));
+  } else {
+    const shortOf = g => g.exact ? (zf3Metro(g.pc) ? zf3PlaceShort(g) : String(g.name).replace(/^\S+시\s(\S+구)$/, '$1')) : g.name;
+    // 경계 자료 전체에서 둘 이상의 시·도에 있는 이름(동구 · 남구 · 강서구 · 고성군 …)은 시·도를 붙인다 — 보이는 점끼리만 세면 「남구」가 홀로 남았다.
+    if(!zf3DupSgg){ const c = {}; Object.keys(G.cent).forEach(x => { const [pc, nm] = x.split('|'); (c[nm] = c[nm] || new Set()).add(pc); }); zf3DupSgg = new Set(Object.keys(c).filter(nm => c[nm].size > 1)); }
+    items = gs.map(g => { const t = shortOf(g); const nm = (g.exact && zf3DupSgg.has(t)) ? `${zf3ShortSido(zf3ProvName(g.pc))} ${t}` : t; return Object.assign({}, g, { text: `${nm} ${g.n}` }); });
+  }
+  items = items.filter(g => g.xy);
+  const rOf = g => g.sido ? 7 + Math.min(9, Math.sqrt(g.n) * 1.6) : g.exact ? 5 + Math.min(7, g.n - 1) : 20 + Math.min(14, g.n);
+  const inView = (x, y, m) => x >= v[0] - m && x <= v[0] + v[2] + m && y >= v[1] - m && y <= v[1] + v[3] + m;
+  // 이름표 — 점 자리를 먼저 깔고 오른쪽 → 왼쪽 → 위 → 아래 빈 자리(자기 점 빼고) · 자리가 없으면 그리지 않는다(아래 단추가 전부를 보인다). 크기는 화면 기준(× s).
+  const placed = [], clash = (b, own) => placed.some(q => q[4] !== own && !(b[2] < q[0] || b[0] > q[2] || b[3] < q[1] || b[1] > q[3]));
+  // 확대 단추·아래 설명 줄이 덮는 자리는 이름표를 두지 않는다(화면 좌표 → 지도 좌표).
+  const sr = svg.getBoundingClientRect();
+  if(sr.width > 0){
+    const u = v[2] / sr.width;
+    ['.zf3-zoom', '.cap'].forEach(q => { const el = radar.querySelector(q); if(!el) return; const r = el.getBoundingClientRect(); if(!r.width) return;
+      placed.push([v[0] + (r.left - sr.left - 4) * u, v[1] + (r.top - sr.top - 4) * u, v[0] + (r.right - sr.left + 4) * u, v[1] + (r.bottom - sr.top + 4) * u, '#ui']); });
+  }
+  const pos = new Map(items.map(g => [g.key, zf3InVb(g.xy)]));
+  items.forEach(g => { if(g.exact){ const p = pos.get(g.key), r = rOf(g) * s; placed.push([p.x - r, p.y - r, p.x + r, p.y + r, g.key]); } });
+  const fs = 14 * s;
+  const lbl = g => {
+    const p = pos.get(g.key);
+    if(!inView(p.x, p.y, 0)) return '';
+    // 너비 어림 — 한글 한 자 = 글자 크기, 숫자·기호·띄어쓰기 = 0.6배(종전 12.5 일률은 한글 이름을 짧게 재 겹쳤다).
+    const w = ([...g.text].reduce((a, ch) => a + (/[가-힣]/.test(ch) ? 14 : 8.4), 0) + 4) * s, r = rOf(g) * s, cx = p.x, cy = p.y;
+    const cand = g.exact ? [[cx + r + 3 * s, cy + 5 * s], [cx - r - 3 * s - w, cy + 5 * s], [cx - w / 2, cy - r - 4 * s], [cx - w / 2, cy + r + 15 * s]] : [[cx - w / 2, cy - r - 8 * s], [cx - w / 2, cy + r + 18 * s]];
+    for(const [x, y] of cand){ const bb = [x - 2 * s, y - 17 * s, x + w, y + 6 * s, '#' + g.key]; if(bb[0] < v[0] || bb[2] > v[0] + v[2] || bb[1] < v[1] || bb[3] > v[1] + v[3] || clash(bb, g.key)) continue; placed.push(bb); return `<text class="lbl" x="${x.toFixed(2)}" y="${y.toFixed(2)}" style="font-size:${fs.toFixed(3)}px;stroke-width:${(3.5 * s).toFixed(3)}px">${escapeHtml(g.text)}</text>`; }
+    return '';
+  };
+  const labels = [...items.filter(g => !g.exact), ...items.filter(g => g.exact)].map(lbl).join('');
+  const pts = items.map((g, i) => {
+    const p = pos.get(g.key), r = rOf(g) * s, x = p.x.toFixed(2), y = p.y.toFixed(2), sel = (g.sido ? zf3PlaceSido === g.pc : zf3PlaceSel === g.key) ? ' sel' : '';
+    const act = g.sido ? `data-act="sido" data-pc="${zfAttr(g.pc)}"` : `data-place="${zfAttr(g.key)}" data-name="${zfAttr(g.name)}"`;
+    const inset = p.moved ? `<rect class="inset" x="${(p.x - r - 4 * s).toFixed(2)}" y="${(p.y - r - 4 * s).toFixed(2)}" width="${(2 * r + 8 * s).toFixed(2)}" height="${(2 * r + 8 * s).toFixed(2)}" rx="${(3 * s).toFixed(2)}"/>` : '';
+    return `<g class="pt${sel}" style="--i:${Math.min(i, 30)}" ${act}>${inset}${g.exact ? `${g.hot || g.cls === 'hot' ? `<circle class="pulse" cx="${x}" cy="${y}" r="${r.toFixed(2)}"/>` : ''}<circle class="dot ${g.cls}" cx="${x}" cy="${y}" r="${r.toFixed(2)}"/>` : `<circle class="ring${sel}" cx="${x}" cy="${y}" r="${r.toFixed(2)}"/>`}<circle class="hit" cx="${x}" cy="${y}" r="${(22 * s).toFixed(2)}"/></g>`;
+  }).join('');
+  svg.innerHTML = G.paths.map(p => `<path class="land${on.has(p.code) ? ' on' : ''}${mine.has(p.code) ? ' mine' : ''}" d="${p.d}"/>`).join('') + bd + pts + labels;
+  const zb = radar.querySelector('.zf3-zoom');
+  if(zb){ zb.querySelector('[data-zoom="in"]').disabled = k >= ZF3_ZOOM_MAX * 0.99; zb.querySelector('[data-zoom="out"]').disabled = !zf3Zoom; zb.querySelector('[data-zoom="all"]').disabled = !zf3Zoom; }
+}
+// 끌기·두 손가락·ctrl+휠 — 지도 상자에 한 번 단다(그림은 다시 그려도 상자는 그대로).
+function zf3MapWire(box){
+  const svgOf = () => box.querySelector('.zf3-radar svg');
+  const toSvg = (cx, cy) => { const sv = svgOf(), r = sv.getBoundingClientRect(), v = zf3CurVb(); return [v[0] + (cx - r.left) / r.width * v[2], v[1] + (cy - r.top) / r.height * v[3]]; };
+  const live = () => { const sv = svgOf(); if(sv) sv.setAttribute('viewBox', zf3CurVb().map(x => +x.toFixed(2)).join(' ')); };
+  let paintT = 0;
+  const settle = () => { clearTimeout(paintT); paintT = setTimeout(zf3MapPaint, 60); };
+  box.addEventListener('pointerdown', e => {
+    if(!e.target.closest('.zf3-radar svg') || !zf3Zoom || e.pointerType === 'touch' && zf3MapDrag && zf3MapDrag.pinch) return;
+    zf3MapDrag = { id: e.pointerId, x: e.clientX, y: e.clientY, v: zf3CurVb().slice() };
+    zf3MapMoved = false;
+  });
+  box.addEventListener('pointermove', e => {
+    const d = zf3MapDrag;
+    if(!d || d.pinch || d.id !== e.pointerId) return;
+    const sv = svgOf(); if(!sv) return;
+    const r = sv.getBoundingClientRect(), dx = e.clientX - d.x, dy = e.clientY - d.y;
+    if(!zf3MapMoved && Math.hypot(dx, dy) < 5) return;
+    zf3MapMoved = true;
+    zf3Zoom = zf3ClampVb([d.v[0] - dx / r.width * d.v[2], d.v[1] - dy / r.height * d.v[3], d.v[2], d.v[3]]) || zf3Zoom;
+    live();
+  });
+  const end = e => { if(zf3MapDrag && !zf3MapDrag.pinch && zf3MapDrag.id === e.pointerId){ zf3MapDrag = null; if(zf3MapMoved) settle(); } };
+  box.addEventListener('pointerup', end);
+  box.addEventListener('pointercancel', end);
+  // 끌고 난 뒤의 click 은 점 누름으로 치지 않는다
+  box.addEventListener('click', e => { if(zf3MapMoved && e.target.closest('.zf3-radar svg')){ e.stopPropagation(); e.preventDefault(); zf3MapMoved = false; } }, true);
+  box.addEventListener('touchstart', e => {
+    if(e.touches.length !== 2 || !e.target.closest('.zf3-radar svg')) return;
+    e.preventDefault();
+    const [a, b] = e.touches;
+    zf3MapDrag = { pinch: true, d0: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), m: toSvg((a.clientX + b.clientX) / 2, (a.clientY + b.clientY) / 2), v: zf3CurVb().slice() };
+    zf3MapMoved = true;
+  }, { passive: false });
+  box.addEventListener('touchmove', e => {
+    const d = zf3MapDrag;
+    if(!d || !d.pinch || e.touches.length !== 2) return;
+    e.preventDefault();
+    const [a, b] = e.touches, f = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) / (d.d0 || 1);
+    const w = d.v[2] / f, h = d.v[3] / f;
+    zf3Zoom = zf3ClampVb([d.m[0] - (d.m[0] - d.v[0]) / f, d.m[1] - (d.m[1] - d.v[1]) / f, w, h]);
+    live();
+  }, { passive: false });
+  box.addEventListener('touchend', e => { if(zf3MapDrag && zf3MapDrag.pinch && e.touches.length < 2){ zf3MapDrag = null; settle(); } });
+  box.addEventListener('wheel', e => {
+    if(!(e.ctrlKey || e.metaKey) || !e.target.closest('.zf3-radar svg')) return;
+    e.preventDefault();
+    const [cx, cy] = toSvg(e.clientX, e.clientY);
+    zf3ZoomBy(Math.exp(-e.deltaY * 0.01), cx, cy);
+    live(); settle();
+  }, { passive: false });
 }
 function zf3RenderMap(){
   if(!zf3On()) return;
@@ -11887,30 +12288,39 @@ function zf3RenderMap(){
   let box = document.getElementById('zf3Map');
   const show = zf3View === 'map' || zf3Wide();
   if(!show){ if(box) box.hidden = true; return; }
-  if(!box){ box = document.createElement('section'); box.id = 'zf3Map'; box.className = 'zf3-map'; box.setAttribute('aria-label', '지도로 보기'); head.after(box); box.addEventListener('click', ev => { const a = ev.target.closest('[data-act="sido"],[data-act="sidos"]'); if(a){ const back = a.dataset.act === 'sidos', pc = a.dataset.pc; zf3PlaceSido = back ? null : pc; zf3RenderMap(); const f = document.querySelector(back ? `#zf3Map [data-act="sido"][data-pc="${pc}"]` : '#zf3Map [data-act="sidos"]') || document.querySelector('#zf3Map .zf3-places button'); if(f) f.focus(); return; } const b = ev.target.closest('[data-place]'); if(b) zf3SetPlace(b.dataset.place, b.dataset.name); }); }
+  if(!box){
+    box = document.createElement('section'); box.id = 'zf3Map'; box.className = 'zf3-map'; box.setAttribute('aria-label', '지도로 보기'); head.after(box);
+    box.addEventListener('click', ev => {
+      const z = ev.target.closest('[data-zoom]');
+      if(z){ if(z.dataset.zoom === 'all'){ zf3Zoom = null; zf3PlaceSido = null; zf3RenderMap(); } else { zf3ZoomBy(z.dataset.zoom === 'in' ? 1.6 : 1 / 1.6); zf3MapPaint(); } return; }
+      const a = ev.target.closest('[data-act="sido"],[data-act="sidos"]');
+      if(a){
+        const back = a.dataset.act === 'sidos', pc = a.dataset.pc, fromMap = !!a.closest('svg');
+        zf3PlaceSido = back ? null : pc;
+        if(back) zf3Zoom = null; else zf3ZoomTo(zf3ProvBox(pc));
+        zf3RenderMap();
+        if(!fromMap){ const f = document.querySelector(back ? `#zf3Map [data-act="sido"][data-pc="${pc}"]:not(g)` : '#zf3Map [data-act="sidos"]') || document.querySelector('#zf3Map .zf3-places button'); if(f) f.focus(); }
+        return;
+      }
+      const b = ev.target.closest('[data-place]'); if(b) zf3SetPlace(b.dataset.place, b.dataset.name);
+    });
+    zf3MapWire(box);
+  }
   box.hidden = false;
   if(!zf3Geo){ box.innerHTML = '<p class="zf3-map-wait">지도를 불러오는 중…</p>'; zf3LoadGeo().then(g => { if(g){ applyNoticeFiltersAndRender(noticePage); } else box.innerHTML = '<p class="zf3-map-wait">지도를 불러오지 못했어요 · 목록으로 보세요</p>'; }); return; }
   // 🔵 2026-10-13(N3) — 곳의 재료인 세대 행 지역(가격 요약)을 목록 전체 몫으로 받는다. 새로 온 것이 있으면 목록·지도를 다시 그린다(이미 받은 id 는 다시 묻지 않는다).
   zfEnsurePriceSummaries((zf3PrePlace || []).map(n => n['announcement_id'])).then(ok => { if(ok){ applyNoticeFiltersAndRender(noticePage); zfFillSummarySlots(); } });
-  const G = zf3Geo, mine = zf3MinePcs(), gs = zf3MapGroups().sort((a, b) => (mine.has(b.pc) ? 1 : 0) - (mine.has(a.pc) ? 1 : 0)), on = new Set(gs.map(g => g.pc));
-  // 🔵 2026-10-13(우편함 「표시층 — 실사용 1회차 반영」 1 · D4) — 이름표가 다른 이름표뿐 아니라 다른 점과도 겹치지 않게: 점 자리를 먼저 깔고,
-  //    이름표는 오른쪽 → 왼쪽 → 위 → 아래 순으로 빈 자리를 찾는다(자기 점은 빼고 잰다). 자리가 없으면 그리지 않는다 — 아래 지역 단추가 전부를 보인다.
-  const placed = [], clash = (b, own) => placed.some(q => q[4] !== own && !(b[2] < q[0] || b[0] > q[2] || b[3] < q[1] || b[1] > q[3]));
-  gs.forEach(g => { if(g.exact){ const r = 5 + Math.min(7, g.n - 1); placed.push([g.xy[0] - r, g.xy[1] - r, g.xy[0] + r, g.xy[1] + r, g.key]); } });
-  const lbl = g => { const t = `${g.exact ? g.name.replace(/^\S+시\s(\S+구)$/, '$1').replace(ZF3_METRO.has(g.pc) ? /^\S+\s/ : /^$/, '') : g.name} ${g.n}`, w = t.length * 12.5;
-    const r = 5 + Math.min(7, g.n - 1), [cx, cy] = g.xy;
-    const cand = g.exact ? [[cx + r + 3, cy + 5], [cx - r - 3 - w, cy + 5], [cx - w / 2, cy - r - 4], [cx - w / 2, cy + r + 15]] : [[cx - w / 2, cy - 28 - Math.min(14, g.n)]];
-    for(const [x, y] of cand){ const b = [x, y - 14, x + w, y + 3, '#' + g.key]; if(clash(b, g.key)) continue; placed.push(b); return `<text class="lbl" x="${x.toFixed(1)}" y="${y.toFixed(1)}">${escapeHtml(t)}</text>`; }
-    return ''; };
-  const rings = gs.filter(g => !g.exact), dots = gs.filter(g => g.exact);
-  const labels = [...rings, ...dots].map(lbl).join('');
-  const pts = gs.map((g, i) => { const r = 5 + Math.min(7, g.n - 1), [x, y] = g.xy, sel = zf3PlaceSel === g.key ? ' sel' : '';
-    return `<g class="pt${sel}" style="--i:${Math.min(i, 30)}" data-place="${zfAttr(g.key)}" data-name="${zfAttr(g.name)}">${g.exact ? `${g.hot ? `<circle class="pulse" cx="${x}" cy="${y}" r="${r}"/>` : ''}<circle class="dot ${g.cls}" cx="${x}" cy="${y}" r="${r}"/>` : `<circle class="ring${sel}" cx="${x}" cy="${y}" r="${20 + Math.min(14, g.n)}"/>`}<circle class="hit" cx="${x}" cy="${y}" r="16"/></g>`; }).join('');
-  const nOpen = (zf3PrePlace || []).length;
-  box.innerHTML = `<div class="zf3-radar"><svg viewBox="${G.vb.join(' ')}" aria-hidden="true" focusable="false">${G.paths.map(p => `<path class="land${on.has(p.code) ? ' on' : ''}${mine.has(p.code) ? ' mine' : ''}" d="${p.d}"/>`).join('')}${pts}${labels}</svg><span class="cap">점 = 시군구 가운데(단지 위치 아님) · 경계 2025 국가데이터처 SGIS</span></div>`
+  const mine = zf3MinePcs(), gs = zf3MapGroups().sort((a, b) => (mine.has(b.pc) ? 1 : 0) - (mine.has(a.pc) ? 1 : 0));
+  zf3MapLast = { gs, mine };
+  const nWide = (zf3PrePlace || []).filter(n => zf3WideRow(n) && !zf3PlacesOfRow(n).length).length, nOpen = (zf3PrePlace || []).filter(n => zf3PlacesOfRow(n).length).length;
+  box.innerHTML = `<div class="zf3-radar"><div class="zf3-mapw"><svg viewBox="${zf3FullVb().join(' ')}" aria-hidden="true" focusable="false"></svg>`
+    + `<div class="zf3-zoom" role="group" aria-label="지도 확대·축소"><button type="button" data-zoom="in" aria-label="지도 확대">＋</button><button type="button" data-zoom="out" aria-label="지도 축소">−</button><button type="button" data-zoom="all" aria-label="전국 보기로">전국</button></div></div>`
+    + `<span class="cap"></span></div>`
     + `<div class="zf3-legend"><span><i></i>접수 중</span><span><i class="hot"></i>오늘·내일 마감</span><span><i class="soon"></i>접수 예정</span><span><i class="ring"></i>시군구 미상</span>${mine.size ? '<span><i class="mine"></i>내 희망 지역</span>' : ''}</div>`
-    + `<p class="zf3-map-n">${gs.length ? `공고 ${nOpen.toLocaleString()}건이 걸친 ${gs.length}곳 · 시·도 → 시·군·구를 누르면 그곳 공고만` : '지금 조건에 맞는 공고가 없어요'}</p>`
+    + `<p class="zf3-map-n">${gs.length ? `공고 ${nOpen.toLocaleString()}건이 걸친 ${gs.length}곳 · 시·도 → 시·군·구를 누르면 그곳 공고만` : (nWide ? '지도에 세울 공고가 없어요' : '지금 조건에 맞는 공고가 없어요')}</p>`
+    + (nWide ? `<p class="zf3-map-n">전국 단위 공고 ${nWide.toLocaleString()}건은 지도에 표시하지 않아요</p>` : '')
     + zf3PlacesHTML(gs, mine);
+  zf3MapPaint();
   try{ if(!matchMedia('(prefers-reduced-motion: reduce)').matches) box.querySelector('.zf3-radar').classList.add('live'); }catch(e){}
 }
 // 관리 탭 「나의 노선도」(d3 · 둘러보기 ④ · 2026-10-12) — 저장한 공고들의 앞으로 남은 날짜(접수 시작 · 접수 마감 · 당첨자 발표)를
@@ -12104,8 +12514,12 @@ function zf3Init(){
     const searchRow = document.getElementById('noticeSearchInput')?.parentElement;
     const sortRow = document.getElementById('noticeSortSel')?.parentElement;
     panel.prepend(head);
-    if(searchRow) head.after(searchRow);
-    if(sortRow) (searchRow || head).after(sortRow);
+    // 🔵 2026-10-16(우편함 「표시층 — 실사용 2회차 다듬기 묶음」 A3 · N16) — 검색 줄은 시트가 아니라 공고 탭 머리 바로 위에 둔다(처음 온 사람은 검색을 「필터」 안에서 찾지 않는다).
+    //    칸 요소 하나를 옮길 뿐이라 값·이벤트·ID 그대로(원칙 7 · 시트 안 칸과 따로 놀 일이 없다). 머리(#zf3NoticeHead)는 치는 대로 다시 그려지므로 그 밖에 둔다(초점·조합 유지).
+    const nh0 = document.getElementById('zf3NoticeHead');
+    if(searchRow && nh0){ searchRow.classList.add('zf3-search'); [searchRow, ...searchRow.querySelectorAll('input,select')].forEach(e => e.removeAttribute('style')); nh0.before(searchRow); }
+    else if(searchRow) head.after(searchRow);
+    if(sortRow) head.after(sortRow);
   }
   const nh = document.getElementById('zf3NoticeHead');
   if(nh) nh.addEventListener('click', e => {
