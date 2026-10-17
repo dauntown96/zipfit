@@ -9,6 +9,9 @@ AS $function$
   --   · SH = 대표 ID. 같은 원문 키에 대표 카드가 둘이면 ID 가 작은 것 하나.
   -- 🔵 2026-10-08(표시층 긴급 2 · 3) — card_phases: 원문 키·대표 카드의 경로 표 차수 창(phase_text 있는 행 · 시작·끝)을 함께 낸다.
   --   대조가 페이지 시작·끝이 한 차수 창과 같으면 「차수 일치」로 다름에서 뺀다(매입 1순위 (우선) 창 — …20882 10-27~10-29).
+  -- 🔵 2026-10-17(우편함 「코드·운영 — pg_net … source_end_diff 차수 오탐 …」 3) — 일정 표(announcement_schedule)의 접수 단계 창도 차수 창으로 낸다
+  --   (묶음 구성원 전부 · get_announcement_group_ids(대표) · 차수 이름 = scope_text). 경로 표가 없는 차수 공고(…0877 — 접수 창 10-19~21 · 11-02~04 가
+  --   형제 …0875 의 일정 표에만 있음)는 분석이 확정 마감을 마지막 창(11-04)으로 둔 뒤 페이지 첫 창(10-21)과 늘 어긋났다(10-16 11:30 UTC 부터).
   WITH d AS (
     SELECT g.* FROM public.get_announcements_deduped(NULL, NULL, NULL) g WHERE g.status <> '접수마감'
   ),
@@ -35,5 +38,9 @@ AS $function$
     (SELECT coalesce(jsonb_agg(DISTINCT jsonb_build_object('phase', r.phase_text, 'start', r.start_date, 'end', r.end_date)), '[]'::jsonb)
        FROM public.announcement_apply_routes r
       WHERE r.announcement_id IN (u.skey, u.cid) AND r.phase_text IS NOT NULL AND r.start_date IS NOT NULL AND r.end_date IS NOT NULL)
+      || (SELECT coalesce(jsonb_agg(DISTINCT jsonb_build_object('phase', coalesce(s.scope_text, s.stage_text), 'start', s.start_date, 'end', s.end_date)), '[]'::jsonb)
+            FROM public.announcement_schedule s
+           WHERE s.announcement_id IN (SELECT g.announcement_id FROM public.get_announcement_group_ids(u.cid) g)
+             AND s.stage = '접수' AND s.start_date IS NOT NULL AND s.end_date IS NOT NULL)
   FROM u JOIN public.announcements a ON a.announcement_id = u.skey
 $function$

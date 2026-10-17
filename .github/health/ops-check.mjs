@@ -5,7 +5,7 @@
 //   「상세조회 마감 … 미시도」 오류는 441런 중 193런(하루 최대 59런)이라 런 단위로는 기준이 되지 않는다 →
 //   「활성 LH 공고 중 6시간 넘게 상세조회를 시도하지 않은 수」(지금 3)로 잰다.
 // 🔴 첫 주는 넉넉하게 — 오탐이 잦으면 알림이 읽히지 않는다.
-import { sqlRead, anonRpc, report, recordFindings, SITE, PROJECT_REF } from './lib.mjs'
+import { sqlRead, anonRpc, report, recordFindings, SITE, PROJECT_REF, ANON_KEY } from './lib.mjs'
 import { YEARLY_SQL, judgeYearly } from './yearly.mjs'
 import { SH_RUN_SQL, judgeShRun } from './sh-run.mjs'
 import { BACKLOG_SQL, judgeBacklog } from './collect-backlog.mjs'
@@ -55,6 +55,32 @@ select jsonb_build_object(
                   coalesce(status_code between 200 and 399 and body_ok, false) as ok
              from public.ops_uptime_log
             where at < now() - interval '12 minutes' and at > now() - interval '24 hours') r), '[]'::jsonb)
+) as j;`
+// ⑭ 공개 목록 RPC 응답 시간(2026-10-17 · 우편함 「코드·운영 — … 목록 RPC 응답 감시 …」 2) — cron zipfit-list-rpc-probe 가 10분마다 anon 으로 잰 기록.
+//    판정은 지난 35분(이 점검 간격 30분 + 여유) 기록만 본다 — 한 번 넘은 기록이 24시간 내내 실패로 남지 않게. 24시간 요약은 값에만 싣는다(원인 판정 재료).
+// ⑮ pg_net 비밀값(2026-10-17 · 같은 우편함 1) — net 표 권한은 supabase_admin 이 PUBLIC 에 준 것이라 회수하지 못한다(마이그레이션 2026-10-17_01 머리).
+//    대신 ① 거두기(zipfit-net-purge-secrets 5분)가 도는지 = 10분 넘게 남은 토큰 꼴 응답 0 ② 노출 스키마(public)에서 anon·authenticated 가 부를 수 있는
+//    함수 중 net 을 부르는 것 0 ③ 바깥 REST 가 net 스키마를 거절(406 PGRST106)하는지를 본다. ③은 아래 판정 자리에서 fetch 로 잰다.
+// ⑯ 갤러리 원본 위치(2026-10-17 · 같은 우편함 5 · 정보) — 칸을 더한 뒤 들어온 갤러리 행 중 원본 위치(source_url)가 빈 수.
+const PROBE_SQL = `
+select jsonb_build_object(
+  'applied_min', (select extract(epoch from now() - applied_at) / 60 from zipfit_ops.schema_migrations where filename = '2026-10-17_01_net_purge_list_probe.sql'),
+  'last_age_min', (select extract(epoch from now() - max(at)) / 60 from zipfit_ops.list_rpc_probe_log),
+  'recent', coalesce((select jsonb_agg(jsonb_build_object('ms', ms, 'ok', ok, 'err', error) order by at desc)
+                        from zipfit_ops.list_rpc_probe_log where at > now() - interval '35 minutes'), '[]'::jsonb),
+  'day', (select jsonb_build_object('n', count(*), 'p50', round(percentile_cont(0.5) within group (order by ms)), 'max', max(ms),
+                                    'over2', count(*) filter (where ms >= 2000), 'bad', count(*) filter (where not ok))
+            from zipfit_ops.list_rpc_probe_log where at > now() - interval '24 hours'),
+  'tok_old', (select count(*) from net._http_response r where r.created < now() - interval '10 minutes'
+                and r.content ~* '"(access_token|refresh_token|id_token|client_secret)"\\s*:'),
+  'exposed_net_fns', coalesce((select jsonb_agg(p.proname order by p.proname) from pg_proc p
+       where p.pronamespace = 'public'::regnamespace
+         and (has_function_privilege('anon', p.oid, 'EXECUTE') or has_function_privilege('authenticated', p.oid, 'EXECUTE'))
+         and not exists (select 1 from pg_depend dp where dp.objid = p.oid and dp.deptype = 'e')
+         and pg_get_functiondef(p.oid) ~ 'net\\.(http_|_http_response|http_collect)'), '[]'::jsonb),
+  'extras_src', (select jsonb_build_object('since', min(m.applied_at), 'new', count(e.id), 'empty', count(e.id) filter (where e.source_url is null))
+                   from zipfit_ops.schema_migrations m left join public.announcement_extras e on e.created_at >= m.applied_at
+                  where m.filename = '2026-10-17_04_extras_source_url.sql')
 ) as j;`
 // ⑧ 분석 발송기 잠금 — 90분 넘게 도는 회차를 심장박동 유무로 가른다(2026-10-15 · 우편함 「코드 — health-ops stale_lock 갈래 …」 1).
 //    발송기 자동 회수(analysis_dispatch_tick ①-3 · 마이그레이션 2026-10-15_02)는 running ∧ reason ≠ followup ∧ 잡힘 ∧ 심장박동 있음 ∧
@@ -145,6 +171,8 @@ const EXPECTED_JOBS = [
   'zipfit-uptime-ping',          // 2026-10-08 바깥 감시 1단계(마이그레이션 2026-10-08_05)
   'zipfit-backup-dispatch', 'zipfit-heartbeat-dispatch',   // 2026-10-08 백업·생존 신호 예약도 GitHub 밖으로(마이그레이션 2026-10-08_06)
   'zipfit-backup-poll',          // 2026-10-11 zipfit-backup backup.yml 실행 기록 수집(마이그레이션 2026-10-11_02 · ⑥ backup)
+  'zipfit-net-purge-secrets',    // 2026-10-17 pg_net 응답 표 비밀값 응답 거두기(마이그레이션 2026-10-17_01 · ⑮ net_secret)
+  'zipfit-list-rpc-probe',       // 2026-10-17 공개 목록 RPC anon 실행 시간 기록(마이그레이션 2026-10-17_01 · ⑭ list_rpc_time)
 ]
 // 🔵 2026-10-03 — workflow_dispatch 토큰(Vault github_actions_dispatch_token · fine-grained · zipfit · zipfit-backup(2026-10-08 더함) · Actions 읽기·쓰기) 만료일.
 //    토큰을 갈면 이 날짜도 함께 고친다(다운님이 알려 준 값 · 값 자체는 Vault 에만 있다).
@@ -568,6 +596,42 @@ try {
     }
   } catch (e) {
     add('uptime', '바깥 감시(사이트·공개 REST) 연속 실패', 'fail', String(e).slice(0, 200), 'ops_uptime_log 를 읽는다')
+  }
+  // ⑭ ⑮ ⑯ — 표가 없으면(적용 전) 쿼리가 실패한다 — 그래서 UPTIME_SQL 처럼 따로 돈다(적용 기록이 없으면 건너뜀).
+  try {
+    const [pr] = await sqlRead(PROBE_SQL)
+    const x = pr.j
+    if (x.applied_min == null) throw Object.assign(new Error('마이그레이션 적용 전'), { skip: true })
+    const day = x.day || {}
+    const daySum = `24시간 ${day.n ?? 0}회 · 중앙 ${day.p50 ?? '-'}ms · 최대 ${day.max ?? '-'}ms · 2초 넘음 ${day.over2 ?? 0} · 한도·오류 ${day.bad ?? 0}`
+    if (x.last_age_min == null && x.applied_min < 30) {
+      add('list_rpc_time', '공개 목록 RPC anon 실행 시간(DB 안 10분마다)', 'skip', `첫 기록 전(적용 ${Math.round(x.applied_min)}분)`, '적용 뒤 30분까지는 판정하지 않는다')
+    } else {
+      const rec = x.recent || []
+      const bad = rec.filter(r => !r.ok), slow = rec.filter(r => r.ok && r.ms >= 2000)
+      const stop = x.last_age_min == null || x.last_age_min > 25
+      add('list_rpc_time', '공개 목록 RPC anon 실행 시간(DB 안 10분마다)', stop || bad.length ? 'fail' : slow.length ? 'warn' : 'pass',
+        [stop ? `기록 멈춤(마지막 ${x.last_age_min == null ? '없음' : Math.round(x.last_age_min) + '분 전'})` : null,
+         rec.length ? `지난 35분 ${rec.map(r => r.err ? '오류' : r.ms + 'ms').join(', ')}` : null, daySum].filter(Boolean).join(' · '),
+        '지난 35분 기록 중 3초(anon 한도) 넘음·오류 = 실패 · 2초 넘음 = ⚠️ · 마지막 기록 ≤ 25분 · 원인은 단정하지 않는다(24시간 요약을 쌓아 판정)')
+    }
+    let rest = 0, restBody = ''
+    try {
+      const r = await fetch(`https://${PROJECT_REF}.supabase.co/rest/v1/_http_response?select=id&limit=1`, {
+        headers: { apikey: ANON_KEY, Authorization: `Bearer ${ANON_KEY}`, 'Accept-Profile': 'net' } })
+      rest = r.status; restBody = (await r.text()).slice(0, 120)
+    } catch (e) { restBody = String(e).slice(0, 120) }
+    const restOk = rest === 406 && restBody.includes('PGRST106')
+    const fns = x.exposed_net_fns || []
+    add('net_secret', 'pg_net 비밀값 — 거두기·노출 함수·바깥 REST', x.tok_old === 0 && fns.length === 0 && restOk ? 'pass' : 'fail',
+      `10분 넘은 토큰 꼴 응답 ${x.tok_old} · anon·authenticated 가 부르는 net 함수 ${fns.length ? fns.join(', ') : 0} · REST net ${rest}${restOk ? '(PGRST106)' : ' ' + restBody}`,
+      '0 · 0 · 406 PGRST106 — net 표 권한은 회수 불가(supabase_admin 이 PUBLIC 에 줌)라 거두기(5분)·노출 0 으로 막는다')
+    const es = x.extras_src || {}
+    add('extras_source_url', '갤러리 새 행 원본 위치(source_url) 빔(정보)', 'info', `칸 추가 뒤 새 행 ${es.new ?? 0} · 빔 ${es.empty ?? 0}`,
+      '정보 — 판정하지 않는다(새 행은 갤러리를 넣는 분석이 채운다 · LH = lhFile.do?fileid=<file_sn>)')
+  } catch (e) {
+    if (e.skip) add('list_rpc_time', '공개 목록 RPC anon 실행 시간(DB 안 10분마다)', 'skip', String(e.message), '마이그레이션 2026-10-17_01 적용 뒤 판정한다')
+    else add('list_rpc_time', '공개 목록 RPC anon 실행 시간(DB 안 10분마다)', 'fail', String(e).slice(0, 200), 'zipfit_ops.list_rpc_probe_log 를 읽는다')
   }
   // ⑥ 백업 — 🔴 zipfit-backup(비공개) 커밋을 이 실행의 내장 토큰(github.token · zipfit 한정)으로는 읽을 수 없다.
   //    2026-10-09(고지 회차 1 · 7 ③ 조사) — 발송 토큰(Vault github_actions_dispatch_token)은 zipfit-backup 에 닿지만 이 점검은 DB 를
