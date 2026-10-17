@@ -162,9 +162,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-10-17 | **표시층 — 상태판 새 칸 셋(「발송부터」 표지 · 비밀값 만료 · 인스턴스 메모리)** — 최근 회차 `minutes_from=sent`면 걸린 분 옆 「발송부터」 · 비밀값 남은 날 오름차순(지남 빨강 · 30일 이하·missing 주황) · 메모리 가용·swap·commit(MiB · 색은 점검 `instance_mem`) · 관리자만 · RPC 0 · `zipfit-v234` · PR #605 |
 | 2026-10-17 | **코드·운영 — 인스턴스 지표 기록 · Vault 밖 만료 표 · 비밀값 30일 전 ⚠️** — health-ops가 관리 API 지표 끝점(기존 토큰)에서 숫자 16개만 `zipfit_ops.instance_metrics_log`에(`instance_mem` ⚠️만 · 첫 회차 swap 49% · commit 1.32배) · `secret_expiry_list()` 한 정의 + 표 `secret_expiry_external` · `secret_expiry` 30일 ⚠️ · PR #603 |
 | 2026-10-17 | **코드·운영 — DB 반영 뒤 공개 REST 자동 확인 · 원칙 32 한 줄 · 상태판 DB 칸** — apply 끝 anon 공개 REST 목록 RPC(200 ∧ 행 수 > 0 · 실패면 `db-apply` 이슈) · `ALTER ROLE` 꼴 check ⚠️ · 공개 REST 전부 실패면 확인 전 되돌림 먼저 · `ops_status_board` `minutes_from`·`secrets`(Vault 설명칸만 · 고정 5) · PR #599 |
-| 2026-10-17 | **표시층 — 목록 RPC 실패 때 한 번 다시 · 상태판 「목록 사용자 실패」** — `zfListRpc` 5xx·네트워크면 0.8초 뒤 한 번만(4xx 그대로 · 정상 요청 1 · 전량·칩 목록·매칭 세 곳) · 상태판 `health.list_user_fail` 한 줄(사람 1 이상 주황) · RPC 0 · `zipfit-v233` · PR #600 |
 ---
 
 ## 🚫 코딩 원칙
