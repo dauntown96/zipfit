@@ -1,11 +1,12 @@
 CREATE OR REPLACE FUNCTION public.get_announcements_deduped(p_region text DEFAULT NULL::text, p_type text DEFAULT NULL::text, p_status text DEFAULT NULL::text)
- RETURNS TABLE(source text, announcement_id text, title text, region text, region_top text, sido_nm text, sigungu_nm text, housing_type text, supply_org text, announcement_date date, apply_start date, apply_end date, status text, url text, is_revised boolean, area_min numeric, area_max numeric, rent_min integer, deposit_min bigint, total_units integer, move_in_date text, created_at timestamp with time zone, mymy_applicable boolean, supply_form text, application_method text, recruit_multiplier text, pair_announcement_key text, housing_change_allowed boolean, precise_address text, is_relaxed_recruitment boolean, relaxation_detail text, selection_method text, contract_before_verification boolean, rent_exemption_until date, rent_exemption_note text, revision_note text, revised_at timestamp with time zone, special_notes jsonb, revised_at_source text, first_seen_at timestamp with time zone, doc_submit_announce_date date, doc_submit_start date, doc_submit_end date, winner_announce_date date, contract_start date, contract_end date, building_name text, attachment_urls jsonb, has_cancel_notice boolean, region_names text[], block_count integer, first_announcement_date date, schedule_varies boolean, apply_end_confirmed date, apply_period_check boolean, last_seen_at timestamp with time zone, revision_seen_date date)
+ RETURNS TABLE(source text, announcement_id text, title text, region text, region_top text, sido_nm text, sigungu_nm text, housing_type text, supply_org text, announcement_date date, apply_start date, apply_end date, status text, url text, is_revised boolean, area_min numeric, area_max numeric, rent_min integer, deposit_min bigint, total_units integer, move_in_date text, created_at timestamp with time zone, mymy_applicable boolean, supply_form text, application_method text, recruit_multiplier text, pair_announcement_key text, precise_address text, is_relaxed_recruitment boolean, relaxation_detail text, selection_method text, contract_before_verification boolean, rent_exemption_until date, rent_exemption_note text, revision_note text, revised_at timestamp with time zone, special_notes jsonb, revised_at_source text, first_seen_at timestamp with time zone, doc_submit_announce_date date, doc_submit_start date, doc_submit_end date, winner_announce_date date, contract_start date, contract_end date, building_name text, attachment_urls jsonb, has_cancel_notice boolean, region_names text[], block_count integer, first_announcement_date date, schedule_varies boolean, apply_end_confirmed date, apply_period_check boolean, revision_seen_date date)
  LANGUAGE sql
  STABLE
 AS $function$
 -- 🔵 2026-10-18(우편함 「코드·운영 — 목록 RPC 응답에서 화면이 안 쓰는 칸 걷기」) — 화면·점검·다른 DB 함수가 읽지 않는 출력 칸 9개를 뺐다
 --   (id · status_normalized · rent_max · deposit_max · target_type · heating_type · updated_at · subscription_months_required ·
 --   subscription_payments_required — 행 집합·남는 칸 값은 그대로 · 표 칸은 그대로). 다시 읽게 하려면 출력 칸을 되돌리는 마이그레이션이 먼저다.
+--   같은 날 2칸 더(우편함 「코드·운영 — 목록 RPC 남은 2칸 걷기 …」 — housing_change_allowed · last_seen_at · 화면 매핑 줄은 표시층 PR #612가 먼저 걷었다).
 -- 🔵 2026-10-17(우편함 「코드·운영 — 목록 RPC 가볍게 …」 1) — announcements 행의 묶음 키는 title_dedup_key(저장 생성 칸 = announcement_dedup_key(title))를 읽는다(행마다 함수 호출 없음 · 결과 같음).
 -- 🔴 2026-10-14(코드 — LH 카드 발표일 A 후속) — search_path 는 SET 절이 아니라 본문 스키마 이름으로 고정한다(public.announcements ·
 --   public.announcement_dedup_key — 나머지 표는 이미 public. · 연산자·내장 함수는 pg_catalog 가 먼저 찾힌다).
@@ -113,12 +114,10 @@ best_location AS (
     id DESC
 ),
 first_seen AS (
-  -- 🔴 2026-09-29(EF 회차 4) last_seen_at — 그룹 안 행 중 수집 EF가 원천에서 마지막으로 다시 본 시각(max).
-  --   announcements.last_seen_at 은 수집 매퍼만 채운다(분석·만료 처리로는 안 바뀐다). SH 행은 NULL.
-  -- 🔵 2026-09-30 — 붙은 행(linked_in)은 세지 않는다 — LH 카드의 처음 본 시각·마지막 본 시각은 종전 그대로다.
+  -- 🔵 2026-09-30 — 붙은 행(linked_in)은 세지 않는다 — LH 카드의 처음 본 시각은 종전 그대로다.
+  -- 🔵 2026-10-18 — 그룹 last_seen_at(max)은 읽는 자리가 없어 출력 칸과 함께 걷었다(표 칸 announcements.last_seen_at 은 그대로).
   SELECT dedup_key,
-    COALESCE(min(created_at) FILTER (WHERE NOT linked_in), min(created_at)) AS first_seen_at,
-    COALESCE(max(last_seen_at) FILTER (WHERE NOT linked_in), max(last_seen_at)) AS last_seen_at
+    COALESCE(min(created_at) FILTER (WHERE NOT linked_in), min(created_at)) AS first_seen_at
   FROM base
   GROUP BY dedup_key
 ),
@@ -374,7 +373,7 @@ SELECT
   w.move_in_date,
   w.created_at,
   w.mymy_applicable, w.supply_form, w.application_method,
-  w.recruit_multiplier, w.pair_announcement_key, w.housing_change_allowed,
+  w.recruit_multiplier, w.pair_announcement_key,
   COALESCE(w.precise_address, bl.best_precise) AS precise_address,
   w.is_relaxed_recruitment, w.relaxation_detail, w.selection_method,
   w.contract_before_verification, w.rent_exemption_until, w.rent_exemption_note,
@@ -413,8 +412,6 @@ SELECT
   (w.source = 'MYHOME' AND w.supply_org IS NOT NULL AND w.supply_org <> 'LH'
    AND w.apply_start_confirmed IS NULL AND w.apply_end_confirmed IS NULL
    AND (pt.period_trust = 'check' OR w.apply_end = w.winner_announce_date)) IS TRUE AS apply_period_check,
-  -- 🔴 2026-09-29(EF 회차 4) 칸 추가뿐 — 행 집합·다른 칸은 그대로다.
-  fs.last_seen_at,
   -- 🔵 2026-10-16(우편함 「코드 — 관측 정정일 …(…0877)」) 칸 추가뿐 — 행 집합·다른 칸은 그대로다.
   --   관측 정정일 = LH 가 정정 게시일을 따로 주지 않은 정정 대표(announcement_date = first_announcement_date — LH 는 정정 게시 시각을
   --   PAN_NT_ST_DT 한 칸에만 주고 그것을 원공고일로 둘 수 있다 · …0877 10-06)의 「우리가 정정 행을 처음 본 날」(created_at 의 KST 날짜).
