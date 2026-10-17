@@ -18,14 +18,15 @@ AS $function$
 --   (health-ops list_user_fail — 관리 API 로그에서 센 값이라 DB 에는 그 점검의 경고 기록만 있다) · warned = 그 실행에서 ⚠️였나 · value = ⚠️일 때 그 기록 문구.
 -- 🔵 2026-10-17(우편함 「코드·운영 — DB 반영 뒤 공개 REST 자동 확인 · … · 상태판 DB 칸」 3 · 백로그 「관리자 페이지 (가)」 ②③):
 --   recent_runs.minutes_from — minutes 를 어디서부터 셌나: claimed(루틴이 잡은 시각) · sent(잡은 시각이 비어 발송 시각부터 — 대기 포함 · run 252 꼴).
---   secrets — 비밀값 만료: vault 줄 = vault.secrets 의 이름·설명칸 머리 「expires=YYYY-MM-DD|none|unknown」만 읽는다(🔴 secret 칸·decrypted_secrets 는 읽지 않는다)
---   · fixed 줄 = Vault 밖 만료(백로그 「자동화가 기대는 비밀값의 만료」 2026-10-11 다운님 확인 표 — 바뀌면 이 함수의 그 줄을 고친다).
---   한 줄 = source(vault|fixed) · name · state(date|none|unknown|missing) · expires · days_left(KST 오늘부터) — 날짜 있는 것부터 남은 날 오름차순.
+--   secrets — 비밀값 만료 한 줄 = source(vault|fixed) · name · state(date|none|unknown|missing) · expires · days_left(KST 오늘부터) — 날짜 있는 것부터 남은 날 오름차순.
+-- 🔵 2026-10-17(우편함 「코드·운영 — 인스턴스 지표 정기 기록 · Vault 밖 만료 표 · 비밀값 30일 전 ⚠️ …」 1·2):
+--   secrets 는 zipfit_ops.secret_expiry_list() 그대로(Vault 밖 만료는 표 zipfit_ops.secret_expiry_external — 종전 이 함수 안 values 다섯 줄을 옮겼다 · health-ops 와 한 정의).
+--   instance — 인스턴스 지표 최근 행(zipfit_ops.instance_metrics_log · health-ops 30분) · swap 사용 = SwapTotal − SwapFree · 24시간 swap 들고 남(쪽 · 4 KB)
+--   = zipfit_ops.instance_metrics_rates 의 이웃 행 차이 합(누적값이 줄면 그 차이는 빼고 센다 — 재시작). 기록이 없으면 null.
 declare
   v_uid uuid := auth.uid();
   cfg public.analysis_dispatch_config%rowtype;
-  v_cov jsonb; v_disp jsonb; v_health jsonb; v_col jsonb; v_fu jsonb; v_hides jsonb; v_rates jsonb; v_runs jsonb; v_secrets jsonb;
-  v_today date := (now() at time zone 'Asia/Seoul')::date;
+  v_cov jsonb; v_disp jsonb; v_health jsonb; v_col jsonb; v_fu jsonb; v_hides jsonb; v_rates jsonb; v_runs jsonb; v_secrets jsonb; v_inst jsonb;
   v_run record; v_last record;
   n_wait int; n_ready int; n_promo int; n_sent int; n_fu_wait int; n_reclaim int; v_failing boolean; v_wait text;
   v_fu_since timestamptz;
@@ -116,24 +117,21 @@ begin
             from public.analysis_dispatch_runs r order by r.id desc limit 5) z;
 
   select coalesce(jsonb_agg(jsonb_build_object('source', s.source, 'name', s.name, 'state', s.state, 'expires', s.expires,
-                                               'days_left', s.expires - v_today)
-                            order by s.expires nulls last, s.source desc, s.name), '[]'::jsonb)
+                                               'days_left', s.days_left) order by s.o), '[]'::jsonb)
     into v_secrets
-    from (select 'vault' as source, v.name,
-                 case when m.tok ~ '^\d{4}-\d{2}-\d{2}$' then 'date' when m.tok in ('none', 'unknown') then m.tok else 'missing' end as state,
-                 case when m.tok ~ '^\d{4}-\d{2}-\d{2}$' then m.tok::date end as expires
-            from vault.secrets v
-            cross join lateral (select lower(trim(substring(coalesce(v.description, '') from '^\s*expires=([^;]*)'))) as tok) m
-          union all
-          select 'fixed', f.name, 'date', f.expires
-            from (values ('Supabase 개인 액세스 토큰 zipfit-claude-code(Claude Code 관리 API)', date '2026-12-27'),
-                         ('공공데이터포털 LH 공고·상세(개발 계정)', date '2028-06-19'),
-                         ('공공데이터포털 마이홈 공공주택 모집공고(개발 계정)', date '2028-06-21'),
-                         ('공공데이터포털 마이홈 단지정보·대기현황(개발 계정)', date '2028-06-23'),
-                         ('공공데이터포털 아파트 전월세 실거래가(개발 계정)', date '2028-09-28')) f(name, expires)) s;
+    from zipfit_ops.secret_expiry_list() with ordinality s(source, name, state, expires, days_left, o);
+
+  select jsonb_build_object('scraped_at', l.scraped_at, 'mem_total', l.mem_total, 'mem_available', l.mem_available,
+                            'swap_total', l.swap_total, 'swap_used', l.swap_total - l.swap_free,
+                            'committed_as', l.committed_as, 'commit_limit', l.commit_limit,
+                            'swapin_24h_pages', (select sum(r.pswpin_d) from zipfit_ops.instance_metrics_rates r where r.scraped_at > now() - interval '24 hours'),
+                            'swapout_24h_pages', (select sum(r.pswpout_d) from zipfit_ops.instance_metrics_rates r where r.scraped_at > now() - interval '24 hours'),
+                            'rows_24h', (select count(*) from zipfit_ops.instance_metrics_log x where x.scraped_at > now() - interval '24 hours'))
+    into v_inst
+    from zipfit_ops.instance_metrics_log l order by l.scraped_at desc limit 1;
 
   return jsonb_build_object('now', now(), 'coverage', v_cov, 'dispatch', v_disp, 'health', v_health,
                             'collected', v_col, 'followups_unreported', v_fu, 'hides', v_hides,
-                            'rates', v_rates, 'recent_runs', v_runs, 'secrets', v_secrets);
+                            'rates', v_rates, 'recent_runs', v_runs, 'secrets', v_secrets, 'instance', v_inst);
 end
 $function$
