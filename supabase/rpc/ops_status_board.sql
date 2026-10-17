@@ -14,6 +14,8 @@ AS $function$
 --   rates(분석률 두 셈 나란히 — routine = 정본 · 루틴 분모 zipfit_ops.metric_analysis_rate() · open_by_source = 열린 카드 출처별 zipfit_ops.metric_open_by_source())
 --   · recent_runs(최근 분석 회차 다섯 — 잡기·끝·걸린 분·끝낸 대기열 행 수·끝 메모 앞 80자 · 💡 회차별 한 줄).
 --   비밀값 D-day 는 넣지 않는다 — Vault 설명칸이 비어 있어 읽을 날짜가 없다(2026-10-17 조회) · 추이는 다음 판.
+-- 🔵 2026-10-17(우편함 「코드·운영 — 목록 RPC 안정화 …」 2) — health.list_user_fail: 마지막 운영 점검(main)의 「목록 RPC 사용자 실패 24시간」 항목
+--   (health-ops list_user_fail — 관리 API 로그에서 센 값이라 DB 에는 그 점검의 경고 기록만 있다) · warned = 그 실행에서 ⚠️였나 · value = ⚠️일 때 그 기록 문구.
 declare
   v_uid uuid := auth.uid();
   cfg public.analysis_dispatch_config%rowtype;
@@ -73,7 +75,11 @@ begin
                        from (select distinct on (l.target) l.target, l.at, l.status_code from public.ops_dispatch_log l
                               order by l.target, l.at desc) z),
     'backup_poll', (select jsonb_build_object('at', p.at, 'status_code', p.status_code, 'runs_seen', p.runs_seen, 'status_note', p.status_note)
-                      from public.ops_backup_poll p order by p.at desc limit 1))
+                      from public.ops_backup_poll p order by p.at desc limit 1),
+    'list_user_fail', (select jsonb_build_object('run_at', h.run_at, 'warned', 'list_user_fail' = any(h.warned),
+                                                 'value', (select f.reason from public.ops_health_findings f
+                                                            where f.run_at = h.run_at and f.item = 'list_user_fail' limit 1))
+                         from public.ops_health_runs h where h.ref = 'main' order by h.run_at desc limit 1))
     into v_health;
 
   select coalesce(jsonb_agg(jsonb_build_object('source', c.source, 'at', c.last_collected_at) order by c.source), '[]'::jsonb)
