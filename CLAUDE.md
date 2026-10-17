@@ -162,9 +162,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-10-18 | **코드·운영 — 목록 RPC 남은 2칸 걷기(57 → 55칸) · 판정 재료 묶은 읽기 안** — `housing_change_allowed`·`last_seen_at`(읽는 자리 0) · #609 꼴 · 남는 칸 md5 7조합 같음 · 응답 1.88 → 1.82 MB · 카드 10/10 같음 · 마이그레이션 `2026-10-18_02` · PR #614 · 안 표(ⓐ 묶은 읽기 1요청 · ⓑ 목록에 싣기 · ⓒ 그대로 · ⓓ 같은 날 MYHOME 요청만 좁히기 249→3 KB) 보고 후 멈춤 |
 | 2026-10-18 | **표시층 — 첫 로드 2차** — 첫 목록 응답 신호(`zfAfterFirstList` · 4초 상한) 뒤로 동네 가격·결과발표 일정만 미룸(판정 재료 경로·링크·유형표는 그대로) · 같은 게시물 링크 표 한 번(`zfPostLinksAll`) · 매핑만 남은 2칸 줄 걷기 · 목록 도는 동안 곁 요청 12→8 · 50 ms 최대 10→7 · `zipfit-v236` · PR #612 |
 | 2026-10-18 | **코드·운영 — 원칙 13 한 줄 · ⑩ 덧 셋** — 원칙 13의 squash 뒤 재push 줄을 고쳐 씀(diff가 비지 않으면 그것만으로 force 금지 · 원격 head = 병합된 PR head sha 증명 뒤에만 다시 떠서 민다 · 안 서면 새 브랜치/지정 브랜치는 멈춤) · ⑩ 주택 매칭 `Promise.all`(PR #514) · 공고 일정 근거 #534 · 운영 감시 오타 · PR #611 |
-| 2026-10-18 | **코드·운영 — 목록 RPC 안 쓰는 칸 9개 걷기(66 → 57칸)** — `id`·`status_normalized`·`rent_max`·`deposit_max`·`target_type`·`heating_type`·`updated_at`·`subscription_*` 둘(읽는 자리 0 전수 grep) · drop → create → 같은 ACL · SET 절 없음 · 남는 칸 md5 7조합 같음 · 응답 2.11 → 1.88 MB · 마이그레이션 `2026-10-18_01` · PR #609 |
 ---
 
 ## 🚫 코딩 원칙
