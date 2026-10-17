@@ -66,11 +66,12 @@ const PROBE_SQL = `
 select jsonb_build_object(
   'applied_min', (select extract(epoch from now() - applied_at) / 60 from zipfit_ops.schema_migrations where filename = '2026-10-17_01_net_purge_list_probe.sql'),
   'last_age_min', (select extract(epoch from now() - max(at)) / 60 from zipfit_ops.list_rpc_probe_log),
-  'recent', coalesce((select jsonb_agg(jsonb_build_object('ms', ms, 'ok', ok, 'err', error) order by at desc)
-                        from zipfit_ops.list_rpc_probe_log where at > now() - interval '35 minutes'), '[]'::jsonb),
+  'recent', coalesce((select jsonb_agg(jsonb_build_object('ms', ms, 'ms2', to_jsonb(l)->'ms2', 'ok', ok, 'err', error) order by at desc)
+                        from zipfit_ops.list_rpc_probe_log l where at > now() - interval '35 minutes'), '[]'::jsonb),
   'day', (select jsonb_build_object('n', count(*), 'p50', round(percentile_cont(0.5) within group (order by ms)), 'max', max(ms),
+                                    'p50_2', round(percentile_cont(0.5) within group (order by (to_jsonb(l)->>'ms2')::int)),
                                     'over2', count(*) filter (where ms >= 2000), 'bad', count(*) filter (where not ok))
-            from zipfit_ops.list_rpc_probe_log where at > now() - interval '24 hours'),
+            from zipfit_ops.list_rpc_probe_log l where at > now() - interval '24 hours'),
   'tok_old', (select count(*) from net._http_response r where r.created < now() - interval '10 minutes'
                 and r.content ~* '"(access_token|refresh_token|id_token|client_secret)"\\s*:'),
   'exposed_net_fns', coalesce((select jsonb_agg(p.proname order by p.proname) from pg_proc p
@@ -603,7 +604,8 @@ try {
     const x = pr.j
     if (x.applied_min == null) throw Object.assign(new Error('마이그레이션 적용 전'), { skip: true })
     const day = x.day || {}
-    const daySum = `24시간 ${day.n ?? 0}회 · 중앙 ${day.p50 ?? '-'}ms · 최대 ${day.max ?? '-'}ms · 2초 넘음 ${day.over2 ?? 0} · 한도·오류 ${day.bad ?? 0}`
+    // 🔵 2026-10-17(목록 RPC 안정화 3) — ms = 새 연결 첫 실행(판정) · ms2 = 같은 연결 둘째 실행(함수 자체 속도 · 「첫/둘째」로 적는다).
+    const daySum = `24시간 ${day.n ?? 0}회 · 중앙 첫 ${day.p50 ?? '-'}ms · 둘째 ${day.p50_2 ?? '-'}ms · 최대 ${day.max ?? '-'}ms · 2초 넘음 ${day.over2 ?? 0} · 한도·오류 ${day.bad ?? 0}`
     if (x.last_age_min == null && x.applied_min < 30) {
       add('list_rpc_time', '공개 목록 RPC anon 실행 시간(DB 안 10분마다)', 'skip', `첫 기록 전(적용 ${Math.round(x.applied_min)}분)`, '적용 뒤 30분까지는 판정하지 않는다')
     } else {
@@ -612,8 +614,9 @@ try {
       const stop = x.last_age_min == null || x.last_age_min > 25
       add('list_rpc_time', '공개 목록 RPC anon 실행 시간(DB 안 10분마다)', stop || bad.length ? 'fail' : slow.length ? 'warn' : 'pass',
         [stop ? `기록 멈춤(마지막 ${x.last_age_min == null ? '없음' : Math.round(x.last_age_min) + '분 전'})` : null,
-         rec.length ? `지난 35분 ${rec.map(r => r.err ? '오류' : r.ms + 'ms').join(', ')}` : null, daySum].filter(Boolean).join(' · '),
-        '지난 35분 기록 중 3초(anon 한도) 넘음·오류 = 실패 · 2초 넘음 = ⚠️ · 마지막 기록 ≤ 25분 · 원인은 단정하지 않는다(24시간 요약을 쌓아 판정)')
+         rec.length ? `지난 35분 ${rec.map(r => (r.ok ? '' : '❌') + r.ms + (r.ms2 != null ? '/' + r.ms2 : '') + 'ms').join(', ')}` : null,
+         ...bad.filter(r => r.err).slice(0, 2).map(r => String(r.err).slice(0, 80)), daySum].filter(Boolean).join(' · '),
+        '지난 35분 기록 중 새 연결 첫 실행(첫/둘째의 앞)이 3초(anon 한도) 넘음·오류 = 실패 · 2초 넘음 = ⚠️ · 마지막 기록 ≤ 25분 · 원인은 단정하지 않는다(24시간 요약을 쌓아 판정)')
     }
     let rest = 0, restBody = ''
     try {
@@ -723,6 +726,34 @@ try {
     '0(.github/health/security-allowlist.json 밖 · 있으면 ⚠️ — 의도를 확인해 목록에 넣거나 고친다)')
 } catch (e) {
   add('sec_advisor', 'Supabase 보안 권고 — 허용 목록 밖 새 지적', 'warn', String(e).slice(0, 200), '관리 API advisors/security 를 읽는다(경고만)')
+}
+
+// ⑰ 목록 RPC 사용자 실패(2026-10-17 · 우편함 「코드·운영 — 목록 RPC 안정화 …」 2) — 관리 API 로그(PostgREST 접근 기록 postgrest_logs)에서 지난 24시간
+//    /rpc/get_announcements_deduped 의 5xx(거의 전부 57014 — anon 3초 한도)를 센다. 점검·위 list_rpc_time 은 자기 호출만 보아 사용자가 겪은 500 을 못 셌다(2026-10-17 조사 G).
+//    사람 브라우저와 자동 브라우저(UA HeadlessChrome — 우리 health-screen·로컬 렌더·Playwright)를 가른다 — 2026-10-17 24시간 12건 중 11건이 자동 브라우저였다.
+//    🔴 ⚠️만(❌ 없음 — 안정화 안이 선 뒤 문턱을 다시 본다) · 사람 실패 1건 이상 = ⚠️ · gate.mjs HARD 밖(루틴을 막지 않는다) · 관리자 상태판 health.list_user_fail 이
+//    ops_health_findings 기록을 읽는다. 로그 조회가 실패하면 ⚠️(판정 못 함).
+try {
+  const token = process.env.SUPABASE_ACCESS_TOKEN
+  if (!token) throw new Error('SUPABASE_ACCESS_TOKEN 이 없다')
+  const sql = `select countIf(event_message not like '%HeadlessChrome%') human, countIf(event_message like '%HeadlessChrome%') headless,
+    toString(maxIf(timestamp, event_message not like '%HeadlessChrome%')) last_human
+    from logs where source = 'postgrest_logs' and event_message like '%/rpc/get_announcements_deduped%' and match(event_message, '" 5[0-9][0-9] ')`
+  const q = new URLSearchParams({ sql, iso_timestamp_start: new Date(now.getTime() - 24 * 3600 * 1000).toISOString(), iso_timestamp_end: now.toISOString() })
+  const res = await fetch(`https://api.supabase.com/v1/projects/${PROJECT_REF}/analytics/endpoints/logs?${q}`, { headers: { Authorization: `Bearer ${token}` } })
+  const text = await res.text()
+  if (!res.ok) throw new Error(`관리 API ${res.status}: ${text.slice(0, 200)}`)
+  const body = JSON.parse(text)
+  if (body.error) throw new Error(`로그 조회: ${String(body.error).slice(0, 200)}`)
+  const r = (body.result || [])[0] || {}
+  const human = Number(r.human ?? 0), headless = Number(r.headless ?? 0)
+  const last = human > 0 && r.last_human ? new Date(String(r.last_human).replace(' ', 'T').slice(0, 23) + 'Z') : null
+  const lastKst = last ? new Date(last.getTime() + 9 * 3600 * 1000).toISOString().slice(5, 16).replace('T', ' ') + ' KST' : null
+  add('list_user_fail', '목록 RPC 사용자 실패(5xx · 57014) 24시간', human > 0 ? 'warn' : 'pass',
+    `사람 브라우저 ${human}${lastKst ? `(마지막 ${lastKst})` : ''} · 자동 브라우저 ${headless} · 합 ${human + headless}`,
+    '사람 브라우저 0 — 1건 이상이면 ⚠️(❌ 없음 · 기준선이 있어 안정화 안이 선 뒤 문턱을 다시 본다) · 자동 브라우저(HeadlessChrome)는 세기만 한다')
+} catch (e) {
+  add('list_user_fail', '목록 RPC 사용자 실패(5xx · 57014) 24시간', 'warn', String(e).slice(0, 200), '관리 API 로그(postgrest_logs)를 읽는다(경고만)')
 }
 
 if (process.env.SIMULATE === 'fail') add('simulate', '실패 흉내(수동 입력 simulate=fail) — 안 멈추는 실패', 'fail', '시험', '알림 경로 확인용 — 평소에는 없다 · 라벨 health-ops-soft')
