@@ -2308,8 +2308,30 @@ const zfSide = {
   routesByKey: new Map(),   // 제목 키 → 경로 행[]
   linkByKey: new Map(),     // MYHOME 제목 키 → { lhKey, lhTitle, lhUrl }
   rentLowByKey: new Map(),  // 제목 키 → 하위 3분의 1 단지 행[]
-  rentLowByAnn: new Map()   // announcement_id → 하위 3분의 1 단지 행[]
+  rentLowByAnn: new Map(),  // announcement_id → 하위 3분의 1 단지 행[]
+  lowLoaded: false          // 🔵 2026-10-18 — 동네 가격은 첫 목록 응답 뒤에 따로 온다(칩 자리는 이것이 참일 때 채운다)
 };
+// 🔵 2026-10-18(우편함 「표시층 — 첫 로드 2차」 1) — 같은 게시물 링크 표를 곁 데이터(zfLoadCardSide)와 공고문(zfLoadPostNotices)이 따로 받던 것을
+//    한 번으로 — 두 쪽이 쓰는 칸을 다 받는다(1,000행 쪽). 실패는 각자 종전대로(곁 데이터는 표 없이 · 공고문은 조용히 끝).
+let zfPostLinksP = null;
+function zfPostLinksAll(){
+  if(zfPostLinksP) return zfPostLinksP;
+  const h = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
+  const p = (async () => {
+    const out = [];
+    for(let off = 0; ; off += 1000){
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/announcement_post_links?select=lh_announcement_id,linked_announcement_id,linked_group_key&order=lh_announcement_id,linked_announcement_id&limit=1000&offset=${off}`, { headers: h });
+      if(!r.ok) throw new Error('announcement_post_links HTTP ' + r.status);
+      const j = await r.json();
+      if(!Array.isArray(j)) throw new Error('announcement_post_links 응답 형식');
+      out.push(...j);
+      if(j.length < 1000) return out;
+    }
+  })();
+  zfPostLinksP = p;
+  p.catch(() => { if(zfPostLinksP === p) zfPostLinksP = null; });
+  return p;
+}
 let zfSidePromise = null;
 function zfAttr(s){ return escapeHtml(String(s == null ? '' : s)).replace(/"/g, '&quot;'); }
 function zfLoadCardSide(){
@@ -2330,12 +2352,24 @@ function zfLoadCardSide(){
       if(j.length < 1000) return out;
     }
   };
+  // 🔵 2026-10-18(우편함 「표시층 — 첫 로드 2차」 1) — 동네 가격(하위 3분의 1)은 판정 없이 칩만 단다 → 첫 목록 응답 뒤에 받는다(아래 lowLoaded).
+  //    같은 게시물 링크 표는 zfLoadPostNotices 와 한 번만 받는다(zfPostLinksAll).
+  zfAfterFirstList().then(() => paged('kukmin_rent_per_sqm_rank?is_low=eq.true&select=announcement_id,title,complex_key,area_label,area_complexes', 'announcement_id,complex_key,area_label')).then(low => {
+    (low || []).forEach(r => {
+      const k = zfDedupKey(r.title);
+      if(!zfSide.rentLowByKey.has(k)) zfSide.rentLowByKey.set(k, []);
+      zfSide.rentLowByKey.get(k).push(r);
+      if(!zfSide.rentLowByAnn.has(r.announcement_id)) zfSide.rentLowByAnn.set(r.announcement_id, []);
+      zfSide.rentLowByAnn.get(r.announcement_id).push(r);
+    });
+    zfSide.lowLoaded = true;
+    zfFillSideSlots();
+  });
   zfSidePromise = Promise.all([
     paged('announcement_apply_routes?select=announcement_id,route,site_text,phase_text,start_date,end_date,sort_order,period_text,place_text,note_text', 'announcement_id,sort_order,route'),
-    paged('announcement_post_links?select=lh_announcement_id,linked_announcement_id,linked_group_key', 'lh_announcement_id,linked_announcement_id'),
-    paged('kukmin_rent_per_sqm_rank?is_low=eq.true&select=announcement_id,title,complex_key,area_label,area_complexes', 'announcement_id,complex_key,area_label')
-  ]).then(async ([routes, links, low]) => {
-    routes = routes || []; links = links || []; low = low || [];
+    zfPostLinksAll().catch(err => { console.error('ZipFit 곁 데이터 로드 실패:', err); return null; })
+  ]).then(async ([routes, links]) => {
+    routes = routes || []; links = links || [];
     const ids = [...new Set(routes.map(r => r.announcement_id).concat(links.map(l => l.lh_announcement_id)))].filter(Boolean);
     const anns = ids.length ? (await get(`announcements?select=announcement_id,title,url&${idFilterFor(ids)}`)) || [] : [];
     const annById = new Map(anns.map(a => [a.announcement_id, a]));
@@ -2354,13 +2388,6 @@ function zfLoadCardSide(){
     });
     // 🔵 2026-09-30 — 링크 문구가 LH 카드의 정리 여부를 보고 갈린다(zfPostLinkOrganized) — LH 카드 요약을 함께 받아 둔다.
     await zfEnsurePriceSummaries([...new Set(links.map(l => String(l.lh_announcement_id || '')).filter(Boolean))]);
-    low.forEach(r => {
-      const k = zfDedupKey(r.title);
-      if(!zfSide.rentLowByKey.has(k)) zfSide.rentLowByKey.set(k, []);
-      zfSide.rentLowByKey.get(k).push(r);
-      if(!zfSide.rentLowByAnn.has(r.announcement_id)) zfSide.rentLowByAnn.set(r.announcement_id, []);
-      zfSide.rentLowByAnn.get(r.announcement_id).push(r);
-    });
     zfSide.loaded = true;
     zfFillSideSlots();
     zfFillSummarySlots();   // ④ — 「아직 정리하지 못했어요」 자리를 링크로 바꾼다
@@ -2423,7 +2450,7 @@ function zfLoadPostNotices(){
   const cols = 'announcement_id,title,announcement_date,apply_start,apply_end,status,winner_announce_date,hidden_from_listing';
   zfPostNoticesPromise = (async () => {
     try{
-      const links = await get('announcement_post_links?select=lh_announcement_id,linked_announcement_id');
+      const links = await zfPostLinksAll();   // 🔵 2026-10-18 — 곁 데이터와 같은 한 번(첫 로드 2차)
       if(!links.length) return zfPostNotices;
       const lhIds = [...new Set(links.map(l => String(l.lh_announcement_id || '')).filter(Boolean))];
       const myIds = [...new Set(links.map(l => String(l.linked_announcement_id || '')).filter(Boolean))];
@@ -2754,8 +2781,8 @@ function zfFillSideSlots(){
     if(card) card.querySelectorAll('.zf-varies').forEach(t => { t.style.display = 'none'; });
     zfHideRouteDupOf(card);
   });
-  // ⑤ 단일 단지 카드의 동네 가격 칩
-  document.querySelectorAll('.zf-rentlow-slot[data-rentlow-key]').forEach(el => {
+  // ⑤ 단일 단지 카드의 동네 가격 칩 — 동네 가격이 온 뒤에만 채운다(그 전 자리는 비운 채 남겨 둔다 · 첫 로드 2차)
+  if(zfSide.lowLoaded) document.querySelectorAll('.zf-rentlow-slot[data-rentlow-key]').forEach(el => {
     if(el.dataset.filled === '1') return;
     el.dataset.filled = '1';
     const rows = zfSide.rentLowByKey.get(el.getAttribute('data-rentlow-key'));
@@ -2929,16 +2956,26 @@ const ZF_LIST_RETRY_MS = 800;
 async function zfListRpc(body){
   const go = () => fetch(`${SUPABASE_URL}/rest/v1/rpc/get_announcements_deduped`,
       {method:'POST', headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY,'Content-Type':'application/json'}, body});
-  let res = null, netErr = null;
-  try{ res = await go(); }catch(e){ netErr = e; }
-  if(netErr || res.status >= 500){
-    console.warn('ZipFit 목록 RPC 한 번 다시 부름:', netErr ? String(netErr) : 'HTTP ' + res.status);
-    await new Promise(r => setTimeout(r, ZF_LIST_RETRY_MS));
-    res = await go();
-  }
-  if(!res.ok) throw new Error('HTTP '+res.status);
-  return res.json();
+  try{
+    let res = null, netErr = null;
+    try{ res = await go(); }catch(e){ netErr = e; }
+    if(netErr || res.status >= 500){
+      console.warn('ZipFit 목록 RPC 한 번 다시 부름:', netErr ? String(netErr) : 'HTTP ' + res.status);
+      await new Promise(r => setTimeout(r, ZF_LIST_RETRY_MS));
+      res = await go();
+    }
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    return await res.json();
+  }finally{ zfListSettledResolve(); }
 }
+// 🔵 2026-10-18(우편함 「표시층 — 첫 로드 2차」 1) — 첫 목록 응답이 끝났다는 신호(성공·실패 모두). 첫 그림의 판정에 쓰이지 않는 곁 요청
+//    (동네 가격 하위 3분의 1 · 결과발표 일정)은 이 뒤에 내보내 목록이 먼저 달리게 한다. 목록을 아무도 안 부르는 경로가 있어도
+//    ZF_SIDE_DEFER_MAX_MS 뒤에는 풀린다. 🔴 판정 재료(경로 · 같은 게시물 링크 · 공고문 · 유형 표준)는 미루지 않는다 — 지금은 대개 목록보다
+//    먼저 와서 첫 그림이 맞는데, 미루면 틀린 상태·문구가 더 오래 보인다.
+const ZF_SIDE_DEFER_MAX_MS = 4000;
+let zfListSettledResolve = () => {};
+const zfListSettledP = new Promise(r => { zfListSettledResolve = r; });
+function zfAfterFirstList(){ return Promise.race([zfListSettledP, new Promise(r => setTimeout(r, ZF_SIDE_DEFER_MAX_MS))]); }
 function zfFetchAllNoticeRows(){
   if(zfAllRowsP && Date.now() - zfAllRowsAt < ZF_ALL_ROWS_TTL) return zfAllRowsP;
   zfAllRowsAt = Date.now();
@@ -3760,7 +3797,7 @@ function zfMapNoticeRows(rows){
     'application_method': r.application_method||'',
     'recruit_multiplier': r.recruit_multiplier||'',
     'pair_announcement_key': r.pair_announcement_key||'',
-    'housing_change_allowed': r.housing_change_allowed,
+    // 🔵 2026-10-18(우편함 「표시층 — 첫 로드 2차」 2) — 읽는 자리가 없던 housing_change_allowed · last_seen_at 매핑 줄을 걷었다(RPC 칸은 코드·운영이 걷는다).
     'precise_address': r.precise_address||'',
     'revised_at': r.revised_at||'',
     'revision_note': r.revision_note||'',
@@ -3789,9 +3826,6 @@ function zfMapNoticeRows(rows){
     //    이 두 줄이 없으면 ③(접수기간 확인 필요)·⑧(원문 확인 일정)이 조용히 안 뜬다(원칙 26).
     'apply_end_confirmed': r.apply_end_confirmed ?? null,
     'apply_period_check': r.apply_period_check ?? null,
-    // 🔵 2026-09-29(EF 회차 4) — 그룹을 수집이 원천에서 마지막으로 다시 본 시각. **매핑만** 한다(표시는 다음 표시층).
-    //    없으면 null 그대로 — SH 행·오래전 마감 그룹은 값이 없고, 「없음」과 「빈 문자열」을 섞지 않는다(원칙 26).
-    'last_seen_at': r.last_seen_at ?? null,
     // 🔵 2026-10-16(관측 정정일) — zfRevisedDate ①·③ 재료. 매핑에 없으면 화면이 영영 못 본다(원칙 26).
     'revised_at_source': r.revised_at_source ?? null,
     'revision_seen_date': r.revision_seen_date ?? null,
@@ -11610,7 +11644,7 @@ function zf3DecorateIn(list, rowsMap, isMatch){
 // 상태 — 불러오는 중: 빈 노선 카드 둘(숨쉬기 · 움직임 줄이기면 멈춤)
 function zf3Skeleton(){
   if(!zf3On()) return;
-  zfLoadWinSched();   // 목록을 받는 동안 함께(작다) — 대개 카드보다 먼저 온다
+  zfAfterFirstList().then(zfLoadWinSched);   // 🔵 2026-10-18(첫 로드 2차 1) — 첫 목록 응답 뒤에(그 전 카드는 종전 늦게 온 경우처럼 「원문 확인」 → 온 뒤 한 번 다시 그림)
   const list = document.getElementById('notice-list');
   if(!list || list.querySelector('.hcard')) return;
   const sk = '<div class="zf3-skel" aria-hidden="true"><div class="zf3-ctop"><span class="zf3-sk" style="width:24px;height:24px;border-radius:50%"></span><span class="zf3-sk" style="width:64px"></span><span class="zf3-sk" style="width:84px;margin-left:auto"></span></div><span class="zf3-sk" style="width:88%;height:16px"></span><span class="zf3-sk" style="width:52%"></span><div class="zf3-line" style="--n:4;--p:0"><span class="zf3-rail"></span>' + '<span class="zf3-stn"><i></i><span class="k">&nbsp;</span><span class="v">&nbsp;</span></span>'.repeat(4) + '</div></div>';
