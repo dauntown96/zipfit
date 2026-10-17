@@ -11245,10 +11245,32 @@ function zf3LineHTML(stns, label){
   const aria = stns.map(x => `${x.k} ${x.d ? (x.d.slice(0, 4) !== today.slice(0, 4) ? x.d.slice(0, 4) + '년 ' : '') + zf3Md(x.d, true) : (x.u || '원문 확인')}${x.sub ? ' ' + x.sub : ''}`).join(', ');
   return `<div class="zf3-line" style="--n:${n};--p:${p.toFixed(3)}" role="img" aria-label="${zfAttr((label ? label + ' — ' : '') + aria)}"><span class="zf3-rail"></span><span class="zf3-done"></span>${st}${moving ? '<span class="zf3-today" aria-hidden="true"><b>오늘</b></span>' : ''}</div>`;
 }
+// 🔵 2026-10-17(우편함 「표시층 — … 목록 카드 「발표 원문 확인」인데 상세에는 발표일」 2) — 목록 노선 「발표」 역은 수집 칸(winner_announce_date)만 읽어,
+//    칸이 빈 SH 수요자맞춤형 셋(SH_311521 · SH_311549 · SH_311349)이 상세 공급일정(공고문 일정 표)에는 발표일이 있는데 「원문 확인」이었다.
+//    수집 칸이 비었고 그 카드 공고(대표 id)의 일정 표 「결과발표」 행이 하나뿐이며 날이 하루로 적혀 있으면(시작 = 끝 또는 한쪽만) 그 날.
+//    행이 없거나 둘 이상(범위별)이거나 기간이면 종전 그대로(「원문 확인」). 재료는 일정 표의 결과발표 행 전부(수십 행)를 한 번 받는다(목록 RPC 그대로).
+let zfWinSched = null, zfWinSchedP = null, zfWinSchedRedrawn = false;
+function zfLoadWinSched(){
+  if(!zfWinSchedP) zfWinSchedP = fetch(`${SUPABASE_URL}/rest/v1/announcement_schedule?select=announcement_id,start_date,end_date&stage=eq.${encodeURIComponent('결과발표')}`, { headers: zfAnonHeaders() })
+    .then(r => r.ok ? r.json() : null).then(rows => {
+      if(!Array.isArray(rows)) throw new Error('응답 없음');
+      const m = new Map();
+      rows.forEach(r => { const k = String(r.announcement_id || ''); if(!m.has(k)) m.set(k, []); m.get(k).push(r); });
+      zfWinSched = m;
+      return true;
+    }).catch(e => { zfWinSchedP = null; console.warn('ZipFit 결과발표 일정 로드 실패:', e); return false; });
+  return zfWinSchedP;
+}
+function zfWinFromSchedule(aid){
+  const rs = zfWinSched && zfWinSched.get(String(aid || ''));
+  if(!rs || rs.length !== 1) return '';
+  const a = rs[0].start_date || '', b = rs[0].end_date || '';
+  return a && b && a !== b ? '' : (a || b);
+}
 function zf3Stations(n){
   const ann = zf3Real(zfNoticeDate(n) || n['announcement_date']), rev = zfRevisedDate(n);
   const s = zf3Real(n['신청시작일'] || n['apply_start']), e = zf3Real(zfSoonestOpenEnd(n));
-  const w = n['winner_announce_date'] || '';
+  const w = n['winner_announce_date'] || zfWinFromSchedule(n['announcement_id']) || '';
   return [
     { k: '공고', d: ann, sub: rev ? '정정 ' + rev.slice(5) : '' },
     { k: '접수', d: s, u: '미상' },
@@ -11269,6 +11291,11 @@ function zf3DecorateMatch(rows){
 }
 function zf3DecorateCards(){
   if(!zf3On()) return;
+  // 결과발표 일정이 목록보다 늦게 오면 그 날을 쓸 카드가 있을 때 한 번만 다시 그린다
+  if(!zfWinSched) zfLoadWinSched().then(ok => {
+    if(!ok || zfWinSchedRedrawn) return;
+    if((noticeFiltered || []).some(n => !n['winner_announce_date'] && zfWinFromSchedule(n['announcement_id']))){ zfWinSchedRedrawn = true; applyNoticeFiltersAndRender(noticePage); }
+  });
   zf3CardRows = new Map((noticeFiltered || []).map((n, i) => ['ncard-' + zfCardKey(n['announcement_id'] || i), n]));
   const nl = document.getElementById('notice-list'), ml = document.getElementById('match-result');
   if(nl) zf3DecorateIn(nl, zf3CardRows);
@@ -11459,6 +11486,7 @@ function zf3DecorateIn(list, rowsMap, isMatch){
 // 상태 — 불러오는 중: 빈 노선 카드 둘(숨쉬기 · 움직임 줄이기면 멈춤)
 function zf3Skeleton(){
   if(!zf3On()) return;
+  zfLoadWinSched();   // 목록을 받는 동안 함께(작다) — 대개 카드보다 먼저 온다
   const list = document.getElementById('notice-list');
   if(!list || list.querySelector('.hcard')) return;
   const sk = '<div class="zf3-skel" aria-hidden="true"><div class="zf3-ctop"><span class="zf3-sk" style="width:24px;height:24px;border-radius:50%"></span><span class="zf3-sk" style="width:64px"></span><span class="zf3-sk" style="width:84px;margin-left:auto"></span></div><span class="zf3-sk" style="width:88%;height:16px"></span><span class="zf3-sk" style="width:52%"></span><div class="zf3-line" style="--n:4;--p:0"><span class="zf3-rail"></span>' + '<span class="zf3-stn"><i></i><span class="k">&nbsp;</span><span class="v">&nbsp;</span></span>'.repeat(4) + '</div></div>';
@@ -12225,7 +12253,15 @@ function zf3MapPaint(){
     const inset = p.moved ? `<rect class="inset" x="${(p.x - r - 4 * s).toFixed(2)}" y="${(p.y - r - 4 * s).toFixed(2)}" width="${(2 * r + 8 * s).toFixed(2)}" height="${(2 * r + 8 * s).toFixed(2)}" rx="${(3 * s).toFixed(2)}"/>` : '';
     return `<g class="pt${sel}" style="--i:${Math.min(i, 30)}" ${act}>${inset}${g.exact ? `${g.hot || g.cls === 'hot' ? `<circle class="pulse" cx="${x}" cy="${y}" r="${r.toFixed(2)}"/>` : ''}<circle class="dot ${g.cls}" cx="${x}" cy="${y}" r="${r.toFixed(2)}"/>` : `<circle class="ring${sel}" cx="${x}" cy="${y}" r="${r.toFixed(2)}"/>`}<circle class="hit" cx="${x}" cy="${y}" r="${(22 * s).toFixed(2)}"/></g>`;
   }).join('');
-  svg.innerHTML = G.paths.map(p => `<path class="land${on.has(p.code) ? ' on' : ''}${mine.has(p.code) ? ' mine' : ''}" d="${p.d}"/>`).join('') + bd + pts + labels;
+  // 🔵 2026-10-17(우편함 「표시층 — 지도 끌기 중 점 깜빡임 …」 1) — 겹(윤곽 · 경계선 · 점 · 이름표)마다 글이 바뀐 것만 다시 만든다.
+  //    끌기(배율 그대로)가 끝날 때마다 svg 전체를 새로 써서 점이 등장 움직임(zf3ptin)을 되풀이하며 깜빡였다 — 점 겹은 배율·묶음·고름이 바뀔 때만 새로.
+  const layer = (cls, html) => {
+    let g = svg.querySelector(`:scope > g.${cls}`);
+    if(!g){ g = document.createElementNS('http://www.w3.org/2000/svg', 'g'); g.setAttribute('class', cls); svg.appendChild(g); }
+    if(g.zfHtml !== html){ g.innerHTML = html; g.zfHtml = html; }
+  };
+  layer('ly-land', G.paths.map(p => `<path class="land${on.has(p.code) ? ' on' : ''}${mine.has(p.code) ? ' mine' : ''}" d="${p.d}"/>`).join(''));
+  layer('ly-bd', bd); layer('ly-pts', pts); layer('ly-lbl', labels);
   const zb = radar.querySelector('.zf3-zoom');
   if(zb){ zb.querySelector('[data-zoom="in"]').disabled = k >= ZF3_ZOOM_MAX * 0.99; zb.querySelector('[data-zoom="out"]').disabled = !zf3Zoom; zb.querySelector('[data-zoom="all"]').disabled = !zf3Zoom; }
 }
