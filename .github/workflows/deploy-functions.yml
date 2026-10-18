@@ -2,7 +2,7 @@
 # 🔴 바뀐 함수만 하나씩 배포한다. 한 번에 전부(`supabase functions deploy` 인자 없이)는 쓰지 않는다 —
 #    안 바뀐 함수의 버전이 오르면 「배포본 = 저장소」 대조가 흐려진다.
 # 🔴 허용 목록(ALLOWED) 밖 함수는 배포하지 않는다 — 저장소에만 있고 배포된 적 없는 함수
-#    (fetch-attachment-probe · upsert-announcement)가 새로 생기지 않게. 목록 = supabase/config.toml 의 [functions.*].
+#    (fetch-attachment-probe · 옛 upsert-announcement 는 2026-10-18 소스를 걷음)가 새로 생기지 않게. 목록 = supabase/config.toml 의 [functions.*].
 # 🔴 verify_jwt 는 supabase/config.toml 이 정본이다(2026-09-29 배포본 값을 관리 API로 읽어 옮겼다).
 #    배포 명령에도 같은 값을 플래그로 싣고, 배포 뒤 관리 API로 다시 읽어 다르면 실패로 끝낸다.
 # 되돌리기: 이전 커밋으로 되돌린 PR을 병합하거나, 그 커밋에서 workflow_dispatch 로 함수 하나를 재배포한다.

@@ -329,7 +329,7 @@ const requireEnv = (key: string): string => {
 31. **Edge Function은 직접 배포하지 않는다 — `main` 병합이 배포다** (2026-09-29 신설 — 배포 자동화 회차)
 - `supabase/functions/**`를 고친 PR을 병합하면 `.github/workflows/deploy-functions.yml`이 **바뀐 함수만** 하나씩 배포한다. 🔴 병합 뒤 Actions 결과(성공 · 새 버전)를 회신 ④에 적는다.
 - 되돌리기는 이전 커밋으로 되돌린 PR, 또는 `workflow_dispatch`로 함수 하나를 재배포한다.
-- `verify_jwt`의 정본은 `supabase/config.toml`이다(배포 뒤 워크플로가 관리 API 값과 대조해 다르면 실패). 🔴 허용 목록 밖 함수(`fetch-attachment-probe` · `upsert-announcement`)는 배포하지 않는다 — 새 함수를 배포하려면 워크플로 `ALLOWED`·dispatch 선택지·`config.toml`을 같은 PR에서 고친다.
+- `verify_jwt`의 정본은 `supabase/config.toml`이다(배포 뒤 워크플로가 관리 API 값과 대조해 다르면 실패). 🔴 허용 목록 밖 함수(`fetch-attachment-probe` — 옛 `upsert-announcement` 소스는 2026-10-18 걷음)는 배포하지 않는다 — 새 함수를 배포하려면 워크플로 `ALLOWED`·dispatch 선택지·`config.toml`을 같은 PR에서 고친다.
 - 토큰은 Actions Secret `SUPABASE_ACCESS_TOKEN`만 쓴다(저장소 설정은 다운님 몫).
 
 32. **DB 스키마·함수 변경은 적용 SQL 파일 + PR 병합으로만 — 관리 API로 운영 DB에 DDL을 직접 보내지 않는다(데이터 쓰기는 종전대로)** (2026-09-30 신설 — 우편함 「운영 — DB 함수·스키마 변경도 PR 병합 = 적용」)

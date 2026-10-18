@@ -1,7 +1,7 @@
 # Supabase CLI 설정 — Edge Function 배포(.github/workflows/deploy-functions.yml)만 이 파일을 읽는다.
 # 🔴 verify_jwt 는 2026-09-29 배포본 값을 관리 API(GET /v1/projects/{ref}/functions)로 읽어 그대로 옮겼다.
 #    값을 바꾸면 배포 뒤 확인 단계가 API 값과 이 파일을 대조한다 — 바꿀 때는 이유를 커밋에 적는다.
-# 🔴 여기 없는 함수(fetch-attachment-probe · upsert-announcement 등)는 배포하지 않는다 — 워크플로 허용 목록과 같다.
+# 🔴 여기 없는 함수(fetch-attachment-probe 등 · 옛 upsert-announcement 소스는 2026-10-18 걷음)는 배포하지 않는다 — 워크플로 허용 목록과 같다.
 project_id = "khdpjjyspmlqtzperoqg"
 
 # 2026-10-08 신설 — 열린 원문 키 정기 대조(3-B ③ 1단계 · 기록만). 다른 수집 함수와 같이 x-cron-secret 으로 막는다(JWT 없음).
