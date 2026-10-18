@@ -162,9 +162,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-10-18 | **코드·운영 — G8 확정 고침** — 수집 EF 예외 문자열을 가린 뒤 자름 + 기록·로그·응답 `scrubSecrets` · 운영 로그 1행 키 가림(1 → 0) · `migrate.py` DB 오류 행 값 가림 · pg_net 지움에 `action_link` · health-ops ℹ️ 원문 오염 0·0·0 · 리허설 VIEW(백업 #29) · history.md 표 칸 검사 · `WEBHOOK_SECRET` 삭제는 분류기 거부 → 다운님 손 · PR #618 |
+| 2026-10-18 | **코드·운영 — G7 복구 리허설 수동 1회** — `workflow_dispatch`(발송 함수는 restore-drill 안 받음) · drill `01045b5` verified · public·zipfit_ops 행 수 같음 · 빠진 것 뷰 개수(→ G8) · 코드·DB 0 |
 | 2026-10-18 | **표시층 — 첫 로드 ③차: 같은 날 MYHOME 좁히기** — `zfLoadPostNotices` LH 행에 `title_dedup_key` · 같은 날 MYHOME을 그 키 `in.(…)`로 좁혀 칸 넷만(761행·249,503 B → 15행·3,374 B · 쓰는 행 15=15 · 키 다름 0) · 키 없음·주소 6,000자 넘으면 종전 꼴 · 카드 950장 같음 · `zipfit-v237` · PR #616 |
-| 2026-10-18 | **코드·운영 — 목록 RPC 남은 2칸 걷기(57 → 55칸) · 판정 재료 묶은 읽기 안** — `housing_change_allowed`·`last_seen_at`(읽는 자리 0) · #609 꼴 · 남는 칸 md5 7조합 같음 · 응답 1.88 → 1.82 MB · 카드 10/10 같음 · 마이그레이션 `2026-10-18_02` · PR #614 · 안 표(ⓐ 묶은 읽기 1요청 · ⓑ 목록에 싣기 · ⓒ 그대로 · ⓓ 같은 날 MYHOME 요청만 좁히기 249→3 KB) 보고 후 멈춤 |
-| 2026-10-18 | **표시층 — 첫 로드 2차** — 첫 목록 응답 신호(`zfAfterFirstList` · 4초 상한) 뒤로 동네 가격·결과발표 일정만 미룸(판정 재료 경로·링크·유형표는 그대로) · 같은 게시물 링크 표 한 번(`zfPostLinksAll`) · 매핑만 남은 2칸 줄 걷기 · 목록 도는 동안 곁 요청 12→8 · 50 ms 최대 10→7 · `zipfit-v236` · PR #612 |
 ---
 
 ## 🚫 코딩 원칙

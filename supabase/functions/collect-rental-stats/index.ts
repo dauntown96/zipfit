@@ -33,6 +33,21 @@ const authcheckResponse = () => new Response(JSON.stringify({ mode: 'authcheck',
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
+// 🔴 예외 문자열에는 키 든 요청 URL이 그대로 실린다(Deno fetch 네트워크 오류 문구). 로그와 응답 —
+// 응답은 pg_net 응답 표(net._http_response)에 남는다 — 에 싣기 전에 가린다(2026-10-18 · 우편함 「G8 확정 고침」).
+const secretVariants = (v: string): string[] => {
+  const out = new Set<string>([v])
+  try { out.add(encodeURIComponent(v)) } catch { /* 무시 */ }
+  try { out.add(decodeURIComponent(v)) } catch { /* 무시 */ }
+  return [...out].filter(s => s.length >= 8)
+}
+const KNOWN_SECRETS = [...secretVariants(API_KEY), ...secretVariants(CRON_SECRET)]
+const scrubSecrets = (text: string): string => {
+  let out = text.replace(/(serviceKey|ServiceKey)=[^&\s"'<]*/g, '$1=***')
+  for (const s of KNOWN_SECRETS) out = out.split(s).join('***')
+  return out
+}
+
 // 5개 API 엔드포인트
 const APIS = [
   { name: '영구임대', path: '/15084928/v1/uddi:c9e71f1d-583e-442f-be76-eabcf906de9d', updated: '2026-05-14' },
@@ -194,10 +209,10 @@ Deno.serve(async (req) => {
     }), { headers: { 'Content-Type': 'application/json' } })
 
   } catch (e) {
-    console.error('오류:', String(e))
+    console.error('오류:', scrubSecrets(String(e)))
     return new Response(JSON.stringify({
       success: false,
-      error: String(e)
+      error: scrubSecrets(String(e))
     }), { status: 500, headers: { 'Content-Type': 'application/json' } })
   }
 })
