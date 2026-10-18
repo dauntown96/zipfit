@@ -774,6 +774,33 @@ try {
   add('secret_expiry', '비밀값 만료(30일 안 ⚠️)', 'warn', String(e).slice(0, 200), 'zipfit_ops.secret_expiry_list() 를 읽는다(못 읽으면 ⚠️)')
 }
 
+// ⑳ 공고 원문 문자열 오염(2026-10-18 · 우편함 「코드·운영 — G8 확정 고침 …」 5 · 정보) — 화면 저장형 XSS 두 자리(제목 → innerHTML ·
+//    URL → href)의 진입은 수집 원문뿐이다. 열린 공고(공고중·접수중·정정공고중)의 제목 꺾쇠 · 공고·첨부 URL 중 http(s) 아닌 것 · 따옴표 든 것을 센다.
+//    처음엔 정보(ℹ️ · 판정하지 않음)다 — 0이 아니면 ⚠️로 올릴지는 따로 정한다. gate.mjs HARD 밖(안 멈춤).
+try {
+  const [x] = await sqlRead(`with o as (select announcement_id, title, url, attachment_urls from public.announcements where status in ('공고중','접수중','정정공고중')),
+u as (select announcement_id, url as u from o where coalesce(url, '') <> ''
+      union all
+      select o.announcement_id, e->>'url' from o, jsonb_array_elements(case when jsonb_typeof(o.attachment_urls) = 'array' then o.attachment_urls else '[]'::jsonb end) e
+       where coalesce(e->>'url', '') <> '')
+select jsonb_build_object(
+  'open', (select count(*) from o),
+  'urls', (select count(*) from u),
+  'title_angle', (select count(*) from o where title ~ '[<>]'),
+  'url_not_http', (select count(*) from u where u.u !~* '^https?://'),
+  'url_quote', (select count(*) from u where u.u ~ '["'']'),
+  'ids', (select coalesce(jsonb_agg(distinct x.announcement_id), '[]'::jsonb) from (
+            select announcement_id from o where title ~ '[<>]'
+            union all select announcement_id from u where u.u !~* '^https?://' or u.u ~ '["'']') x)
+) as j`)
+  const c = x.j
+  add('source_text_taint', '열린 공고 원문 문자열 오염 — 제목 꺾쇠 · http 아닌 URL · 따옴표 든 URL(정보)', 'info',
+    `${c.title_angle} · ${c.url_not_http} · ${c.url_quote}(열린 ${c.open} · URL ${c.urls})${c.ids.length ? ' · ' + c.ids.slice(0, 5).join(', ') : ''}`,
+    '정보 — 판정하지 않는다(0 · 0 · 0 이 정상 · 공고 URL과 첨부 attachment_urls[].url 을 함께 센다)')
+} catch (e) {
+  add('source_text_taint', '열린 공고 원문 문자열 오염 — 제목 꺾쇠 · http 아닌 URL · 따옴표 든 URL(정보)', 'info', String(e).slice(0, 200), '공고 표를 읽는다(못 읽어도 정보)')
+}
+
 // ⑲ 인스턴스 메모리(2026-10-17 · 같은 우편 1 · 조사 「인스턴스 지표 경로」 ⓑ) — 관리 API 지표 끝점(베타)에서 숫자만 골라(instance.mjs) zipfit_ops.instance_metrics_log 에 한 행.
 //    🔴 본문 원문은 어디에도 남기지 않는다(값 칸은 고른 숫자 요약뿐 · 실패하면 HTTP 상태만). ⚠️만(❌ 없음 · 문턱 잠정 — instance.mjs).
 //    베타 끝점이라 받기·고르기·기록이 실패하면 이 항목만 ℹ️ — 점검 전체를 막지 않는다.

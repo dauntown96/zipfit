@@ -10,11 +10,13 @@ AS $function$
 --   net 스키마가 노출되지 않는다(PGRST106 · pg_graphql 꺼짐 — 같은 날 실측) — 그래도 토큰이 6시간 남는 자리 자체를 줄인다.
 --   대상: 본문에 "access_token" · "refresh_token" · "id_token" · "client_secret" 키가 있는 응답(Google OAuth 토큰 응답 꼴 — 2026-10-16 1행 관측).
 --   우리 함수는 그런 응답을 받지 않는다(Drive 토큰은 fetch-attachment 안에서만 받는다) — 손으로 net.http_post 를 부른 자리를 거둔다.
+--   🔵 2026-10-18(우편함 「G8 확정 고침」 강화 c) — "action_link" 키도 더한다: test-login(mode=link)의 1회용 로그인 링크(토큰 해시 포함 · 1시간)가
+--   net.http_post 로 불렸을 때 응답 표에 남는 꼴이다(그날 0행).
 declare
   n integer;
 begin
   delete from net._http_response r
-   where r.content ~* '"(access_token|refresh_token|id_token|client_secret)"\s*:';
+   where r.content ~* '"(access_token|refresh_token|id_token|client_secret|action_link)"\s*:';
   get diagnostics n = row_count;
   return n;
 end

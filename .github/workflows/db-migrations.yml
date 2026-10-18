@@ -40,9 +40,14 @@ jobs:
       - name: CLAUDE.md 이력 표 꼴
         env:
           HISTORY_FAIL_FROM: '2026-10-20'
+        # 🔵 2026-10-18(우편함 「G8 확정 고침」 7) — 표 칸 수도 본다(CLAUDE.md · docs/history.md — 셀 안 `|` 는 `\|` · 행 끝 `|`). 같은 경고→실패 날짜를 따른다.
         run: |
-          if out=$(python3 .claude/hooks/rule-check.py --history CLAUDE.md); then
-            echo "CLAUDE.md 「최근 작업 이력」 꼴 — 통과"; exit 0
+          a=0; b=0
+          o1=$(python3 .claude/hooks/rule-check.py --history CLAUDE.md 2>&1) || a=1
+          o2=$(python3 .claude/hooks/rule-check.py --table-cols CLAUDE.md docs/history.md 2>&1) || b=1
+          out=$(printf '%s\n%s\n' "$o1" "$o2" | sed '/^$/d')
+          if [ "$a" = 0 ] && [ "$b" = 0 ]; then
+            echo "CLAUDE.md 「최근 작업 이력」 꼴 · 표 칸 수 — 통과"; exit 0
           fi
           printf '%s\n' "$out"
           today=$(TZ=Asia/Seoul date +%F)
