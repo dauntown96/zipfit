@@ -248,7 +248,8 @@ try {
                         where l.target = t.target order by l.id desc limit 1))
                          from (values ('zipfit-backup/backup.yml'), ('zipfit-backup/heartbeat.yml')) t(target)),
       -- 🔵 2026-10-09(고지 회차 1 · 7 ①) — 직전 운영 점검 실행(ops_health_runs · 이번 실행은 끝에 기록되므로 아직 없다).
-      'last_health_run_age_min', (select extract(epoch from now() - max(run_at))/60 from ops_health_runs),
+      -- 🔵 2026-10-18 — 화면 점검(kind='screen')도 같은 표에 한 줄을 남긴다 → 운영 점검만 센다.
+      'last_health_run_age_min', (select extract(epoch from now() - max(run_at))/60 from ops_health_runs where kind = 'ops'),
       -- 🔵 2026-10-09(고지 회차 1 · 7 ②) — 24시간 안 발송 중 GitHub 가 204 가 아닌 응답을 준 것 · 응답을 못 옮긴 것(발송 40분 넘게 응답 칸 빔).
       --    ops_dispatch 는 마지막 한 줄만 봐서 다음 발송이 204 면 앞의 500 이 덮였다(10-08 id 245 — 60분 공백이 어디에도 안 남음).
       'dispatch_bad_24h', (select json_agg(json_build_object('target', target, 'non204', non204, 'lost', lost, 'n', n)) from (

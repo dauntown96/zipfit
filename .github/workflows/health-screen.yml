@@ -1,5 +1,5 @@
 # A. 화면 점검 — 배포본이 사실과 같은 말을 하는가(2026-09-29 신설 · 우편함 「화면 점검·운영 건강 점검 자동화」)
-# 🔴 읽기·알림만 한다. 배포본(GitHub Pages)을 390px Chromium 으로 열고, 카드 문구 기대값은 DB 에서 따로 계산한다
+# 🔴 읽기·알림만 한다(예외 하나 2026-10-18: 실행 요약 DB 한 줄 — ops_health_record kind=screen). 배포본(GitHub Pages)을 390px Chromium 으로 열고, 카드 문구 기대값은 DB 에서 따로 계산한다
 #    (관리 API · `set transaction read only`). 비밀값: 기존 SUPABASE_ACCESS_TOKEN 하나 · 공개 anon 키.
 # 언제: index.html·sw.js 가 바뀐 main 병합 뒤(Pages 반영을 기다린다) · 매일 1회 · 수동.
 #   🔵 매일 1회는 GitHub schedule 이 아니라 Supabase pg_cron `zipfit-health-screen-dispatch`(23:50 UTC = KST 08:50)가
@@ -86,3 +86,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: bash .github/health/issue.sh health-screen "[자동 점검 A] 화면 점검 실패"
+      # 🔵 2026-10-18(우편함 「코드·운영 — 게이트 재는 장치」 ④) — 판정이 실패면 실행도 실패로 끝낸다(이슈 단계 뒤 · 마지막).
+      #    그 전에는 판정 실패여도 실행이 success 였다(run 121 · #575) — Actions 목록만 보는 사람·도구가 실패를 못 봤다.
+      #    이 결론에 기대는 장치 없음(2026-10-18 확인): workflow_run 0 · 발송 기록(ops_dispatch_log)은 발송 응답(204)만 · health-ops 는 그 발송 기록만 읽는다.
+      #    ⚠️(경고)는 실패가 아니다 — ok 는 ❌만 본다(lib.mjs report).
+      - name: 판정 실패면 실행도 실패
+        if: always()
+        run: |
+          ok=$(node -e 'try{process.stdout.write(String(JSON.parse(require("fs").readFileSync("health-result.json","utf8")).ok))}catch(e){process.stdout.write("missing")}')
+          echo "판정 ok=$ok"
+          [ "$ok" = "true" ] || { echo "::error::화면 점검 판정 실패(ok=$ok) — 결과 파일·이슈를 본다"; exit 1; }

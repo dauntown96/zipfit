@@ -77,7 +77,7 @@ begin
   select jsonb_build_object(
     'last_run', (select jsonb_build_object('run_at', h.run_at, 'ok', h.ok, 'n_fail', h.n_fail, 'n_warn', h.n_warn,
                                            'failed', to_jsonb(h.failed), 'warned', to_jsonb(h.warned), 'run_url', h.run_url)
-                   from public.ops_health_runs h where h.ref = 'main' order by h.run_at desc limit 1),
+                   from public.ops_health_runs h where h.ref = 'main' and h.kind = 'ops' order by h.run_at desc limit 1),
     'dispatch_log', (select coalesce(jsonb_agg(jsonb_build_object('target', z.target, 'at', z.at, 'status_code', z.status_code) order by z.target), '[]'::jsonb)
                        from (select distinct on (l.target) l.target, l.at, l.status_code from public.ops_dispatch_log l
                               order by l.target, l.at desc) z),
@@ -86,7 +86,7 @@ begin
     'list_user_fail', (select jsonb_build_object('run_at', h.run_at, 'warned', 'list_user_fail' = any(h.warned),
                                                  'value', (select f.reason from public.ops_health_findings f
                                                             where f.run_at = h.run_at and f.item = 'list_user_fail' limit 1))
-                         from public.ops_health_runs h where h.ref = 'main' order by h.run_at desc limit 1))
+                         from public.ops_health_runs h where h.ref = 'main' and h.kind = 'ops' order by h.run_at desc limit 1))
     into v_health;
 
   select coalesce(jsonb_agg(jsonb_build_object('source', c.source, 'at', c.last_collected_at) order by c.source), '[]'::jsonb)

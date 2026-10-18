@@ -1,4 +1,5 @@
 // A. 화면 점검 — 배포본이 사실과 같은 말을 하는가. 읽기·알림만 한다.
+//   예외 하나(2026-10-18): 끝에 실행 요약을 public.ops_health_record(jsonb · kind=screen)로 DB 한 줄 남긴다(⑫ · 운영 점검과 같은 함수).
 // 출발점: claude.ai 가 쓰던 Playwright 두 벌(💡 「실사용 점검 회차 정례화」 · 2026-09-29) —
 //   ① 카드 문구 점검(공고 탭 전 쪽의 카드 요약 문구) ② 390px 화면 품질(깨진 칩 · 경로 한 줄 첫 날짜).
 // 🔴 기대값은 화면 코드가 아니라 DB 에서 **따로** 계산한다(같은 코드로 기대값을 만들면 같은 버그를 함께 통과한다):
@@ -9,7 +10,7 @@
 //   공고문 자리(2026-10-01) = 같은 게시물 카드의 「📑 공고문 N개」 줄 — 공고문마다 접수 기간(M/D~M/D)·상태 배지를
 //   DB 의 링크 표(announcement_post_links)·공고 행 날짜로 따로 계산해 맞춘다(붙은 카드만 · 오늘 = KST).
 import { chromium } from 'playwright'
-import { sqlRead, report, SITE } from './lib.mjs'
+import { sqlRead, report, recordFindings, SITE } from './lib.mjs'
 import { readFileSync } from 'node:fs'
 
 const VIEWPORT = { width: 390, height: 844 }
@@ -963,6 +964,40 @@ try {
   } catch (e) {
     add('drive_thumb', '첨부 미리보기(Drive 썸네일 끝점)가 그림을 주나', 'warn', '못 잼: ' + String(e).slice(0, 200), '경고만')
   }
+  // ⑪ 빈 탭(2026-10-18 · 우편함 「코드·운영 — 게이트 재는 장치」 ② · 런칭 게이트 G5 「다섯 탭 중 빈 탭 0」) — 비로그인으로 새 쪽을 열고
+  //    다섯 탭을 goMain(i)로 하나씩 연다. 3초 뒤 #main{i}의 보이는 글자가 없으면 빈 탭이다. 「없어요·없습니다」 꼴(빈 상태)이면
+  //    그 탭 안에 누를 것(단추·링크)이 있어야 한다 — 무엇이 없고 다음에 무엇을 하라는 안내 없이 「없어요」만이면 빈 탭으로 친다.
+  //    받는 중 표시(「불러오는 중」 등)는 빈 탭이 아니다(목록이 찬 뒤 연다 — 받는 중을 「없어요」로 말하면 위 규칙에 걸린다).
+  //    로그인·저장 0 상태는 여기서 재지 않는다(점검은 비로그인 — 실사용 회차 몫). 실패는 안 멈춤(gate.mjs 밖 · health-screen 이슈).
+  try {
+    const tp = await ctx.newPage()
+    await tp.goto(SITE + '?health=' + Date.now(), { waitUntil: 'networkidle', timeout: 90000 })
+    await tp.waitForFunction(() => typeof noticeData !== 'undefined' && noticeData.length > 0, null, { timeout: 60000 })
+    const tabs = []
+    for (const i of [1, 2, 3, 4, 5]) {
+      await tp.evaluate(n => goMain(n), i)
+      await tp.waitForTimeout(3000)
+      tabs.push(await tp.evaluate(n => {
+        const el = document.getElementById('main' + n)
+        const name = ((document.getElementById('m' + n) || {}).innerText || String(n)).replace(/\s+/g, ' ').trim()
+        if (!el || el.classList.contains('hidden')) return { n, name, chars: 0, why: '탭이 안 열림' }
+        const text = (el.innerText || '').replace(/\s+/g, ' ').trim()
+        const empty = /없어요|없습니다/.test(text)
+        const act = [...el.querySelectorAll('button, a[href], [onclick], [role=button]')].filter(b => b.offsetParent !== null).length
+        const why = !text ? '보이는 글자 0' : (empty && act === 0 ? '「없어요」인데 누를 것 0' : '')
+        return { n, name, chars: text.length, empty, act, why }
+      }, i))
+    }
+    await tp.close()
+    extra.empty_tabs = tabs
+    const bad = tabs.filter(t => t.why)
+    add('empty_tabs', '빈 탭(비로그인 다섯 탭 · 런칭 게이트 G5)', bad.length === 0 ? 'pass' : 'fail',
+      bad.length ? bad.map(t => `${t.name}: ${t.why}`).join(' / ')
+        : tabs.map(t => `${t.name} ${t.chars}자${t.empty ? '(빈 상태 · 누를 것 ' + t.act + ')' : ''}`).join(' · '),
+      '다섯 탭 모두 3초 뒤 보이는 글자 > 0 · 「없어요」 꼴이면 탭 안에 누를 것 ≥ 1 — 로그인·저장 0 상태는 재지 않는다')
+  } catch (e) {
+    add('empty_tabs', '빈 탭(비로그인 다섯 탭 · 런칭 게이트 G5)', 'warn', '못 잼: ' + String(e).slice(0, 200), '다섯 탭을 열어 잰다(못 재면 경고만)')
+  }
 } catch (e) {
   add('runner', '점검 실행', 'fail', String(e).slice(0, 300), '점검 스크립트가 끝까지 돈다')
 } finally {
@@ -971,5 +1006,20 @@ try {
 // ③ 콘솔 오류
 extra.console_errors = consoleErrors
 add('console', '콘솔 오류(카카오맵 제외)', consoleErrors.length === 0 ? 'pass' : 'fail', consoleErrors.length ? `${consoleErrors.length}: ${consoleErrors.slice(0, 2).join(' / ')}` : 0, '0')
+
+// ⑫ 실행 요약 DB 한 줄(2026-10-18 · 우편함 「코드·운영 — 게이트 재는 장치」 ① · 런칭 게이트 G1 화면) — 운영 점검과 같은 길
+//    public.ops_health_record(jsonb)에 kind='screen' 으로 넘긴다: 실행 요약 1행은 ops_health_runs, 경고·실패 항목은 ops_health_findings(30일).
+//    claude.ai 가 SQL 로 G1 화면 쪽을 잰다(docs/launch-gates.sql). 기록이 실패하면 ⚠️ 하나를 더한다(판정은 결과 파일·이슈가 그대로 낸다).
+{
+  const run_url = process.env.GITHUB_SERVER_URL && process.env.GITHUB_RUN_ID
+    ? `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}` : null
+  const all = checks.map(c => ({ id: c.id, name: c.name, status: c.status, value: String(c.value ?? '') }))
+  try {
+    const n = await recordFindings({ kind: 'screen', at: new Date().toISOString(), run_url, ref: process.env.GITHUB_REF_NAME || null, checks: all })
+    console.log(`경고·실패 기록 ${n}행(kind=screen)`)
+  } catch (e) {
+    add('findings_log', '실행 요약·경고·실패 DB 기록(ops_health_runs kind=screen)', 'warn', String(e).slice(0, 200), '기록 실패는 ⚠️ 경고만 — 판정은 결과 파일·이슈가 낸다')
+  }
+}
 
 report('screen', 'A. 화면 점검', checks, extra)
