@@ -11,6 +11,7 @@
 시험: echo '{"tool_input":{"command":"git commit -m x"},"cwd":"/home/user/zipfit"}' | python3 .claude/hooks/rule-check.py
 🔵 2026-10-13(우편함 「코드 — 카드 머리 세대수」 0장 2) — PR check 도 같은 ② 검사를 부른다:
    python3 .claude/hooks/rule-check.py --history CLAUDE.md   → 문제 없으면 exit 0 · 있으면 줄마다 출력하고 exit 1
+   python3 .claude/hooks/rule-check.py --table-cols CLAUDE.md docs/history.md   → 표 행마다 칸 구분자 수 = 표 머리(같은 출력·종료 꼴)
    (표준 라이브러리만 · 훅 경로와 같은 history_problems() 한 벌 — 사본 없음. 경고/실패는 워크플로가 정한다.)
 """
 import json
@@ -98,6 +99,26 @@ def history_problems(text):
     return probs
 
 
+def table_cell_problems(text):
+    """표 블록마다 각 행의 칸 구분자(이스케이프 안 된 `|`) 수가 표 머리와 같은가(2026-10-18 · 우편함 「G8 확정 고침」 7).
+
+    셀 안의 `|`는 백틱 안이어도 칸을 가른다(GFM) — `\\|`로 쓴다. 닫는 `|`가 빠진 행도 여기서 잡힌다.
+    docs/history.md 에서 6행이 이렇게 깨져 있었다(22 · 53 · 132 · 176 · 179 · 184).
+    """
+    probs = []
+    head = None
+    for n, line in enumerate(text.split('\n'), 1):
+        if not line.startswith('|'):
+            head = None
+            continue
+        k = len(re.findall(r'(?<!\\)\|', line))
+        if head is None:
+            head = k
+        elif k != head:
+            probs.append(f'줄 {n}: 칸 구분자 {k}개 — 표 머리는 {head}개(셀 안 | 는 \\| · 행 끝 | 빠짐)')
+    return probs
+
+
 def check_commit(cmd, repo):
     code, staged = git(repo, 'diff', '--cached', '--name-only')
     names = set(staged.split())
@@ -162,6 +183,13 @@ def history_cli(path):
 if __name__ == '__main__':
     if len(sys.argv) >= 3 and sys.argv[1] == '--history':
         sys.exit(history_cli(sys.argv[2]))
+    if len(sys.argv) >= 3 and sys.argv[1] == '--table-cols':
+        bad = 0
+        for path in sys.argv[2:]:
+            with open(path, encoding='utf-8') as f:
+                for p in table_cell_problems(f.read()):
+                    print(f'{path} 표 칸: {p}'); bad = 1
+        sys.exit(bad)
     try:
         main()
     except Exception as e:
