@@ -64,8 +64,10 @@ from (
       'last_real_fail_kst', (select to_char(max(run_at) at time zone 'Asia/Seoul', 'MM-DD HH24:MI') from r where kind = 'screen' and coalesce(cardinality(realf), 0) > 0),
       'last_run', (select json_build_object('at_kst', to_char(run_at at time zone 'Asia/Seoul', 'MM-DD HH24:MI'), 'failed', failed, 'warned', warned)
                      from r where kind = 'screen' order by run_at desc limit 1),
-      'empty_tabs_last', (select f.result || ' — ' || f.reason from ops_health_findings f
-                           where f.kind = 'screen' and f.item = 'empty_tabs' and f.run_at = (select max(run_at) from r where kind = 'screen'))
+      -- 통과 항목은 ops_health_findings 에 남지 않는다(경고·실패만) → 마지막 화면 점검이 있고 그 행이 없으면 「통과」.
+      'empty_tabs_last', (select coalesce((select f.result || ' — ' || f.reason from ops_health_findings f
+                                            where f.kind = 'screen' and f.item = 'empty_tabs' and f.run_at = x.run_at), '통과')
+                            from (select max(run_at) run_at from r where kind = 'screen') x where x.run_at is not null)
     ) as g1_screen,
     json_build_object(
       'open_approx', (select count(*) from c),
