@@ -162,9 +162,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-10-18 | **표시층 — 처리방침 6장 학습 한 줄** — 운영 도구(Claude Code) 계정의 모델 학습 허용 설정을 2026-10-18부터 꺼 둠 · 그날 뒤 작업 중 전달된 정보는 학습에 안 쓰임 · 그 밖은 Anthropic 방침 · 변경 표 한 줄 · 시행일 그대로 · `index.html`·`sw.js` 0 · PR #628 |
 | 2026-10-18 | **표시층 — G8 고지 문구 고침** — 처리방침 시행 10-18: 처리 근거 표 · 저장한 조건(금액·진단 기기 안) · 접속 기록(Supabase 약 30일) · 국외 이전 근거·연락처·국가 · GitHub 백업·Anthropic 운영 보조 줄 · 권리 행사 10일 · 변경 알림 기간 · 이전 판 둘 보관 · 설정 「마케팅 소식 알림」 토글 걷음 · 약관 0 · `zipfit-v239` · PR #626 |
 | 2026-10-18 | **코드·운영 — N21 전국 전세임대 넷** — 목록 RPC `nationwide_set`(원문 정책 행 「사업대상지역·공급지역 : 전국」) → `region_top='전국'` · 지역 인자에도 · 넷 밖 변화 0 가드 · 서울 밖 15 시·도 +4 · P3 매칭 0 → 3 · `index.html` 0 · PR #624 |
-| 2026-10-18 | **코드·운영 — 게이트 재는 장치** — `ops_health_runs`·`findings`에 `kind`(ops·screen) · 화면 점검이 같은 기록 함수로 한 줄 · 상태판·`ops_gap`은 `kind='ops'`만 · 빈 탭 `empty_tabs`(비로그인 다섯 탭 통과) · `docs/launch-gates.sql` · 화면 점검 판정 실패 = 실행 실패 · 고아 `upsert-announcement` 소스 걷음 · PR #622 |
 ---
 
 ## 🚫 코딩 원칙
