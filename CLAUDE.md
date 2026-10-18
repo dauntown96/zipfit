@@ -162,9 +162,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-10-18 | **표시층 — G8 확정 고침: XSS 두 자리** — `zfSafeUrl`·`zfSafeHref`(http(s)만 · href 17 · window.open) · 바깥 문자열 escapeHtml(제목 셋·상세·세대·진단) · onclick 이어 붙이기 → data-*+dataset · 퍼즈 실행 471·170 → 0 · 카드 950장 같음 · `zipfit-v238` · PR #620 |
 | 2026-10-18 | **코드·운영 — G8 확정 고침** — 수집 EF 예외 문자열을 가린 뒤 자름 + 기록·로그·응답 `scrubSecrets` · 운영 로그 1행 키 가림(1 → 0) · `migrate.py` DB 오류 행 값 가림 · pg_net 지움에 `action_link` · health-ops ℹ️ 원문 오염 0·0·0 · 리허설 VIEW(백업 #29) · history.md 표 칸 검사 · `WEBHOOK_SECRET` 삭제는 분류기 거부 → 다운님 손 · PR #618 |
 | 2026-10-18 | **코드·운영 — G7 복구 리허설 수동 1회** — `workflow_dispatch`(발송 함수는 restore-drill 안 받음) · drill `01045b5` verified · public·zipfit_ops 행 수 같음 · 빠진 것 뷰 개수(→ G8) · 코드·DB 0 |
-| 2026-10-18 | **표시층 — 첫 로드 ③차: 같은 날 MYHOME 좁히기** — `zfLoadPostNotices` LH 행에 `title_dedup_key` · 같은 날 MYHOME을 그 키 `in.(…)`로 좁혀 칸 넷만(761행·249,503 B → 15행·3,374 B · 쓰는 행 15=15 · 키 다름 0) · 키 없음·주소 6,000자 넘으면 종전 꼴 · 카드 950장 같음 · `zipfit-v237` · PR #616 |
 ---
 
 ## 🚫 코딩 원칙
