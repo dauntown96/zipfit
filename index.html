@@ -1900,7 +1900,7 @@ function zfAnnDateLabel(row, fallback){
   const d = zfNoticeDate(row) || fallback || '';
   if(!d) return '';
   const rev = zfRevisedDate(row);
-  return rev ? `${d} · 정정 ${rev.slice(5)}` : d;
+  return escapeHtml(rev ? `${d} · 정정 ${rev.slice(5)}` : d);   // 🔴 G8 — HTML 자리(날짜 줄 둘)에만 쓰인다
 }
 function isNewNotice(row){
   // 기준: 회차 날짜(zfNoticeDate) → apply_start → created_at 순 fallback
@@ -2266,8 +2266,8 @@ function applyDateLine(row, annDate, applyStart, applyEnd, url){
   // 🔴 B62 ③ — 날짜 자리에 「확인 필요」와 공사 공고 링크만 둔다. 수집 날짜(믿을 수 없는 값)를 적지 않는다.
   if(row && row['apply_period_check'] === true){
     const head = annLabel ? `모집공고: ${annLabel} · ` : '';
-    const link = url
-      ? ` · <a href="${url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:#0F6E56;font-weight:600;text-decoration:underline">공사 공고에서 확인 ↗</a>`
+    const link = zfSafeUrl(url)
+      ? ` · <a href="${zfSafeHref(url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:#0F6E56;font-weight:600;text-decoration:underline">공사 공고에서 확인 ↗</a>`
       : ' · 공사 공고에서 확인하세요';
     return `${head}접수기간: <b style="color:#6B6B63">확인 필요</b>${link}`;
   }
@@ -2281,14 +2281,14 @@ function applyDateLine(row, annDate, applyStart, applyEnd, url){
   // 마감일이 화면에서 사라진다. 보이던 것을 빼지 않는다 — 안 보이던 것만 더한다.
   if(unknown && !applyStart && !applyEnd){
     const head = annLabel ? `모집공고: ${annLabel} · ` : '';
-    const link = url
-      ? ` <a href="${url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:#0F6E56;font-weight:600;text-decoration:underline">📄 원문에서 확인</a>`
+    const link = zfSafeUrl(url)
+      ? ` <a href="${zfSafeHref(url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:#0F6E56;font-weight:600;text-decoration:underline">📄 원문에서 확인</a>`
       : ' 원문에서 확인하세요';
     return `${head}<b style="color:#6B6B63">${APPLY_UNKNOWN_LABEL}</b> —${link}${variesTag}`;
   }
   // 한쪽만 결측이면 빈 자리를 '-'가 아니라 '미상'으로 적는다. '-'는 「없다」로도 읽힌다.
-  const S = applyStart || (unknown ? '미상' : '-');
-  const E = applyEnd   || (unknown ? '미상' : '-');
+  const S = escapeHtml(applyStart || (unknown ? '미상' : '-'));
+  const E = escapeHtml(applyEnd   || (unknown ? '미상' : '-'));
   const sameAsStart = annBase && applyStart && annBase === applyStart;
   return sameAsStart
     ? `모집공고: ${annLabel} / 접수마감: ${E}${confirmedTag}${variesTag}`
@@ -2334,6 +2334,10 @@ function zfPostLinksAll(){
 }
 let zfSidePromise = null;
 function zfAttr(s){ return escapeHtml(String(s == null ? '' : s)).replace(/"/g, '&quot;'); }
+// 🔴 2026-10-18(우편함 「표시층 — G8 확정 고침: XSS 두 자리」) — 바깥(수집·분석) URL 을 href · window.open 에 넣는 한 자리.
+//    http(s) 만 통과(공지 링크 필터와 같은 꼴) · 아니면 빈 값 — 부르는 쪽은 빈 값이면 링크를 그리지 않는다.
+function zfSafeUrl(u){ const s = String(u == null ? '' : u).trim(); return /^https?:\/\//i.test(s) ? s : ''; }
+function zfSafeHref(u){ return zfAttr(zfSafeUrl(u)); }
 function zfLoadCardSide(){
   if(zfSidePromise) return zfSidePromise;
   const h = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
@@ -2884,7 +2888,7 @@ async function zfOpenNoticeByKey(key){
   }
   if(!row){
     // 목록에 그 카드가 없다(로드 전·실패) — 원문으로 보낸다. 아무 일도 안 일어나는 것보다 낫다.
-    if(lk && lk.lhUrl) window.open(lk.lhUrl, '_blank', 'noopener');
+    if(lk && zfSafeUrl(lk.lhUrl)) window.open(zfSafeUrl(lk.lhUrl), '_blank', 'noopener');
     return;
   }
   if(noticeFiltered.indexOf(row) === -1){
@@ -3407,8 +3411,8 @@ function cancelRowChip(){
 function cancelRowDateLine(row, annDate, url){
   const annLabel = zfAnnDateLabel(row, annDate);
   const head = annLabel ? `모집공고: ${annLabel}` : '';
-  const link = url
-    ? `<a href="${url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:#0F6E56;font-weight:600;text-decoration:underline">📄 취소공고 원문 보기</a>`
+  const link = zfSafeUrl(url)
+    ? `<a href="${zfSafeHref(url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:#0F6E56;font-weight:600;text-decoration:underline">📄 취소공고 원문 보기</a>`
     : '';
   return [head, link].filter(Boolean).join(' · ');
 }
@@ -3417,8 +3421,8 @@ function cancelNoticeBadge(title, applyEnd){
   const st  = 'cursor:help;padding:4px 10px;font-size:11px;background:#A32D2D;border-color:#A32D2D';
   const tip = '같은 이름의 [취소공고]가 따로 게시됐어요. 공고 원문을 반드시 확인하세요.';
   const info = zfCancelInfoFor(title, applyEnd);
-  if(info && info.url){
-    return `<a class="chip sel" href="${escapeHtml(info.url)}" target="_blank" rel="noopener"`
+  if(info && zfSafeUrl(info.url)){
+    return `<a class="chip sel" href="${zfSafeHref(info.url)}" target="_blank" rel="noopener"`
       + ` title="${tip} 눌러 취소공고 원문을 엽니다." onclick="event.stopPropagation()"`
       + ` style="${st};color:#fff;text-decoration:none">🚫 취소공고 보기 ↗</a>`;
   }
@@ -4276,7 +4280,7 @@ function zfPromptLoginForSave(){
 
 // 저장 실패를 버튼 라벨로 잠깐 알린다(shareNotice와 같은 방식, 새 UI 없음).
 function zfFlashSaveError(id){
-  document.querySelectorAll(`[data-save-id="${id}"]`).forEach(btn=>{
+  document.querySelectorAll(`[data-save-id="${CSS.escape(String(id))}"]`).forEach(btn=>{
     btn.textContent = '⚠️ 저장 실패';
   });
   setTimeout(()=>updateSaveBtn(id), 1500);
@@ -4284,7 +4288,7 @@ function zfFlashSaveError(id){
 
 function updateSaveBtn(id){
   const isSaved = isSavedId(id);
-  document.querySelectorAll(`[data-save-id="${id}"]`).forEach(btn=>{
+  document.querySelectorAll(`[data-save-id="${CSS.escape(String(id))}"]`).forEach(btn=>{
     btn.textContent = isSaved ? '🔖 저장됨' : '🔖 저장';
     btn.style.color = isSaved ? '#1D9E75' : '#888';
     btn.style.borderColor = isSaved ? '#1D9E75' : '#ccc';
@@ -4343,14 +4347,14 @@ function renderSavedNotices(){
     html += `<div class="hcard">
       <div class="htop">
         <p class="hname">${escapeHtml(s.title||'(공고명 없음)')}</p>
-        <button style="background:none;border:none;font-size:18px;cursor:pointer;padding:2px 4px;color:#ccc" title="저장 삭제" onclick="toggleSaveNotice('${String(s.id).replace(/'/g,"\\'")}').then(renderSavedNotices)">✕</button>
+        <button style="background:none;border:none;font-size:18px;cursor:pointer;padding:2px 4px;color:#ccc" title="저장 삭제" data-save-del="${zfAttr(s.id)}" onclick="toggleSaveNotice(this.dataset.saveDel).then(renderSavedNotices)">✕</button>
       </div>
       <p class="haddr">${escapeHtml(s.cover||s.region||'')} · ${zfTypeHtml(s.source, s.type, s.title)}</p>
       ${(s.cancelled || zfCancelInfoFor(s.title||'', s.apply_end))
         ? `<div style="margin-top:6px">${cancelNoticeBadge(s.title||'', s.apply_end)}</div>` : ''}
       ${dateStr?`<p style="font-size:11px;color:#bbb;margin-top:4px">저장일: ${dateStr}</p>`:''}
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
-        ${s.url?`<a class="detail-link" href="${s.url}" target="_blank" data-ai-for="${zfAttr(s.id)}" data-ai-key="${zfAttr(zfDedupKey(s.title||''))}"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`:''}
+        ${zfSafeUrl(s.url)?`<a class="detail-link" href="${zfSafeHref(s.url)}" target="_blank" data-ai-for="${zfAttr(s.id)}" data-ai-key="${zfAttr(zfDedupKey(s.title||''))}"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`:''}
       </div>
     </div>`;
   });
@@ -4359,6 +4363,14 @@ function renderSavedNotices(){
   if(typeof zf3MyRoute === 'function') zf3MyRoute();
 }
 
+// 🔴 G8(2026-10-18) — 공유 단추의 값은 data-*(zfAttr)에 담고 누를 때 읽는다(onclick 문자열 이어 붙이기 대신). url 은 http(s)만.
+function zfShareAttrs(title, region, type, url){
+  return `data-share-title="${zfAttr(title || '')}" data-share-region="${zfAttr(region || '')}" data-share-type="${zfAttr(type || '')}" data-share-url="${zfAttr(zfSafeUrl(url))}"`;
+}
+function zfShareFromBtn(btn){
+  const d = btn.dataset;
+  return shareNotice(btn, d.shareTitle || '', d.shareRegion || '', d.shareType || '', d.shareUrl || '');
+}
 async function shareNotice(btn, title, region, type, url){
   // 🔵 2026-09-30 — 카드 표지가 요약·유형 표준 도착 뒤 바뀔 수 있어, 누른 그 순간의 표지 글자를 쓴다(같은 공고를 두 이름으로 부르지 않는다).
   const card = btn && btn.closest ? btn.closest('.hcard') : null;
@@ -4410,7 +4422,7 @@ function moveInUnreal(v){
 //    종전 「입주」/「입주예정」(moveInLabel)은 신청자 일정처럼 읽혀 쓰지 않는다(함수는 남긴다 — 지우지 않는다).
 const ZF_MOVEIN_LABEL = '단지 입주예정월 (LH 공급정보)';
 function moveInRow(v){
-  return moveInUnreal(v) ? [ZF_MOVEIN_LABEL, '확인 필요'] : [ZF_MOVEIN_LABEL, v];
+  return moveInUnreal(v) ? [ZF_MOVEIN_LABEL, '확인 필요'] : [ZF_MOVEIN_LABEL, escapeHtml(v)];
 }
 
 // ===== 1층 요약 한 줄 (보증금 · 월세 · 전용면적) =====
@@ -4498,8 +4510,8 @@ function zfSummaryLine(s){
 // 대신 우리가 하는 일이 「공고 원문을 정리하는 것」임과, 지금 당장 어디를 보면 되는지를 적는다.
 // 🔵 2026-09-29 코드 회차 2 잔여 — 문구만 갈아 끼울 수 있게 text 를 받는다(없으면 종전 문구). 상자·링크는 그대로.
 function zfNotAnalyzedHtml(url, text){
-  const link = url
-    ? ` <a href="${url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:#0F6E56;font-weight:600;text-decoration:underline"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`
+  const link = zfSafeUrl(url)
+    ? ` <a href="${zfSafeHref(url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:#0F6E56;font-weight:600;text-decoration:underline"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`
     : '';
   return `<div style="font-size:12px;color:#6B6B63;background:#F6F6F2;border:1px solid #E8E8E0;border-radius:8px;padding:6px 10px;margin-bottom:6px">${text || '아직 공고 원문을 정리하지 못했어요 · 보증금·면적은 원문에서 확인해 주세요'}${link}</div>`;
 }
@@ -4556,8 +4568,8 @@ function zfAnaPending(s, key){
 }
 // 🔵 2026-10-16 — 아직 정리 전이라 「AI 정리」라고 말하지 않는다(링크는 「원문 보기」만 · 카드 안 다른 원문 링크의 「AI 정리 · 」도 .zf-ana-pending 에서 접는다).
 function zfAnaPendingHtml(url, org){
-  const link = url
-    ? ` <a href="${url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:#0F6E56;font-weight:600;text-decoration:underline">원문 보기 →</a>`
+  const link = zfSafeUrl(url)
+    ? ` <a href="${zfSafeHref(url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:#0F6E56;font-weight:600;text-decoration:underline">원문 보기 →</a>`
     : '';
   return `<div class="zf-ana-box"><span class="zf-ana-pill">분석 중</span>${org ? `<span class="zf-ana-org">${escapeHtml(org)}</span>` : ''}<span class="zf-ana-t">공고 원문을 정리하고 있어요 · 일정·자격은 원문에서 확인해 주세요</span>${link}</div>`;
 }
@@ -4715,7 +4727,7 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
 
     // 상세 영역 항목 구성
     const detailRows = [];
-    if(n['공급기관']) detailRows.push(['공급기관', n['공급기관']]);
+    if(n['공급기관']) detailRows.push(['공급기관', escapeHtml(n['공급기관'])]);
     if(n['area_min']){
       const areaStr = parseFloat(n['area_min']).toFixed(1) + '㎡' +
         (n['area_max']&&n['area_max']!==n['area_min'] ? ' ~ '+parseFloat(n['area_max']).toFixed(1)+'㎡' : '');
@@ -4725,21 +4737,18 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
     if(n['move_in_date']) detailRows.push(moveInRow(n['move_in_date']));
     if(n['deposit_min']) detailRows.push(['보증금', Number(n['deposit_min']).toLocaleString()+'원']);
     if(n['rent_min']) detailRows.push(['월임대료', Number(n['rent_min']).toLocaleString()+'원']);
-    if(annDate) detailRows.push(['공고일', annDate]);
+    if(annDate) detailRows.push(['공고일', escapeHtml(annDate)]);
     // 🔴 B62 ③ — 접수기간을 믿을 수 없는 행은 수집 날짜 대신 「확인 필요」라고 적는다(날짜 줄과 같은 말).
     if(!isCancelRow && n['apply_period_check'] === true) detailRows.push(['접수기간', '확인 필요 — 공사 공고에서 확인']);
-    else if(!isCancelRow && (applyStart||applyEnd)) detailRows.push(['접수기간', (applyStart||'-')+' ~ '+(applyEnd||'-')]);
+    else if(!isCancelRow && (applyStart||applyEnd)) detailRows.push(['접수기간', escapeHtml((applyStart||'-')+' ~ '+(applyEnd||'-'))]);
 
-    const nTitle = (n['공고명']||'').replace(/'/g,"\\'");
     // 🔴 공유 문구도 카드 표지와 같은 함수를 쓴다(2026-09-16) — 카드는 「구미시 외 2곳」인데
     //    공유 텍스트만 대표 주소 한 곳이면 같은 공고를 두 이름으로 부르는 것이 된다.
-    const nRegion = zfCoverPlaceText(n['region_names'], zfComplexCount(n), n['sido_nm'], n['sigungu_nm'], n['지역'], zfUnitPlacesFor(n['announcement_id'])).replace(/'/g,"\\'");
-    const nType = (n['공급유형']||'').replace(/'/g,"\\'");
-    const nUrl = (n['공고URL']||'').replace(/'/g,"\\'");
-    const nId = (n['announcement_id']||String(idx)).replace(/'/g,"\\'");
+    const nRegion = zfCoverPlaceText(n['region_names'], zfComplexCount(n), n['sido_nm'], n['sigungu_nm'], n['지역'], zfUnitPlacesFor(n['announcement_id']));
     const nSaved = isSavedId(n['announcement_id']||String(idx));
-    const shareBtn = `<button class="detail-link" style="border:1px solid #1D9E75;color:#1D9E75;background:#fff;cursor:pointer;margin-top:10px" onclick="event.stopPropagation();shareNotice(this,'${nTitle}','${nRegion}','${nType}','${nUrl}')">🔗 이 공고 공유하기</button>`;
-    const saveBtn = `<button data-save-id="${n['announcement_id']||idx}" class="detail-link" style="border:1px solid ${nSaved?'#1D9E75':'#ccc'};color:${nSaved?'#1D9E75':'#888'};background:#fff;cursor:pointer;margin-top:10px" onclick="event.stopPropagation();toggleSaveNotice('${nId}')">${nSaved?'🔖 저장됨':'🔖 저장'}</button>`;
+    // 🔴 G8(2026-10-18) — 공유·저장 값은 onclick 문자열에 이어 붙이지 않고 data-*(zfAttr)에 담아 누를 때 dataset 으로 읽는다.
+    const shareBtn = `<button class="detail-link" style="border:1px solid #1D9E75;color:#1D9E75;background:#fff;cursor:pointer;margin-top:10px" ${zfShareAttrs(n['공고명'], nRegion, n['공급유형'], n['공고URL'])} onclick="event.stopPropagation();zfShareFromBtn(this)">🔗 이 공고 공유하기</button>`;
+    const saveBtn = `<button data-save-id="${zfAttr(n['announcement_id']||idx)}" class="detail-link" style="border:1px solid ${nSaved?'#1D9E75':'#ccc'};color:${nSaved?'#1D9E75':'#888'};background:#fff;cursor:pointer;margin-top:10px" onclick="event.stopPropagation();toggleSaveNotice(this.dataset.saveId)">${nSaved?'🔖 저장됨':'🔖 저장'}</button>`;
     const detailHTML = detailRows.length
       ? `<div id="${cardId}" data-ann-id="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px;transition:all 0.2s" onclick="event.stopPropagation()">
           <div class="detail-grid">
@@ -4747,16 +4756,16 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
           </div>
           ${zfPlacesLine(n['region_names'], n['announcement_id'])}
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
-            ${n['공고URL']?`<a class="detail-link" href="${n['공고URL']}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`:''}
+            ${zfSafeUrl(n['공고URL'])?`<a class="detail-link" href="${zfSafeHref(n['공고URL'])}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`:''}
             ${shareBtn}
             ${saveBtn}
           </div>
         </div>`
-      : `<div id="${cardId}" data-ann-id="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px" onclick="event.stopPropagation()"><div style="display:flex;gap:8px;flex-wrap:wrap">${n['공고URL']?`<a class="detail-link" href="${n['공고URL']}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`:''} ${shareBtn} ${saveBtn}</div></div>`;
+      : `<div id="${cardId}" data-ann-id="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px" onclick="event.stopPropagation()"><div style="display:flex;gap:8px;flex-wrap:wrap">${zfSafeUrl(n['공고URL'])?`<a class="detail-link" href="${zfSafeHref(n['공고URL'])}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`:''} ${shareBtn} ${saveBtn}</div></div>`;
 
     html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n['지역']||'').replace(/"/g,'&quot;')}" data-sido="${(n['sido_nm']||'').replace(/"/g,'&quot;')}" data-sigungu="${(n['sigungu_nm']||'').replace(/"/g,'&quot;')}" data-title="${(n['공고명']||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" data-housing-type="${(n['공급유형']||'').replace(/"/g,'&quot;')}" data-precise-address="${(n['precise_address']||'').replace(/"/g,'&quot;')}" data-relaxed="${n['is_relaxed_recruitment']===true?'1':''}" data-relaxation-detail="${(n['relaxation_detail']||'').replace(/"/g,'&quot;')}" data-contract-verify="${n['contract_before_verification']===true?'1':''}" data-rent-exempt-until="${(n['rent_exemption_until']||'').replace(/"/g,'&quot;')}" data-rent-exempt-note="${(n['rent_exemption_note']||'').replace(/"/g,'&quot;')}" data-revised="${isAmended?'1':''}" data-revision-note-full="${revisionNoteEsc}" data-special-notes="${n['special_notes']?JSON.stringify(n['special_notes']).replace(/"/g,'&quot;'):''}" data-apply-start="${(n['apply_start']||'').replace(/"/g,'&quot;')}" data-apply-end="${(n['apply_end']||'').replace(/"/g,'&quot;')}" data-announcement-date="${(n['announcement_date']||'').replace(/"/g,'&quot;')}" data-round-date="${zfNoticeDate(n).replace(/"/g,'&quot;')}" data-complex-count="${zfComplexCount(n)}" data-doc-submit-announce="${(n['doc_submit_announce_date']||'').replace(/"/g,'&quot;')}" data-doc-submit-start="${(n['doc_submit_start']||'').replace(/"/g,'&quot;')}" data-doc-submit-end="${(n['doc_submit_end']||'').replace(/"/g,'&quot;')}" data-winner-announce="${(n['winner_announce_date']||'').replace(/"/g,'&quot;')}" data-contract-start="${(n['contract_start']||'').replace(/"/g,'&quot;')}" data-contract-end="${(n['contract_end']||'').replace(/"/g,'&quot;')}" data-attachment-urls="${n['attachment_urls']?JSON.stringify(n['attachment_urls']).replace(/"/g,'&quot;'):''}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this,'notice')" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
       <div class="htop">
-        <p class="hname">${normalizeRevisedTitle(n['공고명'])||'(공고명 없음)'}</p>
+        <p class="hname">${escapeHtml(normalizeRevisedTitle(n['공고명']))||'(공고명 없음)'}</p>
         ${isCancelRow?'':(t => `<span class="htag ${t.closed?'tag-mix':'tag-apt'}">${escapeHtml(t.text)}</span>`)(zfStatusTag(n))}
       </div>
       <!-- 🔴 유형은 **한 번만** 적는다(2026-09-16). 종전에는 classifyNoticeType() 결과와 housing_type
@@ -5174,7 +5183,7 @@ function renderPersonalizedRecommendations(){
     const hasCancel=n['has_cancel_notice']===true;
     html+=`<div class="hcard">
       <div class="htop">
-        <p class="hname">${n['공고명']||n['name']||'(공고명 없음)'}</p>
+        <p class="hname">${escapeHtml(n['공고명']||n['name']||'')||'(공고명 없음)'}</p>
         ${(t => `<span class="htag ${t.closed?'tag-mix':'tag-apt'}">${escapeHtml(t.text)}</span>`)(zfStatusTag(n))}
       </div>
       <p class="haddr">${zfCoverPlace(n['region_names'], zfComplexCount(n), n['sido_nm'], n['sigungu_nm'], n['지역'], n['announcement_id'])} · ${zfTypeHtml(n['source'], n['공급유형'], n['공고명']||n['name'])}</p>
@@ -5190,7 +5199,7 @@ function renderPersonalizedRecommendations(){
       ${n._zfTarget ? zfTargetNoteHtml(n._zfTarget) : zfCheckNoteHtml(zfSupplyCheckLabels(n['공고명']||n['name'], zfProfileFacts()), '')}
       ${zfRouteSlotHtml(n, n['공고명']||n['name'])}
       ${zfNoticesSlotHtml(n)}
-      ${(n['공고URL']||n['url'])?`<a class="detail-link" href="${n['공고URL']||n['url']}" target="_blank" rel="noopener" style="display:block" onclick="zfLog('recommend_click',{rank:${idx+1}},'${(n['announcement_id']||'').toString().replace(/'/g,'')}')"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`:''}
+      ${zfSafeUrl(n['공고URL']||n['url'])?`<a class="detail-link" href="${zfSafeHref(n['공고URL']||n['url'])}" target="_blank" rel="noopener" style="display:block" data-aid="${zfAttr((n['announcement_id']||'').toString().replace(/'/g,''))}" onclick="zfLog('recommend_click',{rank:${idx+1}},this.dataset.aid)"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`:''}
     </div>`;
   });
   if(filtered.length>5) html+=`<p style="font-size:12px;color:#888;text-align:center;margin-top:8px">외 ${filtered.length-5}건 더 — 공고 탭에서 전체 확인</p>`;
@@ -6093,7 +6102,7 @@ async function diagnose(){
   criteria.forEach(x => { (sfKinds[x.housing_type] = sfKinds[x.housing_type] || new Set()).add(x.supply_form || '일반'); });
   const sfLabelOf = c => {
     const sfName = c.supply_form || '일반';
-    return (sfName !== '일반' || (sfKinds[c.housing_type] && sfKinds[c.housing_type].size > 1)) ? `(${sfName})` : '';
+    return (sfName !== '일반' || (sfKinds[c.housing_type] && sfKinds[c.housing_type].size > 1)) ? `(${escapeHtml(sfName)})` : '';
   };
   if(bonusOnlyEntries.length){
     const bonusLabels = bonusOnlyEntries.map(c => {
@@ -6103,7 +6112,7 @@ async function diagnose(){
       if(a.assetLim!=null && b.assetLim!=null && a.assetLim>b.assetLim) parts.push(`자산 ${fmtEok(b.assetLim)} → ${fmtEok(a.assetLim)}`);
       if(a.incLim  !=null && b.incLim  !=null && a.incLim  >b.incLim  ) parts.push(`소득 ${fmt(b.incLim)} → ${fmt(a.incLim)}`);
       if(a.carLim  !=null && b.carLim  !=null && a.carLim  >b.carLim  ) parts.push(`자동차 ${fmt(b.carLim)} → ${fmt(a.carLim)}`);
-      return `· ${c.housing_type}${sf}${parts.length ? ' — '+parts.join(' · ') : ''}`;
+      return `· ${escapeHtml(c.housing_type)}${sf}${parts.length ? ' — '+parts.join(' · ') : ''}`;
     }).join('<br>');
     commonMsgs+=`<div class="rbox warn" style="margin-top:6px"><p class="rtitle">🍼 출산자녀 수에 따라 기준이 완화될 수 있어요</p><p class="rdesc">${bonusLabels}<br><span style="font-size:11px;color:#999">위 판정은 완화 전 기준이에요. 2023년 3월 28일 이후 출산(입양·임신 포함)한 자녀가 있는지를 「모름」으로 두셔서 완화를 적용하지 않았어요. 해당되면 위에서 「예」를 선택하고 다시 진단해주세요.</span></p></div>`;
   }
@@ -6116,7 +6125,7 @@ async function diagnose(){
       const b = limitsFor(c, birthTierApplied, false), a = limitsFor(c, birthTierApplied, true);
       const gap = (a.incLim!=null && b.incLim!=null && a.incLim>b.incLim)
         ? ` — 소득 ${fmt(b.incLim)} → ${fmt(a.incLim)}` : '';
-      return `· ${c.housing_type}${sf}${gap}`;
+      return `· ${escapeHtml(c.housing_type)}${sf}${gap}`;
     }).join('<br>');
     commonMsgs+=`<div class="rbox warn" style="margin-top:6px"><p class="rtitle">👫 본인과 배우자 모두 소득이 있으면 기준이 완화돼요</p><p class="rdesc">${dualLabels}<br><span style="font-size:11px;color:#999">위 판정은 단독소득 기준이에요. 맞벌이 여부를 「모름」으로 두셔서 완화를 적용하지 않았어요. 해당되면 위에서 「예」를 선택하고 다시 진단해주세요.</span></p></div>`;
   }
@@ -6128,7 +6137,7 @@ async function diagnose(){
       const lo = c.age_min, hi = c.age_max;
       const range = (lo != null && hi != null) ? `만 ${lo}~${hi}세` : (lo != null ? `만 ${lo}세 이상` : `만 ${hi}세 이하`);
       const via = ageExceptionVia.has(c) ? ` (${ageExceptionVia.get(c)})` : '';
-      return `· ${c.housing_type}${sf} — 나이 요건 ${range} · ${c.age_exception_note}${via}`;
+      return `· ${escapeHtml(c.housing_type)}${sf} — 나이 요건 ${range} · ${escapeHtml(c.age_exception_note)}${via}`;
     }).join('<br>');
     // 🔵 2026-10-13(우편함 「표시층 — 실사용 1회차 반영」 1 · N8) — 상한을 넘긴 사람(71세·46세 등)에게 청년 유형의 예외(대학생·사회초년생 등)를
     //    맨 앞 경고 상자로 띄우면 자기 일처럼 읽힌다. 모두 「상한 위」일 때는 같은 문장을 접힌 칸으로 내린다(지우지 않는다 — 사유 정본은 DB).
@@ -6145,8 +6154,8 @@ async function diagnose(){
   if(maritalExclEntries.length){
     const exclLabels = maritalExclEntries.map(c => {
       const sf = sfLabelOf(c);
-      const who = (c.supply_form && c.supply_form !== '일반') ? `${c.supply_form} 계층은 ` : '';
-      return `· ${c.housing_type}${sf} — ${who}혼인 중이 아니어야 해요 (공고문: 「${maritalReqOf(c)['원문']}」)`;
+      const who = (c.supply_form && c.supply_form !== '일반') ? `${escapeHtml(c.supply_form)} 계층은 ` : '';
+      return `· ${escapeHtml(c.housing_type)}${sf} — ${who}혼인 중이 아니어야 해요 (공고문: 「${escapeHtml(maritalReqOf(c)['원문'])}」)`;
     }).join('<br>');
     commonMsgs+=`<div class="rbox err" style="margin-top:6px"><p class="rtitle">💍 혼인 상태 때문에 신청할 수 없는 유형</p><p class="rdesc">${exclLabels}</p></div>`;
   }
@@ -6156,7 +6165,7 @@ async function diagnose(){
     const noteLabels = checkNoteEntries.map(c => {
       const sf = sfLabelOf(c);
       const extra = checkExtra.get(c) ? ' ' + checkExtra.get(c) : '';
-      return `· ${c.housing_type}${sf} — ${noteOf(c)}${extra}`;
+      return `· ${escapeHtml(c.housing_type)}${sf} — ${escapeHtml(noteOf(c))}${escapeHtml(extra)}`;
     }).join('<br>');
     commonMsgs+=`<div class="rbox warn" style="margin-top:6px"><p class="rtitle">📄 요건 확인 필요</p><p class="rdesc">${noteLabels}</p></div>`;
   }
@@ -6168,7 +6177,7 @@ async function diagnose(){
       const sf = sfLabelOf(c);
       const lo = c.age_min, hi = c.age_max;
       const range = (lo != null && hi != null) ? `만 ${lo}~${hi}세` : (lo != null ? `만 ${lo}세 이상` : `만 ${hi}세 이하`);
-      return `· ${c.housing_type}${sf} — ${range}`;
+      return `· ${escapeHtml(c.housing_type)}${sf} — ${range}`;
     }).join('<br>');
     const why = birthYear
       ? '생일이 지났는지에 따라 만 나이가 갈려요. 공고문의 기준일로 확인해주세요.'
@@ -6201,7 +6210,7 @@ async function diagnose(){
     // 공급형태별 세분화 목록
     const entryLabels = eligibleEntries.map(c => {
       const sf = sfLabelOf(c);
-      return `· ${c.housing_type}${sf}`;
+      return `· ${escapeHtml(c.housing_type)}${sf}`;
     }).join(' ');
     // 자동차를 축에 적는 조건: 실제로 입력했고, 목록의 모든 행에 한도가 있어 정말로 판정된 경우.
     // 한도가 없는 행이 섞이면 「자동차 요건을 충족했다」가 그 행에 대해 거짓이 된다.
@@ -7413,10 +7422,10 @@ function renderAttachments(cardEl, id){
   wrap.className = 'policy-wrap';
   wrap.innerHTML = `<summary class="policy-title">📄 공고문 원문 (${attachments.length}건)</summary>` +
     attachments.map(a => {
-      if(!a || !a.url) return '';
+      if(!a || !zfSafeUrl(a.url)) return '';
       const label = a.label ? escapeHtml(a.label) : '첨부파일';
       const filename = a.filename ? escapeHtml(a.filename) : '';
-      return `<div class="policy-item"><a class="detail-link" href="${escapeHtml(a.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">📎 ${label}${filename?' — '+filename:''} 다운로드</a></div>`;
+      return `<div class="policy-item"><a class="detail-link" href="${zfSafeHref(a.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">📎 ${label}${filename?' — '+filename:''} 다운로드</a></div>`;
     }).join('');
   const slot = document.getElementById('attachments-slot-'+id);
   if(slot) slot.appendChild(wrap);
@@ -7709,9 +7718,9 @@ function loadAnnouncementExtras(annId, detailEl, id, useGroup){
           // 🔴 2026-09-13: 썸네일이 안 떠도 깨진 <img>로 남기지 않는다. onerror에서 타일을
           // 자리표시자로 바꾸고 (N건)을 다시 센다 — 자세한 근거는 extrasThumbFailed() 주석.
           // fid를 못 뽑은 행은 애초에 띄울 URL이 없으므로 그 자리에서 바로 자리표시자로 만든다.
-          return `<a class="extras-thumb${thumbSrc ? '' : ' extras-thumb-missing'}" data-fid="${escapeHtml(fid||'')}" data-kind="${escapeHtml(it.extra_type||'')}" href="${escapeHtml(it.file_url||'#')}" target="_blank" rel="noopener" onclick="event.preventDefault();openExtrasViewer('${gid}',${idx})">
+          return `<a class="extras-thumb${thumbSrc ? '' : ' extras-thumb-missing'}" data-fid="${zfAttr(fid||'')}" data-kind="${zfAttr(it.extra_type||'')}" href="${zfSafeHref(it.file_url) || '#'}" target="_blank" rel="noopener" onclick="event.preventDefault();openExtrasViewer('${gid}',${idx})">
             ${thumbSrc
-              ? `<img src="${thumbSrc}" loading="lazy" alt="${escapeHtml(caption)}" onerror="extrasThumbFailed(this)">`
+              ? `<img src="${zfAttr(thumbSrc)}" loading="lazy" alt="${zfAttr(caption)}" onerror="extrasThumbFailed(this)">`
               : `<span class="extras-thumb-missing-mark">불러올 수 없음</span>`}
             ${caption ? `<span class="extras-thumb-label">${escapeHtml(caption)}</span>` : ''}${it.extra_type === 'floorplan' && !it.unit_key && typeof zf3On === 'function' && zf3On() && zf3PlanMissing(it.building_address, keys) ? '<span class="zf3-xmiss">이번 모집 세대 목록에 없는 주택형</span>' : ''}
           </a>`;
@@ -7871,7 +7880,7 @@ function renderExtrasModal(){
   document.getElementById('extrasModalNext').style.display = multiple ? 'flex' : 'none';
   document.getElementById('extrasModalCounter').textContent = multiple ? `${extrasModalIndex+1} / ${extrasModalItems.length}` : '';
   document.getElementById('extrasModalCaption').textContent = caption;
-  document.getElementById('extrasModalDriveLink').href = it.file_url || '#';
+  document.getElementById('extrasModalDriveLink').href = zfSafeUrl(it.file_url) || '#';
   // 이미지는 원본 화질(uc?export=view)을 우선 시도하고, CORS/권한 등으로 로드 실패 시에만
   // 기존 미리보기용 thumbnail URL로 자동 폴백한다. 그 폴백마저 실패하면 깨진 <img>로 두지 않고
   // 안내 문구로 바꾼다(extrasModalImgFailed가 단계를 세므로 무한루프가 없다).
@@ -8663,20 +8672,20 @@ function loadPreciseEligibility(annId, detailEl, id, useGroup){
     wrap.innerHTML = `<summary class="elig-title">🎯 이 공고 정밀 자격기준 (${rows.length}건)</summary>` + staleHtml +
       rows.map(r => {
         const sf = r.supply_form ? escapeHtml(r.supply_form) : '일반';
-        const rk = r.rank ? `${r.rank}순위` : '';
+        const rk = r.rank ? `${escapeHtml(String(r.rank))}순위` : '';
         const incomeExempt = r.income_limit_exempt === true;
         const assetExempt = r.asset_limit_exempt === true;
         // 🔴 척도 없이 「소득 150%」만 적으면 사용자가 도시근로자 기준으로 읽는다(2026-09-18).
         //    income_base 가 있으면 밑값 이름을 붙이고, NULL 이면 **종전 그대로** 둔다 — 추측해 붙이지 않는다.
         const INCOME_BASE_LABEL = { '도시근로자': '도시근로자 월평균소득', '기준중위소득': '기준 중위소득' };
         const baseLabel = INCOME_BASE_LABEL[r.income_base] || '';
-        const pctText = p => baseLabel ? `${baseLabel} ${p}%` : `소득 ${p}%`;
+        const pctText = p => baseLabel ? `${baseLabel} ${escapeHtml(String(p))}%` : `소득 ${escapeHtml(String(p))}%`;
         const income = incomeExempt ? '소득기준 배제' : (r.income_pct ? pctText(r.income_pct) : '');
         // 🔴 기본값과 같으면 그리지 않는다 — 「소득 100% (맞벌이 100%)」는 되풀이일 뿐
         //    「맞벌이는 더 높다」는 없는 뜻을 만든다(2026-09-18).
         const dualSame = String(r.income_pct_dual_income) === String(r.income_pct);
         const dual = (!incomeExempt && r.income_pct_dual_income && !dualSame)
-          ? ` (맞벌이 ${baseLabel ? `${baseLabel} ` : ''}${r.income_pct_dual_income}%)` : '';
+          ? ` (맞벌이 ${baseLabel ? `${baseLabel} ` : ''}${escapeHtml(String(r.income_pct_dual_income))}%)` : '';
         // 🔴 (v/10000).toLocaleString() 은 만원 미만을 **조용히 반올림**한다 — manwonText 가 그 자리다.
         const asset = assetExempt ? '자산기준 배제' : (r.asset_limit ? `자산 ${manwonText(r.asset_limit)}` : '');
         const car = r.car_limit ? `차량가액 ${manwonText(r.car_limit)}` : '';
@@ -8758,7 +8767,7 @@ function zfUnitTypeKey(u, head){
 }
 // 칩 자리 — 렌더 함수는 자리만 둔다. 채우는 것은 zfFillUnitChips 다(첨부가 늦게 와도 그 자리에 붙는다).
 function zfUnitChipSlot(key){
-  return key ? `<span class="hu-x-slot" data-xkey="${escapeHtml(key)}"></span>` : '';
+  return key ? `<span class="hu-x-slot" data-xkey="${zfAttr(key)}"></span>` : '';
 }
 // 같은 키의 자리가 여럿이면(같은 주택형 행이 여러 줄) **문서 순서로 첫 자리에만** 단다 — 두 번 세지 않는다.
 function zfFillUnitChips(id){
@@ -8771,7 +8780,7 @@ function zfFillUnitChips(id){
     const g = map.get(key);
     if(!g || used.has(key)){ el.innerHTML = ''; return; }
     used.add(key);
-    el.innerHTML = `<button type="button" class="chip hu-x-chip" title="이 ${escapeHtml(g.kind)}의 사진·평면도 ${g.items.length}건" onclick="event.preventDefault();event.stopPropagation();openExtrasViewer('${g.gid}',0)">📷 ${g.items.length}</button>`;
+    el.innerHTML = `<button type="button" class="chip hu-x-chip" title="이 ${zfAttr(g.kind)}의 사진·평면도 ${g.items.length}건" onclick="event.preventDefault();event.stopPropagation();openExtrasViewer('${g.gid}',0)">📷 ${g.items.length}</button>`;
   });
   if(typeof zf3On === 'function' && zf3On()) zf3HuPhotoBar(id);
 }
@@ -9099,7 +9108,7 @@ function renderHousingGroupRows(id, visibleCount, mapOnly){
     const label = g.building_name || g.address || g.label;
     return `<div class="hu-group">
       <div class="hu-group-head" id="hu-group-head-${id}-${idx}" onclick="event.stopPropagation();toggleHousingGroup('${id}',${idx})">
-        <span class="hu-group-name">${label}</span>
+        <span class="hu-group-name">${escapeHtml(label)}</span>
         ${zfRentLowHeadHtml(id, g)}
         ${zfUnitChipSlot(g.label)}
         <span class="hu-group-count">${g.units.length}건 ▾</span>
@@ -9362,7 +9371,7 @@ function zfWaitReserveHtml(units){
 }
 
 function renderHousingUnitRow(u){
-  const addr = u.address || '주소 정보 없음';
+  const addr = escapeHtml(u.address || '주소 정보 없음');
   const area = u.area_sqm != null ? parseFloat(u.area_sqm).toFixed(1)+'㎡' : '-';
   const deposit = huMoneyText(u.deposit, u.monthly_rent);
   const rent = huRentText(u.monthly_rent, u.deposit);
@@ -9379,7 +9388,7 @@ function renderHousingUnitRow(u){
     ? `<div class="hu-item hu-item-wide"><span class="hu-label">임대조건</span><span class="hu-value">보증금 ${deposit}·월 ${rent} 또는 보증금 ${depositP1}·월 ${rentP1}<br><span style="font-size:11px;color:#888">어느 조건이 적용되는지는 비고·공고문에서 확인하세요</span></span></div>`
     : `<div class="hu-item"><span class="hu-label">보증금</span><span class="hu-value">${deposit}</span></div>
       <div class="hu-item"><span class="hu-label">월임대료</span><span class="hu-value">${rent}</span></div>`;
-  const conv = u.conversion_date ? `<div class="hu-item"><span class="hu-label">분양전환</span><span class="hu-value">${u.conversion_date}</span></div>` : '';
+  const conv = u.conversion_date ? `<div class="hu-item"><span class="hu-label">분양전환</span><span class="hu-value">${escapeHtml(u.conversion_date)}</span></div>` : '';
   const floor = u.floor_info ? `<div class="hu-item"><span class="hu-label">동호수</span><span class="hu-value">${escapeHtml(u.floor_info)}</span></div>` : '';
   const unitType = u.unit_type ? `<div class="hu-item"><span class="hu-label">주택유형</span><span class="hu-value">${escapeHtml(u.unit_type)}</span></div>` : '';
   // has_elevator는 원래 floor_info/extra_note에 섞여있던 걸 별도 컬럼으로 뽑아온 값이라
@@ -9389,7 +9398,7 @@ function renderHousingUnitRow(u){
   //    종전에는 여기만 종전 표시라 태백소도의 긴 조각이 알약 하나로 붙어 있었다.
   const extraNote = u.extra_note ? `<div class="hu-note-wrap"><span class="hu-label">비고</span><div class="hu-note-block">${renderExtraNoteHtml(u.extra_note)}</div></div>` : '';
   // 금회 모집인원 — 경쟁률 가늠에 중요한 정보라 배지로 눈에 띄게 표시(기존 .chip 배지 스타일 재사용)
-  const recruitBadge = u.recruit_count != null ? `<span class="chip hu-recruit-badge">모집 ${u.recruit_count}세대</span>` : '';
+  const recruitBadge = u.recruit_count != null ? `<span class="chip hu-recruit-badge">모집 ${escapeHtml(String(u.recruit_count))}세대</span>` : '';
   // 회차 배지 — 한 블록에 회차가 섞였을 때만 loadHousingUnits가 zfRoundLabel을 붙인다.
   // 🔴 「2026-07-06 회차」라고만 쓰면 어느 쪽이 지금 것인지 모르므로 이번/지난을 함께 적고 색을 가른다.
   const roundBadge = u.zfRoundLabel
@@ -9868,7 +9877,7 @@ function renderMatchResults(rows){
     const cardId = 'mcard-' + zfCardKey(n.announcement_id || idx);
 
     const detailRows = [];
-    if(n.supply_org) detailRows.push(['공급기관', n.supply_org]);
+    if(n.supply_org) detailRows.push(['공급기관', escapeHtml(n.supply_org)]);
     if(n.area_min){
       const areaStr = parseFloat(n.area_min).toFixed(1)+'㎡' +
         (n.area_max&&n.area_max!==n.area_min ? ' ~ '+parseFloat(n.area_max).toFixed(1)+'㎡' : '');
@@ -9878,35 +9887,31 @@ function renderMatchResults(rows){
     if(n.move_in_date) detailRows.push(moveInRow(n.move_in_date));
     if(n.deposit_min) detailRows.push(['보증금', Number(n.deposit_min).toLocaleString()+'원']);
     if(n.rent_min) detailRows.push(['월임대료', Number(n.rent_min).toLocaleString()+'원']);
-    if(annDate) detailRows.push(['공고일', annDate]);
+    if(annDate) detailRows.push(['공고일', escapeHtml(annDate)]);
     // 🔴 B62 ③ — 공고 탭과 같은 말.
     if(n.apply_period_check === true) detailRows.push(['접수기간', '확인 필요 — 공사 공고에서 확인']);
-    else if(applyStart||applyEnd) detailRows.push(['접수기간', (applyStart||'-')+' ~ '+(applyEnd||'-')]);
+    else if(applyStart||applyEnd) detailRows.push(['접수기간', escapeHtml((applyStart||'-')+' ~ '+(applyEnd||'-'))]);
 
-    const mTitle = (n.title||'').replace(/'/g,"\\'");
-    const mRegion = zfCoverPlaceText(n.region_names, zfComplexCount(n), n.sido_nm, n.sigungu_nm, n.region, zfUnitPlacesFor(n.announcement_id)).replace(/'/g,"\\'");
-    const mType = (n.housing_type||'').replace(/'/g,"\\'");
-    const mUrl = (n.url||'').replace(/'/g,"\\'");
-    const mId = (n.announcement_id||'m'+idx).replace(/'/g,"\\'");
+    const mRegion = zfCoverPlaceText(n.region_names, zfComplexCount(n), n.sido_nm, n.sigungu_nm, n.region, zfUnitPlacesFor(n.announcement_id));
     const mSaved = isSavedId(n.announcement_id||'m'+idx);
-    const mShareBtn = `<button class="detail-link" style="border:1px solid #1D9E75;color:#1D9E75;background:#fff;cursor:pointer" onclick="event.stopPropagation();shareNotice(this,'${mTitle}','${mRegion}','${mType}','${mUrl}')">🔗 이 공고 공유하기</button>`;
-    const mSaveBtn = `<button data-save-id="${n.announcement_id||'m'+idx}" class="detail-link" style="border:1px solid ${mSaved?'#1D9E75':'#ccc'};color:${mSaved?'#1D9E75':'#888'};background:#fff;cursor:pointer" onclick="event.stopPropagation();toggleSaveNotice('${mId}')">${mSaved?'🔖 저장됨':'🔖 저장'}</button>`;
+    const mShareBtn = `<button class="detail-link" style="border:1px solid #1D9E75;color:#1D9E75;background:#fff;cursor:pointer" ${zfShareAttrs(n.title, mRegion, n.housing_type, n.url)} onclick="event.stopPropagation();zfShareFromBtn(this)">🔗 이 공고 공유하기</button>`;
+    const mSaveBtn = `<button data-save-id="${zfAttr(n.announcement_id||'m'+idx)}" class="detail-link" style="border:1px solid ${mSaved?'#1D9E75':'#ccc'};color:${mSaved?'#1D9E75':'#888'};background:#fff;cursor:pointer" onclick="event.stopPropagation();toggleSaveNotice(this.dataset.saveId)">${mSaved?'🔖 저장됨':'🔖 저장'}</button>`;
     const detailHTML = detailRows.length
       ? `<div id="${cardId}" data-ann-id="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px" onclick="event.stopPropagation()">
           <div class="detail-grid">
             ${detailRows.map(([k,v])=>`<div${ZF_DCELL_DATE.test(k)?' class="zf-dcell-date"':''} style="font-size:12px"><span style="color:#999">${k}</span><br><span style="color:#333;font-weight:500">${v}</span></div>`).join('')}
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
-            ${n.url?`<a class="detail-link" href="${n.url}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`:''}
+            ${zfSafeUrl(n.url)?`<a class="detail-link" href="${zfSafeHref(n.url)}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`:''}
             ${mShareBtn}
             ${mSaveBtn}
           </div>
         </div>`
-      : `<div id="${cardId}" data-ann-id="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px" onclick="event.stopPropagation()"><div style="display:flex;gap:8px;flex-wrap:wrap">${n.url?`<a class="detail-link" href="${n.url}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`:''} ${mShareBtn} ${mSaveBtn}</div></div>`;
+      : `<div id="${cardId}" data-ann-id="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px" onclick="event.stopPropagation()"><div style="display:flex;gap:8px;flex-wrap:wrap">${zfSafeUrl(n.url)?`<a class="detail-link" href="${zfSafeHref(n.url)}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`:''} ${mShareBtn} ${mSaveBtn}</div></div>`;
 
     html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n.region||'').replace(/"/g,'&quot;')}" data-sido="${(n.sido_nm||'').replace(/"/g,'&quot;')}" data-sigungu="${(n.sigungu_nm||'').replace(/"/g,'&quot;')}" data-title="${(n.title||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" data-housing-type="${(n.housing_type||'').replace(/"/g,'&quot;')}" data-precise-address="${(n.precise_address||'').replace(/"/g,'&quot;')}" data-relaxed="${n.is_relaxed_recruitment===true?'1':''}" data-relaxation-detail="${(n.relaxation_detail||'').replace(/"/g,'&quot;')}" data-contract-verify="${n.contract_before_verification===true?'1':''}" data-rent-exempt-until="${(n.rent_exemption_until||'').replace(/"/g,'&quot;')}" data-rent-exempt-note="${(n.rent_exemption_note||'').replace(/"/g,'&quot;')}" data-revised="${isAmended?'1':''}" data-revision-note-full="${revisionNoteEscM}" data-special-notes="${n.special_notes?JSON.stringify(n.special_notes).replace(/"/g,'&quot;'):''}" data-apply-start="${(n.apply_start||'').replace(/"/g,'&quot;')}" data-apply-end="${(n.apply_end||'').replace(/"/g,'&quot;')}" data-announcement-date="${(n.announcement_date||'').replace(/"/g,'&quot;')}" data-round-date="${zfNoticeDate(n).replace(/"/g,'&quot;')}" data-complex-count="${zfComplexCount(n)}" data-doc-submit-announce="${(n.doc_submit_announce_date||'').replace(/"/g,'&quot;')}" data-doc-submit-start="${(n.doc_submit_start||'').replace(/"/g,'&quot;')}" data-doc-submit-end="${(n.doc_submit_end||'').replace(/"/g,'&quot;')}" data-winner-announce="${(n.winner_announce_date||'').replace(/"/g,'&quot;')}" data-contract-start="${(n.contract_start||'').replace(/"/g,'&quot;')}" data-contract-end="${(n.contract_end||'').replace(/"/g,'&quot;')}" data-attachment-urls="${n.attachment_urls?JSON.stringify(n.attachment_urls).replace(/"/g,'&quot;'):''}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this,'match')" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
       <div class="htop">
-        <p class="hname">${normalizeRevisedTitle(n.title)||'(공고명 없음)'}</p>
+        <p class="hname">${escapeHtml(normalizeRevisedTitle(n.title))||'(공고명 없음)'}</p>
         ${(t => `<span class="htag ${t.closed?'tag-mix':'tag-apt'}">${escapeHtml(t.text)}</span>`)(zfStatusTag(n))}
       </div>
       <!-- 🔴 공고 탭과 같은 규칙 — 유형은 원문 한 번만(2026-09-16). -->
@@ -10166,7 +10171,7 @@ function buildChecklist(){
   document.getElementById('checklist-apply-btn').innerHTML = `
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:1.25rem">
       <button class="btn btn-sec" onclick="window.open('${applyUrl}','_blank')">${applyLabel}</button>
-      ${sel.url?`<a class="detail-link" href="${sel.url}" target="_blank" data-ai-for="${zfAttr(sel.id)}" data-ai-key="${zfAttr(zfDedupKey(sel.title||''))}"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`:''}
+      ${zfSafeUrl(sel.url)?`<a class="detail-link" href="${zfSafeHref(sel.url)}" target="_blank" data-ai-for="${zfAttr(sel.id)}" data-ai-key="${zfAttr(zfDedupKey(sel.title||''))}"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`:''}
     </div>`;
   zfAiLabelSync();   // 🔵 2026-10-16 — 분석 없는 공고는 「원문 보기」만
 }
@@ -10783,7 +10788,7 @@ function zfOpsHtml(b, issues){
   out.push(line(fu.length ? 'orange' : 'ok', '결과 없이 닫힌 후속 요청', fu.length ? fu.map(f => `#${f.id} ${zfOpsEsc(f.page_ref)}`).join(' / ') : '0'));
   // 열린 점검 이슈(GitHub · zipfit)
   out.push(line(issues === undefined ? 'ok' : issues === null ? 'yellow' : (issues.length ? (hasHard ? 'red' : 'orange') : 'ok'), '열린 점검 이슈',
-    issues === undefined ? '받는 중…' : issues === null ? 'GitHub 를 읽지 못했어요' : (issues.length ? issues.map(i => `<a href="${zfOpsEsc(i.url)}" target="_blank" rel="noopener">#${i.n}</a> ${zfOpsEsc(i.t)}(${zfOpsEsc(i.labels.join(', '))})`).join('<br>') : '없음')));
+    issues === undefined ? '받는 중…' : issues === null ? 'GitHub 를 읽지 못했어요' : (issues.length ? issues.map(i => `<a href="${zfSafeHref(i.url)}" target="_blank" rel="noopener">#${i.n}</a> ${zfOpsEsc(i.t)}(${zfOpsEsc(i.labels.join(', '))})`).join('<br>') : '없음')));
   // 숨긴 묶음(열린 것 · 풀기) + 숨기기 입력
   const hides = b.hides || [];
   const hideRows = hides.length ? hides.map(x => `<div style="font-size:13px;padding:4px 0">${zfOpsEsc(x.group_key)} <span style="color:#888">— ${zfOpsEsc(x.reason)} · ${zfOpsTime(x.hidden_at)} · ${zfOpsEsc(x.announcement_id || '')}</span>`
