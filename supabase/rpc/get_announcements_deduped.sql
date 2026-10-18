@@ -165,6 +165,18 @@ region_set AS (
   ) rn
   GROUP BY dedup_key
 ),
+-- 🔵 2026-10-18(우편함 「코드·운영 — N21: 전국 모집 전세임대 넷 …」) — 원문이 공급 지역을 「전국」이라 적은 묶음은 대표 시도를 「전국」으로 둔다
+--   → 어느 지역 거름에도 함께 뜬다(아래 WHERE · 화면 zfIsNationwide 의 종전 「전국」 장치 그대로).
+--   근거는 그 묶음 행의 분석 정책 행(공고문 원문)뿐이다: 항목 「사업대상지역」·「공급지역」 ∧ 본문 「사업대상지역 : 전국」 꼴(괄호 덧말 허용).
+--   🔴 유형(전세임대 등)으로 추정하지 않는다 · 수집 칸(region·sido_nm)에 쓰지 않고 조회 때 계산한다(수집이 덮어쓰지 않게 — region_set 과 같은 이유).
+--   계기: LH 수집값 「서울특별시 외」(대표 시도 서울) · 형제 MYHOME 시도별 행 16개가 모두 시·군·구 없음이라 region_set 이 비어 서울 밖 거름에 안 걸렸다.
+nationwide_set AS (
+  SELECT DISTINCT b.dedup_key
+  FROM base b
+  JOIN public.announcement_policies p ON p.announcement_id = b.announcement_id
+  WHERE p.category IN ('사업대상지역', '공급지역')
+    AND p.content_raw ~ '^\s*(사업대상지역|공급지역)\s*(\([^)]*\))?\s*:\s*전국\s*$'
+),
 -- 🔴 그 공고의 단지(블록) 수 (2026-09-16 신설). get_announcement_blocks 의 세는 규칙을
 -- 그대로 옮긴 것이다 — 괄호 꼬리를 뗀 precise_address(addr_core)의 distinct 수이고,
 -- MYHOME 주소가 하나라도 있으면 MYHOME 기준, 없으면 전체 소스 기준으로 센다.
@@ -357,6 +369,7 @@ complex_name AS MATERIALIZED (
 SELECT
   w.source, w.announcement_id, w.title, w.region,
   CASE
+    WHEN nw.dedup_key IS NOT NULL THEN '전국'
     WHEN bl.best_sido IS NOT NULL THEN bl.best_sido
     WHEN w.region = '서울' THEN '서울특별시'
     ELSE COALESCE(SUBSTRING(w.region FROM '^\S+?[시도]'), SPLIT_PART(w.region, ' ', 1))
@@ -433,6 +446,7 @@ JOIN best_location bl ON bl.dedup_key = w.dedup_key
 JOIN best_schedule bs ON bs.dedup_key = w.dedup_key
 JOIN first_seen fs ON fs.dedup_key = w.dedup_key
 LEFT JOIN region_set rs ON rs.dedup_key = w.dedup_key
+LEFT JOIN nationwide_set nw ON nw.dedup_key = w.dedup_key
 LEFT JOIN unit_best ub ON ub.dedup_key = w.dedup_key
 LEFT JOIN block_count bc ON bc.dedup_key = w.dedup_key
 LEFT JOIN complex_name cn ON cn.dedup_key = w.dedup_key
@@ -454,6 +468,8 @@ WHERE (
     --   걸친 시도 전부의 지역 필터에 뜬다. 재료는 region_names(「시도 시군구」 — 그룹 형제 행)의 시도 마디다.
     --   대표 시도(region_top·sido_nm)와 카드 첫 줄은 그대로 — 행 집합만 넓어진다.
     OR EXISTS (SELECT 1 FROM unnest(rs.region_names) rn WHERE split_part(rn, ' ', 1) = p_region)
+    -- 🔵 2026-10-18(N21) — 원문 「사업대상지역 : 전국」 묶음(nationwide_set — 위 CTE 주석).
+    OR nw.dedup_key IS NOT NULL
   )
   AND (
     p_type IS NULL
