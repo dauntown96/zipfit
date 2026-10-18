@@ -87,10 +87,26 @@ def query(sql, read_only=False):
             raise
 
 
+# 🔴 공개 저장소라 db-apply 이슈 본문·Actions 요약·로그가 모두 공개다(2026-10-18 · 우편함 「G8 확정 고침」 강화 a).
+# DB 오류 원문에는 행 값이 실린다 — `DETAIL: Failing row contains (…)` · `Key (열)=(값) already exists` 등.
+# 싣기 전에 값 자리만 가린다(오류 종류·제약 이름·열 이름은 남긴다). 자르기 전에 가린다 — 자른 뒤면 값 조각이 남는다.
+_ROW_VALUE_RES = (
+    (re.compile(r'(Failing row contains ).*?(?=\\n|\n|$)', re.S), r'\1(…값 가림…)'),
+    (re.compile(r'(Key \([^)]*\))=\(.*?\)(?= (?:already exists|is not present|is still referenced|conflicts with))'), r'\1=(…값 가림…)'),
+    (re.compile(r'(Key \([^)]*\))=\((?!…값 가림…\)).*?(?=\\n|\n|$)', re.S), r'\1=(…값 가림…)'),
+)
+
+
+def redact_db_error(text):
+    for rx, rep in _ROW_VALUE_RES:
+        text = rx.sub(rep, text)
+    return text
+
+
 def read(sql):
     st, txt = query(sql, read_only=True)
     if st not in (200, 201):
-        raise RuntimeError(f'읽기 실패 {st}: {txt[:400]}')
+        raise RuntimeError(f'읽기 실패 {st}: {redact_db_error(txt)[:400]}')
     return json.loads(txt)
 
 
@@ -488,7 +504,7 @@ def cmd_check():
             data['invariants_changed'] = inv_changed
             st, txt = query(f'select count(*)::int as n from ({invariants_sql()}) x', read_only=True)
             if st not in (200, 201):
-                lines.append(f'- ❌ 불변식 {INV_NAME} 이 돌지 못했다(HTTP {st}) — 바뀐 파일 {", ".join(inv_changed)}: `{txt[:400]}`')
+                lines.append(f'- ❌ 불변식 {INV_NAME} 이 돌지 못했다(HTTP {st}) — 바뀐 파일 {", ".join(inv_changed)}: `{redact_db_error(txt)[:400]}`')
                 return report('check', 'DB 변경 PR 체크', False, lines, data)
             n = json.loads(txt)[0]['n']
             data['invariants'] = n
@@ -514,7 +530,7 @@ def cmd_check():
         msg = txt
     m = re.search(CHECK_TAG + r' (\{[^\n]*\})', msg)
     if st != 400 or not m:
-        lines.append(f'- ❌ 적용 SQL이 끝까지 돌지 못했다(결과 표식 없음): `{txt[:500]}`')
+        lines.append(f'- ❌ 적용 SQL이 끝까지 돌지 못했다(결과 표식 없음): `{redact_db_error(txt)[:500]}`')
         ok = False
         res = None
     else:
@@ -663,7 +679,7 @@ end
         st, txt = query(sql)
         if st not in (200, 201):
             ok = False
-            lines.append(f'- ❌ `{f["name"]}` 적용 실패(HTTP {st}) — 트랜잭션 전체가 롤백됐다: `{txt[:500]}`')
+            lines.append(f'- ❌ `{f["name"]}` 적용 실패(HTTP {st}) — 트랜잭션 전체가 롤백됐다: `{redact_db_error(txt)[:500]}`')
             break
         fp1 = fingerprint()
         info = functions_info(sorted({s.split('(')[0] for s in list(f['functions']) + f['dropped']}))

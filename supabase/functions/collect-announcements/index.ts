@@ -104,8 +104,24 @@ class UpstreamError extends Error {
 const SNIPPET_LEN = 200
 const redactKey = (text: string): string =>
   text.replace(/(serviceKey|ServiceKey)=[^&\s"'<]*/g, '$1=***')
+// 키가 URL 인코딩된 형태로 섞여 들어갈 수 있어 변형까지 함께 막는다.
+const secretVariants = (v: string): string[] => {
+  const out = new Set<string>([v])
+  try { out.add(encodeURIComponent(v)) } catch { /* 무시 */ }
+  try { out.add(decodeURIComponent(v)) } catch { /* 무시 */ }
+  return [...out].filter(s => s.length >= 8)
+}
+const KNOWN_SECRETS = [...secretVariants(LH_API_KEY), ...secretVariants(CRON_SECRET)]
+const scrubSecrets = (text: string): string => {
+  let out = redactKey(text)
+  for (const s of KNOWN_SECRETS) out = out.split(s).join('***')
+  return out
+}
+// 🔴 가림이 자르기보다 먼저다 — 자른 뒤에 가리면 잘린 키 조각(`serviceKey` 이름이 잘려 나간 값)이
+// 남는다. 예외 문자열(`String(e)`)도 이 길로만 담는다: Deno fetch 네트워크 오류 문구가 키 든 URL을
+// 그대로 담는다(2026-10-01 collection_run_log 1행 · 우편함 「G8 확정 고침」 2026-10-18).
 const snippetOf = (text: string): string =>
-  redactKey(text).slice(0, SNIPPET_LEN).replace(/\s+/g, ' ').trim()
+  scrubSecrets(text).slice(0, SNIPPET_LEN).replace(/\s+/g, ' ').trim()
 
 // JSON 배열을 기대하는 엔드포인트용 공통 페치.
 // 순서: res.ok → Content-Type → text()+JSON.parse → Array.isArray
@@ -115,7 +131,7 @@ async function fetchJsonStrict(url: string, timeoutMs: number): Promise<{ value:
     res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) })
   } catch (e) {
     // 네트워크 실패·타임아웃. 여기엔 응답 자체가 없다.
-    throw new UpstreamError({ kind: `network:${e instanceof Error ? e.name : 'Error'}`, status: null, contentType: null, snippet: String(e).slice(0, SNIPPET_LEN) })
+    throw new UpstreamError({ kind: `network:${e instanceof Error ? e.name : 'Error'}`, status: null, contentType: null, snippet: snippetOf(String(e)) })
   }
 
   const contentType = res.headers.get('content-type')
@@ -222,7 +238,7 @@ async function fetchNoticeList(tps: string[], win: ListWin = 'main'): Promise<{ 
       } catch (e) {
         const info: FetchFail = e instanceof UpstreamError
           ? e.info
-          : { kind: `unexpected:${e instanceof Error ? e.name : 'Error'}`, status: null, contentType: null, snippet: String(e).slice(0, SNIPPET_LEN) }
+          : { kind: `unexpected:${e instanceof Error ? e.name : 'Error'}`, status: null, contentType: null, snippet: snippetOf(String(e)) }
         failures.push(describeFail(`LH 목록${win === 'long' ? '(장기 창)' : ''} tp=${tp} page=${page}`, info))
         failedTps.push(tp)
         break   // 이 카테고리만 중단. 다음 카테고리는 그대로 시도하고, 이미 모은 all은 유지한다.
@@ -543,7 +559,7 @@ async function fetchMyHome(): Promise<{ items: MyHomeItem[]; failures: string[];
     } catch(e) {
       const info: FetchFail = e instanceof UpstreamError
         ? e.info
-        : { kind: `unexpected:${e instanceof Error ? e.name : 'Error'}`, status: null, contentType: null, snippet: String(e).slice(0, SNIPPET_LEN) }
+        : { kind: `unexpected:${e instanceof Error ? e.name : 'Error'}`, status: null, contentType: null, snippet: snippetOf(String(e)) }
       failures.push(describeFail(`MYHOME 목록 page=${page}`, info))
       console.error(`MYHOME page${page} 오류: ${info.kind}`)
       failed = true
@@ -1118,14 +1134,14 @@ async function collect() {
     // 전용 컬럼이 없으므로 errors에 남긴다(스키마 변경은 이번 범위 밖).
     // 이 방식이 효과가 있는지 판정할 유일한 근거이므로, 성공/실패 양쪽 다 남긴다.
     errors.push(`late_retry: ${notes.join(' / ')}`)
-    console.log(`[LATE_RETRY] ${notes.join(' / ')}`)
+    console.log(scrubSecrets(`[LATE_RETRY] ${notes.join(' / ')}`))
   }
 
   // 🔵 2026-10-13 — 지방공사 게시판 첨부 목록(fillBoardAttachments 주석). 실패는 errors 에 넣지 않는다.
   let board: Awaited<ReturnType<typeof fillBoardAttachments>> | { failed: string[] }
   try { board = await fillBoardAttachments(startedAt) }
   catch (e) { board = { failed: [`게시판 단계 예외: ${e}`] } }
-  console.log(`[BOARD] ${JSON.stringify(board)}`)
+  console.log(scrubSecrets(`[BOARD] ${JSON.stringify(board)}`))
 
   const expired = await markExpired()
   const durationMs = Date.now() - startedAt
@@ -1140,7 +1156,8 @@ async function collect() {
       myhome_upserted:     mhUpserted,
       myhome_dedup_merged: mhDedupMerged,
       expired_marked:      expired,
-      errors:              errors.length ? errors : null,
+      // 🔴 싱크 쪽 한 겹 — 어느 길로 들어온 문자열이든 기록 직전에 비밀값을 가린다(snippetOf가 1차).
+      errors:              errors.length ? errors.map(scrubSecrets) : null,
       duration_ms:         durationMs,
     })
     if (logError) errors.push(`collection_run_log insert: ${logError.message}`)
@@ -1153,7 +1170,7 @@ async function collect() {
     myhome: { fetched: mhFetched, upserted: mhUpserted, dedup_merged: mhDedupMerged, late_retry_ok: lateRetryMhOk },
     expired,
     board,
-    errors,
+    errors: errors.map(scrubSecrets),
   }
 }
 
@@ -1174,25 +1191,12 @@ async function collect() {
 // 목록의 쪽·카테고리는 파라미터로 받되 **한 번에 한 쪽**이다. 더 보려면 다시 부른다.
 //
 // 🔴 비밀값은 어떤 형태로도 응답에 싣지 않는다. 응답 문자열 전체에 scrubSecrets()를 한 번 더
-// 건다 — URL을 담지 않는 것이 1차 방어이고, 이것이 2차 방어다.
+// 건다 — URL을 담지 않는 것이 1차 방어이고, 이것이 2차 방어다. scrubSecrets는 파일 위쪽 공용
+// 도우미다(collect()의 기록·로그·응답도 같은 것을 쓴다 · 2026-10-18).
 const PROBE_MAX_DETAIL   = 5
 const PROBE_MAX_ELEMENTS = 20    // 원소 배열을 통째로 싣되 이 수에서 자른다
 const PROBE_LIST_TIMEOUT_MS   = 12000
 const PROBE_DETAIL_TIMEOUT_MS = 20000   // 관측용이라 수집(5초)보다 길게 — 느린 공고도 봐야 한다
-
-// 키가 URL 인코딩된 형태로 섞여 들어갈 수 있어 변형까지 함께 막는다.
-const secretVariants = (v: string): string[] => {
-  const out = new Set<string>([v])
-  try { out.add(encodeURIComponent(v)) } catch { /* 무시 */ }
-  try { out.add(decodeURIComponent(v)) } catch { /* 무시 */ }
-  return [...out].filter(s => s.length >= 8)
-}
-const PROBE_SECRETS = [...secretVariants(LH_API_KEY), ...secretVariants(CRON_SECRET)]
-const scrubSecrets = (text: string): string => {
-  let out = redactKey(text)
-  for (const s of PROBE_SECRETS) out = out.split(s).join('***')
-  return out
-}
 
 // 「0」과 「"0"」과 「""」과 「없음」을 갈라 말한다 — mapMyHomeRow의 0 접기를 판정할 유일한 근거다.
 // DB로는 못 가른다(넷이 전부 NULL로 합류한다).
@@ -1459,6 +1463,7 @@ Deno.serve(async (req: Request) => {
   const started = new Date().toISOString()
   const result  = await collect()
   const res = { started, finished: new Date().toISOString(), ...result }
-  console.log('[DONE]', JSON.stringify(res))
-  return new Response(JSON.stringify(res), {headers:{'Content-Type':'application/json'}})
+  const body = scrubSecrets(JSON.stringify(res))
+  console.log('[DONE]', body)
+  return new Response(body, {headers:{'Content-Type':'application/json'}})
 })
