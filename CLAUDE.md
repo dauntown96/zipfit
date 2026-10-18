@@ -162,9 +162,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-10-18 | **코드·운영 — N21 전국 전세임대 넷** — 목록 RPC `nationwide_set`(원문 정책 행 「사업대상지역·공급지역 : 전국」) → `region_top='전국'` · 지역 인자에도 · 넷 밖 변화 0 가드 · 서울 밖 15 시·도 +4 · P3 매칭 0 → 3 · `index.html` 0 · PR #624 |
 | 2026-10-18 | **코드·운영 — 게이트 재는 장치** — `ops_health_runs`·`findings`에 `kind`(ops·screen) · 화면 점검이 같은 기록 함수로 한 줄 · 상태판·`ops_gap`은 `kind='ops'`만 · 빈 탭 `empty_tabs`(비로그인 다섯 탭 통과) · `docs/launch-gates.sql` · 화면 점검 판정 실패 = 실행 실패 · 고아 `upsert-announcement` 소스 걷음 · PR #622 |
 | 2026-10-18 | **표시층 — G8 확정 고침: XSS 두 자리** — `zfSafeUrl`·`zfSafeHref`(http(s)만 · href 17 · window.open) · 바깥 문자열 escapeHtml(제목 셋·상세·세대·진단) · onclick 이어 붙이기 → data-*+dataset · 퍼즈 실행 471·170 → 0 · 카드 950장 같음 · `zipfit-v238` · PR #620 |
-| 2026-10-18 | **코드·운영 — G8 확정 고침** — 수집 EF 예외 문자열을 가린 뒤 자름 + 기록·로그·응답 `scrubSecrets` · 운영 로그 1행 키 가림(1 → 0) · `migrate.py` DB 오류 행 값 가림 · pg_net 지움에 `action_link` · health-ops ℹ️ 원문 오염 0·0·0 · 리허설 VIEW(백업 #29) · history.md 표 칸 검사 · `WEBHOOK_SECRET` 삭제는 분류기 거부 → 다운님 손 · PR #618 |
 ---
 
 ## 🚫 코딩 원칙
