@@ -106,6 +106,8 @@ try {
   const brokenChips = []
   const hiddenDates = []
   const overflow = []
+  const greyOpen = []         // 회색(흐림 · zf3-closed)인데 숨기기 술어(isHiddenAsClosed)로는 열린 카드
+  let greySeen = 0
   for (let pg = 1; pg <= MAX_PAGES; pg++) {
     if (pg > 1) {
       const ok = await page.evaluate(pg => { const b = [...document.querySelectorAll('button')].find(b => b.offsetParent !== null && b.innerText.trim() === String(pg)); if (!b) return false; b.click(); return true }, pg)
@@ -141,6 +143,12 @@ try {
           }
         }
       }
+      // ⑦-0 회색 술어(2026-10-19 · 우편함 「표시층 — 순위별 접수 창 사이 카드가 회색 …」) — 회색은 숨기기와 같은 술어여야 한다
+      const greys = [...document.querySelectorAll('#notice-list .hcard')].filter(vis).filter(c => c.classList.contains('zf3-closed') || c.style.opacity)
+      const greyBad = greys.map(c => c.getAttribute('data-announcement-id') || '?').filter(id => {
+        const r = (typeof noticeData !== 'undefined' ? noticeData : []).find(n => String(n.announcement_id) === id)
+        return !r || !isHiddenAsClosed(r)
+      })
       const sw = document.documentElement.scrollWidth
       // 공고문 자리 — 이름 칸(title 속성 = 공고문 제목 전문)마다 같은 줄(.zf-nt-line)의 기간·상태 배지. 한 줄 모양이면 상자 하나가 줄이다.
       const nts = []
@@ -160,7 +168,7 @@ try {
             sp ? (sp.innerText || sp.textContent).replace(/^접수\s*/, '').trim() : '(없음)', state])
         }
       }
-      return { cardRows, chips, dates, nts, overflow: sw > window.innerWidth + 1 ? sw : 0 }
+      return { cardRows, chips, dates, nts, overflow: sw > window.innerWidth + 1 ? sw : 0, greys: greys.length, greyBad }
     })
     // 🔴 갈래는 자르기 전 전문으로 정한다(이슈 #360 · 2026-10-07) — 60자로 자른 뒤 판정하면 긴 ④ 링크 문구
     //    (「…[정정공고] … 공고에 함께 정리돼 있어요 →」 65자)의 「있어요」가 잘려 「알수없음」으로 떨어졌다. 60자는 결과 표에 보일 때만.
@@ -169,6 +177,8 @@ try {
     brokenChips.push(...got.chips)
     hiddenDates.push(...got.dates)
     if (got.overflow) overflow.push(`쪽 ${pg}: scrollWidth ${got.overflow}`)
+    greySeen += got.greys
+    greyOpen.push(...got.greyBad)
   }
   extra.cards_seen = cards.length
 
@@ -279,6 +289,7 @@ try {
   add('chips', '깨진 칩(높이 > 30px 또는 줄바꿈 조각 2개 이상)', brokenChips.length === 0 ? 'pass' : 'fail', brokenChips.length ? `${brokenChips.length}: ${brokenChips.slice(0, 3).join(' / ')}` : 0, '0(표시층 B 뒤 0)')
   add('route_date', '접힌 경로 줄 첫 날짜가 보이는가', hiddenDates.length === 0 ? 'pass' : 'fail', hiddenDates.length ? `${hiddenDates.length}: ${hiddenDates.slice(0, 3).join(' / ')}` : 0, '가려진 첫 날짜 0')
   add('overflow', '가로 넘침(390px)', overflow.length === 0 ? 'pass' : 'fail', overflow.length ? overflow.join(' / ') : 0, 'scrollWidth ≤ 390')
+  add('grey_open', '회색(흐림) 카드 중 숨기기 술어로는 열린 카드 — 회색 = isHiddenAsClosed', greyOpen.length === 0 ? 'pass' : 'fail', `회색 ${greySeen} · 열린데 회색 ${greyOpen.length}${greyOpen.length ? ': ' + greyOpen.slice(0, 5).join(' / ') : ''}`, '0(목록에 보이는 카드 전 쪽 · 2026-10-19 순위별 접수 창 사이 3장)')
   // ④ 보이는 글자에 옛 서비스명 0(2026-10-06 · 우편함 「코드 — Z-1 …」 PR-A A4 · 이름 규칙 — 사용자에게 보이는 곳 = 「꼭집」).
   //    body.innerText(화면에 그려진 글자만 · 숨은 요소·주석·콘솔 제외) 안의 「ZipFit」(대소문자 그대로)을 센다 — 지금 열린 쪽 기준.
   //    SIMULATE=zipfit 이면 보이는 글자 하나를 넣고 센다(알림 경로 시험 — 실패해야 맞다).
