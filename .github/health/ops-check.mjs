@@ -830,6 +830,34 @@ select json_build_object('n', (select count(*) from hit), 'key_rows', (select co
   add('target_hanbumo_age', '열린 카드 한부모 갈래에 확인필요 없음 ∧ 원문 「한부모 … N세 이하」', 'warn', String(e).slice(0, 200), '공고·키·정책 표를 읽는다(못 읽으면 ⚠️)')
 }
 
+// ㉒ 청년 갈래 혼인 조건 누락(2026-10-19 · 우편함 「코드·운영 — 점검 항목 target_youth_marital …」 1 · 조사 「G3 후보 실측」 ⓒ).
+//    행복주택 등 청년·대학생·사회초년생 갈래는 원문이 「혼인 중이 아닐 것」을 거는데, 키 갈래에 조건.혼인도 확인필요도 없으면
+//    화면이 혼인한 진단 사용자에게도 ok 를 낸다(2026-10-19 …20850 · …20854 — 같은 날 운영 데이터 쓰기로 채웠다).
+//    청년 갈래 = 대상 청년·대학생·사회초년생·취업준비생 ∨ (대상 「계층」 또는 대상 없음 ∧ 계층_중_하나에 그 낱말).
+//    확인필요가 있는 갈래는 화면이 이미 check 라 세지 않는다(SH 청년 창업가·예술인 꼴 · 원문이 혼인을 걸지 않는 대상).
+//    열린 카드 · 키 행 범위는 ㉑ 과 같다 · ⚠️ 경고만(이슈를 열지 않는다 · gate.mjs HARD 밖).
+try {
+  const [x] = await sqlRead(`with oc as materialized (select announcement_dedup_key(d.title) k from public.get_announcements_deduped() d
+        where d.apply_end >= (now() at time zone 'Asia/Seoul')::date and d.title not like '%조기%마감%'),
+     kr as materialized (select distinct e.id, e.announcement_id, e.verification_requirements->'공급대상' g
+        from public.announcements a join oc on public.announcement_dedup_key(a.title) = oc.k
+        join public.eligibility_criteria e on e.announcement_id = a.announcement_id
+       where jsonb_typeof(e.verification_requirements->'공급대상') = 'object' and jsonb_typeof(e.verification_requirements->'공급대상'->'갈래') = 'array'),
+     yb as (select kr.id, kr.announcement_id, b from kr, jsonb_array_elements(kr.g->'갈래') b
+        where b->>'대상' in ('청년', '대학생', '사회초년생', '취업준비생')
+           or (coalesce(b->>'대상', '계층') = '계층' and jsonb_typeof(b->'조건'->'계층_중_하나') = 'array'
+               and (b->'조건'->'계층_중_하나')::text ~ '(청년|대학생|사회초년생|취업준비생)')),
+     hit as (select * from yb where not (jsonb_typeof(b->'조건') = 'object' and (b->'조건') ? '혼인') and not (b ? '확인필요'))
+select json_build_object('n', (select count(*) from hit), 'key_rows', (select count(*) from kr), 'youth', (select count(*) from yb),
+  'ids', (select coalesce(json_agg(distinct announcement_id), '[]'::json) from hit)) j`)
+  const c = x.j
+  add('target_youth_marital', '열린 카드 청년·대학생·사회초년생 갈래에 혼인 조건도 확인필요도 없음', c.n === 0 ? 'pass' : 'warn',
+    c.n === 0 ? `0(키 행 ${c.key_rows} · 청년 갈래 ${c.youth})` : `${c.n}갈래: ${c.ids.slice(0, 5).join(', ')}`,
+    '0 — 열린 카드(G2 식) 제목 키 묶음의 공급대상 키 행 중 갈래 대상 청년·대학생·사회초년생·취업준비생(또는 계층_중_하나에 그 낱말) ∧ 조건.혼인 없음 ∧ 확인필요 없음 · 넘으면 ⚠️ 경고만(혼인 조건 채우기는 운영 데이터 쓰기 몫)')
+} catch (e) {
+  add('target_youth_marital', '열린 카드 청년·대학생·사회초년생 갈래에 혼인 조건도 확인필요도 없음', 'warn', String(e).slice(0, 200), '공고·키 표를 읽는다(못 읽으면 ⚠️)')
+}
+
 // ⑲ 인스턴스 메모리(2026-10-17 · 같은 우편 1 · 조사 「인스턴스 지표 경로」 ⓑ) — 관리 API 지표 끝점(베타)에서 숫자만 골라(instance.mjs) zipfit_ops.instance_metrics_log 에 한 행.
 //    🔴 본문 원문은 어디에도 남기지 않는다(값 칸은 고른 숫자 요약뿐 · 실패하면 HTTP 상태만). ⚠️만(❌ 없음 · 문턱 잠정 — instance.mjs).
 //    베타 끝점이라 받기·고르기·기록이 실패하면 이 항목만 ℹ️ — 점검 전체를 막지 않는다.
