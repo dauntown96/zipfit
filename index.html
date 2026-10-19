@@ -554,6 +554,7 @@ span.zf3-mi{cursor:default}
 .zf3-tblock .k{color:var(--ink-3);white-space:nowrap}
 .zf3-tblock .v{font-weight:700;color:var(--ink)}
 .zf3-tblock .v.led{font-family:var(--f-led)}
+.zf-win-other{display:block;font-size:11px;font-weight:400;opacity:.8;margin-top:2px;line-height:1.4}
 .zf3-chips{display:flex;gap:6px;overflow-x:auto;padding:2px 0 8px;scrollbar-width:none}
 .zf3-chips::-webkit-scrollbar{display:none}
 .zf3-chip{all:unset;box-sizing:border-box;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;min-height:var(--hit);padding:0 14px;border-radius:999px;border:1px solid var(--line);font-size:var(--t-s);cursor:pointer;background:var(--paper);color:var(--ink);font-family:var(--f-ui)}
@@ -1970,14 +1971,20 @@ function zfLhSpanIsUnion(row, pn){
 //    창 사이 = 'before' + 다음 창 시작일(닫지 않는다) · 마지막 창 끝 뒤(카드 기간 안) = 'closed' · 창 안 = 종전 판정 그대로(LH 「…마감」 포함).
 //    보지 않는 것: 경로 행이 아직 안 왔거나(zfSide.routesReady) · 기간 확인 대상 · 조기 마감 알림 · 당첨발표가 지남 · 오늘이 카드 기간 밖 ·
 //    기간 모르는 경로 행이 섞임 · 창(겹치거나 하루 차로 붙은 행은 한 창)이 하나뿐 — 모두 종전 그대로다.
+// 🔵 2026-10-19(우편함 「표시층 — 순위별 접수 창 카드의 기본 노출」) — 창 묶기만 따로 뗐다(zfRouteWinsAll · 오늘 가드 없음).
+//    상태 판정(zfRouteWins → zfRouteGap · zfRouteCurEnd)은 종전 그대로 오늘이 카드 기간 안 · 당첨발표 전일 때만 본다.
 function zfRouteWins(row){
+  const W = zfRouteWinsAll(row);
+  if(!W || W.today < W.s0 || W.today > W.e0) return null;
+  const w = parseNoticeDate(row['winner_announce_date'] || '');
+  if(w && startOfLocalDay(w).getTime() < W.today) return null;
+  return W;
+}
+function zfRouteWinsAll(row){
   if(!row || !zfSide.routesReady || row['apply_period_check'] === true || zfEarlyClosed(row)) return null;
   const S = parseNoticeDate(row['신청시작일'] || row['apply_start'] || ''), E = parseNoticeDate(row['신청마감일'] || row['apply_end'] || '');
   if(!S || !E) return null;
   const day = d => startOfLocalDay(d).getTime(), s0 = day(S), e0 = day(E), today = day(new Date());
-  if(today < s0 || today > e0) return null;
-  const w = parseNoticeDate(row['winner_announce_date'] || '');
-  if(w && day(w) < today) return null;
   const rows = zfSide.routesByKey.get(zfDedupKey(row['공고명'] ?? row.title)) || [];
   const wins = [];
   for(const r of rows){
@@ -1990,7 +1997,46 @@ function zfRouteWins(row){
   wins.sort((p, q) => p.x - q.x);
   const merged = [];
   wins.forEach(c => { const m = merged[merged.length - 1]; if(m && c.x <= m.y + 864e5){ if(c.y > m.y){ m.y = c.y; m.de = c.de; } m.ph = m.ph.concat(c.ph); m.rt = m.rt.concat(c.rt); } else merged.push(Object.assign({}, c)); });
-  return merged.length < 2 ? null : { merged, today, routes: new Set(wins.flatMap(w => w.rt)).size };
+  return merged.length < 2 ? null : { merged, today, s0, e0, routes: new Set(wins.flatMap(w => w.rt)).size };
+}
+// 기본 창 — 오늘이 어느 창 안이면 그 창 · 창 사이면 다음 창 · 모두 끝났으면 마지막 창 · 모두 전이면 첫 창(다운님 설계 「기본 노출 = 오늘 날짜에 해당하는 창」).
+//    창이 하나뿐이거나 경로 행 전이면 null(검은 상자 「접수기간」은 종전 그대로).
+function zfRouteDefaultWin(row){
+  const W = zfRouteWinsAll(row);
+  if(!W) return null;
+  const M = W.merged, t = W.today;
+  let i = M.findIndex(m => m.x <= t && t <= m.y);
+  if(i < 0) i = M.findIndex(m => m.x > t);
+  if(i < 0) i = M.length - 1;
+  return { W, i };
+}
+// 검은 상자 「접수기간」 — 기본 창 시작~끝 · 그 창 대상 글자 + 아래 한 줄에 다른 창(끝남 / 시작 전). 창이 셋 넘게 같은 쪽이면 묶어 센다(…19241 매달 창).
+function zfWinBoxHTML(row){
+  const D = zfRouteDefaultWin(row);
+  if(!D) return null;
+  const M = D.W.merged, t = D.W.today, md = d => String(d).slice(5, 10).replace('-', '/');
+  const ph = m => [...new Set(m.ph.map(zfPhaseShort).filter(Boolean))].join('·');
+  const m0 = M[D.i];
+  const main = `${m0.d} ~ ${m0.de}${ph(m0) ? ' · ' + ph(m0) : ''}`;
+  const grp = (ws, tag) => !ws.length ? '' : (ws.length <= 2
+    ? ws.map(m => `${ph(m) ? ph(m) + ' ' : ''}${md(m.d)}~${md(m.de)}`).join(' · ')
+    : `${ws.length}개 ${md(ws[0].d)}~${md(ws[ws.length - 1].de)}`) + ` · ${tag}`;
+  const others = M.filter((m, j) => j !== D.i);
+  const line = [grp(others.filter(m => m.y < t), '끝남'), grp(others.filter(m => m.x > t), '시작 전')].filter(Boolean).join(' / ');
+  return escapeHtml(main) + (line ? `<br><small class="zf-win-other">다른 창 ${escapeHtml(line)}</small>` : '');
+}
+// 카드를 그린 뒤 · 경로 행이 온 뒤 채운다(data-zf-win = 카드 공고 id · 행을 못 찾거나 창이 하나면 종전 글자 그대로).
+function zfFillWinSlots(){
+  if(!zfSide.routesReady) return;
+  document.querySelectorAll('[data-zf-win]').forEach(el => {
+    if(el.dataset.zfWinDone === '1') return;
+    el.dataset.zfWinDone = '1';
+    const id = el.getAttribute('data-zf-win');
+    const row = (typeof noticeData !== 'undefined' ? noticeData : []).find(n => String(n['announcement_id'] || '') === id)
+      || (typeof lastFiltered !== 'undefined' && Array.isArray(lastFiltered) ? lastFiltered : []).find(n => String(n['announcement_id'] || '') === id);
+    const h = row ? zfWinBoxHTML(row) : null;
+    if(h) el.innerHTML = h;
+  });
 }
 // 🔵 2026-10-19(우편함 「표시층 — 덧 셋」 ①) — 다음 창의 대상 순위(경로 행 phase_text 원문)와, 경로가 갈리는 카드면 그 창의 경로(route)도 함께 돌려준다.
 //    글자는 원문 그대로이고 띄어쓰기·가운뎃점만 좁힌다(「1순위 (일반) ⋅ 2순위」 → 「1순위(일반)·2순위」). 경로가 하나뿐인 카드는 경로 글자를 내지 않는다.
@@ -2418,6 +2464,7 @@ function zfRoutesReadyMark(){
   const before = rows.map(n => applyWindowState(n));
   zfSide.routesReady = true;
   zfRoutesReadyResolve();
+  zfFillWinSlots();   // 검은 상자 「접수기간」 기본 창(2026-10-19)
   // 🔵 2026-10-16 — 지금 창 끝(zfRouteCurEnd)이 생긴 카드도 다시 그린다(알약 「이번 차수 마감 D-n」 · 마감임박).
   const changed = rows.some((n, i) => applyWindowState(n) !== before[i] || !!zfRouteCurEnd(n));
   if(changed && noticeLoaded) applyNoticeFiltersAndRender(noticePage);
@@ -2429,6 +2476,7 @@ function zfLoadRoutes(){
 // 카드를 그린 뒤 부른다 — 곁 데이터가 이미 있으면 바로 채우고, 없으면 로드를 건다(도착하면 다시 채운다).
 function zfAfterCardsRender(){
   zfFillSideSlots();
+  zfFillWinSlots();
   zfTitleClippedChips();
   zfLoadCardSide();
   zfFillNoticeSlots();
@@ -4751,7 +4799,7 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
     if(annDate) detailRows.push(['공고일', escapeHtml(annDate)]);
     // 🔴 B62 ③ — 접수기간을 믿을 수 없는 행은 수집 날짜 대신 「확인 필요」라고 적는다(날짜 줄과 같은 말).
     if(!isCancelRow && n['apply_period_check'] === true) detailRows.push(['접수기간', '확인 필요 — 공사 공고에서 확인']);
-    else if(!isCancelRow && (applyStart||applyEnd)) detailRows.push(['접수기간', escapeHtml((applyStart||'-')+' ~ '+(applyEnd||'-'))]);
+    else if(!isCancelRow && (applyStart||applyEnd)) detailRows.push(['접수기간', `<span data-zf-win="${zfAttr(String(n['announcement_id']||''))}">${escapeHtml((applyStart||'-')+' ~ '+(applyEnd||'-'))}</span>`]);   // 창 둘 이상이면 기본 창(zfFillWinSlots)
 
     // 🔴 공유 문구도 카드 표지와 같은 함수를 쓴다(2026-09-16) — 카드는 「구미시 외 2곳」인데
     //    공유 텍스트만 대표 주소 한 곳이면 같은 공고를 두 이름으로 부르는 것이 된다.
@@ -9980,7 +10028,7 @@ function renderMatchResults(rows){
     if(annDate) detailRows.push(['공고일', escapeHtml(annDate)]);
     // 🔴 B62 ③ — 공고 탭과 같은 말.
     if(n.apply_period_check === true) detailRows.push(['접수기간', '확인 필요 — 공사 공고에서 확인']);
-    else if(applyStart||applyEnd) detailRows.push(['접수기간', escapeHtml((applyStart||'-')+' ~ '+(applyEnd||'-'))]);
+    else if(applyStart||applyEnd) detailRows.push(['접수기간', `<span data-zf-win="${zfAttr(String(n.announcement_id||''))}">${escapeHtml((applyStart||'-')+' ~ '+(applyEnd||'-'))}</span>`]);   // 공고 탭과 같은 자리(zfFillWinSlots)
 
     const mRegion = zfCoverPlaceText(n.region_names, zfComplexCount(n), n.sido_nm, n.sigungu_nm, n.region, zfUnitPlacesFor(n.announcement_id));
     const mSaved = isSavedId(n.announcement_id||'m'+idx);

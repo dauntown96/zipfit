@@ -296,6 +296,28 @@ try {
   if (process.env.SIMULATE === 'zipfit') await page.evaluate(() => { const p = document.createElement('p'); p.textContent = 'ZipFit(시험)'; document.body.prepend(p) })
   const oldName = await page.evaluate(() => (document.body.innerText.match(/ZipFit/g) || []).length)
   add('old_name', '보이는 글자에 「ZipFit」', oldName === 0 ? 'pass' : 'fail', oldName, '0(body.innerText · 대소문자 그대로 — 이름 규칙: 보이는 곳은 「꼭집」)')
+  // ④-1 전광판 두 반쪽(2026-10-19 · 우편함 「표시층 — 순위별 접수 창 카드의 기본 노출」 덧 · 덧 셋 ③) — 띠는 같은 항목 두 벌(.zf3-half)을 -50% 흘려 끝 뒤에 앞을 잇는다.
+  //    둘째 반쪽이 숨거나 너비가 다르면 한 바퀴 도중 처음으로 되감긴다(#451 카드용 .zf3-dup 숨김이 그랬다 · PR #659). 흐르는 모드(.zf3-run)일 때만 잰다 · 안 멈춤.
+  //    SIMULATE=mq_half 이면 둘째 반쪽을 숨기고 잰다(실패해야 맞다).
+  {
+    const mq = await page.evaluate(sim => {
+      const tr = document.querySelector('#zf3Board .zf3-run .zf3-track')
+      if (!tr) return { skip: (document.querySelector('#zf3Board .zf3-mq') || {}).className || '전광판 없음' }
+      const hs = [...tr.querySelectorAll(':scope > .zf3-half')]
+      if (sim && hs[1]) hs[1].style.display = 'none'
+      const w = hs.map(h => Math.round(h.getBoundingClientRect().width * 10) / 10)
+      const shown = hs.map(h => getComputedStyle(h).display !== 'none' && h.getBoundingClientRect().width > 0)
+      const trw = Math.round(tr.getBoundingClientRect().width * 10) / 10
+      if (sim && hs[1]) hs[1].style.display = ''
+      return { n: hs.length, w, shown, trw }
+    }, process.env.SIMULATE === 'mq_half')
+    if (mq.skip) add('mq_half', '전광판 두 반쪽 너비 같음 · 둘 다 보임', 'skip', `흐르지 않는 모드(${String(mq.skip).slice(0, 60)})`, '흐르는 모드에서만 잰다')
+    else {
+      const ok = mq.n === 2 && mq.shown.every(Boolean) && Math.abs(mq.w[0] - mq.w[1]) <= 1 && Math.abs(mq.trw - mq.w[0] - mq.w[1]) <= 1
+      add('mq_half', '전광판 두 반쪽 너비 같음 · 둘 다 보임', ok ? 'pass' : 'fail', `반쪽 ${mq.n} · 너비 ${mq.w.join(' / ')} · 보임 ${mq.shown.map(x => x ? 'O' : 'X').join('')} · 띠 ${mq.trw}`,
+        '반쪽 2 · 둘 다 보임 · 너비 차 ≤ 1px · 띠 = 두 반쪽 합(다르면 한 바퀴 도중 되감김 — PR #659)')
+    }
+  }
   // ⑨-2 깨진 객체 글자(2026-10-08 · 우편함 「표시층 긴급 2」 1) — 부산문현2 …20806 상세 자격 절에 「공급대상 | 갈래 | [object Object]」가 나갔다.
   //    ⓐ 지금 보이는 글자(body.innerText) ⓑ 자격 행 verification_requirements 전부(anon REST)를 화면과 같은 함수(zfEligVrEntries ·
   //    prettifyEligKey · renderEligValue)로 그린 글자 — 카드 상세를 펼치지 않아도 상세 자격 절의 글자를 잰다. 둘 다 0이어야 통과.
