@@ -7593,10 +7593,13 @@ function roundInfoFor(rawRows, annId, roundMap, cardDate){
 //    그래서 정정 카드는 RPC get_revision_analysis_done(카드 id)도 묻는다 — 참(같은 마감의 정정 행에 카드 정정 시각 뒤의 완료 계열 분석)이면
 //    행의 수집일·정정 표시를 따지지 않는다. 🔴 회차 축(마감·회차 날짜)은 그대로 본다 — 다른 회차 행(원주 …0783 의 7월 행)의 배너는 남는다.
 //    결과는 roundMap 의 열거되지 않는 속성 revisionAnalyzed 로 싣는다(roundMap 을 공고 id 로 훑는 곳이 키로 보지 않게).
+// 🔵 2026-10-19(우편함 「표시층 — 열린 카드에 다른 회차 자격 행이 섞인다」) — 회차 조회는 orphan 이 아니어도 그룹 ID 가 둘 이상이면 받는다.
+//    두 로더가 zfSplitByCardRound 로 이번/다른 회차를 가르는 재료다. 배너 판정은 그대로다 — orphan 이 아니면 staleSourceBannerHtml 이
+//    어차피 빈 문자열이고, zfRowsSameRoundAsCard 가 참이어도 빈 문자열이다. 정정 분석 RPC 는 종전대로 orphan 일 때만 묻는다.
 function zfRoundsIfOrphan(rows, annId, ids, useGroup, id){
   const orphan = !!useGroup && Array.isArray(rows) && rows.length > 0 && !rows.some(r => r && r.announcement_id === annId);
-  const need = orphan && Array.isArray(ids) && ids.length >= 2;
-  const cardEl = need && id != null ? cardElFor(id) : null;
+  const need = !!useGroup && Array.isArray(rows) && rows.length > 0 && Array.isArray(ids) && ids.length >= 2;
+  const cardEl = orphan && need && id != null ? cardElFor(id) : null;
   const revP = (cardEl && cardEl.dataset.revised === '1') ? zfRevisionAnalyzed(annId) : Promise.resolve(false);
   return Promise.all([fetchGroupRounds(ids, need), revP]).then(([roundMap, rev]) => {
     if(roundMap && rev === true) Object.defineProperty(roundMap, 'revisionAnalyzed', { value: true });
@@ -7627,6 +7630,22 @@ function zfRowsSameRoundAsCard(rawRows, roundMap, cardEl){
   });
 }
 
+// 🔵 2026-10-19 — 정밀 자격기준·첨부 사진을 정책 안내(B46)와 같은 축으로 가른다: 다른 회차 = 행의 출처 공고 apply_end 가 카드 apply_end 와 다르다.
+//    get_announcement_group_ids 는 제목만 보아 재공고(다른 회차·같은 제목)까지 묶는다 — 열린 카드 넷의 자격기준에 지난 회차 행이 이번 회차처럼 섞였다
+//    (남원노암 …20649 ← …20249 19행 · 김제하동 …20908 · 제주 …20922 · 익산한스빌 …20893 — 2026-10-19 실측).
+//    🔴 정책 로더와 같은 규칙: 판정 재료(회차 조회 · 카드 apply_end)가 없으면 가르지 않는다 · 회차 조회에 없는 행은 이번 회차 쪽 ·
+//    이번 회차 행이 하나도 없으면(orphan) 가르지 않고 종전 그대로(배너가 말한다).
+function zfSplitByCardRound(rows, roundMap, cardEl){
+  const all = Array.isArray(rows) ? rows : [];
+  const cardEnd = (cardEl && cardEl.dataset.applyEnd) || '';
+  if(!roundMap || !cardEnd || all.length === 0) return { cur: all, other: [], split: false };
+  const isOther = r => { const a = r && roundMap[r.announcement_id]; return !!a && (a.apply_end || '') !== cardEnd; };
+  const other = all.filter(isOther);
+  const cur = all.filter(r => !isOther(r));
+  if(cur.length === 0 || other.length === 0) return { cur: all, other: [], split: false };
+  return { cur, other, split: true };
+}
+
 // 사진·평면도·팸플릿 그룹별 아이템 목록 — 모달의 이전/다음 넘기기가 참조하는 레지스트리
 const extrasGroupsRegistry = {};
 let extrasGroupSeq = 0;
@@ -7653,6 +7672,8 @@ function loadAnnouncementExtras(annId, detailEl, id, useGroup){
         : `<p class="zf3-none">이 공고는 사진·평면도가 아직 없어요${att && att.querySelector('.policy-wrap') ? ' · 원문 파일은 위 「공고문 원문」' : ''}</p>`; }
       return;
     }
+    // 🔵 2026-10-19 — 다른 회차 사진은 그리지 않는다(zfSplitByCardRound — 정책 안내와 같은 축). 이번 회차 행이 없으면 종전 그대로.
+    rows = zfSplitByCardRound(rows, roundMap, cardElFor(id)).cur;
     // 🔴 2026-10-01 — 같은 회차 행만 왔으면 배너 없음(zfRowsSameRoundAsCard · 규약 29 블록 배치).
     const staleHtml = zfRowsSameRoundAsCard(rows, roundMap, cardElFor(id)) ? '' : staleSourceBannerHtml(rows, annId, useGroup, id);
     // 같은 건물이 LH·MYHOME 두 파이프라인으로 각각 수집돼 서로 다른 announcement_id를 갖고,
@@ -8633,6 +8654,10 @@ function loadPreciseEligibility(annId, detailEl, id, useGroup){
     if(!zfStillOurs(id, ownerAnn)) return;
     // 🔴 요청 실패(null)는 여기서 끝낸다 — 정상 0행([])만 아래에서 안내를 받는다.
     if(rows === null) return;
+    // 🔵 2026-10-19 — 다른 회차 자격 행은 본문에서 빼 아래 「🕘 다른 회차 자격기준」 접기로 보낸다(정책 안내 B46 꼴 · zfSplitByCardRound).
+    const eligSplit = zfSplitByCardRound(rows, roundMap, cardElFor(id));
+    rows = eligSplit.cur;
+    let otherElig = eligSplit.other;
     // 🔴 2026-10-01 — 같은 회차 행만 왔으면 배너 없음(zfRowsSameRoundAsCard · 규약 29 블록 배치).
     const staleHtml = zfRowsSameRoundAsCard(rows, roundMap, cardElFor(id)) ? '' : staleSourceBannerHtml(rows, annId, useGroup, id);
     // 그룹조회로 형제 announcement_id 여러 곳에 동일 자격기준이 중복 백필된 경우를 대비해
@@ -8655,22 +8680,22 @@ function loadPreciseEligibility(annId, detailEl, id, useGroup){
     ];
     if(Array.isArray(rows) && rows.length > 0){
       const seenElig = new Set();
-      rows = rows.filter(r => {
+      // 🔴 이번 회차 쪽을 먼저 남긴다 — 화면에서 똑같은 행이 두 회차에 다 있으면 이번 회차 쪽에 한 번만 나온다(정책 안내와 같다).
+      const dedupElig = list => list.filter(r => {
         // 🔵 단지 칩을 그리는 카드는 칩도 화면에 그리는 필드다 — 단지가 다르면 둘 다 남는다.
         const key = ELIG_RENDER_FIELDS.map(f => JSON.stringify(r[f] ?? null)).join('|') + (siteLabel ? '|' + zfRowSite(siteLabel, r) : '');
         if(seenElig.has(key)) return false;
         seenElig.add(key);
         return true;
       });
+      rows = dedupElig(rows);
+      otherElig = dedupElig(otherElig);
     }
     if(!Array.isArray(rows) || rows.length === 0){
       zfEmptySectionNote('elig-slot-'+id, zfCardEmptyKindFor(annId) === 'link_only' ? ZF_SEC_LINK_ONLY : '이 공고의 자격기준은 아직 정리하지 못했어요. 공고 원문에서 확인해 주세요.');
       return;
     }
-    const wrap = document.createElement('details');
-    wrap.className = 'elig-wrap';
-    wrap.innerHTML = `<summary class="elig-title">🎯 이 공고 정밀 자격기준 (${rows.length}건)</summary>` + staleHtml +
-      rows.map(r => {
+    const eligItemHtml = r => {
         const sf = r.supply_form ? escapeHtml(r.supply_form) : '일반';
         const rk = r.rank ? `${escapeHtml(String(r.rank))}순위` : '';
         const incomeExempt = r.income_limit_exempt === true;
@@ -8707,7 +8732,40 @@ function loadPreciseEligibility(annId, detailEl, id, useGroup){
           ${car ? `<div class="elig-row"><span>차량가액</span><span>${car}</span></div>` : ''}
           ${vr}
         </div>`;
-      }).join('');
+      };
+    // 다른 회차 행은 회차(출처 공고 apply_end)별로 묶어 소제목(공고일 · 접수기간)을 단다 — 정책 안내 「🕘 다른 회차 안내」와 같은 꼴·같은 규칙.
+    let otherEligHtml = '';
+    if(otherElig.length){
+      const byRound = new Map();
+      otherElig.forEach(r => {
+        const k = (roundMap[r.announcement_id] || {}).apply_end || '';
+        if(!byRound.has(k)) byRound.set(k, { end: k, start: '', date: '', rows: [] });
+        byRound.get(k).rows.push(r);
+      });
+      Object.values(roundMap).forEach(a => {
+        const g = a && byRound.get(a.apply_end || '');
+        if(!g) return;
+        const d = zfNoticeDate(a);
+        if(d && (!g.date || d < g.date)) g.date = d;
+        if(a.apply_start && (!g.start || a.apply_start < g.start)) g.start = a.apply_start;
+      });
+      // 🔴 모르는 값은 채우지 않는다 — 시작일이 없으면 마감일만, 둘 다 없으면 공고일만 적는다.
+      const headOf = g => {
+        const parts = [];
+        if(g.date) parts.push(`${g.date} 공고`);
+        if(g.start && g.end) parts.push(`접수 ${g.start} ~ ${g.end}`);
+        else if(g.end) parts.push(`접수 마감 ${g.end}`);
+        return parts.length ? parts.join(' · ') : '회차 정보 없음';
+      };
+      const rounds = Array.from(byRound.values()).sort((a, b) => (b.end || '').localeCompare(a.end || ''));
+      otherEligHtml = `<details class="hu-past"><summary class="hu-past-title">🕘 다른 회차 자격기준 (${otherElig.length})</summary>`
+        + rounds.map(g => `<div class="policy-round-head">${escapeHtml(headOf(g))}</div>` + g.rows.map(eligItemHtml).join('')).join('')
+        + `</details>`;
+    }
+    const wrap = document.createElement('details');
+    wrap.className = 'elig-wrap';
+    wrap.innerHTML = `<summary class="elig-title">🎯 이 공고 정밀 자격기준 (${rows.length}건)</summary>` + staleHtml +
+      rows.map(eligItemHtml).join('') + otherEligHtml;
     const slot = document.getElementById('elig-slot-'+id);
     if(slot) slot.appendChild(wrap);
   }).catch(err => {
@@ -8828,8 +8886,12 @@ function zfPruneCardCaches(){
 // 금액 네 개만 뺀 것이다. 중복제거는 이미 「키가 같고 금액까지 같으면 한 세대」로 판정하고 있으므로,
 // 금액만 빼면 그대로 「키가 같고 금액이 달라진 세대」, 즉 비교해야 할 짝이 된다.
 // 두 규칙이 갈리면 한쪽이 합친 행을 다른 쪽이 못 찾는 사각지대가 생긴다.
+// 🔵 2026-10-19 — 주택형 끝 「형」 유무는 같게 본다(익산부송3 …20895 「39」 ↔ 직전 회차 …20624 「39형」 — 원문 표기만 달라 「같은 세대 없음」이 떴다).
+//    비교 키에만 쓴다 — 원문 값·중복제거 키·화면 글자는 그대로다. 다른 꼴(A·B 붙임 등)은 바꾸지 않는다.
+//    ⚠️ 그래서 위 「중복제거 키 − 금액」 관계에서 이 한 칸만 넓다 — 한 회차 안에서는 두 표기가 같이 오지 않아(실측 0) 중복제거는 그대로 둔다.
 function huCompareKey(u){
-  return [u.building_name, u.address, u.floor_info, u.unit_type, u.area_sqm].join('|');
+  const ut = u.unit_type == null ? u.unit_type : String(u.unit_type).replace(/\s*형$/, '');
+  return [u.building_name, u.address, u.floor_info, ut, u.area_sqm].join('|');
 }
 // 값이 양쪽에 다 있는 필드만 비교한다. 한쪽이 NULL이면 「0이 됐다」가 아니라 「모른다」이므로 건너뛴다.
 const HU_DIFF_FIELDS = [
