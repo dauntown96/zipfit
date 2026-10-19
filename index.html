@@ -1976,7 +1976,8 @@ function zfLhSpanIsUnion(row, pn){
 function zfRouteWins(row){
   const W = zfRouteWinsAll(row);
   if(!W || W.today < W.s0 || W.today > W.e0) return null;
-  const w = parseNoticeDate(row['winner_announce_date'] || '');
+  // 🔵 2026-10-19(우편함 「표시층 — 노선 발표·계약 역 = 기본 창」 2) — 카드 발표 칸은 앞 창 발표일 수 있다 — 일정 표에 마지막 창 결과발표가 있으면 그 날로 끈다.
+  const w = parseNoticeDate(zfRouteSchedOf(row, W, W.merged.length - 1).win || row['winner_announce_date'] || '');
   if(w && startOfLocalDay(w).getTime() < W.today) return null;
   return W;
 }
@@ -1992,11 +1993,11 @@ function zfRouteWinsAll(row){
     if(!a || !b) return null;
     const x = day(a), y = day(b);
     if(y < s0 || x > e0) continue;   // 카드 기간 밖 창(같은 제목의 다른 회차)은 보지 않는다
-    wins.push({ x, y, d: String(r.start_date).slice(0, 10), de: String(r.end_date).slice(0, 10), ph: [r.phase_text].filter(Boolean), rt: [r.route].filter(Boolean) });
+    wins.push({ x, y, d: String(r.start_date).slice(0, 10), de: String(r.end_date).slice(0, 10), ph: [r.phase_text].filter(Boolean), rt: [r.route].filter(Boolean), ids: [String(r.announcement_id || '')] });
   }
   wins.sort((p, q) => p.x - q.x);
   const merged = [];
-  wins.forEach(c => { const m = merged[merged.length - 1]; if(m && c.x <= m.y + 864e5){ if(c.y > m.y){ m.y = c.y; m.de = c.de; } m.ph = m.ph.concat(c.ph); m.rt = m.rt.concat(c.rt); } else merged.push(Object.assign({}, c)); });
+  wins.forEach(c => { const m = merged[merged.length - 1]; if(m && c.x <= m.y + 864e5){ if(c.y > m.y){ m.y = c.y; m.de = c.de; } m.ph = m.ph.concat(c.ph); m.rt = m.rt.concat(c.rt); m.ids = m.ids.concat(c.ids); } else merged.push(Object.assign({}, c)); });
   return merged.length < 2 ? null : { merged, today, s0, e0, routes: new Set(wins.flatMap(w => w.rt)).size };
 }
 // 기본 창 — 오늘이 어느 창 안이면 그 창 · 창 사이면 다음 창 · 모두 끝났으면 마지막 창 · 모두 전이면 첫 창(다운님 설계 「기본 노출 = 오늘 날짜에 해당하는 창」).
@@ -2009,6 +2010,26 @@ function zfRouteDefaultWin(row){
   if(i < 0) i = M.findIndex(m => m.x > t);
   if(i < 0) i = M.length - 1;
   return { W, i };
+}
+// 🔵 2026-10-19(우편함 「표시층 — 노선 발표·계약 역 = 기본 창」 1) — 창 i 의 결과발표·계약 = 일정 표(announcement_schedule) 행 중
+//    그 창 경로 행의 공고(같은 제목 키 — 정정 카드는 원공고 행일 수 있다)에서 scope_text 가 그 창 phase_text(원문 그대로)와 같은 행.
+//    결과발표는 하루로 적힌 날이 하나일 때만 · 계약은 행 하나일 때만 · 없으면 빈 값(카드 칸 그대로 — …19241 은 창마다 행이 없다).
+function zfRouteSchedOf(row, W, i){
+  const out = { win: '', cs: '', ce: '' };
+  const m = W && W.merged[i];
+  if(!m || !zfSchedRows || !m.ph.length) return out;
+  const ph = new Set(m.ph), ids = new Set(m.ids.concat(String(row['announcement_id'] || '')));
+  const rs = [...ids].flatMap(id => zfSchedRows.get(id) || []).filter(r => ph.has(r.scope_text));
+  const wd = [...new Set(rs.filter(r => r.stage === '결과발표').map(r => (r.start_date && r.end_date && r.start_date !== r.end_date) ? '#' : (r.start_date || r.end_date || '')).filter(Boolean))];
+  if(wd.length === 1 && wd[0] !== '#') out.win = wd[0];
+  const cr = rs.filter(r => r.stage === '계약' && (r.start_date || r.end_date));
+  if(cr.length === 1){ out.cs = cr[0].start_date || ''; out.ce = cr[0].end_date || ''; }
+  return out;
+}
+function zfRouteSchedHit(row){ const d = zfRouteDefaultSched(row); return !!(d && (d.win || d.cs || d.ce)); }
+function zfRouteDefaultSched(row){
+  const D = zfRouteDefaultWin(row);
+  return D ? zfRouteSchedOf(row, D.W, D.i) : null;
 }
 // 검은 상자 「접수기간」 — 기본 창 시작~끝 · 그 창 대상 글자 + 아래 한 줄에 다른 창(끝남 / 시작 전). 창이 셋 넘게 같은 쪽이면 묶어 센다(…19241 매달 창).
 function zfWinBoxHTML(row){
@@ -2466,7 +2487,7 @@ function zfRoutesReadyMark(){
   zfRoutesReadyResolve();
   zfFillWinSlots();   // 검은 상자 「접수기간」 기본 창(2026-10-19)
   // 🔵 2026-10-16 — 지금 창 끝(zfRouteCurEnd)이 생긴 카드도 다시 그린다(알약 「이번 차수 마감 D-n」 · 마감임박).
-  const changed = rows.some((n, i) => applyWindowState(n) !== before[i] || !!zfRouteCurEnd(n));
+  const changed = rows.some((n, i) => applyWindowState(n) !== before[i] || !!zfRouteCurEnd(n) || zfRouteSchedHit(n));
   if(changed && noticeLoaded) applyNoticeFiltersAndRender(noticePage);
   if(changed) zfRerenderRecIfVisible();
 }
@@ -11560,13 +11581,21 @@ function zf3LineHTML(stns, label){
 //    수집 칸이 비었고 그 카드 공고(대표 id)의 일정 표 「결과발표」 행이 하나뿐이며 날이 하루로 적혀 있으면(시작 = 끝 또는 한쪽만) 그 날.
 //    행이 없거나 둘 이상(범위별)이거나 기간이면 종전 그대로(「원문 확인」). 재료는 일정 표의 결과발표 행 전부(수십 행)를 한 번 받는다(목록 RPC 그대로).
 let zfWinSched = null, zfWinSchedP = null, zfWinSchedRedrawn = false;
+let zfSchedRows = null;   // 🔵 2026-10-19 — 결과발표 + 계약 행(scope_text 포함) · 공고 id → 행들(기본 창 발표·계약 · zfRouteSchedOf)
 function zfLoadWinSched(){
-  if(!zfWinSchedP) zfWinSchedP = fetch(`${SUPABASE_URL}/rest/v1/announcement_schedule?select=announcement_id,start_date,end_date&stage=eq.${encodeURIComponent('결과발표')}`, { headers: zfAnonHeaders() })
+  if(!zfWinSchedP) zfWinSchedP = fetch(`${SUPABASE_URL}/rest/v1/announcement_schedule?select=announcement_id,stage,scope_text,start_date,end_date&stage=in.(${encodeURIComponent('결과발표')},${encodeURIComponent('계약')})`, { headers: zfAnonHeaders() })
     .then(r => r.ok ? r.json() : null).then(rows => {
       if(!Array.isArray(rows)) throw new Error('응답 없음');
-      const m = new Map();
-      rows.forEach(r => { const k = String(r.announcement_id || ''); if(!m.has(k)) m.set(k, []); m.get(k).push(r); });
-      zfWinSched = m;
+      const m = new Map(), all = new Map();
+      rows.forEach(r => { const k = String(r.announcement_id || '');
+        if(!all.has(k)) all.set(k, []); all.get(k).push(r);
+        if(r.stage !== '결과발표') return;
+        if(!m.has(k)) m.set(k, []); m.get(k).push(r); });
+      // 창 가드(zfRouteWins)가 이 행을 본다 — 오면 상태가 바뀐 카드가 있을 때 다시 거른다(경로 행 도착과 같은 꼴)
+      const rowsN = typeof noticeData !== 'undefined' ? noticeData : [];
+      const before = rowsN.map(n => applyWindowState(n));
+      zfWinSched = m; zfSchedRows = all;
+      if(rowsN.some((n, i) => applyWindowState(n) !== before[i])){ if(noticeLoaded) applyNoticeFiltersAndRender(noticePage); zfRerenderRecIfVisible(); }
       return true;
     }).catch(e => { zfWinSchedP = null; console.warn('ZipFit 결과발표 일정 로드 실패:', e); return false; });
   return zfWinSchedP;
@@ -11580,7 +11609,8 @@ function zfWinFromSchedule(aid){
 function zf3Stations(n){
   const ann = zf3Real(zfNoticeDate(n) || n['announcement_date']), rev = zfRevisedDate(n);
   const s = zf3Real(n['신청시작일'] || n['apply_start']), e = zf3Real(zfSoonestOpenEnd(n));
-  const w = n['winner_announce_date'] || zfWinFromSchedule(n['announcement_id']) || '';
+  const ds = zfRouteDefaultSched(n);   // 🔵 2026-10-19 — 순위별 창 카드는 기본 창의 결과발표(일정 표 scope = 그 창 phase)
+  const w = (ds && ds.win) || n['winner_announce_date'] || zfWinFromSchedule(n['announcement_id']) || '';
   return [
     { k: '공고', d: ann, sub: rev ? '정정 ' + rev.slice(5) : '' },
     { k: '접수', d: s, u: '미상' },
@@ -11604,7 +11634,7 @@ function zf3DecorateCards(){
   // 결과발표 일정이 목록보다 늦게 오면 그 날을 쓸 카드가 있을 때 한 번만 다시 그린다
   if(!zfWinSched) zfLoadWinSched().then(ok => {
     if(!ok || zfWinSchedRedrawn) return;
-    if((noticeFiltered || []).some(n => !n['winner_announce_date'] && zfWinFromSchedule(n['announcement_id']))){ zfWinSchedRedrawn = true; applyNoticeFiltersAndRender(noticePage); }
+    if((noticeFiltered || []).some(n => (!n['winner_announce_date'] && zfWinFromSchedule(n['announcement_id'])) || zfRouteSchedHit(n))){ zfWinSchedRedrawn = true; applyNoticeFiltersAndRender(noticePage); }
   });
   zf3CardRows = new Map((noticeFiltered || []).map((n, i) => ['ncard-' + zfCardKey(n['announcement_id'] || i), n]));
   const nl = document.getElementById('notice-list'), ml = document.getElementById('match-result');
@@ -11619,6 +11649,10 @@ function zf3DecorateIn(list, rowsMap, isMatch){
     if(!n) return;
     if(card.dataset.zf3 !== '1'){
       card.dataset.zf3 = '1';
+      // 🔵 2026-10-19(우편함 「표시층 — 노선 발표·계약 역 = 기본 창」 1) — 순위별 창 카드는 상세 「🗓️ 공급일정」 종전 칸(발표·계약)도 기본 창 날로
+      { const ds = zfRouteDefaultSched(n);
+        if(ds && ds.win) card.dataset.winnerAnnounce = ds.win;
+        if(ds && (ds.cs || ds.ce)){ card.dataset.contractStart = ds.cs; card.dataset.contractEnd = ds.ce; } }
       card.classList.add('zf3-card', 'zf3-in');
       card.style.setProperty('--d', Math.min(fresh++, 8) * 60 + 'ms');
       // 추천 판정 배지(매칭 결과만) — 근거 문장은 카드 안 종전 줄(zfTargetNoteHtml) 그대로 · 배지는 그 갈래의 이름표일 뿐
