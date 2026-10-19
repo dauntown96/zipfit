@@ -652,7 +652,7 @@ html[data-ui="d3"] .zf3-card>div[id^="ncard-"]{margin:0 -14px 0 -18px!important;
 .zf3-stn.unk i{border-style:dashed;border-color:var(--ink-3)}
 .zf3-stn .k{font-size:var(--t-xs);color:var(--ink-3);line-height:1.3;margin-top:2px}
 .zf3-stn .k .yr{font-weight:700;color:var(--ink-2);font-family:var(--f-led)}
-html[data-ui="d3"] .zf3-dup{display:none!important}
+html[data-ui="d3"] .hcard .zf3-dup{display:none!important}   /* 🔴 2026-10-19(덧 셋 ③) — 카드 안(접은 같은 말 칩)만. 종전 전역 규칙이 전광판 둘째 반쪽(.zf3-half.zf3-dup)까지 숨겨 -50% 가 첫 반쪽 가운데서 처음으로 되감겼다(#451 이후) */
 .zf3-stn .v{font-size:12px;font-weight:700;font-family:var(--f-led);color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.25;overflow-wrap:anywhere}
 .zf3-stn .v small{display:block;font-family:var(--f-ui);font-weight:400;font-size:var(--t-xs);color:var(--ink-3)}
 .zf3-stn.unk .v{font-family:var(--f-ui);font-weight:400;color:var(--ink-3)}
@@ -1021,6 +1021,7 @@ html[data-ui="d3"] #notice-status.zf3-empty{background:var(--surface)!important;
 .zf3-stat b{font:700 var(--t-xl)/1 var(--f-led);color:var(--led);text-shadow:0 0 6px var(--led-glow)}
 .zf3-stat.hot b{color:var(--led-red);text-shadow:0 0 6px rgba(255,122,102,.45)}
 .zf3-stat.on{box-shadow:inset 0 -3px 0 var(--led)}
+.zf3-statk{flex:none;align-self:center;font-size:12px;color:var(--ink-2);white-space:nowrap;padding-right:2px}
 .zf3-stat:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){.zf3-eart circle.q{animation:none!important}}
 /* 아이디어 ③ — 1200px 이상 공고 탭: 펼친 상세는 오른쪽 패널(지도 자리) */
@@ -1984,19 +1985,27 @@ function zfRouteWins(row){
     if(!a || !b) return null;
     const x = day(a), y = day(b);
     if(y < s0 || x > e0) continue;   // 카드 기간 밖 창(같은 제목의 다른 회차)은 보지 않는다
-    wins.push({ x, y, d: String(r.start_date).slice(0, 10), de: String(r.end_date).slice(0, 10) });
+    wins.push({ x, y, d: String(r.start_date).slice(0, 10), de: String(r.end_date).slice(0, 10), ph: [r.phase_text].filter(Boolean), rt: [r.route].filter(Boolean) });
   }
   wins.sort((p, q) => p.x - q.x);
   const merged = [];
-  wins.forEach(c => { const m = merged[merged.length - 1]; if(m && c.x <= m.y + 864e5){ if(c.y > m.y){ m.y = c.y; m.de = c.de; } } else merged.push(Object.assign({}, c)); });
-  return merged.length < 2 ? null : { merged, today };
+  wins.forEach(c => { const m = merged[merged.length - 1]; if(m && c.x <= m.y + 864e5){ if(c.y > m.y){ m.y = c.y; m.de = c.de; } m.ph = m.ph.concat(c.ph); m.rt = m.rt.concat(c.rt); } else merged.push(Object.assign({}, c)); });
+  return merged.length < 2 ? null : { merged, today, routes: new Set(wins.flatMap(w => w.rt)).size };
 }
+// 🔵 2026-10-19(우편함 「표시층 — 덧 셋」 ①) — 다음 창의 대상 순위(경로 행 phase_text 원문)와, 경로가 갈리는 카드면 그 창의 경로(route)도 함께 돌려준다.
+//    글자는 원문 그대로이고 띄어쓰기·가운뎃점만 좁힌다(「1순위 (일반) ⋅ 2순위」 → 「1순위(일반)·2순위」). 경로가 하나뿐인 카드는 경로 글자를 내지 않는다.
+const zfPhaseShort = t => String(t || '').replace(/\s*\(\s*/g, '(').replace(/\s*\)/g, ')').replace(/\s*[⋅·]\s*/g, '·').trim();
 function zfRouteGap(row){
   const W = zfRouteWins(row);
   if(!W || W.merged.some(m => m.x <= W.today && W.today <= m.y)) return null;
   const nxt = W.merged.find(m => m.x > W.today);
-  return nxt ? { state: 'before', next: nxt.d, nextEnd: nxt.de } : { state: 'closed' };
+  if(!nxt) return { state: 'closed' };
+  const phase = [...new Set(nxt.ph.map(zfPhaseShort).filter(Boolean))].join('·');
+  const route = W.routes > 1 ? [...new Set(nxt.rt)].join('·') : '';
+  return { state: 'before', next: nxt.d, nextEnd: nxt.de, phase, route };
 }
+// 알약·노선 「다음 창」에 붙이는 꼬리 — 대상 순위 · 경로(있는 것만)
+function zfRouteGapTail(gap){ return gap ? [gap.phase, gap.route].filter(Boolean).join(' · ') : ''; }
 // 🔵 2026-10-16(우편함 「표시층 — 차수 카드 마감 표시 …」 2) — 창이 둘 이상인 카드가 지금 창 **안**이고 그 창이 마지막 창이 아니면
 //    그 창의 끝(YYYY-MM-DD). 알약 D-day · 마감임박(isClosingSoon) · 「오늘 마감」 셈은 카드 끝(마지막 창 끝)이 아니라 이 날까지 센다
 //    (…19241 · 11-08에 「접수 중 · D-53」 → 이번 창 11-10). 마지막 창 안 · 창 하나 · 경로 행 전 · 차수 사이는 null(종전 그대로).
@@ -11256,6 +11265,7 @@ function zf3Place(n){
 // 공지 — 「고지 회차 3」 notices.json 그대로. 띠는 하나: d3 에서는 공지도 이 전광판으로 흐른다(종전 띠는 숨김). 닫기 = 같은 탭 안만(같은 저장 칸).
 const ZF3_NOTICE_KEY = 'zf_notice_closed';
 let zf3Notices = [];
+let zf3ListRows = null, zf3ListCond = '';   // 공고 탭 지금 목록(걸린 조건 다 건 뒤)과 그 조건 글자 — 전광판 묶음 셈(덧 셋 ②)
 function zf3ClosedNotices(){ try{ return JSON.parse(sessionStorage.getItem(ZF3_NOTICE_KEY) || '[]'); }catch(e){ return []; } }
 function zf3BoardItems(rows){
   const pool = rows.filter(n => !isHiddenAsClosed(n) && !zfIsCancelRow(n['공고명']));
@@ -11276,10 +11286,13 @@ function zf3BoardItems(rows){
   items.forEach(it => { if(it.n > 1) it.place = (it.place ? it.place + ' ' : '') + it.n + '건'; });
   // 🔵 묶음 항목(Notion 💡 「전광판 묶음 항목 — 내일 접수 시작 n건 · 내 조건 k건」 · 2026-10-12) — 내일 접수가 열리는 열린 공고가 둘 이상이면 맨 앞에 한 줄.
   //    누르면 공고 탭을 접수 시작순으로(그날 시작 공고가 위로). 세는 술어는 종전 그대로(applyWindowState · 신청시작일) · 내 조건은 희망 조건만(zf3Mine).
+  //    🔵 2026-10-19(덧 셋 ②) — 공고 탭 목록을 이미 그렸으면 그 목록(걸린 조건 다 건 뒤 · zf3ListRows) 안에서 센다 — 누른 뒤 목록 수와 같다.
   { const tm = new Date(Date.now() + 33 * 3600 * 1000).toISOString().slice(0, 10);
-    const tmr = pool.filter(n => applyWindowState(n) === 'before' && zf3Real(n['신청시작일'] || n['apply_start']) === tm);
+    const src = zf3ListRows ? zf3ListRows.filter(n => !isHiddenAsClosed(n) && !zfIsCancelRow(n['공고명'])) : pool;
+    const tmr = src.filter(n => applyWindowState(n) === 'before' && zf3Real(n['신청시작일'] || n['apply_start']) === tm);
     if(tmr.length >= 2){ const k = pref ? tmr.filter(n => zf3Mine(n, pref)).length : 0;
-      items.unshift({ type: 'sum', ev: 'start', tag: '내일 접수 시작', name: `${tmr.length}건${pref ? ` · 희망 조건 ${k}건` : ''}`, place: '' }); } }
+      const cl = zf3ListRows ? zf3ListCond : '';
+      items.unshift({ type: 'sum', ev: 'start', tag: '내일 접수 시작', name: `${cl ? cl + ' · ' : ''}${tmr.length}건${pref ? ` · 희망 조건 ${k}건` : ''}`, place: '' }); } }
   const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
   const shut = zf3ClosedNotices();
   const notices = zf3Notices.filter(x => x && x.id && x.title && x.start <= today && today <= x.end && !shut.includes(x.id))
@@ -11466,7 +11479,7 @@ function zf3Pill(n){
   }
   if(st === 'before'){
     const gap = zfRouteGap(n);   // 🔴 2026-10-15 — 차수 사이는 다음 창 시작일(카드 시작일은 이미 지났다)
-    if(gap && gap.next) return zf3NextPill(gap.next);
+    if(gap && gap.next) return zf3NextPill(gap.next, zfRouteGapTail(gap));
     return { cls: 'before', t: start ? '접수 예정 · D-' + zf3Days(today, start) : '접수 예정' };
   }
   if(st === 'closed') return { cls: 'closed', t: zfEarlyClosed(n) ? '조기 마감' : '마감' };   // 🔵 2026-10-13 — 공급기관이 알린 조기 접수마감(zfEarlyClosed)
@@ -11474,9 +11487,9 @@ function zf3Pill(n){
   return { cls: 'unknown', t: APPLY_UNKNOWN_LABEL };
 }
 // 다음 창을 기다리는 알약 — 차수 사이(zfRouteGap)와 반복 접수 창(⑤)이 같은 글자를 쓴다.
-function zf3NextPill(d){
+function zf3NextPill(d, tail){
   const n = zf3Days(zf3Today(), d);
-  return { cls: 'before', t: '다음 접수 ' + zf3Md(d).replace(/\(.\)$/, '') + (n > 0 ? ' · D-' + n : '') };
+  return { cls: 'before', t: '다음 접수 ' + zf3Md(d).replace(/\(.\)$/, '') + (n > 0 ? ' · D-' + n : '') + (tail ? ' · ' + tail : '') };
 }
 // 가로 노선 — 역 간격은 같게, 「오늘」 깃발만 실제 경과에 비례(시안 D-2 4차 그대로).
 function zf3LineHTML(stns, label){
@@ -11725,7 +11738,8 @@ function zf3DecorateIn(list, rowsMap, isMatch){
         const route = card.querySelector('.zf3-route');
         if(gap && gap.next && route && card.dataset.zf3Branch !== '1'){
           const st = zf3Stations(n);
-          st[1] = { k: '접수', d: gap.next, sub: '다음 창' + (gap.nextEnd && gap.nextEnd !== gap.next ? ' ~' + zf3Md(gap.nextEnd).replace(/\(.\)$/, '') : '') };
+          const tail = zfRouteGapTail(gap);   // 🔵 2026-10-19 덧 셋 ① — 다음 창의 대상 순위(·경로)
+          st[1] = { k: '접수', d: gap.next, sub: (tail || '다음 창') + (gap.nextEnd && gap.nextEnd !== gap.next ? ' ~' + zf3Md(gap.nextEnd).replace(/\(.\)$/, '') : '') };
           route.innerHTML = zf3LineHTML(st);
         }
       }
@@ -11885,6 +11899,9 @@ function zf3RenderNoticeHead(filtered){
   const all = zf3Rows || noticeData;
   const o = zfOpenBreakdown(all);
   const chips = zf3CondChips();
+  // 🔵 2026-10-19(덧 셋 ②) — 전광판 「내일 접수 시작 N건」도 이 목록 안에서 센다(누르면 이 목록을 접수 시작순으로 — 조건은 그대로).
+  zf3ListRows = filtered || []; zf3ListCond = zf3CondLabel(chips);
+  if(zf3Rows) zf3PaintBoard(zf3Rows);   // 셈이 같으면 다시 그리지 않는다(zf3Key)
   const n = (filtered || []).length;
   const denom = closedExcluded ? `열린 ${o.n.toLocaleString()}건` : `마감 포함 ${all.length.toLocaleString()}건`;
   const head = chips.length
@@ -11899,7 +11916,7 @@ function zf3RenderNoticeHead(filtered){
   if(sn) sn.textContent = chips.length ? `조건에 맞는 ${n.toLocaleString()}건` : (closedExcluded ? `열린 공고 ${o.n.toLocaleString()}건` : `마감 포함 ${n.toLocaleString()}건`);
   el.innerHTML = `<div class="zf3-lhrow"><p class="zf3-lh">${head}</p><span class="zf3-vseg" role="group" aria-label="보기"><button type="button" data-act="view" data-v="list" aria-pressed="${zf3View !== 'map'}">목록</button><button type="button" data-act="view" data-v="map" aria-pressed="${zf3View === 'map'}">지도</button></span></div>`
     + `<p class="zf3-lsub">${closedExcluded ? '' : `열린 ${o.n.toLocaleString()}건: `}${zf3StLink('접수 중', '접수 중', o.a)} · ${zf3StLink('예정', '접수 예정', o.b)}${o.k ? ` · ${zf3StLink('미상', '접수기간 미상', o.k)}` : ''}</p>`
-    + zf3StatChips(all)
+    + zf3StatChips(filtered, chips)
     + `<div class="zf3-tblock" role="note"><div><span class="k">마지막 수집</span><span class="v led" data-zf3-coll>${escapeHtml(zf3CollText())}</span></div></div>`
     + `<div class="zf3-ctl"><button type="button" class="zf3-chip add zf3-fbtn" data-act="sheet" aria-expanded="${sheetOpen}" aria-controls="noticeFilterPanel">${ZF3_ICO_FILTER}필터${chips.length ? ` <b>${chips.length}</b>` : ''}</button>`
     + (sortOpts ? `<span class="zf3-sortsel">${ZF3_ICO_SORT}<select data-act="sortsel" aria-label="정렬">${sortOpts}</select><span class="cv" aria-hidden="true">▾</span></span>` : '') + `</div>`
@@ -12159,8 +12176,16 @@ function zf3MinePcs(){
 //    셈은 「신청할 수 없는 공고」를 뺀 열린 공고에서 · 술어는 종전 그대로(isClosingSoon · applyWindowState · zfNoticeDate).
 // 머리 아랫줄 갈래 숫자 → 상태 칩 켜기(Notion 💡 「공고 탭 머리의 접수 중 a · 예정 b · 미상 k 를 해당 상태 칩을 켜는 링크로」) — 같은 칩을 다시 누르면 끈다.
 function zf3StLink(label, st, n){ return `<button type="button" class="zf3-stl${activeNoticeStatus === st ? ' on' : ''}" data-act="st" data-v="${zfAttr(st)}" aria-pressed="${activeNoticeStatus === st}">${label} <b>${Number(n || 0).toLocaleString()}</b></button>`; }
-function zf3StatChips(all){
-  const today = zf3Today(), open = (all || []).filter(n => !isHiddenAsClosed(n));
+// 🔵 2026-10-19(우편함 「표시층 — 덧 셋」 ②) — 셈의 모수는 지금 목록(걸린 지역·유형·상태·대상·검색·숨기기·지도 고른 곳을 다 건 뒤 · zf3RenderNoticeHead 의 filtered)이다.
+//    칩을 누르면 정렬만 바꾸고 조건은 그대로라, 누른 뒤 목록에서 그 술어에 드는 카드 수 = 칩 숫자. 술어는 종전 그대로(열린 공고만 — 숨기기를 꺼도 마감 카드는 세지 않는다).
+//    조건이 걸렸으면 칩 앞에 그 조건을 적는다(zf3CondLabel).
+function zf3CondLabel(chips){
+  const t = (chips || []).filter(([k]) => k !== 'closed').map(([, v]) => v);
+  return t.length ? (t.length > 2 ? `${t.slice(0, 2).join(' · ')} 외 ${t.length - 2}` : t.join(' · ')) : '';
+}
+function zf3StatChips(rows, chips){
+  const today = zf3Today(), open = (rows || []).filter(n => !isHiddenAsClosed(n));
+  const cl = zf3CondLabel(chips);
   let d0 = 0, d3 = 0, st = 0, nw = 0;
   open.forEach(n => {
     const end = zf3Real(zfDeadline(n)), sta = applyWindowState(n), start = zf3Real(n['신청시작일'] || n['apply_start']), ann = zf3Real(zfNoticeDate(n) || n['announcement_date']);
@@ -12171,7 +12196,7 @@ function zf3StatChips(all){
   });
   const cur = (document.getElementById('noticeSortSel') || {}).value || 'date-desc';
   const chip = (n, label, sort, hot) => `<button type="button" class="zf3-stat${hot && n ? ' hot' : ''}${cur === sort ? ' on' : ''}" data-act="sort" data-v="${sort}" aria-label="${label} ${n}건 — ${sort === 'end-asc' ? '마감 임박순' : sort === 'start-asc' ? '접수 시작순' : '최신 공고순'}으로 보기"><b>${n}</b>${label}</button>`;
-  return `<div class="zf3-stats" role="group" aria-label="열린 공고 한눈에">${chip(d0, '오늘 마감', 'end-asc', true)}${chip(d3, '3일 안 마감', 'end-asc', false)}${chip(st, '7일 안 접수 시작', 'start-asc', false)}${chip(nw, '새 공고 · 3일', 'date-desc', false)}</div>`;
+  return `<div class="zf3-stats" role="group" aria-label="${cl ? zfAttr(cl) + ' 조건 안 ' : ''}열린 공고 한눈에">${cl ? `<span class="zf3-statk">${escapeHtml(cl)} 안에서</span>` : ''}${chip(d0, '오늘 마감', 'end-asc', true)}${chip(d3, '3일 안 마감', 'end-asc', false)}${chip(st, '7일 안 접수 시작', 'start-asc', false)}${chip(nw, '새 공고 · 3일', 'date-desc', false)}</div>`;
 }
 // ── 추천(D-3 단계 e · 2026-10-12) — 종전 진단 양식(#panel1)을 지우지 않고 덧입힌다(입력칸·ID·diagnose() 그대로 · 원칙 7).
 //    ① 처음 온 사람(390~1199px): 노선 따라 한 역씩 6역(나이 · 혼인 · 자녀·가구 · 소득 · 자산·차 · 집·통장) — 「다음 질문 →」 · 마지막 역에서 「자격 진단하기」
