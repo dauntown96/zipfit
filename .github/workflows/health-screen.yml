@@ -40,7 +40,7 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
       # 🔵 2026-10-19(우편함 「표시층 — 화면 점검 오탐 막기」 3) — 배포가 도는 동안 배포본을 열지 않는다(모든 실행 · push 는 sw.js 반영까지).
@@ -94,7 +94,7 @@ jobs:
           node .github/health/screen-check.mjs
       - name: 결과 올리기
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: health-result
           path: |
