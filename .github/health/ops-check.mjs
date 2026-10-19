@@ -802,6 +802,34 @@ select jsonb_build_object(
   add('source_text_taint', '열린 공고 원문 문자열 오염 — 제목 꺾쇠 · http 아닌 URL · 따옴표 든 URL(정보)', 'info', String(e).slice(0, 200), '공고 표를 읽는다(못 읽어도 정보)')
 }
 
+// ㉑ 한부모 갈래 나이 조건 누락(2026-10-19 · 우편함 「코드·운영 — CLAUDE.md 원칙 「개인정보 값 출력 금지」 · 점검 항목 …」 2 · 조사 「큐 B 첫 회차」 회신 ②(c)).
+//    원문이 「한부모 … N세 이하」(자녀 나이)를 말하는데 키 갈래 {"대상":"한부모"}에 확인필요가 없으면 화면이 자녀 나이를 안 보고 ok·no 를 낸다
+//    (2026-10-19 열린 5공고 14행 — 같은 날 확인필요를 채웠다). 재발 막기는 코드 안전망이 아니라 이 점검이다.
+//    열린 카드 = docs/launch-gates.sql G2 와 같은 식(apply_end ≥ 오늘 KST ∧ 제목에 「조기…마감」 없음) · 키 행 = 그 카드와 같은 제목 키 묶음의 공급대상 객체 행
+//    (화면 zfTargetRowsFor 는 자기 행 → 형제 행 순이라 이쪽이 넓다 — 화면에 안 쓰이는 형제 행도 센다).
+//    원문 = 키 행과 같은 공고의 정책 행 content_raw 에 /한부모[^.]{0,40}[0-9]+\s*세\s*이하/ · ⚠️ 경고만(이슈를 열지 않는다 · gate.mjs HARD 밖).
+try {
+  const [x] = await sqlRead(`with oc as materialized (select announcement_dedup_key(d.title) k from public.get_announcements_deduped() d
+        where d.apply_end >= (now() at time zone 'Asia/Seoul')::date and d.title not like '%조기%마감%'),
+     kr as materialized (select distinct e.id, e.announcement_id, e.verification_requirements->'공급대상' g
+        from public.announcements a join oc on public.announcement_dedup_key(a.title) = oc.k
+        join public.eligibility_criteria e on e.announcement_id = a.announcement_id
+       where jsonb_typeof(e.verification_requirements->'공급대상') = 'object' and jsonb_typeof(e.verification_requirements->'공급대상'->'갈래') = 'array'),
+     hit as (select kr.id, kr.announcement_id from kr
+        where exists (select 1 from jsonb_array_elements(kr.g->'갈래') b where b->>'대상' = '한부모' and not (b ? '확인필요'))
+          and exists (select 1 from public.announcement_policies p where p.announcement_id = kr.announcement_id
+                       and p.content_raw ~ '한부모[^.]{0,40}[0-9]+\\s*세\\s*이하'))
+select json_build_object('n', (select count(*) from hit), 'key_rows', (select count(*) from kr),
+  'hanbumo', (select count(*) from kr, jsonb_array_elements(kr.g->'갈래') b where b->>'대상' = '한부모'),
+  'ids', (select coalesce(json_agg(distinct announcement_id), '[]'::json) from hit)) j`)
+  const c = x.j
+  add('target_hanbumo_age', '열린 카드 한부모 갈래에 확인필요 없음 ∧ 원문 「한부모 … N세 이하」', c.n === 0 ? 'pass' : 'warn',
+    c.n === 0 ? `0(키 행 ${c.key_rows} · 한부모 갈래 ${c.hanbumo})` : `${c.n}행: ${c.ids.slice(0, 5).join(', ')}`,
+    '0 — 열린 카드(G2 식) 제목 키 묶음의 공급대상 키 행 중 갈래 대상 「한부모」 ∧ 확인필요 없음 ∧ 같은 공고 정책 행 content_raw 에 「한부모 … N세 이하」 · 넘으면 ⚠️ 경고만(확인필요 채우기는 운영 데이터 쓰기 몫)')
+} catch (e) {
+  add('target_hanbumo_age', '열린 카드 한부모 갈래에 확인필요 없음 ∧ 원문 「한부모 … N세 이하」', 'warn', String(e).slice(0, 200), '공고·키·정책 표를 읽는다(못 읽으면 ⚠️)')
+}
+
 // ⑲ 인스턴스 메모리(2026-10-17 · 같은 우편 1 · 조사 「인스턴스 지표 경로」 ⓑ) — 관리 API 지표 끝점(베타)에서 숫자만 골라(instance.mjs) zipfit_ops.instance_metrics_log 에 한 행.
 //    🔴 본문 원문은 어디에도 남기지 않는다(값 칸은 고른 숫자 요약뿐 · 실패하면 HTTP 상태만). ⚠️만(❌ 없음 · 문턱 잠정 — instance.mjs).
 //    베타 끝점이라 받기·고르기·기록이 실패하면 이 항목만 ℹ️ — 점검 전체를 막지 않는다.
