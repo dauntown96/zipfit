@@ -20,14 +20,15 @@ on:
   workflow_dispatch:
     inputs:
       simulate:
-        description: '알림 경로 시험 — fail 이면 카드 하나의 기대 문구를 없는 문구로 · notice 면 공고문 기대 마감일을 하루 옮긴다 · zipfit 이면 보이는 글자에 「ZipFit」을 하나 넣는다 · stale_date 면 히어로에 지난 날짜가 든 옛 배지를 넣는다 · objobj 면 보이는 글자에 「[object Object]」를 하나 넣는다 · target_out 이면 매칭 「대상이 달라 뺀 공고」에 키 없는 카드 하나를 끼워 넣는다 · open_count 면 공고 탭 머리의 열린 공고 수에 1을 더해 잰다 · route_gap 이면 차수 사이 카드를 경로 표 없이(종전 판정) 잰다 · relax_badge 면 완화 배지 기대 갈래 하나를 바꿔 잰다 · sched_line 이면 상세 노선 기대 일정 행 id 하나를 더해 잰다 · rev_date 면 행에서 관측 정정일(revision_seen_date)을 지우고 정정일 표지·자리를 잰다 · geo_names 면 열린 카드에 없는 구 이름 하나를 붙여 경계 판 갈이 점검을 잰다(경고)'
+        description: '알림 경로 시험 — fail 이면 카드 하나의 기대 문구를 없는 문구로 · notice 면 공고문 기대 마감일을 하루 옮긴다 · zipfit 이면 보이는 글자에 「ZipFit」을 하나 넣는다 · stale_date 면 히어로에 지난 날짜가 든 옛 배지를 넣는다 · objobj 면 보이는 글자에 「[object Object]」를 하나 넣는다 · target_out 이면 매칭 「대상이 달라 뺀 공고」에 키 없는 카드 하나를 끼워 넣는다 · open_count 면 공고 탭 머리의 열린 공고 수에 1을 더해 잰다 · route_gap 이면 차수 사이 카드를 경로 표 없이(종전 판정) 잰다 · relax_badge 면 완화 배지 기대 갈래 하나를 바꿔 잰다 · sched_line 이면 상세 노선 기대 일정 행 id 하나를 더해 잰다 · rev_date 면 행에서 관측 정정일(revision_seen_date)을 지우고 정정일 표지·자리를 잰다 · geo_names 면 열린 카드에 없는 구 이름 하나를 붙여 경계 판 갈이 점검을 잰다(경고) · ana_pending 이면 분석 전 카드 글자에 「접수 10-21 · D-3」을 넣고 잰다 · route_win 이면 일정 표 행 없이 노선 발표를 잰다 · mq_half 면 전광판 둘째 반쪽을 숨기고 잰다'
         type: choice
-        options: [none, fail, notice, zipfit, stale_date, objobj, target_out, open_count, route_gap, relax_badge, sched_line, rev_date, geo_names]
+        options: [none, fail, notice, zipfit, stale_date, objobj, target_out, open_count, route_gap, relax_badge, sched_line, rev_date, geo_names, ana_pending, route_win, mq_half]
         default: none
 
 permissions:
   contents: read
   issues: write
+  actions: read   # 배포(pages-build-deployment) 진행 여부를 본다(2026-10-19)
 
 concurrency:
   group: health-screen
@@ -42,18 +43,38 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '20'
-      - name: Pages 반영 기다리기(push 때만)
-        if: github.event_name == 'push'
+      # 🔵 2026-10-19(우편함 「표시층 — 화면 점검 오탐 막기」 3) — 배포가 도는 동안 배포본을 열지 않는다(모든 실행 · push 는 sw.js 반영까지).
+      #    실측: #667 병합 직후 수동 실행 1차가 그 커밋의 Pages 배포(07:31:45→07:33:30Z) 한가운데서 page.goto 90초 시간 초과로 「점검 실행」 실패(run 39216575169).
+      #    main 에 무엇이 push 되든(이력·점검 파일만이어도) Pages 는 다시 배포한다 — 이 워크플로가 안 도는 push 의 배포와도 겹친다.
+      #    🔴 10분 넘게 반영되지 않으면 점검하지 않고 「점검 불능」(라벨 health-screen-blind · 루틴 안 막음 · 다음에 점검이 돌아 통과하면 닫힘)으로 남긴다 —
+      #       배포를 기다리다 넘긴 것은 화면이 틀렸다는 뜻이 아니다. 배포가 끝난 뒤 배포본이 안 열리면 그것은 종전대로 「점검 실행」 실패(멈춤)다.
+      - name: 배포 반영 기다리기
+        id: deploy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
           want=$(grep -o "CACHE_NAME *= *'[^']*'" sw.js | head -1)
+          # 저장소 전체 실행 목록(actions/runs)에는 Pages 실행이 안 나온다(2026-10-19 실측) — 그 워크플로 id 를 이름으로 찾아 그 실행만 본다.
+          wf=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows?per_page=100" --jq '[.workflows[] | select(.name == "pages-build-deployment")][0].id' 2>/dev/null || true)
           for i in $(seq 1 30); do
-            got=$(curl -fsSL "https://kkokzip.com/sw.js?t=$(date +%s)" | grep -o "CACHE_NAME *= *'[^']*'" | head -1 || true)
-            if [ "$got" = "$want" ]; then echo "배포본 반영 확인: $got"; exit 0; fi
-            echo "기다림 $i/30 — 배포본 ${got:-?} · 저장소 $want"; sleep 20
+            busy="?"
+            [ -n "$wf" ] && [ "$wf" != "null" ] && busy=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$wf/runs?per_page=10" --jq '[.workflow_runs[] | select(.status != "completed")] | length' 2>/dev/null || echo "?")
+            got=want
+            if [ "$EVENT" = "push" ]; then
+              got=$(curl -fsSL "https://kkokzip.com/sw.js?t=$(date +%s)" | grep -o "CACHE_NAME *= *'[^']*'" | head -1 || true)
+              [ "$got" = "$want" ] && got=want
+            fi
+            if [ "$busy" = "0" ] && [ "$got" = "want" ]; then echo "배포 반영 확인(진행 중 배포 0${EVENT:+ · $EVENT})"; exit 0; fi
+            echo "기다림 $i/30 — 진행 중 배포 ${busy} · 배포본 ${got} · 저장소 $want"; sleep 20
           done
-          echo "::warning::10분 안에 배포본이 저장소 sw.js 와 같아지지 않았다 — 그대로 점검한다"
+          echo "::warning::10분 안에 배포가 끝나지 않았다 — 점검하지 않고 「점검 불능」으로 남긴다"
+          echo "blind=1" >> "$GITHUB_OUTPUT"
+          echo '{"kind":"screen","ok":false,"failed":["runner"],"warned":[],"blind_reason":"deploy_wait"}' > health-result.json
+          printf '## A. 화면 점검 — 점검 불능(배포 반영 기다림 10분 초과)\n\n배포(pages-build-deployment)가 끝나거나 배포본 sw.js 가 저장소와 같아지기를 10분 기다렸지만 되지 않아 점검을 돌리지 않았다. 화면이 틀렸다는 뜻이 아니다 — 다음 실행(병합 · 매일 08:50 KST)이 다시 재고, 통과하면 이 이슈를 닫는다.\n' > health-summary.md
       - name: Playwright 준비
+        if: steps.deploy.outputs.blind != '1'
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/pw" && cd "$RUNNER_TEMP/pw"
@@ -63,6 +84,7 @@ jobs:
           npx playwright install --with-deps chromium >/dev/null
           echo "NODE_PATH=$RUNNER_TEMP/pw/node_modules" >> "$GITHUB_ENV"
       - name: 점검
+        if: steps.deploy.outputs.blind != '1'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SIMULATE: ${{ inputs.simulate || 'none' }}
@@ -85,7 +107,23 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: bash .github/health/issue.sh health-screen "[자동 점검 A] 화면 점검 실패"
+          BLIND: ${{ steps.deploy.outputs.blind }}
+        run: |
+          # 「배포 반영 기다림 초과」는 점검 불능 라벨(health-screen-blind) 이슈 하나만 연다 — 열린 멈춤 이슈(health-screen)는 건드리지 않는다
+          #   (issue.sh 에 health-screen 을 넘기면 「이번 실행은 멈춤 실패 없음」으로 그 이슈를 닫아 버린다 — 점검을 안 돌렸는데 회복으로 읽힌다).
+          #   점검을 돌린 뒤의 「점검 실행」 실패(배포본이 안 열림 등)는 종전대로 멈춤이다.
+          if [ "${BLIND:-}" = "1" ]; then
+            bash .github/health/issue.sh health-screen-blind "[자동 점검 A] 화면 점검 불능 — 배포 반영 기다림 초과"
+          else
+            bash .github/health/issue.sh health-screen "[자동 점검 A] 화면 점검 실패"
+            # 점검이 돌아 통과했으면 열려 있던 점검 불능 이슈도 닫는다(점검 불능 실행만 그 라벨을 넘기므로 issue.sh 가 닫지 못한다)
+            ok=$(node -e 'try{process.stdout.write(String(JSON.parse(require("fs").readFileSync("health-result.json","utf8")).ok))}catch(e){process.stdout.write("missing")}')
+            if [ "$ok" = "true" ]; then
+              for n in $(gh issue list --label health-screen-blind --state open --json number --jq '.[].number' 2>/dev/null); do
+                gh issue comment "$n" --body "점검이 다시 돌아 통과 — 닫는다. 실행: $RUN_URL" && gh issue close "$n" --reason completed && echo "점검 불능 이슈 #$n 닫음"
+              done
+            fi
+          fi
       # 🔵 2026-10-18(우편함 「코드·운영 — 게이트 재는 장치」 ④) — 판정이 실패면 실행도 실패로 끝낸다(이슈 단계 뒤 · 마지막).
       #    그 전에는 판정 실패여도 실행이 success 였다(run 121 · #575) — Actions 목록만 보는 사람·도구가 실패를 못 봤다.
       #    이 결론에 기대는 장치 없음(2026-10-18 확인): workflow_run 0 · 발송 기록(ops_dispatch_log)은 발송 응답(204)만 · health-ops 는 그 발송 기록만 읽는다.
@@ -95,4 +133,6 @@ jobs:
         run: |
           ok=$(node -e 'try{process.stdout.write(String(JSON.parse(require("fs").readFileSync("health-result.json","utf8")).ok))}catch(e){process.stdout.write("missing")}')
           echo "판정 ok=$ok"
+          # 배포 반영 기다림 초과(점검 불능)는 실패로 남기지 않는다 — 점검을 돌리지 않았다(2026-10-19)
+          if [ "${{ steps.deploy.outputs.blind }}" = "1" ]; then echo "::warning::화면 점검 불능(배포 반영 기다림 초과) — 실패로 세지 않는다"; exit 0; fi
           [ "$ok" = "true" ] || { echo "::error::화면 점검 판정 실패(ok=$ok) — 결과 파일·이슈를 본다"; exit 1; }
