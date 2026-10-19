@@ -12,6 +12,7 @@
 import { chromium } from 'playwright'
 import { sqlRead, report, recordFindings, SITE } from './lib.mjs'
 import { readFileSync } from 'node:fs'
+import { ANA_DATE_RE } from './ana-date-re.mjs'
 
 const VIEWPORT = { width: 390, height: 844 }
 const MAX_PAGES = 30
@@ -93,7 +94,15 @@ try {
   let flOpen = true
   page.on('request', r => { if (flOpen) flReq.push({ r, t: Date.now() - t0, url: r.url() }) })
 
-  await page.goto(SITE + '?health=' + Date.now(), { waitUntil: 'networkidle', timeout: 90000 })
+  // 🔵 2026-10-19(우편함 「표시층 — 화면 점검 오탐 막기」 3) — 첫 열기가 시간 초과면 20초 뒤 한 번만 다시 연다(점검 도중 다른 push 의 Pages 배포와 겹친 경우).
+  //    두 번째도 안 열리면 종전대로 「점검 실행」 실패다 — 배포본이 정말 안 열리는 것은 숨기지 않는다.
+  try { await page.goto(SITE + '?health=' + Date.now(), { waitUntil: 'networkidle', timeout: 90000 }) }
+  catch (e) {
+    if (!/Timeout/i.test(String(e && e.message))) throw e
+    console.log('첫 열기 시간 초과 — 20초 뒤 한 번 다시 연다:', String(e.message).slice(0, 120))
+    await page.waitForTimeout(20000)
+    await page.goto(SITE + '?health=' + Date.now(), { waitUntil: 'networkidle', timeout: 90000 })
+  }
   await page.waitForFunction(() => typeof noticeData !== 'undefined' && noticeData.length > 0, null, { timeout: 60000 })
   flOpen = false
   try {
@@ -788,7 +797,9 @@ try {
          and p.deposit_min is null and p.rent_min is null and p.area_min is null
          and not exists (select 1 from announcement_post_links l where l.linked_group_key is not null
                           and announcement_dedup_key(l.linked_group_key) = announcement_dedup_key(c.title))`)
-    const want = aq.j || []
+    // SIMULATE=ana_pending 인데 분석 전 카드가 0장이면 열린 첫 카드로 잰다(일부러 넣은 날짜 글자로 실패해야 맞다)
+    const want = (aq.j || []).length || process.env.SIMULATE !== 'ana_pending' ? (aq.j || [])
+      : await page.evaluate(() => [String((zfOpenNotices(noticeData)[0] || {}).announcement_id || '')].filter(Boolean))
     const got = []
     let err = null
     try {
@@ -797,17 +808,18 @@ try {
         const ok1 = await page.evaluate(aid => { const rows = noticeData.filter(n => String(n.announcement_id) === aid); if (!rows.length) return false; renderNoticeList(rows, rows.length, 0); return true }, aid)
         if (!ok1) { got.push({ aid, none: true }); continue }
         await page.waitForFunction(aid => { const c = document.querySelector(`#notice-list .hcard[data-announcement-id="${CSS.escape(aid)}"]`); const s = c && c.querySelector('[data-sum-for]'); return !!(s && s.innerHTML.trim()) }, aid, { timeout: 15000 }).catch(() => {})
-        got.push(await page.evaluate(aid => {
+        got.push(await page.evaluate(([aid, re, sim]) => {
           const c = document.querySelector(`#notice-list .hcard[data-announcement-id="${CSS.escape(aid)}"]`)
           // 2026-10-19(이슈 #666) — 주소 줄(.haddr)도 뺀다: 도로명 번지 「동학로 36-21」(…20917)이 날짜 꼴로 잡혔다
           const clone = c.cloneNode(true); clone.querySelectorAll('.hname, .haddr, [id^="ncard-"]').forEach(e => e.remove())
+          if (sim) clone.insertAdjacentHTML('beforeend', '<span>접수 10-21 · D-3</span>')   // SIMULATE=ana_pending — 실패해야 맞다
           document.body.appendChild(clone); clone.style.position = 'absolute'; clone.style.left = '-9999px'
           const txt = clone.innerText; clone.remove()
           // 2026-10-16 — 분석 전 카드는 「AI 정리」라고 말하지 않는다(요약 상자 링크 · 상세 원문 링크 · 지도 안내의 「AI 정리 · 」 접힘)
           const ai = /AI 정리/.test((c.querySelector('[data-sum-for]') || {}).textContent || '') || [...c.querySelectorAll('.zf-ai-lbl')].some(e => getComputedStyle(e).display !== 'none')
           return { aid, ai, pending: c.classList.contains('zf-ana-pending'), box: /분석 중/.test(c.innerText),
-            dates: (txt.match(/\d{1,4}\s*[-./]\s*\d{1,2}|D-\d+|접수 ?중|마감|접수 예정/g) || []).slice(0, 4) }
-        }, aid))
+            dates: (txt.match(new RegExp(re, 'g')) || []).slice(0, 4) }
+        }, [aid, ANA_DATE_RE.source, process.env.SIMULATE === 'ana_pending']))
       }
       await page.evaluate(() => { try { applyNoticeFiltersAndRender() } catch (e) {} })
     } catch (e) { err = String(e.message || e).slice(0, 120) }
