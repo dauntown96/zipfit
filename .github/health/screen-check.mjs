@@ -799,7 +799,8 @@ try {
         await page.waitForFunction(aid => { const c = document.querySelector(`#notice-list .hcard[data-announcement-id="${CSS.escape(aid)}"]`); const s = c && c.querySelector('[data-sum-for]'); return !!(s && s.innerHTML.trim()) }, aid, { timeout: 15000 }).catch(() => {})
         got.push(await page.evaluate(aid => {
           const c = document.querySelector(`#notice-list .hcard[data-announcement-id="${CSS.escape(aid)}"]`)
-          const clone = c.cloneNode(true); clone.querySelectorAll('.hname, [id^="ncard-"]').forEach(e => e.remove())
+          // 2026-10-19(이슈 #666) — 주소 줄(.haddr)도 뺀다: 도로명 번지 「동학로 36-21」(…20917)이 날짜 꼴로 잡혔다
+          const clone = c.cloneNode(true); clone.querySelectorAll('.hname, .haddr, [id^="ncard-"]').forEach(e => e.remove())
           document.body.appendChild(clone); clone.style.position = 'absolute'; clone.style.left = '-9999px'
           const txt = clone.innerText; clone.remove()
           // 2026-10-16 — 분석 전 카드는 「AI 정리」라고 말하지 않는다(요약 상자 링크 · 상세 원문 링크 · 지도 안내의 「AI 정리 · 」 접힘)
