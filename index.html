@@ -4700,7 +4700,9 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
   // 「113건 중 21–40」 — 지금 보고 있는 자리를 한 줄로 적는다.
   let html = `<p class="pg-range">${filtered.length}건 중 ${from + 1}–${from + shown.length}</p>`;
   shown.forEach((n, idx) => {
-    const isClosed   = n['처리상태']==='접수마감';
+    // 🔵 2026-10-19(우편함 「표시층 — 순위별 접수 창 사이 카드가 회색 …」) — 회색(흐림 · d3 zf3-closed)은 숨기기·상태 칩·노선과 같은 술어(isHiddenAsClosed)를 본다.
+    //    종전 LH 원래 상태(처리상태 === '접수마감')만 보면 순위별 접수 창 사이의 열린 카드(…20706 · …20713 · …20737)가 끝난 공고처럼 흐렸다.
+    const isClosed   = isHiddenAsClosed(n);
     const hasCancel  = n['has_cancel_notice']===true;
     // 🔴 B31 — 짝 없이 남은 [취소공고] 행. 모집 공고의 표지(상태·접수기간·원문 정리 전)를 빼고 그린다.
     const isCancelRow = zfIsCancelRow(n['공고명']);
@@ -9940,7 +9942,7 @@ function renderMatchResults(rows){
   html += `<div class="count-info"><span>총 ${rows.length}건 매칭</span></div>`;
 
   shown.forEach((n, idx) => {
-    const isClosed    = (n.status||'') === '접수마감';
+    const isClosed    = isHiddenAsClosed(n);   // 공고 탭과 같은 술어(2026-10-19) — 매칭 목록은 이미 숨김을 걸러 열린 카드만 온다
     const hasCancel   = n.has_cancel_notice===true;
     const isAmended   = (n.title||'').includes('[정정공고]') || n.is_revised;
     const demoTags    = classifyDemographics(n.housing_type||'', n.title||'');
