@@ -385,7 +385,8 @@ try {
                 from b),
           bs as (select aid, id, b,
                   (b is not null and not unk and (
-                    (b->>'대상' = '다자녀' and coalesce((b->'조건'->>'미성년자녀_최소')::int, 0) > 0)
+                    (b->>'대상' = '다자녀' and coalesce((b->'조건'->>'미성년자녀_최소')::int, 0) > 0
+                      and not (coalesce(b->>'확인필요', '') like '%태아%' and (b->'조건'->>'미성년자녀_최소')::int = 1))   -- 시험 사용자 자녀 0 = 최소−1 이고 확인필요에 태아면 check(화면 2026-10-19)
                     or (b->>'대상' = '신혼·신생아' and (has_new or not (b ? '확인필요')))
                     or (b->>'대상' = '한부모')
                     or (b->>'대상' in ('고령자', '청년') and ((b->'조건') ? '나이_최소' or (b->'조건') ? '나이_최대')
@@ -422,7 +423,7 @@ try {
       const y = new Date().getFullYear()
       // members "diag_untouched" — 진단 칸에 이벤트 없이 2를 넣고(사용자가 안 건드린 기본값과 같은 꼴) 화면 zfTargetDiagFacts 가 내는 값을 쓴다(2026-10-15).
       const diagMembers = () => { const el = document.getElementById('members'); if (el) el.value = '2'; return typeof zfTargetDiagFacts === 'function' ? zfTargetDiagFacts().members : NaN }
-      const fx = s => ({ marital: s.facts.marital, children: null, birthYear: y - s.facts.age, classes: new Set(s.facts.classes),
+      const fx = s => ({ marital: s.facts.marital, children: s.facts.children ?? null, birthYear: y - s.facts.age, classes: new Set(s.facts.classes),
         members: s.facts.members === 'diag_untouched' ? diagMembers() : s.facts.members })
       // 카드 표본(2026-10-15 · 우편함 「코드 — 공급대상 갈래 「no 먼저」 …」) — zfTargetVerdict 의 state 와 checks(안내 괄호 안 낱말 · 순서까지).
       const v = vs.map(s => { const r = zfTargetVerdict(s.rows, fx(s)) || {}

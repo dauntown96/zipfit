@@ -6391,6 +6391,11 @@ function zfTargetBranchBase(b, f){
   const s = zfTargetBranchCore(b, f);
   if(!b['확인필요']) return s;
   if(s === 'no' && b['대상'] === '한부모' && ZF_TARGET_SP_NO_FIRST.includes(f.marital) && !(f.classes && f.classes.has('singleparent'))) return 'no';
+  // 🔵 2026-10-19(우편함 「표시층 — 다자녀 갈래 확인필요에 「태아」가 있고 미성년 자녀 = 최소−1이면 no 대신 check」) — 진단 칸은 「자녀 수(미성년)」라
+  //    태아를 세지 않는다. 갈래 확인필요가 「태아」를 말하면(…19546 원문 「2명 이상의 직계비속(태아를 포함…)」) 한 명 모자란 가구는 임신 중일 수 있어 check.
+  //    두 명 이상 모자라면 종전대로 no · 「태아」 없는 다자녀 갈래는 그대로다(진단 칸 · 안내 글자는 바꾸지 않는다 — 갈래 키가 말할 때만).
+  if(s === 'no' && b['대상'] === '다자녀' && /태아/.test(String(b['확인필요'])) && f.children != null
+     && f.children === Number((b['조건'] || {})['미성년자녀_최소']) - 1) return 'check';
   return (s === 'no' && ZF_TARGET_NO_FIRST.includes(b['대상'])) ? 'no' : 'check';
 }
 function zfTargetBranchCore(b, f){
