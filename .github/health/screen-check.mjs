@@ -15,6 +15,18 @@ import { readFileSync } from 'node:fs'
 
 const VIEWPORT = { width: 390, height: 844 }
 const MAX_PAGES = 30
+// 🔵 2026-10-19(우편함 「표시층 — 노선 발표·계약 역 = 기본 창」 2 · 원칙 33) — 창 판정 가드 날짜(화면 zfRouteWins 사본).
+//    카드 발표 칸은 앞 창 발표일 수 있어 일정 표의 **마지막 창** 결과발표(scope_text = 그 창 phase_text · 그 창 경로 행 공고 ∪ 카드 · 하루로 적힌 날 하나)가 있으면 그 날,
+//    없으면 카드 winner_announce_date. g(창 묶음 행: aid · gid · ph · rid · wd)에 이어 쓰는 CTE 두 개(lg · gd).
+//    SCHED_DAY_SQL(창 aid·gid) = 그 창의 결과발표 날(화면 zfRouteSchedOf 사본) — route_win 도 쓴다.
+const SCHED_DAY_SQL = (A, G) => `(select case when count(distinct coalesce(s.start_date, s.end_date)) = 1
+                     and bool_and(s.start_date is null or s.end_date is null or s.start_date = s.end_date) then max(coalesce(s.start_date, s.end_date)) end
+                from announcement_schedule s
+               where s.stage = '결과발표' and coalesce(s.start_date, s.end_date) is not null
+                 and s.announcement_id in (select g2.rid from g g2 where g2.aid = ${A} and g2.gid = ${G} union select ${A})
+                 and s.scope_text in (select g3.ph from g g3 where g3.aid = ${A} and g3.gid = ${G}))`
+const ROUTE_GUARD_SQL = `lg as (select aid, max(gid) gid, max(wd) wd from g group by aid),
+      gd as (select lg.aid, coalesce(${SCHED_DAY_SQL('lg.aid', 'lg.gid')}, lg.wd) gd from lg),`
 // 콘솔 오류 제외 — 카카오맵 SDK(지도만 빠진다).
 const CONSOLE_IGNORE = [/dapi\.kakao\.com/, /kakao/i]
 const checks = []
@@ -576,18 +588,18 @@ try {
   {
     const [gq] = await sqlRead(`
       with today as (select (now() at time zone 'Asia/Seoul')::date d),
-      c as (select d.announcement_id aid, d.title, d.apply_start s, d.apply_end e
+      c as (select d.announcement_id aid, d.title, d.apply_start s, d.apply_end e, d.winner_announce_date wd
               from get_announcements_deduped() d, today t
              where d.apply_period_check is not true and d.apply_start <= t.d and t.d <= d.apply_end
-               and (d.winner_announce_date is null or d.winner_announce_date >= t.d)
                and not (d.title ~ '^\\s*(\\[[^]]*\\]\\s*)*\\[\\s*조기\\s*(접수)?\\s*마감\\s*\\]' or coalesce(d.revision_note, '') ~ '조기\\s*(접수\\s*)?마감')),
-      rt as (select c.aid, c.s, c.e, r.start_date x, r.end_date y
+      rt as (select c.aid, c.s, c.e, c.wd, r.start_date x, r.end_date y, r.phase_text ph, r.announcement_id rid
                from c join announcements a on announcement_dedup_key(a.title) = announcement_dedup_key(c.title)
                join announcement_apply_routes r on r.announcement_id = a.announcement_id),
-      w as (select aid, x, y from rt where aid not in (select aid from rt where x is null or y is null) and y >= s and x <= e),
-      o as (select aid, x, y, max(y) over (partition by aid order by x, y rows between unbounded preceding and 1 preceding) py from w),
-      g as (select aid, x, y, sum(case when py is null or x > py + 1 then 1 else 0 end) over (partition by aid order by x, y) gid from o),
-      isl as (select aid, gid, min(x) x, max(y) y from g group by aid, gid),
+      w as (select aid, x, y, wd, ph, rid from rt where aid not in (select aid from rt where x is null or y is null) and y >= s and x <= e),
+      o as (select aid, x, y, wd, ph, rid, max(y) over (partition by aid order by x, y rows between unbounded preceding and 1 preceding) py from w),
+      g as (select aid, x, y, wd, ph, rid, sum(case when py is null or x > py + 1 then 1 else 0 end) over (partition by aid order by x, y) gid from o),
+      ${ROUTE_GUARD_SQL}
+      isl as (select aid, gid, min(x) x, max(y) y from g where aid in (select aid from gd where gd is null or gd >= (select d from today)) group by aid, gid),
       agg as (select aid, count(*) n, bool_or(x <= t.d and t.d <= y) inwin, min(x) filter (where x > t.d) nxt from isl, today t group by aid)
       select coalesce(json_agg(json_build_object('aid', aid, 'next', nxt) order by aid), '[]'::json) j from agg where n >= 2 and not inwin`)
     const want = gq.j || []
@@ -626,18 +638,18 @@ try {
   {
     const [cq] = await sqlRead(`
       with today as (select (now() at time zone 'Asia/Seoul')::date d),
-      c as (select d.announcement_id aid, d.title, d.apply_start s, d.apply_end e
+      c as (select d.announcement_id aid, d.title, d.apply_start s, d.apply_end e, d.winner_announce_date wd
               from get_announcements_deduped() d, today t
              where d.apply_period_check is not true and d.apply_start <= t.d and t.d <= d.apply_end
-               and (d.winner_announce_date is null or d.winner_announce_date >= t.d)
                and not (d.title ~ '^\\s*(\\[[^]]*\\]\\s*)*\\[\\s*조기\\s*(접수)?\\s*마감\\s*\\]' or coalesce(d.revision_note, '') ~ '조기\\s*(접수\\s*)?마감')),
-      rt as (select c.aid, c.s, c.e, r.start_date x, r.end_date y
+      rt as (select c.aid, c.s, c.e, c.wd, r.start_date x, r.end_date y, r.phase_text ph, r.announcement_id rid
                from c join announcements a on announcement_dedup_key(a.title) = announcement_dedup_key(c.title)
                join announcement_apply_routes r on r.announcement_id = a.announcement_id),
-      w as (select aid, x, y from rt where aid not in (select aid from rt where x is null or y is null) and y >= s and x <= e),
-      o as (select aid, x, y, max(y) over (partition by aid order by x, y rows between unbounded preceding and 1 preceding) py from w),
-      g as (select aid, x, y, sum(case when py is null or x > py + 1 then 1 else 0 end) over (partition by aid order by x, y) gid from o),
-      isl as (select aid, gid, min(x) x, max(y) y from g group by aid, gid),
+      w as (select aid, x, y, wd, ph, rid from rt where aid not in (select aid from rt where x is null or y is null) and y >= s and x <= e),
+      o as (select aid, x, y, wd, ph, rid, max(y) over (partition by aid order by x, y rows between unbounded preceding and 1 preceding) py from w),
+      g as (select aid, x, y, wd, ph, rid, sum(case when py is null or x > py + 1 then 1 else 0 end) over (partition by aid order by x, y) gid from o),
+      ${ROUTE_GUARD_SQL}
+      isl as (select aid, gid, min(x) x, max(y) y from g where aid in (select aid from gd where gd is null or gd >= (select d from today)) group by aid, gid),
       agg as (select aid, count(*) n, bool_or(x <= t.d and t.d <= y) inwin, max(y) filter (where x <= t.d and t.d <= y) cur, max(y) lst, (select d from today) td from isl, today t group by aid)
       select coalesce(json_agg(json_build_object('aid', aid, 'kind', case when inwin then 'in' else 'gap' end, 'cur', cur, 'days', cur - td) order by aid), '[]'::json) j
         from agg where n >= 2 and (not inwin or cur < lst)`)
@@ -671,6 +683,51 @@ try {
     } else value = `못 잼(${got.err})`
     add('route_cur', '차수 카드 마감 — 차수 사이 매칭 마감임박 없음 · 창 안은 이번 창 끝까지', ok ? 'pass' : 'fail', value,
       'DB 로 따로 계산한 창(route_gap 과 같은 식) — 차수 사이: 매칭 경로 마감임박 거짓 / 마지막 아닌 창 안: 알약 「이번 차수 마감 D-n」 · 마감임박 = 0≤n≤3(매칭·공고 둘 다)')
+  }
+  // ⑦-1a0 노선 발표 = 기본 창(2026-10-19 · 우편함 「표시층 — 노선 발표·계약 역 = 기본 창」 4 · 원칙 33) — 순위별 창 카드(경로 표 창 둘 이상)의 노선 「발표」 역은
+  //    기본 창(오늘이 창 안 → 그 창 · 사이 → 다음 창 · 모두 끝 → 마지막 창)의 일정 표 결과발표(scope_text = 그 창 phase_text)여야 한다.
+  //    기대값은 DB 에서 **따로**(route_gap 과 같은 창 묶기 · 오늘 가드 없음 · 마감이 오늘 이후인 카드) · 그 창 결과발표 행이 없으면 건너뛴다(카드 칸 그대로).
+  //    SIMULATE=route_win 이면 일정 표 행을 비우고 잰다(종전 화면 — 순위별 창 카드가 있는 날 실패해야 맞다).
+  {
+    const [wq] = await sqlRead(`
+      with today as (select (now() at time zone 'Asia/Seoul')::date d),
+      c as (select d.announcement_id aid, d.title, d.apply_start s, d.apply_end e
+              from get_announcements_deduped() d, today t
+             where d.apply_period_check is not true and d.apply_start is not null and d.apply_end >= t.d
+               and not (d.title ~ '^\\s*(\\[[^]]*\\]\\s*)*\\[\\s*조기\\s*(접수)?\\s*마감\\s*\\]' or coalesce(d.revision_note, '') ~ '조기\\s*(접수\\s*)?마감')),
+      rt as (select c.aid, c.s, c.e, r.start_date x, r.end_date y, r.phase_text ph, r.announcement_id rid
+               from c join announcements a on announcement_dedup_key(a.title) = announcement_dedup_key(c.title)
+               join announcement_apply_routes r on r.announcement_id = a.announcement_id),
+      w as (select aid, x, y, ph, rid from rt where aid not in (select aid from rt where x is null or y is null) and y >= s and x <= e),
+      o as (select aid, x, y, ph, rid, max(y) over (partition by aid order by x, y rows between unbounded preceding and 1 preceding) py from w),
+      g as (select aid, x, y, ph, rid, sum(case when py is null or x > py + 1 then 1 else 0 end) over (partition by aid order by x, y) gid from o),
+      isl as (select aid, gid, min(x) x, max(y) y from g group by aid, gid),
+      pick as (select aid, count(*) n, coalesce(min(gid) filter (where x <= t.d and t.d <= y), min(gid) filter (where x > t.d), max(gid)) gid from isl, today t group by aid),
+      res as (select p.aid, ${SCHED_DAY_SQL('p.aid', 'p.gid')} d from pick p where p.n >= 2)
+      select coalesce(json_agg(json_build_object('aid', aid, 'd', d) order by aid), '[]'::json) j from res where d is not null`)
+    const want = wq.j || []
+    const got = await page.evaluate(async ([want, sim]) => {
+      if (typeof zfRouteDefaultSched !== 'function' || typeof zf3Stations !== 'function') return { err: 'zfRouteDefaultSched·zf3Stations 없음' }
+      if (typeof zfLoadRoutes === 'function') await zfLoadRoutes()
+      await zfLoadWinSched()
+      const keep = zfSchedRows
+      if (sim) zfSchedRows = null
+      const out = want.map(x => {
+        const r = noticeData.find(n => String(n.announcement_id) === x.aid)
+        return r ? [x.aid, (zf3Stations(r)[3] || {}).d || ''] : [x.aid, null]
+      })
+      if (sim) zfSchedRows = keep
+      return { out }
+    }, [want, process.env.SIMULATE === 'route_win'])
+    let ok = false, value
+    if (!got.err) {
+      const bad = got.out.map(([aid, d], i) => d === want[i].d ? null : `${aid}: ${d === null ? '목록 행 없음' : `발표 ${d || '없음'}`}(기대 ${want[i].d})`).filter(Boolean)
+      ok = bad.length === 0
+      value = `순위별 창 카드(그 창 결과발표 있음) ${want.length}${want.length ? ` (${want.map(x => x.aid.slice(-5) + '→' + String(x.d).slice(5)).join(' ')})` : ''} · 어긋남 ${bad.length}${bad.length ? ': ' + bad.slice(0, 3).join(' / ') : ''}`
+      extra.route_win = { want, out: got.out, bad }
+    } else value = `못 잼(${got.err})`
+    add('route_win', '순위별 창 카드 노선 발표 = 기본 창의 일정 표 결과발표', ok ? 'pass' : 'fail', value,
+      'DB 로 따로 계산한 기본 창(창 안 → 그 창 · 사이 → 다음 · 모두 끝 → 마지막) · 그 창 phase_text = 일정 표 scope_text 인 결과발표 하루 날 = 노선 「발표」 역(행 없으면 건너뜀)')
   }
   // ⑦-1a1 정정일(2026-10-16 · 우편함 「코드 — 관측 정정일 …(…0877)」 4 · 원칙 33) — 열린 정정 대표 전부를 꼴로 잰다(특정 공고 기대값을 박지 않는다).
   //    기대 정정일은 DB 에서 **따로**: ① user_verified revised_at(KST 날짜) ② LH 게시일(announcement_date > first_announcement_date)
