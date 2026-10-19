@@ -6385,11 +6385,16 @@ const ZF_TARGET_NO_FIRST = ['다자녀', '고령자', '청년'];
 //    🔴 이혼·사별 · 예비신혼 · 빈 값은 종전대로 check(한부모 여부를 그 값이 말하지 않는다) · 특수 계층 「한부모가족」을 골랐으면 no로 빼지 않는다.
 //    🔴 「신혼·신생아」에는 걸지 않는다 — 위 「그 밖의 혼인가구」 꼴처럼 확인필요가 대상을 넓히는 갈래가 있다.
 const ZF_TARGET_SP_NO_FIRST = ['single', 'married_7', 'newborn', 'married_child6', 'married'];
+// 🔵 2026-10-19(같은 우편함 페이지 「덧 요청」) — 다자녀 갈래 확인필요가 「태아를 포함」 낱말만이면 자녀 수를 **넓히는** 말이다
+//    (원문 「2명 이상의 직계비속(태아를 포함…)」 — 이미 미성년 자녀가 최소 이상이면 충족). 그래서 자녀 ≥ 최소면 확인필요를 건너뛰어 몸통 판정(ok).
+//    「태아」 밖 글자가 섞인 확인필요는 그대로 check.
+const ZF_TARGET_FETUS_ONLY = /^\s*[(（]?\s*태아\s*(?:를|을)?\s*포함\s*[)）]?\s*$/;
 function zfTargetBranchBase(b, f){
   if(zfTargetClassHit(b, f)) return 'ok';
   if(!b || typeof b !== 'object') return 'check';
   const s = zfTargetBranchCore(b, f);
   if(!b['확인필요']) return s;
+  if(s === 'ok' && b['대상'] === '다자녀' && ZF_TARGET_FETUS_ONLY.test(String(b['확인필요']))) return 'ok';
   if(s === 'no' && b['대상'] === '한부모' && ZF_TARGET_SP_NO_FIRST.includes(f.marital) && !(f.classes && f.classes.has('singleparent'))) return 'no';
   // 🔵 2026-10-19(우편함 「표시층 — 다자녀 갈래 확인필요에 「태아」가 있고 미성년 자녀 = 최소−1이면 no 대신 check」) — 진단 칸은 「자녀 수(미성년)」라
   //    태아를 세지 않는다. 갈래 확인필요가 「태아」를 말하면(…19546 원문 「2명 이상의 직계비속(태아를 포함…)」) 한 명 모자란 가구는 임신 중일 수 있어 check.
