@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION public.analysis_queue_claim()
+CREATE OR REPLACE FUNCTION public.analysis_queue_claim(p_run_id bigint DEFAULT NULL::bigint)
  RETURNS TABLE(run_id bigint, announcement_id text, title text, group_key text, apply_start date, apply_end date, phase text, needs_promo boolean, enqueued_at timestamp with time zone, was_returned boolean)
  LANGUAGE plpgsql
  SET search_path TO 'public', 'pg_temp'
@@ -11,13 +11,17 @@ AS $function$
 --   analysis_queue_finish(run, '{}', 메모, 결과)로 닫는다(결과 처리 · 미착수 · 실패가 요청 표에 남는다). 그동안 잠금이 서 있어 분석 발송이 없다.
 --   finish 를 부르지 않으면 발송기가 만든 지 60분에 닫는다(analysis_dispatch_tick ①-2 · 결과 빈 채 → health-ops followup_unreported ⚠️).
 --   잡은 회차에 실린 후속 처리 요청(분석 회차에 함께 실린 것 포함)에 picked_at 을 남긴다 — 잠금 풀기로 되돌아와 다른 회차에 다시 실리면 그 회차가 다시 쓴다.
+-- 🔵 2026-10-20(우편함 「코드·운영 — 미착수 회차 자동 회수·재발송(안 A) + 잡기 가드 …」 2) — 잡기 가드: p_run_id(발송 본문의 run 번호)를 넘기면
+--   지금 도는 회차(firing·running)가 그 번호일 때만 잡는다 — 아니면(회수됨 released · 끝남 · 다른 회차가 도는 중) 아무것도 쓰지 않고 0행.
+--   계기: 발송기가 미착수 회차를 거두고 다시 보낸 뒤(analysis_dispatch_tick ①-4) 옛 세션이 늦게 깨어나 잡기를 부르면
+--   종전 꼴은 「지금 도는 회차」 = 새 회차의 몫을 잡았다. 인자 없이 부르면(p_run_id NULL · 루틴 v2.10 까지) 종전 동작 그대로.
 #variable_conflict use_column
 declare
   v_run bigint; v_reason text; v_created timestamptz;
 begin
   perform pg_advisory_xact_lock(hashtext('zipfit_analysis_dispatch'));
   select r.id, r.reason, r.created_at into v_run, v_reason, v_created
-    from public.analysis_dispatch_runs r where r.state in ('firing', 'running') order by r.id limit 1;
+    from public.analysis_dispatch_runs r where r.state in ('firing', 'running') and (p_run_id is null or r.id = p_run_id) order by r.id limit 1;
   if v_run is null then
     return;
   end if;

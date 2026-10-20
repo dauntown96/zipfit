@@ -89,23 +89,33 @@ select jsonb_build_object(
 //    마지막 심장박동 30분 조용 ∧ 만든 지 90분인 회차를 거둔다 — 이 점검은 그 조건을 거울한다(바뀌면 여기도).
 //    why: hb = 심장박동 있는 회차가 잡은 지 90분 넘음(자동 회수 대상 · ⚠️) ·
 //         reclaim_missed = 회수 조건(조용 30분 ∧ 생성 90분)을 넘고도 tick 두 번(20분)이 지나도록 running(회수가 안 돈다 · ❌) ·
-//         회수 밖 셋(❌ · 사람 풀기 — 2026-10-20 · 우편함 「코드·운영 — 미착수 회차(사용량 소진) 조사 …」 ⓒ에서 종전 no_hb 하나를 갈랐다 · 등급·기준 그대로):
-//           unclaimed = 잡기 없음(claimed_at NULL — 세션이 뜨지 않음 · 사용량 소진이 흔한 원인 · run 260 꼴 · 후속 전용은 잡기를 안 부르고 끝내는 일이 많아(2026-10-20 실측 23회차 중 13) 먼저 가른다) ·
-//           no_hb = 잡았는데 첫 심장박동 전에 끊김(판정 (가)로 회수 밖) · followup = 후속 전용 회차(①-2 가 60분에 닫는다)가 90분 넘음.
+//         미착수(2026-10-20 · 우편함 「코드·운영 — 미착수 회차 자동 회수·재발송(안 A) …」 4 — 발송기 ①-4 거울 · 후속 전용은 뺀다):
+//           unclaimed = 잡기 없음(claimed_at NULL — 세션이 뜨지 않음 · 사용량 소진이 흔한 원인 · run 260 꼴)으로 발송 45분 넘음(⚠️ · 자동 회수 대상) ·
+//           unclaimed_missed = 회수 가능 시각(발송 45분 ∨ 직전 미착수 회수 60분 중 늦은 쪽)을 20분 넘기도록 그대로(❌ · 회수가 안 돈다 —
+//             6시간 6번 상한에 걸렸거나 발송기가 멈춤 · 사람 풀기).
+//         회수 밖 둘(❌ · 사람 풀기 — 2026-10-20 ⓒ에서 종전 no_hb 하나를 갈랐다 · 등급·기준 그대로):
+//           no_hb = 잡았는데 첫 심장박동 전에 끊김(판정 (가)로 회수 밖) · followup = 후속 전용 회차(①-2 가 60분에 닫는다)가 90분 넘음
+//           (후속 전용은 잡기를 안 부르고 끝내는 일이 많아(2026-10-20 실측 23회차 중 13) 미착수로 세지 않는다).
 //    롤백 시험이 이 문자열을 그대로 떠서 쓴다(가짜 회차를 넣고 같은 판정이 나오는지) — 바꾸면 시험도 다시 돈다.
 const STALE_LOCK_SQL = `(select json_build_object(
          'hard', coalesce(json_agg(json_build_object('id', r.id, 'why', z.why, 'age_min', round(extract(epoch from now() - coalesce(r.claimed_at, r.created_at)) / 60),
-                    'hb_min', round(extract(epoch from now() - r.heartbeat_at) / 60)) order by r.id) filter (where z.why <> 'hb'), '[]'::json),
+                    'hb_min', round(extract(epoch from now() - r.heartbeat_at) / 60)) order by r.id) filter (where z.why not in ('hb', 'unclaimed')), '[]'::json),
          'hb', coalesce(json_agg(json_build_object('id', r.id, 'age_min', round(extract(epoch from now() - coalesce(r.claimed_at, r.created_at)) / 60),
-                    'hb_min', round(extract(epoch from now() - r.heartbeat_at) / 60)) order by r.id) filter (where z.why = 'hb'), '[]'::json))
+                    'hb_min', round(extract(epoch from now() - r.heartbeat_at) / 60)) order by r.id) filter (where z.why = 'hb'), '[]'::json),
+         'unclaimed', coalesce(json_agg(json_build_object('id', r.id, 'age_min', round(extract(epoch from now() - r.created_at) / 60)) order by r.id)
+                    filter (where z.why = 'unclaimed'), '[]'::json))
        from analysis_dispatch_runs r
        cross join lateral (select case
            when r.reason <> 'followup' and r.heartbeat_at is not null
                 and r.heartbeat_at < now() - interval '50 minutes' and r.created_at < now() - interval '110 minutes' then 'reclaim_missed'
+           when r.reason <> 'followup' and r.claimed_at is null
+                and now() > greatest(r.created_at + interval '45 minutes',
+                                     coalesce((select max(x.finished_at) from analysis_dispatch_runs x where x.finish_note like '자동 회수 — 미착수%'),
+                                              '-infinity'::timestamptz) + interval '60 minutes') + interval '20 minutes' then 'unclaimed_missed'
+           when r.reason <> 'followup' and r.claimed_at is null and r.created_at < now() - interval '45 minutes' then 'unclaimed'
            when coalesce(r.claimed_at, r.created_at) >= now() - interval '90 minutes' then null
            when r.reason <> 'followup' and r.heartbeat_at is not null then 'hb'
            when r.reason = 'followup' then 'followup'
-           when r.claimed_at is null then 'unclaimed'
            else 'no_hb' end as why) z
       where r.state in ('firing', 'running') and z.why is not null)`
 // ⑧-5 자동 회수 본 횟수(2026-10-15 · 같은 우편함 2) — 지난 24시간 발송기가 거둔 회차. 사람 풀기(analysis_run_release)는 finish_note 「잠금 풀기: …」 ·
@@ -394,7 +404,7 @@ try {
       const missed = hard.filter(s => s.why === 'reclaim_missed')
       // 🔵 2026-10-20(우편함 「코드·운영 — 미착수 회차 …」 ⓒ) — 회수 밖 갈래 셋을 따로 부른다(종전 한 문구 「심장박동 없음 · 후속 전용」이 미착수를 가렸다).
       const offReclaim = [
-        ['unclaimed', '미착수(잡기 없음 · 세션이 뜨지 않음 — 사용량 소진이 흔한 원인)', s => `run ${s.id}(발송 뒤 ${s.age_min}분)`],
+        ['unclaimed_missed', '미착수(잡기 없음) 자동 회수가 안 돈다(회수 가능 시각을 20분 넘김 — 6시간 6번 상한 또는 발송기 멈춤)', s => `run ${s.id}(발송 뒤 ${s.age_min}분)`],
         ['no_hb', '첫 심장박동 전 끊김(잡았는데 심장박동 없음)', s => `run ${s.id}(잡은 지 ${s.age_min}분)`],
         ['followup', '후속 전용', s => `run ${s.id}(${s.age_min}분)`],
       ]
@@ -408,7 +418,7 @@ try {
       // 🔵 2026-10-02 — 우편함 후속 처리 요청(analysis_followup_request)이 120분 넘게 루틴에 실리지 않음(잠금 · 멈춤 · 스위치).
       if (x.followup_stuck > 0) bad.push(`120분 넘게 실리지 않은 후속 처리 요청 ${x.followup_stuck}`)
       add('dispatch', '분석 발송기', bad.length ? 'fail' : 'pass', bad.length ? bad.join(' · ') : `대기 ${x.waiting} · 이상 없음`,
-        '켜짐: grace+max_wait 동안 발송 0인데 그보다 오래 기다린 대기 0(몫 상한 — 한 발송 batch_size건) · 홍보물 24시간 대기 0 · 자동 회수 밖 회차(미착수 · 첫 심장박동 전 끊김 · 후속 전용) 90분 넘은 잠금(잡은 때 · 잡기 없으면 발송 때 기준) 0 · 자동 회수 조건 넘고 20분 지난 회차 0 · 연속 3실패 아님 · 연속 3회차 0건 끝 아님(후속 전용 회차 제외) · 120분 넘은 후속 처리 요청 0')
+        '켜짐: grace+max_wait 동안 발송 0인데 그보다 오래 기다린 대기 0(몫 상한 — 한 발송 batch_size건) · 홍보물 24시간 대기 0 · 미착수 회수가 안 도는 회차 0 · 자동 회수 밖 회차(첫 심장박동 전 끊김 · 후속 전용) 90분 넘은 잠금(잡은 때 · 잡기 없으면 발송 때 기준) 0 · 자동 회수 조건 넘고 20분 지난 회차 0 · 연속 3실패 아님 · 연속 3회차 0건 끝 아님(후속 전용 회차 제외) · 120분 넘은 후속 처리 요청 0')
     }
   }
   // ⑧-1 심장박동 있는 회차의 긴 잠금 · ⑧-5 자동 회수 본 횟수(2026-10-15 · 우편함 「코드 — health-ops stale_lock 갈래 …」 1·2).
@@ -419,6 +429,11 @@ try {
     add('stale_lock_hb', '심장박동 있는 분석 회차 90분 넘게 도는 중(자동 회수 대상)', hb.length === 0 ? 'pass' : 'warn',
       hb.length ? hb.map(s => `run ${s.id} 잡은 지 ${s.age_min}분 · 심장박동 ${s.hb_min}분 전`).join(', ') : 0,
       '0 — 심장박동이 30분 넘게 조용 ∧ 만든 지 90분이면 발송기가 거둔다(analysis_dispatch_tick ①-3) · 넘으면 ⚠️ 경고만 · 회수 조건을 20분 넘기면 dispatch ❌')
+    // 🔵 2026-10-20(우편함 「코드·운영 — 미착수 회차 자동 회수·재발송(안 A) …」 4) — 미착수 45분 = ⚠️(발송기 ①-4 가 거둔다 · 회수가 안 돌면 dispatch ❌).
+    const uc = (d.dispatch && d.dispatch.stale_lock && d.dispatch.stale_lock.unclaimed) || []
+    add('stale_lock_unclaimed', '미착수 분석 회차(잡기 없음) 45분 넘음 — 자동 회수 대상', uc.length === 0 ? 'pass' : 'warn',
+      uc.length ? uc.map(s => `run ${s.id} 발송 뒤 ${s.age_min}분 · 잡기 없음`).join(', ') + ' — 사용량 창이 닫혀 있으면 다음 판정이 다시 보낸다' : 0,
+      '0 — 잡기 없이 발송 45분이면 발송기가 거두고 다시 보낸다(analysis_dispatch_tick ①-4 · 직전 미착수 회수 60분 안이면 기다림 · 6시간 6번 상한) · 넘으면 ⚠️ 경고만 · 회수 가능 시각을 20분 넘기면 dispatch ❌')
     const rc = (d.dispatch && d.dispatch.auto_reclaim_24h) || []
     add('auto_reclaim_24h', '24시간 안 발송기 자동 회수(루틴 세션이 끊긴 흔적)', rc.length === 0 ? 'pass' : 'warn',
       rc.length ? rc.map(x => `run ${x.id} ${x.at} KST · 공고 ${x.ann || '—'} · 마감 정리 ${x.fu || '없음(분석 행 없음)'}`).join(', ') : 0,
