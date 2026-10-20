@@ -6496,11 +6496,32 @@ const ZF_TARGET_SP_NO_FIRST = ['single', 'married_7', 'newborn', 'married_child6
 //    (원문 「2명 이상의 직계비속(태아를 포함…)」 — 이미 미성년 자녀가 최소 이상이면 충족). 그래서 자녀 ≥ 최소면 확인필요를 건너뛰어 몸통 판정(ok).
 //    「태아」 밖 글자가 섞인 확인필요는 그대로 check.
 const ZF_TARGET_FETUS_ONLY = /^\s*[(（]?\s*태아\s*(?:를|을)?\s*포함\s*[)）]?\s*$/;
+// 🔵 S1 PR-1 ②(설계서 2026-10-19 ㉯ · 검증 「㉯ 채택」) — 「신혼·신생아」 갈래 확인필요는 한 값(넓힘/좁힘)으로 가를 수 없다
+//    (같은 글자가 「혼인기간 10년 · 9세」로 기혼(기타)을 넓히고 「주거약자」로 좁힌다). 그래서 글자 속 숫자를 읽는다:
+//    혼인기간 N년(괄호 속 완화 숫자까지 — 가장 큰 값) · M세 이하 자녀(같음). 조각은 「 · 」(앞뒤 띄움)으로 가른다.
+//    결혼한 적 없음 → no(글자에 「한부모」가 있을 때만 한부모 가족은 그대로) · 신혼(7년) N≥7 · 유자녀(6세) M≥6 · 신생아 M≥2 · 예비는 「예비 신혼부부」 조각이 있을 때만 → ok
+//    — 숫자·예비 밖 조각(주거약자 등)이 붙으면 ok 대신 check · 기혼(기타)은 숫자 조각이 있고 N≤7 ∧ M≤6(넓히지 않음)일 때만 no · 그 밖은 check.
+//    🔴 숫자 조각이 없는 글자(「그 밖의 혼인가구」 · 「주거약자의 요건」)에서 기혼(기타)을 no로 빼지 않는다 — 위 ZF_TARGET_NO_FIRST 주석의 넓히는 꼴.
+function zfTargetNewlywed(t, f){
+  const m = f.marital || '', txt = String(t || '');
+  if(m === 'single' || (m === 'single_parent' && !/한부모/.test(txt))) return 'no';
+  const pieces = txt.split(/\s+·\s+/).map(p => p.trim()).filter(Boolean);
+  // 숫자 조각 = 「혼인기간 …」 또는 「… 이하 자녀」(괄호 뒤 「이하) 자녀」 꼴 포함) — 「주거약자(고령자(만 65세 이상…)…)」의 65세를 자녀 나이로 읽지 않게.
+  const isNum = p => /혼인\s*기간|이하\s*\)?\s*자녀/.test(p), isPre = p => /예비\s*신혼/.test(p);
+  const nums = pieces.filter(isNum);
+  const extra = pieces.some(p => !isNum(p) && !isPre(p));
+  const maxOf = re => Math.max(-Infinity, ...nums.flatMap(p => [...p.matchAll(re)].map(x => Number(x[1]))));
+  const N = maxOf(/(\d+)\s*년/g), M = maxOf(/(\d+)\s*세/g);
+  if(m === 'married') return (nums.length && !(N > 7) && !(M > 6)) ? 'no' : 'check';
+  const ok = m === 'married_7' ? N >= 7 : m === 'married_child6' ? M >= 6 : m === 'newborn' ? M >= 2 : m === 'pre' ? pieces.some(isPre) : false;
+  return (ok && !extra) ? 'ok' : 'check';
+}
 function zfTargetBranchBase(b, f){
   if(zfTargetClassHit(b, f)) return 'ok';
   if(!b || typeof b !== 'object') return 'check';
   const s = zfTargetBranchCore(b, f);
   if(!b['확인필요']) return s;
+  if(b['대상'] === '신혼·신생아') return zfTargetNewlywed(b['확인필요'], f);
   if(s === 'ok' && b['대상'] === '다자녀' && ZF_TARGET_FETUS_ONLY.test(String(b['확인필요']))) return 'ok';
   if(s === 'no' && b['대상'] === '한부모' && ZF_TARGET_SP_NO_FIRST.includes(f.marital) && !(f.classes && f.classes.has('singleparent'))) return 'no';
   // 🔵 2026-10-19(우편함 「표시층 — 다자녀 갈래 확인필요에 「태아」가 있고 미성년 자녀 = 최소−1이면 no 대신 check」) — 진단 칸은 「자녀 수(미성년)」라
