@@ -684,8 +684,9 @@ html[data-ui="d3"] #notice-status .btn{min-height:var(--hit);padding:0 16px;bord
 html[data-ui="d3"] .zf3-card .detail-grid{background:var(--board);background-image:radial-gradient(circle at center,var(--led-dot) 0 1px,transparent 1.4px);background-size:4px 4px;border-radius:var(--r-2);padding:12px 14px;gap:10px 18px;border:1px solid #2b2e35}
 html[data-ui="d3"] .zf3-card .detail-grid>div>span:first-child{color:var(--board-ink-2)!important;font-size:var(--t-xs)}
 html[data-ui="d3"] .zf3-card .detail-grid>div>span:last-child{color:var(--led)!important;font-family:var(--f-led);font-weight:700!important;font-size:13px;text-shadow:0 0 6px var(--led-glow);font-variant-numeric:tabular-nums}
-/* 🔵 2026-10-20 — 입주 연월이 어느 단지 값인지(「· ○○ 기준」)는 읽혀야 하는 말이라 검은 판 위에서 이름표 색으로(세대수 줄 「· LH 단지 등록 기준」은 그대로) */
-html[data-ui="d3"] .zf3-card .detail-grid .zf-movein-base{color:var(--board-ink-2);text-shadow:none}
+/* 🔵 2026-10-20 — 검은 판 위 덧말(입주월 「· ○○ 기준」 · 세대수 「· LH 단지 등록 기준」)은 읽혀야 하는 말이라 이름표 색으로
+   (S1 3 — 입주월 회신 ② · claude.ai 판정 「맞춘다」: 세대수 줄도 같은 색 · 회색 --ink-3 은 검은 판에서 잘 안 읽혔다) */
+html[data-ui="d3"] .zf3-card .detail-grid .zf-units-src{color:var(--board-ink-2);text-shadow:none}
 .zf3-vline{border:0!important;background:transparent!important}
 html[data-ui="d3"] .zf3-vline .policy-item{position:relative;padding:2px 0 12px 28px!important;border:0!important;background:transparent!important;margin:0!important}
 html[data-ui="d3"] .zf3-vline .policy-item::before{content:"";position:absolute;left:9px;top:0;bottom:0;width:3px;background:var(--rail)}
@@ -4555,7 +4556,7 @@ function moveInRow(v, row){
   if(moveInUnreal(v)) return [ZF_MOVEIN_LABEL, '확인 필요'];
   const bn = String((row && row['building_name']) || '');
   const base = ZF_COMPLEX_SUFFIX.test(bn) ? bn.replace(ZF_COMPLEX_SUFFIX, '').trim() : '';
-  return [zfMoveInLabelFor(v), escapeHtml(v) + (base ? ` <span class="zf-units-src zf-movein-base">· ${escapeHtml(base)} 기준</span>` : '')];
+  return [zfMoveInLabelFor(v), escapeHtml(v) + (base ? ` <span class="zf-units-src">· ${escapeHtml(base)} 기준</span>` : '')];
 }
 
 // ===== 1층 요약 한 줄 (보증금 · 월세 · 전용면적) =====
