@@ -4127,6 +4127,7 @@ function zfOpsOn(){
   zfOpsMem = on;
   return on;
 }
+function zfAutoBrowser(){ try{ return navigator.webdriver === true; }catch(e){ return false; } }
 function zfOpsBadge(){
   if(!zfOpsOn() || document.getElementById('zfOpsBadge')) return;
   // 🔵 2026-10-16(우편함 「표시층 — 실사용 2회차 다듬기 묶음」 A4 · N19) — d3 에서는 앱 머리 「꼭집」 옆 작은 점(누름 칸 44). 누르면 「운영 기기 · … 끄기」가 열린다.
@@ -4152,6 +4153,10 @@ function zfLog(event, props, announcementId){
   try{
     if(!ZF_LOG_EVENTS.has(event)) return;   // 목록 밖은 보내지 않는다(DB CHECK 가 거부한다)
     if(zfOpsOn()) props = Object.assign({}, props || {}, { ops: 1 });   // 운영 세션 표지 — 집계에서 뺄 수 있게
+    // 🔵 S1 4(백로그 「이용 기록에서 운영·시험 세션을 가를 수 없다」 ③ · 2026-10-20) — 자동 브라우저(WebDriver·Playwright — navigator.webdriver)도 같은 표지를
+    //    단다(ops:'auto' · 세션 단위 제외 `props ? 'ops'`에 그대로 걸림). 주소에 표지를 붙이는 대신 브라우저가 스스로 밝히는 값을 쓴다 — 여는 쪽이
+    //    잊어도(로컬 렌더 · 보조 에이전트 · 바깥 수집기) 빠지지 않게. 운영 기기 표시(zfOpsBadge)는 ?ops=1 기기에만 — 화면 변화 0.
+    else if(zfAutoBrowser()) props = Object.assign({}, props || {}, { ops: 'auto' });
     const win = (event in ZF_LOG_DEDUPE_MS) ? ZF_LOG_DEDUPE_MS[event] : 1000;
     if(win > 0){
       const key = event+'|'+(announcementId||'')+'|'+JSON.stringify(props||{});
