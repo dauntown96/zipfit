@@ -752,6 +752,8 @@ html[data-ui="d3"] .maintabs.zf3-ind-on .maintab.active{box-shadow:none}
 .zf3-sticky[hidden]{display:none!important}
 .zf3-st-t{font-weight:700;font-size:var(--t-s);color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @keyframes zf3slide{from{transform:translate(-50%,-100%)}}
+/* 🔵 2026-10-20(다운님 실사용 10-20 ①) — 넓은 화면(1200px~)은 바를 가운데로 옮기지 않아(transform:none) 세로로만 내려온다 — 종전 zf3slide 의 -50% 가로 이동이 옆에서 미끄러져 나왔다 */
+@keyframes zf3slidev{from{transform:translateY(-100%)}}
 /* 카드 첫 등장(⑥) · 상세 펼침(⑦) · 마감 임박 깃발(⑧) · 「상세」 꺾쇠(⑪) */
 .zf3-in{animation:zf3up 360ms var(--ease) backwards;animation-delay:var(--d,0ms)}
 @keyframes zf3up{from{opacity:0;transform:translateY(10px)}}
@@ -941,7 +943,7 @@ html.zf3-mapview[data-ui="d3"] #notice-list{display:none}
   html[data-ui="d3"] .zf3-vseg{display:none}
   html[data-ui="d3"] body:has(#main2:not(.hidden)) .wrap{margin-left:max(24px,calc((100vw - 1232px) / 2));margin-right:auto}
   html[data-ui="d3"] body:has(#main2:not(.hidden)) #zf3Map{position:fixed;top:60px;left:calc(max(24px,calc((100vw - 1232px) / 2)) + 752px);width:480px;max-height:calc(100vh - 76px);overflow:auto;margin:0;padding:2px}
-  html[data-ui="d3"] body:has(#main2:not(.hidden)) .zf3-sticky{left:max(24px,calc((100vw - 1232px) / 2));transform:none;width:720px}
+  html[data-ui="d3"] body:has(#main2:not(.hidden)) .zf3-sticky{left:max(24px,calc((100vw - 1232px) / 2));transform:none;width:720px;animation-name:zf3slidev}
   html[data-ui="d3"] body:has(#main2:not(.hidden)) .zf3-radar svg{max-height:calc(100vh - 300px)}
   html[data-ui="d3"] body:has(#main2:not(.hidden)) .zf-totop{right:auto;left:calc(max(24px,calc((100vw - 1232px) / 2)) + 660px)}
 }
