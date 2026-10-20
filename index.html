@@ -346,6 +346,7 @@ body.theme-dark .extras-missing-note{color:#d8c48a;background:#2a2721;border-col
 .hu-past-only{padding:2px 9px;font-size:11px;cursor:default;display:inline-block;margin-left:6px;background:#f0efe9;color:#777;border-color:#ddd}
 /* 🔵 카드 1층 회차 칩 — 상세 아코디언의 「지난 회차」 배지(.hu-round-old)와 **같은 색**을 쓴다.
    한 카드 안에서 같은 뜻이 두 색으로 보이면 안 된다. */
+.zf-dual-tag{font-weight:400;opacity:.85;margin-left:4px;white-space:nowrap}
 .zf-round-tag{padding:2px 9px;font-size:11px;cursor:pointer;display:inline-block;margin-left:6px;background:#fff3d6;color:#8a6a1c;border-color:#e0b96a;font-weight:600;white-space:normal;text-align:left}
 body.theme-dark .hu-past-title{color:#cfcfcf}
 .hu-note-price{font-size:12px;color:#555;margin-top:2px}
@@ -4586,6 +4587,10 @@ function moveInRow(v, row){
 //    없음(has=false)=미조회 · undefined=조회 중 · null=조회했으나 세대정보 없음 · 객체=요약.
 // 이걸 안 가르면 응답이 오기 전에 「원문 정리 전」을 잘못 띄운다.
 const zfPriceCache = new Map();
+// 🔵 2026-10-20(우편함 「표시층 — S1 다섯」 2) — 세대 하나에 임대조건이 두 벌(deposit·monthly_rent + deposit_priority1·rent_priority1)인 공고 id.
+//    요약 RPC 는 두 벌을 한 범위로 합친다(min(least) ~ max(greatest)) — 숫자는 그대로 두고 범위 옆에 「두 임대조건 합친 범위」를 단다.
+//    🔴 어느 벌이 1순위·일반인지는 DB 에 단서가 없다(2026-09-11 — 이름을 붙이지 않는다 · renderHousingUnitRow 주석). 카드 자기 id 의 세대 행만 본다.
+const zfDualIds = new Set();
 
 function zfPriceUnit(v, div, digits, mode){
   const p = Math.pow(10, digits);
@@ -4643,7 +4648,7 @@ function zfRoundTagExpand(el){
   el.textContent = ZF_ROUND_NOTE_UNKNOWN;
 }
 
-function zfSummaryLine(s){
+function zfSummaryLine(s, dualTag){
   const parts = [];
   if(s.deposit_min !== null && s.deposit_min !== undefined){
     parts.push('보증금 ' + zfPriceRange(s.deposit_min, s.deposit_max, 10000, 0, '만', true));
@@ -4653,6 +4658,7 @@ function zfSummaryLine(s){
       ? '월세 없음'
       : '월 ' + zfPriceRange(s.rent_min, s.rent_max, 10000, 1, '만', true));
   }
+  if(dualTag && parts.length) parts[parts.length - 1] += dualTag;   // 2026-10-20 — 가격 범위 바로 뒤(면적 앞)
   if(s.area_min !== null && s.area_min !== undefined){
     parts.push('전용 ' + zfPriceRange(s.area_min, s.area_max, 1, 0, '㎡', false));
   }
@@ -4737,7 +4743,8 @@ function zfFillSummarySlots(){
     if(card) card.classList.toggle('zf-ana-pending', pend);
     if(card) card.classList.toggle('zf-ana-no', zfAiOff(s, el.getAttribute('data-sum-key')));   // 🔵 2026-10-16 — 분석 없으면 「AI 정리 · 」 접음
     if(pend){ el.innerHTML = zfAnaPendingHtml(url, el.getAttribute('data-sum-org') || ''); return; }
-    const line = s ? zfSummaryLine(s) : '';
+    const line = s ? zfSummaryLine(s, zfDualIds.has(String(id))
+      ? '<span class="zf-dual-tag" title="이 공고는 한 세대에 임대조건이 두 가지예요. 범위는 두 조건을 합친 값이고, 어느 조건이 적용되는지는 펼쳐서 비고·공고문에서 확인하세요.">(두 임대조건 합친 범위)</span>' : '') : '';
     // 🔵 이번 회차 값이 아니면 상자 색도 함께 바꾼다 — 칩만 달면 초록 상자가 「확인됨」처럼 읽힌다.
     const stale = !!(s && (s.round_state === 'past' || s.round_state === 'unknown'));
     const box = stale
@@ -4765,6 +4772,9 @@ async function zfEnsurePriceSummaries(ids){
   (ids || []).forEach(id => { if(id && !zfPriceCache.has(id)) need.push(String(id)); });
   if(!need.length) return false;
   need.forEach(id => zfPriceCache.set(id, undefined));   // 같은 id로 두 번 나가지 않게 자리를 잡는다
+  // 두 임대조건 표지 재료(위 zfDualIds) — 실패해도 요약은 그대로(표지만 없음)
+  const dualP = fetch(`${SUPABASE_URL}/rest/v1/housing_units?select=announcement_id&${idFilterFor(need)}&or=(deposit_priority1.not.is.null,rent_priority1.not.is.null)`, { headers: zfAnonHeaders() })
+    .then(r => r.ok ? r.json() : null).then(rows => { if(Array.isArray(rows)) rows.forEach(r => r && r.announcement_id && zfDualIds.add(String(r.announcement_id))); }).catch(() => {});
   try{
     const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_announcement_price_summary`,
       {method:'POST', headers: zfAnonHeaders(), body: JSON.stringify({p_ids: need})});
@@ -4773,6 +4783,7 @@ async function zfEnsurePriceSummaries(ids){
     if(!Array.isArray(rows)) throw new Error('예상치 못한 응답');
     need.forEach(id => zfPriceCache.set(id, null));      // 응답에 없으면 세대정보가 없는 것이다
     rows.forEach(r => { if(r && r.announcement_id) zfPriceCache.set(String(r.announcement_id), r); });
+    await dualP;
     return true;
   }catch(err){
     // 🔴 실패하면 자리를 도로 비운다 — 안 물어본 것과 같게 두어야 다음 렌더가 다시 시도한다.
