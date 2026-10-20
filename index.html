@@ -11391,7 +11391,13 @@ function zf3BoardItems(rows){
       items.unshift({ type: 'sum', ev: 'start', tag: '내일 접수 시작', name: `${cl ? cl + ' · ' : ''}${tmr.length}건${pref ? ` · 희망 조건 ${k}건` : ''}`, place: '' }); } }
   const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
   const shut = zf3ClosedNotices();
-  const notices = zf3Notices.filter(x => x && x.id && x.title && x.start <= today && today <= x.end && !shut.includes(x.id))
+  // 🔵 S1 PR-1 ④(설계서 2026-10-19 · 백로그 「갱신 공지 … 최신 판만」) — 같은 문서를 고친 공지가 여러 판이면(링크 집합이 같음) 지금 걸린 것 중
+  //    시작일이 가장 늦은 판 하나만. 사용자가 닫은 판을 거르기 **전에** 고른다 — 새 판을 닫았는데 옛 판이 다시 나오지 않게. 링크 없는 공지는 묶지 않는다.
+  const live = zf3Notices.filter(x => x && x.id && x.title && x.start <= today && today <= x.end);
+  const linkKey = x => [...new Set((x.links || []).map(l => String(l.href || '')))].sort().join('\n');
+  const latest = new Map();
+  live.forEach(x => { const k = linkKey(x); if(k && (!latest.has(k) || String(x.start) > String(latest.get(k).start))) latest.set(k, x); });
+  const notices = live.filter(x => { const k = linkKey(x); return !k || latest.get(k) === x; }).filter(x => !x._shut && !shut.includes(x.id))
     .map(x => ({ type: 'notice', id: x.id, tag: '공지', name: x.title, links: (x.links || []).filter(l => /^(\.\/|https:\/\/)/.test(String(l.href || ''))) }));
   if(!items.length) items.push({ type: 'empty', tag: '안내', name: pref ? `희망 조건 공고에 오늘 새 소식이 없어요 · 희망 지역·유형·보증금에 맞는 열린 공고 ${mine.length.toLocaleString()}건` : `오늘 새 소식이 없어요 · 열린 공고 ${pool.length.toLocaleString()}건` });
   return { list: [...notices, ...items], mine: !!pref };
@@ -11522,7 +11528,8 @@ function zf3TogglePause(){
 }
 function zf3CloseNotice(id){
   try{ const d = zf3ClosedNotices(); if(!d.includes(id)) d.push(id); sessionStorage.setItem(ZF3_NOTICE_KEY, JSON.stringify(d)); }catch(e){}
-  zf3Notices = zf3Notices.filter(x => x.id !== id);
+  // 🔵 S1 PR-1 ④ — 빼지 않고 닫음 표지만(세션 저장소가 막혀도 닫힌다) — 빼면 「같은 문서 최신 판」 고르기가 옛 판을 다시 고른다.
+  zf3Notices = zf3Notices.map(x => x.id === id ? Object.assign({}, x, { _shut: true }) : x);
   zf3Key = '';
   if(zf3Rows) zf3PaintBoard(zf3Rows);
 }
