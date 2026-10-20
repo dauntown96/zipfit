@@ -3355,6 +3355,11 @@ function zfCoverPlaceText(regionNames, blockCount, sido, sigungu, fallback, unit
   const blocks = Number(blockCount) || 1;
   if(!units.length){
     const places = zfPlaceNames(regionNames);
+    // 🔵 2026-10-20 실사용 5회차 D5 — 전국 단위 공고(판정 zf3WideRow · 곳 없음)는 「전국 단위」를 앞에 · 원문 지역 칸은 뒤에 그대로(LH 「서울특별시 외」가 서울 공고로 읽혔다).
+    if(!places.length && zf3WideRow({ sido_nm: sido, sigungu_nm: sigungu, '지역': fallback })){
+      const raw = String(fallback || '').trim();
+      return raw && raw !== '전국' ? '전국 단위 · 원문 「' + raw + '」' : '전국 단위';
+    }
     if(places.length >= 2){
       return zfShortPlace(zfPickLeadPlace(places, sido, sigungu, fallback)) + ' 외 ' + (places.length - 1) + '곳';
     }
@@ -5485,7 +5490,9 @@ function renderInsight(rows, wrap, statsRows){
   // 🔵 2026-10-08 — 「지금 열린 공고」 한 벌(zfOpenNotices — 같은 술어 isHiddenAsClosed)을 부른다. 인사이트 머리의 수도 이 값이다.
   const regionRows = openRows;
   const regionMap = {};
+  let wideN = 0;   // 2026-10-20 D4 — 전국 단위 공고는 시·도(종전 「서울특별시」)에 넣지 않고 따로 센다(지도 「전국 단위 공고 N건」과 같은 판정)
   regionRows.forEach(r=>{
+    if(zfWideOnly(r)){ wideN++; return; }
     const k = r.sido_nm||r.region||'기타';
     if(!regionMap[k]) regionMap[k]={cnt:0};
     regionMap[k].cnt++;
@@ -5499,7 +5506,7 @@ function renderInsight(rows, wrap, statsRows){
   const regionTop = regionAll.slice(0, REGION_HEAD);
   const regionRest = regionAll.slice(REGION_HEAD);
   // 막대 기준은 접힘·펼침 상태와 무관하게 같아야 하므로 전 지역 기준으로 잡는다
-  const regionMaxCnt = Math.max(1,...regionAll.map(e=>e[1].cnt));
+  const regionMaxCnt = Math.max(1, wideN, ...regionAll.map(e=>e[1].cnt));
   const regionRowHTML = ([region,v])=>`
           <div>
             <div style="display:flex;justify-content:space-between;font-size:12px;color:#555;margin-bottom:4px">
@@ -5625,7 +5632,7 @@ function renderInsight(rows, wrap, statsRows){
   })();
   // 🔵 D-3 둘러보기 ③ — d3 는 같은 수로 다른 판(LED 숫자판 · 14일 마감 막대 · 지역 막대 · 30일 추이)을 그리고, 재고 절은 색만 토큰으로(어둡게 모드)
   if(typeof zf3On === 'function' && zf3On()){
-    wrap.innerHTML = zf3InsightTop({ openN: regionRows.length, cumText: zfCumulativeText(rows), kpiActive, kpiNew, kpiClosing, timelineEntries, todayStr, tomorrowStr, regionAll, regionTop, regionRest, regionMaxCnt, trendEntries, trendMax, rows }) + zf3Recolor(statsHTML);
+    wrap.innerHTML = zf3InsightTop({ openN: regionRows.length, cumText: zfCumulativeText(rows), kpiActive, kpiNew, kpiClosing, timelineEntries, todayStr, tomorrowStr, regionAll, regionTop, regionRest, regionMaxCnt, wideN, trendEntries, trendMax, rows }) + zf3Recolor(statsHTML);
     return;
   }
   wrap.innerHTML = `
@@ -5677,8 +5684,9 @@ function renderInsight(rows, wrap, statsRows){
     <div style="${S}">
       <p style="${T};margin-bottom:4px">📍 지역별 공고 현황 (${regionAll.length}개 지역)</p>
       <p style="font-size:12px;color:#888;margin:0 0 14px;line-height:1.5">신청할 수 없는 공고는 빼고 <strong style="color:#5a7af7">${regionRows.length.toLocaleString()}건</strong>을 세었어요 · 목록에 없는 지역은 지금 신청할 수 있는 공고가 없는 곳이에요</p>
-      ${regionAll.length===0 ? '<p style="font-size:13px;color:#aaa;text-align:center;padding:20px 0">지금 신청할 수 있는 공고가 없어요</p>' : `
+      ${regionAll.length===0 && !wideN ? '<p style="font-size:13px;color:#aaa;text-align:center;padding:20px 0">지금 신청할 수 있는 공고가 없어요</p>' : `
       <div style="display:flex;flex-direction:column;gap:10px">
+        ${wideN ? regionRowHTML(['전국 단위', {cnt: wideN}]) : ''}
         ${regionTop.map(regionRowHTML).join('')}
       </div>
       ${regionRest.length ? `
@@ -12598,6 +12606,8 @@ function zf3WideRow(n){
   if(String(n['sido_nm'] || '').trim() === '전국') return true;
   return !String(n['sigungu_nm'] || '').trim() && /\s외$/.test(String(n['지역'] || n['region'] || '').trim());   // 화면 행은 매핑을 거친 「지역」(zfMapNoticeRows)
 }
+// 🔵 2026-10-20 실사용 5회차 D4 — 「전국 단위」로 세는 공고 = 전국 단위 ∧ 곳(그룹 시군구 ∪ 세대 시군구) 없음. 지도 아래 줄과 같은 판정을 인사이트 지역 막대가 쓴다.
+function zfWideOnly(n){ return zf3WideRow(n) && !zfMergeUnitPlaces(n['region_names'], zfUnitPlacesFor(n['announcement_id'])).length; }
 function zf3PlacesOfRow(n){
   const out = new Map();
   let names = zfMergeUnitPlaces(n['region_names'], zfUnitPlacesFor(n['announcement_id'])).map(x => String(x || '').trim()).filter(Boolean);
@@ -13000,8 +13010,8 @@ function zf3InsightTop(c){
     <div class="zf3-ins-card"><h3>앞으로 14일 마감</h3><p class="zf3-ins-note">지금 열린 공고의 마감일(차수 공고는 이번 차수 마감) · ${c.timelineEntries.length ? `${+c.timelineEntries[0][0].slice(5, 7)}월 ${+c.timelineEntries[0][0].slice(8, 10)}일(오늘)부터` : ''} · 빨강 = 3일 안 마감(위 숫자와 같은 공고)</p>
       <div class="zf3-tl" role="img" aria-label="${zfAttr(tlAria)}">${tl}</div></div>
     <div class="zf3-ins-card"><h3>지역별 열린 공고 <span>${c.regionAll.length}개 지역</span></h3>
-      <p class="zf3-ins-note">신청할 수 없는 공고는 빼고 ${fmt(c.openN)}건을 세었어요 · 목록에 없는 지역은 지금 신청할 수 있는 공고가 없는 곳이에요</p>
-      ${c.regionAll.length === 0 ? '<p class="zf3-ins-empty">지금 신청할 수 있는 공고가 없어요</p>' : `<div class="zf3-rl">${c.regionTop.map(rRow).join('')}</div>
+      <p class="zf3-ins-note">신청할 수 없는 공고는 빼고 ${fmt(c.openN)}건을 세었어요 · 목록에 없는 지역은 지금 신청할 수 있는 공고가 없는 곳이에요${c.wideN ? ' · 「전국 단위」는 시·도를 가리지 않는 공고(시·도 막대에 넣지 않음)' : ''}</p>
+      ${c.regionAll.length === 0 && !c.wideN ? '<p class="zf3-ins-empty">지금 신청할 수 있는 공고가 없어요</p>' : `<div class="zf3-rl">${c.wideN ? rRow(['전국 단위', { cnt: c.wideN }]) : ''}${c.regionTop.map(rRow).join('')}</div>
       ${c.regionRest.length ? `<div id="regionRest" class="zf3-rl" style="display:none;margin-top:10px">${c.regionRest.map(rRow).join('')}</div>
       <button type="button" class="zf3-more" id="regionMoreBtn" data-more="나머지 ${c.regionRest.length}개 지역 더 보기" data-less="접기" onclick="toggleRegionRest(this)">나머지 ${c.regionRest.length}개 지역 더 보기</button>` : ''}`}</div>
     <div class="zf3-ins-card"><h3>공고 추이 <span>30일씩</span></h3><p class="zf3-ins-note">공고일 기준 · 마감 포함 · ‹ › 로 지난 기간</p>
