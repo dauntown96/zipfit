@@ -4942,7 +4942,7 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
         </div>`
       : `<div id="${cardId}" data-ann-id="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px" onclick="event.stopPropagation()"><div style="display:flex;gap:8px;flex-wrap:wrap">${zfSafeUrl(n['공고URL'])?`<a class="detail-link" href="${zfSafeHref(n['공고URL'])}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`:''} ${shareBtn} ${saveBtn}</div></div>`;
 
-    html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n['지역']||'').replace(/"/g,'&quot;')}" data-sido="${(n['sido_nm']||'').replace(/"/g,'&quot;')}" data-sigungu="${(n['sigungu_nm']||'').replace(/"/g,'&quot;')}" data-title="${(n['공고명']||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" data-housing-type="${(n['공급유형']||'').replace(/"/g,'&quot;')}" data-precise-address="${(n['precise_address']||'').replace(/"/g,'&quot;')}" data-relaxed="${n['is_relaxed_recruitment']===true?'1':''}" data-relaxation-detail="${(n['relaxation_detail']||'').replace(/"/g,'&quot;')}" data-contract-verify="${n['contract_before_verification']===true?'1':''}" data-rent-exempt-until="${(n['rent_exemption_until']||'').replace(/"/g,'&quot;')}" data-rent-exempt-note="${(n['rent_exemption_note']||'').replace(/"/g,'&quot;')}" data-revised="${isAmended?'1':''}" data-revision-note-full="${revisionNoteEsc}" data-special-notes="${n['special_notes']?JSON.stringify(n['special_notes']).replace(/"/g,'&quot;'):''}" data-apply-start="${(n['apply_start']||'').replace(/"/g,'&quot;')}" data-apply-end="${(n['apply_end']||'').replace(/"/g,'&quot;')}" data-announcement-date="${(n['announcement_date']||'').replace(/"/g,'&quot;')}" data-round-date="${zfNoticeDate(n).replace(/"/g,'&quot;')}" data-complex-count="${zfComplexCount(n)}" data-doc-submit-announce="${(n['doc_submit_announce_date']||'').replace(/"/g,'&quot;')}" data-doc-submit-start="${(n['doc_submit_start']||'').replace(/"/g,'&quot;')}" data-doc-submit-end="${(n['doc_submit_end']||'').replace(/"/g,'&quot;')}" data-winner-announce="${(n['winner_announce_date']||'').replace(/"/g,'&quot;')}" data-contract-start="${(n['contract_start']||'').replace(/"/g,'&quot;')}" data-contract-end="${(n['contract_end']||'').replace(/"/g,'&quot;')}" data-attachment-urls="${n['attachment_urls']?JSON.stringify(n['attachment_urls']).replace(/"/g,'&quot;'):''}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this,'notice')" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
+    html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n['지역']||'').replace(/"/g,'&quot;')}" data-sido="${(n['sido_nm']||'').replace(/"/g,'&quot;')}" data-sigungu="${(n['sigungu_nm']||'').replace(/"/g,'&quot;')}" data-title="${(n['공고명']||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" data-housing-type="${(n['공급유형']||'').replace(/"/g,'&quot;')}" data-precise-address="${(n['precise_address']||'').replace(/"/g,'&quot;')}" data-relaxed="${n['is_relaxed_recruitment']===true?'1':''}" data-relaxation-detail="${(n['relaxation_detail']||'').replace(/"/g,'&quot;')}" data-contract-verify="${n['contract_before_verification']===true?'1':''}" data-rent-exempt-until="${(n['rent_exemption_until']||'').replace(/"/g,'&quot;')}" data-rent-exempt-note="${(n['rent_exemption_note']||'').replace(/"/g,'&quot;')}" data-revised="${isAmended?'1':''}" data-revision-note-full="${revisionNoteEsc}" data-special-notes="${n['special_notes']?JSON.stringify(n['special_notes']).replace(/"/g,'&quot;'):''}" data-apply-start="${(n['apply_start']||'').replace(/"/g,'&quot;')}" data-apply-end="${(n['apply_end']||'').replace(/"/g,'&quot;')}" data-announcement-date="${(n['announcement_date']||'').replace(/"/g,'&quot;')}" data-round-date="${zfNoticeDate(n).replace(/"/g,'&quot;')}" data-complex-count="${zfComplexCount(n)}" data-doc-submit-announce="${(n['doc_submit_announce_date']||'').replace(/"/g,'&quot;')}" data-doc-submit-start="${(n['doc_submit_start']||'').replace(/"/g,'&quot;')}" data-doc-submit-end="${(n['doc_submit_end']||'').replace(/"/g,'&quot;')}" data-winner-announce="${zfWinnerTrusted(n).replace(/"/g,'&quot;')}" data-contract-start="${(n['contract_start']||'').replace(/"/g,'&quot;')}" data-contract-end="${(n['contract_end']||'').replace(/"/g,'&quot;')}" data-attachment-urls="${n['attachment_urls']?JSON.stringify(n['attachment_urls']).replace(/"/g,'&quot;'):''}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this,'notice')" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
       <div class="htop">
         <p class="hname">${escapeHtml(normalizeRevisedTitle(n['공고명']))||'(공고명 없음)'}</p>
         ${isCancelRow?'':(t => `<span class="htag ${t.closed?'tag-mix':'tag-apt'}">${escapeHtml(t.text)}</span>`)(zfStatusTag(n))}
@@ -7242,18 +7242,32 @@ function zfEligVrEntries(vr){
   return Object.entries(vr).filter(([k,v]) => !(k === '공급대상' && v !== null && typeof v === 'object'));
 }
 
-function renderEligValue(v, inFold){
+// 🔴 2026-10-20(우편함 「표시층 — G3 고침」 2) — 키 이름이 「(만원)」으로 끝나면 그 아래 숫자는 이미 만원 단위다(원문 표의 단위 머리).
+//    종전에는 모든 숫자를 원으로 읽어 「총자산 가액(만원)」 34,500 이 「3만 4,500원」으로 보였다(만 배 작게 · …20730 · …20899 · …19307 · …20793).
+//    단위는 가장 가까운 단위 꼬리 키를 따른다(안쪽 키가 「(원)」이면 원) · 꼬리가 없으면 종전 그대로 원.
+function zfEligUnitOf(k, unit){
+  const m = /\((만원|원)\)\s*$/.exec(String(k || ''));
+  return m ? m[1] : unit;
+}
+function manText(v){
+  const n = Number(v);
+  if(!isFinite(n)) return String(v);
+  if(!Number.isInteger(n) || Math.abs(n) < 10000) return n.toLocaleString(undefined, {maximumFractionDigits: 20}) + '만원';
+  const sign = n < 0 ? '-' : '', abs = Math.abs(n), eok = Math.floor(abs / 10000), rest = abs % 10000;
+  return `${sign}${eok.toLocaleString()}억${rest ? ' ' + rest.toLocaleString() + '만' : ''}원`;
+}
+function renderEligValue(v, inFold, unit){
   if(v === null || v === undefined) return '<span></span>';
-  if(typeof v === 'number') return `<span>${manwonText(v)}</span>`;
+  if(typeof v === 'number') return `<span>${unit === '만원' ? manText(v) : manwonText(v)}</span>`;
   if(typeof v === 'string') return `<span>${escapeHtml(v)}</span>`;
   if(Array.isArray(v)){
     // 🔴 2026-10-08(표시층 긴급 2 · 1) — 원소가 객체·배열이면 String(x) 가 「[object Object]」를 찍는다(부산문현2 …20806).
     //    그런 배열은 원소마다 이 함수로 다시 그린다(객체 갈래 · 줄 단위). 글자·숫자 원소만인 배열은 종전 그대로 쉼표로 잇는다.
     if(v.some(x => x !== null && typeof x === 'object')){
-      const body = `<div class="elig-subrows">` + v.map(x => `<div class="elig-subrow">${renderEligValue(x, true)}</div>`).join('') + `</div>`;
+      const body = `<div class="elig-subrows">` + v.map(x => `<div class="elig-subrow">${renderEligValue(x, true, unit)}</div>`).join('') + `</div>`;
       return (!inFold && v.length >= ELIG_FOLD_ARR) ? eligFold(`${v.length}개 — 펼쳐 보기`, body) : body;
     }
-    const items = v.map(x => typeof x==='number' ? manwonText(x) : escapeHtml(String(x)));
+    const items = v.map(x => typeof x==='number' ? (unit === '만원' ? manText(x) : manwonText(x)) : escapeHtml(String(x)));
     const body = `<span>${items.join(', ')}</span>`;
     return (!inFold && items.length >= ELIG_FOLD_ARR) ? eligFold(`${items.length}개 — 펼쳐 보기`, body) : body;
   }
@@ -7261,7 +7275,7 @@ function renderEligValue(v, inFold){
     const entries = Object.entries(v);
     const fold = !inFold && entries.length >= ELIG_FOLD_OBJ;
     const body = `<div class="elig-subrows">` + entries.map(([k,vv]) =>
-      `<div class="elig-subrow"><span>${escapeHtml(prettifyEligKey(k))}</span>${renderEligValue(vv, inFold || fold)}</div>`
+      `<div class="elig-subrow"><span>${escapeHtml(prettifyEligKey(k))}</span>${renderEligValue(vv, inFold || fold, zfEligUnitOf(k, unit))}</div>`
     ).join('') + `</div>`;
     return fold ? eligFold(`${entries.length}개 항목 — 펼쳐 보기`, body) : body;
   }
@@ -8943,7 +8957,7 @@ function loadPreciseEligibility(annId, detailEl, id, useGroup){
         let vr = '';
         if(r.verification_requirements && typeof r.verification_requirements === 'object'){
           vr = zfEligVrEntries(r.verification_requirements).map(([k,v]) =>
-            `<div class="elig-row"><span class="elig-key">${escapeHtml(prettifyEligKey(k))}</span>${renderEligValue(v)}</div>`
+            `<div class="elig-row"><span class="elig-key">${escapeHtml(prettifyEligKey(k))}</span>${renderEligValue(v, false, zfEligUnitOf(k))}</div>`
           ).join('');
         }
         const siteNm = zfRowSite(siteLabel, r);
@@ -10195,7 +10209,7 @@ function renderMatchResults(rows){
         </div>`
       : `<div id="${cardId}" data-ann-id="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px" onclick="event.stopPropagation()"><div style="display:flex;gap:8px;flex-wrap:wrap">${zfSafeUrl(n.url)?`<a class="detail-link" href="${zfSafeHref(n.url)}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`:''} ${mShareBtn} ${mSaveBtn}</div></div>`;
 
-    html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n.region||'').replace(/"/g,'&quot;')}" data-sido="${(n.sido_nm||'').replace(/"/g,'&quot;')}" data-sigungu="${(n.sigungu_nm||'').replace(/"/g,'&quot;')}" data-title="${(n.title||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" data-housing-type="${(n.housing_type||'').replace(/"/g,'&quot;')}" data-precise-address="${(n.precise_address||'').replace(/"/g,'&quot;')}" data-relaxed="${n.is_relaxed_recruitment===true?'1':''}" data-relaxation-detail="${(n.relaxation_detail||'').replace(/"/g,'&quot;')}" data-contract-verify="${n.contract_before_verification===true?'1':''}" data-rent-exempt-until="${(n.rent_exemption_until||'').replace(/"/g,'&quot;')}" data-rent-exempt-note="${(n.rent_exemption_note||'').replace(/"/g,'&quot;')}" data-revised="${isAmended?'1':''}" data-revision-note-full="${revisionNoteEscM}" data-special-notes="${n.special_notes?JSON.stringify(n.special_notes).replace(/"/g,'&quot;'):''}" data-apply-start="${(n.apply_start||'').replace(/"/g,'&quot;')}" data-apply-end="${(n.apply_end||'').replace(/"/g,'&quot;')}" data-announcement-date="${(n.announcement_date||'').replace(/"/g,'&quot;')}" data-round-date="${zfNoticeDate(n).replace(/"/g,'&quot;')}" data-complex-count="${zfComplexCount(n)}" data-doc-submit-announce="${(n.doc_submit_announce_date||'').replace(/"/g,'&quot;')}" data-doc-submit-start="${(n.doc_submit_start||'').replace(/"/g,'&quot;')}" data-doc-submit-end="${(n.doc_submit_end||'').replace(/"/g,'&quot;')}" data-winner-announce="${(n.winner_announce_date||'').replace(/"/g,'&quot;')}" data-contract-start="${(n.contract_start||'').replace(/"/g,'&quot;')}" data-contract-end="${(n.contract_end||'').replace(/"/g,'&quot;')}" data-attachment-urls="${n.attachment_urls?JSON.stringify(n.attachment_urls).replace(/"/g,'&quot;'):''}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this,'match')" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
+    html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n.region||'').replace(/"/g,'&quot;')}" data-sido="${(n.sido_nm||'').replace(/"/g,'&quot;')}" data-sigungu="${(n.sigungu_nm||'').replace(/"/g,'&quot;')}" data-title="${(n.title||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" data-housing-type="${(n.housing_type||'').replace(/"/g,'&quot;')}" data-precise-address="${(n.precise_address||'').replace(/"/g,'&quot;')}" data-relaxed="${n.is_relaxed_recruitment===true?'1':''}" data-relaxation-detail="${(n.relaxation_detail||'').replace(/"/g,'&quot;')}" data-contract-verify="${n.contract_before_verification===true?'1':''}" data-rent-exempt-until="${(n.rent_exemption_until||'').replace(/"/g,'&quot;')}" data-rent-exempt-note="${(n.rent_exemption_note||'').replace(/"/g,'&quot;')}" data-revised="${isAmended?'1':''}" data-revision-note-full="${revisionNoteEscM}" data-special-notes="${n.special_notes?JSON.stringify(n.special_notes).replace(/"/g,'&quot;'):''}" data-apply-start="${(n.apply_start||'').replace(/"/g,'&quot;')}" data-apply-end="${(n.apply_end||'').replace(/"/g,'&quot;')}" data-announcement-date="${(n.announcement_date||'').replace(/"/g,'&quot;')}" data-round-date="${zfNoticeDate(n).replace(/"/g,'&quot;')}" data-complex-count="${zfComplexCount(n)}" data-doc-submit-announce="${(n.doc_submit_announce_date||'').replace(/"/g,'&quot;')}" data-doc-submit-start="${(n.doc_submit_start||'').replace(/"/g,'&quot;')}" data-doc-submit-end="${(n.doc_submit_end||'').replace(/"/g,'&quot;')}" data-winner-announce="${zfWinnerTrusted(n).replace(/"/g,'&quot;')}" data-contract-start="${(n.contract_start||'').replace(/"/g,'&quot;')}" data-contract-end="${(n.contract_end||'').replace(/"/g,'&quot;')}" data-attachment-urls="${n.attachment_urls?JSON.stringify(n.attachment_urls).replace(/"/g,'&quot;'):''}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this,'match')" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
       <div class="htop">
         <p class="hname">${escapeHtml(normalizeRevisedTitle(n.title))||'(공고명 없음)'}</p>
         ${(t => `<span class="htag ${t.closed?'tag-mix':'tag-apt'}">${escapeHtml(t.text)}</span>`)(zfStatusTag(n))}
@@ -11767,7 +11781,7 @@ function zf3LineHTML(stns, label){
 let zfWinSched = null, zfWinSchedP = null, zfWinSchedRedrawn = false;
 let zfSchedRows = null;   // 🔵 2026-10-19 — 결과발표 + 계약 행(scope_text 포함) · 공고 id → 행들(기본 창 발표·계약 · zfRouteSchedOf)
 function zfLoadWinSched(){
-  if(!zfWinSchedP) zfWinSchedP = fetch(`${SUPABASE_URL}/rest/v1/announcement_schedule?select=announcement_id,stage,scope_text,start_date,end_date&stage=in.(${encodeURIComponent('결과발표')},${encodeURIComponent('계약')})`, { headers: zfAnonHeaders() })
+  if(!zfWinSchedP) zfWinSchedP = fetch(`${SUPABASE_URL}/rest/v1/announcement_schedule?select=announcement_id,stage,scope_text,start_date,end_date,period_text&stage=in.(${encodeURIComponent('결과발표')},${encodeURIComponent('계약')})`, { headers: zfAnonHeaders() })
     .then(r => r.ok ? r.json() : null).then(rows => {
       if(!Array.isArray(rows)) throw new Error('응답 없음');
       const m = new Map(), all = new Map();
@@ -11784,6 +11798,30 @@ function zfLoadWinSched(){
     }).catch(e => { zfWinSchedP = null; console.warn('ZipFit 결과발표 일정 로드 실패:', e); return false; });
   return zfWinSchedP;
 }
+// 🔴 2026-10-20(우편함 「표시층 — G3 고침」 1) — 카드가 원문에 없는 발표일을 단정하지 않게: 수집 칸 발표일(winner_announce_date)을 믿지 않는 두 꼴.
+//    ⓐ 마이홈 값 — 대표가 마이홈이거나, LH 대표인데 단지마다 일정이 다른 공고(schedule_varies 참). 그 LH 행은 자기 발표일이 늘 비어 있어
+//       (DB 2026-10-20 실측 LH schedule_varies 참 13행 중 발표일 있음 0) 목록 RPC 가 같은 회차 마이홈 형제 값을 채운 것이다.
+//       마이홈은 원문의 「당첨자에 한하여 개별 안내」·「2027년 1월 중」을 월말·임의 날로 적는다(태백철암1 12-31 · 부산 신혼Ⅱ 2027-01-29).
+//    ⓑ 발표 = 마감 — LH 가 선착순·추가모집 공고의 발표 칸에 마감일을 자리값으로 둔다(DB LH 4행 · 열린 3: …20453 · …19841 · …20850).
+//    둘 다 일정 표(공고문)의 결과발표가 먼저다 — 날이 하루로 적혔으면 그 날, 날 없이 짧은 글(「2027년 1월 중」)이면 그 글자, 없으면 「원문 확인」.
+//    🔴 나머지 LH 자기 발표일(LH 공고 「당첨자발표일」 칸)은 그대로다. 창 판정(zfRouteWins · applyWindowState)의 가드는 바꾸지 않는다(표시만).
+function zfWinnerTrusted(row){
+  const w = String((row && row['winner_announce_date']) || '');
+  if(!w) return '';
+  const src = row['source'];
+  if(src === 'MYHOME') return '';
+  if(src === 'LH' && row['schedule_varies'] === true) return '';
+  if(src === 'LH' && w.slice(0, 10) === String(row['apply_end'] || row['신청마감일'] || '').slice(0, 10)) return '';
+  return w;
+}
+// 일정 표 결과발표 행이 하나이고 날 없이 짧은 글이면 그 글(원문 그대로) — 위 두 꼴로 수집 칸 발표일을 걷어 낸 카드의 노선 역 글자로만 쓴다
+//    (수집 칸이 처음부터 빈 카드는 종전 「원문 확인」 그대로 — 이 고침의 범위 밖).
+function zfWinTextFromSchedule(aid){
+  const rs = zfWinSched && zfWinSched.get(String(aid || ''));
+  if(!rs || rs.length !== 1 || rs[0].start_date || rs[0].end_date) return '';
+  const t = String(rs[0].period_text || '').trim();
+  return t && t.length <= 14 ? t : '';
+}
 function zfWinFromSchedule(aid){
   const rs = zfWinSched && zfWinSched.get(String(aid || ''));
   if(!rs || rs.length !== 1) return '';
@@ -11796,14 +11834,16 @@ function zf3Stations(n){
   const ds = zfRouteDefaultSched(n);   // 🔵 2026-10-19 — 순위별 창 카드는 기본 창의 결과발표(일정 표 scope = 그 창 phase)
   // 🔵 S1 PR-2 — 단추 카드는 접수·마감·발표 역이 고른 창(기본 = 오늘 날짜의 창)을 따른다. 기본 창의 발표는 종전 식 그대로(위 ds · 카드 칸 대체) ·
   //    기본 밖 창은 그 창 일정 표 결과발표만(없으면 「원문 확인」 — 카드 발표 칸은 다른 창 날일 수 있어 쓰지 않는다).
+  //    🔴 기본 창의 카드 칸 대체는 믿을 수 있는 발표일만(zfWinnerTrusted · G3 #685) — 걷어 낸 카드는 일정 표의 짧은 글 · 없으면 「원문 확인」.
   const S = zfWinSwitch(n);
-  const w = S && S.i !== S.def ? zfRouteSchedOf(n, S.W, S.i).win : ((ds && ds.win) || n['winner_announce_date'] || zfWinFromSchedule(n['announcement_id']) || '');
+  const other = !!(S && S.i !== S.def);
+  const w = other ? zfRouteSchedOf(n, S.W, S.i).win : ((ds && ds.win) || zfWinnerTrusted(n) || zfWinFromSchedule(n['announcement_id']) || '');
   const m = S ? S.W.merged[S.i] : null;
   return [
     { k: '공고', d: ann, sub: rev ? '정정 ' + rev.slice(5) : '' },
     m ? { k: '접수', d: m.d, sub: S.labels[S.i], u: '미상' } : { k: '접수', d: s, u: '미상' },
     { k: '마감', d: m ? m.de : e, u: '미상' },
-    { k: '발표', d: zf3Real(w), u: '원문 확인' }
+    { k: '발표', d: zf3Real(w), u: (!other && n['winner_announce_date'] && !zfWinnerTrusted(n) ? zfWinTextFromSchedule(n['announcement_id']) : '') || '원문 확인' }
   ];
 }
 let zf3CardRows = new Map();
@@ -11822,7 +11862,7 @@ function zf3DecorateCards(){
   // 결과발표 일정이 목록보다 늦게 오면 그 날을 쓸 카드가 있을 때 한 번만 다시 그린다
   if(!zfWinSched) zfLoadWinSched().then(ok => {
     if(!ok || zfWinSchedRedrawn) return;
-    if((noticeFiltered || []).some(n => (!n['winner_announce_date'] && zfWinFromSchedule(n['announcement_id'])) || zfRouteSchedHit(n))){ zfWinSchedRedrawn = true; applyNoticeFiltersAndRender(noticePage); }
+    if((noticeFiltered || []).some(n => (!zfWinnerTrusted(n) && (zfWinFromSchedule(n['announcement_id']) || zfWinTextFromSchedule(n['announcement_id']))) || zfRouteSchedHit(n))){ zfWinSchedRedrawn = true; applyNoticeFiltersAndRender(noticePage); }
   });
   zf3CardRows = new Map((noticeFiltered || []).map((n, i) => ['ncard-' + zfCardKey(n['announcement_id'] || i), n]));
   const nl = document.getElementById('notice-list'), ml = document.getElementById('match-result');
