@@ -7,7 +7,10 @@
 --   G1 운영·화면 점검 실패 0, 7일 연속
 --      운영 = ops_health_runs kind='ops' · 화면 = ops_health_runs kind='screen'(2026-10-18 마이그레이션 2026-10-18_04 뒤부터 쌓인다 —
 --      그 전 화면 실패는 `health-screen` 이슈로만 셈: 마지막 #575 2026-10-16 20:37 KST).
---      실패 = ref='main' ∧ failed 에서 simulate* 를 뺀 ❌ ≥ 1 인 실행(⚠️는 세지 않는다 · 멈춤/안 멈춤 둘 다 센다).
+--      실패 = ref='main' ∧ failed 에서 simulate* 와 점검 불능을 뺀 ❌ ≥ 1 인 실행(⚠️는 세지 않는다 · 멈춤/안 멈춤 둘 다 센다).
+--      점검 불능(2026-10-20 · 우편함 「코드·운영 — 미착수 회차 … 점검 불능 분리」 ⓓ) = ops_health_runs.blind 에 든 ❌(마이그레이션 2026-10-20_01 뒤) ·
+--      운영 runner 는 그 전 행도 점검 불능으로 센다(gate.mjs 가 늘 blind 로 갈랐다). 실패와 따로 blind_7d 로 낸다 — 「실패 0」이어도 점검 불능이 크면 잰 것이 아니다.
+--      화면 점검 불능(배포 반영 기다림 초과)은 2026-10-20 뒤부터 DB 에 남는다(그 전에는 health-screen-blind 이슈로만).
 --   G2 열린 카드 전부 분석 완료 또는 「분석 중」 표시 · 판정 대기 0
 --      카드 요약 갈래(health-screen phrase 와 같은 식): 요약 · 목록없음 · 링크만 · 분석중 = 표지 있음 / 빈칸 · 미정리 = 위반.
 --      더함 둘(claude.ai 확정 2026-10-18): 「분석 중」은 대기열(analysis_dispatch_queue waiting·sent·claimed)에 있을 때만 약속이다(analyzing_not_queued = 0) ·
@@ -16,10 +19,15 @@
 --   G3 열린 카드에 지금 보이는 틀린 정보 0(출처 무관 — 2026-10-19 다운님 결정 · 종전 「가장 최근 실사용 회차 『높음』 결함 0」) → 아래 Notion 질의 ①
 --   G4 사용자 목록 실패 → health-ops list_user_fail(`ops_health_runs` warned · `ops_health_findings` item='list_user_fail'). 「사람」에는 다운님 기기가 섞인다 —
 --      판정에서 다운님 기기 실패도 센다(claude.ai 확정 2026-10-18 · 빼면 낙관 쪽으로 기운다).
+--      아래 g4: 로그 조회 실패(관리 API 오류 — 2026-10-19 22:25 「Failed to get project's logs」)는 사람 실패가 아니라 점검 불능 — blind 로 가른다(2026-10-20 ⓓ).
+--      그 전 행은 기록 문구에 「Error:」가 있으면 점검 불능으로 본다(조회 실패 때만 예외 문구가 값에 들어간다 · 성공 값은 「사람 브라우저 N · …」).
 --   G5 다섯 탭 중 빈 탭 0 → 비로그인: 화면 점검 항목 empty_tabs(kind='screen' 실행의 failed/warned · ops_health_findings item='empty_tabs').
 --      로그인·저장 0 상태는 실사용 회차가 잰다.
 --   G6 7일 동안 다운님 손 0 → DB 갈래 ⓐⓑⓔ는 아래 g6_db · ⓒ 사람이 닫은 점검 이슈는 GitHub(공개 이슈 목록) · ⓓ는 아래 Notion 질의 ②.
 --      「손」 = 자동 장치가 멈춰 사람이 메운 것만(우리가 개선을 위해 부른 회차는 세지 않는다). 2026-10-12 #428(발송기 잠금 → 다운님 급히 전달)은 센다.
+--      g6_db.late_claim_7d(2026-10-20 ⓑ) = 발송 뒤 잡기까지 30분 넘은 회차 — 사람 재개(세션에 메시지)는 다른 어떤 기록에도 안 남아 보이게만 둔다(셈에 넣을지는 판정).
+--        후속 전용(reason='followup')은 원래 잡기를 남기지 않아 이 칸에서 뺀다 → followup_noclaim_close_7d(①-2 가 60분에 닫은 = 세션이 안 뜬 후속 회차) ·
+--        followup_long_7d(끝까지 30분 넘은 후속 회차 — 늦게 떴는지 오래 일했는지 기록으로 못 가른다)로 따로 낸다.
 --   G7·G8 은 회차 판정으로 닫는다(복구 리허설 · 보안 감사) — 이 파일 밖.
 --
 -- Notion 질의(우편함 · 백로그 — Notion 커넥터로 claude.ai 가 돌린다)
@@ -34,12 +42,18 @@ select json_build_object(
   'g1_ops', g.g1_ops,
   'g1_screen', g.g1_screen,
   'g2', g.g2,
+  'g4', g.g4,
   'g6_db', g.g6_db
 )
 from (
   with kst as (select (now() at time zone 'Asia/Seoul')::date d),
-  r as (select kind, run_at, failed, warned,
-               (select array_agg(f) from unnest(failed) f where f not like 'simulate%') realf
+  r as (select kind, run_at, failed, warned, blind,
+               (select array_agg(f) from unnest(failed) f
+                 where f not like 'simulate%' and not (f = any(blind)) and not (kind = 'ops' and f = 'runner')) realf,
+               (select array_agg(f) from unnest(failed) f where f = any(blind) or (kind = 'ops' and f = 'runner')) blindf,
+               'list_user_fail' = any(warned) luf_warn,
+               'list_user_fail' = any(blind) or exists (select 1 from ops_health_findings x where x.kind = 'ops' and x.run_at = ops_health_runs.run_at
+                                                          and x.item = 'list_user_fail' and x.reason like '%Error:%') luf_blind
           from ops_health_runs where ref = 'main' and run_at > now() - interval '7 days'),
   o as (select d.announcement_id aid, d.title from get_announcements_deduped() d, kst
          where d.apply_end >= kst.d and d.title not like '%조기%마감%'),
@@ -57,13 +71,16 @@ from (
       'runs_7d', (select count(*) from r where kind = 'ops'),
       'real_fail_7d', (select count(*) from r where kind = 'ops' and coalesce(cardinality(realf), 0) > 0),
       'last_real_fail_kst', (select to_char(max(run_at) at time zone 'Asia/Seoul', 'MM-DD HH24:MI') from r where kind = 'ops' and coalesce(cardinality(realf), 0) > 0),
-      'clean_hours', (select round(extract(epoch from now() - coalesce(max(run_at), now() - interval '7 days')) / 3600) from r where kind = 'ops' and coalesce(cardinality(realf), 0) > 0)
+      'clean_hours', (select round(extract(epoch from now() - coalesce(max(run_at), now() - interval '7 days')) / 3600) from r where kind = 'ops' and coalesce(cardinality(realf), 0) > 0),
+      'blind_7d', (select count(*) from r where kind = 'ops' and coalesce(cardinality(blindf), 0) > 0),
+      'last_blind_kst', (select to_char(max(run_at) at time zone 'Asia/Seoul', 'MM-DD HH24:MI') from r where kind = 'ops' and coalesce(cardinality(blindf), 0) > 0)
     ) as g1_ops,
     json_build_object(
       'runs_7d', (select count(*) from r where kind = 'screen'),
       'first_run_kst', (select to_char(min(run_at) at time zone 'Asia/Seoul', 'MM-DD HH24:MI') from ops_health_runs where kind = 'screen' and ref = 'main'),
       'real_fail_7d', (select count(*) from r where kind = 'screen' and coalesce(cardinality(realf), 0) > 0),
       'last_real_fail_kst', (select to_char(max(run_at) at time zone 'Asia/Seoul', 'MM-DD HH24:MI') from r where kind = 'screen' and coalesce(cardinality(realf), 0) > 0),
+      'blind_7d', (select count(*) from r where kind = 'screen' and coalesce(cardinality(blindf), 0) > 0),
       'last_run', (select json_build_object('at_kst', to_char(run_at at time zone 'Asia/Seoul', 'MM-DD HH24:MI'), 'failed', failed, 'warned', warned)
                      from r where kind = 'screen' order by run_at desc limit 1),
       -- 통과 항목은 ops_health_findings 에 남지 않는다(경고·실패만) → 마지막 화면 점검이 있고 그 행이 없으면 「통과」.
@@ -83,10 +100,29 @@ from (
       'judge_wait_status', (select count(*) from announcement_analysis aa join o on o.aid = aa.announcement_id where aa.status = '완료(판정 대기)')
     ) as g2,
     json_build_object(
+      'runs_7d', (select count(*) from r where kind = 'ops'),
+      'human_fail_runs_7d', (select count(*) from r where kind = 'ops' and luf_warn and not luf_blind),
+      'last_human_fail_kst', (select to_char(max(run_at) at time zone 'Asia/Seoul', 'MM-DD HH24:MI') from r where kind = 'ops' and luf_warn and not luf_blind),
+      'blind_7d', (select count(*) from r where kind = 'ops' and luf_blind),
+      'last_blind_kst', (select to_char(max(run_at) at time zone 'Asia/Seoul', 'MM-DD HH24:MI') from r where kind = 'ops' and luf_blind)
+    ) as g4,
+    json_build_object(
       'manual_dispatch_7d', (select count(*) from analysis_dispatch_runs where reason = 'manual' and created_at > now() - interval '7 days'),
       'manual_release_7d', (select count(*) from analysis_dispatch_runs where finish_note like '잠금 풀기:%' and finished_at > now() - interval '7 days'),
       'auto_release_7d', (select count(*) from analysis_dispatch_runs where finish_note like '자동 회수%' and finished_at > now() - interval '7 days'),
       'listing_hides_7d', (select count(*) from zipfit_ops.listing_hides where hidden_at > now() - interval '7 days'),
-      'aux_missing_open', (select count(*) from announcement_analysis aa join o on o.aid = aa.announcement_id where aa.status = '완료(보조 누락)')
+      'aux_missing_open', (select count(*) from announcement_analysis aa join o on o.aid = aa.announcement_id where aa.status = '완료(보조 누락)'),
+      'late_claim_7d', (select json_build_object('n', count(*), 'runs', coalesce(json_agg(json_build_object('id', id, 'reason', reason,
+                              'wait_min', round(extract(epoch from claimed_at - created_at) / 60)) order by id), '[]'::json))
+                          from analysis_dispatch_runs
+                         where reason <> 'followup' and created_at > now() - interval '7 days' and claimed_at - created_at > interval '30 minutes'),
+      'followup_noclaim_close_7d', (select json_build_object('n', count(*), 'runs', coalesce(json_agg(id order by id), '[]'::json))
+                                      from analysis_dispatch_runs
+                                     where reason = 'followup' and created_at > now() - interval '7 days' and finish_note like '후속 전용 — 만든 지 60분%'),
+      'followup_long_7d', (select json_build_object('n', count(*), 'runs', coalesce(json_agg(json_build_object('id', id,
+                              'min', round(extract(epoch from finished_at - created_at) / 60)) order by id), '[]'::json))
+                             from analysis_dispatch_runs
+                            where reason = 'followup' and created_at > now() - interval '7 days' and finished_at - created_at > interval '30 minutes'
+                              and finish_note not like '후속 전용 — 만든 지 60분%')
     ) as g6_db
 ) g;
