@@ -1919,13 +1919,19 @@ function isNewNotice(row){
   return d ? Math.round((startOfLocalDay(new Date()) - startOfLocalDay(d)) / 86400000) <= ZF_FRESH_DAYS : false;
 }
 const ZF_FRESH_DAYS = 3;
-function isClosingSoon(row){
+// 🔵 2026-10-20(다운님 실사용 10-20 ④) — 「마감 임박」이 재는 마감일을 한 곳에서 낸다(판정은 종전 isClosingSoon 그대로 — 옮기기만 했다).
+//    인사이트 「앞으로 14일 마감」 막대도 이 날짜로 센다 — 종전 막대는 apply_end 원값이라 숫자판 「3일 안 마감」과 다른 카드 집합을 셌다(…20877 차수 창).
+//    날짜를 못 믿거나(apply_period_check) 차수 사이(zfRouteGap)면 null — 마감 임박에도 막대에도 넣지 않는다.
+function zfClosingEnd(row){
   // 🔴 B62 ③ — 접수기간을 믿을 수 없는 행에는 날짜에서 나오는 배지를 달지 않는다.
-  if(row['apply_period_check'] === true) return false;
-  if(zfRouteGap(row)) return false;   // 🔴 2026-10-15 — 차수 사이(다음 창을 기다리는 카드)는 마감 임박이 아니다(zfRouteGap)
+  if(row['apply_period_check'] === true) return null;
+  if(zfRouteGap(row)) return null;   // 🔴 2026-10-15 — 차수 사이(다음 창을 기다리는 카드)는 마감 임박이 아니다(zfRouteGap)
   // 🔵 2026-10-16 — 창 안 차수 카드는 지금 창 끝까지 잰다(zfRouteCurEnd · 알약 「이번 차수 마감 D-n」과 같은 축).
   const own = row['신청마감일']||row['apply_end']||'', cur = zfRouteCurEnd(row);
-  const d = parseNoticeDate(cur && (!own || cur < String(own).slice(0, 10)) ? cur : own);
+  return parseNoticeDate(cur && (!own || cur < String(own).slice(0, 10)) ? cur : own) || null;
+}
+function isClosingSoon(row){
+  const d = zfClosingEnd(row);
   if(!d) return false;
   // 🔴 시각을 비교에서 제거한다 — 양쪽 다 「로컬 날짜의 00:00」으로 맞춘 뒤 일수 차를 센다.
   // 예전에는 마감일 23:59(UTC 자정 파싱분이라 KST 09:00 기준)와 「지금 시각」을 뺐다.
@@ -5393,10 +5399,10 @@ function renderInsight(rows, wrap, statsRows){
     timelineMap[dateKey(d)] = 0;
   }
   // 🔵 2026-10-08(숫자가 말하는 「지금」) — 「마감 임박」은 지금 열린 공고만 센다. 마감일이 남아도 기관이 먼저 마감한 공고(LH 조기 마감)는 뺀다.
+  // 🔵 2026-10-20(다운님 실사용 10-20 ④) — 마감일은 숫자판 「3일 안 마감」(kpiClosing)과 같은 판정(zfClosingEnd · zfWithSoonestEnd)으로 —
+  //    차수 창 끝 · 같은 게시물 가장 이른 열린 마감 · 날짜 못 믿음·차수 사이는 뺌. 그래서 막대 오늘~3일 뒤 합 = 「3일 안 마감」.
   openRows.forEach(r=>{
-    const raw = r.apply_end||'';
-    if(!raw) return;
-    const d = parseNoticeDate(raw);
+    const d = zfClosingEnd(zfWithSoonestEnd(r));
     if(!d) return;
     const key = dateKey(d);
     if(key in timelineMap) timelineMap[key]++;
@@ -12777,10 +12783,11 @@ function zf3InsightTop(c){
   const dow = k => '일월화수목금토'[new Date(k + 'T00:00:00Z').getUTCDay()];
   const tMax = Math.max(1, ...c.timelineEntries.map(e => e[1]));
   const tl = c.timelineEntries.map(([k, n], i) => {
-    const hot = k === c.todayStr || k === c.tomorrowStr;
+    // 🔵 2026-10-20(다운님 실사용 10-20 ④) — 빨강 = 「3일 안 마감」 구간(오늘~3일 뒤 · isClosingSoon 의 0~3일)과 같은 칸 — 그 칸 합 = 위 숫자.
+    const hot = i <= 3;
     const day = +k.slice(8, 10);
     // 🔵 2026-10-13(D1) — 글자를 12px(t-xs)로 올리면서 390의 14칸(한 칸 약 20px)에 들어가게: 날짜는 일만(달이 바뀌는 1일만 「월/1」 · 시작 달은 위 설명 줄에) ·
-    //    두 글자는 「오늘」 하나만(내일은 요일 · 빨강(경고 색)이 오늘·내일을 함께 가리킨다 — 설명 줄에 적는다).
+    //    두 글자는 「오늘」 하나만(내일은 요일 · 빨강(경고 색)이 「3일 안 마감」 구간을 가리킨다 — 설명 줄에 적는다 · 2026-10-20).
     const lab = day === 1 && i > 0 ? `${+k.slice(5, 7)}/1` : String(day);
     const wk = k === c.todayStr ? '오늘' : dow(k);
     return `<div class="zf3-tc${hot ? ' hot' : ''}${n ? '' : ' z'}" title="${k}: ${n}건"><span class="n">${n}</span><i style="--h:${n ? Math.round(n / tMax * 100) : 0}"></i><span class="d">${lab}</span><span class="w">${wk}</span></div>`;
@@ -12797,7 +12804,7 @@ function zf3InsightTop(c){
       <div class="zf3-kc"><b style="--c:var(--led)">${fmt(c.kpiNew)}</b><span>새 공고 · 3일</span></div>
       <div class="zf3-kc"><b style="--c:var(--led-red)">${fmt(c.kpiClosing)}</b><span>3일 안 마감</span></div>
     </div>
-    <div class="zf3-ins-card"><h3>앞으로 14일 마감</h3><p class="zf3-ins-note">지금 열린 공고의 마감일 · ${c.timelineEntries.length ? `${+c.timelineEntries[0][0].slice(5, 7)}월 ${+c.timelineEntries[0][0].slice(8, 10)}일(오늘)부터` : ''} · 빨강 = 오늘·내일 마감</p>
+    <div class="zf3-ins-card"><h3>앞으로 14일 마감</h3><p class="zf3-ins-note">지금 열린 공고의 마감일(차수 공고는 이번 차수 마감) · ${c.timelineEntries.length ? `${+c.timelineEntries[0][0].slice(5, 7)}월 ${+c.timelineEntries[0][0].slice(8, 10)}일(오늘)부터` : ''} · 빨강 = 3일 안 마감(위 숫자와 같은 공고)</p>
       <div class="zf3-tl" role="img" aria-label="${zfAttr(tlAria)}">${tl}</div></div>
     <div class="zf3-ins-card"><h3>지역별 열린 공고 <span>${c.regionAll.length}개 지역</span></h3>
       <p class="zf3-ins-note">신청할 수 없는 공고는 빼고 ${fmt(c.openN)}건을 세었어요 · 목록에 없는 지역은 지금 신청할 수 있는 공고가 없는 곳이에요</p>
