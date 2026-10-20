@@ -1,0 +1,77 @@
+{
+  "_설명": "공급대상 판정 페르소나 정본 — scripts/target-persona-check.mjs 가 이 목록 × 지금 열린 카드로 화면 판정 함수(zfTargetVerdictFor → zfTargetIncomeGate)를 돌린다. 🔴 새로 지어내지 않는다 — 각 페르소나는 우편함 회신에 적힌 입력을 그대로 옮기고 source 에 페이지·절을 적는다. 더할 때도 같은 규칙(회신에 쓴 입력만 · 출처 한 줄). 입력 칸은 진단 화면 칸 값(코드값)이다: marital(#marital) · birthYear 또는 age(출생연도 = 올해 − age) · children(#children 0~3 · 3 = 3명 이상) · members(#members · null = 사용자가 안 건드림 = 판정에서 모름) · income(#income 세전 월 만원 · null = 비움) · dualIncome(#dualIncome yes/no/unknown) · birthAfterBase(#birthAfterBase yes/no/unknown) · classes(#zfClassSet 체크 값). 적히지 않은 칸은 null(진단 기본값 그대로). 화면 글자 → 코드값 대응은 index.html #marital · #zfClassSet 보기 글자로 했다(회신은 화면 글자만 적었다).",
+  "personas": [
+    {
+      "id": "P1",
+      "name": "청년 1인(관악)",
+      "source": "우편함 「실사용 피드백 1회차」 회신 「페르소나 입력표」 P1 — 1999 · 결혼한 적 없음 · 0 · 1인 · 280만 · 맞벌이 —",
+      "inputs": { "marital": "single", "birthYear": 1999, "children": 0, "members": 1, "income": 280, "dualIncome": null, "birthAfterBase": null, "classes": [] }
+    },
+    {
+      "id": "P2",
+      "name": "신혼(성동)",
+      "source": "우편함 「실사용 피드백 1회차」 회신 「페르소나 입력표」 P2 — 1994 · 신혼부부(7년 이내) · 0 · 2인 · '23.3.28 뒤 출산 아니오 · 550만 · 맞벌이 예",
+      "inputs": { "marital": "married_7", "birthYear": 1994, "children": 0, "members": 2, "income": 550, "dualIncome": "yes", "birthAfterBase": "no", "classes": [] }
+    },
+    {
+      "id": "P3",
+      "name": "다자녀(화성)",
+      "source": "우편함 「실사용 피드백 1회차」 회신 「페르소나 입력표」 P3 — 1986 · 유자녀 혼인가구(6세 이하) · 3명 이상 · 5인 · 아니오 · 600만 · 맞벌이 아니오",
+      "inputs": { "marital": "married_child6", "birthYear": 1986, "children": 3, "members": 5, "income": 600, "dualIncome": "no", "birthAfterBase": "no", "classes": [] }
+    },
+    {
+      "id": "P4",
+      "name": "고령 수급자(사하)",
+      "source": "우편함 「실사용 피드백 1회차」 회신 「페르소나 입력표」 P4 — 1955 · 이혼·사별 · 0 · 1인 · 70만 + 「실사용 피드백 2회차」 회신 「페르소나 입력표(바뀐 것만)」 생계급여 수급자 체크",
+      "inputs": { "marital": "divorced_widowed", "birthYear": 1955, "children": 0, "members": 1, "income": 70, "dualIncome": null, "birthAfterBase": null, "classes": ["livelihood"] }
+    },
+    {
+      "id": "P5",
+      "name": "장애인(수성)",
+      "source": "우편함 「실사용 피드백 1회차」 회신 「페르소나 입력표」 P5 — 1980 · 결혼한 적 없음 · 0 · 1인 · 180만 + 「실사용 피드백 2회차」 회신 「페르소나 입력표(바뀐 것만)」 장애인 체크",
+      "inputs": { "marital": "single", "birthYear": 1980, "children": 0, "members": 1, "income": 180, "dualIncome": null, "birthAfterBase": null, "classes": ["disabled"] }
+    },
+    {
+      "id": "Y30",
+      "name": "미혼 청년 30",
+      "source": "우편함 「표시층 — 한부모 갈래에 확인필요가 있어도 미혼·기혼은 no 먼저 …」(2026-10-19) 요청 ① 3 「미혼 청년 30」 · 회신 「실물」 진단 입력 — 미혼 · 1인 · 30세 · 소득 250 · 자산 9,000",
+      "inputs": { "marital": "single", "age": 30, "children": 0, "members": 1, "income": 250, "dualIncome": null, "birthAfterBase": null, "classes": [] }
+    },
+    {
+      "id": "SP45",
+      "name": "한부모 45 · 자녀 1",
+      "source": "우편함 「표시층 — 한부모 갈래에 확인필요가 있어도 미혼·기혼은 no 먼저 …」(2026-10-19) 요청 ① 3 · 회신 페르소나 표 「한부모 45 · 자녀 1」(가구원·소득은 적히지 않음)",
+      "inputs": { "marital": "single_parent", "age": 45, "children": 1, "members": null, "income": null, "dualIncome": null, "birthAfterBase": null, "classes": [] }
+    },
+    {
+      "id": "NW32",
+      "name": "신혼 32",
+      "source": "우편함 「표시층 — 한부모 갈래에 확인필요가 있어도 미혼·기혼은 no 먼저 …」(2026-10-19) 요청 ① 3 「기혼 신혼 32」 · 회신 페르소나 표 「신혼 32」(가구원·소득은 적히지 않음)",
+      "inputs": { "marital": "married_7", "age": 32, "children": 0, "members": null, "income": null, "dualIncome": null, "birthAfterBase": null, "classes": [] }
+    },
+    {
+      "id": "MC1",
+      "name": "유자녀 혼인가구 · 미성년 자녀 1",
+      "source": "우편함 「표시층 — 다자녀 갈래 확인필요에 「태아」가 있고 …」(2026-10-19) 회신 페르소나 표 첫 줄 · 「실물」 진단 입력 — 유자녀 혼인가구 · 자녀 1 · 3인 · 35세 · 소득 300 · 자산 9,000",
+      "inputs": { "marital": "married_child6", "age": 35, "children": 1, "members": 3, "income": 300, "dualIncome": null, "birthAfterBase": null, "classes": [] }
+    },
+    {
+      "id": "MC2",
+      "name": "유자녀 혼인가구 · 자녀 2",
+      "source": "우편함 「표시층 — 다자녀 갈래 확인필요에 「태아」가 있고 …」(2026-10-19) 덧 회신 페르소나 표 「유자녀 · 자녀 2」(나이·가구원·소득은 적히지 않음)",
+      "inputs": { "marital": "married_child6", "age": null, "children": 2, "members": null, "income": null, "dualIncome": null, "birthAfterBase": null, "classes": [] }
+    },
+    {
+      "id": "MC3",
+      "name": "유자녀 혼인가구 · 자녀 3",
+      "source": "우편함 「표시층 — 다자녀 갈래 확인필요에 「태아」가 있고 …」(2026-10-19) 덧 회신 페르소나 표 「유자녀 · 자녀 3」 · 덧 회신 「실물」 진단 입력 — 유자녀 · 자녀 3 · 5인 · 40세",
+      "inputs": { "marital": "married_child6", "age": 40, "children": 3, "members": 5, "income": null, "dualIncome": null, "birthAfterBase": null, "classes": [] }
+    },
+    {
+      "id": "M0",
+      "name": "혼인가구 · 자녀 0",
+      "source": "우편함 「표시층 — 다자녀 갈래 확인필요에 「태아」가 있고 …」(2026-10-19) 회신 페르소나 표 「혼인가구 · 자녀 0」(나이·가구원·소득은 적히지 않음)",
+      "inputs": { "marital": "married", "age": null, "children": 0, "members": null, "income": null, "dualIncome": null, "birthAfterBase": null, "classes": [] }
+    }
+  ]
+}
