@@ -4704,7 +4704,19 @@ function zfCardEmptyKindFor(annId){
 //    🔴 판정은 카드 요약 상자와 같은 RPC 칸(get_announcement_price_summary)뿐 — 대기열 표는 읽지 않는다. 첨부 0(link_only)은 분석될 길이 없으니
 //    「분석 중」이라 하지 않고, 같은 게시물 링크가 있는 카드(B62 ④)는 그 링크를 그대로 둔다(종전 안내). 분석이 끝나면 다음 조회에서 일반 카드로 돌아온다.
 //    판정·거름·정렬·셈은 바꾸지 않는다(표시만).
-const ZF_DCELL_DATE = /^(공고일|접수기간)$/;
+const ZF_DCELL_DATE = /^(공고일|최초 공고일|정정일|접수기간)$/;
+// 🔵 2026-10-20(우편함 「표시층 — S1 다섯」 3 · 실사용 5회차 D6) — 상세 공고일 칸을 노선(zf3Stations 「공고 · 정정 MM-DD」)과 같은 뜻으로.
+//    종전 「공고일」 = announcement_date 라 정정 공고에서 어떤 카드는 정정 게시일(…20904 10-13), 어떤 카드는 원공고일(…0877 10-06)이었다.
+//    정정 행이고 원공고일(first_announcement_date)이 있으면 「최초 공고일」(zfNoticeDate) + 「정정일」(zfRevisedDate · 있을 때만) · 그 밖은 종전 그대로.
+function zfAnnDateRows(row, annDate){
+  if(!annDate) return [];
+  if(row['is_revised'] === true && row['first_announcement_date']){
+    const out = [['최초 공고일', escapeHtml(zfNoticeDate(row))]], rv = zfRevisedDate(row);
+    if(rv) out.push(['정정일', escapeHtml(rv)]);
+    return out;
+  }
+  return [['공고일', escapeHtml(annDate)]];
+}
 // 🔵 2026-10-16(우편함 「표시층 — 「AI 정리」는 분석 있을 때만 …」 1) — 카드 회차 분석이 없으면(analysis_done 거짓) 원문 링크는 「원문 보기」만.
 //    분석 전(zfAnaPending) · 첨부 0(「원문 링크만 제공해요」) · 같은 게시물 링크만 있는 카드 · 저장 목록 · 체크리스트 모두 같은 판정이다.
 //    같은 게시물 LH 카드에 함께 정리된 카드(zfPostLinkOrganized 참 — 정리가 그쪽에 있다)는 그대로 · 모르면(요약 전·실패) 그대로.
@@ -4903,7 +4915,7 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
     if(n['move_in_date']) detailRows.push(moveInRow(n['move_in_date'], n));
     if(n['deposit_min']) detailRows.push(['보증금', Number(n['deposit_min']).toLocaleString()+'원']);
     if(n['rent_min']) detailRows.push(['월임대료', Number(n['rent_min']).toLocaleString()+'원']);
-    if(annDate) detailRows.push(['공고일', escapeHtml(annDate)]);
+    detailRows.push(...zfAnnDateRows(n, annDate));
     // 🔴 B62 ③ — 접수기간을 믿을 수 없는 행은 수집 날짜 대신 「확인 필요」라고 적는다(날짜 줄과 같은 말).
     if(!isCancelRow && n['apply_period_check'] === true) detailRows.push(['접수기간', '확인 필요 — 공사 공고에서 확인']);
     else if(!isCancelRow && (applyStart||applyEnd)) detailRows.push(['접수기간', `<span data-zf-win="${zfAttr(String(n['announcement_id']||''))}">${escapeHtml((applyStart||'-')+' ~ '+(applyEnd||'-'))}</span>`]);   // 창 둘 이상이면 기본 창(zfFillWinSlots)
@@ -10156,7 +10168,7 @@ function renderMatchResults(rows){
     if(n.move_in_date) detailRows.push(moveInRow(n.move_in_date, n));
     if(n.deposit_min) detailRows.push(['보증금', Number(n.deposit_min).toLocaleString()+'원']);
     if(n.rent_min) detailRows.push(['월임대료', Number(n.rent_min).toLocaleString()+'원']);
-    if(annDate) detailRows.push(['공고일', escapeHtml(annDate)]);
+    detailRows.push(...zfAnnDateRows(n, annDate));
     // 🔴 B62 ③ — 공고 탭과 같은 말.
     if(n.apply_period_check === true) detailRows.push(['접수기간', '확인 필요 — 공사 공고에서 확인']);
     else if(applyStart||applyEnd) detailRows.push(['접수기간', `<span data-zf-win="${zfAttr(String(n.announcement_id||''))}">${escapeHtml((applyStart||'-')+' ~ '+(applyEnd||'-'))}</span>`]);   // 공고 탭과 같은 자리(zfFillWinSlots)
