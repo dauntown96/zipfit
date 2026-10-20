@@ -892,6 +892,10 @@ html.zf3-mapview[data-ui="d3"] #notice-list{display:none}
 .zf3-map-wait{margin:20px 0;text-align:center;font-size:var(--t-s);color:var(--ink-3)}
 .zf3-radar{position:relative;border:1px solid var(--line);border-radius:var(--r-3);background:var(--map-sea);overflow:hidden}
 .zf3-radar svg{display:block;width:100%;height:auto;max-height:70vh}
+/* 지도 휠 안내(S1 PR-1 ③) — 그냥 휠이 쪽 스크롤을 막지 않게 글자만 잠깐(누름 통과) */
+.zf3-whint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:grid;gap:2px;justify-items:center;max-width:86%;padding:8px 14px;border-radius:10px;background:rgba(20,20,18,.78);color:#fff;font-size:var(--t-s);text-align:center;pointer-events:none;opacity:0;transition:opacity var(--m-fast) var(--ease);z-index:3}
+.zf3-whint span{font-size:var(--t-xs);opacity:.85}
+.zf3-whint.on{opacity:1}
 .zf3-radar .land{fill:var(--map-land);stroke:var(--map-line);stroke-width:.8}
 .zf3-radar .land.on{fill:var(--surface-2)}
 .zf3-radar .dot{fill:var(--map-dot);stroke:var(--map-land);stroke-width:1.5}
@@ -12518,6 +12522,9 @@ function zf3PlaceFilter(rows){
 }
 const zf3Wide = () => { try{ return matchMedia('(min-width:1200px)').matches; }catch(e){ return false; } };
 function zf3SetView(v){
+  // 🔵 S1 PR-1 ③ — 좁은 화면에서 목록 → 지도로 돌아오면 고른 곳(📍)을 푼다: 지도는 다시 고르는 자리라 한 곳만 남은 목록을 들고 오지 않는다.
+  //    넓은 화면(1200px~)은 지도·목록이 같이 보여 그대로 · 목록의 시·군·구 칩으로 고른 것도 지도로 갈 때만 풀린다.
+  if(v === 'map' && zf3View !== 'map' && !zf3Wide() && zf3PlaceSel){ zf3PlaceSel = null; zf3PlaceName = ''; zf3View = 'map'; applyNoticeFiltersAndRender(); }
   zf3View = v === 'map' ? 'map' : 'list';
   document.documentElement.classList.toggle('zf3-mapview', zf3View === 'map');
   document.querySelectorAll('#zf3NoticeHead [data-act="view"]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === zf3View)));
@@ -12581,6 +12588,14 @@ function zf3PlacesHTML(gs, mine){
 //    시·도 점·단추를 누르면 그 시·도로 확대하고 시·군·구 단추 층을 연다 · 「← 시·도 전체」는 전국으로.
 //    첫 화면은 시도 윤곽 + 시군구 중심점(ZF3_GEO) · 확대하면 같은 판의 경계선(zf3LinesFor) — 새 호스트 0. 점·글자는 배율을 나눠 화면 크기를 지킨다.
 let zf3Zoom = null, zf3ProvBoxC = null, zf3MapLast = null, zf3MapDrag = null, zf3MapMoved = false, zf3DupSgg = null;
+// 🔵 S1 PR-1 ③(설계서 · 실사용 4회차 UX 묶음) — 지도를 한 번 누르면(점·땅·빈 바다 어디든) 지도 밖으로 나갈 때까지 그냥 휠도 확대 · 안 누른 채 그냥 휠이면 안내 한 줄(쪽 스크롤은 그대로).
+let zf3MapWheelOn = false, zf3WheelHintT = 0;
+function zf3WheelHint(box){
+  const r = box.querySelector('.zf3-radar'); if(!r) return;
+  let h = r.querySelector('.zf3-whint');
+  if(!h){ h = document.createElement('div'); h.className = 'zf3-whint'; h.setAttribute('aria-hidden', 'true'); h.innerHTML = '<b>Ctrl(⌘)+휠로 확대해요</b><span>지도를 한 번 누르면 휠만으로도 돼요</span>'; r.appendChild(h); }
+  h.classList.add('on'); clearTimeout(zf3WheelHintT); zf3WheelHintT = setTimeout(() => h.classList.remove('on'), 1500);
+}
 const ZF3_ZOOM_SGG = 1.8, ZF3_ZOOM_MAX = 10, ZF3_SIDO_AT = { 경기도: '이천시' };
 function zf3FullVb(){ return (zf3Geo && zf3Geo.vb) ? zf3Geo.vb.slice() : [0, 0, 461, 565]; }
 function zf3CurVb(){ return zf3Zoom || zf3FullVb(); }
@@ -12755,8 +12770,11 @@ function zf3MapWire(box){
     live();
   }, { passive: false });
   box.addEventListener('touchend', e => { if(zf3MapDrag && zf3MapDrag.pinch && e.touches.length < 2){ zf3MapDrag = null; settle(); } });
+  box.addEventListener('pointerdown', e => { if(e.target.closest('.zf3-radar svg')) zf3MapWheelOn = true; });
+  box.addEventListener('pointerleave', () => { zf3MapWheelOn = false; });
   box.addEventListener('wheel', e => {
-    if(!(e.ctrlKey || e.metaKey) || !e.target.closest('.zf3-radar svg')) return;
+    if(!e.target.closest('.zf3-radar svg')) return;
+    if(!(e.ctrlKey || e.metaKey) && !zf3MapWheelOn){ zf3WheelHint(box); return; }
     e.preventDefault();
     const [cx, cy] = toSvg(e.clientX, e.clientY);
     zf3ZoomBy(Math.exp(-e.deltaY * 0.01), cx, cy);
