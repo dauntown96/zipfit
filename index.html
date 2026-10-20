@@ -435,6 +435,10 @@ a[href^="./privacy.html"]{font-weight:700}
    오버레이(z-index 1000)뿐이라 그 아래(90)에 둔다 — 위쪽 탭 줄(sticky 100)과도 자리가 다르다. */
 .zf-totop{position:fixed;right:max(16px,calc((100vw - 720px) / 2 + 16px));bottom:calc(20px + env(safe-area-inset-bottom, 0px));z-index:90;width:44px;height:44px;border-radius:50%;border:1px solid #d8d8d0;background:#fff;color:#0F6E56;font-size:20px;line-height:1;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.15);display:flex;align-items:center;justify-content:center;opacity:0;visibility:hidden;transform:translateY(8px);transition:opacity .2s,transform .2s,visibility .2s}
 .zf-totop.show{opacity:1;visibility:visible;transform:none}
+/* 🔵 2026-10-20 실사용 5회차 D2 — 맨 위로 단추가 카드 펼침 단추 「›」를 덮지 않게: 단 밖 여백이 있으면 단 밖으로(840~) ·
+   좁은 화면에서 「›」와 겹치는 동안은 숨는다(zf-dodge — 아래 스크립트가 스크롤마다 잰다). */
+.zf-totop.show.zf-dodge{opacity:0;visibility:hidden;pointer-events:none}
+@media (min-width:840px){.zf-totop{right:calc((100vw - 720px) / 2 - 52px)}}
 .zf-totop:focus-visible{outline:2px solid #5DCAA5;outline-offset:2px}
 body.theme-dark .zf-totop{background:#262932;border-color:#3a3e48;color:#5DCAA5;box-shadow:0 2px 10px rgba(0,0,0,0.5)}
 
@@ -960,7 +964,7 @@ html.zf3-mapview[data-ui="d3"] #notice-list{display:none}
   html[data-ui="d3"] body:has(#main2:not(.hidden)) #zf3Map{position:fixed;top:60px;left:calc(max(24px,calc((100vw - 1232px) / 2)) + 752px);width:480px;max-height:calc(100vh - 76px);overflow:auto;margin:0;padding:2px}
   html[data-ui="d3"] body:has(#main2:not(.hidden)) .zf3-sticky{left:max(24px,calc((100vw - 1232px) / 2));transform:none;width:720px;animation-name:zf3slidev}
   html[data-ui="d3"] body:has(#main2:not(.hidden)) .zf3-radar svg{max-height:calc(100vh - 300px)}
-  html[data-ui="d3"] body:has(#main2:not(.hidden)) .zf-totop{right:auto;left:calc(max(24px,calc((100vw - 1232px) / 2)) + 660px)}
+  html[data-ui="d3"] body:has(#main2:not(.hidden)) .zf-totop{right:auto;left:calc(max(24px,calc((100vw - 1232px) / 2)) + 706px)}
 }
 @media (prefers-reduced-motion:reduce){.zf3-radar .pulse,.zf3-radar .pt{animation:none!important}}
 /* 추천(D-3 단계 e) — 노선 스텝 · 결과부터 · 1200px 두 단 · 결과 상자 토큰 */
@@ -11333,9 +11337,24 @@ initNoticeFilters();
   const btn = document.getElementById('zfToTop');
   if(!btn) return;
   let queued = false;
-  const update = () => { queued = false; btn.classList.toggle('show', (window.scrollY || document.documentElement.scrollTop || 0) > window.innerHeight); };
-  window.addEventListener('scroll', () => { if(!queued){ queued = true; requestAnimationFrame(update); } }, { passive: true });
-  window.addEventListener('resize', update, { passive: true });
+  // 2026-10-20 D2 — 보이는 카드 펼침 단추(.zf3-gotop)와 4px 안으로 겹치면 숨긴다(그 자리를 누르면 카드가 열려야 한다).
+  const covers = () => {
+    const r = btn.getBoundingClientRect(), m = 4;
+    return [...document.querySelectorAll('.zf3-gotop')].some(g => {
+      const b = g.getBoundingClientRect();
+      return b.width > 0 && b.right > r.left - m && b.left < r.right + m && b.bottom > r.top - m && b.top < r.bottom + m;
+    });
+  };
+  const update = () => {
+    queued = false;
+    const on = (window.scrollY || document.documentElement.scrollTop || 0) > window.innerHeight;
+    btn.classList.toggle('show', on);
+    btn.classList.toggle('zf-dodge', on && covers());
+  };
+  const later = () => { if(!queued){ queued = true; requestAnimationFrame(update); } };
+  window.addEventListener('scroll', later, { passive: true });
+  window.addEventListener('resize', later, { passive: true });
+  document.addEventListener('click', later, true);   // 카드를 펼치고 접어 단추 자리가 바뀌는 경우
   update();
 })();
 function zfScrollToTop(){
