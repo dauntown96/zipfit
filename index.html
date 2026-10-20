@@ -684,6 +684,8 @@ html[data-ui="d3"] #notice-status .btn{min-height:var(--hit);padding:0 16px;bord
 html[data-ui="d3"] .zf3-card .detail-grid{background:var(--board);background-image:radial-gradient(circle at center,var(--led-dot) 0 1px,transparent 1.4px);background-size:4px 4px;border-radius:var(--r-2);padding:12px 14px;gap:10px 18px;border:1px solid #2b2e35}
 html[data-ui="d3"] .zf3-card .detail-grid>div>span:first-child{color:var(--board-ink-2)!important;font-size:var(--t-xs)}
 html[data-ui="d3"] .zf3-card .detail-grid>div>span:last-child{color:var(--led)!important;font-family:var(--f-led);font-weight:700!important;font-size:13px;text-shadow:0 0 6px var(--led-glow);font-variant-numeric:tabular-nums}
+/* 🔵 2026-10-20 — 입주 연월이 어느 단지 값인지(「· ○○ 기준」)는 읽혀야 하는 말이라 검은 판 위에서 이름표 색으로(세대수 줄 「· LH 단지 등록 기준」은 그대로) */
+html[data-ui="d3"] .zf3-card .detail-grid .zf-movein-base{color:var(--board-ink-2);text-shadow:none}
 .zf3-vline{border:0!important;background:transparent!important}
 html[data-ui="d3"] .zf3-vline .policy-item{position:relative;padding:2px 0 12px 28px!important;border:0!important;background:transparent!important;margin:0!important}
 html[data-ui="d3"] .zf3-vline .policy-item::before{content:"";position:absolute;left:9px;top:0;bottom:0;width:3px;background:var(--rail)}
@@ -4508,8 +4510,24 @@ function moveInUnreal(v){
 //    그래서 이름표는 LH 칸 이름 그대로에 단지 기준임을 붙인다(값은 LH 출처뿐 — 2026-10-15 실측 161건 전부 LH).
 //    종전 「입주」/「입주예정」(moveInLabel)은 신청자 일정처럼 읽혀 쓰지 않는다(함수는 남긴다 — 지우지 않는다).
 const ZF_MOVEIN_LABEL = '단지 입주예정월 (LH 공급정보)';
-function moveInRow(v){
-  return moveInUnreal(v) ? [ZF_MOVEIN_LABEL, '확인 필요'] : [ZF_MOVEIN_LABEL, escapeHtml(v)];
+// 🔵 2026-10-20(우편함 「표시층 — 카드 『단지 입주예정월』 이름표 …」 · 다운님 실사용 「헷갈리지 않게」) — LH 칸 이름 「입주예정월」은 지난 연월에도 붙어
+//    (열린 카드 값 38 중 과거 36) 「앞으로 입주한다」로 읽혔다. 이름표를 값의 때로 가른다: 이번 달보다 앞 = 「단지 입주 시작」(지난 일) ·
+//    이번 달부터 = 「단지 입주 예정」. 출처 「(LH 공급정보)」는 그대로. 「최초 입주」는 쓰지 않는다 — 같은 단지 공고문 「최초입주」와 갈리는 카드가 있다(조사 회신 2절).
+//    읽지 못하는 값은 종전 이름표.
+function zfMoveInLabelFor(v){
+  const m = String(v || '').match(/^(\d{4})\D+(\d{1,2})/);
+  if(!m) return ZF_MOVEIN_LABEL;
+  const now = new Date();
+  return (Number(m[1]) * 100 + Number(m[2])) < (now.getFullYear() * 100 + now.getMonth() + 1) ? '단지 입주 시작 (LH 공급정보)' : '단지 입주 예정 (LH 공급정보)';
+}
+// 🔵 2026-10-20 — 값은 LH 공급정보 **첫 단지**(= 카드 대표 단지) 하나다. 그 공고에 단지가 둘 이상이면(EF 가 그 공고의 LH 단지를 세어 붙인
+//    building_name 「 외 N개 단지」 — block_count 는 다른 회차·소스까지 센 넓은 축이라 쓰지 않는다) 값 옆에 대표 단지명 「· ○○ 기준」 —
+//    한 단지 값이 공고 전체처럼 읽히지 않게(다단지 13장 중 11장은 다른 단지 값이 다르다 · 조사 회신). 꼴은 옆 줄 세대수 「· LH 단지 등록 기준」과 같다.
+function moveInRow(v, row){
+  if(moveInUnreal(v)) return [ZF_MOVEIN_LABEL, '확인 필요'];
+  const bn = String((row && row['building_name']) || '');
+  const base = ZF_COMPLEX_SUFFIX.test(bn) ? bn.replace(ZF_COMPLEX_SUFFIX, '').trim() : '';
+  return [zfMoveInLabelFor(v), escapeHtml(v) + (base ? ` <span class="zf-units-src zf-movein-base">· ${escapeHtml(base)} 기준</span>` : '')];
 }
 
 // ===== 1층 요약 한 줄 (보증금 · 월세 · 전용면적) =====
@@ -4823,7 +4841,7 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
       detailRows.push(['단지 전용면적', areaStr]);
     }
     if(n['total_units']) detailRows.push([zfUnitsLabel(n['source']), zfUnitsCell(n['source'], n['total_units'], cardId)]);
-    if(n['move_in_date']) detailRows.push(moveInRow(n['move_in_date']));
+    if(n['move_in_date']) detailRows.push(moveInRow(n['move_in_date'], n));
     if(n['deposit_min']) detailRows.push(['보증금', Number(n['deposit_min']).toLocaleString()+'원']);
     if(n['rent_min']) detailRows.push(['월임대료', Number(n['rent_min']).toLocaleString()+'원']);
     if(annDate) detailRows.push(['공고일', escapeHtml(annDate)]);
@@ -10052,7 +10070,7 @@ function renderMatchResults(rows){
       detailRows.push(['단지 전용면적', areaStr]);
     }
     if(n.total_units) detailRows.push([zfUnitsLabel(n.source), zfUnitsCell(n.source, n.total_units, cardId)]);
-    if(n.move_in_date) detailRows.push(moveInRow(n.move_in_date));
+    if(n.move_in_date) detailRows.push(moveInRow(n.move_in_date, n));
     if(n.deposit_min) detailRows.push(['보증금', Number(n.deposit_min).toLocaleString()+'원']);
     if(n.rent_min) detailRows.push(['월임대료', Number(n.rent_min).toLocaleString()+'원']);
     if(annDate) detailRows.push(['공고일', escapeHtml(annDate)]);
