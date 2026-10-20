@@ -12943,6 +12943,11 @@ function zf3RenderMap(){
     });
     zf3MapWire(box);
   }
+  // 🔵 2026-10-20(우편함 「표시층 — S1 다섯」 5 · 실사용 5회차 D10) — 넓은 화면(1200~)은 지도가 오른쪽 고정 패널이라 DOM 자리(= Tab 순서)를 공고 탭 끝으로:
+  //    정렬 → 카드로 바로(종전 지도 확대 · 시·도 단추 14개를 먼저 지났다). 좁은 화면은 종전대로 머리 바로 뒤(지도 보기는 목록 자리를 대신한다).
+  const sec = head.closest('.main-section');
+  if(zf3Wide() && sec){ if(sec.lastElementChild !== box) sec.appendChild(box); }
+  else if(head.nextElementSibling !== box) head.after(box);
   box.hidden = false;
   if(!zf3Geo){ box.innerHTML = '<p class="zf3-map-wait">지도를 불러오는 중…</p>'; zf3LoadGeo().then(g => { if(g){ applyNoticeFiltersAndRender(noticePage); } else box.innerHTML = '<p class="zf3-map-wait">지도를 불러오지 못했어요 · 목록으로 보세요</p>'; }); return; }
   // 🔵 2026-10-13(N3) — 곳의 재료인 세대 행 지역(가격 요약)을 목록 전체 몫으로 받는다. 새로 온 것이 있으면 목록·지도를 다시 그린다(이미 받은 id 는 다시 묻지 않는다).
