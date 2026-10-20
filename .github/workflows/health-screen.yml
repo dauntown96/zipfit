@@ -71,8 +71,23 @@ jobs:
           done
           echo "::warning::10분 안에 배포가 끝나지 않았다 — 점검하지 않고 「점검 불능」으로 남긴다"
           echo "blind=1" >> "$GITHUB_OUTPUT"
-          echo '{"kind":"screen","ok":false,"failed":["runner"],"warned":[],"blind_reason":"deploy_wait"}' > health-result.json
+          echo '{"kind":"screen","ok":false,"failed":["runner"],"warned":[],"blind":["runner"],"blind_reason":"deploy_wait"}' > health-result.json
           printf '## A. 화면 점검 — 점검 불능(배포 반영 기다림 10분 초과)\n\n배포(pages-build-deployment)가 끝나거나 배포본 sw.js 가 저장소와 같아지기를 10분 기다렸지만 되지 않아 점검을 돌리지 않았다. 화면이 틀렸다는 뜻이 아니다 — 다음 실행(병합 · 매일 08:50 KST)이 다시 재고, 통과하면 이 이슈를 닫는다.\n' > health-summary.md
+      # 🔵 2026-10-20(우편함 「코드·운영 — 미착수 회차 … 점검 불능 분리」 ⓓ) — 점검 불능도 DB 실행 요약(ops_health_runs kind=screen)에 한 줄 남긴다.
+      #    그 전에는 점검을 안 돌려 기록이 없었다(런칭 게이트 G1 화면 셈에 안 보였다). runner 에 blind 를 붙여 ops_health_runs.blind 로 실패와 가른다.
+      #    기록 실패는 결과를 바꾸지 않는다(경고만 — 판정은 결과 파일·이슈).
+      - name: 점검 불능 기록
+        if: steps.deploy.outputs.blind == '1'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          node --input-type=module -e "
+            import { recordFindings } from './.github/health/lib.mjs'
+            const checks = [{ id: 'runner', name: '점검 실행 — 점검 불능(배포 반영 기다림 10분 초과)', status: 'fail', value: 'deploy_wait', blind: true }]
+            try { console.log('기록', await recordFindings({ kind: 'screen', at: new Date().toISOString(), run_url: process.env.RUN_URL, ref: process.env.GITHUB_REF_NAME || null, checks })) }
+            catch (e) { console.log('::warning::점검 불능 기록 실패 — ' + String(e).slice(0, 200)) }
+          "
       - name: Playwright 준비
         if: steps.deploy.outputs.blind != '1'
         run: |

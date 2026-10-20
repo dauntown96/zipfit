@@ -89,7 +89,9 @@ select jsonb_build_object(
 //    마지막 심장박동 30분 조용 ∧ 만든 지 90분인 회차를 거둔다 — 이 점검은 그 조건을 거울한다(바뀌면 여기도).
 //    why: hb = 심장박동 있는 회차가 잡은 지 90분 넘음(자동 회수 대상 · ⚠️) ·
 //         reclaim_missed = 회수 조건(조용 30분 ∧ 생성 90분)을 넘고도 tick 두 번(20분)이 지나도록 running(회수가 안 돈다 · ❌) ·
-//         no_hb = 심장박동 없는 회차(첫 심장박동 전에 끊김 · 판정 (가)로 회수 밖) 또는 후속 전용 회차(①-2 가 60분에 닫는다)가 90분 넘음(❌ · 사람 풀기).
+//         회수 밖 셋(❌ · 사람 풀기 — 2026-10-20 · 우편함 「코드·운영 — 미착수 회차(사용량 소진) 조사 …」 ⓒ에서 종전 no_hb 하나를 갈랐다 · 등급·기준 그대로):
+//           unclaimed = 잡기 없음(claimed_at NULL — 세션이 뜨지 않음 · 사용량 소진이 흔한 원인 · run 260 꼴 · 후속 전용은 원래 잡기를 남기지 않아 먼저 가른다) ·
+//           no_hb = 잡았는데 첫 심장박동 전에 끊김(판정 (가)로 회수 밖) · followup = 후속 전용 회차(①-2 가 60분에 닫는다)가 90분 넘음.
 //    롤백 시험이 이 문자열을 그대로 떠서 쓴다(가짜 회차를 넣고 같은 판정이 나오는지) — 바꾸면 시험도 다시 돈다.
 const STALE_LOCK_SQL = `(select json_build_object(
          'hard', coalesce(json_agg(json_build_object('id', r.id, 'why', z.why, 'age_min', round(extract(epoch from now() - coalesce(r.claimed_at, r.created_at)) / 60),
@@ -102,6 +104,8 @@ const STALE_LOCK_SQL = `(select json_build_object(
                 and r.heartbeat_at < now() - interval '50 minutes' and r.created_at < now() - interval '110 minutes' then 'reclaim_missed'
            when coalesce(r.claimed_at, r.created_at) >= now() - interval '90 minutes' then null
            when r.reason <> 'followup' and r.heartbeat_at is not null then 'hb'
+           when r.reason = 'followup' then 'followup'
+           when r.claimed_at is null then 'unclaimed'
            else 'no_hb' end as why) z
       where r.state in ('firing', 'running') and z.why is not null)`
 // ⑧-5 자동 회수 본 횟수(2026-10-15 · 같은 우편함 2) — 지난 24시간 발송기가 거둔 회차. 사람 풀기(analysis_run_release)는 finish_note 「잠금 풀기: …」 ·
@@ -158,6 +162,9 @@ select json_build_object(
   'multi_closed', coalesce((select json_agg(announcement_id order by announcement_id) from s where st = 'closed_multi'), '[]')) as j;`
 const checks = []
 const add =(id, name, status, value, rule) => checks.push({ id, name, status, value, rule })
+// 🔵 2026-10-20(우편함 「코드·운영 — 미착수 회차 … 점검 불능 분리」 ⓓ) — 점검 불능: 그 항목을 재지 못했다(판정 자체가 없다). ❌·⚠️ 등급은 그대로 두고
+//    blind 를 붙여 ops_health_runs.blind 에 따로 남긴다(런칭 게이트 G1·G4 셈이 빼고 센다 — docs/launch-gates.sql).
+const addBlind = (id, name, status, value, rule) => checks.push({ id, name, status, value, rule, blind: true })
 
 const EXPECTED_JOBS = [
   'zipfit-collect-announcements', 'zipfit-collect-announcements-warmup', 'zipfit-collect-announcements-night',
@@ -384,15 +391,24 @@ try {
       // 🔵 2026-10-15(우편함 「코드 — health-ops stale_lock 갈래 …」 1) — 심장박동 있는 회차의 90분은 ⚠️(아래 stale_lock_hb · 자동 회수 대상).
       //    ❌ 는 둘만 — 심장박동 없는 회차(회수 밖 · 사람 풀기) · 회수 조건을 넘고 tick 두 번(20분) 지나도록 도는 회차(회수가 안 돈다).
       const hard = (x.stale_lock && x.stale_lock.hard) || []
-      const noHb = hard.filter(s => s.why === 'no_hb'), missed = hard.filter(s => s.why === 'reclaim_missed')
-      if (noHb.length) bad.push(`자동 회수 밖 회차(심장박동 없음 · 후속 전용) 90분 넘게 안 풀린 잠금 ${noHb.map(s => `run ${s.id}(${s.age_min}분${s.hb_min == null ? ' · 심장박동 없음' : ''})`).join(', ')} — 세션 확인 뒤 analysis_run_release`)
+      const missed = hard.filter(s => s.why === 'reclaim_missed')
+      // 🔵 2026-10-20(우편함 「코드·운영 — 미착수 회차 …」 ⓒ) — 회수 밖 갈래 셋을 따로 부른다(종전 한 문구 「심장박동 없음 · 후속 전용」이 미착수를 가렸다).
+      const offReclaim = [
+        ['unclaimed', '미착수(잡기 없음 · 세션이 뜨지 않음 — 사용량 소진이 흔한 원인)', s => `run ${s.id}(발송 뒤 ${s.age_min}분)`],
+        ['no_hb', '첫 심장박동 전 끊김(잡았는데 심장박동 없음)', s => `run ${s.id}(잡은 지 ${s.age_min}분)`],
+        ['followup', '후속 전용', s => `run ${s.id}(${s.age_min}분)`],
+      ]
+      for (const [why, label, fmt] of offReclaim) {
+        const xs = hard.filter(s => s.why === why)
+        if (xs.length) bad.push(`자동 회수 밖 회차 90분 넘게 안 풀린 잠금 — ${label} ${xs.map(fmt).join(', ')} — 세션 확인 뒤 analysis_run_release`)
+      }
       if (missed.length) bad.push(`자동 회수 조건(조용 30분 ∧ 생성 90분)을 20분 넘게 지났는데 도는 회차 ${missed.map(s => `run ${s.id}(심장박동 ${s.hb_min}분 전)`).join(', ')} — 발송기 회수가 안 돈다(zipfit-analysis-dispatch 확인)`)
       if (x.fail_streak) bad.push('연속 3번 발송 실패(자동 발송 멈춤)')
       if (x.zero_streak) bad.push('연속 3회차 끝낸 공고 0건(자동 발송 멈춤 — 공통 원인 확인)')
       // 🔵 2026-10-02 — 우편함 후속 처리 요청(analysis_followup_request)이 120분 넘게 루틴에 실리지 않음(잠금 · 멈춤 · 스위치).
       if (x.followup_stuck > 0) bad.push(`120분 넘게 실리지 않은 후속 처리 요청 ${x.followup_stuck}`)
       add('dispatch', '분석 발송기', bad.length ? 'fail' : 'pass', bad.length ? bad.join(' · ') : `대기 ${x.waiting} · 이상 없음`,
-        '켜짐: grace+max_wait 동안 발송 0인데 그보다 오래 기다린 대기 0(몫 상한 — 한 발송 batch_size건) · 홍보물 24시간 대기 0 · 심장박동 없는(또는 후속 전용) 회차 90분 넘은 잠금(잡은 때 기준) 0 · 자동 회수 조건 넘고 20분 지난 회차 0 · 연속 3실패 아님 · 연속 3회차 0건 끝 아님(후속 전용 회차 제외) · 120분 넘은 후속 처리 요청 0')
+        '켜짐: grace+max_wait 동안 발송 0인데 그보다 오래 기다린 대기 0(몫 상한 — 한 발송 batch_size건) · 홍보물 24시간 대기 0 · 자동 회수 밖 회차(미착수 · 첫 심장박동 전 끊김 · 후속 전용) 90분 넘은 잠금(잡은 때 · 잡기 없으면 발송 때 기준) 0 · 자동 회수 조건 넘고 20분 지난 회차 0 · 연속 3실패 아님 · 연속 3회차 0건 끝 아님(후속 전용 회차 제외) · 120분 넘은 후속 처리 요청 0')
     }
   }
   // ⑧-1 심장박동 있는 회차의 긴 잠금 · ⑧-5 자동 회수 본 횟수(2026-10-15 · 우편함 「코드 — health-ops stale_lock 갈래 …」 1·2).
@@ -694,7 +710,7 @@ try {
     add('promo_backlog', '홍보물·단지 이미지 목록 수집 — 처리 안 된 대상', 'fail', String(e).slice(0, 200), 'BACKLOG_SQL 을 읽는다')
   }
 } catch (e) {
-  add('runner', '점검 실행', 'fail', String(e).slice(0, 300), '점검 스크립트가 끝까지 돈다')
+  addBlind('runner', '점검 실행', 'fail', String(e).slice(0, 300), '점검 스크립트가 끝까지 돈다')
 }
 
 // ⑫ Supabase 보안 권고(2026-10-08 · 우편함 「운영 기반 묶음」 2) — 관리 API advisors/security 를 읽어 허용 목록
@@ -749,7 +765,8 @@ try {
     `사람 브라우저 ${human}${lastKst ? `(마지막 ${lastKst})` : ''} · 자동 브라우저 ${headless} · 합 ${human + headless}`,
     '사람 브라우저 0 — 1건 이상이면 ⚠️(❌ 없음 · 기준선이 있어 안정화 안이 선 뒤 문턱을 다시 본다) · 자동 브라우저(HeadlessChrome)는 세기만 한다')
 } catch (e) {
-  add('list_user_fail', '목록 RPC 사용자 실패(5xx · 57014) 24시간', 'warn', String(e).slice(0, 200), '관리 API 로그(postgrest_logs)를 읽는다(경고만)')
+  // 🔵 2026-10-20 — 로그 조회 실패(2026-10-19 22:25 「관리 API 500: Failed to get project's logs」)는 사람 실패가 아니라 점검 불능 — ⚠️ 그대로 · blind.
+  addBlind('list_user_fail', '목록 RPC 사용자 실패(5xx · 57014) 24시간 — 점검 불능(로그 조회 실패)', 'warn', String(e).slice(0, 200), '관리 API 로그(postgrest_logs)를 읽는다(경고만)')
 }
 
 // ⑱ 비밀값 만료(2026-10-17 · 우편함 「코드·운영 — 인스턴스 지표 정기 기록 · Vault 밖 만료 표 · 비밀값 30일 전 ⚠️ …」 3) — zipfit_ops.secret_expiry_list() 한 정의
@@ -898,7 +915,7 @@ if (process.env.SIMULATE === 'notify') add('simulate', '시험 — 알림 확인
   const run_url = process.env.GITHUB_SERVER_URL && process.env.GITHUB_RUN_ID
     ? `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}` : null
   // 🔵 2026-10-06 1-C 3 — 전 항목을 넘긴다: 함수가 경고·실패는 ops_health_findings 에, 실행 요약(통과 포함)은 ops_health_runs 에 1행.
-  const all = checks.map(c => ({ id: c.id, name: c.name, status: c.status, value: String(c.value ?? '') }))
+  const all = checks.map(c => ({ id: c.id, name: c.name, status: c.status, value: String(c.value ?? ''), ...(c.blind ? { blind: true } : {}) }))
   try {
     const n = await recordFindings({ at: now.toISOString(), run_url, ref: process.env.GITHUB_REF_NAME || null, checks: all })
     console.log(`경고·실패 기록 ${n}행`)
