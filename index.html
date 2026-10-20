@@ -11427,6 +11427,20 @@ function zf3PaintBoard(rows){
   let at = null;
   const oldTrack = box.querySelector('.zf3-run .zf3-track');
   if(oldTrack && oldTrack.getAnimations){ const a = oldTrack.getAnimations()[0]; if(a) at = a.currentTime; }
+  // 🔵 2026-10-20(다운님 실사용 10-20 ③) — 시각(초)이 아니라 **보이던 항목**에 닻을 내린다. 필터를 바꾸면 「내일 접수 시작」 묶음 항목의 글자 수가
+  //    바뀌거나 빠져(공고 탭 목록 범위로 센다 · 10-19) 줄 너비가 달라지고, 같은 초가 다른 자리가 되어 흐르던 글자가 수백 px 튀었다.
+  //    그래서 다시 그리기 전에 보기 칸에 걸린 항목들의 화면 x 를 왼쪽부터 적어 두고, 새 줄에 남아 있는 첫 항목을 같은 x 에 놓는다.
+  //    바뀐 항목(묶음)이 닻이면 그 자리에서 글자만 바뀐다 · 남은 항목이 없으면 종전처럼 시각으로 잇는다.
+  let anchors = null;
+  if(oldTrack && zf3Mode === 'run'){
+    const vl = box.querySelector('.zf3-view').getBoundingClientRect().left;
+    anchors = [];
+    oldTrack.querySelectorAll('.zf3-half').forEach(h => zf3HalfItems(h).forEach((e, i) => {
+      const r = e.getBoundingClientRect();
+      if(zf3List[i] && r.right - vl > 0) anchors.push({ k: zf3ItemKey(zf3List[i]), x: r.left - vl });
+    }));
+    anchors.sort((p, q) => p.x - q.x);
+  }
   zf3Key = key; zf3List = B.list; zf3Mode = mode; zf3BoardMine = B.mine;
   const label = `${B.mine ? '희망 조건(지역·유형·보증금)' : '전체'} 소식 ${B.list.length}개 전광판`;
   if(quiet){
@@ -11442,11 +11456,32 @@ function zf3PaintBoard(rows){
     box.hidden = false;   // 숨긴 채 재면 너비가 0이라 속도가 틀린다 — 먼저 보이고 잰다
     const tr = box.querySelector('.zf3-track');
     const setDur = () => { const half = tr.getBoundingClientRect().width / 2; if(half > 0) tr.style.setProperty('--mq-dur', (half / ZF3_MQ_SPEED).toFixed(2) + 's'); return half > 0; };
-    if(!setDur()) requestAnimationFrame(setDur);
-    if(at != null && tr.getAnimations){ const a = tr.getAnimations()[0]; if(a) try{ a.currentTime = at; }catch(e){} }
+    const place = () => {
+      const a = tr.getAnimations && tr.getAnimations()[0];
+      if(!a) return;
+      const half = tr.getBoundingClientRect().width / 2, first = tr.querySelector('.zf3-half');
+      if(half > 0 && first && anchors && anchors.length){
+        const els = zf3HalfItems(first), vl = box.querySelector('.zf3-view').getBoundingClientRect().left;
+        for(const an of anchors){
+          const i = B.list.findIndex(it => zf3ItemKey(it) === an.k);
+          if(i < 0 || !els[i]) continue;
+          try{
+            a.currentTime = 0;   // 옮기지 않은 자리에서 재고 → 같은 화면 x 가 되는 만큼 흘려 둔다(80px/초 · 반쪽 너비로 돈다)
+            const px = els[i].getBoundingClientRect().left - vl - an.x;
+            a.currentTime = (((px % half) + half) % half) / ZF3_MQ_SPEED * 1000;
+            return;
+          }catch(e){ break; }
+        }
+      }
+      if(at != null) try{ a.currentTime = at; }catch(e){}
+    };
+    if(setDur()) place(); else requestAnimationFrame(() => { setDur(); place(); });
   }
   box.hidden = false;
 }
+// 전광판 항목 열쇠(닻 잇기) — 카드·공지는 id, 묶음·안내는 종류 하나. 반쪽 안 항목은 B.list 순서(사이 ◆ 빼고)와 같다.
+function zf3ItemKey(it){ return it.type === 'card' ? 'c:' + it.id : it.type === 'notice' ? 'n:' + it.id : it.type; }
+function zf3HalfItems(half){ return [...half.children].filter(e => !e.classList.contains('zf3-sep')); }
 function zf3OneHTML(){
   const it = zf3List[zf3I % zf3List.length];
   return `${zf3ItemHTML(it)}<span class="zf3-cnt">${(zf3I % zf3List.length) + 1}/${zf3List.length}</span>`;
