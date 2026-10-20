@@ -960,11 +960,16 @@ html.zf3-mapview[data-ui="d3"] #notice-list{display:none}
 .zf3-places button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 @media (min-width:1200px){
   html[data-ui="d3"] .zf3-vseg{display:none}
-  html[data-ui="d3"] body:has(#main2:not(.hidden)) .wrap{margin-left:max(24px,calc((100vw - 1232px) / 2));margin-right:auto}
+  /* 🔵 2026-10-20 실사용 5회차 D1 — 넓은 화면 배치 한 벌: 탭마다 단을 옮기지 않는다. 모든 탭이 1232 틀의 왼쪽(L)에서 시작하고
+     머리 · 탭 바 · 전광판은 L 부터 720(공고 탭 단과 같은 폭) — 종전에는 공고 탭만 왼쪽 · 추천은 1232 가운데 · 나머지는 720 가운데라
+     누른 탭 단추가 다른 자리로 옮겨 갔다(1920 [344,1232]·[344,720]·[600,720]). 오른쪽 480(지도 · 추천 결과)은 공고 탭과 같은 L+752. */
+  html[data-ui="d3"] .wrap{margin-left:max(24px,calc((100vw - 1232px) / 2));margin-right:auto}
+  html[data-ui="d3"] :is(.maintabs,#zf3Board){max-width:720px;box-sizing:border-box}
+  html[data-ui="d3"] :is(#zf3Top,#zf3AiFull){max-width:688px;box-sizing:border-box}
   html[data-ui="d3"] body:has(#main2:not(.hidden)) #zf3Map{position:fixed;top:60px;left:calc(max(24px,calc((100vw - 1232px) / 2)) + 752px);width:480px;max-height:calc(100vh - 76px);overflow:auto;margin:0;padding:2px}
   html[data-ui="d3"] body:has(#main2:not(.hidden)) .zf3-sticky{left:max(24px,calc((100vw - 1232px) / 2));transform:none;width:720px;animation-name:zf3slidev}
   html[data-ui="d3"] body:has(#main2:not(.hidden)) .zf3-radar svg{max-height:calc(100vh - 300px)}
-  html[data-ui="d3"] body:has(#main2:not(.hidden)) .zf-totop{right:auto;left:calc(max(24px,calc((100vw - 1232px) / 2)) + 706px)}
+  html[data-ui="d3"] .zf-totop{right:auto;left:calc(max(24px,calc((100vw - 1232px) / 2)) + 706px)}
 }
 @media (prefers-reduced-motion:reduce){.zf3-radar .pulse,.zf3-radar .pt{animation:none!important}}
 /* 추천(D-3 단계 e) — 노선 스텝 · 결과부터 · 1200px 두 단 · 결과 상자 토큰 */
@@ -1007,7 +1012,7 @@ html[data-ui="d3"] .ok .rdesc,html[data-ui="d3"] .warn .rdesc,html[data-ui="d3"]
 html[data-ui="d3"] #panel1 select,html[data-ui="d3"] #panel1 input[type=number],html[data-ui="d3"] #panel2 input[type=number]{min-height:var(--hit);font-size:15px;background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:var(--r-1);text-overflow:ellipsis}
 @media (min-width:1200px){
   html[data-ui="d3"] body:has(#main1:not(.hidden)) .wrap{max-width:1232px}
-  html[data-ui="d3"] #panel1{display:grid;grid-template-columns:minmax(0,1fr) 520px;column-gap:28px;align-items:start}
+  html[data-ui="d3"] #panel1{display:grid;grid-template-columns:minmax(0,1fr) 439px;column-gap:48px;align-items:start}   /* 2026-10-20 D1 — 둘째 단을 공고 탭 지도와 같은 L+752 에(첫 단 끝 = L+704 = 공고 단 끝 · 그 틈 48 에 「맨 위로」) · 종전 520 · 틈 28 */
   html[data-ui="d3"] #panel1 > *{grid-column:1}
   html[data-ui="d3"] #panel1 > #diag-result,html[data-ui="d3"] #panel1 > .zf3-rph{grid-column:2;grid-row:1 / span 30;position:sticky;top:60px;margin-top:0;max-height:calc(100vh - 76px);overflow:auto}
   html[data-ui="d3"] #panel1 > .zf3-rph{display:flex;align-items:center;justify-content:center;min-height:240px;margin:0;padding:24px;border:1px dashed var(--line);border-radius:var(--r-3);color:var(--ink-3);font-size:var(--t-s);text-align:center}
