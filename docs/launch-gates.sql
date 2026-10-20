@@ -21,6 +21,8 @@
 --      판정에서 다운님 기기 실패도 센다(claude.ai 확정 2026-10-18 · 빼면 낙관 쪽으로 기운다).
 --      아래 g4: 로그 조회 실패(관리 API 오류 — 2026-10-19 22:25 「Failed to get project's logs」)는 사람 실패가 아니라 점검 불능 — blind 로 가른다(2026-10-20 ⓓ).
 --      그 전 행은 기록 문구에 「Error:」가 있으면 점검 불능으로 본다(조회 실패 때만 예외 문구가 값에 들어간다 · 성공 값은 「사람 브라우저 N · …」).
+--      g4.last_human_event_kst(2026-10-20 · 우편함 「… 미착수 회차 자동 회수·재발송(안 A) … G4 사건 시각 칸」 5) = 사건 시각 — 기록 문구 「마지막 MM-DD HH:MI KST」의
+--      가장 늦은 값(사람 브라우저 마지막 실패). last_human_fail_kst 는 그 실패를 24시간 창에서 본 점검 시각이라 최대 하루 늦다(메아리).
 --   G5 다섯 탭 중 빈 탭 0 → 비로그인: 화면 점검 항목 empty_tabs(kind='screen' 실행의 failed/warned · ops_health_findings item='empty_tabs').
 --      로그인·저장 0 상태는 실사용 회차가 잰다.
 --   G6 7일 동안 다운님 손 0 → DB 갈래 ⓐⓑⓔ는 아래 g6_db · ⓒ 사람이 닫은 점검 이슈는 GitHub(공개 이슈 목록) · ⓓ는 아래 Notion 질의 ②.
@@ -28,6 +30,8 @@
 --      g6_db.late_claim_7d(2026-10-20 ⓑ) = 발송 뒤 잡기까지 30분 넘은 회차 — 사람 재개(세션에 메시지)는 다른 어떤 기록에도 안 남아 보이게만 둔다(셈에 넣을지는 판정).
 --        후속 전용(reason='followup')은 잡기를 안 부르고 끝내는 일이 많아(2026-10-20 실측 23회차 중 13) 이 칸에서 뺀다 → followup_noclaim_close_7d(①-2 가 60분에 닫은 = 세션이 안 뜬 후속 회차) ·
 --        followup_long_7d(끝까지 30분 넘은 후속 회차 — 늦게 떴는지 오래 일했는지 기록으로 못 가른다)로 따로 낸다.
+--      g6_db.auto_release_unclaimed_7d(2026-10-20 안 A) = 발송기 ①-4 가 미착수 회차를 거둔 수 — 사람 손이 아니다(다음 판정이 재발송).
+--        auto_release_7d(「자동 회수%」 전부)에도 함께 든다.
 --   G7·G8 은 회차 판정으로 닫는다(복구 리허설 · 보안 감사) — 이 파일 밖.
 --
 -- Notion 질의(우편함 · 백로그 — Notion 커넥터로 claude.ai 가 돌린다)
@@ -103,6 +107,8 @@ from (
       'runs_7d', (select count(*) from r where kind = 'ops'),
       'human_fail_runs_7d', (select count(*) from r where kind = 'ops' and luf_warn and not luf_blind),
       'last_human_fail_kst', (select to_char(max(run_at) at time zone 'Asia/Seoul', 'MM-DD HH24:MI') from r where kind = 'ops' and luf_warn and not luf_blind),
+      'last_human_event_kst', (select max(substring(f.reason from '마지막 ([0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}) KST'))
+                                 from ops_health_findings f where f.kind = 'ops' and f.item = 'list_user_fail' and f.run_at > now() - interval '7 days'),
       'blind_7d', (select count(*) from r where kind = 'ops' and luf_blind),
       'last_blind_kst', (select to_char(max(run_at) at time zone 'Asia/Seoul', 'MM-DD HH24:MI') from r where kind = 'ops' and luf_blind)
     ) as g4,
@@ -110,6 +116,7 @@ from (
       'manual_dispatch_7d', (select count(*) from analysis_dispatch_runs where reason = 'manual' and created_at > now() - interval '7 days'),
       'manual_release_7d', (select count(*) from analysis_dispatch_runs where finish_note like '잠금 풀기:%' and finished_at > now() - interval '7 days'),
       'auto_release_7d', (select count(*) from analysis_dispatch_runs where finish_note like '자동 회수%' and finished_at > now() - interval '7 days'),
+      'auto_release_unclaimed_7d', (select count(*) from analysis_dispatch_runs where finish_note like '자동 회수 — 미착수%' and finished_at > now() - interval '7 days'),
       'listing_hides_7d', (select count(*) from zipfit_ops.listing_hides where hidden_at > now() - interval '7 days'),
       'aux_missing_open', (select count(*) from announcement_analysis aa join o on o.aid = aa.announcement_id where aa.status = '완료(보조 누락)'),
       'late_claim_7d', (select json_build_object('n', count(*), 'runs', coalesce(json_agg(json_build_object('id', id, 'reason', reason,

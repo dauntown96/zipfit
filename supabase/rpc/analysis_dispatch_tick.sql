@@ -61,6 +61,14 @@ AS $function$
 --   겹침 방지: 루틴은 단계 경계마다 analysis_run_heartbeat(N) · 분석 DB 쓰기 트랜잭션 맨 앞에 analysis_run_alive(N)(거짓이면 예외로 롤백 ·
 --   참이면 회차 행을 잠가 그 트랜잭션이 끝날 때까지 회수가 기다린다) · released 회차의 analysis_queue_finish 는 쓰기 없이 released 를 돌려준다.
 --   ①-3 은 ② 앞이다 — 되돌린 몫이 같은 판정에서 바로 후보 대조(완료 분석이면 dropped)를 거치고, 잠금이 풀렸으니 이번 판정이 새 회차를 보낼 수 있다.
+-- 🔵 미착수 회수(2026-10-20 · 우편함 「코드·운영 — 미착수 회차 자동 회수·재발송(안 A) + 잡기 가드 …」 1 · 다운님 안 A 선택) — ①-4:
+--   firing·running ∧ reason ≠ followup ∧ 잡기 없음(claimed_at NULL) ∧ 발송 45분 지남 → released(「자동 회수 — 미착수(잡기 없음 N분)」) ·
+--   실린 몫 → waiting · returned · 실린 후속 요청 → waiting → 이번(또는 다음) 판정이 다시 보낸다.
+--   계기: run 260(2026-10-19) — 세션이 만들어졌으나 첫 턴이 사용량 한도(429)로 끝나고, 창이 다시 열려도 스스로 재개하지 않아 122분 뒤 사람이 깨웠다.
+--   잡기 전이라 쓰기가 시작됐을 수 없어 판정 (가)(심장박동 없는 회차는 회수 밖 — 잡은 뒤 오래 도는 회차가 끝내 쓰는 위험)와 겹치지 않는다.
+--   헛도는 비용 막기: 직전 미착수 회수 뒤 60분 안에는 거두지 않는다(사용량 창 5시간 안 최대 5번) · 6시간 안 미착수 회수가 6번이면 멈춘다
+--   (사용량 창보다 길게 안 뜨면 다른 원인 — health-ops dispatch ❌ 로 사람에게). 늦게 깨어난 옛 세션은 착수 심장박동(alive 거짓)에서 멈추고,
+--   잡기 가드(analysis_queue_claim(p_run_id))가 새 회차 몫을 잡지 못하게 한다. 45분: 정상 잡기 대기 p95 3분 · 최대 20분 밑(10-01 뒤 76회차 · 넘은 셋은 102~122분).
 -- 비밀값: Vault zipfit_routine_fire_url · zipfit_routine_fire_token(값은 표·반환에 싣지 않는다).
 declare
   cfg public.analysis_dispatch_config%rowtype;
@@ -168,6 +176,31 @@ begin
     end if;
     n_reclaim := n_reclaim + 1;
   end loop;
+
+  -- ①-4 미착수 회수(2026-10-20) — 잡기 없이 45분 넘은 분석 회차(세션이 뜨지 않음 · 사용량 소진이 흔한 원인)를 released 로 옮기고 몫·후속을 대기로 되돌린다.
+  --      60분 간격 · 6시간 6번 상한(머리 주석). 한 판정에 한 회차만.
+  if not exists (select 1 from public.analysis_dispatch_runs
+                  where finish_note like '자동 회수 — 미착수%' and finished_at > now() - interval '60 minutes')
+     and (select count(*) from public.analysis_dispatch_runs
+           where finish_note like '자동 회수 — 미착수%' and finished_at > now() - interval '6 hours') < 6 then
+    for rr in select r.id, r.created_at from public.analysis_dispatch_runs r
+               where r.state in ('firing', 'running') and r.reason <> 'followup' and r.claimed_at is null
+                 and r.created_at < now() - interval '45 minutes'
+               order by r.id limit 1 for update loop
+      update public.analysis_dispatch_runs
+         set state = 'released', finished_at = now(),
+             finish_note = '자동 회수 — 미착수(잡기 없음 ' || round(extract(epoch from now() - rr.created_at) / 60) || '분)'
+       where id = rr.id and state in ('firing', 'running') and claimed_at is null;
+      continue when not found;
+      update public.analysis_dispatch_queue
+         set state = 'waiting', returned = true, run_id = null, state_at = now(), note = '자동 회수 run ' || rr.id || '(미착수)'
+       where run_id = rr.id and state in ('sent', 'claimed');
+      update public.analysis_followup_requests
+         set state = 'waiting', run_id = null, state_at = now(), note = '자동 회수 run ' || rr.id || '(미착수)'
+       where run_id = rr.id and state = 'sent';
+      n_reclaim := n_reclaim + 1;
+    end loop;
+  end if;
 
   with link_map as (
     select distinct on (l.linked_announcement_id)
