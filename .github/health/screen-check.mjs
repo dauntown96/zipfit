@@ -739,6 +739,62 @@ try {
     add('route_win', '순위별 창 카드 노선 발표 = 기본 창의 일정 표 결과발표', ok ? 'pass' : 'fail', value,
       'DB 로 따로 계산한 기본 창(창 안 → 그 창 · 사이 → 다음 · 모두 끝 → 마지막) · 그 창 phase_text = 일정 표 scope_text 인 결과발표 하루 날 = 노선 「발표」 역(행 없으면 건너뜀)')
   }
+  // ⑦-1a0′ 조건 스위치 기본 단추(S1 PR-2 · 설계서 2026-10-19 ① · 원칙 33) — 창마다 대상 글자(phase_text)가 있고 서로 다른 순위별 창 카드는
+  //    처음 그릴 때 눌린 단추가 DB 로 **따로** 계산한 기본 창(route_win 과 같은 창 묶기 · 창 안 → 그 창 · 사이 → 다음 · 모두 끝 → 마지막)이어야 한다
+  //    (그 창 대상 글자 집합이 같다 · 고른 창 없음). 발표 역은 route_win 이 잰다. 글자 없는 창이 낀 카드(매달 창 …19241)는 단추가 없어야 한다.
+  //    SIMULATE=win_pick 이면 각 카드에 기본 밖 창을 골라 둔 채 잰다(실패해야 맞다).
+  {
+    const [pq] = await sqlRead(`
+      with today as (select (now() at time zone 'Asia/Seoul')::date d),
+      c as (select d.announcement_id aid, d.title, d.apply_start s, d.apply_end e
+              from get_announcements_deduped() d, today t
+             where d.apply_period_check is not true and d.apply_start is not null and d.apply_end >= t.d
+               and not (d.title ~ '^\\s*(\\[[^]]*\\]\\s*)*\\[\\s*조기\\s*(접수)?\\s*마감\\s*\\]' or coalesce(d.revision_note, '') ~ '조기\\s*(접수\\s*)?마감')),
+      rt as (select c.aid, c.s, c.e, r.start_date x, r.end_date y, r.phase_text ph
+               from c join announcements a on announcement_dedup_key(a.title) = announcement_dedup_key(c.title)
+               join announcement_apply_routes r on r.announcement_id = a.announcement_id),
+      w as (select aid, x, y, ph from rt where aid not in (select aid from rt where x is null or y is null) and y >= s and x <= e),
+      o as (select aid, x, y, ph, max(y) over (partition by aid order by x, y rows between unbounded preceding and 1 preceding) py from w),
+      g as (select aid, x, y, ph, sum(case when py is null or x > py + 1 then 1 else 0 end) over (partition by aid order by x, y) gid from o),
+      isl as (select aid, gid, min(x) x, max(y) y, array_agg(distinct ph) filter (where ph is not null and ph <> '') phs from g group by aid, gid),
+      pick as (select aid, count(*) n, bool_and(phs is not null) allph,
+                      coalesce(min(gid) filter (where x <= t.d and t.d <= y), min(gid) filter (where x > t.d), max(gid)) gid from isl, today t group by aid)
+      select coalesce(json_agg(json_build_object('aid', p.aid, 'n', p.n, 'allph', p.allph, 'phs', i.phs) order by p.aid), '[]'::json) j
+        from pick p join isl i on i.aid = p.aid and i.gid = p.gid where p.n >= 2`)
+    const want = pq.j || []
+    const got = await page.evaluate(async ([want, sim]) => {
+      if (typeof zfWinSwitch !== 'function') return { err: 'zfWinSwitch 없음' }
+      if (typeof zfLoadRoutes === 'function') await zfLoadRoutes()
+      const keep = new Map(zfWinPick)
+      const out = want.map(x => {
+        const r = noticeData.find(n => String(n.announcement_id) === x.aid)
+        if (!r) return [x.aid, null]
+        let S = zfWinSwitch(r)
+        if (sim && S) { zfWinPick.set(x.aid, (S.def + 1) % S.W.merged.length); S = zfWinSwitch(r) }
+        if (!S) return [x.aid, '없음']
+        return [x.aid, { def: S.i === S.def, ph: [...new Set(S.W.merged[S.i].ph.map(zfPhaseShort))].sort(), want: [...new Set((x.phs || []).map(zfPhaseShort))].sort() }]
+      })
+      zfWinPick.clear(); keep.forEach((v, k) => zfWinPick.set(k, v))
+      return { out }
+    }, [want, process.env.SIMULATE === 'win_pick'])
+    let ok = false, value
+    if (!got.err) {
+      const bad = got.out.map(([aid, g], i) => {
+        const w = want[i]
+        if (g === null) return `${aid}: 목록 행 없음`
+        // 글자 없는 창이 낀 카드는 단추가 없어야 · 글자가 다 있는데 화면이 단추를 안 달았으면(같은 글자 창 등) 건너뛴다(그 판정은 화면 규칙)
+        if (!w.allph) return g === '없음' ? null : `${aid}: 글자 없는 창이 있는데 단추`
+        if (g === '없음') return null
+        return g.def && JSON.stringify(g.ph) === JSON.stringify(g.want) ? null : `${aid}: 눌린 단추 ${g.ph.join('·')}${g.def ? '' : '(기본 아님)'}(기대 ${g.want.join('·')})`
+      }).filter(Boolean)
+      ok = bad.length === 0
+      const sw = got.out.filter(([, g]) => g && g !== '없음').length
+      value = `순위별 창 카드 ${want.length} · 단추 ${sw} · 어긋남 ${bad.length}${bad.length ? ': ' + bad.slice(0, 3).join(' / ') : ''}`
+      extra.win_pick = { want, out: got.out, bad }
+    } else value = `못 잼(${got.err})`
+    add('win_pick', '조건 스위치 — 처음 눌린 단추 = 기본 창(DB 로 따로) · 글자 없는 창 카드는 단추 없음', ok ? 'pass' : 'fail', value,
+      'DB 로 따로 계산한 기본 창(route_win 과 같은 식)의 대상 글자 집합 = 눌린 단추 · 고른 창 없음 · phase_text 없는 창이 낀 카드는 단추 0')
+  }
   // ⑦-1a1 정정일(2026-10-16 · 우편함 「코드 — 관측 정정일 …(…0877)」 4 · 원칙 33) — 열린 정정 대표 전부를 꼴로 잰다(특정 공고 기대값을 박지 않는다).
   //    기대 정정일은 DB 에서 **따로**: ① user_verified revised_at(KST 날짜) ② LH 게시일(announcement_date > first_announcement_date)
   //    ③ 관측 — LH ∧ 두 날짜 같음 ∧ 같은 제목 키·같은 원공고일의 다른 LH 행을 5분 넘게 먼저 봄 → 정정 행 첫 수집(KST 날짜) · 셋 다 회차 날짜보다 뒤인 날만.
