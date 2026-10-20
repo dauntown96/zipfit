@@ -594,7 +594,8 @@ html[data-ui="d3"] #panel4{background:transparent;border:0;box-shadow:none;paddi
 @media (prefers-reduced-motion:reduce){html[data-ui="d3"] .zf3-track{animation:none!important}}
 /* ── 단계 b — 노선 카드(종전 카드 DOM 위에 덧입힘 · d3 만) ── */
 html[data-ui="d3"] :is(#notice-list,#match-result) .hcard.zf3-card{position:relative;background:var(--paper);border:1px solid var(--line);border-radius:var(--r-3);padding:12px 14px 0 18px;margin-bottom:12px;overflow:clip;color:var(--ink);transition:border-color var(--m-fast) var(--ease),box-shadow var(--m-fast) var(--ease)}
-html[data-ui="d3"] :is(#notice-list,#match-result) .hcard.zf3-card::before{content:"";position:absolute;inset:0 auto 0 0;width:6px;background:var(--ln,var(--ln-gi))}
+/* 🔵 2026-10-20(다운님 실사용 10-20 ②) — 띠를 한 층 올린다: 펼친 상세(zf3open)는 애니메이션 동안 opacity·transform 으로 자기 층이 되어 띠 위에 그려졌다(260ms 끊김) */
+html[data-ui="d3"] :is(#notice-list,#match-result) .hcard.zf3-card::before{content:"";position:absolute;inset:0 auto 0 0;width:6px;background:var(--ln,var(--ln-gi));z-index:1}
 @media (hover:hover){html[data-ui="d3"] :is(#notice-list,#match-result) .hcard.zf3-card:hover{border-color:var(--ink-3);box-shadow:0 6px 20px rgba(0,0,0,.06)}}
 html[data-ui="d3"] :is(#notice-list,#match-result) .hcard.zf3-card:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 html[data-ui="d3"] :is(#notice-list,#match-result) .hcard.zf3-card.zf3-open{border-color:var(--ink)}
