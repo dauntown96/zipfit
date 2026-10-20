@@ -346,6 +346,7 @@ body.theme-dark .extras-missing-note{color:#d8c48a;background:#2a2721;border-col
 .hu-past-only{padding:2px 9px;font-size:11px;cursor:default;display:inline-block;margin-left:6px;background:#f0efe9;color:#777;border-color:#ddd}
 /* 🔵 카드 1층 회차 칩 — 상세 아코디언의 「지난 회차」 배지(.hu-round-old)와 **같은 색**을 쓴다.
    한 카드 안에서 같은 뜻이 두 색으로 보이면 안 된다. */
+.zf-sch-rawmark{font-weight:400;font-size:11px;opacity:.75;white-space:nowrap}
 .zf-dual-tag{font-weight:400;opacity:.85;margin-left:4px;white-space:nowrap}
 .zf-round-tag{padding:2px 9px;font-size:11px;cursor:pointer;display:inline-block;margin-left:6px;background:#fff3d6;color:#8a6a1c;border-color:#e0b96a;font-weight:600;white-space:normal;text-align:left}
 body.theme-dark .hu-past-title{color:#cfcfcf}
@@ -7540,10 +7541,14 @@ function zfSchDateLine(r){
   if(a) return `${a} ~`;
   return '';
 }
+// 🔵 2026-10-20(우편함 「표시층 — S1 다섯」 4 · 실사용 5회차 D7) — 원문 칸 이름에 같은 낱말이 붙어 되풀이되면(「예비예비입주자 발표」) 글자는 그대로 두고
+//    「(원문 표기)」 꼬리만 단다 — 우리 오타로 읽혔다. 🔴 낱말을 고치지 않는다(원문 그대로 · 위 주석). 대상은 한글 두 글자 이상이 바로 되풀이되는 꼴만.
+const ZF_RAW_REPEAT = /([가-힣]{2,})\1/;
 function zfScheduleItemHTML(r, showScope){
   const d1 = r.start_date || r.end_date || '', d2 = r.end_date || r.start_date || '';
   const sc = [showScope ? r.scope_text : '', r.site_label].filter(Boolean).map(escapeHtml).join(' · ');
-  const head = `<span class="policy-category">${ZF_STAGE_ICON[r.stage] ? ZF_STAGE_ICON[r.stage] + ' ' : ''}${escapeHtml(r.stage_text || '')}${sc ? ` <span class="zf-sch-scope">${sc}</span>` : ''}</span>`;
+  const rawMark = ZF_RAW_REPEAT.test(r.stage_text || '') ? ' <span class="zf-sch-rawmark" title="공고문에 적힌 글자 그대로예요">(원문 표기)</span>' : '';
+  const head = `<span class="policy-category">${ZF_STAGE_ICON[r.stage] ? ZF_STAGE_ICON[r.stage] + ' ' : ''}${escapeHtml(r.stage_text || '')}${rawMark}${sc ? ` <span class="zf-sch-scope">${sc}</span>` : ''}</span>`;
   const dl = zfSchDateLine(r), raw = escapeHtml(r.period_text || '');
   const inner = dl
     ? `<summary>${head}<span class="policy-content">${escapeHtml(dl)}<span class="zf-sch-more" aria-hidden="true">원문</span></span></summary><div class="zf-sch-raw">${raw}</div>`
