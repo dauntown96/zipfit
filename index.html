@@ -2810,7 +2810,10 @@ function zfRouteVerdict(rows, today){
     widen(p, r.start_date, r.end_date, '');
   });
   if(phases.length >= 2){
-    return { kind: '①', text: '순위별로 접수일이 달라요 · ' + phases.map(p => `${p.name} ${zfSpanText(p.s, p.e)}`.trim()).join(' · ') };
+    // 🔵 2026-10-21(우편함 「표시층 — S1 묶음 3」 ⑥ · 조사 「표본 정확도 2차」 ⑦ 2) — 차수 이름에 「순위」가 하나도 없으면(…19312 첫날 · 2일차 ~ 마감일 —
+    //    순위가 아니라 접수 차수) 「순위별로」라 하지 않는다. 순위 차수는 그대로.
+    const lead = phases.some(p => /순위/.test(p.name)) ? '순위별로 접수일이 달라요' : '접수일이 나뉘어 있어요';
+    return { kind: '①', text: lead + ' · ' + phases.map(p => `${p.name} ${zfSpanText(p.s, p.e)}`.trim()).join(' · ') };
   }
   // 묶음 — site_text 로 묶는다. site_text 가 NULL 인 행은 공통 행이라 **모든 묶음**에 들어간다.
   const names = [];
