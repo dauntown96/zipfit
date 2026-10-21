@@ -46,6 +46,10 @@ AS $function$
 --   (cand 는 analysis_rate.sql 과 같은 규칙이라 그대로 둔다 — 종전에는 cand 로 원공고의 done 행과 충돌해 아무 표시 없이 사라졌다).
 --   대기열 키 충돌: 더는 후보가 아니라 뺐던(dropped) 행이 다시 후보면 대기(waiting)로 되살린다 · 끝난(done) 행과 충돌하는 후보는
 --   health-ops dispatch_orphan ❌(health-ops-soft)가 잡는다.
+--   🔵 2026-10-21(우편함 「코드·운영 — …20929 정정본이 분석 대기열에 안 들어갔다 …」) — 정정본 후보의 창은 「apply_end ≥ 오늘」이다
+--   (일반 후보는 종전대로 ⑨ 5-2 분모 「≥ 오늘+3」 — reps.in_win). 종전에는 정정본 후보도 reps 의 「≥ 오늘+3」을 거쳐
+--   마감 3일 안에 나온 정정(…20929 대구경북 든든전세 분양전환형 — 10-20 정정 · 10-21 마감)이 처음부터 후보가 못 됐다.
+--   정정 전 분석이 이미 화면에 열려 있어 마감 날까지 정정본으로 고칠 몫이다 — health-ops revision_gap 과 같은 창(≥ 오늘).
 -- 🔵 접수기간 없는 SH 공고(2026-10-12 · 우편함 「코드·운영 — 부산 첨부 등록 · SH 접수기간 없는 열린 공고 대기열 진입」 2):
 --   SH 목록에는 접수기간이 없어 apply_end 가 NULL 인 열린 SH 대표가 「apply_end ≥ 오늘+3」과 대기열 PK(apply_end NOT NULL)에서 빠졌다.
 --   대표의 apply_end 가 NULL ∧ SH ∧ status 가 접수마감이 아님 ∧ 최근 원문 키 대조(source_page_checks)의 SH 목록 모집상태가 「모집중」이면 후보로 올린다.
@@ -218,10 +222,11 @@ begin
     where a.title is not null and a.hidden_from_listing is not true
   ),
   reps as (
-    select d.announcement_id, d.title, d.source, d.housing_type, d.apply_start, d.apply_end, d.announcement_date, k.k
+    select d.announcement_id, d.title, d.source, d.housing_type, d.apply_start, d.apply_end, d.announcement_date, k.k,
+           (d.apply_end is null or d.apply_end >= current_date + 3) as in_win
     from get_announcements_deduped() d
     join keyed k on k.announcement_id = d.announcement_id
-    where d.apply_end >= current_date + 3
+    where d.apply_end >= current_date
        or (d.apply_end is null and d.source = 'SH' and d.status is distinct from '접수마감'
            and (select c.page_status from public.source_page_checks c
                  where c.source = 'SH' and c.card_id = d.announcement_id and c.error is null
@@ -229,7 +234,8 @@ begin
   ),
   cand as (
     select r.* from reps r
-    where (select coalesce(sum(jsonb_array_length(g.attachment_urls)), 0) from keyed g
+    where r.in_win
+      and (select coalesce(sum(jsonb_array_length(g.attachment_urls)), 0) from keyed g
             where g.k = r.k and jsonb_typeof(g.attachment_urls) = 'array') > 0
       and not exists (select 1 from keyed g
             join public.announcement_analysis aa on aa.announcement_id = g.announcement_id
