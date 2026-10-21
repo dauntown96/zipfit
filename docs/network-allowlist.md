@@ -37,7 +37,7 @@
 | `lh3.googleusercontent.com` | 썸네일 넘김 대상(curl은 `drive.google.com` 302 → `lh3…/d/<id>=w300`) | 지금(2026-10-14 더함) | 해외 IP 무관(Google) | 2026-10-14 | 열림 400(루트) |
 | `housing.seoul.go.kr` | SH 공고 목록·페이지 원문 재확인 | 지금(2026-10-14 더함) | 해외 IP 허용(EF가 싱가포르에서 긁는다) | 2026-10-14 | 열림 200 |
 | `www.data.go.kr` | 공공데이터 포털 | 지금 | — | 2026-10-14 | 열림 200 |
-| `apis.data.go.kr` | 국토부 실거래 API 🔑(키가 주소에 실린다) · LH 공지 API(곧) | 지금 | 해외 IP 허용(실측) · ⚠️ 서버가 절반쯤 끊는다 | 2026-10-14 | 열림 400(루트) — 4회 중 2회는 CONNECT 200 뒤 11초에 `Connection reset by peer`(000). 지난 「000」 기록은 허용 목록이 아니라 이것이다 · 실패하면 다시 부른다 |
+| `apis.data.go.kr` | 국토부 실거래 API 🔑(키가 주소에 실린다) · LH 공지사항 목록 API(15058222 — 2026-10-21 지금 키로 200 · 원천은 [`data-sources.md`](data-sources.md)) | 지금 | 해외 IP 허용(실측) · ⚠️ 서버가 절반쯤 끊는다 | 2026-10-14 | 열림 400(루트) — 4회 중 2회는 CONNECT 200 뒤 11초에 `Connection reset by peer`(000). 지난 「000」 기록은 허용 목록이 아니라 이것이다 · 실패하면 다시 부른다 |
 | `api.notion.com` | Notion 파일 업로드 🔑(서명 주소) | 지금 | — | 2026-10-14 | 열림 302 |
 | `productionresultssa0.blob.core.windows.net` | Actions 로그·결과물 받기 | 지금 | — | 2026-10-14 | 열림 400(루트) |
 | `github.com` | git · PR(별도 프록시) | 지금(기본 목록) | — | 2026-10-14 | 열림 400(루트) |
