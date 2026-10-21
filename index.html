@@ -659,7 +659,7 @@ html[data-ui="d3"] .zf3-card>div[id^="ncard-"]{margin:0 -14px 0 -18px!important;
 .zf3-stn.next i{border-color:var(--ln,var(--ink))}
 .zf3-stn.unk i{border-style:dashed;border-color:var(--ink-3)}
 .zf3-stn .k{font-size:var(--t-xs);color:var(--ink-3);line-height:1.3;margin-top:2px}
-.zf3-stn .k .yr{font-weight:700;color:var(--ink-2);font-family:var(--f-led)}
+.zf3-stn .v .yr{display:block;font-weight:700;color:var(--ink-2);font-family:var(--f-led)}   /* 2026-10-21 S1 묶음 3 ⑤ — 다음 해 날짜는 연도를 날짜 위 한 줄로(역 이름 줄은 이름만) */
 html[data-ui="d3"] .hcard .zf3-dup{display:none!important}   /* 🔴 2026-10-19(덧 셋 ③) — 카드 안(접은 같은 말 칩)만. 종전 전역 규칙이 전광판 둘째 반쪽(.zf3-half.zf3-dup)까지 숨겨 -50% 가 첫 반쪽 가운데서 처음으로 되감겼다(#451 이후) */
 .zf3-stn .v{font-size:12px;font-weight:700;font-family:var(--f-led);color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.25;overflow-wrap:anywhere}
 .zf3-stn .v small{display:block;font-family:var(--f-ui);font-weight:400;font-size:var(--t-xs);color:var(--ink-3)}
@@ -11919,7 +11919,7 @@ function zf3LineHTML(stns, label){
     else { const j = last + 1 + j0, f = zf3Days(stns[last].d, today) / Math.max(1, zf3Days(stns[last].d, stns[j].d)); p = (last + f * (j - last)) / (n - 1); moving = true; }
   }
   const nextI = stns.findIndex(x => x.d && x.d > today);
-  const st = stns.map((x, i) => `<span class="zf3-stn${!x.d ? ' unk' : x.d <= today ? ' past' : i === nextI ? ' next' : ''}"><i></i><span class="k">${escapeHtml(x.k)}${x.d && x.d.slice(0, 4) !== today.slice(0, 4) ? ` <b class="yr">${x.d.slice(0, 4)}</b>` : ''}</span><span class="v">${x.d ? zf3Md(x.d, true) : escapeHtml(x.u || '원문 확인')}${x.sub ? `<small>${escapeHtml(x.sub)}</small>` : ''}</span></span>`).join('');
+  const st = stns.map((x, i) => `<span class="zf3-stn${!x.d ? ' unk' : x.d <= today ? ' past' : i === nextI ? ' next' : ''}"><i></i><span class="k">${escapeHtml(x.k)}</span><span class="v">${x.d && x.d.slice(0, 4) !== today.slice(0, 4) ? `<b class="yr">${x.d.slice(0, 4)}</b>` : ''}${x.d ? zf3Md(x.d, true) : escapeHtml(x.u || '원문 확인')}${x.sub ? `<small>${escapeHtml(x.sub)}</small>` : ''}</span></span>`).join('');
   const aria = stns.map(x => `${x.k} ${x.d ? (x.d.slice(0, 4) !== today.slice(0, 4) ? x.d.slice(0, 4) + '년 ' : '') + zf3Md(x.d, true) : (x.u || '원문 확인')}${x.sub ? ' ' + x.sub : ''}`).join(', ');
   return `<div class="zf3-line" style="--n:${n};--p:${p.toFixed(3)}" role="img" aria-label="${zfAttr((label ? label + ' — ' : '') + aria)}"><span class="zf3-rail"></span><span class="zf3-done"></span>${st}${moving ? '<span class="zf3-today" aria-hidden="true"><b>오늘</b></span>' : ''}</div>`;
 }
