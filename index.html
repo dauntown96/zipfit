@@ -2902,20 +2902,28 @@ function zfRouteSlotHtml(row, title){
   if(row && row['apply_period_check'] === true) return '';
   return `<div class="zf-route-slot" data-route-key="${zfAttr(zfDedupKey(title))}"></div>`;
 }
+// 🔵 2026-10-21(우편함 「표시층 — S1 묶음 3」 ④ · 조사 「카드 표기 넷」 ④) — 경로 행이 전부 「전체」이면 zfRouteVerdict 는 줄을 내지 않는다(갈래가 순위 · 단지 · 현장 · 인터넷뿐).
+//    그래서 신청처(이메일 접수 · 외부 기관 누리집)가 카드에 안 보였다(SH 이메일 접수 3장 · 기장군 …20930). 그 행의 place_text(없으면 note_text)를
+//    원문 글자 그대로 「📅 접수 방법 · …」 한 줄로 — 현장 접수 줄과 같은 자리 · 같은 꼴. 우리 말을 덧붙이지 않는다. 여럿이면 「 / 」.
+function zfRouteMethodOf(rows){
+  if(!Array.isArray(rows) || !rows.length || rows.some(r => !r || r.route !== '전체')) return null;
+  const txt = [...new Set(rows.map(r => String(r.place_text || '').trim() || String(r.note_text || '').trim()).filter(Boolean))];
+  return txt.length ? { kind: '④', text: '접수 방법 · ' + txt.join(' / ') } : null;
+}
 function zfFillSideSlots(){
   if(!zfSide.loaded) return;
   document.querySelectorAll('.zf-route-slot[data-route-key]').forEach(el => {
     if(el.dataset.filled === '1') return;
     el.dataset.filled = '1';
     const rows = zfSide.routesByKey.get(el.getAttribute('data-route-key'));
-    const v = zfRouteVerdict(rows);
+    let v = zfRouteVerdict(rows);
     // 🔵 2026-10-21(우편함 「표시층 — S1 묶음 3」 ③ · 조사 「카드 표기 넷」 ③ⓒ) — 「단지마다 일정이 달라요」는 원문에 단지 갈래가 있을 때만.
     //    배지의 근거(schedule_varies)는 LH 공고 페이지 원소라, 분석한 경로 행(원문)이 단지를 둘 이상 가르지 않으면 LH 원소만 다른 것이다(…20909 · …20886) → 숨긴다.
     //    🔴 경로 행이 아직 없는 카드(분석 전)는 LH 원소가 유일한 신호라 그대로 둔다(위험한 쪽 — 표지 없이 한 단지 일정만 보이는 꼴을 만들지 않는다).
     const vCard = el.closest('.hcard');
     const vSites = new Set((rows || []).map(r => String((r && r.site_text) || '').trim()).filter(Boolean));
     if(vCard && Array.isArray(rows) && rows.length && vSites.size < 2) vCard.querySelectorAll('.zf-varies').forEach(t => { t.style.display = 'none'; });
-    if(!v.text) return;
+    if(!v.text){ const m = zfRouteMethodOf(rows); if(!m) return; v = m; }   // ④ 「전체」 경로만 있는 카드 — 접수 방법 한 줄(아래)
     // 🔵 2026-10-07(Z-2 ③ 3 · 다운님 승인 3) — 현장 접수 줄(②-나·②-다·②-라) 끝에 접수 장소를 경로 칸 place_text 그대로 붙인다(여럿이면 「 / 」).
     const places = (v.kind === '②-나' || v.kind === '②-다' || v.kind === '②-라' || v.kind === '②-마')
       ? [...new Set((rows || []).map(r => String(r.place_text || '').trim()).filter(Boolean))] : [];
