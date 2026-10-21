@@ -36,7 +36,7 @@
 | `drive.google.com` | 카드 썸네일 `drive.google.com/thumbnail?id=…` | 지금(2026-10-14 더함) | 해외 IP 무관(Google) | 2026-10-14 | 열림 302 · 브라우저 썸네일 200 image/jpeg |
 | `lh3.googleusercontent.com` | 썸네일 넘김 대상(curl은 `drive.google.com` 302 → `lh3…/d/<id>=w300`) | 지금(2026-10-14 더함) | 해외 IP 무관(Google) | 2026-10-14 | 열림 400(루트) |
 | `housing.seoul.go.kr` | SH 공고 목록·페이지 원문 재확인 | 지금(2026-10-14 더함) | 해외 IP 허용(EF가 싱가포르에서 긁는다) | 2026-10-14 | 열림 200 |
-| `www.data.go.kr` | 공공데이터 포털 | 지금 | — | 2026-10-14 | 열림 200 |
+| `www.data.go.kr` | 공공데이터 포털 | 지금 | — | 2026-10-21 | 열림 200 — ⚠️ 활용사례 목록은 스크립트가 불러와 curl 본문에 없다 · 검색·데이터셋 페이지가 간헐로 `Connection reset by peer`(000)로 끊긴다(다시 부르면 200 · 2026-10-21) |
 | `apis.data.go.kr` | 국토부 실거래 API 🔑(키가 주소에 실린다) · LH 공지사항 목록 API(15058222 — 2026-10-21 지금 키로 200 · 원천은 [`data-sources.md`](data-sources.md)) | 지금 | 해외 IP 허용(실측) · ⚠️ 서버가 절반쯤 끊는다 | 2026-10-14 | 열림 400(루트) — 4회 중 2회는 CONNECT 200 뒤 11초에 `Connection reset by peer`(000). 지난 「000」 기록은 허용 목록이 아니라 이것이다 · 실패하면 다시 부른다 |
 | `api.notion.com` | Notion 파일 업로드 🔑(서명 주소) | 지금 | — | 2026-10-14 | 열림 302 |
 | `productionresultssa0.blob.core.windows.net` | Actions 로그·결과물 받기 | 지금 | — | 2026-10-14 | 열림 400(루트) |
@@ -45,8 +45,11 @@
 | `registry.npmjs.org` | npm | 지금(기본 목록) | — | 2026-10-14 | 열림 200 |
 | `pypi.org` | pip | 지금(기본 목록) | — | 2026-10-14 | 열림 200 |
 | `files.pythonhosted.org` | pip 패키지 받기 | 지금(기본 목록) | — | 2026-10-14 | 열림 404(루트) |
+| `www.i-sh.co.kr` | SH 공고 페이지 · 게시판 후속 공지 | 지금 | 해외 IP 허용(EF) | 2026-10-21 | 열림 307(루트 · CONNECT 200 · 2회 같음) — 2026-10-14 막힘(CONNECT 403) 뒤 열림 |
+| `jugeo.co.kr` | 조사용 — 경쟁 서비스 실사용 조사 | 지금(조사용) | — | 2026-10-21 | 열림 200(CONNECT 200 · 2회 같음) |
+| `apps.apple.com` | 조사용 — 앱스토어 경쟁 앱 조사 | 지금(조사용) | — | 2026-10-21 | 열림 301(루트 · CONNECT 200 · 2회 같음) |
+| `play.google.com` | 조사용 — 구글 플레이 경쟁 앱 조사 | 지금(조사용) | — | 2026-10-21 | 열림 302(루트 · CONNECT 200 · 2회 같음) |
 | `www.myhome.go.kr` | 카드 마이홈 링크 대상 확인 | 예정 | 허용 목록 · 해외 IP 미상 | 2026-10-14 | 막힘(CONNECT 403) |
-| `www.i-sh.co.kr` | SH 공고 페이지 | 예정 | 허용 목록 · 해외 IP 허용(EF) | 2026-10-14 | 막힘(CONNECT 403) |
 | `www.molit.go.kr` | 동향 — 국토부 보도자료 RSS(💡 인사이트 재편 2차 · S1) | 예정 | 허용 목록 · 미상 | 2026-10-14 | 막힘(CONNECT 403) |
 | `www.korea.kr` | 동향 — 정책브리핑 원문 링크 | 예정 | 허용 목록 · 미상 | 2026-10-14 | 막힘(CONNECT 403) |
 | `www.lh.or.kr` | 동향 — LH 보도자료 | 예정 | 허용 목록 · 미상 | 2026-10-14 | 막힘(CONNECT 403) |
