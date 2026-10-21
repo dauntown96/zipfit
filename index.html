@@ -4592,6 +4592,20 @@ const zfPriceCache = new Map();
 //    요약 RPC 는 두 벌을 한 범위로 합친다(min(least) ~ max(greatest)) — 숫자는 그대로 두고 범위 옆에 「두 임대조건 합친 범위」를 단다.
 //    🔴 어느 벌이 1순위·일반인지는 DB 에 단서가 없다(2026-09-11 — 이름을 붙이지 않는다 · renderHousingUnitRow 주석). 카드 자기 id 의 세대 행만 본다.
 const zfDualIds = new Set();
+// 🔵 2026-10-21(우편함 「표시층 — S1 묶음 2」 ③ · 백로그 「카드 가격 범위가 두 기준 … 라벨 없이 섞는다」 꼴 B·C) — 세대 행 공급대상(supply_target)이
+//    영구임대 가군·나군으로 갈리거나 소득 구간(1~6구간)으로 갈리는 공고는 요약 범위가 그 기준들을 합친 값이다 — 숫자는 그대로 두고 이름표만(꼴 A와 같은 결).
+//    이름표는 세대 행 글자에서만 만든다(가·나 둘 다 따로 있는 행이 있을 때 · 구간 번호가 둘 이상일 때). 카드 자기 id 의 세대 행만 본다(꼴 A와 같다).
+const zfGroupTag = new Map();   // id → 이름표 글자
+function zfGroupTagOf(targets){
+  const t = (targets || []).map(x => String(x || ''));
+  const GA = /가[\s「」『』'"]{0,2}군/, NA = /나[\s「」『』'"]{0,2}군/;   // 「가군(…)」 · 「「가」군」 두 꼴(2026-10-21 실측)
+  const ga = t.some(x => GA.test(x) && !NA.test(x)), na = t.some(x => NA.test(x) && !GA.test(x));
+  if(ga && na) return '가군·나군 합친 범위';
+  const g = [...new Set(t.map(x => (/^\s*([1-9])\s*구간/.exec(x) || [])[1]).filter(Boolean).map(Number))].sort((a, b) => a - b);
+  if(g.length >= 2) return `소득 ${g[0]}~${g[g.length - 1]}구간 합친 범위`;
+  return '';
+}
+
 function zfPriceUnit(v, div, digits, mode){
   const p = Math.pow(10, digits);
   const x = (Number(v) / div) * p;
@@ -4755,8 +4769,11 @@ function zfFillSummarySlots(){
     if(card) card.classList.toggle('zf-ana-pending', pend);
     if(card) card.classList.toggle('zf-ana-no', zfAiOff(s, el.getAttribute('data-sum-key')));   // 🔵 2026-10-16 — 분석 없으면 「AI 정리 · 」 접음
     if(pend){ el.innerHTML = zfAnaPendingHtml(url, el.getAttribute('data-sum-org') || ''); return; }
+    const gTag = zfGroupTag.get(String(id)) || '';
     const line = s ? zfSummaryLine(s, zfDualIds.has(String(id))
-      ? '<span class="zf-dual-tag" title="이 공고는 한 세대에 임대조건이 두 가지예요. 범위는 두 조건을 합친 값이고, 어느 조건이 적용되는지는 펼쳐서 비고·공고문에서 확인하세요.">(두 임대조건 합친 범위)</span>' : '') : '';
+      ? '<span class="zf-dual-tag" title="이 공고는 한 세대에 임대조건이 두 가지예요. 범위는 두 조건을 합친 값이고, 어느 조건이 적용되는지는 펼쳐서 비고·공고문에서 확인하세요.">(두 임대조건 합친 범위)</span>'
+      : (gTag && ((s.deposit_min != null && s.deposit_min !== s.deposit_max) || (s.rent_min != null && s.rent_min !== s.rent_max))
+        ? `<span class="zf-dual-tag" title="${zfAttr(gTag.startsWith('가군') ? '이 공고는 가군·나군의 임대조건이 달라요. 범위는 두 군을 합친 값이고, 군별 값은 펼쳐서 세대 표에서 확인하세요.' : '이 공고는 소득 구간마다 임대조건이 달라요. 범위는 구간을 합친 값이고, 구간별 값은 펼쳐서 세대 표에서 확인하세요.')}">(${escapeHtml(gTag)})</span>` : '')) : '';
     // 🔵 이번 회차 값이 아니면 상자 색도 함께 바꾼다 — 칩만 달면 초록 상자가 「확인됨」처럼 읽힌다.
     const stale = !!(s && (s.round_state === 'past' || s.round_state === 'unknown'));
     const box = stale
@@ -4787,6 +4804,14 @@ async function zfEnsurePriceSummaries(ids){
   // 두 임대조건 표지 재료(위 zfDualIds) — 실패해도 요약은 그대로(표지만 없음)
   const dualP = fetch(`${SUPABASE_URL}/rest/v1/housing_units?select=announcement_id&${idFilterFor(need)}&or=(deposit_priority1.not.is.null,rent_priority1.not.is.null)`, { headers: zfAnonHeaders() })
     .then(r => r.ok ? r.json() : null).then(rows => { if(Array.isArray(rows)) rows.forEach(r => r && r.announcement_id && zfDualIds.add(String(r.announcement_id))); }).catch(() => {});
+  // 가군·나군 · 소득 구간 이름표 재료(위 zfGroupTag · 2026-10-21) — 공급대상 글자에 「군」·「구간」이 든 행만. 실패해도 요약은 그대로(이름표만 없음).
+  const groupP = fetch(`${SUPABASE_URL}/rest/v1/housing_units?select=announcement_id,supply_target&${idFilterFor(need)}&or=(supply_target.like.*군*,supply_target.like.*구간*)`, { headers: zfAnonHeaders() })
+    .then(r => r.ok ? r.json() : null).then(rows => {
+      if(!Array.isArray(rows)) return;
+      const tg = new Map();
+      rows.forEach(r => { if(r && r.announcement_id){ const a = String(r.announcement_id); if(!tg.has(a)) tg.set(a, []); tg.get(a).push(r.supply_target); } });
+      tg.forEach((t, a) => { const g = zfGroupTagOf(t); if(g) zfGroupTag.set(a, g); });
+    }).catch(() => {});
   try{
     const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_announcement_price_summary`,
       {method:'POST', headers: zfAnonHeaders(), body: JSON.stringify({p_ids: need})});
@@ -4795,7 +4820,7 @@ async function zfEnsurePriceSummaries(ids){
     if(!Array.isArray(rows)) throw new Error('예상치 못한 응답');
     need.forEach(id => zfPriceCache.set(id, null));      // 응답에 없으면 세대정보가 없는 것이다
     rows.forEach(r => { if(r && r.announcement_id) zfPriceCache.set(String(r.announcement_id), r); });
-    await dualP;
+    await dualP; await groupP;
     return true;
   }catch(err){
     // 🔴 실패하면 자리를 도로 비운다 — 안 물어본 것과 같게 두어야 다음 렌더가 다시 시도한다.
