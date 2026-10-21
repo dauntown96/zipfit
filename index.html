@@ -2909,6 +2909,12 @@ function zfFillSideSlots(){
     el.dataset.filled = '1';
     const rows = zfSide.routesByKey.get(el.getAttribute('data-route-key'));
     const v = zfRouteVerdict(rows);
+    // 🔵 2026-10-21(우편함 「표시층 — S1 묶음 3」 ③ · 조사 「카드 표기 넷」 ③ⓒ) — 「단지마다 일정이 달라요」는 원문에 단지 갈래가 있을 때만.
+    //    배지의 근거(schedule_varies)는 LH 공고 페이지 원소라, 분석한 경로 행(원문)이 단지를 둘 이상 가르지 않으면 LH 원소만 다른 것이다(…20909 · …20886) → 숨긴다.
+    //    🔴 경로 행이 아직 없는 카드(분석 전)는 LH 원소가 유일한 신호라 그대로 둔다(위험한 쪽 — 표지 없이 한 단지 일정만 보이는 꼴을 만들지 않는다).
+    const vCard = el.closest('.hcard');
+    const vSites = new Set((rows || []).map(r => String((r && r.site_text) || '').trim()).filter(Boolean));
+    if(vCard && Array.isArray(rows) && rows.length && vSites.size < 2) vCard.querySelectorAll('.zf-varies').forEach(t => { t.style.display = 'none'; });
     if(!v.text) return;
     // 🔵 2026-10-07(Z-2 ③ 3 · 다운님 승인 3) — 현장 접수 줄(②-나·②-다·②-라) 끝에 접수 장소를 경로 칸 place_text 그대로 붙인다(여럿이면 「 / 」).
     const places = (v.kind === '②-나' || v.kind === '②-다' || v.kind === '②-라' || v.kind === '②-마')
@@ -2917,9 +2923,10 @@ function zfFillSideSlots(){
     // 두 줄을 넘치면 말줄임 · 전문은 툴팁(누르면 펼친다 — 손가락으로는 툴팁을 못 본다) · ▾는 말줄임 밖 칸
     el.innerHTML = `<p class="zf-route-line" data-route-kind="${zfAttr(v.kind)}" title="${zfAttr(v.text + pl)}" onclick="event.stopPropagation();this.classList.toggle('open')"><span class="zf-route-text">📅 ${v.ex ? escapeHtml(v.text.slice(0, -(v.ex.length + 3))) + `<span class="zf-route-ex"> · ${escapeHtml(v.ex)}</span>` : escapeHtml(v.text)}${pl ? `<span class="zf-route-place">${escapeHtml(pl)}</span>` : ''}</span><span class="zf-route-more" aria-hidden="true"></span></p>`;
     zfMarkRouteFits(el.firstElementChild);
-    // 🔴 같은 뜻을 두 번 말하지 않는다 — 이 한 줄이 「단지마다 일정이 달라요」 배지를 대신한다.
+    // 🔴 같은 뜻을 두 번 말하지 않는다 — 단지 갈래 줄(②-가)이 「단지마다 일정이 달라요」 배지를 대신한다.
+    //    🔵 2026-10-21 — 단지 갈래가 아닌 줄(현장 접수 등)은 대신하지 못한다 — 원문이 단지를 가르는데 그 줄이 서면 배지를 남긴다(위에서 원문 갈래 없음은 이미 숨김).
     const card = el.closest('.hcard');
-    if(card) card.querySelectorAll('.zf-varies').forEach(t => { t.style.display = 'none'; });
+    if(card && v.kind === '②-가') card.querySelectorAll('.zf-varies').forEach(t => { t.style.display = 'none'; });
     zfHideRouteDupOf(card);
   });
   // ⑤ 단일 단지 카드의 동네 가격 칩 — 동네 가격이 온 뒤에만 채운다(그 전 자리는 비운 채 남겨 둔다 · 첫 로드 2차)
