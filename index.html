@@ -1418,7 +1418,7 @@ html[data-ui="d3"] .pg-btn{min-width:var(--hit);height:var(--hit);font-size:var(
         <option value="30">30개씩</option>
         <option value="50">50개씩</option>
       </select>
-      <select id="noticeSortSel" style="font-size:13px;padding:5px 8px;border:1px solid #e0e0e0;border-radius:8px;background:#fff;color:#333;cursor:pointer" onchange="applyNoticeFiltersAndRender()">
+      <select id="noticeSortSel" autocomplete="off" style="font-size:13px;padding:5px 8px;border:1px solid #e0e0e0;border-radius:8px;background:#fff;color:#333;cursor:pointer" onchange="applyNoticeFiltersAndRender()">
         <option value="date-desc">최신 공고순</option>
         <option value="end-asc">마감 임박순</option>
         <option value="start-asc">접수 시작순</option>
@@ -4592,7 +4592,6 @@ const zfPriceCache = new Map();
 //    요약 RPC 는 두 벌을 한 범위로 합친다(min(least) ~ max(greatest)) — 숫자는 그대로 두고 범위 옆에 「두 임대조건 합친 범위」를 단다.
 //    🔴 어느 벌이 1순위·일반인지는 DB 에 단서가 없다(2026-09-11 — 이름을 붙이지 않는다 · renderHousingUnitRow 주석). 카드 자기 id 의 세대 행만 본다.
 const zfDualIds = new Set();
-
 function zfPriceUnit(v, div, digits, mode){
   const p = Math.pow(10, digits);
   const x = (Number(v) / div) * p;
@@ -4983,6 +4982,7 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
   zfAfterCardsRender();   // 🔵 B62 — 경로 한 줄 · 동네 가격 칩 · 같은 게시물 링크
   zfNoticeHighlight();    // 🔵 2026-10-02 — 검색어 강조(검색어가 없으면 아무것도 감싸지 않는다)
   if(typeof zf3DecorateCards === 'function') zf3DecorateCards();   // 🔵 D-3 b — ui=d3 일 때만 노선 카드로 덧입힌다
+  zfNavKeepOpen();        // 🔵 2026-10-21 뒤로가기 안 2 — 지금 이력 칸이 펼친 카드(주소창 ?n=)는 다시 그린 뒤에도 펼친 채로
 }
 
 // 페이저 — 「‹ 이전 · 1 … 4 5 6 … 12 · 다음 ›」. 현재 쪽 좌우 1칸과 양 끝을 늘 보여주고
@@ -5408,6 +5408,7 @@ function goMain(n){
     zfLastTab=n;
     zfLog('page_view', {tab: ZF_TAB_NAME[n]||String(n), nav: nav});
   }
+  zfNavTab(n);
   if(n===1) renderPersonalizedRecommendations();
   if(n===2 && !noticeLoaded) initNoticeFilters();
   // 🔵 보던 쪽을 들려 보낸다 — 재질의가 3쪽을 1쪽으로 되돌리던 것을 막는다(2026-09-16).
@@ -5416,6 +5417,104 @@ function goMain(n){
   if(n===4) zfRenderSavedTab();
   if(n===5) renderSettingsGate();
 }
+
+// ===== 🔵 2026-10-21 뒤로가기 안 2(우편함 「표시층 — S1 묶음 2」 ② · 백로그 「휴대폰 뒤로가기가 사이트를 떠난다」 D8 · 설계 「S1 다섯」 6) =====
+//    이력 한 칸 = { zf:1, t: 탭, open: 펼친 공고 id | null, idx: 몇 번째 칸, y: 그 칸을 떠날 때 스크롤 }.
+//    탭 이동과 좁은 화면(1200px 미만)의 카드 펼침을 pushState 로 쌓는다 — 뒤로 = 펼친 카드 접기(펼치기 전 스크롤로) · 그다음 뒤로 = 앞 탭.
+//    넓은 화면(1200px 이상)은 오른쪽 패널이라 탭만 쌓고, 펼침은 주소창만 바꾼다(replaceState).
+//    펼치면 주소창이 ?n=공고ID(다운님 결정 2026-10-20 — 주소창 복사 = 공유 링크 · 새로고침은 그 카드 펼침 · 아래 ?n= 열기와 같은 길).
+//    직접 접으면 그 칸이 맨 위일 때만 history.back()(이력 쓰레기를 안 남긴다), 아니면 주소창만 고친다.
+//    🔴 저장 0 · 보내는 것 0 — 주소창과 브라우저 이력만 쓴다.
+let zfNavApplying = false;   // 이력을 되감는 중(popstate)·한꺼번에 접는 중 — 그 사이의 탭 이동·펼침은 쌓지 않는다
+let zfNavSkip = false;       // 직접 접어 history.back() 한 것 — 돌아온 popstate 는 화면을 건드리지 않는다
+let zfNavCur = null;         // 지금 칸(popstate 는 떠나는 칸을 주지 않는다 — 쌓고 고칠 때마다 맞춘다)
+function zfNavNarrow(){ try{ return !matchMedia('(min-width:1200px)').matches; }catch(e){ return true; } }
+function zfNavUrl(aid){
+  try{
+    const u = new URL(location.href);
+    if(aid) u.searchParams.set('n', aid); else u.searchParams.delete('n');
+    return u.pathname + u.search;   // 해시는 싣지 않는다(로그인 응답 자리)
+  }catch(e){ return undefined; }
+}
+function zfNavState(){ const s = history.state; return (s && s.zf) ? s : null; }
+function zfNavWrite(push, st, url){
+  try{ if(push) history.pushState(st, '', url); else history.replaceState(st, '', url); zfNavCur = st; }catch(e){}
+}
+function zfNavPush(next, aid){
+  const cur = zfNavState();
+  if(cur) zfNavWrite(false, Object.assign({}, cur, { y: window.scrollY }));   // 떠나는 칸에 스크롤을 적어 둔다
+  zfNavWrite(true, Object.assign({ zf: 1, open: null }, next, { idx: ((cur && cur.idx) || 0) + 1 }), zfNavUrl(aid));
+}
+function zfNavReplace(patch, aid){
+  zfNavWrite(false, Object.assign({ zf: 1, t: zfLastTab, open: null, idx: 0 }, zfNavState(), patch), zfNavUrl(aid));
+}
+// goMain 이 부른다 — 첫 그림(문서를 읽는 중)은 지금 칸을 고쳐 쓰고(주소는 그대로 — 아래 ?n= 열기가 읽는다), 그 뒤 탭 이동은 한 칸 쌓는다.
+function zfNavTab(n){
+  if(zfNavApplying) return;
+  const cur = zfNavState();
+  if(document.readyState === 'loading' || !cur){ zfNavWrite(false, Object.assign({ zf: 1, open: null, idx: 0 }, cur, { t: n })); return; }
+  if(cur.t !== n) zfNavPush({ t: n }, null);
+}
+// toggleDetail 이 부른다(펼침·접음 다음).
+function zfNavCard(cardEl, opened){
+  if(zfNavApplying || !cardEl || !cardEl.dataset) return;
+  const aid = String(cardEl.dataset.announcementId || '');
+  if(!aid) return;
+  const cur = zfNavState();
+  if(opened){
+    if(zfNavNarrow() && cur) zfNavPush({ t: zfLastTab, open: aid }, aid);
+    else zfNavReplace({ open: aid }, aid);
+    return;
+  }
+  if(!cur || cur.open !== aid) return;
+  if(zfNavNarrow() && (cur.idx || 0) > 0){ zfNavSkip = true; history.back(); }
+  else zfNavReplace({ open: null }, null);
+}
+// 펼침 상태를 맞춘다 — 카드를 누른 것과 같은 길(toggleDetail · d3 펼침 단추 상태)로.
+function zfNavSetOpen(aid, want, tab){
+  const sel = `[data-card-id][data-announcement-id="${CSS.escape(String(aid))}"]`;
+  const pool = [...document.querySelectorAll((tab ? '#main' + tab + ' ' : '') + sel)];
+  const isOpen = c => { const d = document.getElementById(c.getAttribute('data-card-id')); return !!(d && d.style.display === 'block'); };
+  if(want){ if(!pool.some(isOpen) && pool[0]) pool[0].click(); }
+  else pool.filter(isOpen).forEach(c => c.click());
+}
+// 목록을 다시 그리면(경로 행 · 결과발표 일정 · 지도 가격 요약 도착 · 조건 바꿈) 펼친 카드가 접힌다 — 지금 이력 칸이 펼친 카드는 다시 펼친다.
+//    없으면(쪽 · 조건 밖) 그대로 둔다. 2026-10-21 실측: ?n= 로 연 카드가 그 뒤 다시 그림(390 두 번 · 1280 네 번)에 접혔다(종전 배포본도 같다).
+function zfNavKeepOpen(){
+  const cur = zfNavState();
+  if(zfNavApplying || !cur || !cur.open || cur.t !== 2) return;
+  const c = document.querySelector(`#notice-list [data-card-id][data-announcement-id="${CSS.escape(String(cur.open))}"]`);
+  const d = c && document.getElementById(c.getAttribute('data-card-id'));
+  if(!d || d.style.display === 'block') return;
+  zfNavApplying = true;
+  try{ c.click(); }finally{ zfNavApplying = false; }
+}
+window.addEventListener('popstate', e => {
+  const s = (e.state && e.state.zf) ? e.state : { zf: 1, t: zfLastTab, open: null, idx: 0 };
+  const cur = zfNavCur; zfNavCur = s;
+  if(zfNavSkip){ zfNavSkip = false; return; }
+  zfNavApplying = true;
+  try{
+    if(cur && cur.open && cur.open !== s.open) zfNavSetOpen(cur.open, false);
+    if(s.t && s.t !== zfLastTab) goMain(s.t);
+    if(s.open && (s.idx || 0) > ((cur && cur.idx) || 0)) zfNavSetOpen(s.open, true, s.t);   // 앞으로 가기만 다시 펼친다(뒤로는 접기만)
+  }finally{ zfNavApplying = false; }
+  if(typeof s.y === 'number') requestAnimationFrame(() => window.scrollTo(0, s.y));
+});
+try{ history.scrollRestoration = 'manual'; }catch(e){}   // 스크롤은 칸의 y 로 맞춘다(카드가 접힌 뒤의 자리)
+// 첫 칸 — 보이는 탭으로(d3 는 곧 goMain(2) 가 고쳐 쓴다 · 종전 모드는 goMain 없이 추천 탭에서 시작한다).
+(function(){
+  const vis = [1,2,3,4,5].find(i => { const m = document.getElementById('main' + i); return m && !m.classList.contains('hidden'); }) || 1;
+  zfNavWrite(false, Object.assign({ zf: 1, open: null, idx: 0 }, zfNavState(), { t: vis }));
+})();
+// 정렬 칸 — 뒤로 돌아온 화면(bfcache)에서 정렬 칸이 비지 않게: 정렬 칸은 autocomplete=off · 돌아오면 머리 사본을 정렬 값에 맞춘다.
+window.addEventListener('pageshow', e => {
+  if(!e.persisted) return;
+  const ss = document.getElementById('noticeSortSel');
+  if(ss && !ss.value && ss.options.length) ss.value = ss.options[0].value;
+  const f = document.querySelector('#zf3NoticeHead [data-act="sortsel"]');
+  if(ss && f && f.value !== ss.value) f.value = ss.value;
+});
 
 // 페이지 로드 시 전국 지역 목록 초기화
 loadRegionsFromSupabase();
@@ -7070,6 +7169,7 @@ function toggleDetail(id, card, from){
       const g = cardEl.querySelector('.zf3-go'); if(g) g.setAttribute('aria-expanded', open ? 'false' : 'true');
     }
   }
+  zfNavCard(cardEl, !open);   // 🔵 2026-10-21 뒤로가기 안 2 — 좁은 화면은 펼침을 이력에 쌓고, 주소창은 ?n=
   if(!open && !detailEl.dataset.mapLoaded && cardEl){
     detailEl.dataset.mapLoaded = '1';
     const preciseAddr = cardEl.dataset.preciseAddress || '';
@@ -10561,7 +10661,7 @@ function zfCaptureAuthUrlError(){
     console.warn('[ZipFit auth] 복귀 주소 오류:', { error: pick('error'), error_code: code, error_description: desc });
     // 🔵 주소창을 정리한다 — 새로고침해도 같은 오류가 되살아나지 않게.
     //    replaceState 라 뒤로가기 이력이 늘지 않는다.
-    history.replaceState(null, '', location.pathname + location.search.replace(/[?&](error|error_code|error_description)=[^&]*/g, '').replace(/^&/, '?'));
+    history.replaceState(history.state, '', location.pathname + location.search.replace(/[?&](error|error_code|error_description)=[^&]*/g, '').replace(/^&/, '?'));
   }catch(e){
     console.warn('[ZipFit auth] 복귀 주소 오류 파싱 실패', e);
   }
@@ -11710,9 +11810,12 @@ async function zf3GoCard(aid){
     goMain(2);
     for(let i = 0; i < 150 && !noticeLoaded; i++) await new Promise(r => setTimeout(r, 100));
     const el = await zf3GoCard(id);
-    if(!el) return;
+    // 🔵 2026-10-21 뒤로가기 안 2 — 첫 로드의 ?n= 은 지금 칸을 고쳐 쓴다(쌓지 않는다 — 공유 링크로 와서 뒤로 = 왔던 곳). 없는 id(닫힌 공고 · 오타)는 주소에서 걷는다.
+    if(!el){ zfNavReplace({ t: 2, open: null }, null); return; }
     const det = document.getElementById(el.getAttribute('data-card-id'));
-    if(det && det.style.display !== 'block') (el.querySelector('.zf3-gotop') || el).click();
+    zfNavApplying = true;
+    try{ if(det && det.style.display !== 'block') (el.querySelector('.zf3-gotop') || el).click(); }finally{ zfNavApplying = false; }
+    zfNavReplace({ t: 2, open: String(el.dataset.announcementId || id) }, String(el.dataset.announcementId || id));
   };
   if(document.readyState === 'complete') go(); else window.addEventListener('load', go);
 })();
@@ -11952,7 +12055,8 @@ function zf3DecorateIn(list, rowsMap, isMatch){
       card.addEventListener('click', () => setTimeout(() => {
         sync();
         // ③ 1200px 이상 공고 탭: 펼친 상세는 오른쪽(지도 자리)에 뜬다 — 한 번에 하나만(다른 카드는 접는다 · DOM 은 옮기지 않고 CSS 로 자리만)
-        if(!isMatch && det && det.style.display === 'block' && typeof zf3Wide === 'function' && zf3Wide()){
+        //    🔵 2026-10-21 — 그사이 목록을 다시 그렸으면(이 카드가 문서 밖) 접지 않는다 — 다시 그린 새 카드(같은 공고)를 「다른 카드」로 보고 접었다.
+        if(!isMatch && card.isConnected && det && det.style.display === 'block' && typeof zf3Wide === 'function' && zf3Wide()){
           list.querySelectorAll('.zf3-card.zf3-open').forEach(c => { if(c !== card){ const d2 = document.getElementById(c.getAttribute('data-card-id')); if(d2 && d2.style.display === 'block') c.click(); } });
           try{ det.scrollTop = 0; }catch(e){}
         }
@@ -12270,7 +12374,7 @@ function zf3RenderNoticeHead(filtered){
     + zf3StatChips(filtered, chips)
     + `<div class="zf3-tblock" role="note"><div><span class="k">마지막 수집</span><span class="v led" data-zf3-coll>${escapeHtml(zf3CollText())}</span></div></div>`
     + `<div class="zf3-ctl"><button type="button" class="zf3-chip add zf3-fbtn" data-act="sheet" aria-expanded="${sheetOpen}" aria-controls="noticeFilterPanel">${ZF3_ICO_FILTER}필터${chips.length ? ` <b>${chips.length}</b>` : ''}</button>`
-    + (sortOpts ? `<span class="zf3-sortsel">${ZF3_ICO_SORT}<select data-act="sortsel" aria-label="정렬">${sortOpts}</select><span class="cv" aria-hidden="true">▾</span></span>` : '') + `</div>`
+    + (sortOpts ? `<span class="zf3-sortsel">${ZF3_ICO_SORT}<select data-act="sortsel" autocomplete="off" aria-label="정렬">${sortOpts}</select><span class="cv" aria-hidden="true">▾</span></span>` : '') + `</div>`
     + (chips.length ? `<div class="zf3-chips" role="group" aria-label="걸린 조건">${chips.map(([k, t]) => `<button type="button" class="zf3-chip on" data-act="clear" data-k="${k}" aria-label="${zfAttr(t)} 조건 빼기">${escapeHtml(t)}<span aria-hidden="true">✕</span></button>`).join('')}</div>` : '');
   el.hidden = false;
   zf3RenderSheetPlaces();
@@ -13166,10 +13270,16 @@ function zf3StickyHead(){
 // 첫 화면 = 페이지를 처음 열 때 서는 화면(아래 첫 goMain — d3 는 공고 탭) · 1쪽 · 맨 위. 새로고침하지 않는다 — 로그인 세션 · 공고 탭 조건(지역·유형·검색)은 그대로 두고,
 //    펼친 조건 시트와 펼친 공고 상세만 접는다. 「첫 화면」이 바뀌면 여기와 첫 goMain 을 함께 고친다.
 function zfGoHome(){
-  if(typeof zf3ToggleSheet === 'function') zf3ToggleSheet(false);
-  goMain(2);
-  document.querySelectorAll('#notice-list .hcard.zf3-open').forEach(c => c.click());
-  if(noticeLoaded && noticePage !== 1){ noticePage = 1; renderNoticeList(noticeFiltered, noticeData.length); }
+  // 🔵 2026-10-21 뒤로가기 안 2 — 한꺼번에 접는 동안은 이력을 건드리지 않고(접을 때마다 뒤로 가면 안 된다), 다 접은 뒤 첫 화면 한 칸을 쌓는다(뒤로 = 집 누르기 전).
+  const was = zfNavState();
+  zfNavApplying = true;
+  try{
+    if(typeof zf3ToggleSheet === 'function') zf3ToggleSheet(false);
+    goMain(2);
+    document.querySelectorAll('#notice-list .hcard.zf3-open').forEach(c => c.click());
+    if(noticeLoaded && noticePage !== 1){ noticePage = 1; renderNoticeList(noticeFiltered, noticeData.length); }
+  }finally{ zfNavApplying = false; }
+  if(was && (was.t !== 2 || was.open)) zfNavPush({ t: 2 }, null);
   window.scrollTo({ top: 0, behavior: 'auto' });
 }
 function zf3Init(){
