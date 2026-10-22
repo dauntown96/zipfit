@@ -16,6 +16,9 @@
 --      더함 둘(claude.ai 확정 2026-10-18): 「분석 중」은 대기열(analysis_dispatch_queue waiting·sent·claimed)에 있을 때만 약속이다(analyzing_not_queued = 0) ·
 --      판정 대기는 announcement_analysis.status = '완료(판정 대기)'로 센다(pending_fields 「[판정대기]」 표식으로 세지 않는다 — 표식은 판정 뒤에도 기록으로 남는다).
 --      열린 카드는 근사다: apply_end ≥ 오늘(KST) ∧ 제목에 「조기…마감」 없음(2026-10-18 화면 58 = 이 식 58). 정본은 health-screen phrase(공고 탭 전 카드).
+--      🔵 2026-10-22(우편함 「표시층 C 묶음 5」 4 ⓓ) — 화면은 마감 날 원문 끝 시각(경로 표 · 일정 표 접수 행 period_text)이 지나면 그 카드를 내린다.
+--      이 근사는 날짜만 보아 그날 끝까지 그 카드를 센다 — 어긋나는 쪽은 늘 「근사가 더 센다」(엄격한 쪽 · 거짓 초록 없음) · 끝 시각 읽기를 SQL 로 옮기면 사본이 생겨 옮기지 않는다.
+--      마감 날 오후에 G2 가 화면보다 많으면 health-screen phrase(정본)로 가른다.
 --   G3 열린 카드에 지금 보이는 틀린 정보 0(출처 무관 — 2026-10-19 다운님 결정 · 종전 「가장 최근 실사용 회차 『높음』 결함 0」) → 아래 Notion 질의 ①
 --   G4 사용자 목록 실패 → health-ops list_user_fail(`ops_health_runs` warned · `ops_health_findings` item='list_user_fail'). 「사람」에는 다운님 기기가 섞인다 —
 --      판정에서 다운님 기기 실패도 센다(claude.ai 확정 2026-10-18 · 빼면 낙관 쪽으로 기운다).
