@@ -128,6 +128,7 @@ try {
   const cards = []           // [aid, 문구 갈래, 문구 앞 60자]
   const notices = []         // [aid, 공고문 제목 전문, 화면 접수 기간, 화면 상태]
   const brokenChips = []
+  const orgCards = []   // [id, 제목이 기관공급 낱말, 표지 있음]
   const hiddenDates = []
   const overflow = []
   const greyOpen = []         // 회색(흐림 · zf3-closed)인데 숨기기 술어(isHiddenAsClosed)로는 열린 카드
@@ -192,12 +193,19 @@ try {
             sp ? (sp.innerText || sp.textContent).replace(/^접수\s*/, '').trim() : '(없음)', state, !!(st && st.dataset.zfWin2 === '1')])
         }
       }
-      return { cardRows, chips, dates, nts, overflow: sw > window.innerWidth + 1 ? sw : 0, greys: greys.length, greyBad }
+      // 🔵 2026-10-22(우편함 「표시층 — A(G3 셋)」 2 · 원칙 33) — 기관공급 표지 = 제목 원문 낱말(화면 ZF_ORG_SUPPLY_RE 의 사본 — 화면 상수를 읽지 않고 따로 적는다)
+      const ORG_RE = /기관공급|대상기업\s*모집/
+      const orgCards = [...document.querySelectorAll('.hcard')].filter(vis).map(c => {
+        const t = c.getAttribute('data-title') || (c.querySelector('.hname') || {}).textContent || ''
+        return [c.getAttribute('data-announcement-id') || '?', ORG_RE.test(t), !!c.querySelector('.zf-org-sup')]
+      })
+      return { cardRows, chips, dates, nts, overflow: sw > window.innerWidth + 1 ? sw : 0, greys: greys.length, greyBad, orgCards }
     })
     // 🔴 갈래는 자르기 전 전문으로 정한다(이슈 #360 · 2026-10-07) — 60자로 자른 뒤 판정하면 긴 ④ 링크 문구
     //    (「…[정정공고] … 공고에 함께 정리돼 있어요 →」 65자)의 「있어요」가 잘려 「알수없음」으로 떨어졌다. 60자는 결과 표에 보일 때만.
     for (const [aid, t, lo] of got.cardRows) cards.push([aid, phraseOf(t), t.slice(0, 60), lo])
     notices.push(...got.nts)
+    orgCards.push(...got.orgCards)
     brokenChips.push(...got.chips)
     hiddenDates.push(...got.dates)
     if (got.overflow) overflow.push(`쪽 ${pg}: scrollWidth ${got.overflow}`)
@@ -314,6 +322,11 @@ try {
   }
   // ② 390px
   extra.broken_chips = brokenChips; extra.hidden_route_dates = hiddenDates; extra.overflow = overflow
+  { const bad = orgCards.filter(([, want, has]) => want !== has).map(([id, want]) => `${id}: ${want ? '표지 없음' : '표지 잘못 붙음'}`)
+    extra.org_supply_mismatch = bad
+    add('org_supply', '기관공급 「기업이 신청하는 공고」 표지 ↔ 제목 원문 낱말', bad.length === 0 ? 'pass' : 'fail',
+      `대상 ${orgCards.filter(c => c[1]).length}장 / 본 카드 ${orgCards.length}장${bad.length ? ` · 어긋남 ${bad.length}: ${bad.slice(0, 3).join(' / ')}` : ''}`,
+      '제목에 「기관공급」·「대상기업 모집」 ⇔ 카드 표지(.zf-org-sup) — 2026-10-22') }
   add('chips', '깨진 칩(높이 > 30px 또는 줄바꿈 조각 2개 이상)', brokenChips.length === 0 ? 'pass' : 'fail', brokenChips.length ? `${brokenChips.length}: ${brokenChips.slice(0, 3).join(' / ')}` : 0, '0(표시층 B 뒤 0)')
   add('route_date', '접힌 경로 줄 첫 날짜가 보이는가', hiddenDates.length === 0 ? 'pass' : 'fail', hiddenDates.length ? `${hiddenDates.length}: ${hiddenDates.slice(0, 3).join(' / ')}` : 0, '가려진 첫 날짜 0')
   add('overflow', '가로 넘침(390px)', overflow.length === 0 ? 'pass' : 'fail', overflow.length ? overflow.join(' / ') : 0, 'scrollWidth ≤ 390')
