@@ -93,6 +93,8 @@ def history_problems(text):
         b = len(r.encode('utf-8'))
         if b > 600:
             probs.append(f'{row_re.match(r).group(1)} 행이 {b}B — 600B 안')
+        if re.search(r'\|\s*-{3,}\s*$', r):
+            probs.append(f'{row_re.match(r).group(1)} 행 끝에 「|---」가 붙었다 — 절 구분선은 행 뒤 빈 줄 다음 줄에(행을 갈아 끼우며 꼬리가 옮겨 다닌다 · 2026-10-21)')
     dates = [row_re.match(r).group(1) for r in rows]
     if dates != sorted(dates, reverse=True):
         probs.append(f'날짜가 최신부터가 아니다({" → ".join(dates)})')

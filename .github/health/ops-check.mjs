@@ -325,6 +325,7 @@ try {
       --    열린 대표(apply_end ≥ 오늘+3 · 들어온 지/정정된 지 60분 넘음) ∧ 묶음 첨부 > 0 ∧ 아직 분석할 것이 있음
       --      (정정 행 ∧ 정정본 분석 없음 ∧ 같은 제목 묶음에 정정 전 분석 있음 — revision_gap 과 같은 판정 · 또는 같은 회차(같은 마감 · 링크)에 완료 분석 없음 — 발송기 cand 와 같은 판정)
       --    ∧ 그 공고의 대기열 행이 waiting·sent·claimed 어디에도 없음. 발송기는 10분마다 후보를 넣으므로 이 꼴은 넣다가 충돌로 사라진 것이다(…0877 · 10-15~16).
+      --    🔵 2026-10-21(…20929) — 정정본 갈래는 「apply_end ≥ 오늘」(발송기 rcand 와 같은 창) · 미분석 갈래만 「≥ 오늘+3」.
       'dispatch_orphan', (with lm as (select distinct on (l.linked_announcement_id) l.linked_announcement_id aid, announcement_dedup_key(lh.title) lh_key
              from announcement_post_links l join announcements lh on lh.announcement_id = l.lh_announcement_id
             where lh.title is not null and lh.hidden_from_listing is not true order by l.linked_announcement_id, l.lh_announcement_id),
@@ -332,16 +333,16 @@ try {
              from announcements a left join lm on lm.aid = a.announcement_id where a.title is not null and a.hidden_from_listing is not true),
            rp as materialized (select d.announcement_id, d.apply_end, kd.k, a.is_revised, a.revised_at, a.created_at
              from get_announcements_deduped() d join kd using (announcement_id) join announcements a using (announcement_id)
-            where d.apply_end >= current_date + 3)
+            where d.apply_end >= current_date)
          select coalesce(json_agg(rp.announcement_id order by rp.announcement_id), '[]'::json) from rp
           where greatest(rp.created_at, coalesce(rp.revised_at, rp.created_at)) < now() - interval '60 minutes'
             and (select coalesce(sum(jsonb_array_length(g.attachment_urls)), 0) from kd g where g.k = rp.k and jsonb_typeof(g.attachment_urls) = 'array') > 0
             and ((rp.is_revised and rp.revised_at is not null and not get_revision_analysis_done(rp.announcement_id)
                   and exists (select 1 from kd g join announcement_analysis aa using (announcement_id)
                                where g.k = rp.k and aa.status in ('완료', '완료(보조 누락)', '완료(판정 대기)', '완료(소급)')))
-                 or not exists (select 1 from kd g join announcement_analysis aa using (announcement_id)
+                 or (rp.apply_end >= current_date + 3 and not exists (select 1 from kd g join announcement_analysis aa using (announcement_id)
                                where g.k = rp.k and (g.apply_end = rp.apply_end or g.linked)
-                                 and aa.status in ('완료', '완료(보조 누락)', '완료(판정 대기)', '완료(소급)')))
+                                 and aa.status in ('완료', '완료(보조 누락)', '완료(판정 대기)', '완료(소급)'))))
             and not exists (select 1 from analysis_dispatch_queue q where q.announcement_id = rp.announcement_id and q.state in ('waiting', 'sent', 'claimed'))),
       -- 🔵 2026-10-15(우편함 「코드 — 불변식 … · health-ops-soft 「판정완료인데 판정 대기」 감지」 2) — 판정 대기 잔존.
       --    done = 상태 「완료(판정 대기)」인데 pending_fields 에 「[판정완료] YYYY-MM-DD …」 줄(2026-10-15 규약 — 판정이 난 날 · 근거 페이지)이 있는 공고.
@@ -458,7 +459,7 @@ try {
     const ids = d.dispatch_orphan || []
     add('dispatch_orphan', '분석할 것이 있는 열린 대표인데 대기열에 없음(발송기 누락)', ids.length === 0 ? 'pass' : 'fail',
       ids.length ? `${ids.length}: ${ids.slice(0, 5).join(', ')}` : 0,
-      '0 — 대표 ∧ apply_end ≥ 오늘+3 ∧ 들어온·정정된 지 60분 ∧ 묶음 첨부 > 0 ∧ (정정본 분석 없음 ∨ 같은 회차 완료 분석 없음) ∧ 대기열 waiting·sent·claimed 행 없음 · 넘으면 ❌(health-ops-soft — 루틴 착수를 막지 않는다)')
+      '0 — 대표 ∧ 들어온·정정된 지 60분 ∧ 묶음 첨부 > 0 ∧ (정정본 분석 없음(apply_end ≥ 오늘) ∨ 같은 회차 완료 분석 없음(apply_end ≥ 오늘+3)) ∧ 대기열 waiting·sent·claimed 행 없음 · 넘으면 ❌(health-ops-soft — 루틴 착수를 막지 않는다)')
   }
   // ⑧-2b 판정 대기 잔존(2026-10-15 · 우편함 「코드 — 불변식 … · health-ops-soft 「판정완료인데 판정 대기」 감지」 2).
   //    🔴 ⚠️ 경고만이다(이슈를 열지 않는다 — revision_gap·followup_unreported 와 같은 처리) — 고치는 길이 코드가 아니라 「운영 — 데이터 쓰기」(상태만)라
