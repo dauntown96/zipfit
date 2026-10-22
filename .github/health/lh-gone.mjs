@@ -18,18 +18,27 @@ o as (select a.announcement_id, a.last_seen_at from public.announcements a
          and a.apply_end >= (${at} at time zone 'Asia/Seoul')::date and a.title not like '%조기%마감%'),
 g as (select o.announcement_id, o.last_seen_at,
              floor(extract(epoch from (select t from ok) - o.last_seen_at) / 86400)::int days
-        from o where o.last_seen_at is null or (select t from ok) - o.last_seen_at > interval '1 day')
+        from o where o.last_seen_at is null or (select t from ok) - o.last_seen_at > interval '1 day'),
+-- 🔵 2026-10-22 덧(우편함 「코드·운영 — A(G3 감시 덧) …」 3) — 경보 ID마다 공급기관 페이지 대조(source_page_checks · LH 는 source_key = 공고 ID)의
+--    기준 시각까지 마지막 행 꼬리 — 「사라짐 + 페이지 접수마감」이면 바로 정정 대상으로 좁혀진다. 경보 행만 붙인다(평소 0행).
+p as (select g.announcement_id, c.page_status, c.checked_at from g
+        left join lateral (select x.page_status, x.checked_at from public.source_page_checks x
+                            where x.source = 'LH' and x.source_key = g.announcement_id and x.checked_at <= ${at} and x.error is null
+                            order by x.checked_at desc limit 1) c on true)
 select json_build_object(
   'ok_at', (select t from ok),
   'open', (select count(*) from o),
   'n', (select count(*) from g),
-  'ids', (select coalesce(json_agg(json_build_object('id', g.announcement_id, 'days', g.days) order by g.last_seen_at nulls first), '[]'::json) from g)) j`
+  'ids', (select coalesce(json_agg(json_build_object('id', g.announcement_id, 'days', g.days, 'page', p.page_status,
+            'page_at', to_char(p.checked_at at time zone 'Asia/Seoul', 'MM-DD HH24:MI')) order by g.last_seen_at nulls first), '[]'::json)
+          from g join p using (announcement_id))) j`
 
 // 판정 — ok_at 이 없으면(7일 안 성공한 LH 목록 수집 0) 잴 기준이 없다 → ⚠️(그 자체가 수집 문제다 · 수집 항목이 따로 ❌를 낸다).
 export function judgeLhGone(j) {
   const rule = '0 — 열린 LH 행(공고중·접수중·정정공고중 ∧ 마감 ≥ 오늘 KST ∧ 조기 마감 아님) 중 last_seen_at 이 마지막 성공 LH 목록 수집보다 1일 넘게 앞선 것 · 넘으면 ⚠️ 경고만(카드를 닫지 않는다 — 공고 페이지 확인)'
   if (!j.ok_at) return { status: 'warn', value: `7일 안 성공한 LH 목록 수집 없음(열린 LH 행 ${j.open})`, rule }
   if (j.n === 0) return { status: 'pass', value: `0(열린 LH 행 ${j.open})`, rule }
-  const ids = j.ids.slice(0, 5).map(x => `${x.id}(${x.days == null ? '본 기록 없음' : `${x.days}일째 안 보임`})`)
+  const page = x => x.page_at ? ` · 페이지: ${x.page || '상태 없음'} · ${x.page_at}` : ' · 페이지 대조 없음'
+  const ids = j.ids.slice(0, 5).map(x => `${x.id}(${x.days == null ? '본 기록 없음' : `${x.days}일째 안 보임`}${page(x)})`)
   return { status: 'warn', value: `${j.n}: ${ids.join(', ')} — LH 목록에서 안 보임 · 공고 페이지 확인`, rule }
 }
