@@ -61,6 +61,9 @@ const ALLOWED: Record<string, string[] | null> = {
   'i-sh.co.kr': null,
   'housing.seoul.go.kr': null,
   'www.bmc.busan.kr': ['/board/download.do', '/board/view.do'],
+  // 🔵 2026-10-22(우편함 「코드·운영 — A(G2): … 제주개발공사 …」 1) — 제주특별자치도개발공사 게시판. 상세(act=view)·받기(act=download)가
+  //   같은 경로다. 싱가포르 DB `net.http_get`·서울 탐침 모두 200 → SEOUL_ONLY 아님.
+  'www.jpdc.co.kr': ['/open/news/notice.htm'],
 }
 
 // 국내 IP만 받는 호스트 — 실행 지역(SB_REGION · Supabase 런타임 변수)이 서울일 때만 연다.
@@ -801,6 +804,8 @@ const PROBE_HOSTS = new Set([
   'www.bmc.busan.kr', 'www.gbdc.co.kr', 'www.jpdc.co.kr', 'apply.cndc.kr', 'www.ih.co.kr', 'www.sjfmc.or.kr',
   'www.gndc.co.kr', 'house.gmuc.co.kr', 'www.ansanuc.net', 'apply.ansanuc.net', 'www.gdco.co.kr', 'www.gimje.go.kr',
   'www.gunsan.go.kr', 'www.jbdc.co.kr', 'happydorm.or.kr', 'www.dcco.kr', 'www.changwon.go.kr',
+  // 🔵 2026-10-22(같은 우편함 3) — 광주광역시도시공사(금호빛여울채 21443_*) · 싱가포르 DB 에서 SSL 오류 → 서울에서 열리는지 잰다.
+  'www.gmcc.co.kr',
 ])
 const PROBE_TIMEOUT_MS = 20_000
 const PROBE_MAX_HTML = 3_000_000
