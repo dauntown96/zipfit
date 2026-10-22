@@ -719,6 +719,11 @@ html[data-ui="d3"] .zf-ana-box{background:var(--surface-2);border-color:var(--li
 html[data-ui="d3"] .zf-ana-pill{background:var(--ink);color:var(--paper)}
 html[data-ui="d3"] .zf-ana-org{color:var(--ink)}
 html[data-ui="d3"] .zf-ana-box a{color:var(--ink)!important}
+/* 🔵 2026-10-22(우편함 「표시층 — A(G2): 「링크만」 카드에 사실대로의 표지」) — 첨부 0 · 분석 없음 카드(zf-lo): 머리 줄 상태 알약 앞에 「꼭집 미분석」 표지.
+   카드 그림과 요약 도착 순서에 기대지 않게 CSS 로 단다(머리 줄은 flex — 표지 order 1 · 알약 order 2). 날짜·상태는 수집값 그대로 둔다. */
+.hcard.zf-lo .zf3-ctop::after{content:'꼭집 미분석';order:1;font-size:var(--t-xs);font-weight:700;border-radius:999px;padding:1px 8px;color:#fff;background:#6B6B63}
+.hcard.zf-lo .zf3-ctop .zf3-dpill{order:2}
+html[data-ui="d3"] .hcard.zf-lo .zf3-ctop::after{background:var(--ink-2);color:var(--paper)}
 .zf-sch-stop>summary::-webkit-details-marker{display:none}
 .zf-sch-stop>summary>.policy-category,.zf-sch-stop>summary>.policy-content{display:block}
 .zf-sch-stop .zf-sch-more{font-family:inherit;font-size:11px;font-weight:600;color:var(--ink-3,#777);margin-left:8px;white-space:nowrap}
@@ -4616,9 +4621,16 @@ function zfNotAnalyzedHtml(url, text){
 //    has_attachments = 그룹 구성원 누구든 첨부 목록이 있다 → 거짓이면 분석할 첨부 자체가 없다(원문 링크뿐)
 //    🔴 칸이 없는 옛 응답·조회 전·실패는 '' — 종전 문구 그대로. B62 ④ 게시물 링크가 붙는 카드도 '' — 링크를 그대로 둔다.
 const ZF_SUM_NO_UNITS   = '이 공고는 원문에 세대별 목록이 없어요 · 자격·일정은 펼쳐서 확인하세요';
-const ZF_SUM_LINK_ONLY  = '이 공고는 원문 링크만 제공해요 · 보증금·면적은 원문에서 확인해 주세요';
+// 🔵 2026-10-22(우편함 「표시층 — A(G2): 「링크만」 카드에 사실대로의 표지」) — 첨부 0 · 분석 없음 카드는 사실 둘만 말한다:
+//    꼭집이 아직 이 공고를 분석하지 않았다 · 원문은 공급기관 게시판에 있다. 「분석 중」이라 하지 않는다(발송 대상이 아니라 분석이 돌지 않는다).
+//    {org} = 카드 공급기관(수집값 · 없거나 LH·SH·MYHOME 이름뿐이면 「공급기관」). 머리 줄 표지 「꼭집 미분석」은 CSS(.hcard.zf-lo).
+const ZF_SUM_LINK_ONLY  = '꼭집이 아직 분석하지 않은 공고예요 · 원문은 {org} 게시판에 있어요';
 const ZF_SEC_NO_UNITS   = '이 공고는 원문에 세대별 목록이 없어요. 공급 주택은 공고문에서 확인해 주세요.';
-const ZF_SEC_LINK_ONLY  = '이 공고는 원문 링크만 제공해요. 공고 원문에서 확인해 주세요.';
+const ZF_SEC_LINK_ONLY  = '꼭집이 아직 분석하지 않은 공고예요. 원문은 공급기관 게시판에서 확인해 주세요.';
+function zfLinkOnlyText(org){
+  const o = String(org || '').trim();
+  return ZF_SUM_LINK_ONLY.replace('{org}', !o || /^(LH|SH|MYHOME)$/i.test(o) ? '공급기관' : escapeHtml(o));
+}
 function zfCardEmptyKind(s, key){
   if(!s || typeof s.analysis_done !== 'boolean') return '';
   if(zfPostLinkOrganized(key) === true) return '';
@@ -4678,6 +4690,8 @@ function zfFillSummarySlots(){
     const pend = zfAnaPending(s, el.getAttribute('data-sum-key')), card = el.closest('.hcard');
     if(card) card.classList.toggle('zf-ana-pending', pend);
     if(card) card.classList.toggle('zf-ana-no', zfAiOff(s, el.getAttribute('data-sum-key')));   // 🔵 2026-10-16 — 분석 없으면 「AI 정리 · 」 접음
+    // 🔵 2026-10-22 — 첨부 0 · 분석 없음(요약 줄도 없고 같은 게시물 LH 정리도 없음) 카드에 머리 줄 표지(.zf-lo)
+    if(card) card.classList.toggle('zf-lo', !(s && zfSummaryLine(s)) && zfPostLinkOrganized(el.getAttribute('data-sum-key')) !== true && zfCardEmptyKind(s, el.getAttribute('data-sum-key')) === 'link_only');
     if(pend){ el.innerHTML = zfAnaPendingHtml(url, el.getAttribute('data-sum-org') || ''); return; }
     const line = s ? zfSummaryLine(s) : '';
     // 🔵 이번 회차 값이 아니면 상자 색도 함께 바꾼다 — 칩만 달면 초록 상자가 「확인됨」처럼 읽힌다.
@@ -4693,7 +4707,7 @@ function zfFillSummarySlots(){
           : zfPostLinkHtml(el.getAttribute('data-sum-key')) + (() => {
               // 🔵 2026-09-30 — LH 카드도 미분석이면 링크(같은 게시물) 아래에 종전 안내를 그대로 둔다.
               const kind = zfCardEmptyKind(s, el.getAttribute('data-sum-key'));
-              return zfNotAnalyzedHtml(url, kind === 'no_units' ? ZF_SUM_NO_UNITS : kind === 'link_only' ? ZF_SUM_LINK_ONLY : '');
+              return zfNotAnalyzedHtml(url, kind === 'no_units' ? ZF_SUM_NO_UNITS : kind === 'link_only' ? zfLinkOnlyText(el.getAttribute('data-sum-org')) : '');
             })());
   });
   zfRefreshCovers();   // 🔵 2026-09-30 — 세대 행 지역이 방금 왔을 수 있다(표지 대표·곳 수)
