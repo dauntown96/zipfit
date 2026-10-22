@@ -634,6 +634,7 @@ html[data-ui="d3"] :is(#notice-list,#match-result) .hcard.zf3-closed::before{bac
 .zf3-dpill.hot{background:var(--warn);border-color:var(--warn);color:var(--paper)}
 .zf3-dpill.closed{border-color:var(--line);color:var(--ink-3);background:transparent}
 .zf3-dpill.unknown{border-style:dashed;color:var(--ink-2);background:transparent}
+.zf3-hmparts{margin:-2px 0 6px;text-align:right;font-size:11px;color:var(--ink-2)}
 .zf3-card .htag{display:none}
 .zf3-card .htop{margin-bottom:2px}
 html[data-ui="d3"] .zf3-card .hname{font-size:15px;font-weight:700;color:var(--ink);line-height:1.42;margin-top:0}
@@ -2156,7 +2157,8 @@ function applyWindowState(row){
   if(!pn || zfLhPostClosed(row) || zfEarlyClosed(row)) return st;
   // 당첨발표가 지났거나 기간 확인 대상이면(zfWindowStateOne 의 날짜 앞 판정) LH 행 판정을 그대로 센다 — 날짜로 연 「open」만 공고문에 맡긴다.
   let best = (st === 'open' && zfLhSpanIsUnion(row, pn)) ? 'closed' : st;
-  pn.linked.forEach(nt => { const s = zfWindowStateOne(nt.row); if(ZF_WINDOW_RANK[s] < ZF_WINDOW_RANK[best]) best = s; });
+  const key = zfDedupKey(row['공고명'] ?? row.title);   // 🔵 2026-10-22 — 붙은 공고문도 카드 제목 키의 끝 시각으로(같은 날 끝나는 행만)
+  pn.linked.forEach(nt => { const s = zfWindowStateOne(nt.row, key); if(ZF_WINDOW_RANK[s] < ZF_WINDOW_RANK[best]) best = s; });
   return best;
 }
 function zfLhPostClosed(row){
@@ -2174,7 +2176,8 @@ function zfEarlyClosed(row){
   return /조기\s*(접수\s*)?마감/.test(String(row.revision_note || ''));
 }
 const ZF_WINDOW_RANK = { open: 0, before: 1, unknown: 2, closed: 3 };
-function zfWindowStateOne(row){
+// 🔵 2026-10-22(우편함 「표시층 C 묶음 5」 4) — hmKey: 마감 날 끝 시각(zfEndHmAt)을 찾을 제목 키. 생략 = 그 행 제목 · null = 시각을 보지 않는다(날짜만 — 종전).
+function zfWindowStateOne(row, hmKey){
   const today = startOfLocalDay(new Date());
   // 🔴 당첨발표일이 지났으면 그 공고의 접수는 끝났다 — 업스트림의 상태·마감일보다 이 관계가 우선이다.
   //    계기: MYHOME 이 2025.09.15 울산 정례모집(과 그 정정공고)을 「모집중」으로 돌려주고
@@ -2206,7 +2209,94 @@ function zfWindowStateOne(row){
   const dE = Math.round((startOfLocalDay(e) - today) / (1000*60*60*24));
   if(dS > 0)  return 'before';
   if(dE < 0)  return 'closed';
+  // 🔵 2026-10-22(우편함 「표시층 C 묶음 5」 4 · 다운님 승인 2026-10-21) — 마감 날 원문 끝 시각이 지났으면 마감이다(회색 · 열린 수에서 빠짐).
+  //    부르는 곳(머리 칩 · 정렬 · 인사이트 · 지도 · 상세 · 매칭)이 모두 이 한 자리를 거친다. 시각을 모르면(경로·일정 행 전 · 원문에 없음) 종전대로 그날 끝까지 열림.
+  if(dE === 0 && hmKey !== null){
+    const t = zfEndHmAt(row, hmKey);
+    if(t && Date.now() >= t) return 'closed';
+  }
   return 'open';
+}
+// ── 마감 날 끝 시각(우편함 「표시층 C 묶음 5」 2·3 · 2026-10-22) ─────────────────────────────────────────
+// 재료는 둘 — 경로 표(announcement_apply_routes · 곁 데이터)와 일정 표 접수 행(announcement_schedule stage 접수 · 결과발표·계약 행과 한 요청 · zfLoadWinSched).
+//    ① 그날 끝나는 경로 행이 모두 시각을 적었으면 그 시각들 ② 경로 행이 없거나 시각 없는 행이 섞이면 일정 표 접수 행(end_date = 그날)의 시각을 더한다.
+//    🔴 거름 — 일정 행 글이 경로 이름을 둘 이상 말하는데 시각을 경로마다 따로 적지 않았으면 쓰지 않는다(김제하동 「현장접수 … 10:00∼15:00 / 인터넷접수」 —
+//    한 경로의 시각을 다른 경로 사용자에게 말하게 된다). 시각이 여럿이면 가장 늦은 시각(그 카드가 누구에게나 닫히는 때) + 경로마다 한 줄.
+//    읽기는 원문 글자만(zf3EndHm) — 짓지 않는다. 키는 카드 제목 키(zfDedupKey)라 정정 전 원공고에 붙은 일정 행도 같은 카드다(같은 날 끝나는 행만 본다).
+const ZF_ROUTE_WORD = /전자우편|이메일|인터넷|온라인|모바일|PC|현장|방문|우편|등기|팩스/g;
+function zfRouteFam(w){ return /현장|방문/.test(w) ? '현장' : /인터넷|온라인|모바일|PC/.test(w) ? '온라인' : /이메일|전자우편/.test(w) ? '이메일' : /우편|등기/.test(w) ? '우편' : '팩스'; }
+// 일정 행 글 하나 → [{ label, hm }] · 못 읽거나 거름에 걸리면 null. 경로 이름이 한 갈래뿐이면 마지막 시각 하나(이름표 = scope_text 원문).
+//    둘 이상이면 이름마다 다음 이름 앞까지 잘라 읽는다 — 시각 없는 조각(「인터넷/」)은 다음 조각과 한 이름표로 묶는다 · 끝까지 시각이 없거나 묶음이 하나뿐이면 null.
+function zfSchedHmParts(text, label){
+  const s = String(text || '');
+  const ms = [...s.matchAll(ZF_ROUTE_WORD)];
+  if(new Set(ms.map(m => zfRouteFam(m[0]))).size < 2){ const hm = zf3EndHm(s); return hm ? [{ label: String(label || '').trim(), hm }] : null; }
+  const out = [];
+  let cur = null;
+  ms.forEach((m, i) => {
+    const seg = s.slice(m.index, i + 1 < ms.length ? ms[i + 1].index : s.length);
+    (cur = cur || []).push(m[0]);
+    const hm = zf3EndHm(seg);
+    if(hm){ out.push({ label: [...new Set(cur)].join('·'), hm }); cur = null; }
+  });
+  return cur || out.length < 2 ? null : out;
+}
+const zfEndHmMemo = new Map();   // 제목 키 + 날 → 결과(곁 데이터가 다시 붙으면 비운다)
+// { hm: 가장 늦은 끝 시각, parts: [{ label, hm }](시각이 둘 이상이고 모두 이름표가 있을 때만) | null, tip: 원문 글 } | null
+function zfEndHmOf(key, day){
+  if(!zfSide.routesReady || !key || !day) return null;
+  const mk = key + '\u0000' + day;
+  if(zfEndHmMemo.has(mk)) return zfEndHmMemo.get(mk);
+  let v = null;
+  const rr = (zfSide.routesByKey.get(key) || []).filter(r => r.end_date === day);
+  let parts = rr.map(r => ({ label: r.route || '', hm: zf3EndHm(r.period_text) })).filter(p => p.hm);
+  const tip = rr.map(r => (r.route ? r.route + ' ' : '') + (r.period_text || ''));
+  let ok = rr.length > 0 && parts.length === rr.length;
+  if(!ok){
+    const ss = (zfSide.schedByKey.get(key) || []).filter(r => r.end_date === day);
+    const sp = ss.map(r => zfSchedHmParts(r.period_text, r.scope_text));
+    if(ss.length && sp.every(Boolean)){
+      parts = parts.concat(sp.flat());
+      ss.forEach(r => tip.push((r.scope_text ? r.scope_text + ' ' : '') + (r.period_text || '')));
+      ok = true;
+    }
+  }
+  if(ok && parts.length){
+    const hms = [...new Set(parts.map(p => p.hm))].sort();
+    let list = null;
+    if(hms.length > 1 && parts.every(p => p.label)){
+      const by = new Map();
+      parts.forEach(p => { if(!by.has(p.label) || by.get(p.label) < p.hm) by.set(p.label, p.hm); });
+      list = [...by].map(([label, hm]) => ({ label, hm })).sort((a, b) => a.hm.localeCompare(b.hm) || a.label.localeCompare(b.label, 'ko'));
+      if(new Set(list.map(p => p.hm)).size < 2) list = null;
+    }
+    v = { hm: hms[hms.length - 1], parts: list, tip: tip.join(' / ') };
+  }
+  zfEndHmMemo.set(mk, v);
+  return v;
+}
+// 이 행이 오늘 끝나면 원문 끝 시각(ms) · 아니면 null. key 생략 = 행 제목 키.
+function zfEndHmAt(row, key){
+  const day = zf3Real(row && (row['신청마감일'] || row['apply_end']));
+  if(!day || day !== zf3Today()) return null;
+  const e = zfEndHmOf(key === undefined ? zfDedupKey(row['공고명'] ?? row.title) : key, day);
+  return e ? Date.parse(day + 'T' + e.hm + ':00+09:00') : null;
+}
+// 열어 둔 채 시각이 지나면 상태를 다시 센다(1분마다 · 지난 1분 사이에 끝 시각이 든 카드가 있을 때만 다시 그린다 — 요청 0).
+let zfEndHmT = null, zfEndHmLast = 0;
+function zfEndHmWatch(){
+  if(zfEndHmT) return;
+  zfEndHmLast = Date.now();
+  zfEndHmT = setInterval(() => {
+    const now = Date.now(), prev = zfEndHmLast;
+    zfEndHmLast = now;
+    const rows = typeof noticeData !== 'undefined' ? noticeData : [];
+    if(!rows.some(n => { const t = zfEndHmAt(n); return t && t > prev && t <= now; })) return;
+    if(noticeLoaded) applyNoticeFiltersAndRender(noticePage);
+    zfRerenderRecIfVisible();
+    const m4 = document.getElementById('main4');
+    if(m4 && !m4.classList.contains('hidden')) buildChecklist();
+  }, 60000);
 }
 // 🔴 2026-09-30(표시층·필터) — 실제 전국 모집(RPC region_top 「전국」)은 지역 칩이 아니다.
 //    지역 칩 목록에서 빼고, 어느 지역을 골라도 함께 뜬다(RPC get_announcements_deduped WHERE 와 같은 규칙).
@@ -2437,6 +2527,7 @@ const zfSide = {
   loaded: false,
   routesReady: false,       // 🔴 2026-10-15 — 경로 행이 붙었나(카드 상태가 창 사이를 본다 · zfRouteGap) — 가격 요약을 기다리지 않고 먼저 선다
   routesByKey: new Map(),   // 제목 키 → 경로 행[]
+  schedByKey: new Map(),    // 🔵 2026-10-22 — 제목 키 → 일정 표 접수 행[](오늘 이후 끝 · 마감 날 끝 시각 보강 · zfEndHmOf)
   linkByKey: new Map(),     // MYHOME 제목 키 → { lhKey, lhTitle, lhUrl }
   rentLowByKey: new Map(),  // 제목 키 → 하위 3분의 1 단지 행[]
   rentLowByAnn: new Map(),  // announcement_id → 하위 3분의 1 단지 행[]
@@ -2500,14 +2591,26 @@ function zfLoadCardSide(){
     zfSide.lowLoaded = true;
     zfFillSideSlots();
   });
+  // 🔵 2026-10-22(우편함 「표시층 C 묶음 5」 2) — 일정 표 접수 행(결과발표·계약과 한 요청 · zfLoadWinSched)도 기다려 같은 공고 제목 조회에 id 를 싣는다
+  //    (새 요청 0 — 일정 행은 공고 id 만 있어 카드 제목 키로 붙이려면 제목이 필요하다). 실패하면 접수 행 없이(종전 그대로).
   zfSidePromise = Promise.all([
     paged('announcement_apply_routes?select=announcement_id,route,site_text,phase_text,start_date,end_date,sort_order,period_text,place_text,note_text', 'announcement_id,sort_order,route'),
-    zfPostLinksAll().catch(err => { console.error('ZipFit 곁 데이터 로드 실패:', err); return null; })
+    zfPostLinksAll().catch(err => { console.error('ZipFit 곁 데이터 로드 실패:', err); return null; }),
+    zfAfterFirstList().then(() => zfLoadWinSched()).catch(() => false)   // 이름은 뒤 스크립트 블록에 있다 — 부를 때 찾는다
   ]).then(async ([routes, links]) => {
     routes = routes || []; links = links || [];
-    const ids = [...new Set(routes.map(r => r.announcement_id).concat(links.map(l => l.lh_announcement_id)))].filter(Boolean);
+    const sched = [];
+    if(zfSchedRows) zfSchedRows.forEach(rs => rs.forEach(r => { if(r.stage === '접수') sched.push(r); }));
+    const ids = [...new Set(routes.map(r => r.announcement_id).concat(links.map(l => l.lh_announcement_id), sched.map(r => r.announcement_id)))].filter(Boolean);
     const anns = ids.length ? (await get(`announcements?select=announcement_id,title,url&${idFilterFor(ids)}`)) || [] : [];
     const annById = new Map(anns.map(a => [a.announcement_id, a]));
+    sched.forEach(r => {
+      const a = annById.get(r.announcement_id);
+      if(!a) return;
+      const k = zfDedupKey(a.title);
+      if(!zfSide.schedByKey.has(k)) zfSide.schedByKey.set(k, []);
+      zfSide.schedByKey.get(k).push(r);
+    });
     routes.forEach(r => {
       const a = annById.get(r.announcement_id);
       if(!a) return;                                   // 제목을 모르면 어느 카드인지도 모른다 — 붙이지 않는다
@@ -2538,8 +2641,10 @@ function zfRoutesReadyMark(){
   if(zfSide.routesReady) return;
   const rows = typeof noticeData !== 'undefined' ? noticeData : [];
   const before = rows.map(n => applyWindowState(n));
+  zfEndHmMemo.clear();
   zfSide.routesReady = true;
   zfRoutesReadyResolve();
+  zfEndHmWatch();   // 🔵 2026-10-22 — 마감 날 끝 시각이 지나면 다시 센다(상태가 바뀐 카드는 아래 비교가 이미 다시 그린다)
   zfFillWinSlots();   // 검은 상자 「접수기간」 기본 창(2026-10-19)
   // 🔵 2026-10-16 — 지금 창 끝(zfRouteCurEnd)이 생긴 카드도 다시 그린다(알약 「이번 차수 마감 D-n」 · 마감임박).
   const changed = rows.some((n, i) => applyWindowState(n) !== before[i] || !!zfRouteCurEnd(n) || zfRouteSchedHit(n));
@@ -2662,9 +2767,12 @@ function zfPostNoticeList(row){
   const pn = zfPostNoticeFor(row);
   if(!pn) return null;
   const list = [];
-  if(pn.own) list.push({ title: pn.own.title, start: row['apply_start'] || '', end: row['apply_end'] || '', state: zfWindowStateOne(row) });
+  // 🔵 2026-10-22(우편함 「표시층 C 묶음 5」 4) — 카드와 같은 끝 시각 판정 · 시각이 지나 닫힌 것은 hmPassed(배지 data-zf-hm — 화면 점검이 날짜 대조에서 가른다)
+  const key = zfDedupKey(row['공고명'] ?? row.title);
+  const stOf = r => { const st = zfWindowStateOne(r, key); return { state: st, hmPassed: st === 'closed' && zfWindowStateOne(r, null) !== 'closed' }; };
+  if(pn.own) list.push(Object.assign({ title: pn.own.title, start: row['apply_start'] || '', end: row['apply_end'] || '' }, stOf(row)));
   const postClosed = zfLhPostClosed(row);   // LH 가 게시물 전체를 마감했으면 공고문도 마감(applyWindowState 주석)
-  pn.linked.forEach(nt => list.push({ title: nt.title, start: nt.start, end: nt.end, state: postClosed ? 'closed' : zfWindowStateOne(nt.row) }));
+  pn.linked.forEach(nt => list.push(Object.assign({ title: nt.title, start: nt.start, end: nt.end }, postClosed ? { state: 'closed', hmPassed: false } : stOf(nt.row))));
   if(list.length < 2) return null;
   list.sort((a, b) => String(a.start).localeCompare(String(b.start)) || String(a.title).localeCompare(String(b.title), 'ko'));
   // 이름 — MYHOME 제목에서 공고문들이 함께 가진 꼬리 낱말(「국민임대주택 예비입주자 모집공고(2026.09.15)」)만 뗀다. 전문은 툴팁.
@@ -2697,19 +2805,19 @@ function zfNoticeStateText(state, end){
   }
   return state === 'before' ? '접수 예정' : state === 'closed' ? '마감' : '기간 미상';
 }
-function zfNoticeStateBadge(state, end){
+function zfNoticeStateBadge(state, end, hmPassed){
   const t = zfNoticeStateText(state, end);
   const c = t === '오늘 마감' ? 'background:#FBF0DC;color:#8A5A12'
     : t === '접수 중' ? 'background:#E6F4EE;color:#0F6E56'
     : t === '접수 예정' ? 'background:#EEF2FA;color:#3D5A99'
     : 'background:#F6F6F2;color:#6B6B63';
-  return `<span class="zf-nt-state" style="display:inline-block;white-space:nowrap;margin-left:4px;padding:1px 6px;border-radius:9px;font-size:11px;font-weight:600;${c}">${t}</span>`;
+  return `<span class="zf-nt-state"${hmPassed ? ' data-zf-hm="1"' : ''} style="display:inline-block;white-space:nowrap;margin-left:4px;padding:1px 6px;border-radius:9px;font-size:11px;font-weight:600;${c}">${t}</span>`;
 }
 // 자리는 카드 행의 접수 재료를 함께 싣는다 — 공고 탭·추천·매칭 카드의 행 모양이 달라도 채울 때 같은 판정을 한다.
 function zfNoticesSlotHtml(row){
   if(!row) return '';
   const v = k => zfAttr(row[k] == null ? '' : row[k]);
-  return `<div class="zf-notices-slot" data-notices-for="${v('announcement_id')}" data-s="${zfAttr(row['신청시작일'] || row['apply_start'] || '')}" data-e="${zfAttr(row['신청마감일'] || row['apply_end'] || '')}" data-st="${zfAttr(row['status'] || row['처리상태'] || '')}" data-src="${v('source')}" data-w="${v('winner_announce_date')}"></div>`;
+  return `<div class="zf-notices-slot" data-notices-for="${v('announcement_id')}" data-s="${zfAttr(row['신청시작일'] || row['apply_start'] || '')}" data-e="${zfAttr(row['신청마감일'] || row['apply_end'] || '')}" data-st="${zfAttr(row['status'] || row['처리상태'] || '')}" data-src="${v('source')}" data-w="${v('winner_announce_date')}" data-t="${zfAttr(row['공고명'] ?? row.title ?? '')}"></div>`;
 }
 function zfFillNoticeSlots(){
   if(!zfPostNotices.loaded) return;
@@ -2717,7 +2825,7 @@ function zfFillNoticeSlots(){
     if(el.dataset.filled === '1') return;
     el.dataset.filled = '1';
     const d = el.dataset;
-    const row = { announcement_id: d.noticesFor, apply_start: d.s || '', apply_end: d.e || '', status: d.st || '', source: d.src || '', winner_announce_date: d.w || '' };
+    const row = { announcement_id: d.noticesFor, apply_start: d.s || '', apply_end: d.e || '', status: d.st || '', source: d.src || '', winner_announce_date: d.w || '', title: d.t || '' };   // title — 끝 시각 제목 키(2026-10-22)
     const list = zfPostNoticeList(row);
     if(!list) return;
     const same = list.every(x => x.start === list[0].start && x.end === list[0].end && x.state === list[0].state);
@@ -2725,9 +2833,9 @@ function zfFillNoticeSlots(){
     const name = x => `<span title="${zfAttr(x.title)}" style="font-weight:600;color:#333">${escapeHtml(x.name || x.title)}</span>`;
     // 🔵 2026-10-01 — class zf-nt-line·zf-nt-span·zf-nt-state 는 화면 점검(health-screen 「공고문 자리 ↔ DB」)이 읽는 표지다. 모양은 그대로다.
     el.innerHTML = same
-      ? `<div class="zf-nt-line" style="${box}">📑 공고문 ${list.length}개 · ${list.map(name).join(' · ')}<br><span class="zf-nt-span" style="color:#666">접수 ${escapeHtml(zfSpanText(list[0].start, list[0].end))}</span>${zfNoticeStateBadge(list[0].state, list[0].end)}</div>`
+      ? `<div class="zf-nt-line" style="${box}">📑 공고문 ${list.length}개 · ${list.map(name).join(' · ')}<br><span class="zf-nt-span" style="color:#666">접수 ${escapeHtml(zfSpanText(list[0].start, list[0].end))}</span>${zfNoticeStateBadge(list[0].state, list[0].end, list[0].hmPassed)}</div>`
       : `<div style="${box}">📑 공고문 ${list.length}개 · <b style="color:#8A5A12">공고문마다 접수일이 달라요</b>`
-        + list.map(x => `<div class="zf-nt-line">· ${name(x)} <span class="zf-nt-span" style="color:#666;white-space:nowrap">${escapeHtml(zfSpanText(x.start, x.end))}</span>${zfNoticeStateBadge(x.state, x.end)}</div>`).join('')
+        + list.map(x => `<div class="zf-nt-line">· ${name(x)} <span class="zf-nt-span" style="color:#666;white-space:nowrap">${escapeHtml(zfSpanText(x.start, x.end))}</span>${zfNoticeStateBadge(x.state, x.end, x.hmPassed)}</div>`).join('')
         + `</div>`;
     zfHideRouteDupOf(el.closest('.hcard'));
     // 🔴 2026-10-01 — 공고문 목록이 서면 날짜 줄의 「단지마다 일정이 달라요」 배지를 숨긴다 — 목록이 공고문별 일정을 이미 말한다
@@ -10598,6 +10706,17 @@ function buildChecklist(){
     if(diff !== null){
       ddayNum.textContent = diff>0?`D-${diff}`:diff===0?'D-Day':`D+${Math.abs(diff)}`;
       ddaySub.textContent = `신청 마감 ${sel.apply_end}`;
+      // 🔵 2026-10-22(우편함 「표시층 C 묶음 5」 5) — 마감 당일 원문 끝 시각을 알면 「D-Day · 16:00까지」(카드 알약과 같은 규칙 · zfEndHmOf).
+      //    곁 데이터가 아직이면 받은 뒤 한 번 다시 그린다(목록이 받는 같은 요청 — 새 요청 0).
+      if(diff === 0){
+        const day = zf3Real(sel.apply_end);
+        const e = day ? zfEndHmOf(zfDedupKey(sel.title), day) : null;
+        if(e) ddayNum.textContent = Date.now() < Date.parse(day + 'T' + e.hm + ':00+09:00') ? `D-Day · ${e.hm}까지` : `D-Day · ${e.hm} 마감 시각 지남`;
+        else if(!zfSide.routesReady && !buildChecklist.zfWait){
+          buildChecklist.zfWait = true;
+          zfLoadRoutes().then(() => { const m4 = document.getElementById('main4'); if(zfSide.routesReady && m4 && !m4.classList.contains('hidden')) buildChecklist(); });
+        }
+      }
     }
   } else {
     ddayNum.textContent = 'D-?';
@@ -11951,9 +12070,10 @@ function zf3LineHTML(stns, label){
 //    수집 칸이 비었고 그 카드 공고(대표 id)의 일정 표 「결과발표」 행이 하나뿐이며 날이 하루로 적혀 있으면(시작 = 끝 또는 한쪽만) 그 날.
 //    행이 없거나 둘 이상(범위별)이거나 기간이면 종전 그대로(「원문 확인」). 재료는 일정 표의 결과발표 행 전부(수십 행)를 한 번 받는다(목록 RPC 그대로).
 let zfWinSched = null, zfWinSchedP = null, zfWinSchedRedrawn = false;
-let zfSchedRows = null;   // 🔵 2026-10-19 — 결과발표 + 계약 행(scope_text 포함) · 공고 id → 행들(기본 창 발표·계약 · zfRouteSchedOf)
+let zfSchedRows = null;   // 🔵 2026-10-19 — 결과발표 + 계약 행(scope_text 포함) · 공고 id → 행들(기본 창 발표·계약 · zfRouteSchedOf) · 2026-10-22 접수 행도(zfLoadCardSide 가 제목 키로 옮긴다)
 function zfLoadWinSched(){
-  if(!zfWinSchedP) zfWinSchedP = fetch(`${SUPABASE_URL}/rest/v1/announcement_schedule?select=announcement_id,stage,scope_text,start_date,end_date,period_text&stage=in.(${encodeURIComponent('결과발표')},${encodeURIComponent('계약')})`, { headers: zfAnonHeaders() })
+  // 🔵 2026-10-22(우편함 「표시층 C 묶음 5」 2) — 같은 요청에 접수 행(끝이 오늘 이후 · 지금 약 55행)을 함께 받는다 — 마감 날 끝 시각 보강(zfSide.schedByKey). 요청 수 그대로.
+  if(!zfWinSchedP) zfWinSchedP = fetch(`${SUPABASE_URL}/rest/v1/announcement_schedule?select=announcement_id,stage,scope_text,start_date,end_date,period_text&or=${encodeURIComponent(`(stage.in.(결과발표,계약),and(stage.eq.접수,end_date.gte.${zf3Today()}))`)}`, { headers: zfAnonHeaders() })
     .then(r => r.ok ? r.json() : null).then(rows => {
       if(!Array.isArray(rows)) throw new Error('응답 없음');
       const m = new Map(), all = new Map();
@@ -12154,21 +12274,27 @@ function zf3DecorateIn(list, rowsMap, isMatch){
         card.dataset.zf3Branch = '1';
         const ann = zf3Real(zfNoticeDate(n) || n['announcement_date']);
         route.innerHTML = `<p class="zf3-bhead">📑 공고문 ${nl.length}개 · 공고문마다 접수일이 달라요</p>`
-          + nl.map(x => `<div class="zf3-branch"><p class="zf3-bn"><span title="${zfAttr(x.title)}">${escapeHtml(x.name || x.title)}</span>${zfNoticeStateBadge(x.state, x.end)}</p>${zf3LineHTML([{ k: '공고', d: ann }, { k: '접수', d: zf3Real(x.start), u: '미상' }, { k: '마감', d: zf3Real(x.end), u: '미상' }], x.name || x.title)}</div>`).join('');
+          + nl.map(x => `<div class="zf3-branch"><p class="zf3-bn"><span title="${zfAttr(x.title)}">${escapeHtml(x.name || x.title)}</span>${zfNoticeStateBadge(x.state, x.end, x.hmPassed)}</p>${zf3LineHTML([{ k: '공고', d: ann }, { k: '접수', d: zf3Real(x.start), u: '미상' }, { k: '마감', d: zf3Real(x.end), u: '미상' }], x.name || x.title)}</div>`).join('');
         slot.classList.add('zf3-off');
       }
     }
-    // ⑦ 오늘 마감 카드 — 경로 표 원문(period_text)에 끝 시각이 적혀 있으면 알약을 「오늘 16:00까지 · n시간 남음」으로(1분마다 고침).
-    //    오늘 끝나는 경로 행이 모두 시각을 적고 그 시각이 하나일 때만 · 아니면 종전 「오늘 마감」 그대로.
+    // ⑦ 오늘 마감 카드 — 원문에 끝 시각이 적혀 있으면 알약을 「오늘 16:00까지 · n시간 남음」으로(1분마다 고침).
+    //    🔵 2026-10-22(우편함 「표시층 C 묶음 5」 2·3) — 시각은 zfEndHmOf 한 자리(경로 표 → 없으면 일정 표 접수 행 · 거름 포함 — 카드 상태와 같은 규칙).
+    //    경로마다 시각이 다르면 알약은 가장 늦은 시각 · 머리 줄 아래 한 줄에 「현장 16:00 · 인터넷·모바일 17:00」(경로 이름은 원문 그대로). 못 읽으면 종전 「오늘 마감」 그대로.
     if(card.dataset.zf3 === '1' && zfSide.loaded && card.dataset.zf3Hour !== '1'){
       card.dataset.zf3Hour = '1';
       const pill = card.querySelector('.zf3-dpill'), today = zf3Today();
       if(pill && pill.textContent === '오늘 마감'){
-        const rr = (zfSide.routesByKey.get(zfDedupKey(n['공고명'])) || []).filter(r => r.end_date === today);
-        const hm = [...new Set(rr.map(r => zf3EndHm(r.period_text)))];
-        if(rr.length && hm.length === 1 && hm[0]){
-          pill.dataset.zf3Hm = hm[0]; pill.dataset.zf3End = today + 'T' + hm[0];
-          pill.title = '공고 원문 접수기간: ' + rr.map(r => (r.route ? r.route + ' ' : '') + (r.period_text || '')).join(' / ');
+        const e = zfEndHmOf(zfDedupKey(n['공고명']), today);
+        if(e){
+          pill.dataset.zf3Hm = e.hm; pill.dataset.zf3End = today + 'T' + e.hm;
+          pill.title = '공고 원문 접수기간: ' + e.tip;
+          if(e.parts){
+            const top = pill.parentElement, p = document.createElement('p');
+            p.className = 'zf3-hmparts';
+            p.textContent = e.parts.map(x => x.label + ' ' + x.hm).join(' · ');
+            if(top) top.after(p);
+          }
           zf3TickHour(pill); zf3HourTimer();
         }
       }
@@ -12519,12 +12645,19 @@ function zf3IcsEsc(t){ return String(t || '').replace(/\\/g, '\\\\').replace(/;/
 function zf3IcsFold(line){ const out = []; let cur = ''; for(const ch of line){ if(new TextEncoder().encode(cur + ch).length > 73){ out.push(cur); cur = ' ' + ch; } else cur += ch; } out.push(cur); return out.join('\r\n'); }
 // 아이디어 2회차 ④ — 오늘 마감 카드의 끝 시각. 경로 표 원문(period_text)에 적힌 마지막 시각만 쓴다(지어내지 않는다).
 //    점심시간 괄호는 걷고 마지막 「HH:MM」 또는 「N시」를 읽는다 · 못 읽으면 null(알약은 종전 「오늘 마감」 그대로).
+// 🔴 2026-10-22(우편함 「표시층 C 묶음 5」 1) — 오독 셋을 고쳤다: ① 「오후 4시」를 04:00 으로 읽었다(오후 N시 → N+12 · 오후 12시 = 12시 · 오전 12시 = 0시)
+//    ② 「24시간 가능」의 「24시」를 24:00 으로 읽었다(「시간」은 시각이 아니다) ③ 「점심」 글자 없는 「*12:00~13:00 제외」의 13:00 을 끝 시각으로 읽었다
+//    (경기북부 청년 매입 일정 행 — 「… (10:00~15:00) *12:00~13:00 제외」). 「24:00」은 그날 끝(Date 가 다음 날 0시로 받는다 — 시각 모름과 같다).
 function zf3EndHm(t){
-  const s = String(t || '').replace(/\([^)]*점심[^)]*\)/g, '').replace(/점심[^0-9]*\d{1,2}\s*[:시]\s*\d{0,2}\s*[~∼-]\s*\d{1,2}\s*[:시]\s*\d{0,2}[^)]*/g, '');
-  const all = [...s.matchAll(/(\d{1,2})\s*(?::\s*(\d{2})|시(?:\s*(\d{2})\s*분)?)/g)];
+  const s = String(t || '').replace(/\([^)]*점심[^)]*\)/g, '').replace(/점심[^0-9]*\d{1,2}\s*[:시]\s*\d{0,2}\s*[~∼-]\s*\d{1,2}\s*[:시]\s*\d{0,2}[^)]*/g, '')
+    .replace(/\d{1,2}\s*(?:[:시]\s*\d{0,2})?\s*[~∼-]\s*\d{1,2}\s*[:시]\s*\d{0,2}\s*분?\s*(?:까지\s*)?제외/g, '');
+  const all = [...s.matchAll(/(오전|오후)?\s*(\d{1,2})\s*(?::\s*(\d{2})|시(?!간)(?:\s*(\d{1,2})\s*분)?)/g)];
   if(!all.length) return null;
-  const m = all[all.length - 1], h = +m[1], mi = +(m[2] || m[3] || 0);
-  if(h > 24 || mi > 59) return null;
+  const m = all[all.length - 1], mi = +(m[3] || m[4] || 0);
+  let h = +m[2];
+  if(m[1] === '오후' && h < 12) h += 12;
+  else if(m[1] === '오전' && h === 12) h = 0;
+  if(h > 24 || mi > 59 || (h === 24 && mi)) return null;
   return String(h).padStart(2, '0') + ':' + String(mi).padStart(2, '0');
 }
 function zf3TickHour(pill){

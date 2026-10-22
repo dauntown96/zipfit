@@ -186,7 +186,7 @@ try {
           let state = st ? (st.innerText || st.textContent).trim() : '(없음)'
           if (br) { const b = br.find(x => x[0] === nm.getAttribute('title')); if (!b) state = '(갈래 없음)'; else if (b[1] !== state) state = `(갈래 상태 ${b[1]} ≠ ${state})` }
           nts.push([slot.getAttribute('data-notices-for'), nm.getAttribute('title'),
-            sp ? (sp.innerText || sp.textContent).replace(/^접수\s*/, '').trim() : '(없음)', state])
+            sp ? (sp.innerText || sp.textContent).replace(/^접수\s*/, '').trim() : '(없음)', state, !!(st && st.dataset.zfHm === '1')])
         }
       }
       return { cardRows, chips, dates, nts, overflow: sw > window.innerWidth + 1 ? sw : 0, greys: greys.length, greyBad }
@@ -295,10 +295,13 @@ try {
       from st`)
     const expN = new Map((row.j || []).map(x => [x.aid + '\u0000' + x.title, x]))
     const nm = []
-    for (const [aid, title, span, state] of notices) {
+    for (const [aid, title, span, state, hmPassed] of notices) {
       const x = expN.get(aid + '\u0000' + title)
       if (!x || !x.known) { nm.push(`${aid}: 「${String(title).slice(0, 30)}」 DB 에서 공고문을 못 찾음`); continue }
-      if (x.span !== span || x.state !== state) nm.push(`${aid}: 「${String(title).slice(0, 30)}」 화면 ${span} ${state} ↔ DB ${x.span} ${x.state}`)
+      // 🔵 2026-10-22(우편함 「표시층 C 묶음 5」 4 ⓓ · 원칙 33) — 마감 날 원문 끝 시각이 지난 공고문은 화면이 「마감」(배지 data-zf-hm)이다.
+      //    끝 시각 읽기(원문 글자 · 경로 표 → 일정 표 · 거름)를 SQL 로 옮기면 사본이 생긴다 — 날짜 축만 DB 로 대조하고, 시각으로 닫힌 것은 DB 가 「오늘 마감」일 때만 받는다.
+      const st = hmPassed && state === '마감' && x.state === '오늘 마감' ? '오늘 마감' : state
+      if (x.span !== span || x.state !== st) nm.push(`${aid}: 「${String(title).slice(0, 30)}」 화면 ${span} ${state}${hmPassed ? '(끝 시각 지남)' : ''} ↔ DB ${x.span} ${x.state}`)
     }
     extra.notices_mismatch = nm
     add('notices', '공고문 자리 ↔ DB 날짜', nm.length === 0 ? 'pass' : 'fail',
