@@ -162,9 +162,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-10-22 | **자동 — run 279 · 정정 몫 대곡 호정포레스트 외 10년 공공임대 예비 `0000061191`(정정 전 `…61187`) [완료]** — 정정 차이 1줄(르상트레빌 단지위치 달서구 → 달성군) · 세대 3 address · 공급대상 정책 1 UPDATE · ⚠️ 단지위치 행 1 삭제 · 분석 연결 참 · 분석률 60/64 · PR |
 | 2026-10-22 | **자동 — run 276 · 제주개발공사 법환 통합공공임대(일자리연계형) `21442_1_…` [완료]** — 게시판 zip(hwpx 셋) · 정책 55 · 세대 6(30㎡ × 구간) · 자격 1(직업 AND 신분 · 공급대상 갈래 넷) · 일정 7 · 경로 2(현장·E-mail) · 매핑 23 · 원문 총자산 기준 없음 · 분석률 60/61 · PR |
 | 2026-10-22 | **코드·운영(A · G2) — 지방공사 게시판 첨부 목록에 제주개발공사 + 광주 서울 탐침 호스트** — `fetch-attachment` `ALLOWED` `www.jpdc.co.kr` · `BOARD_SOURCES` 제주 + `parseJpdcFiles`(`board-parse.ts` · 같은 글 seq·번호 짝만) · `PROBE_HOSTS` `www.gmcc.co.kr` · 단위 시험 4/4(실물 받기 링크 20 중 첨부 1) · 법환 `21442_*` 첨부 → 대기열 · PR |
-| 2026-10-22 | **코드·운영(A · G3 감시 덧) — ⚠️ 두 줄 + `lh_list_gone` 페이지 꼬리** — `elig_form_null`(열린 묶음 자격 `supply_form` NULL · 지금 ⚠️ 2행 …20930) · `rent_null_not_jeonse`(전세 아닌 세대 월세 NULL · 지금 0) · `lh_list_gone` 경보에 `source_page_checks` 마지막 행 꼬리 · `.github/health/open-gaps.mjs` · 목록 함수 안 부름 · PR |
 
 ---
 
