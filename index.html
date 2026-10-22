@@ -8808,8 +8808,12 @@ function loadPreciseEligibility(annId, detailEl, id, useGroup){
       return;
     }
     const eligItemHtml = r => {
-        const sf = r.supply_form ? escapeHtml(r.supply_form) : '일반';
+        // 🔴 2026-10-22(우편함 「표시층 — A(G8·G3) 처리방침 백업 정정 + 덧」) — supply_form 이 비면 머리에 「일반」을 짓지 않는다.
+        //    기장군 기관공급 …20930(원문 「기관공급 사업 대상기업 모집」 · 「계약체결 기업체의 내국인 직원에 한함」)이 「일반 · 1순위」로 보여 개인이 일반공급으로 읽었다.
+        //    값이 없으면 순위만 · 둘 다 없으면 머리 줄을 그리지 않는다(단지 칩이 있으면 칩만).
+        const sf = r.supply_form ? escapeHtml(r.supply_form) : '';
         const rk = r.rank ? `${escapeHtml(String(r.rank))}순위` : '';
+        const headTxt = [sf, rk].filter(Boolean).join(' · ');
         const incomeExempt = r.income_limit_exempt === true;
         const assetExempt = r.asset_limit_exempt === true;
         // 🔴 척도 없이 「소득 150%」만 적으면 사용자가 도시근로자 기준으로 읽는다(2026-09-18).
@@ -8838,7 +8842,7 @@ function loadPreciseEligibility(annId, detailEl, id, useGroup){
         const siteChip = siteNm ? `<span class="pol-site">${escapeHtml(siteNm)}</span>`
           : (siteLabel && String(r.announcement_id || '') === String(annId) ? `<span class="pol-site pol-common">공통</span>` : '');
         return `<div class="elig-item" data-zf-site="${zfAttr(String(siteNm || ''))}">
-          <div class="elig-head">${siteChip}${sf}${rk ? ' · '+rk : ''}</div>
+          ${siteChip || headTxt ? `<div class="elig-head">${siteChip}${headTxt}</div>` : ''}
           ${income ? `<div class="elig-row"><span>소득기준</span><span>${income}${dual}</span></div>` : ''}
           ${asset ? `<div class="elig-row"><span>자산기준</span><span>${asset}</span></div>` : ''}
           ${car ? `<div class="elig-row"><span>차량가액</span><span>${car}</span></div>` : ''}
