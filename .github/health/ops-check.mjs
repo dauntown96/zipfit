@@ -12,6 +12,7 @@ import { SH_RUN_SQL, judgeShRun } from './sh-run.mjs'
 import { BACKLOG_SQL, judgeBacklog } from './collect-backlog.mjs'
 import { HARD, splitFailed } from './gate.mjs'
 import { lhGoneSql, judgeLhGone } from './lh-gone.mjs'
+import { ELIG_FORM_NULL_SQL, RENT_NULL_SQL, judgeEligFormNull, judgeRentNull } from './open-gaps.mjs'
 import { readdirSync, readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 
@@ -899,6 +900,20 @@ try {
   add('lh_list_gone', 'LH 목록에서 안 보이는 열린 LH 카드', j.status, j.value, j.rule)
 } catch (e) {
   addBlind('lh_list_gone', 'LH 목록에서 안 보이는 열린 LH 카드 — 점검 불능', 'warn', String(e).slice(0, 200), '공고·수집 기록 표를 읽는다(못 읽으면 ⚠️)')
+}
+
+// ㉔·㉕ 열린 카드 데이터 빈칸 둘(2026-10-22) — 판정·SQL 은 open-gaps.mjs 머리 주석. ⚠️만 · 못 읽으면 ⚠️ 점검 불능.
+for (const [id, name, sql, judge] of [
+  ['elig_form_null', '열린 카드 자격 행 공급 형태(supply_form) 빔', ELIG_FORM_NULL_SQL, judgeEligFormNull],
+  ['rent_null_not_jeonse', '열린 카드 전세 아닌 세대 행 월세(monthly_rent) 빔', RENT_NULL_SQL, judgeRentNull],
+]) {
+  try {
+    const [x] = await sqlRead(sql)
+    const j = judge(x.j)
+    add(id, name, j.status, j.value, j.rule)
+  } catch (e) {
+    addBlind(id, `${name} — 점검 불능`, 'warn', String(e).slice(0, 200), '공고·자격·세대 표를 읽는다(못 읽으면 ⚠️)')
+  }
 }
 
 // ⑲ 인스턴스 메모리(2026-10-17 · 같은 우편 1 · 조사 「인스턴스 지표 경로」 ⓑ) — 관리 API 지표 끝점(베타)에서 숫자만 골라(instance.mjs) zipfit_ops.instance_metrics_log 에 한 행.

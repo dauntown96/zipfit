@@ -162,9 +162,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-10-22 | **코드·운영(A · G3 감시 덧) — ⚠️ 두 줄 + `lh_list_gone` 페이지 꼬리** — `elig_form_null`(열린 묶음 자격 `supply_form` NULL · 지금 ⚠️ 2행 …20930) · `rent_null_not_jeonse`(전세 아닌 세대 월세 NULL · 지금 0) · `lh_list_gone` 경보에 `source_page_checks` 마지막 행 꼬리 · `.github/health/open-gaps.mjs` · 목록 함수 안 부름 · PR |
 | 2026-10-22 | **코드·운영(A · G3 감시) — LH 목록에서 사라진 열린 카드 ⚠️** — 김제하동 `…20908` 꼴 · `health-ops` `lh_list_gone`(열린 LH 행 `last_seen_at` < 마지막 성공 LH 목록 수집 − 1일 · ⚠️만 · 실패는 점검 불능 ⚠️ · 마이홈 제외 · 자동 닫기 없음) · `.github/health/lh-gone.mjs` · 지금 0/59 · 재현 10-18~10-21 …20908 1건 · DB 3ms · PR |
 | 2026-10-22 | **운영 — 데이터 쓰기(자동 run 275 · 후속만) — 큐 B 4 첫 조각 + 덧** — 일반명 정책 행 5공고 23행 원문 대조(교체 18 · 파일명만 4 · 원문에 없음 1) · 남원노암·태백소도 「모집일정」 + 현장 경로 3 · 기장군 경로 1 · 양산 ⚠️ 당첨자 발표일 1 · 든든전세 형제·자매 ⚠️ 0(판정 요청) · 불변식 0 · PR |
-| 2026-10-22 | **코드·운영(A · G3) — 그룹 키가 제목 머리의 날짜 붙은 정정 괄호를 걷는다** — 창녕영산 `…20937` 「('26.10.21. 정정)」 키 갈림 → 카드 두 장·정정본 분석 누락 · `announcement_dedup_key` + `title_dedup_key` 다시 채움 + 자기 링크 1행 삭제 + `zfDedupKey` 거울 · 키 바뀐 행 1/3,388 · 카드 958 → 957 · PR #704 |
 
 ---
 
