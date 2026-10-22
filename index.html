@@ -10752,9 +10752,30 @@ function buildChecklist(){
   document.getElementById('checklist-cond-title').style.display = conds.length ? '' : 'none';
 
   // 신청 방법
-  document.getElementById('checklist-apply').innerHTML = `
+  // 🔵 2026-10-22(우편함 「표시층 C 묶음 6」 2) — 경로 표(announcement_apply_routes · 곁 데이터 — 새 요청 0) 행이 있으면 고정 안내 대신 경로·기간을 행마다.
+  //    이름표 = 차수 · 단지 · 경로 원문 · 날짜 = 행 값 · 끝 시각 = period_text 원문에서 읽은 것(zf3EndHm — 카드 알약과 같은 규칙) · 장소·방법 = place_text(전체 행은 없으면 note_text) 원문.
+  //    인증서 줄은 인터넷·모바일 경로가 있을 때만(현장·우편·이메일뿐인 공고에 「인증서 준비」라 단정하지 않는다). 행이 없으면 종전 고정 안내.
+  const apRows = zfSide.routesReady ? (zfSide.routesByKey.get(zfDedupKey(sel.title || '')) || []).slice().sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)) : [];
+  const apOnline = apRows.some(r => /인터넷|온라인|모바일/.test(r.route || ''));
+  const apLines = [...new Set(apRows.map(r => {
+    const lab = [r.phase_text, r.site_text, r.route === '전체' ? '' : r.route].map(x => String(x || '').trim()).filter(Boolean).join(' · ');
+    const span = r.start_date && r.end_date && r.start_date !== r.end_date ? `${zfMdDow(r.start_date)}~${zfMdDow(r.end_date)}` : zfMdDow(r.start_date || r.end_date);
+    const hm = zf3EndHm(r.period_text);
+    const where = String(r.place_text || '').trim() || (r.route === '전체' ? String(r.note_text || '').trim() : '');
+    const past = r.end_date && (zfKstDayDiff(r.end_date) ?? 0) < 0;   // 끝난 창은 남기되 지났다고 적는다(차수가 나뉜 공고의 앞 창)
+    return [lab, span ? span + (hm ? ` · ${hm}까지` : '') + (past ? ' · 지났어요' : '') : '', where && (r.route === '전체' ? where : `접수 장소 ${where}`)].filter(Boolean).join(' — ');
+  }).filter(Boolean))];
+  document.getElementById('checklist-apply').innerHTML = apLines.length
+    ? apLines.map(t => `<li><span class="cicon creq">✓</span><span>${escapeHtml(t)}</span></li>`).join('')
+      + (apOnline ? `<li><span class="cicon creq">✓</span><span>인터넷 신청은 공동인증서 또는 민간인증서(네이버·토스·KB국민) 미리 준비</span></li>` : '')
+      + `<li><span class="cicon creq">✓</span><span>서류제출 기간·공고일 등 상세 일정은 공고 원문에서 확인하세요</span></li>`
+    : `
     <li><span class="cicon creq">✓</span><span>공동인증서 또는 민간인증서(네이버·토스·KB국민) 미리 준비</span></li>
     <li><span class="cicon creq">✓</span><span>서류제출 기간·공고일 등 상세 일정은 공고 원문에서 확인하세요</span></li>`;
+  if(!zfSide.routesReady && !buildChecklist.zfWaitAp){
+    buildChecklist.zfWaitAp = true;
+    zfLoadRoutes().then(() => { const m4 = document.getElementById('main4'); if(zfSide.routesReady && m4 && !m4.classList.contains('hidden')) buildChecklist(); });
+  }
 
   // 신청 링크
   const applyUrl = sel.source==='LH' ? 'https://apply.lh.or.kr' : 'https://www.myhome.go.kr';
