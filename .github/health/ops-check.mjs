@@ -11,6 +11,7 @@ import { YEARLY_SQL, judgeYearly } from './yearly.mjs'
 import { SH_RUN_SQL, judgeShRun } from './sh-run.mjs'
 import { BACKLOG_SQL, judgeBacklog } from './collect-backlog.mjs'
 import { HARD, splitFailed } from './gate.mjs'
+import { lhGoneSql, judgeLhGone } from './lh-gone.mjs'
 import { readdirSync, readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 
@@ -889,6 +890,15 @@ select json_build_object('n', (select count(*) from hit), 'key_rows', (select co
     '0 — 열린 카드(G2 식) 제목 키 묶음의 공급대상 키 행 중 갈래 대상 청년·대학생·사회초년생·취업준비생(또는 계층_중_하나에 그 낱말) ∧ 조건.혼인 없음 ∧ 확인필요 없음 · 넘으면 ⚠️ 경고만(혼인 조건 채우기는 운영 데이터 쓰기 몫)')
 } catch (e) {
   add('target_youth_marital', '열린 카드 청년·대학생·사회초년생 갈래에 혼인 조건도 확인필요도 없음', 'warn', String(e).slice(0, 200), '공고·키 표를 읽는다(못 읽으면 ⚠️)')
+}
+
+// ㉓ LH 목록에서 사라진 열린 카드(2026-10-22 · 김제하동 …20908) — 판정·SQL 은 lh-gone.mjs 머리 주석. ⚠️만 · 못 읽으면 ⚠️ 점검 불능.
+try {
+  const [x] = await sqlRead(lhGoneSql())
+  const j = judgeLhGone(x.j)
+  add('lh_list_gone', 'LH 목록에서 안 보이는 열린 LH 카드', j.status, j.value, j.rule)
+} catch (e) {
+  addBlind('lh_list_gone', 'LH 목록에서 안 보이는 열린 LH 카드 — 점검 불능', 'warn', String(e).slice(0, 200), '공고·수집 기록 표를 읽는다(못 읽으면 ⚠️)')
 }
 
 // ⑲ 인스턴스 메모리(2026-10-17 · 같은 우편 1 · 조사 「인스턴스 지표 경로」 ⓑ) — 관리 API 지표 끝점(베타)에서 숫자만 골라(instance.mjs) zipfit_ops.instance_metrics_log 에 한 행.
