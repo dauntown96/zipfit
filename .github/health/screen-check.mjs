@@ -186,7 +186,7 @@ try {
           let state = st ? (st.innerText || st.textContent).trim() : '(없음)'
           if (br) { const b = br.find(x => x[0] === nm.getAttribute('title')); if (!b) state = '(갈래 없음)'; else if (b[1] !== state) state = `(갈래 상태 ${b[1]} ≠ ${state})` }
           nts.push([slot.getAttribute('data-notices-for'), nm.getAttribute('title'),
-            sp ? (sp.innerText || sp.textContent).replace(/^접수\s*/, '').trim() : '(없음)', state])
+            sp ? (sp.innerText || sp.textContent).replace(/^접수\s*/, '').trim() : '(없음)', state, !!(st && st.dataset.zfWin2 === '1')])
         }
       }
       return { cardRows, chips, dates, nts, overflow: sw > window.innerWidth + 1 ? sw : 0, greys: greys.length, greyBad }
@@ -295,10 +295,13 @@ try {
       from st`)
     const expN = new Map((row.j || []).map(x => [x.aid + '\u0000' + x.title, x]))
     const nm = []
-    for (const [aid, title, span, state] of notices) {
+    for (const [aid, title, span, state, win2] of notices) {
       const x = expN.get(aid + '\u0000' + title)
       if (!x || !x.known) { nm.push(`${aid}: 「${String(title).slice(0, 30)}」 DB 에서 공고문을 못 찾음`); continue }
-      if (x.span !== span || x.state !== state) nm.push(`${aid}: 「${String(title).slice(0, 30)}」 화면 ${span} ${state} ↔ DB ${x.span} ${x.state}`)
+      // 🔵 2026-10-22(우편함 「표시층 — A(G3): LH 「…마감」 우선을 첫 창에서만」 · 원칙 33) — LH 「…마감」이어도 경로 표 둘째 이후 창 안이면 화면은 날짜로 연다(배지 data-zf-win2).
+      //    창 판정(경로 표 창 묶기)은 route_gap · route_cur 가 DB 로 따로 잰다 — 여기서는 DB 「마감」(LH 상태) ↔ 화면 날짜 상태 + 표지만 받는다.
+      const lhWin2 = win2 && x.state === '마감' && /^(접수 중|오늘 마감)$/.test(state)
+      if (x.span !== span || (x.state !== state && !lhWin2)) nm.push(`${aid}: 「${String(title).slice(0, 30)}」 화면 ${span} ${state}${win2 ? '(둘째 창)' : ''} ↔ DB ${x.span} ${x.state}`)
     }
     extra.notices_mismatch = nm
     add('notices', '공고문 자리 ↔ DB 날짜', nm.length === 0 ? 'pass' : 'fail',
