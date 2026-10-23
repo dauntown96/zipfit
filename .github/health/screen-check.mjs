@@ -37,7 +37,10 @@ const add = (id, name, status, value, rule) => checks.push({ id, name, status, v
 const phraseOf = t =>
   /함께 정리돼 있어요|같은 게시물에 올라왔어요/.test(t) ? '④링크'
   : /세대별 목록이 없어요/.test(t) ? '목록없음'
-  : /링크만 제공/.test(t) ? '링크만'
+  // 🔵 2026-10-22(우편함 「표시층 — A(G2): 「링크만」 카드에 사실대로의 표지」) — 첨부 0 · 분석 없음 카드는 「꼭집이 아직 분석하지 않은 공고예요 · 원문은 … 게시판」
+  //    + 머리 줄 표지(.hcard.zf-lo)여야 한다. 옛 문구 「원문 링크만 제공해요」는 표지 없는 링크만 — DB 「링크만」과 어긋나 실패한다(G2 표지 판정이 여기다).
+  : /분석하지 않은 공고/.test(t) ? '링크만'
+  : /링크만 제공/.test(t) ? '링크만(표지 없음)'
   : /공고 원문을 정리하고 있어요/.test(t) ? '분석중'   // 2026-10-16 — 분석 전 카드(zfAnaPending)
   : /정리하지 못했어요/.test(t) ? '미정리'
   : /(보증금|월세|월 |전용)/.test(t) ? '요약'
@@ -143,7 +146,7 @@ try {
       const vis = e => e.offsetParent !== null
       const cardRows = [...document.querySelectorAll('.hcard')].filter(vis).map(c => {
         const s = c.querySelector('[data-sum-for]')
-        return s ? [s.getAttribute('data-sum-for'), (s.innerText || '').replace(/\s+/g, ' ')] : null   // 전문 — 자르기는 아래 결과 표 보이기용만(#360)
+        return s ? [s.getAttribute('data-sum-for'), (s.innerText || '').replace(/\s+/g, ' '), c.classList.contains('zf-lo')] : null   // 전문 — 자르기는 아래 결과 표 보이기용만(#360) · 셋째 = 머리 줄 「꼭집 미분석」 표지(2026-10-22)
       }).filter(Boolean)
       const chips = [...document.querySelectorAll('.hcard .chip')].filter(vis)
         .filter(e => e.getBoundingClientRect().height > 30 || e.getClientRects().length > 1)
@@ -186,14 +189,14 @@ try {
           let state = st ? (st.innerText || st.textContent).trim() : '(없음)'
           if (br) { const b = br.find(x => x[0] === nm.getAttribute('title')); if (!b) state = '(갈래 없음)'; else if (b[1] !== state) state = `(갈래 상태 ${b[1]} ≠ ${state})` }
           nts.push([slot.getAttribute('data-notices-for'), nm.getAttribute('title'),
-            sp ? (sp.innerText || sp.textContent).replace(/^접수\s*/, '').trim() : '(없음)', state])
+            sp ? (sp.innerText || sp.textContent).replace(/^접수\s*/, '').trim() : '(없음)', state, !!(st && st.dataset.zfWin2 === '1')])
         }
       }
       return { cardRows, chips, dates, nts, overflow: sw > window.innerWidth + 1 ? sw : 0, greys: greys.length, greyBad }
     })
     // 🔴 갈래는 자르기 전 전문으로 정한다(이슈 #360 · 2026-10-07) — 60자로 자른 뒤 판정하면 긴 ④ 링크 문구
     //    (「…[정정공고] … 공고에 함께 정리돼 있어요 →」 65자)의 「있어요」가 잘려 「알수없음」으로 떨어졌다. 60자는 결과 표에 보일 때만.
-    for (const [aid, t] of got.cardRows) cards.push([aid, phraseOf(t), t.slice(0, 60)])
+    for (const [aid, t, lo] of got.cardRows) cards.push([aid, phraseOf(t), t.slice(0, 60), lo])
     notices.push(...got.nts)
     brokenChips.push(...got.chips)
     hiddenDates.push(...got.dates)
@@ -229,18 +232,19 @@ try {
     if (process.env.SIMULATE === 'fail') expected.set(ids[0], '없는문구(시험)')
     const mism = []
     const counts = {}
-    for (const [aid, got, t] of cards) {
+    for (const [aid, got, t, lo] of cards) {
       counts[got] = (counts[got] || 0) + 1
       const exp = expected.get(aid)
       if (exp !== got) mism.push(`${aid}: 화면 ${got} ↔ DB ${exp} 「${t}」`)
       // 2026-10-16 — 분석 없는 갈래(첨부 0 · 분석 전)의 요약 상자는 「AI 정리」라고 말하지 않는다(보이는 글자 · 「원문 보기」만)
       else if ((got === '링크만' || got === '분석중') && /AI 정리/.test(t)) mism.push(`${aid}: ${got} 상자에 「AI 정리」 「${t}」`)
+      else if (got === '링크만' && !lo) mism.push(`${aid}: 링크만인데 머리 줄 「꼭집 미분석」 표지 없음`)
     }
     extra.phrase_counts = counts
     extra.phrase_mismatch = mism
     add('phrase', '카드 문구 ↔ DB 상태', mism.length === 0 ? 'pass' : 'fail',
       `${cards.length}장 · ${Object.entries(counts).map(([k, v]) => `${k} ${v}`).join(' · ')}${mism.length ? ` · 어긋남 ${mism.length}: ${mism.slice(0, 3).join(' / ')}` : ''}`,
-      '카드마다 화면 문구 갈래 = DB 로 따로 계산한 갈래 · 링크만·분석중 상자에 보이는 「AI 정리」 0')
+      '카드마다 화면 문구 갈래 = DB 로 따로 계산한 갈래 · 링크만·분석중 상자에 보이는 「AI 정리」 0 · 링크만은 표지 문구 + 머리 줄 「꼭집 미분석」(G2)')
   }
   // ①-2 공고문 자리 ↔ DB (2026-10-01) — 화면 코드를 쓰지 않고 SQL 로 따로 계산한다.
   //   공고문 = 링크 표로 이 LH 카드에 붙은 MYHOME 행을 제목 키로 묶은 것(한 MYHOME 행이 LH 둘에 걸리면 id 가 작은 LH) —
@@ -295,10 +299,13 @@ try {
       from st`)
     const expN = new Map((row.j || []).map(x => [x.aid + '\u0000' + x.title, x]))
     const nm = []
-    for (const [aid, title, span, state] of notices) {
+    for (const [aid, title, span, state, win2] of notices) {
       const x = expN.get(aid + '\u0000' + title)
       if (!x || !x.known) { nm.push(`${aid}: 「${String(title).slice(0, 30)}」 DB 에서 공고문을 못 찾음`); continue }
-      if (x.span !== span || x.state !== state) nm.push(`${aid}: 「${String(title).slice(0, 30)}」 화면 ${span} ${state} ↔ DB ${x.span} ${x.state}`)
+      // 🔵 2026-10-22(우편함 「표시층 — A(G3): LH 「…마감」 우선을 첫 창에서만」 · 원칙 33) — LH 「…마감」이어도 경로 표 둘째 이후 창 안이면 화면은 날짜로 연다(배지 data-zf-win2).
+      //    창 판정(경로 표 창 묶기)은 route_gap · route_cur 가 DB 로 따로 잰다 — 여기서는 DB 「마감」(LH 상태) ↔ 화면 날짜 상태 + 표지만 받는다.
+      const lhWin2 = win2 && x.state === '마감' && /^(접수 중|오늘 마감)$/.test(state)
+      if (x.span !== span || (x.state !== state && !lhWin2)) nm.push(`${aid}: 「${String(title).slice(0, 30)}」 화면 ${span} ${state}${win2 ? '(둘째 창)' : ''} ↔ DB ${x.span} ${x.state}`)
     }
     extra.notices_mismatch = nm
     add('notices', '공고문 자리 ↔ DB 날짜', nm.length === 0 ? 'pass' : 'fail',

@@ -719,6 +719,11 @@ html[data-ui="d3"] .zf-ana-box{background:var(--surface-2);border-color:var(--li
 html[data-ui="d3"] .zf-ana-pill{background:var(--ink);color:var(--paper)}
 html[data-ui="d3"] .zf-ana-org{color:var(--ink)}
 html[data-ui="d3"] .zf-ana-box a{color:var(--ink)!important}
+/* 🔵 2026-10-22(우편함 「표시층 — A(G2): 「링크만」 카드에 사실대로의 표지」) — 첨부 0 · 분석 없음 카드(zf-lo): 머리 줄 상태 알약 앞에 「꼭집 미분석」 표지.
+   카드 그림과 요약 도착 순서에 기대지 않게 CSS 로 단다(머리 줄은 flex — 표지 order 1 · 알약 order 2). 날짜·상태는 수집값 그대로 둔다. */
+.hcard.zf-lo .zf3-ctop::after{content:'꼭집 미분석';order:1;font-size:var(--t-xs);font-weight:700;border-radius:999px;padding:1px 8px;color:#fff;background:#6B6B63}
+.hcard.zf-lo .zf3-ctop .zf3-dpill{order:2}
+html[data-ui="d3"] .hcard.zf-lo .zf3-ctop::after{background:var(--ink-2);color:var(--paper)}
 .zf-sch-stop>summary::-webkit-details-marker{display:none}
 .zf-sch-stop>summary>.policy-category,.zf-sch-stop>summary>.policy-content{display:block}
 .zf-sch-stop .zf-sch-more{font-family:inherit;font-size:11px;font-weight:600;color:var(--ink-3,#777);margin-left:8px;white-space:nowrap}
@@ -2105,7 +2110,20 @@ function applyWindowState(row){
   return best;
 }
 function zfLhPostClosed(row){
-  return String((row && row.source) || '') === 'LH' && statusSaysClosed(row);
+  return zfLhSaysClosed(row);
+}
+// 🔴 2026-10-22(우편함 「표시층 — A(G3): LH 「…마감」 우선을 첫 창에서만」) — LH 「…마감」(목록 API PAN_SS)은 첫 창(인터넷 청약)만 따른다.
+//    백업 덤프 상태 전환이 매번 인터넷 청약 끝 직후다(…20706·…20713 10-01 · …20737 10-14 · …20877 10-21) — 공고 전체 마감이 아니다.
+//    그래서 경로 표 창이 둘 이상이고 오늘이 둘째 이후 창 **안**이면 LH 「…마감」 대신 날짜로 판정한다(전북 매입 …20737 둘째 창 11-02~11-04 ·
+//    LH 공지 #173 「1순위(일반) 및 2순위 주택목록 게시」). 창 사이는 종전대로 zfRouteGap 이 먼저 선다 · 첫 창 · 창 하나 · 경로 행 전은 종전대로 LH 를 믿는다.
+//    제목 「[조기접수마감]」(zfEarlyClosed)은 이 앞에서 닫힌다(zfRouteWinsAll 이 null). 「주택 없음」 공지로 둘째 창이 없는 공고는 데이터(카드 끝)로 푼다.
+function zfInLaterWin(row){
+  const W = zfRouteWinsAll(row);
+  if(!W) return false;
+  return W.merged.findIndex(m => m.x <= W.today && W.today <= m.y) >= 1;
+}
+function zfLhSaysClosed(row){
+  return String((row && row.source) || '') === 'LH' && statusSaysClosed(row) && !zfInLaterWin(row);
 }
 // 🔴 2026-10-13(우편함 「코드 — 열린 카드 오표시·오답·놓침」 1) — 공급기관이 「조기 접수마감」을 알린 공고는 날짜보다 그 알림을 믿는다.
 //    양산 삼성파크빌 `…20898` — LH 정정사유 「모집호수 소진으로 조기 접수마감합니다」 · 제목 머리 `[조기접수마감]` 인데 LH 공고상태는
@@ -2139,7 +2157,8 @@ function zfWindowStateOne(row){
   //    [VERIFY] 백업 덤프 43회분(2026-08-11~09-29 · LH 1,014건): 마감일 전에 「접수마감」이 붙은 것 9건 —
   //    7건은 마지막 날 새벽 스냅숏에서 처음 보였고 2건은 태백철암1(시작일 없음 · 취소공고 포함).
   //    「마감」이 다시 풀린 경우 0건. 🔵 MYHOME 대표 카드는 종전(날짜) 그대로 — MYHOME status 는 늦게 따라온다.
-  if(String(row.source || '') === 'LH' && statusSaysClosed(row)) return 'closed';
+  //    🔴 2026-10-22 — 둘째 이후 창 안이면 날짜로(zfLhSaysClosed 주석).
+  if(zfLhSaysClosed(row)) return 'closed';
   // 🔴 B62 ③ — 공사 공고와 수집 접수기간이 어긋나는 공사의 행(apply_period_check, RPC 판정)은 날짜를 믿지 않는다.
   //    그래서 접수 중·예정·마감 어느 쪽으로도 만들지 않고 'unknown' 으로 둔다. 목록 숨김은 isHiddenAsClosed 가
   //    종전 순서 그대로 가른다 — 마감일이 지났고 기관 status 가 「…마감」이면 여전히 숨는다(지금 참 6장 전부).
@@ -2607,7 +2626,9 @@ function zfPostNoticeList(row){
   const pn = zfPostNoticeFor(row);
   if(!pn) return null;
   const list = [];
-  if(pn.own) list.push({ title: pn.own.title, start: row['apply_start'] || '', end: row['apply_end'] || '', state: zfWindowStateOne(row) });
+  // 🔵 2026-10-22 — LH 「…마감」인데 둘째 이후 창 안이라 날짜로 연 것은 win2(배지 data-zf-win2 — 화면 점검이 DB 대조에서 가른다)
+  const win2 = String(row.source || '') === 'LH' && statusSaysClosed(row) && zfInLaterWin(row);
+  if(pn.own) list.push({ title: pn.own.title, start: row['apply_start'] || '', end: row['apply_end'] || '', state: zfWindowStateOne(row), win2 });
   const postClosed = zfLhPostClosed(row);   // LH 가 게시물 전체를 마감했으면 공고문도 마감(applyWindowState 주석)
   pn.linked.forEach(nt => list.push({ title: nt.title, start: nt.start, end: nt.end, state: postClosed ? 'closed' : zfWindowStateOne(nt.row) }));
   if(list.length < 2) return null;
@@ -2642,19 +2663,19 @@ function zfNoticeStateText(state, end){
   }
   return state === 'before' ? '접수 예정' : state === 'closed' ? '마감' : '기간 미상';
 }
-function zfNoticeStateBadge(state, end){
+function zfNoticeStateBadge(state, end, win2){
   const t = zfNoticeStateText(state, end);
   const c = t === '오늘 마감' ? 'background:#FBF0DC;color:#8A5A12'
     : t === '접수 중' ? 'background:#E6F4EE;color:#0F6E56'
     : t === '접수 예정' ? 'background:#EEF2FA;color:#3D5A99'
     : 'background:#F6F6F2;color:#6B6B63';
-  return `<span class="zf-nt-state" style="display:inline-block;white-space:nowrap;margin-left:4px;padding:1px 6px;border-radius:9px;font-size:11px;font-weight:600;${c}">${t}</span>`;
+  return `<span class="zf-nt-state"${win2 ? ' data-zf-win2="1"' : ''} style="display:inline-block;white-space:nowrap;margin-left:4px;padding:1px 6px;border-radius:9px;font-size:11px;font-weight:600;${c}">${t}</span>`;
 }
 // 자리는 카드 행의 접수 재료를 함께 싣는다 — 공고 탭·추천·매칭 카드의 행 모양이 달라도 채울 때 같은 판정을 한다.
 function zfNoticesSlotHtml(row){
   if(!row) return '';
   const v = k => zfAttr(row[k] == null ? '' : row[k]);
-  return `<div class="zf-notices-slot" data-notices-for="${v('announcement_id')}" data-s="${zfAttr(row['신청시작일'] || row['apply_start'] || '')}" data-e="${zfAttr(row['신청마감일'] || row['apply_end'] || '')}" data-st="${zfAttr(row['status'] || row['처리상태'] || '')}" data-src="${v('source')}" data-w="${v('winner_announce_date')}"></div>`;
+  return `<div class="zf-notices-slot" data-notices-for="${v('announcement_id')}" data-s="${zfAttr(row['신청시작일'] || row['apply_start'] || '')}" data-e="${zfAttr(row['신청마감일'] || row['apply_end'] || '')}" data-st="${zfAttr(row['status'] || row['처리상태'] || '')}" data-src="${v('source')}" data-w="${v('winner_announce_date')}" data-t="${zfAttr(row['공고명'] ?? row.title ?? '')}"></div>`;
 }
 function zfFillNoticeSlots(){
   if(!zfPostNotices.loaded) return;
@@ -2662,7 +2683,7 @@ function zfFillNoticeSlots(){
     if(el.dataset.filled === '1') return;
     el.dataset.filled = '1';
     const d = el.dataset;
-    const row = { announcement_id: d.noticesFor, apply_start: d.s || '', apply_end: d.e || '', status: d.st || '', source: d.src || '', winner_announce_date: d.w || '' };
+    const row = { announcement_id: d.noticesFor, apply_start: d.s || '', apply_end: d.e || '', status: d.st || '', source: d.src || '', winner_announce_date: d.w || '', title: d.t || '' };   // title — 제목 키(경로 창 판정 · 2026-10-22)
     const list = zfPostNoticeList(row);
     if(!list) return;
     const same = list.every(x => x.start === list[0].start && x.end === list[0].end && x.state === list[0].state);
@@ -2670,9 +2691,9 @@ function zfFillNoticeSlots(){
     const name = x => `<span title="${zfAttr(x.title)}" style="font-weight:600;color:#333">${escapeHtml(x.name || x.title)}</span>`;
     // 🔵 2026-10-01 — class zf-nt-line·zf-nt-span·zf-nt-state 는 화면 점검(health-screen 「공고문 자리 ↔ DB」)이 읽는 표지다. 모양은 그대로다.
     el.innerHTML = same
-      ? `<div class="zf-nt-line" style="${box}">📑 공고문 ${list.length}개 · ${list.map(name).join(' · ')}<br><span class="zf-nt-span" style="color:#666">접수 ${escapeHtml(zfSpanText(list[0].start, list[0].end))}</span>${zfNoticeStateBadge(list[0].state, list[0].end)}</div>`
+      ? `<div class="zf-nt-line" style="${box}">📑 공고문 ${list.length}개 · ${list.map(name).join(' · ')}<br><span class="zf-nt-span" style="color:#666">접수 ${escapeHtml(zfSpanText(list[0].start, list[0].end))}</span>${zfNoticeStateBadge(list[0].state, list[0].end, list[0].win2)}</div>`
       : `<div style="${box}">📑 공고문 ${list.length}개 · <b style="color:#8A5A12">공고문마다 접수일이 달라요</b>`
-        + list.map(x => `<div class="zf-nt-line">· ${name(x)} <span class="zf-nt-span" style="color:#666;white-space:nowrap">${escapeHtml(zfSpanText(x.start, x.end))}</span>${zfNoticeStateBadge(x.state, x.end)}</div>`).join('')
+        + list.map(x => `<div class="zf-nt-line">· ${name(x)} <span class="zf-nt-span" style="color:#666;white-space:nowrap">${escapeHtml(zfSpanText(x.start, x.end))}</span>${zfNoticeStateBadge(x.state, x.end, x.win2)}</div>`).join('')
         + `</div>`;
     zfHideRouteDupOf(el.closest('.hcard'));
     // 🔴 2026-10-01 — 공고문 목록이 서면 날짜 줄의 「단지마다 일정이 달라요」 배지를 숨긴다 — 목록이 공고문별 일정을 이미 말한다
@@ -4600,9 +4621,16 @@ function zfNotAnalyzedHtml(url, text){
 //    has_attachments = 그룹 구성원 누구든 첨부 목록이 있다 → 거짓이면 분석할 첨부 자체가 없다(원문 링크뿐)
 //    🔴 칸이 없는 옛 응답·조회 전·실패는 '' — 종전 문구 그대로. B62 ④ 게시물 링크가 붙는 카드도 '' — 링크를 그대로 둔다.
 const ZF_SUM_NO_UNITS   = '이 공고는 원문에 세대별 목록이 없어요 · 자격·일정은 펼쳐서 확인하세요';
-const ZF_SUM_LINK_ONLY  = '이 공고는 원문 링크만 제공해요 · 보증금·면적은 원문에서 확인해 주세요';
+// 🔵 2026-10-22(우편함 「표시층 — A(G2): 「링크만」 카드에 사실대로의 표지」) — 첨부 0 · 분석 없음 카드는 사실 둘만 말한다:
+//    꼭집이 아직 이 공고를 분석하지 않았다 · 원문은 공급기관 게시판에 있다. 「분석 중」이라 하지 않는다(발송 대상이 아니라 분석이 돌지 않는다).
+//    {org} = 카드 공급기관(수집값 · 없거나 LH·SH·MYHOME 이름뿐이면 「공급기관」). 머리 줄 표지 「꼭집 미분석」은 CSS(.hcard.zf-lo).
+const ZF_SUM_LINK_ONLY  = '꼭집이 아직 분석하지 않은 공고예요 · 원문은 {org} 게시판에 있어요';
 const ZF_SEC_NO_UNITS   = '이 공고는 원문에 세대별 목록이 없어요. 공급 주택은 공고문에서 확인해 주세요.';
-const ZF_SEC_LINK_ONLY  = '이 공고는 원문 링크만 제공해요. 공고 원문에서 확인해 주세요.';
+const ZF_SEC_LINK_ONLY  = '꼭집이 아직 분석하지 않은 공고예요. 원문은 공급기관 게시판에서 확인해 주세요.';
+function zfLinkOnlyText(org){
+  const o = String(org || '').trim();
+  return ZF_SUM_LINK_ONLY.replace('{org}', !o || /^(LH|SH|MYHOME)$/i.test(o) ? '공급기관' : escapeHtml(o));
+}
 function zfCardEmptyKind(s, key){
   if(!s || typeof s.analysis_done !== 'boolean') return '';
   if(zfPostLinkOrganized(key) === true) return '';
@@ -4662,6 +4690,8 @@ function zfFillSummarySlots(){
     const pend = zfAnaPending(s, el.getAttribute('data-sum-key')), card = el.closest('.hcard');
     if(card) card.classList.toggle('zf-ana-pending', pend);
     if(card) card.classList.toggle('zf-ana-no', zfAiOff(s, el.getAttribute('data-sum-key')));   // 🔵 2026-10-16 — 분석 없으면 「AI 정리 · 」 접음
+    // 🔵 2026-10-22 — 첨부 0 · 분석 없음(요약 줄도 없고 같은 게시물 LH 정리도 없음) 카드에 머리 줄 표지(.zf-lo)
+    if(card) card.classList.toggle('zf-lo', !(s && zfSummaryLine(s)) && zfPostLinkOrganized(el.getAttribute('data-sum-key')) !== true && zfCardEmptyKind(s, el.getAttribute('data-sum-key')) === 'link_only');
     if(pend){ el.innerHTML = zfAnaPendingHtml(url, el.getAttribute('data-sum-org') || ''); return; }
     const line = s ? zfSummaryLine(s) : '';
     // 🔵 이번 회차 값이 아니면 상자 색도 함께 바꾼다 — 칩만 달면 초록 상자가 「확인됨」처럼 읽힌다.
@@ -4677,7 +4707,7 @@ function zfFillSummarySlots(){
           : zfPostLinkHtml(el.getAttribute('data-sum-key')) + (() => {
               // 🔵 2026-09-30 — LH 카드도 미분석이면 링크(같은 게시물) 아래에 종전 안내를 그대로 둔다.
               const kind = zfCardEmptyKind(s, el.getAttribute('data-sum-key'));
-              return zfNotAnalyzedHtml(url, kind === 'no_units' ? ZF_SUM_NO_UNITS : kind === 'link_only' ? ZF_SUM_LINK_ONLY : '');
+              return zfNotAnalyzedHtml(url, kind === 'no_units' ? ZF_SUM_NO_UNITS : kind === 'link_only' ? zfLinkOnlyText(el.getAttribute('data-sum-org')) : '');
             })());
   });
   zfRefreshCovers();   // 🔵 2026-09-30 — 세대 행 지역이 방금 왔을 수 있다(표지 대표·곳 수)
@@ -11796,7 +11826,7 @@ function zf3DecorateIn(list, rowsMap, isMatch){
         card.dataset.zf3Branch = '1';
         const ann = zf3Real(zfNoticeDate(n) || n['announcement_date']);
         route.innerHTML = `<p class="zf3-bhead">📑 공고문 ${nl.length}개 · 공고문마다 접수일이 달라요</p>`
-          + nl.map(x => `<div class="zf3-branch"><p class="zf3-bn"><span title="${zfAttr(x.title)}">${escapeHtml(x.name || x.title)}</span>${zfNoticeStateBadge(x.state, x.end)}</p>${zf3LineHTML([{ k: '공고', d: ann }, { k: '접수', d: zf3Real(x.start), u: '미상' }, { k: '마감', d: zf3Real(x.end), u: '미상' }], x.name || x.title)}</div>`).join('');
+          + nl.map(x => `<div class="zf3-branch"><p class="zf3-bn"><span title="${zfAttr(x.title)}">${escapeHtml(x.name || x.title)}</span>${zfNoticeStateBadge(x.state, x.end, x.win2)}</p>${zf3LineHTML([{ k: '공고', d: ann }, { k: '접수', d: zf3Real(x.start), u: '미상' }, { k: '마감', d: zf3Real(x.end), u: '미상' }], x.name || x.title)}</div>`).join('');
         slot.classList.add('zf3-off');
       }
     }
