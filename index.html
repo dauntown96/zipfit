@@ -4531,7 +4531,7 @@ function zfLoadBuckets(){
 }
 
 // 의견 글 가리기 — 🔴 저장하기 전에 연락처 · 긴 숫자를 가린다(처리방침 1). 검색어 거름(ZF_PII_PATTERNS)과 같은 세 꼴이고,
-//    DB CHECK(user_feedback_body_masked)가 같은 꼴을 거부해 화면을 거치지 않은 쓰기도 막는다.
+//    EF submit-feedback 이 같은 세 꼴로 한 번 더 가리고(그 함수 MASK — 한쪽을 바꾸면 같은 PR 에서), DB CHECK(user_feedback_body_masked)가 마지막 벽이다.
 const ZF_FB_MASK = [/[^\s@]+@[^\s@]+\.[^\s@]+/g, /\d{2,4}-\d{3,4}-\d{4}/g, /\d{6,}/g];
 function zfFbMask(t){ return ZF_FB_MASK.reduce((s, re) => s.replace(re, '(가림)'), String(t || '')); }
 const ZF_FB_WRONG = ['접수','가격','자격','일정','기타'];   // 처리방침 1 「카드 반응」 — 틀렸다고 고른 칸
@@ -4587,7 +4587,7 @@ function zfFbOpen(annId, wrongKeys){
       + '<div class="zf-fb-count" id="zfFbCount" aria-live="polite">0 / 1000</div>'
       + '<label for="zfFbMail">답변받을 이메일 <span class="zf-fb-opt">(선택)</span></label>'
       + '<input id="zfFbMail" type="email" inputmode="email" autocomplete="email" maxlength="254" placeholder="답변이 필요할 때만 적어 주세요">'
-      + '<p class="zf-fb-note" id="zfFbNote">보내 주신 의견은 받은 날부터 1년 보관한 뒤 지워요. 글 속 전화번호 · 이메일 주소 · 긴 숫자는 가린 뒤 저장해요. '
+      + '<p class="zf-fb-note" id="zfFbNote">받는 것: 의견 · 보낸 화면·공고 · (적으시면) 답변 이메일 — 서비스 개선과 답변에만 써요. 보내 주신 의견은 받은 날부터 1년 보관한 뒤 지워요. 글 속 전화번호 · 이메일 주소 · 긴 숫자는 가린 뒤 저장해요. '
       + '보내지 않아도 다른 기능은 그대로 쓸 수 있어요. <a href="./privacy.html" target="_blank" rel="noopener">개인정보 처리방침</a></p>'
       + '<p class="zf-fb-err" role="alert" hidden></p>'
       + '<button type="submit" class="zf-fb-submit">보내기</button></form>'
@@ -4634,10 +4634,13 @@ function zfFbSubmit(ov){
   if(ov.dataset.ann) body.announcement_id = String(ov.dataset.ann).slice(0, 64);
   if(mail) body.reply_email = mail.slice(0, 254);
   btn.disabled = true; err.hidden = true;
-  // 🔴 anon 키로만 보낸다 — 표에 회원 칸이 없고(처리방침 1 「의견」 항목 밖), Prefer: return=minimal(읽기 권한 없음).
-  fetch(SUPABASE_URL + '/rest/v1/user_feedback', { method:'POST', headers:Object.assign({}, zfAnonHeaders(), {'Prefer':'return=minimal'}), body:JSON.stringify(body) })
+  // 🔴 anon 키로만 보낸다 — 표에 회원 칸이 없다(처리방침 1 「의견」 항목 밖).
+  // 🔵 2026-10-26 — 표에 직접 쓰지 않고 EF submit-feedback 하나로 보낸다(회수 제한 · 가림 한 번 더 · 표 권한은 service_role 만).
+  fetch(SUPABASE_URL + '/functions/v1/submit-feedback', { method:'POST', headers:zfAnonHeaders(), body:JSON.stringify(body) })
     .then(r => {
       btn.disabled = false;
+      if(r.status === 409){ showErr('같은 의견을 이미 받았어요. 고마워요.'); return; }
+      if(r.status === 429){ showErr('지금은 의견이 몰려 받지 못했어요. 조금 뒤 다시 눌러 주세요.'); return; }
       if(!r.ok){ showErr('보내지 못했어요. 잠시 뒤 다시 눌러 주세요.'); return; }
       ov.querySelector('#zfFbBody').value = ''; ov.querySelector('#zfFbMail').value = '';
       ov.querySelector('.zf-fb-form').hidden = true;

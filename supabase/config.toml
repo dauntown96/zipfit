@@ -34,6 +34,11 @@ verify_jwt = false
 [functions.save-user-profile]
 verify_jwt = true
 
+# 2026-10-26 신설(병합 = 처리방침 시행일) — 의견 보내기. 로그인 없이 쓰는 기능이라 JWT 를 요구하지 않는다(anon 키는 공개값이라 막는 힘이 없다).
+# 막는 것은 함수 안의 회수 제한(전체 10분 · 하루 상한 · 같은 글 하루 한 번)과 가림 · 표 권한은 service_role 만.
+[functions.submit-feedback]
+verify_jwt = false
+
 # 2026-10-13 신설 — 시험 사용자 하나의 1회용 로그인 링크·정리(우편함 「코드 — 시험 로그인 함수」 · 길 A). 수집 함수와 같이 x-cron-secret 으로 막는다(JWT 없음).
 [functions.test-login]
 verify_jwt = false

@@ -13,7 +13,6 @@
 
 | 파일 | 무엇 |
 |---|---|
-| `v3.16.sql` | 🔴 **브랜치 판(처리방침 시행일 병합)** — v3.15 + `allow_write_tables`에 `user_feedback` `INSERT` 한 줄(의견 보내기 · 마이그레이션 2026-10-26_01과 함께) |
 | **`v3.15.sql`** | **현행(main).** v3.14 + `allow_exec_funcs`에 넷(`listing_hidden_keys` · `ops_is_admin` · `ops_status_board` · `ops_listing_hide` — 2026-10-16 관리자 페이지) |
 | `v3.14.sql` | v3.13 + **V16** 순위·차수 접수 창(일정 표 · 서로 다른 `start_date`·`end_date`)이 둘 이상인 열린 공고 그룹에 경로 표 0행 → 위반 |
 | `v3.13.sql` | v3.12 + **V15b** category가 「⚠️」로 시작하지 않는 정책 행 `content_raw`에 「⚠️」 0 |

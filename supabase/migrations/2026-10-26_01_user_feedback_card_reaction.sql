@@ -3,8 +3,8 @@
 --    1 「의견」: 의견 내용 · 보낸 화면 · 공고 식별자 · (선택) 답변받을 이메일 / 받은 날부터 1년 / 저장 전에 연락처 · 긴 숫자를 가림
 --    1 「서비스 이용 기록」 카드 반응: 공고 식별자 · 👍/👎 · 틀렸다고 고른 칸 → usage_events 의 새 event 'card_reaction'(새 표 0)
 --    7 파기 절차: 「1년이 지난 의견 삭제」 → 기존 정리 잡 zipfit-purge-usage-events 에 한 문장(잡을 새로 만들지 않는다)
--- 🔴 회원 식별자 · 세션 식별자 칸을 두지 않는다(고지 「의견」 항목 밖). 화면은 anon 키로만 보낸다.
--- 🔴 개인정보 표 — SELECT 정책 0 · anon/authenticated 는 칼럼 단위 INSERT 만(CLAUDE.md 원칙 15 · usage_events 와 같은 꼴). 읽기는 service_role(운영자).
+-- 🔴 회원 식별자 · 세션 식별자 칸을 두지 않는다(고지 「의견」 항목 밖). 화면은 anon 키로 EF submit-feedback 을 부른다.
+-- 🔴 개인정보 표 — 정책 0 · anon/authenticated 권한 0 · EF submit-feedback(service_role)만 넣는다(CLAUDE.md 원칙 15 · user_profiles 와 같은 꼴). 읽기는 service_role(운영자).
 -- 🔴 백업 저장소 zipfit-backup scripts/data_excluded.py 에 user_feedback 을 같은 날 더한다 — 안 그러면 다음 덤프에 의견 데이터가 담긴다.
 -- 되돌리기: 아래 잡 명령에서 user_feedback 줄을 뺀 옛 명령으로 cron.alter_job · drop table public.user_feedback ·
 --           usage_events_event_check 를 card_reaction 없는 옛 목록으로(이 파일의 GUARD 가 확인한 그대로).
@@ -45,8 +45,9 @@ create index user_feedback_received_at_idx on public.user_feedback (received_at)
 
 alter table public.user_feedback enable row level security;
 revoke all on table public.user_feedback from public, anon, authenticated;
-grant insert (body, screen, announcement_id, reply_email) on table public.user_feedback to anon, authenticated;
-create policy "anon can insert user_feedback" on public.user_feedback for insert to anon, authenticated with check (true);
+-- 🔵 2026-10-26(우편함 「코드·운영 — 런칭 날 병합 리허설 + 의견 표 남용 막기」 2) — 화면은 표에 직접 쓰지 않는다.
+--    EF submit-feedback(service_role)만 넣고 센다(회수 제한 · 가림 한 번 더) · anon·authenticated 권한 0 · 정책 0.
+grant select, insert, delete on table public.user_feedback to service_role;
 
 -- ③ 1년 지난 의견 삭제 — 기존 정리 잡에 한 문장(매일 15:00 UTC = 00:00 KST · 처리방침 7 「매일 0시 무렵」).
 select cron.alter_job(

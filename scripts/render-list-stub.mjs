@@ -80,7 +80,8 @@ export async function stubListRpc(page, { dir, maxAgeMin = 30 } = {}) {
   //    10분 단위 10 · 27 · 19 세션으로 이용 기록에 남았다(ops 표지 0). 화면 동작은 그대로(송신은 fire-and-forget).
   await page.route(/\/rest\/v1\/usage_events(\?|$)/, r => r.fulfill({ status: 201, body: '' }))
   // 🔵 2026-10-26 — 의견 보내기(user_feedback · 처리방침 새 판)도 같다 — 로컬 렌더의 시험 의견이 운영 표에 남지 않게.
-  await page.route(/\/rest\/v1\/user_feedback(\?|$)/, r => r.fulfill({ status: 201, body: '' }))
+  //    보내는 길은 EF submit-feedback(같은 날 남용 막기) — 옛 REST 주소도 함께 받아 끝낸다.
+  await page.route(/\/(rest\/v1\/user_feedback|functions\/v1\/submit-feedback)(\?|$)/, r => r.fulfill({ status: 201, contentType: 'application/json', body: '{"ok":true}' }))
   await page.route(`**${RPC}*`, async route => {
     const req = route.request()
     const key = req.method() === 'POST' ? argKey(req.postData()) : null

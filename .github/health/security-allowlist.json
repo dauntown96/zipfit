@@ -157,6 +157,11 @@
    "why": "개인정보 표 — anon·authenticated 권한 0 · 화면 직접 조회 0 · EF save-user-profile·delete-account(service_role)만 읽고 쓴다. 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15 · 2026-10-12 고지 회차 3 · 5에서 정책 셋 걷음)"
   },
   {
+   "key": "rls_enabled_no_policy_public_user_feedback",
+   "kind": "intended",
+   "why": "개인정보 표(의견 — 처리방침 1) — anon·authenticated 권한 0 · 화면 직접 쓰기·조회 0 · EF submit-feedback(service_role)만 넣는다(회수 제한 · 가림). 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15 · 2026-10-26 의견 표 남용 막기)"
+  },
+  {
    "key": "auth_leaked_password_protection",
    "kind": "known",
    "why": "유출 비밀번호 보호(HIBP) 꺼짐 — 비밀번호로 가입·로그인하는 경로가 없다: 이메일 공급자 꺼짐(external_email_enabled=false) · 전화 공급자 꺼짐 · 로그인은 카카오 하나(2026-10-21 관리 API config/auth 실측 — 우편함 「런칭 전 점검 ① Supabase」 ①) · 이메일 공급자를 다시 켜면 이 줄을 다시 본다(켜기는 다운님 대시보드 몫)"
