@@ -79,6 +79,8 @@ export async function stubListRpc(page, { dir, maxAgeMin = 30 } = {}) {
   //    쓰지 않는다(health-screen 과 같은 꼴 · keepalive 송신도 이 가로챔에 걸린다 — 실측 3/3). 2026-10-20 실측: 이 대역 없이 띄운 세션 렌더가
   //    10분 단위 10 · 27 · 19 세션으로 이용 기록에 남았다(ops 표지 0). 화면 동작은 그대로(송신은 fire-and-forget).
   await page.route(/\/rest\/v1\/usage_events(\?|$)/, r => r.fulfill({ status: 201, body: '' }))
+  // 🔵 2026-10-26 — 의견 보내기(user_feedback · 처리방침 새 판)도 같다 — 로컬 렌더의 시험 의견이 운영 표에 남지 않게.
+  await page.route(/\/rest\/v1\/user_feedback(\?|$)/, r => r.fulfill({ status: 201, body: '' }))
   await page.route(`**${RPC}*`, async route => {
     const req = route.request()
     const key = req.method() === 'POST' ? argKey(req.postData()) : null
