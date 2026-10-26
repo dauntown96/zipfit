@@ -6,7 +6,8 @@
    날짜가 최신부터인지(원칙 21 · #430 꼴).
 
 경고는 모델 문맥(additionalContext)과 사람 화면(systemMessage)에 함께 내고, /tmp/zipfit-rule-hook.log 에 한 줄 남긴다.
-🔴 첫 한 주(~2026-10-19)는 경고만 — 「막기」로 바꿀지는 claude.ai 판정. 훅이 스스로 죽어도 명령은 그대로 간다(언제나 exit 0).
+🔴 훅은 경고만 한다(언제나 exit 0 · 훅이 스스로 죽어도 명령은 그대로 간다). 막는 쪽은 PR check 다 — `db-migrations.yml` 「CLAUDE.md 이력 표 꼴」이
+   같은 ② 검사를 2026-10-20(HISTORY_FAIL_FROM)부터 실패로 낸다(아래 --history · --table-cols).
 🔴 두 저장소가 함께 붙은 세션(루틴 포함)에서는 저장소 .claude/settings.json 의 훅이 돌지 않는다 — 회신 참조.
 시험: echo '{"tool_input":{"command":"git commit -m x"},"cwd":"/home/user/zipfit"}' | python3 .claude/hooks/rule-check.py
 🔵 2026-10-13(우편함 「코드 — 카드 머리 세대수」 0장 2) — PR check 도 같은 ② 검사를 부른다:
@@ -65,7 +66,8 @@ def check_force_push(cmd, repo):
         return None
     n = len([l for l in out.splitlines() if '|' in l])
     return (f'원칙 13 — force push 전에 `git diff origin/{branch} origin/main`이 비어야 한다(squash 병합 뒤 같은 가지 재사용). '
-            f'지금 {n}개 파일이 다르다 — 원격 가지에 main에 없는 커밋이 있으면 덮어 잃는다. 증명 뒤에만 --force-with-lease={branch}:<원격 head>.')
+            f'지금 {n}개 파일이 다르다 — 원격 가지에 main에 없는 커밋이 있으면 덮어 잃는다. 비지 않으면 원격 head = 이미 병합된 PR의 head sha'
+            f'(pull_request_read · merged: true)임을 증명한 뒤에만 origin/main에서 다시 떠서 --force-with-lease={branch}:<원격 head> · 증명이 안 서면 밀지 않는다.')
 
 
 def history_problems(text):
