@@ -421,6 +421,41 @@ body.theme-dark .hu-ug-name,body.theme-dark .hu-ug-target,body.theme-dark .hu-ug
 .zf-ai-note{margin:0.75rem 0 0;font-size:12px;line-height:1.6;color:#5F5F57;word-break:keep-all}
 .zf-footer .zf-ai-note{margin:0 0 6px;color:#888}
 body.theme-dark .zf-ai-note{color:#9aa0aa}
+/* 의견 창구(시행일 뒤에만 그려진다 — zfV2On) — 카드 반응 한 줄 · 의견 보내기 창 · 바닥 링크 */
+.zf-fb-react{margin-top:12px;padding-top:12px;border-top:1px solid var(--line-2,#e8e8e0);font-size:var(--t-s,13px);color:var(--ink-2,#3d424a)}
+.zf-fb-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.zf-fb-react [hidden]{display:none}   /* 위 display 가 hidden 을 이기지 않게 */
+.zf-fb-q{flex:1 1 auto;min-width:9em}
+.zf-fb-btns{display:flex;gap:6px}
+.zf-fb-b,.zf-fb-chip,.zf-fb-send,.zf-fb-more{min-height:var(--hit,44px);padding:0 12px;border:1px solid var(--line,#ccc);border-radius:var(--r-2,10px);background:var(--paper,#fff);color:var(--ink,#15171b);font:inherit;cursor:pointer}
+.zf-fb-b[aria-pressed="true"],.zf-fb-chip[aria-pressed="true"]{border-color:var(--ink,#15171b);background:var(--ink,#15171b);color:var(--paper,#fff)}
+.zf-fb-sub{margin:10px 0 6px}
+.zf-fb-chips,.zf-fb-act{display:flex;gap:6px;flex-wrap:wrap}
+.zf-fb-act{margin-top:8px}
+.zf-fb-send{background:var(--ink,#15171b);color:var(--paper,#fff);border-color:var(--ink,#15171b);font-weight:700}
+.zf-fb-more{border-color:transparent;background:transparent;text-decoration:underline;padding:0 4px}
+.zf-fb-done{padding:6px 0;color:var(--ink-2,#3d424a)}
+.zf-fb-foot{border:0;background:none;padding:0 4px;font:inherit;font-size:12px;color:#888;cursor:pointer;min-height:24px;vertical-align:middle}   /* 바닥 고지 링크와 같은 꼴 */
+html[data-ui="d3"] .zf-fb-foot{display:inline-flex;align-items:center;min-height:var(--hit);color:var(--ink-2)}
+body.theme-dark .zf-fb-foot{color:#9aa0aa}
+body.zf-fb-lock{overflow:hidden}
+.zf-fb-ov{position:fixed;inset:0;z-index:300;background:rgba(10,11,13,.45);display:flex;align-items:flex-end;justify-content:center}
+.zf-fb-ov[hidden]{display:none}
+.zf-fb-sheet{width:100%;max-width:560px;max-height:92vh;overflow:auto;background:var(--paper,#fff);color:var(--ink,#15171b);border-radius:var(--r-3,14px) var(--r-3,14px) 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));box-shadow:0 -6px 24px rgba(0,0,0,.18)}
+@media (min-width:720px){.zf-fb-ov{align-items:center}.zf-fb-sheet{border-radius:var(--r-3,14px)}}
+.zf-fb-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.zf-fb-head h2{margin:0;font-size:var(--t-xl,18px)}
+.zf-fb-x{width:var(--hit,44px);height:var(--hit,44px);border:0;background:none;color:inherit;font-size:18px;cursor:pointer}
+.zf-fb-form label{display:block;margin:12px 0 6px;font-size:var(--t-m,14px);font-weight:700}
+.zf-fb-opt{font-weight:400;color:var(--ink-3,#5a616b)}
+.zf-fb-form textarea,.zf-fb-form input{box-sizing:border-box;width:100%;padding:10px 12px;border:1px solid var(--line,#ccc);border-radius:var(--r-2,10px);background:var(--paper,#fff);color:var(--ink,#15171b);font:inherit;font-size:16px}
+.zf-fb-count{text-align:right;font-size:var(--t-xs,12px);color:var(--ink-3,#5a616b);margin-top:4px}
+.zf-fb-about{margin:0 0 4px;padding:8px 10px;border-radius:var(--r-1,6px);background:var(--surface-2,#eeece6);font-size:var(--t-s,13px)}
+.zf-fb-note{margin:12px 0 0;font-size:var(--t-xs,12px);line-height:1.6;color:var(--ink-3,#5a616b)}
+.zf-fb-err{margin:8px 0 0;color:var(--warn,#b3261e);font-size:var(--t-s,13px)}
+.zf-fb-submit{width:100%;min-height:var(--hit-band,48px);margin-top:12px;border:0;border-radius:var(--r-2,10px);background:var(--ink,#15171b);color:var(--paper,#fff);font:inherit;font-weight:700;cursor:pointer}
+.zf-fb-submit:disabled{opacity:.6}
+.zf-fb-sent{padding:24px 4px;font-size:var(--t-l,16px)}
 .zf-ops-badge{position:fixed;left:8px;bottom:calc(8px + env(safe-area-inset-bottom, 0px));z-index:130;padding:4px 10px;border-radius:999px;background:#3d424a;color:#fff;font-size:11px;font-weight:700;line-height:1.6;box-shadow:0 2px 8px rgba(0,0,0,.2)}
 .zf-ops-badge a{color:#fff;text-decoration:underline;margin-left:4px;display:inline-block;min-height:24px;min-width:24px}
 .zf-ops-dot-w{position:relative;display:inline-flex;align-items:center}
@@ -4308,7 +4343,7 @@ function zfSavedHeaders(token){
 // ===== 사용 로그 송신 =====
 // 🔴 측정은 부수적인 일이다. 실패해도 삼키고, 화면을 절대 붙들지 않는다.
 //    호출자는 await 하지 않는다(전부 fire-and-forget).
-const ZF_LOG_EVENTS = new Set(['page_view','notice_open','search','recommend_click']);
+const ZF_LOG_EVENTS = new Set(['page_view','notice_open','search','recommend_click','card_reaction']);   // card_reaction — 시행일 뒤 카드 반응(zfFbAttachReaction)만 보낸다
 let zfLogFailures = 0;      // 삼킨 실패 수. 화면에 띄우지 않고 콘솔에서만 본다.
 let zfLogSent     = 0;      // 보낸 수. 둘을 견주면 삼킨 비율이 나온다.
 let zfSidMem      = null;   // sessionStorage 가 막혔을 때의 폴백
@@ -4439,6 +4474,187 @@ function zfLogSearchSoon(q){
     if(zfLooksPersonal(t)) zfLog('search', {q_omitted:true, len:t.length});
     else                   zfLog('search', {q: t.slice(0,50)});
   }, 800);
+}
+
+// ===== 처리방침 새 판(의견 창구 · 처음 열기 구간) — 시행일 스위치 =====
+// 🔵 2026-10-26(우편함 「표시층 — 의견 창구 · 이용 기록 구간값 셋 구현 준비」) — 처리방침 1 「의견」 · 「서비스 이용 기록」(처음 열기 세 구간 · 카드 반응) ·
+//    3 「지난 방문 날짜」(localStorage) 를 지키는 화면 몫. 🔴 시행일 전에는 아무것도 하지 않는다 — 카드 반응 · 의견 보내기 칸이 안 그려지고,
+//    page_view 에 구간이 붙지 않고, zf_last_visit 도 쓰지 않는다(지금 방침 3장은 세션 저장소 둘만 말한다).
+//    🔴 아래 자리 표시는 처리방침 머리 `{{시행일}}`과 같은 날로 병합 회차가 채운다(YYYY-MM-DD) — 날짜가 아니면 꺼진 채다.
+const ZF_PRIVACY_V2_START = '{{시행일}}';
+function zfKstDay(ms){ return new Date((ms==null?Date.now():ms) + 9*3600e3).toISOString().slice(0,10); }
+function zfV2On(){ return /^\d{4}-\d{2}-\d{2}$/.test(ZF_PRIVACY_V2_START) && zfKstDay() >= ZF_PRIVACY_V2_START; }
+
+// 처음 열기 세 구간 — 🔴 원값(날짜 · 폭 · 이전 주소 · 브라우저 정보)은 여기서 구간 이름으로 바꾸고 버린다. 보내는 것은 구간 이름만(처리방침 1).
+//    이름은 처리방침 문구 그대로 둔다 — 고지 ↔ 기록 대조가 글자로 된다.
+let zfLoadBucketsMem = null;
+function zfLoadBuckets(){
+  if(zfLoadBucketsMem) return zfLoadBucketsMem;
+  const b = {};
+  // ① 지난 방문이 며칠 전인지 — 날짜는 이 브라우저(localStorage zf_last_visit)에만 두고 그날 날짜로 바꾼다(처리방침 3).
+  try{
+    const today = zfKstDay();
+    let last = null;
+    try{ last = localStorage.getItem('zf_last_visit'); }catch(e){}
+    if(!last || !/^\d{4}-\d{2}-\d{2}$/.test(last)) b.revisit = '첫 방문';
+    else {
+      const d = Math.round((Date.parse(today) - Date.parse(last)) / 864e5);
+      b.revisit = d <= 0 ? '같은 날' : d <= 7 ? '1~7일 전' : d <= 30 ? '8~30일 전' : '31일 이상 전';
+    }
+    try{ localStorage.setItem('zf_last_visit', today); }catch(e){}   // 막힌 브라우저는 매번 「첫 방문」 — 서비스는 그대로
+  }catch(e){}
+  // ② 화면 폭 — 좁음(720 미만) · 중간(720~1199) · 넓음(1200 이상). 화면 배치가 갈리는 폭과 같은 축(뷰포트 CSS 폭).
+  try{
+    const w = window.innerWidth || document.documentElement.clientWidth || 0;
+    if(w > 0) b.width = w < 720 ? '좁음' : w < 1200 ? '중간' : '넓음';
+  }catch(e){}
+  // ③ 들어온 길 — 공유 링크 표시(?s=1) → 메신저 앱 안 브라우저 · 메신저 주소 → 검색 사이트 → 이전 주소 없음·같은 사이트 = 직접 → 나머지 기타.
+  try{
+    const qs = new URLSearchParams(location.search);
+    let ua = ''; try{ ua = navigator.userAgent || ''; }catch(e){}
+    let host = ''; try{ host = document.referrer ? new URL(document.referrer).hostname.toLowerCase() : ''; }catch(e){ host = '?'; }
+    const inApp = /KAKAOTALK|\bLine\/|Telegram|FB_IAB|FBAN|Instagram|Whale\/.*(?:Band|NAVER\()|BAND\//i.test(ua);
+    if(qs.get('s') === '1') b.via = '공유 링크';
+    else if(inApp || /(^|\.)(kakao\.com|kakaocdn\.net|line\.me|t\.me|telegram\.org|band\.us|messenger\.com)$/.test(host)) b.via = '메신저';
+    else if(/(^|\.)(google\.[a-z.]+|naver\.com|daum\.net|bing\.com|zum\.com|yahoo\.[a-z.]+|duckduckgo\.com|ecosia\.org)$/.test(host)) b.via = '검색';
+    else if(!host || host === location.hostname.toLowerCase()) b.via = '직접';
+    else b.via = '기타';
+    // 공유 표시는 한 번 읽고 주소창에서 걷는다 — 새로고침·주소 복사가 「공유 링크」를 다시 만들지 않게(?n= 등 나머지는 그대로).
+    if(qs.has('s')){
+      qs.delete('s');
+      const rest = qs.toString();
+      try{ history.replaceState(history.state, '', location.pathname + (rest ? '?' + rest : '') + location.hash); }catch(e){}
+    }
+  }catch(e){}
+  zfLoadBucketsMem = b;
+  return b;
+}
+
+// 의견 글 가리기 — 🔴 저장하기 전에 연락처 · 긴 숫자를 가린다(처리방침 1). 검색어 거름(ZF_PII_PATTERNS)과 같은 세 꼴이고,
+//    DB CHECK(user_feedback_body_masked)가 같은 꼴을 거부해 화면을 거치지 않은 쓰기도 막는다.
+const ZF_FB_MASK = [/[^\s@]+@[^\s@]+\.[^\s@]+/g, /\d{2,4}-\d{3,4}-\d{4}/g, /\d{6,}/g];
+function zfFbMask(t){ return ZF_FB_MASK.reduce((s, re) => s.replace(re, '(가림)'), String(t || '')); }
+const ZF_FB_WRONG = ['접수','가격','자격','일정','기타'];   // 처리방침 1 「카드 반응」 — 틀렸다고 고른 칸
+
+// 카드 반응 — 펼친 카드 맨 아래 한 줄. 👍 · 👎(+ 틀린 칸) 는 이용 기록 card_reaction 한 행(공고 식별자 · 반응 · 고른 칸)만 보낸다.
+function zfFbAttachReaction(detailEl, annId){
+  if(!zfV2On() || !detailEl || !annId || detailEl.querySelector('.zf-fb-react')) return;
+  const box = document.createElement('div');
+  box.className = 'zf-fb-react';
+  box.innerHTML = '<div class="zf-fb-row"><span class="zf-fb-q" id="zfFbQ-' + zfAttr(detailEl.id) + '">이 정리가 도움이 됐나요?</span>'
+    + '<span class="zf-fb-btns" role="group" aria-labelledby="zfFbQ-' + zfAttr(detailEl.id) + '">'
+    + '<button type="button" class="zf-fb-b" data-v="up" aria-pressed="false">👍 <span>도움됐어요</span></button>'
+    + '<button type="button" class="zf-fb-b" data-v="down" aria-pressed="false">👎 <span>아쉬워요</span></button></span></div>'
+    + '<div class="zf-fb-wrong" hidden><div class="zf-fb-sub">어디가 원문과 달랐나요? (여럿 골라도 돼요)</div><div class="zf-fb-chips">'
+    + ZF_FB_WRONG.map(k => '<button type="button" class="zf-fb-chip" data-k="' + k + '" aria-pressed="false">' + k + '</button>').join('')
+    + '</div><div class="zf-fb-act"><button type="button" class="zf-fb-send">보내기</button>'
+    + '<button type="button" class="zf-fb-more">자세히 적어 보내기 ›</button></div></div>'
+    + '<div class="zf-fb-done" role="status" hidden></div>';
+  box.addEventListener('click', e => e.stopPropagation());
+  const wrong = box.querySelector('.zf-fb-wrong'), done = box.querySelector('.zf-fb-done');
+  const finish = (msg) => { box.querySelector('.zf-fb-row').hidden = true; wrong.hidden = true; done.textContent = msg; done.hidden = false; };
+  box.querySelectorAll('.zf-fb-b').forEach(b => b.addEventListener('click', () => {
+    box.querySelectorAll('.zf-fb-b').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    if(b.dataset.v === 'up'){ zfLog('card_reaction', {v:'up'}, annId); finish('고마워요. 알려 주신 반응은 정리를 다듬는 데 써요.'); }
+    else { wrong.hidden = false; const c = wrong.querySelector('.zf-fb-chip'); if(c) c.focus(); }
+  }));
+  box.querySelectorAll('.zf-fb-chip').forEach(c => c.addEventListener('click', () => c.setAttribute('aria-pressed', String(c.getAttribute('aria-pressed') !== 'true'))));
+  const sendDown = () => {
+    const ks = [...box.querySelectorAll('.zf-fb-chip[aria-pressed="true"]')].map(c => c.dataset.k);
+    zfLog('card_reaction', ks.length ? {v:'down', wrong:ks} : {v:'down'}, annId);
+    return ks;
+  };
+  box.querySelector('.zf-fb-send').addEventListener('click', () => { sendDown(); finish('고마워요. 알려 주신 칸은 공고 원문과 다시 맞춰 볼게요.'); });
+  box.querySelector('.zf-fb-more').addEventListener('click', () => { const ks = sendDown(); finish('고마워요. 아래 창에 자세히 적어 주세요.'); zfFbOpen(annId, ks); });
+  detailEl.appendChild(box);
+}
+
+// 의견 보내기 — 처리방침 1 「의견」: 의견 내용 · 보낸 화면 · 공고 식별자 · (선택) 답변받을 이메일만 저장한다(회원 식별자 · 세션 식별자 없음).
+const ZF_FB_SCREENS = ['추천','공고','인사이트','관리','설정'];
+let zfFbLastFocus = null;
+function zfFbOpen(annId, wrongKeys){
+  if(!zfV2On()) return;
+  let ov = document.getElementById('zfFbSheet');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'zfFbSheet'; ov.className = 'zf-fb-ov'; ov.hidden = true;
+    ov.innerHTML = '<div class="zf-fb-sheet" role="dialog" aria-modal="true" aria-labelledby="zfFbTitle">'
+      + '<div class="zf-fb-head"><h2 id="zfFbTitle">의견 보내기</h2><button type="button" class="zf-fb-x" aria-label="닫기">✕</button></div>'
+      + '<form class="zf-fb-form" novalidate>'
+      + '<p class="zf-fb-about" id="zfFbAbout" hidden></p>'
+      + '<label for="zfFbBody">무엇이 불편했거나, 무엇이 원문과 달랐나요?</label>'
+      + '<textarea id="zfFbBody" maxlength="1000" rows="5" required aria-describedby="zfFbCount zfFbNote"></textarea>'
+      + '<div class="zf-fb-count" id="zfFbCount" aria-live="polite">0 / 1000</div>'
+      + '<label for="zfFbMail">답변받을 이메일 <span class="zf-fb-opt">(선택)</span></label>'
+      + '<input id="zfFbMail" type="email" inputmode="email" autocomplete="email" maxlength="254" placeholder="답변이 필요할 때만 적어 주세요">'
+      + '<p class="zf-fb-note" id="zfFbNote">보내 주신 의견은 받은 날부터 1년 보관한 뒤 지워요. 글 속 전화번호 · 이메일 주소 · 긴 숫자는 가린 뒤 저장해요. '
+      + '보내지 않아도 다른 기능은 그대로 쓸 수 있어요. <a href="./privacy.html" target="_blank" rel="noopener">개인정보 처리방침</a></p>'
+      + '<p class="zf-fb-err" role="alert" hidden></p>'
+      + '<button type="submit" class="zf-fb-submit">보내기</button></form>'
+      + '<div class="zf-fb-sent" role="status" hidden></div></div>';
+    document.body.appendChild(ov);
+    const close = () => { ov.hidden = true; document.body.classList.remove('zf-fb-lock'); if(zfFbLastFocus && zfFbLastFocus.focus) zfFbLastFocus.focus(); };
+    ov.querySelector('.zf-fb-x').addEventListener('click', close);
+    ov.addEventListener('click', e => { if(e.target === ov) close(); });
+    ov.addEventListener('keydown', e => {
+      if(e.key === 'Escape'){ e.preventDefault(); close(); return; }
+      if(e.key !== 'Tab') return;   // 창 안에서만 돈다
+      const f = [...ov.querySelectorAll('button,textarea,input,a[href]')].filter(x => x.offsetParent !== null);
+      if(!f.length) return;
+      if(e.shiftKey && document.activeElement === f[0]){ e.preventDefault(); f[f.length-1].focus(); }
+      else if(!e.shiftKey && document.activeElement === f[f.length-1]){ e.preventDefault(); f[0].focus(); }
+    });
+    const ta = ov.querySelector('#zfFbBody');
+    ta.addEventListener('input', () => { ov.querySelector('#zfFbCount').textContent = ta.value.length + ' / 1000'; });
+    ov.querySelector('form').addEventListener('submit', e => { e.preventDefault(); zfFbSubmit(ov); });
+  }
+  zfFbLastFocus = document.activeElement;
+  ov.dataset.ann = annId || '';
+  const about = ov.querySelector('#zfFbAbout');
+  const card = annId ? document.querySelector('[data-announcement-id="' + (window.CSS && CSS.escape ? CSS.escape(annId) : annId) + '"]') : null;
+  const t = card && card.dataset ? (card.dataset.title || '') : '';
+  about.textContent = annId ? ('이 공고에 대한 의견으로 보내요' + (t ? ' — ' + normalizeRevisedTitle(t) : '')) : '';
+  about.hidden = !annId;
+  const ta = ov.querySelector('#zfFbBody');
+  if(wrongKeys && wrongKeys.length && !ta.value) ta.value = '원문과 다른 칸: ' + wrongKeys.join(' · ') + '\n';
+  ov.querySelector('#zfFbCount').textContent = ta.value.length + ' / 1000';
+  ov.querySelector('.zf-fb-form').hidden = false; ov.querySelector('.zf-fb-sent').hidden = true; ov.querySelector('.zf-fb-err').hidden = true;
+  ov.hidden = false; document.body.classList.add('zf-fb-lock');
+  ta.focus();
+}
+function zfFbSubmit(ov){
+  const err = ov.querySelector('.zf-fb-err'), btn = ov.querySelector('.zf-fb-submit');
+  const showErr = (m) => { err.textContent = m; err.hidden = false; };
+  const raw = ov.querySelector('#zfFbBody').value.trim();
+  const mail = ov.querySelector('#zfFbMail').value.trim();
+  if(!raw){ showErr('의견을 한 글자 이상 적어 주세요.'); return; }
+  if(mail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)){ showErr('이메일 주소 꼴이 아니에요. 답변이 필요 없으면 비워 두세요.'); return; }
+  const body = { body: zfFbMask(raw).slice(0, 1000) };
+  const scr = ZF_TAB_NAME[zfLastTab]; if(ZF_FB_SCREENS.includes(scr)) body.screen = scr;
+  if(ov.dataset.ann) body.announcement_id = String(ov.dataset.ann).slice(0, 64);
+  if(mail) body.reply_email = mail.slice(0, 254);
+  btn.disabled = true; err.hidden = true;
+  // 🔴 anon 키로만 보낸다 — 표에 회원 칸이 없고(처리방침 1 「의견」 항목 밖), Prefer: return=minimal(읽기 권한 없음).
+  fetch(SUPABASE_URL + '/rest/v1/user_feedback', { method:'POST', headers:Object.assign({}, zfAnonHeaders(), {'Prefer':'return=minimal'}), body:JSON.stringify(body) })
+    .then(r => {
+      btn.disabled = false;
+      if(!r.ok){ showErr('보내지 못했어요. 잠시 뒤 다시 눌러 주세요.'); return; }
+      ov.querySelector('#zfFbBody').value = ''; ov.querySelector('#zfFbMail').value = '';
+      ov.querySelector('.zf-fb-form').hidden = true;
+      const s = ov.querySelector('.zf-fb-sent');
+      s.textContent = mail ? '보냈어요. 적어 주신 이메일로 답할게요.' : '보냈어요. 고마워요 — 화면과 공고 정리를 고치는 데 쓸게요.';
+      s.hidden = false; ov.querySelector('.zf-fb-x').focus();
+    })
+    .catch(() => { btn.disabled = false; showErr('보내지 못했어요. 잠시 뒤 다시 눌러 주세요.'); });
+}
+// 바닥 「의견 보내기」 — 시행일 뒤에만 고지 링크 옆에 선다.
+function zfFbFooter(){
+  if(!zfV2On() || document.getElementById('zfFbFoot')) return;
+  const ft = document.querySelector('.zf-footer'); if(!ft) return;
+  const sep = document.createElement('span'); sep.style.cssText = 'font-size:12px;color:#888'; sep.textContent = ' · ';
+  const b = document.createElement('button'); b.type = 'button'; b.id = 'zfFbFoot'; b.className = 'zf-fb-foot'; b.textContent = '의견 보내기';
+  b.addEventListener('click', () => zfFbOpen('', null));
+  ft.appendChild(sep); ft.appendChild(b);
 }
 
 // 서버에서 찜 목록을 읽어 savedIds/savedRows를 갱신한다.
@@ -4731,7 +4947,9 @@ async function shareNotice(btn, title, region, type, url){
   // 🔵 d3 — 꼭집 카드 링크(?n=공고ID · 열면 그 카드가 펼쳐진다)를 나눈다. 원문은 그 카드 상세의 「AI 정리 · 원문 보기」에 있다.
   const aidS = card && card.dataset ? card.dataset.announcementId : '';
   if(aidS && typeof zf3On === 'function' && zf3On()) shareUrl = ZF_REDIRECT_TO.replace(/[?#].*$/, '') + '?n=' + encodeURIComponent(aidS);
-  const text = [region, type].filter(Boolean).join(' · ') + ' | 꼭집';
+  // 🔵 시행일 뒤 — 꼭집 주소를 나눌 때만 공유 표시(s=1)를 붙인다(처리방침 1 「들어온 길」 · 연 쪽 브라우저가 「공유 링크」 구간으로만 바꾸고 주소창에서 걷는다).
+  if(zfV2On() && shareUrl.indexOf(ZF_REDIRECT_TO.replace(/[?#].*$/, '')) === 0) shareUrl += (shareUrl.indexOf('?') < 0 ? '?' : '&') + 's=1';
+  const text =[region, type].filter(Boolean).join(' · ') + ' | 꼭집';
   if(navigator.share){
     try{ await navigator.share({ title, text, url: shareUrl }); }catch(e){ if(e.name!=='AbortError') console.warn('공유 실패:', e); }
   } else {
@@ -5661,7 +5879,8 @@ function goMain(n){
   if(n!==zfLastTab){
     const nav = (zfLastTab===null) ? 'load' : 'tab';
     zfLastTab=n;
-    zfLog('page_view', {tab: ZF_TAB_NAME[n]||String(n), nav: nav});
+    // 🔵 처음 열기에만 세 구간(재방문 간격 · 화면 폭 · 들어온 길)을 붙인다 — 시행일 뒤만(zfV2On) · 운영 표지(ops)는 zfLog 가 따로 얹는다(키가 겹치지 않는다).
+    zfLog('page_view', Object.assign({tab: ZF_TAB_NAME[n]||String(n), nav: nav}, (nav==='load' && zfV2On()) ? zfLoadBuckets() : {}));
   }
   zfNavTab(n);
   if(n===1) renderPersonalizedRecommendations();
@@ -7416,6 +7635,7 @@ function toggleDetail(id, card, from){
   const cardEl = card || document.querySelector(`[data-card-id="${id}"]`);
   // 사용 로그: 펼칠 때만 보낸다(접는 것은 열람이 아니다).
   if(!open) zfLog('notice_open', from?{from:from}:null, cardEl && cardEl.dataset ? cardEl.dataset.announcementId : '');
+  if(!open && cardEl && cardEl.dataset) zfFbAttachReaction(detailEl, cardEl.dataset.announcementId || '');   // 시행일 뒤에만 그린다
   if(cardEl){
     cardEl.style.borderColor = open ? '' : '#1D9E75';
     cardEl.setAttribute('aria-expanded', open ? 'false' : 'true');
@@ -13729,6 +13949,7 @@ function zf3Init(){
 }
 zf3Init();
 try{ zfOpsBadge(); }catch(e){}   // 운영 세션 표지가 켜진 기기에만 작은 표시
+try{ zfFbFooter(); }catch(e){}   // 시행일 뒤 바닥 「의견 보내기」
 // 🔵 2026-10-12(우편함 「표시층 — 런칭 전 남은 화면 일」 2 · 백로그 「접근성 critical 0」) — 카카오 지도 SDK 가 마커 클릭 자리로 만드는
 //    <map><area> 에 대체 글이 비어 axe area-alt(critical)로 잡혔다(기준선 detail-390 · 1). 검사에서 빼는 대신 비어 있는 alt 를 채운다 —
 //    마커 title(d3 표지 이름)이 있으면 그 글, 없으면 「지도에 표시한 위치」. 화면 모양·동작은 그대로(대체 글만).
