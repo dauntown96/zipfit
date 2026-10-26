@@ -30,6 +30,8 @@ const requireEnv = (key: string): string => {
   return v
 }
 
+import { allowedPaths, seoulOnlyHosts, probeHosts, extraCaOf } from '../_shared/board-hosts.ts'
+
 // 기존 수집 EF와 같은 기준 — verify_jwt=false + x-cron-secret 게이트.
 const CRON_SECRET = requireEnv('CRON_SECRET_V2')
 const matchCronSecret = (req: Request): boolean =>
@@ -55,21 +57,46 @@ const matchCronSecret = (req: Request): boolean =>
 //   (싱가포르 DB `net.http_get` 실측). 그래서 SEOUL_ONLY에 두어 **서울 지역 실행일 때만** 연다 — 호출하는 쪽이
 //   `x-region: ap-northeast-2`(또는 `?forceFunctionRegion=ap-northeast-2`)를 싣는다. 다른 지역이면 막고 사유를 돌려준다.
 //   이것은 우회가 아니라 우리 함수의 실행 위치 선택이다 — UA·경유는 바꾸지 않는다. 경로는 게시판 상세·첨부 받기 둘뿐.
-const ALLOWED: Record<string, string[] | null> = {
-  'apply.lh.or.kr': ['/lhapply/', '/upload/Files/'],
-  'www.i-sh.co.kr': null,
-  'i-sh.co.kr': null,
-  'housing.seoul.go.kr': null,
-  'www.bmc.busan.kr': ['/board/download.do', '/board/view.do'],
-  // 🔵 2026-10-22(우편함 「코드·운영 — A(G2): … 제주개발공사 …」 1) — 제주특별자치도개발공사 게시판. 상세(act=view)·받기(act=download)가
-  //   같은 경로다. 싱가포르 DB `net.http_get`·서울 탐침 모두 200 → SEOUL_ONLY 아님.
-  'www.jpdc.co.kr': ['/open/news/notice.htm'],
-}
+// 🔵 2026-10-26(우편함 「코드·운영 — 지방공사 받기 …」 ⓐ) — 호스트·경로·서울 전용·관측 대상은 `_shared/board-hosts.ts` 표 하나에서 뽑는다
+//   (종전 상수 셋 + collect-announcements BOARD_SOURCES 가 네 곳으로 갈려 있었다). 지금 호스트의 값은 전과 같다 —
+//   scripts/board-hosts.test.mjs 가 종전 상수와 대조한다. 더한 것: 광주(www.gmcc.co.kr) · 경북(www.gbdc.co.kr) · 경남(www.gndc.co.kr).
+const ALLOWED: Record<string, string[] | null> = allowedPaths()
 
 // 국내 IP만 받는 호스트 — 실행 지역(SB_REGION · Supabase 런타임 변수)이 서울일 때만 연다.
 //   다른 지역에서 불리면 본체 맨 앞에서 서울 지역으로 자신에게 한 번 넘긴다(아래 Deno.serve).
 const SEOUL_REGION = 'ap-northeast-2'
-const SEOUL_ONLY = new Set(['www.bmc.busan.kr'])
+const SEOUL_ONLY = seoulOnlyHosts()
+
+// 🔵 2026-10-26(같은 우편함 ⓒ) — 서버가 중간 인증서를 빠뜨린 호스트(표의 extraCaPem — 지금 광주 하나)에만 그 중간을 더한 HTTP 클라이언트를 쓴다.
+//   🔴 범위: 그 호스트로 가는 요청에만(리다이렉트 홉마다 다시 고른다) — 다른 호스트·Drive·OAuth 요청은 기본 신뢰 목록 그대로.
+//   Deno.createHttpClient({ caCerts })는 기본 루트에 「더하는」 꼴이다(바꾸지 않는다).
+//   ⚠️ Supabase Edge Runtime 이 이 API 를 주는지는 배포 전에는 모른다(로컬 Deno 2.5.6 에서는 광주 200 · 없으면 UnknownIssuer).
+//     없거나 만들다 실패하면 일반 fetch 로 돌아가고(종전과 같음) host_probe 결과의 ca_client 칸에 사유를 남긴다 — 병합(= 배포) 뒤 host_probe 한 번으로 확인.
+type HttpClientLike = { close?: () => void }
+const caClients = new Map<string, HttpClientLike | null>()
+const caClientState = new Map<string, string>()   // 호스트 → 'ok' | 'unsupported' | 'error: …'
+const clientFor = (host: string): HttpClientLike | null => {
+  if (caClients.has(host)) return caClients.get(host) ?? null
+  const pem = extraCaOf(host)
+  let c: HttpClientLike | null = null
+  if (pem) {
+    // deno-lint-ignore no-explicit-any
+    const mk = (Deno as any).createHttpClient
+    if (typeof mk !== 'function') caClientState.set(host, 'unsupported')
+    else {
+      try { c = mk({ caCerts: [pem] }); caClientState.set(host, 'ok') }
+      catch (e) { caClientState.set(host, `error: ${e instanceof Error ? e.message.slice(0, 120) : e}`) }
+    }
+  }
+  caClients.set(host, c)
+  return c
+}
+// 대상(호출자가 준 URL·그 리다이렉트)으로 나가는 fetch — 호스트마다 클라이언트를 고른다. Drive·OAuth 는 이것을 쓰지 않는다.
+const targetFetch = (u: URL | string, init: RequestInit): Promise<Response> => {
+  const url = typeof u === 'string' ? new URL(u) : u
+  const client = clientFor(url.hostname)
+  return client ? fetch(url, { ...init, client } as RequestInit) : fetch(url, init)
+}
 const mode_of = (u: URL) => u.searchParams.get('mode') ?? 'fetch'
 
 // 🔴 운반 상한. 원본 바이트 기준이다.
@@ -799,14 +826,8 @@ const handleResumable = async (
 // 🔴 범위 장치: 호스트는 PROBE_HOSTS 상수뿐이다(호출자가 준 URL 이라도 이 밖이면 400) · 리다이렉트도 이 안에서만 따라간다 ·
 //   첨부 시험은 상세 안 **같은 호스트** 링크 하나뿐. ALLOWED(받기 허용목록)와 따로다 — 여기 있다고 받기가 열리지 않는다.
 // 🔴 이 모드는 서울 지역에서 돈다(본체 맨 앞 넘기기) — 「서울에서 열리나」를 재는 자리라서다. UA·경유는 바꾸지 않는다.
-// 호스트 목록 = 2026-10-13 MYHOME `announcements.url` 의 LH 밖 호스트 전수(17).
-const PROBE_HOSTS = new Set([
-  'www.bmc.busan.kr', 'www.gbdc.co.kr', 'www.jpdc.co.kr', 'apply.cndc.kr', 'www.ih.co.kr', 'www.sjfmc.or.kr',
-  'www.gndc.co.kr', 'house.gmuc.co.kr', 'www.ansanuc.net', 'apply.ansanuc.net', 'www.gdco.co.kr', 'www.gimje.go.kr',
-  'www.gunsan.go.kr', 'www.jbdc.co.kr', 'happydorm.or.kr', 'www.dcco.kr', 'www.changwon.go.kr',
-  // 🔵 2026-10-22(같은 우편함 3) — 광주광역시도시공사(금호빛여울채 21443_*) · 싱가포르 DB 에서 SSL 오류 → 서울에서 열리는지 잰다.
-  'www.gmcc.co.kr',
-])
+// 호스트 목록 = 2026-10-13 MYHOME `announcements.url` 의 LH 밖 호스트 전수(17) + 2026-10-22 광주 — `_shared/board-hosts.ts` 표의 probe.
+const PROBE_HOSTS = probeHosts()
 const PROBE_TIMEOUT_MS = 20_000
 const PROBE_MAX_HTML = 3_000_000
 const PROBE_LINK_RE = /(?:href|onclick)\s*=\s*["']([^"']*(?:download|fileDown|FileDown|atchFile|getFile|file_down|filedown|downFile|FileDownload)[^"']*)["']/gi
@@ -817,7 +838,7 @@ const probeFetch = async (start: URL, init: RequestInit = {}): Promise<{ res: Re
   for (let i = 0; i <= MAX_REDIRECTS; i++) {
     let res: Response
     try {
-      res = await fetch(cur, { ...init, redirect: 'manual', signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) })
+      res = await targetFetch(cur, { ...init, redirect: 'manual', signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) })
     } catch (e) {
       return `network:${e instanceof Error ? e.name : 'Error'}`
     }
@@ -845,7 +866,9 @@ const hostProbe = async (target: string | null) => {
   const region = Deno.env.get('SB_REGION') ?? '(없음)'
   const t0 = Date.now()
   const d = await probeFetch(u)
-  if (typeof d === 'string') return { status: 200, body: { ok: true, host: u.hostname, region, detail: { error: d, elapsed_ms: Date.now() - t0 } } }
+  // 추가 인증서를 쓰는 호스트면 그 클라이언트 상태('ok' · 'unsupported' · 'error: …') — 아니면 null(종전 응답과 같은 자리 하나 더).
+  const caClient = () => extraCaOf(u.hostname) ? (caClientState.get(u.hostname) ?? 'unused') : null
+  if (typeof d === 'string') return { status: 200, body: { ok: true, host: u.hostname, region, ca_client: caClient(), detail: { error: d, elapsed_ms: Date.now() - t0 } } }
   const ct = d.res.headers.get('content-type')
   const { bytes } = d.res.body ? await readCapped(d.res.body, PROBE_MAX_HTML) : { bytes: new Uint8Array() }
   const charset = /euc-kr|ks_c_5601/i.test(ct ?? '') ? 'euc-kr' : 'utf-8'
@@ -884,7 +907,7 @@ const hostProbe = async (target: string | null) => {
   }
   return {
     status: 200,
-    body: { ok: true, host: u.hostname, region, detail, links: { url_same_host: urlLinks.length, script: scriptN, sample: urlLinks.slice(0, 3).map(x => x.toString().slice(0, 200)) }, file },
+    body: { ok: true, host: u.hostname, region, ca_client: caClient(), detail, links: { url_same_host: urlLinks.length, script: scriptN, sample: urlLinks.slice(0, 3).map(x => x.toString().slice(0, 200)) }, file },
   }
 }
 
@@ -1046,7 +1069,7 @@ Deno.serve(async (req: Request) => {
   try {
     let res: Response | null = null
     for (let i = 0; i <= MAX_REDIRECTS; i++) {
-      res = await fetch(current.toString(), { signal: ac.signal, redirect: 'manual' })
+      res = await targetFetch(current, { signal: ac.signal, redirect: 'manual' })
       if (res.status < 300 || res.status >= 400) break
       const loc = res.headers.get('location')
       if (!loc) break

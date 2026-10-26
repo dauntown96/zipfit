@@ -1,0 +1,500 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+    <head>
+		<!-- META SECTION -->
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<meta name="author" content="경남개발공사">
+		<meta name="keywords" content=", 경남개발공사">
+		<meta name="description" content="경남개발공사">
+		<meta property="og:type" content="website">
+		<meta property="og:title" content="경남개발공사">
+		<meta property="og:description" content="경남개발공사">
+		<meta property="og:url" content="http://www.gndc.co.kr">
+		<!-- TITLE -->
+		<title id="pageTitle">임대공고 | 경남개발공사</title>
+		<!-- Font -->
+		<!-- 파비콘 -->
+		<link rel="shortcut icon" href="/favicon.ico"/>
+		<link rel="apple-touch-icon" sizes="180x180" href="/favicons/apple-touch-icon.png"/>
+		<link rel="apple-touch-icon" sizes="167x167" href="/favicons/apple-touch-icon-167x167.png"/>
+		<link rel="icon" type="image/png" sizes="32x32" href="/favicons/favicon-32x32.png"/>
+		<link rel="icon" type="image/png" sizes="16x16" href="/favicons/favicon-16x16.png"/>
+		<link rel="manifest" href="/favicons/site.webmanifest"/>
+		<!-- 스와이프 -->
+       	<link rel="stylesheet" href="/templates/cms/common/swiper/swiper-bundle.min.css" />
+		<!-- CSS -->
+		<!-- <link rel="stylesheet" href="/templates/cms/common/css/font.css"> -->
+		<!-- bootstrapfileinput css : START -->
+		<link rel="stylesheet" type="text/css" id="theme" href="/templates/cms/bootstrapfileinput/css/theme-default.css"/>
+	 	<link rel="stylesheet" type="text/css" href="/templates/cms/bootstrapfileinput/themes/explorer/theme.css">
+	  	<link rel="stylesheet" type="text/css" href="/templates/cms/bootstrapfileinput/css/fileinput.css">
+		<!-- bootstrapfileinput css : END -->
+		<!-- jquery-ui -->
+		<link rel="stylesheet" href="/templates/cms/common/jquery-ui-1.14.2.custom/jquery-ui.min.css" />
+			<link rel="stylesheet" href="/templates/cms/common/css/main.css">
+		<!-- 공통 -->
+		<!-- 파일 -->
+		<!-- bootstrapfileinput js : START -->
+  		<!-- bootstrapfileinput js : END -->
+		<!-- Service Worker Registration for PWA -->
+    </head>
+<body>
+<div id="header">
+  <header class="header">
+    <div class="skip-nav">
+      <a href="#gnb-list">메인 메뉴 바로가기</a>
+        <a href="#sub-center">본문 바로가기</a>
+    </div>
+    <div class="masthead-container">
+      <div class="masthead content-wrap">
+        <div class="nuri-wrap">
+          <p class="nuri-txt">이 누리집은 대한민국 공식 전자정부 누리집입니다.</p>
+        </div>
+        <div class="util-container">
+          <a href="/gndc_en/index.do" target="_blank" rel="noopener noreferrer" title="새창열림"
+             aria-label="ENGLISH (새창열림)" class="en">ENGLISH</a>
+          <ul class="sns-list">
+            <li><a href="#" target="_blank" rel="noopener noreferrer" title="새창열림" aria-label="유튜브 (새창열림)"       class="yt"></a></li>
+            <li><a href="#" target="_blank" rel="noopener noreferrer" title="새창열림" aria-label="네이버블로그 (새창열림)" class="nb"></a></li>
+            <li><a href="#" target="_blank" rel="noopener noreferrer" title="새창열림" aria-label="틱톡 (새창열림)"        class="tt"></a></li>
+            <li><a href="#" target="_blank" rel="noopener noreferrer" title="새창열림" aria-label="페이스북 (새창열림)"    class="fb"></a></li>
+            <li><a href="#" target="_blank" rel="noopener noreferrer" title="새창열림" aria-label="인스타그램 (새창열림)"  class="ig"></a></li>
+          </ul>
+          <!-- 상단 유틸 메뉴(로그인/회원가입 등) 삽입 영역 -->
+          <div class="top-util" id="headMenu"></div>
+        </div>
+      </div>
+    </div>
+    <div id="gnb">
+      <div class="gnb-bg"></div>
+      <div class="menu-container">
+        <div class="menu-top">
+          <div class="inner content-wrap">
+			<h1 class="logo">
+                    <a href="/"><span class="blind">경남개발공사</span></a>
+            </h1>
+            <nav class="nav" aria-label="주요 메뉴">
+              <ul class="gnb-list" id="gnb-list"></ul>
+            </nav>
+			<div class="header-utils">
+				<a href="https://www.jhnpcc.co.kr/" class="go-jhnpcc" target="_blank" rel="noopener noreferrer" title="새창열림">
+				   진해신항CC
+				</a>
+	            <div class="menu-search-container">
+	              <button
+	                type="button"
+	                class="menu-search-btn"
+	                aria-expanded="false"
+	                aria-controls="menuSearchLayer"
+	              >
+	              	<span class=ic></span>
+	                <span class="blind">통합검색 열기</span>
+	              </button>
+	              <div
+	                class="menu-search-layer"
+	                id="menuSearchLayer"
+	                hidden
+	              >
+	                <div class="search-input-container">
+	                  <label for="searchKeyword" class="blind">검색</label>
+	                  <input type="text" class="search-input" id="searchKeyword" name="searchKeyword"
+	                         placeholder="검색어를 입력하세요." aria-label="검색어 입력"
+	                         value=""
+	                         onkeydown="if(event.keyCode==13){totalSearch(); return false;}" />
+	                  <input type="hidden" id="pageIndex" name="pageIndex" value="">
+	                  <input type="hidden" id="tapIdx"    name="tapIdx"    value="">
+	                  <input type="hidden" id="seqId"     name="seqId"     value="">
+	                  <input type="hidden" id="clickTap"  name="clickTap"  value="">
+	                  <input type="hidden" id="checkList" name="checkList" value="">
+	                  <button type="button" class="search-btn" id="totalSearchBtn"
+	                          onclick="totalSearch();" aria-label="검색">
+	                          <span class="ic"></span>
+	                          <span class="blind">검색버튼</span>
+	                  </button>
+	                </div>
+	              </div>
+	            </div>
+	            <button class="menu-btn sitemap-btn" aria-expanded="false" onclick="siteMapInit()">
+	              <span class="blind">사이트맵 버튼</span>
+	            </button>
+	            <button class="menu-btn drawer-menu" aria-controls="drawer-menu" aria-expanded="false">
+	              <span class="blind">전체메뉴</span>
+	            </button>
+			</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+  <div class="sitemap-modal" role="dialog" aria-modal="true" aria-labelledby="sitemap-title"></div>
+  <div id="drawer-menu" class="drawer-menu-modal" role="dialog" aria-modal="true" aria-labelledby="menu-title" hidden>
+    <div class="mo-gnb-bg"></div>
+    <div class="menu-panel">
+      <div class="menu-top">
+        <div class="util-container">
+          <a href="/gndc_en/index.do" target="_blank" rel="noopener noreferrer" title="새창열림" aria-label="ENGLISH (새창열림)" class="en">ENGLISH</a>
+          <ul class="sns-list">
+            <li><a href="#" target="_blank" rel="noopener noreferrer" title="새창열림" aria-label="유튜브 (새창열림)"       class="yt"></a></li>
+            <li><a href="#" target="_blank" rel="noopener noreferrer" title="새창열림" aria-label="네이버블로그 (새창열림)" class="nb"></a></li>
+            <li><a href="#" target="_blank" rel="noopener noreferrer" title="새창열림" aria-label="틱톡 (새창열림)"        class="tt"></a></li>
+            <li><a href="#" target="_blank" rel="noopener noreferrer" title="새창열림" aria-label="페이스북 (새창열림)"    class="fb"></a></li>
+            <li><a href="#" target="_blank" rel="noopener noreferrer" title="새창열림" aria-label="인스타그램 (새창열림)"  class="ig"></a></li>
+          </ul>
+        </div>
+        <button type="button" class="drawer-menu-close">
+          <span class="ic"></span>
+          <span class="blind">닫기버튼</span>
+        </button>
+      </div>
+      <div class="search-row">
+        <div class="menu-search-container">
+           <input type="text" class="search-input" id="searchKeywordMo" placeholder="검색어를 입력하세요." aria-label="검색어 입력"
+                  onkeydown="if(event.keyCode==13){ totalSearchMo(); return false; }" />
+           <button class="search-btn" aria-label="검색" onclick="totalSearchMo()"></button>
+        </div>
+      </div>
+      <nav>
+        <ul class="drawer" id="mo-drawer-list"></ul>
+      </nav>
+    </div>
+  </div>
+</div>
+<aside class="side-quick-menu" aria-label="퀵 메뉴">
+	<button
+		type="button"
+		class="quick-toggle active"
+		aria-expanded="true"
+		aria-controls="quickMenuList"
+	>
+		<span class="ic"></span>
+		<span class="blind">퀵메뉴 닫기</span>
+	</button>
+	<div id="quickMenuList" class="quick-menu-inner">
+		<ul>
+				<li>
+					<a href="/boardlist.do?seqId=0000006247"
+					   target="_self"
+					   >
+						<span class="ic ic-qk01" style="background-image: url('/publicfiles/BANNER0/0c90e835-ee1d-42bd-8204-f1ee8c82d34a/c9eb50d4-e699-4fa1-ac5a-ce4c9c560315.png'); background-size: contain; background-repeat: no-repeat; background-position: center;"></span>
+						<p class="name">채용공고</p>
+					</a>
+				</li>
+				<li>
+					<a href="/boardlist.do?seqId=0000006202"
+					   target="_self"
+					   >
+						<span class="ic ic-qk02" style="background-image: url('/publicfiles/BANNER0/62cf4705-863a-42e8-b840-90a8de97c055/8f184c0a-6788-454f-9600-0039e645a66e.png'); background-size: contain; background-repeat: no-repeat; background-position: center;"></span>
+						<p class="name">임대공고</p>
+					</a>
+				</li>
+				<li>
+					<a href="/boardlist.do?seqId=0000006190"
+					   target="_self"
+					   >
+						<span class="ic ic-qk03" style="background-image: url('/publicfiles/BANNER0/7251f240-74e9-4714-8c45-c69fdf0e19f4/f735e0c8-40b3-417a-a1bd-f25f0d32d58e.png'); background-size: contain; background-repeat: no-repeat; background-position: center;"></span>
+						<p class="name">분양공고</p>
+					</a>
+				</li>
+				<li>
+					<a href="/boardlist.do?seqId=0000006239"
+					   target="_self"
+					   >
+						<span class="ic ic-qk04" style="background-image: url('/publicfiles/BANNER0/eeb0f8ce-8077-46ed-b81f-c8eae2fee401/21057ccb-1787-4e3b-af1f-eb8bc8699042.png'); background-size: contain; background-repeat: no-repeat; background-position: center;"></span>
+						<p class="name">공지사항</p>
+					</a>
+				</li>
+				<li>
+					<a href="/boardlist.do?seqId=0000006203"
+					   target="_self"
+					   >
+						<span class="ic ic-qk05" style="background-image: url('/publicfiles/BANNER0/f64ebc82-f60e-4090-b247-021777a5d2fb/ea964275-a61e-458d-b23f-10e7adb61d7e.png'); background-size: contain; background-repeat: no-repeat; background-position: center;"></span>
+						<p class="name">임대물건</p>
+					</a>
+				</li>
+		</ul>
+	</div>
+</aside>
+	<div class="sub-layout">
+		<div class="sub-container">
+<div class="content-wrap">
+    <div class="sub-nav-container">
+        <!-- 홈 -->
+        <a href="/" class="home-btn">
+            <span class="blind">홈</span>
+        </a>
+        <!-- 메뉴 셀렉트 영역 -->
+        <div class="sub-nav-select" id="sub-nav-select">
+            <!-- depth0: 대메뉴 (현재 대메뉴명 + 전체 대메뉴 목록) -->
+            <div class="select-box" id="depth0-box">
+                <button class="select-btn" aria-haspopup="listbox" aria-expanded="false" id="lTitle">분양/임대/보상</button>
+                <ul class="select-list" role="listbox" id="depth0-list">
+                        <li role="option" aria-selected="true"><a href="/boardlist.do?seqId=0000006190">분양/임대/보상</a></li><li role="option"><a href="/boardlist.do?seqId=0000006383">사업소개</a></li><li role="option"><a href="/boardlist.do?seqId=0000006239">공사소식</a></li><li role="option"><a href="/page.do?seqId=0000006263">고객센터</a></li><li role="option"><a href="/page.do?seqId=0000006276">ESG 경영</a></li><li role="option"><a href="/page.do?seqId=0000006313">정보공개</a></li><li role="option"><a href="/page.do?seqId=0000006334">공사안내</a></li><li role="option"><a href="/home/guide/private.do?seqId=0000006349">GNDC 가이드</a></li>
+                </ul>
+            </div>
+            <!-- depth1: 중메뉴 (현재 대메뉴 하위) -->
+            <div class="select-box" id="depth1-box">
+                <button class="select-btn" aria-haspopup="listbox" aria-expanded="false" id="lSubTitle">임대정보</button>
+                <ul class="select-list" role="listbox" id="depth1-list">
+                        <li role="option"><a href="/boardlist.do?seqId=0000006190">분양정보</a></li><li role="option" aria-selected="true"><a href="/boardlist.do?seqId=0000006202">임대정보</a></li><li role="option"><a href="/boardlist.do?seqId=0000006213">보상정보</a></li>
+                </ul>
+            </div>
+            <!-- depth2: 소메뉴 (현재 중메뉴 하위, 없으면 숨김) -->
+            <div class="select-box" id="depth2-box" >
+                <button class="select-btn" aria-haspopup="listbox" aria-expanded="false" id="lSubSubTitle">임대공고</button>
+                <ul class="select-list" role="listbox" id="depth2-list">
+                        <li role="option" aria-selected="true"><a href="/boardlist.do?seqId=0000006202">임대공고</a></li><li role="option"><a href="/boardlist.do?seqId=0000006203">임대물건</a></li><li role="option"><a href="/page.do?seqId=0000006205">임대절차</a></li><li role="option"><a href="/home/alert/apply.do?seqId=0000006394">알림서비스</a></li><li role="option"><a href="/home/rental/payment-inquiry.do?seqId=0000006208">납부금조회신청</a></li><li role="option"><a href="/boardlist.do?seqId=0000006210">홍보 브로슈어</a></li><li role="option"><a href="/home/lease/rentWaitingList.do?seqId=0000006211">입주대기자 조회</a></li>
+                </ul>
+            </div>
+            <!-- depth3: 세부메뉴/탭 (현재 소메뉴 하위, 없으면 숨김) -->
+            <div class="select-box" id="depth3-box" style="display:none;">
+                <button class="select-btn" aria-haspopup="listbox" aria-expanded="false" id="lSubSubSubTitle">-</button>
+                <ul class="select-list" role="listbox" id="depth3-list">
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+			<div class="content-area content-wrap" id="sub-center">
+				<div class="contents-body">
+<div class="content-header">
+    <div class="breadcrumb" id="conTitle2">
+                <a href="/" class="ic-home">홈</a><a href="/boardlist.do?seqId=0000006190">분양/임대/보상</a><a href="/boardlist.do?seqId=0000006202">임대정보</a><span>임대공고</span>
+    </div>
+    <!-- page title -->
+    <h2 class="page-name" id="conTitle1">임대공고</h2>
+    <ul class="utile">
+        <li id="btnShare">
+            <button class="btn-share" onclick="hf_copyURI(location.href)"><span class="blind">sns공유</span></button>
+        </li>
+        <li>
+            <button class="btn-print" onclick="hf_pagePrint();"><span class="blind">본문 인쇄</span></button>
+        </li>
+    </ul>
+</div>
+					<input type="hidden" value="[ROLE_ALLUSER]">
+					<div class="board-view">
+						<div class="board-view-head">
+							<p class="title">2026년 진주정촌올리움 국민임대 예비입주자 1차 모집 공고</p>
+							<dl class="info">
+								<dt>작성자</dt>
+								<dd>관리자</dd>
+								<dt>작성일</dt>
+								<dd>2026-09-14</dd>
+								<dt>조회수</dt>
+								<dd>8851</dd>
+							</dl>
+						</div>
+						<div class="board-view-body board-format"><p class="0" style="mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt; font-size:6.0pt"></p><table style="border-collapse:collapse;table-layout:fixed;border-top:none;border-left:none;border-bottom:none;border-right:none;mso-table-overlap:never;"><tbody><tr><td style="width: 537.25pt; height: 44.8pt; padding: 3px 4px; border-width: 0.56pt; border-style: solid; border-color: rgb(0, 0, 0); background: rgb(169, 197, 143); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:HY헤드라인M; font-family:HY헤드라인M; mso-ascii-font-family:HY헤드라인M; mso-font-width:84%; mso-text-raise:0pt; font-weight:bold; font-size:20.0pt">2026</span><span style="font-family:HY헤드라인M;mso-fareast-font-family:HY헤드라인M;mso-font-width:84%;font-weight:bold;font-size:20.0pt;">년 진주정촌올리움 국민임대 </span><span style="font-family:HY헤드라인M;mso-fareast-font-family:HY헤드라인M;mso-font-width:84%;font-weight:bold;font-size:20.0pt;color:#ff0000;">예비입주자 </span><span lang="EN-US" style="mso-fareast-font-family:HY헤드라인M; font-family:HY헤드라인M; mso-ascii-font-family:HY헤드라인M; mso-font-width:84%; mso-text-raise:0pt; font-weight:bold; font-size:20.0pt; color:#ff0000">1</span><span style="font-family:HY헤드라인M;mso-fareast-font-family:HY헤드라인M;mso-font-width:84%;font-weight:bold;font-size:20.0pt;color:#ff0000;">차</span><span lang="EN-US" style="mso-fareast-font-family:HY헤드라인M;mso-font-width:84%;font-weight:bold;font-size:20.0pt;"> </span><span style="font-family:HY헤드라인M;mso-fareast-font-family:HY헤드라인M;mso-font-width:84%;font-weight:bold;font-size:20.0pt;">모집 공고</span></p></td></tr></tbody></table><p></p><p class="0" style="mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt; font-size:6.0pt">  &nbsp;  </p><p class="0" style="mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt; font-size:6.0pt"></p><table style="border-collapse:collapse;table-layout:fixed;border-top:none;border-left:none;border-bottom:none;border-right:none;background:#fafabf;mso-table-overlap:never;"><tbody><tr><td style="width: 536.93pt; height: 73.76pt; padding: 3px 4px; border-width: 0.28pt; border-style: solid; border-color: rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-size:11.0pt; color:#ff0000">‘19.09.27.</span><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-size:11.0pt"> </span><span style="font-family:맑은 고딕; mso-fareast-font-family:맑은 고딕; font-size:11.0pt">이후 입주자 모집부터 </span><span style="font-family:맑은 고딕; mso-fareast-font-family:맑은 고딕; font-weight:bold; font-size:11.0pt">동일유형 예비 입주자 중복선정이 되지 않으며</span><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-weight:bold; font-size:11.0pt">,</span><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-size:11.0pt"> </span><span style="font-family:맑은 고딕; mso-fareast-font-family:맑은 고딕; font-size:11.0pt">장기임대주택</span><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-size:11.0pt">(</span><span style="font-family:맑은 고딕; mso-fareast-font-family:맑은 고딕; font-size:11.0pt">통합</span><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;font-size:11.0pt;">공공임대</span><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-size:11.0pt">, </span><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;font-size:11.0pt;">국민임대</span><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-size:11.0pt">, </span><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;font-size:11.0pt;">영구임대</span><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-size:11.0pt">, </span><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;font-size:11.0pt;">행복주택</span><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-size:11.0pt">) </span><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;font-weight:bold;font-size:11.0pt;">입주 시 모든 대기자 명부에서 제외 처리</span><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;font-size:11.0pt;">되니 신청 시 유의</span><span style="font-family:맑은 고딕; mso-fareast-font-family:맑은 고딕; font-size:11.0pt">하시기 바라며</span><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-size:11.0pt">, </span><span style="font-family:맑은 고딕; mso-fareast-font-family:맑은 고딕; font-size:11.0pt">세부적인 사항은 아래 </span><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-size:11.0pt">[</span><span style="font-family:맑은 고딕; mso-fareast-font-family:맑은 고딕; font-size:11.0pt">공고문 숙지사항</span><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-size:11.0pt">] </span><span style="font-family:맑은 고딕; mso-fareast-font-family:맑은 고딕; font-size:11.0pt">및 </span><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-size:11.0pt">[</span><span style="font-family:맑은 고딕; mso-fareast-font-family:맑은 고딕; font-size:11.0pt">당첨 발표 및 계약안내</span><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-size:11.0pt">] </span><span style="font-family:맑은 고딕; mso-fareast-font-family:맑은 고딕; font-size:11.0pt">내용을 참조</span><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;font-size:11.0pt;">하시기 바랍니다</span><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-size:11.0pt">.</span></p></td></tr></tbody></table><p></p><p class="0" style="mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt; font-size:6.0pt">  &nbsp;  </p><p class="0" style="mso-pagination:none;text-autospace:none;mso-padding-alt:0pt 0pt 0pt 0pt;font-size:6.0pt;"></p><table style="border-collapse:collapse;table-layout:fixed;border-top:none;border-left:none;border-bottom:none;border-right:none;mso-table-overlap:never;"><tbody><tr><td style="width: 536.93pt; height: 135.96pt; padding: 3px 4px; border-width: 0.28pt; border-style: solid; border-color: rgb(0, 0, 0); box-sizing: border-box;" valign="top"><p class="0"><span style="font-family:맑은 고딕; mso-fareast-font-family:맑은 고딕; mso-hansi-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-size:11.0pt">▪ </span><span style="font-family:맑은 고딕; mso-fareast-font-family:맑은 고딕; font-size:11.0pt">신청</span><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;font-size:11.0pt;">자격 미 숙지</span><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-size:11.0pt">, </span><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;font-size:11.0pt;">착오 신청 등에 대해서는 신청자 본인에게 책임이 있으니 불이익을 당하는</span><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-size:11.0pt"> </span><span style="font-family:맑은 고딕; mso-fareast-font-family:맑은 고딕; font-size:11.0pt">일이</span><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕;font-size:11.0pt;"> </span><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;font-size:11.0pt;">없도록 유의하여 주시기 바랍니다</span><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-size:11.0pt">.</span></p><p class="0"><span style="font-family:맑은 고딕; mso-fareast-font-family:맑은 고딕; mso-hansi-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-size:11.0pt">▪ </span><span style="font-family:맑은 고딕; mso-fareast-font-family:맑은 고딕; font-size:11.0pt">경남개발공사 주거복지팀</span><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-size:11.0pt">(</span><span style="font-family:맑은 고딕; mso-fareast-font-family:맑은 고딕; mso-hansi-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-size:11.0pt">☎</span><span lang="EN-US" style="font-family: "맑은 고딕"; font-size: 11pt;"><strong>055-269-0435</strong><span style="font-size: 11pt;">)</span></span><span style="font-family:맑은 고딕; mso-fareast-font-family:맑은 고딕; font-size:11.0pt">를 통해</span><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-size:11.0pt"> </span><span style="font-family:맑은 고딕; mso-fareast-font-family:맑은 고딕; font-size:11.0pt">입주자 모집공고의 내용과 관련하여</span><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-size:11.0pt"> </span><span style="font-family:맑은 고딕; mso-fareast-font-family:맑은 고딕; font-size:11.0pt">안내 및 </span><span style="font-family:맑은 고딕; mso-fareast-font-family:맑은 고딕; font-size:11.0pt">상담을 실시하고 있으나</span><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-size:11.0pt">, </span><span style="font-family:맑은 고딕; mso-fareast-font-family:맑은 고딕; font-size:11.0pt">신청자 개인의 복잡한 상황에 대한</span><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-size:11.0pt"> </span><span style="font-family:맑은 고딕; mso-fareast-font-family:맑은 고딕; font-size:11.0pt">정보 미제공</span><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-size:11.0pt"> </span><span style="font-family:맑은 고딕; mso-fareast-font-family:맑은 고딕; font-size:11.0pt">등에 기인하여 불이익을 당하는 일이 가끔 발생하고 있습니다</span><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-size:11.0pt">.</span></p><p class="0"><span style="font-family:맑은 고딕; mso-fareast-font-family:맑은 고딕; mso-hansi-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-size:11.0pt">▪ </span><span style="font-family:맑은 고딕; mso-fareast-font-family:맑은 고딕; font-size:11.0pt">따라서 신청과 관련한 상담은 참고 자료로만 활용하여 주시고</span><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-size:11.0pt">, </span><span style="font-family:맑은 고딕; mso-fareast-font-family:맑은 고딕; font-size:11.0pt">신청자 본인이 </span><u style="text-underline:#000000 single"><span style="font-family:맑은 고딕; mso-fareast-font-family:맑은 고딕; font-weight:bold; font-size:11.0pt">반드시 공고문을 읽어보시고</span></u><u style="text-underline:#000000 single"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-weight:bold; font-size:11.0pt"> </span></u><u style="text-underline:#000000 single"><span style="font-family:맑은 고딕; mso-fareast-font-family:맑은 고딕; font-weight:bold; font-size:11.0pt">필요 시</span></u><u style="text-underline:#000000 single"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕;font-weight:bold;font-size:11.0pt;"> </span></u><u style="text-underline:#000000 single"><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;font-weight:bold;font-size:11.0pt;">현장방문을 통한 직접 상담을 권해드립니다</span></u><u style="text-underline:#000000 single"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-weight:bold; font-size:11.0pt">.</span></u></p></td></tr></tbody></table><p class="0" style="mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"></p><table style="border-collapse:collapse;table-layout:fixed;border-top:none;border-left:none;border-bottom:none;border-right:none;mso-table-overlap:never;"><tbody><tr><td style="width: 537.44pt; height: 20.48pt; padding: 3px 4px; border-width: 0.28pt; border-style: solid; border-color: rgb(0, 0, 0); background: rgb(253, 223, 199); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:left; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt; font-weight:bold; font-size:12.0pt; color:#0000ff"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-weight:bold; font-size:12.0pt">1. </span><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;font-weight:bold;font-size:12.0pt;">주택단지 개요</span></p></td></tr></tbody></table><p></p><p class="0" style="mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"></p><table style="border-collapse:collapse;table-layout:fixed;border-top:none;border-left:none;border-bottom:none;border-right:none;mso-table-overlap:never;"><tbody><tr><td style="width: 84.37pt; height: 26.97pt; padding: 3px 4px; border-width: 1.7pt 0.28pt 0.25pt 1.7pt; border-style: solid; border-color: rgb(0, 0, 0); background: rgb(216, 255, 255); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center;word-break:keep-all;mso-pagination:none;text-autospace:none;mso-padding-alt:0pt 0pt 0pt 0pt;"><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;font-weight:bold;">단지명</span></p></td><td colspan="2" style="width: 290.38pt; height: 26.97pt; padding: 3px 4px; border-width: 1.7pt 0.28pt 0.25pt; border-style: solid; border-color: rgb(0, 0, 0); background: rgb(216, 255, 255); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center;word-break:keep-all;mso-pagination:none;text-autospace:none;mso-padding-alt:0pt 0pt 0pt 0pt;"><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;font-weight:bold;">단 지 위 치 </span></p></td><td style="width: 80.94pt; height: 26.97pt; padding: 3px 4px; border-width: 1.7pt 0.28pt 0.25pt; border-style: solid; border-color: rgb(0, 0, 0); background: rgb(216, 255, 255); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center;word-break:keep-all;mso-pagination:none;text-autospace:none;mso-padding-alt:0pt 0pt 0pt 0pt;"><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;font-weight:bold;">건설호수</span></p></td><td style="width: 78.12pt; height: 26.97pt; padding: 3px 4px; border-width: 1.7pt 1.7pt 0.25pt 0.28pt; border-style: solid; border-color: rgb(0, 0, 0); background: rgb(216, 255, 255); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center;word-break:keep-all;mso-pagination:none;text-autospace:none;mso-padding-alt:0pt 0pt 0pt 0pt;"><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;font-weight:bold;">최초입주</span></p></td></tr><tr><td style="width: 84.37pt; height: 26.97pt; padding: 3px 4px; border-width: 0.25pt 0.28pt 1.7pt 1.7pt; border-style: solid; border-color: rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center;word-break:keep-all;mso-pagination:none;text-autospace:none;mso-padding-alt:0pt 0pt 0pt 0pt;"><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;">정촌올리움</span></p></td><td style="width: 199.25pt; height: 26.97pt; padding: 3px 4px; border-width: 0.25pt medium 1.7pt 0.28pt; border-style: solid none solid solid; border-color: rgb(0, 0, 0) currentcolor rgb(0, 0, 0) rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:left;word-break:keep-all;mso-pagination:none;text-autospace:none;mso-padding-alt:0pt 0pt 0pt 0pt;"><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;">경남 진주시 삼일로 </span><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">12(</span><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;">예하리</span><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">)</span></p></td><td style="width: 91.13pt; height: 26.97pt; padding: 3px 4px; border-width: 0.25pt 0.28pt 1.7pt medium; border-style: solid solid solid none; border-color: rgb(0, 0, 0) rgb(0, 0, 0) rgb(0, 0, 0) currentcolor; box-sizing: border-box;" valign="middle"><p class="0" style="text-align:left;word-break:keep-all;mso-pagination:none;text-autospace:none;mso-padding-alt:0pt 0pt 0pt 0pt;">  &nbsp;  </p></td><td style="width: 80.94pt; height: 26.97pt; padding: 3px 4px; border-width: 0.25pt 0.28pt 1.7pt; border-style: solid; border-color: rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center;word-break:keep-all;mso-pagination:none;text-autospace:none;mso-padding-alt:0pt 0pt 0pt 0pt;"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">6</span><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;">개동 </span><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">794</span><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;">호</span></p></td><td style="width: 78.12pt; height: 26.97pt; padding: 3px 4px; border-width: 0.25pt 1.7pt 1.7pt 0.28pt; border-style: solid; border-color: rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center;word-break:keep-all;mso-pagination:none;text-autospace:none;mso-padding-alt:0pt 0pt 0pt 0pt;"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">2020.03.27.</span></p></td></tr></tbody></table><p></p><p class="0" style="margin-left:10.1pt; text-indent:-10.1pt; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt; font-weight:bold"></p><table style="border-collapse:collapse;table-layout:fixed;border-top:none;border-left:none;border-bottom:none;border-right:none;mso-table-overlap:never;"><tbody><tr><td style="width: 537.44pt; height: 20.48pt; padding: 3px 4px; border-width: 0.28pt; border-style: solid; border-color: rgb(0, 0, 0); background: rgb(253, 223, 199); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:left; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-weight:bold; font-size:12.0pt">2. </span><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;font-weight:bold;font-size:12.0pt;">모집대상 주택</span></p></td></tr></tbody></table><p></p><p class="0" style="margin-left:10.1pt; text-indent:-10.1pt; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt; font-size:6.0pt"></p><table style="border-collapse:collapse;table-layout:fixed;border-top:none;border-left:none;border-bottom:none;border-right:none;mso-table-overlap:never;"><tbody><tr><td rowspan="2" style="width: 44.8pt; height: 53.59pt; padding: 3px 4px; border-width: 1.7pt 0.28pt 0.28pt 1.7pt; border-style: solid; border-color: rgb(0, 0, 0); background: rgb(216, 255, 255); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;font-weight:bold;">공급형</span></p></td><td rowspan="2" style="width: 39.14pt; height: 53.59pt; padding: 3px 4px; border-width: 1.7pt 0.28pt 0.28pt; border-style: solid; border-color: rgb(0, 0, 0); background: rgb(216, 255, 255); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span style="font-family:맑은 고딕; mso-fareast-font-family:맑은 고딕; font-weight:bold">주택유형</span></p></td><td colspan="4" style="width: 193.4pt; height: 25.94pt; padding: 3px 4px; border-width: 1.7pt 0.28pt 0.28pt; border-style: solid; border-color: rgb(0, 0, 0); background: rgb(216, 255, 255); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;font-weight:bold;">세대당 계약면적</span><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-weight:bold">(</span><span style="font-family:맑은 고딕; mso-fareast-font-family:맑은 고딕; mso-hansi-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-weight:bold">㎡</span><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-weight:bold">)</span></p></td><td rowspan="2" style="width: 64.13pt; height: 53.59pt; padding: 3px 4px; border-width: 1.7pt 2.26pt 0.28pt 0.28pt; border-style: solid; border-color: rgb(0, 0, 0) rgb(255, 0, 0) rgb(0, 0, 0) rgb(0, 0, 0); background: rgb(216, 255, 255); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;font-weight:bold;">건설호수</span></p><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-weight:bold">794</span><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;font-weight:bold;">세대</span></p><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">(</span><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;">청년</span><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">30</span><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;">포함</span><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">)</span></p></td><td colspan="2" style="width: 117.92pt; height: 25.94pt; padding: 3px 4px; border-width: 2.26pt 2.26pt 0.28pt; border-style: solid; border-color: rgb(255, 0, 0) rgb(255, 0, 0) rgb(0, 0, 0); background: rgb(216, 255, 255); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;font-weight:bold;">모집호수</span><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-weight:bold">(</span><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;font-weight:bold;">예비입주자</span><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-weight:bold">)</span></p></td><td rowspan="2" style="width: 75.93pt; height: 53.59pt; padding: 3px 4px; border-width: 1.7pt 1.7pt 0.28pt 2.26pt; border-style: solid; border-color: rgb(0, 0, 0) rgb(0, 0, 0) rgb(0, 0, 0) rgb(255, 0, 0); background: rgb(216, 255, 255); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;font-weight:bold;">구조</span><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-weight:bold">/</span><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;font-weight:bold;">난방</span></p></td></tr><tr><td style="width: 48.35pt; height: 27.65pt; padding: 3px 4px; border-width: 0.28pt; border-style: solid; border-color: rgb(0, 0, 0); background: rgb(216, 255, 255); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;font-weight:bold;">주거전용</span></p></td><td style="width: 48.35pt; height: 27.65pt; padding: 3px 4px; border-width: 0.28pt; border-style: solid; border-color: rgb(0, 0, 0); background: rgb(216, 255, 255); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;font-weight:bold;">주거공용</span></p></td><td style="width: 48.35pt; height: 27.65pt; padding: 3px 4px; border-width: 0.28pt; border-style: solid; border-color: rgb(0, 0, 0); background: rgb(216, 255, 255); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;font-weight:bold;">기타공용</span></p></td><td style="width: 48.35pt; height: 27.65pt; padding: 3px 4px; border-width: 0.28pt; border-style: solid; border-color: rgb(0, 0, 0); background: rgb(216, 255, 255); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;font-weight:bold;">합계</span></p></td><td style="width: 58.96pt; height: 27.65pt; padding: 3px 4px; border-width: 0.28pt 0.28pt 0.28pt 2.26pt; border-style: solid; border-color: rgb(0, 0, 0) rgb(0, 0, 0) rgb(0, 0, 0) rgb(255, 0, 0); background: rgb(216, 255, 255); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;font-weight:bold;">일반</span></p></td><td style="width: 58.96pt; height: 27.65pt; padding: 3px 4px; border-width: 0.28pt 2.26pt 0.28pt 0.28pt; border-style: solid; border-color: rgb(0, 0, 0) rgb(255, 0, 0) rgb(0, 0, 0) rgb(0, 0, 0); background: rgb(216, 255, 255); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;font-weight:bold;">청년</span></p></td></tr><tr><td style="width: 44.8pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt 0.28pt 0.28pt 1.7pt; border-style: solid; border-color: rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-weight:bold">34</span><span style="font-family:맑은 고딕; mso-fareast-font-family:맑은 고딕; mso-hansi-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-weight:bold">㎡</span></p></td><td style="width: 39.14pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt; border-style: solid; border-color: rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">34A</span></p><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">34B</span></p></td><td style="width: 48.35pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt; border-style: solid; border-color: rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">34.15</span></p><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">34.16</span></p></td><td style="width: 48.35pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt; border-style: solid; border-color: rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">14.0191</span></p><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">14.0122</span></p></td><td style="width: 48.35pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt; border-style: solid; border-color: rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">18.4049</span></p><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">18.4103</span></p></td><td style="width: 48.35pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt; border-style: solid; border-color: rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">66.5740</span></p><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">66.5825</span></p></td><td style="width: 64.13pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt 2.26pt 0.28pt 0.28pt; border-style: solid; border-color: rgb(0, 0, 0) rgb(255, 0, 0) rgb(0, 0, 0) rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">160(24)</span></p><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">42</span></p></td><td style="width: 58.96pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt 0.28pt 0.28pt 2.26pt; border-style: solid; border-color: rgb(0, 0, 0) rgb(0, 0, 0) rgb(0, 0, 0) rgb(255, 0, 0); background: rgb(255, 255, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center;word-break:keep-all;mso-pagination:none;text-autospace:none;mso-padding-alt:0pt 0pt 0pt 0pt;"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-weight:bold; font-size:11.0pt">25</span></p></td><td style="width: 58.96pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt 2.26pt 0.28pt 0.28pt; border-style: solid; border-color: rgb(0, 0, 0) rgb(255, 0, 0) rgb(0, 0, 0) rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center;word-break:keep-all;mso-pagination:none;text-autospace:none;mso-padding-alt:0pt 0pt 0pt 0pt;"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-weight:bold; font-size:11.0pt">-</span></p></td><td rowspan="5" style="width: 75.93pt; height: 158.85pt; padding: 3px 4px; border-width: 0.28pt 1.7pt 1.7pt 2.26pt; border-style: solid; border-color: rgb(0, 0, 0) rgb(0, 0, 0) rgb(0, 0, 0) rgb(255, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center;word-break:keep-all;mso-pagination:none;text-autospace:none;mso-padding-alt:0pt 0pt 0pt 0pt;"><span style="font-family:맑은 고딕;mso-fareast-font-family:맑은 고딕;font-size:9.0pt;">철근콘크리트벽식</span></p><p class="0" style="text-align:center;word-break:keep-all;mso-pagination:none;text-autospace:none;mso-padding-alt:0pt 0pt 0pt 0pt;"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕;font-size:9.0pt;"> </span><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">/ LNG</span></p></td></tr><tr><td style="width: 44.8pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt 0.28pt 0.28pt 1.7pt; border-style: solid; border-color: rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-weight:bold">38</span><span style="font-family:맑은 고딕; mso-fareast-font-family:맑은 고딕; mso-hansi-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-weight:bold">㎡</span></p></td><td style="width: 39.14pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt; border-style: solid; border-color: rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center;word-break:keep-all;mso-pagination:none;text-autospace:none;mso-padding-alt:0pt 0pt 0pt 0pt;"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">38A</span></p></td><td style="width: 48.35pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt; border-style: solid; border-color: rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center;word-break:keep-all;mso-pagination:none;text-autospace:none;mso-padding-alt:0pt 0pt 0pt 0pt;"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">38.45</span></p></td><td style="width: 48.35pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt; border-style: solid; border-color: rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center;word-break:keep-all;mso-pagination:none;text-autospace:none;mso-padding-alt:0pt 0pt 0pt 0pt;"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">15.5361</span></p></td><td style="width: 48.35pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt; border-style: solid; border-color: rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center;word-break:keep-all;mso-pagination:none;text-autospace:none;mso-padding-alt:0pt 0pt 0pt 0pt;"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">20.7223</span></p></td><td style="width: 48.35pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt; border-style: solid; border-color: rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center;word-break:keep-all;mso-pagination:none;text-autospace:none;mso-padding-alt:0pt 0pt 0pt 0pt;"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">74.7084</span></p></td><td style="width: 64.13pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt 2.26pt 0.28pt 0.28pt; border-style: solid; border-color: rgb(0, 0, 0) rgb(255, 0, 0) rgb(0, 0, 0) rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center;word-break:keep-all;mso-pagination:none;text-autospace:none;mso-padding-alt:0pt 0pt 0pt 0pt;"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">36(6)</span></p></td><td style="width: 58.96pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt 0.28pt 0.28pt 2.26pt; border-style: solid; border-color: rgb(0, 0, 0) rgb(0, 0, 0) rgb(0, 0, 0) rgb(255, 0, 0); background: rgb(255, 255, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center;word-break:keep-all;mso-pagination:none;text-autospace:none;mso-padding-alt:0pt 0pt 0pt 0pt;"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-weight:bold; font-size:11.0pt">20</span></p></td><td style="width: 58.96pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt 2.26pt 0.28pt 0.28pt; border-style: solid; border-color: rgb(0, 0, 0) rgb(255, 0, 0) rgb(0, 0, 0) rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center;word-break:keep-all;mso-pagination:none;text-autospace:none;mso-padding-alt:0pt 0pt 0pt 0pt;"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-weight:bold; font-size:11.0pt">5</span></p></td></tr><tr><td style="width: 44.8pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt 0.28pt 0.28pt 1.7pt; border-style: solid; border-color: rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-weight:bold">44</span><span style="font-family:맑은 고딕; mso-fareast-font-family:맑은 고딕; mso-hansi-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-weight:bold">㎡</span></p></td><td style="width: 39.14pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt; border-style: solid; border-color: rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">44A</span></p><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">44B</span></p></td><td style="width: 48.35pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt; border-style: solid; border-color: rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">44.5069</span></p><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">44.5058</span></p></td><td style="width: 48.35pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt; border-style: solid; border-color: rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">17.3889</span></p><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">17.3890</span></p></td><td style="width: 48.35pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt; border-style: solid; border-color: rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">23.9861</span></p></td><td style="width: 48.35pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt; border-style: solid; border-color: rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">85.8819</span></p><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">85.8809</span></p></td><td style="width: 64.13pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt 2.26pt 0.28pt 0.28pt; border-style: solid; border-color: rgb(0, 0, 0) rgb(255, 0, 0) rgb(0, 0, 0) rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">175</span></p><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">20</span></p></td><td style="width: 58.96pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt 0.28pt 0.28pt 2.26pt; border-style: solid; border-color: rgb(0, 0, 0) rgb(0, 0, 0) rgb(0, 0, 0) rgb(255, 0, 0); background: rgb(255, 255, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center;word-break:keep-all;mso-pagination:none;text-autospace:none;mso-padding-alt:0pt 0pt 0pt 0pt;"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-weight:bold; font-size:11.0pt">25</span></p></td><td style="width: 58.96pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt 2.26pt 0.28pt 0.28pt; border-style: solid; border-color: rgb(0, 0, 0) rgb(255, 0, 0) rgb(0, 0, 0) rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center;word-break:keep-all;mso-pagination:none;text-autospace:none;mso-padding-alt:0pt 0pt 0pt 0pt;"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-weight:bold; font-size:11.0pt">-</span></p></td></tr><tr><td style="width: 44.8pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt 0.28pt 0.28pt 1.7pt; border-style: solid; border-color: rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-weight:bold">50</span><span style="font-family:맑은 고딕; mso-fareast-font-family:맑은 고딕; mso-hansi-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-weight:bold">㎡</span></p></td><td style="width: 39.14pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt; border-style: solid; border-color: rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">50A</span></p><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">50B</span></p></td><td style="width: 48.35pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt; border-style: solid; border-color: rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">50.7059</span></p></td><td style="width: 48.35pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt; border-style: solid; border-color: rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">19.4878</span></p></td><td style="width: 48.35pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt; border-style: solid; border-color: rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">27.3275</span></p></td><td style="width: 48.35pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt; border-style: solid; border-color: rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">97.5212</span></p></td><td style="width: 64.13pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt 2.26pt 0.28pt 0.28pt; border-style: solid; border-color: rgb(0, 0, 0) rgb(255, 0, 0) rgb(0, 0, 0) rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">39</span></p><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">9</span></p></td><td style="width: 58.96pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt 0.28pt 0.28pt 2.26pt; border-style: solid; border-color: rgb(0, 0, 0) rgb(0, 0, 0) rgb(0, 0, 0) rgb(255, 0, 0); background: rgb(255, 255, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center;word-break:keep-all;mso-pagination:none;text-autospace:none;mso-padding-alt:0pt 0pt 0pt 0pt;"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-weight:bold; font-size:11.0pt">10</span></p></td><td style="width: 58.96pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt 2.26pt 0.28pt 0.28pt; border-style: solid; border-color: rgb(0, 0, 0) rgb(255, 0, 0) rgb(0, 0, 0) rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center;word-break:keep-all;mso-pagination:none;text-autospace:none;mso-padding-alt:0pt 0pt 0pt 0pt;"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-weight:bold; font-size:11.0pt">-</span></p></td></tr><tr><td style="width: 44.8pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt 0.28pt 1.7pt 1.7pt; border-style: solid; border-color: rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-weight:bold">59</span><span style="font-family:맑은 고딕; mso-fareast-font-family:맑은 고딕; mso-hansi-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-weight:bold">㎡</span></p></td><td style="width: 39.14pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt 0.28pt 1.7pt; border-style: solid; border-color: rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">59A</span></p></td><td style="width: 48.35pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt 0.28pt 1.7pt; border-style: solid; border-color: rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">59.9613</span></p></td><td style="width: 48.35pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt 0.28pt 1.7pt; border-style: solid; border-color: rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">23.1443</span></p></td><td style="width: 48.35pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt 0.28pt 1.7pt; border-style: solid; border-color: rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">32.3157</span></p></td><td style="width: 48.35pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt 0.28pt 1.7pt; border-style: solid; border-color: rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">115.4213</span></p></td><td style="width: 64.13pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt 2.26pt 1.7pt 0.28pt; border-style: solid; border-color: rgb(0, 0, 0) rgb(255, 0, 0) rgb(0, 0, 0) rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center; word-break:keep-all; mso-pagination:none; text-autospace:none; mso-padding-alt:0pt 0pt 0pt 0pt"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt">313</span></p></td><td style="width: 58.96pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt 0.28pt 2.26pt 2.26pt; border-style: solid; border-color: rgb(0, 0, 0) rgb(0, 0, 0) rgb(255, 0, 0) rgb(255, 0, 0); background: rgb(255, 255, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center;word-break:keep-all;mso-pagination:none;text-autospace:none;mso-padding-alt:0pt 0pt 0pt 0pt;"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-weight:bold; font-size:11.0pt">25</span></p></td><td style="width: 58.96pt; height: 31.77pt; padding: 3px 4px; border-width: 0.28pt 2.26pt 2.26pt 0.28pt; border-style: solid; border-color: rgb(0, 0, 0) rgb(255, 0, 0) rgb(255, 0, 0) rgb(0, 0, 0); box-sizing: border-box;" valign="middle"><p class="0" style="text-align:center;word-break:keep-all;mso-pagination:none;text-autospace:none;mso-padding-alt:0pt 0pt 0pt 0pt;"><span lang="EN-US" style="mso-fareast-font-family:맑은 고딕; font-family:맑은 고딕; mso-ascii-font-family:맑은 고딕; mso-font-width:100%; mso-text-raise:0pt; font-weight:bold; font-size:11.0pt">-</span></p></td></tr></tbody></table><p></p><p class="0" style="mso-pagination:none;text-autospace:none;mso-padding-alt:0pt 0pt 0pt 0pt;">  &nbsp;<span style="color: rgb(9, 0, 255); font-family: ngb; font-size: 24px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; orphans: 2; text-align: justify; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: normal; background-color: rgb(255, 255, 255); text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial; display: inline !important; float: none">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;※ 자세한 내용은 첨부를 반드시 참고하시기 바랍니다.</span>  </p><p></p></div>
+							<div class="board-view-file">
+								<p class="title">첨부파일</p>
+								<ul class="file-list">
+											<li>     <a href="javascript:void(0)" onclick="pdfViewr('[붙임] 1. 진주정촌올리움 국민임대 예비입주자 1차 모집 공고문.pdf', 'pdf' , '/privatefiles/BBS/F7054C80FACF4D22AD23CAD92547CE03/0A8EEAC4B3E44110A9D96962C3F3C901.pdf', '/common/download.do?fileVirtualPath=%2fprivatefiles%2fBBS%2fF7054C80FACF4D22AD23CAD92547CE03%2f0A8EEAC4B3E44110A9D96962C3F3C901.pdf&fileOrgName=%5b%eb%b6%99%ec%9e%84%5d+1.+%ec%a7%84%ec%a3%bc%ec%a0%95%ec%b4%8c%ec%98%ac%eb%a6%ac%ec%9b%80+%ea%b5%ad%eb%af%bc%ec%9e%84%eb%8c%80+%ec%98%88%eb%b9%84%ec%9e%85%ec%a3%bc%ec%9e%90+1%ec%b0%a8+%eb%aa%a8%ec%a7%91+%ea%b3%b5%ea%b3%a0%eb%ac%b8.pdf')"  class="file-name" title="선택한 파일을 뷰어를 통해 확인합니다.(새 창 열림)"> 
+															<span class="ic-file ic-file-pdf"></span>
+													 [붙임] 1. 진주정촌올리움 국민임대 예비입주자 1차 모집 공고문.pdf<span class="file-size">(372.86KB)
+												</span>
+												<span class="blind">(새 창 열림)</span>
+											</a>
+												<a href="/common/download.do?fileVirtualPath=%2fprivatefiles%2fBBS%2fF7054C80FACF4D22AD23CAD92547CE03%2f0A8EEAC4B3E44110A9D96962C3F3C901.pdf&fileOrgName=%5b%eb%b6%99%ec%9e%84%5d+1.+%ec%a7%84%ec%a3%bc%ec%a0%95%ec%b4%8c%ec%98%ac%eb%a6%ac%ec%9b%80+%ea%b5%ad%eb%af%bc%ec%9e%84%eb%8c%80+%ec%98%88%eb%b9%84%ec%9e%85%ec%a3%bc%ec%9e%90+1%ec%b0%a8+%eb%aa%a8%ec%a7%91+%ea%b3%b5%ea%b3%a0%eb%ac%b8.pdf" class="dl-btn" target="fileDownFrame" title="선택한 파일을 다운로드 합니다.">
+													<span class="pc">다운로드</span>
+												</a></li>
+											<li>     <a href="javascript:void(0)" onclick="pdfViewr('[붙임] 3. 진주 정촌올리움 단지배치도 및 평면도 (1).pdf', 'pdf' , '/privatefiles/BBS/F7054C80FACF4D22AD23CAD92547CE03/82C60B5987FE4061951EDA5BB95353C8.pdf', '/common/download.do?fileVirtualPath=%2fprivatefiles%2fBBS%2fF7054C80FACF4D22AD23CAD92547CE03%2f82C60B5987FE4061951EDA5BB95353C8.pdf&fileOrgName=%5b%eb%b6%99%ec%9e%84%5d+3.+%ec%a7%84%ec%a3%bc+%ec%a0%95%ec%b4%8c%ec%98%ac%eb%a6%ac%ec%9b%80+%eb%8b%a8%ec%a7%80%eb%b0%b0%ec%b9%98%eb%8f%84+%eb%b0%8f+%ed%8f%89%eb%a9%b4%eb%8f%84+(1).pdf')"  class="file-name" title="선택한 파일을 뷰어를 통해 확인합니다.(새 창 열림)"> 
+															<span class="ic-file ic-file-pdf"></span>
+													 [붙임] 3. 진주 정촌올리움 단지배치도 및 평면도 (1).pdf<span class="file-size">(1,239.44KB)
+												</span>
+												<span class="blind">(새 창 열림)</span>
+											</a>
+												<a href="/common/download.do?fileVirtualPath=%2fprivatefiles%2fBBS%2fF7054C80FACF4D22AD23CAD92547CE03%2f82C60B5987FE4061951EDA5BB95353C8.pdf&fileOrgName=%5b%eb%b6%99%ec%9e%84%5d+3.+%ec%a7%84%ec%a3%bc+%ec%a0%95%ec%b4%8c%ec%98%ac%eb%a6%ac%ec%9b%80+%eb%8b%a8%ec%a7%80%eb%b0%b0%ec%b9%98%eb%8f%84+%eb%b0%8f+%ed%8f%89%eb%a9%b4%eb%8f%84+(1).pdf" class="dl-btn" target="fileDownFrame" title="선택한 파일을 다운로드 합니다.">
+													<span class="pc">다운로드</span>
+												</a></li>
+											<li>     <a href="javascript:void(0)" onclick="pdfViewr('[붙임] 2. 서류 및 양식 (1).hwp', 'hwp' , '/privatefiles/BBS/F7054C80FACF4D22AD23CAD92547CE03/66E7A748D0B048178458573733B2258A.hwp', '/common/download.do?fileVirtualPath=%2fprivatefiles%2fBBS%2fF7054C80FACF4D22AD23CAD92547CE03%2f66E7A748D0B048178458573733B2258A.hwp&fileOrgName=%5b%eb%b6%99%ec%9e%84%5d+2.+%ec%84%9c%eb%a5%98+%eb%b0%8f+%ec%96%91%ec%8b%9d+(1).hwp')"  class="file-name" title="선택한 파일을 뷰어를 통해 확인합니다.(새 창 열림)"> 
+															<span class="ic-file ic-file-hwp"></span>
+													 [붙임] 2. 서류 및 양식 (1).hwp<span class="file-size">(253.50KB)
+												</span>
+												<span class="blind">(새 창 열림)</span>
+											</a>
+												<a href="/common/download.do?fileVirtualPath=%2fprivatefiles%2fBBS%2fF7054C80FACF4D22AD23CAD92547CE03%2f66E7A748D0B048178458573733B2258A.hwp&fileOrgName=%5b%eb%b6%99%ec%9e%84%5d+2.+%ec%84%9c%eb%a5%98+%eb%b0%8f+%ec%96%91%ec%8b%9d+(1).hwp" class="dl-btn" target="fileDownFrame" title="선택한 파일을 다운로드 합니다.">
+													<span class="pc">다운로드</span>
+												</a></li>
+								</ul>
+							</div>
+						<div class="board-nav">
+							<div class="board-nav-prev">
+								<span class="board-nav-label">이전글</span>
+										<a href="javascript:void(0)" onclick="selectBbsItem('0F1FC340767349CCBAA1556F45DA12FA'); return false;" class="board-nav-link"> 2026년 전세임대주택 입주자모집(제2차) 공고 </a>
+							</div>
+							<div class="board-nav-next">
+								<span class="board-nav-label">다음글</span>
+										<a href="javascript:void(0)" onclick="selectBbsItem('BF896C4C35674EAF88D530BB6B577213'); return false;" class="board-nav-link"> 2026년 거북이집 1호(청년셰어하우스) 입주자 모집 공고 </a>
+							</div>
+						</div>
+						<div class="btn-row">
+							<button class="board-btn" onclick="selectBbsList();">목록으로</button>
+						</div>
+					</div>
+					<input type="hidden" id="CURRENT_PAGE" name="CURRENT_PAGE" value="1">
+					<input type="hidden" id="COLM1_CD" name="COLM1_CD" value="notice_06">
+					<input type="hidden" id="SEARCH_CONTITION" name="SEARCH_CONTITION" value="CPDS_SUBJECT_CONTENT">
+					<input type="hidden" id="SEARCH_KEYWORD" name="SEARCH_KEYWORD" value="">
+				</div>				
+			</div>
+		</div>
+	</div>
+<!-- 페이지 정보 및 만족도 조사 -->
+<div id="pageFeedback" class="content-wrap" style="display: none;">
+	<div class="page-feedback">
+		<p class="blind">페이지 정보 및 만족도 조사</p>
+		<!-- 담당부서 -->
+		<div class="dept-info">
+			<dl class="dept-list">
+				<dt>담당부서</dt>
+				<dd></dd>
+				<dt>연락처</dt>
+						<dd>전화번호없음</dd>
+			</dl>
+		</div>
+		<!-- 만족도 -->
+		<div class="satisfaction">
+			<p class="description">
+				현재 페이지의 내용과 사용편의성에 만족하십니까?<br class="mo"> 만족도 조사결과는 서비스
+				개선을 위한 자료로<br class="mo"> 활용됩니다.
+			</p>
+			<div id="feedbackForm">
+				<fieldset>
+					<legend class="blind">이 페이지에서 제공하는 정보에 만족하셨습니까?</legend>
+					<div class="score-group">
+						<div class="score-item">
+							<input type="radio" id="score-5" name="satisfy" value="5" checked />
+							<label for="score-5">매우 만족</label>
+						</div>
+						<div class="score-item">
+							<input type="radio" id="score-4" name="satisfy" value="4" />
+							<label for="score-4">만족</label>
+						</div>
+						<div class="score-item">
+							<input type="radio" id="score-3" name="satisfy" value="3" />
+							<label for="score-3">보통</label>
+						</div>
+						<div class="score-item">
+							<input type="radio" id="score-2" name="satisfy" value="2" />
+							<label for="score-2">불만족</label>
+						</div>
+						<div class="score-item">
+							<input type="radio" id="score-1" name="satisfy" value="1" />
+							<label for="score-1">매우 불만족</label>
+						</div>
+					</div>
+				</fieldset>
+				<!-- 모바일 호환성을 위한 숨김 필드 (homeCommon.js 대응) -->
+				<input type="hidden" id="satisfy_m" value="5">
+				<!-- 의견 -->
+				<div class="opinion">
+					<label for="PAGE_OPINION" class="blind">의견 입력</label>
+					<div class="opinion-input">
+						<textarea
+							id="PAGE_OPINION"
+							name="PAGE_OPINION"
+							maxlength="100"
+							placeholder="여러분의 소중한 한마디를 부탁드립니다."
+						></textarea>
+						<p class="text-count"><span id="textCount">0</span> / 100</p>
+					</div>
+					<button type="button" class="submit-btn" onclick="hf_pageSatisfySave()">등록</button>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+<footer id="footer" class="footer">
+  <div class="site-links">
+    <div class="content-wrap">
+      <ul class="site-link-list">
+        <li>
+          <fieldset>
+            <legend>
+              경상남도유관기관 리스트입니다 페이지를 확인 후 선택하면 페이지가
+              이동됩니다.
+            </legend>
+            <select
+              class="link-sel"
+              id="related_agency"
+              title="경상남도 유관 기관 홈페이지 바로가기"
+            >
+              <option value="">경상남도유관기관</option>
+            </select>
+          </fieldset>
+        </li>
+        <li>
+          <fieldset>
+            <legend>
+              중앙행정기관 리스트입니다 페이지를 확인 후 선택하면 페이지가
+              이동됩니다.
+            </legend>
+            <select class="link-sel" id="central_administrative_agencies" title="중앙행정기관 홈페이지 바로가기">
+              <option value="">중앙행정기관</option>
+            </select>
+          </fieldset>
+        </li>
+        <li>
+          <fieldset>
+            <legend>
+              전국도시개발공사 리스트입니다 페이지를 확인 후 선택하면 페이지가
+              이동됩니다.
+            </legend>
+            <select class="link-sel" id="development_corporation" title="전국도시개발공사 홈페이지 바로가기">
+              <option value="">전국도시개발공사</option>
+            </select>
+          </fieldset>
+        </li>
+      </ul>
+    </div>
+  </div>
+  <div class="site-info-container">
+    <div class="content-wrap">
+      <div class="site-info">
+        <div>
+          <div class="logo">
+            <a href="/">
+              <img src="/templates/cms/common/img/logo_main_sm.png" alt="경남개발공사" />
+            </a>
+          </div>
+          <div class="adress">
+            <p>(51430) 경상남도 창원시 성산구 용지로 244 (용호동)</p>
+            <dl>
+              <dt>대표전화</dt>
+              <dd>055)269-0420</dd>
+              <dt>팩스</dt>
+              <dd>055)269-0419</dd>
+            </dl>
+          </div>
+          <p class="email-notice">
+            본 사이트에 게시된 이메일주소의 자동수집을 거부하며,<br />
+            이를 위반시 정보통신망법에 의해 형사처벌됨을 유념하시기 바랍니다.
+          </p>
+        </div>
+        <a title="새창" href="http://www.wa.or.kr/board/list.asp?BoardID=0006" target="_blank" class="wa-mark">
+			<img class="wa" alt="(사)한국장애인단체총연합회 한국정보접근성인증평가원 웹 접근성
+			우수사이트 인증마크(WA인증마크)" src="/templates/cms/common/img/accessibility-mark.png" />
+		</a>
+      </div>
+    </div>
+  </div>
+  <div class="privacy-info">
+    <div class="content-wrap">
+      <ul class="privacy-list">
+        <li><a href="/home/guide/private.do?seqId=0000006349">개인정보처리방침</a></li>
+        <li><a href="/page.do?seqId=0000006354">뷰어다운로드</a></li>
+      </ul>
+      <p class="copy">Copyright © 2026 GNDC All Rights Reserved.</p>
+    </div>
+  </div>
+    <a href="#" class="btn-move" title="상단으로 이동"><span class="blind">상단으로 이동</span></a>
+</footer>
+	<!-- 다운로드 및 에러 처리를 위한 숨겨진 iframe -->
+	<iframe name="fileDownFrame" id="fileDownFrame" style="display:none;"></iframe>
+</body>
+</html>
