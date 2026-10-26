@@ -13,7 +13,8 @@
 
 | 파일 | 무엇 |
 |---|---|
-| **`v3.14.sql`** | **현행.** v3.13 + **V16** 순위·차수 접수 창(일정 표 · 서로 다른 `start_date`·`end_date`)이 둘 이상인 열린 공고 그룹에 경로 표 0행 → 위반 |
+| **`v3.15.sql`** | **현행(main).** v3.14 + `allow_exec_funcs`에 넷(`listing_hidden_keys` · `ops_is_admin` · `ops_status_board` · `ops_listing_hide` — 2026-10-16 관리자 페이지) |
+| `v3.14.sql` | v3.13 + **V16** 순위·차수 접수 창(일정 표 · 서로 다른 `start_date`·`end_date`)이 둘 이상인 열린 공고 그룹에 경로 표 0행 → 위반 |
 | `v3.13.sql` | v3.12 + **V15b** category가 「⚠️」로 시작하지 않는 정책 행 `content_raw`에 「⚠️」 0 |
 | `v3.12.sql` | v3.11 + **V15** 정책 행 `content_raw`에 우리 판단 문장 표지(🔴·🔵·「확정:」·「애초에」·「로 읽으시기 바랍니다」) 0 |
 | `v3.11.sql` | v3.10 + `allow_exec_funcs`에 `get_last_collected_at` 한 줄(2026-10-13 마지막 수집 시각 RPC) |
