@@ -1,4 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2.116.0'
+import { decodeEntities, parseJpdcFiles, type BoardFile } from './board-parse.ts'
 
 // 시크릿은 전부 환경변수 필수. 하드코딩 폴백을 두지 않는다.
 // TypeScript의 `!`는 타입 단언일 뿐 런타임 검사가 아니라서, 미설정 시 undefined로
@@ -643,14 +644,8 @@ function mapMyHomeRow(it: MyHomeItem) {
 // 🔴 대표 행 고르기·dedup·그룹 규칙과 무관하다 — `attachment_urls` 한 칸만, 그것도 비어 있는 행에만 쓴다.
 // 🔴 파일 이름은 게시판이 보여 주는 글자 그대로다(「(안)」 등을 고치지 않는다). 못 읽으면 쓰지 않는다(다음 런이 다시 본다).
 // 🔴 결과는 응답(`board`)에만 싣고 errors 에 넣지 않는다 — 게시판 실패가 LH·MYHOME 수집 런의 성패로 읽히지 않게.
-type BoardFile = { url: string; label: string; filename: string }
+// 🔵 2026-10-22 — 첨부 꼴(BoardFile)·엔티티 풀기·제주 파서는 board-parse.ts(단위 시험이 함께 읽는다).
 type BoardSource = { host: string; viewPath: string; parse: (html: string, base: string) => BoardFile[] | null }
-
-const decodeEntities = (s: string): string =>
-  s.replace(/&#(\d+);/g, (_, d) => String.fromCharCode(Number(d)))
-   .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)))
-   .replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-   .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
 
 // 부산도시공사 게시판 상세 — `<div class="fileList"><ul><li>…<span class="fileName">이름</span>…
 //   <a href="/board/download.do?…&fileSid=N">다운로드</a></li>…`(2026-10-13 `dataSid=800690` 실물). 한 <li> 안에서 이름·링크를 짝짓는다
@@ -676,6 +671,7 @@ function parseBmcFiles(html: string, base: string): BoardFile[] | null {
 
 const BOARD_SOURCES: BoardSource[] = [
   { host: 'www.bmc.busan.kr', viewPath: '/board/view.do', parse: parseBmcFiles },
+  { host: 'www.jpdc.co.kr', viewPath: '/open/news/notice.htm', parse: parseJpdcFiles },
 ]
 const BOARD_CAP = 3
 const BOARD_FETCH_TIMEOUT_MS = 30000

@@ -222,6 +222,10 @@ body.theme-dark .zf-site-chip.on{background:#5b78b8;color:#fff}
 mark.zf-hl{background:#FFE27A;color:inherit;font-weight:700;padding:0;border-radius:2px}
 body.theme-dark mark.zf-hl{background:#7A5F00;color:#fff}
 /* 🔵 B62 ①② — 날짜 줄 아래 한 줄. 🔵 표시층 B ② 접힌 상태는 두 줄까지(첫 날짜가 보이게) · 펼침 표시 ▾는 말줄임 밖 별도 칸 · 누르면 펼친다 */
+.zf-org-sup{margin:4px 0 2px}
+.zf-org-sup span{display:inline-block;font-size:12px;font-weight:700;color:#3B4A6B;background:#E8EDF7;border-radius:999px;padding:2px 10px}
+.zf-wave-slot{font-size:12px;color:#8A5A12;background:#FBF0DC;border-radius:8px;padding:4px 10px;margin:4px 0 6px}
+html[data-ui="d3"] .zf-org-sup span{background:var(--surface-2);color:var(--ink)}
 .zf-route-line{font-size:12px;color:#8A5A12;background:#FBF0DC;border-radius:8px;padding:4px 10px;margin:-4px 0 8px;cursor:pointer;display:flex;align-items:flex-start;gap:6px}
 .zf-route-text{flex:1;min-width:0;line-height:1.5;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;word-break:keep-all;overflow-wrap:anywhere}
 .zf-route-line.open .zf-route-text{display:block;-webkit-line-clamp:unset}
@@ -730,6 +734,11 @@ html[data-ui="d3"] .zf-ana-box{background:var(--surface-2);border-color:var(--li
 html[data-ui="d3"] .zf-ana-pill{background:var(--ink);color:var(--paper)}
 html[data-ui="d3"] .zf-ana-org{color:var(--ink)}
 html[data-ui="d3"] .zf-ana-box a{color:var(--ink)!important}
+/* 🔵 2026-10-22(우편함 「표시층 — A(G2): 「링크만」 카드에 사실대로의 표지」) — 첨부 0 · 분석 없음 카드(zf-lo): 머리 줄 상태 알약 앞에 「꼭집 미분석」 표지.
+   카드 그림과 요약 도착 순서에 기대지 않게 CSS 로 단다(머리 줄은 flex — 표지 order 1 · 알약 order 2). 날짜·상태는 수집값 그대로 둔다. */
+.hcard.zf-lo .zf3-ctop::after{content:'꼭집 미분석';order:1;font-size:var(--t-xs);font-weight:700;border-radius:999px;padding:1px 8px;color:#fff;background:#6B6B63}
+.hcard.zf-lo .zf3-ctop .zf3-dpill{order:2}
+html[data-ui="d3"] .hcard.zf-lo .zf3-ctop::after{background:var(--ink-2);color:var(--paper)}
 .zf-sch-stop>summary::-webkit-details-marker{display:none}
 .zf-sch-stop>summary>.policy-category,.zf-sch-stop>summary>.policy-content{display:block}
 .zf-sch-stop .zf-sch-more{font-family:inherit;font-size:11px;font-weight:600;color:var(--ink-3,#777);margin-left:8px;white-space:nowrap}
@@ -2162,7 +2171,20 @@ function applyWindowState(row){
   return best;
 }
 function zfLhPostClosed(row){
-  return String((row && row.source) || '') === 'LH' && statusSaysClosed(row);
+  return zfLhSaysClosed(row);
+}
+// 🔴 2026-10-22(우편함 「표시층 — A(G3): LH 「…마감」 우선을 첫 창에서만」) — LH 「…마감」(목록 API PAN_SS)은 첫 창(인터넷 청약)만 따른다.
+//    백업 덤프 상태 전환이 매번 인터넷 청약 끝 직후다(…20706·…20713 10-01 · …20737 10-14 · …20877 10-21) — 공고 전체 마감이 아니다.
+//    그래서 경로 표 창이 둘 이상이고 오늘이 둘째 이후 창 **안**이면 LH 「…마감」 대신 날짜로 판정한다(전북 매입 …20737 둘째 창 11-02~11-04 ·
+//    LH 공지 #173 「1순위(일반) 및 2순위 주택목록 게시」). 창 사이는 종전대로 zfRouteGap 이 먼저 선다 · 첫 창 · 창 하나 · 경로 행 전은 종전대로 LH 를 믿는다.
+//    제목 「[조기접수마감]」(zfEarlyClosed)은 이 앞에서 닫힌다(zfRouteWinsAll 이 null). 「주택 없음」 공지로 둘째 창이 없는 공고는 데이터(카드 끝)로 푼다.
+function zfInLaterWin(row){
+  const W = zfRouteWinsAll(row);
+  if(!W) return false;
+  return W.merged.findIndex(m => m.x <= W.today && W.today <= m.y) >= 1;
+}
+function zfLhSaysClosed(row){
+  return String((row && row.source) || '') === 'LH' && statusSaysClosed(row) && !zfInLaterWin(row);
 }
 // 🔴 2026-10-13(우편함 「코드 — 열린 카드 오표시·오답·놓침」 1) — 공급기관이 「조기 접수마감」을 알린 공고는 날짜보다 그 알림을 믿는다.
 //    양산 삼성파크빌 `…20898` — LH 정정사유 「모집호수 소진으로 조기 접수마감합니다」 · 제목 머리 `[조기접수마감]` 인데 LH 공고상태는
@@ -2197,7 +2219,8 @@ function zfWindowStateOne(row, hmKey){
   //    [VERIFY] 백업 덤프 43회분(2026-08-11~09-29 · LH 1,014건): 마감일 전에 「접수마감」이 붙은 것 9건 —
   //    7건은 마지막 날 새벽 스냅숏에서 처음 보였고 2건은 태백철암1(시작일 없음 · 취소공고 포함).
   //    「마감」이 다시 풀린 경우 0건. 🔵 MYHOME 대표 카드는 종전(날짜) 그대로 — MYHOME status 는 늦게 따라온다.
-  if(String(row.source || '') === 'LH' && statusSaysClosed(row)) return 'closed';
+  //    🔴 2026-10-22 — 둘째 이후 창 안이면 날짜로(zfLhSaysClosed 주석).
+  if(zfLhSaysClosed(row)) return 'closed';
   // 🔴 B62 ③ — 공사 공고와 수집 접수기간이 어긋나는 공사의 행(apply_period_check, RPC 판정)은 날짜를 믿지 않는다.
   //    그래서 접수 중·예정·마감 어느 쪽으로도 만들지 않고 'unknown' 으로 둔다. 목록 숨김은 isHiddenAsClosed 가
   //    종전 순서 그대로 가른다 — 마감일이 지났고 기관 status 가 「…마감」이면 여전히 숨는다(지금 참 6장 전부).
@@ -2646,6 +2669,7 @@ function zfRoutesReadyMark(){
   zfRoutesReadyResolve();
   zfEndHmWatch();   // 🔵 2026-10-22 — 마감 날 끝 시각이 지나면 다시 센다(상태가 바뀐 카드는 아래 비교가 이미 다시 그린다)
   zfFillWinSlots();   // 검은 상자 「접수기간」 기본 창(2026-10-19)
+  zfLoadWaveNotes();   // 🔵 2026-10-22 — 둘째 이후 창 카드의 「차수 대상」 ⚠️ 행(후보 카드가 있을 때만 한 요청)
   // 🔵 2026-10-16 — 지금 창 끝(zfRouteCurEnd)이 생긴 카드도 다시 그린다(알약 「이번 차수 마감 D-n」 · 마감임박).
   const changed = rows.some((n, i) => applyWindowState(n) !== before[i] || !!zfRouteCurEnd(n) || zfRouteSchedHit(n));
   if(changed && noticeLoaded) applyNoticeFiltersAndRender(noticePage);
@@ -2657,6 +2681,7 @@ function zfLoadRoutes(){
 // 카드를 그린 뒤 부른다 — 곁 데이터가 이미 있으면 바로 채우고, 없으면 로드를 건다(도착하면 다시 채운다).
 function zfAfterCardsRender(){
   zfFillSideSlots();
+  zfLoadWaveNotes();
   zfFillWinSlots();
   zfTitleClippedChips();
   zfLoadCardSide();
@@ -2768,9 +2793,11 @@ function zfPostNoticeList(row){
   if(!pn) return null;
   const list = [];
   // 🔵 2026-10-22(우편함 「표시층 C 묶음 5」 4) — 카드와 같은 끝 시각 판정 · 시각이 지나 닫힌 것은 hmPassed(배지 data-zf-hm — 화면 점검이 날짜 대조에서 가른다)
+  // 🔵 2026-10-22 — LH 「…마감」인데 둘째 이후 창 안이라 날짜로 연 것은 win2(배지 data-zf-win2 — 화면 점검이 DB 대조에서 가른다)
   const key = zfDedupKey(row['공고명'] ?? row.title);
   const stOf = r => { const st = zfWindowStateOne(r, key); return { state: st, hmPassed: st === 'closed' && zfWindowStateOne(r, null) !== 'closed' }; };
-  if(pn.own) list.push(Object.assign({ title: pn.own.title, start: row['apply_start'] || '', end: row['apply_end'] || '' }, stOf(row)));
+  const win2 = String(row.source || '') === 'LH' && statusSaysClosed(row) && zfInLaterWin(row);
+  if(pn.own) list.push(Object.assign({ title: pn.own.title, start: row['apply_start'] || '', end: row['apply_end'] || '', win2 }, stOf(row)));
   const postClosed = zfLhPostClosed(row);   // LH 가 게시물 전체를 마감했으면 공고문도 마감(applyWindowState 주석)
   pn.linked.forEach(nt => list.push(Object.assign({ title: nt.title, start: nt.start, end: nt.end }, postClosed ? { state: 'closed', hmPassed: false } : stOf(nt.row))));
   if(list.length < 2) return null;
@@ -2805,13 +2832,13 @@ function zfNoticeStateText(state, end){
   }
   return state === 'before' ? '접수 예정' : state === 'closed' ? '마감' : '기간 미상';
 }
-function zfNoticeStateBadge(state, end, hmPassed){
+function zfNoticeStateBadge(state, end, hmPassed, win2){
   const t = zfNoticeStateText(state, end);
   const c = t === '오늘 마감' ? 'background:#FBF0DC;color:#8A5A12'
     : t === '접수 중' ? 'background:#E6F4EE;color:#0F6E56'
     : t === '접수 예정' ? 'background:#EEF2FA;color:#3D5A99'
     : 'background:#F6F6F2;color:#6B6B63';
-  return `<span class="zf-nt-state"${hmPassed ? ' data-zf-hm="1"' : ''} style="display:inline-block;white-space:nowrap;margin-left:4px;padding:1px 6px;border-radius:9px;font-size:11px;font-weight:600;${c}">${t}</span>`;
+  return `<span class="zf-nt-state"${hmPassed ? ' data-zf-hm="1"' : ''}${win2 ? ' data-zf-win2="1"' : ''} style="display:inline-block;white-space:nowrap;margin-left:4px;padding:1px 6px;border-radius:9px;font-size:11px;font-weight:600;${c}">${t}</span>`;
 }
 // 자리는 카드 행의 접수 재료를 함께 싣는다 — 공고 탭·추천·매칭 카드의 행 모양이 달라도 채울 때 같은 판정을 한다.
 function zfNoticesSlotHtml(row){
@@ -2825,7 +2852,7 @@ function zfFillNoticeSlots(){
     if(el.dataset.filled === '1') return;
     el.dataset.filled = '1';
     const d = el.dataset;
-    const row = { announcement_id: d.noticesFor, apply_start: d.s || '', apply_end: d.e || '', status: d.st || '', source: d.src || '', winner_announce_date: d.w || '', title: d.t || '' };   // title — 끝 시각 제목 키(2026-10-22)
+    const row = { announcement_id: d.noticesFor, apply_start: d.s || '', apply_end: d.e || '', status: d.st || '', source: d.src || '', winner_announce_date: d.w || '', title: d.t || '' };   // title — 끝 시각 · 경로 창 판정 제목 키(2026-10-22)
     const list = zfPostNoticeList(row);
     if(!list) return;
     const same = list.every(x => x.start === list[0].start && x.end === list[0].end && x.state === list[0].state);
@@ -2833,9 +2860,9 @@ function zfFillNoticeSlots(){
     const name = x => `<span title="${zfAttr(x.title)}" style="font-weight:600;color:#333">${escapeHtml(x.name || x.title)}</span>`;
     // 🔵 2026-10-01 — class zf-nt-line·zf-nt-span·zf-nt-state 는 화면 점검(health-screen 「공고문 자리 ↔ DB」)이 읽는 표지다. 모양은 그대로다.
     el.innerHTML = same
-      ? `<div class="zf-nt-line" style="${box}">📑 공고문 ${list.length}개 · ${list.map(name).join(' · ')}<br><span class="zf-nt-span" style="color:#666">접수 ${escapeHtml(zfSpanText(list[0].start, list[0].end))}</span>${zfNoticeStateBadge(list[0].state, list[0].end, list[0].hmPassed)}</div>`
+      ? `<div class="zf-nt-line" style="${box}">📑 공고문 ${list.length}개 · ${list.map(name).join(' · ')}<br><span class="zf-nt-span" style="color:#666">접수 ${escapeHtml(zfSpanText(list[0].start, list[0].end))}</span>${zfNoticeStateBadge(list[0].state, list[0].end, list[0].hmPassed, list[0].win2)}</div>`
       : `<div style="${box}">📑 공고문 ${list.length}개 · <b style="color:#8A5A12">공고문마다 접수일이 달라요</b>`
-        + list.map(x => `<div class="zf-nt-line">· ${name(x)} <span class="zf-nt-span" style="color:#666;white-space:nowrap">${escapeHtml(zfSpanText(x.start, x.end))}</span>${zfNoticeStateBadge(x.state, x.end, x.hmPassed)}</div>`).join('')
+        + list.map(x => `<div class="zf-nt-line">· ${name(x)} <span class="zf-nt-span" style="color:#666;white-space:nowrap">${escapeHtml(zfSpanText(x.start, x.end))}</span>${zfNoticeStateBadge(x.state, x.end, x.hmPassed, x.win2)}</div>`).join('')
         + `</div>`;
     zfHideRouteDupOf(el.closest('.hcard'));
     // 🔴 2026-10-01 — 공고문 목록이 서면 날짜 줄의 「단지마다 일정이 달라요」 배지를 숨긴다 — 목록이 공고문별 일정을 이미 말한다
@@ -3557,6 +3584,55 @@ function zfTypeLabel(source, housingType, title){
     if(hit && mm[2].split('·').indexOf(hit[1]) >= 0) return mm[1] + '(' + hit[1] + '년)';
   }
   return std;
+}
+// 🔵 2026-10-22(우편함 「표시층 — A(G3 셋)」 2 · 조사 「해석 감사 2회차」 🔴3) — 기관공급(기업이 신청하는 공고)은 원문 낱말로만 가른다(이 정규식 한 곳).
+//    지금 …20930 「… 기관공급 사업 대상기업 모집계획 공고」. 해석 감사 4회차가 공고 단위 칸을 더하면 그 칸으로 바꾼다.
+const ZF_ORG_SUPPLY_RE = /기관공급|대상기업\s*모집/;
+const ZF_ORG_SUPPLY_TEXT = '기업이 신청하는 공고';
+function zfOrgSupplyHtml(title){
+  return ZF_ORG_SUPPLY_RE.test(String(title || '')) ? `<p class="zf-org-sup"><span>${ZF_ORG_SUPPLY_TEXT}</span></p>` : '';
+}
+// 🔵 2026-10-22(우편함 「표시층 — A(G3 셋)」 1 · 조사 「해석 감사 2회차」 🔴1) — 둘째 이후 창 카드(경로 표 창 둘 이상 ∧ 기본 창 = 지금·다음 창이 첫 창이 아님)에
+//    그 공고 묶음의 「⚠️ … 차수 … 대상」 정책 행이 있으면 지역 줄 아래 한 줄. 수(N호)는 그 행 원문에서 읽은 것만 · 행이 없으면 아무것도 쓰지 않는다.
+//    정책 행은 카드가 받지 않던 것이라 후보 카드가 있을 때만 한 번 받는다(⚠️ 행만 · 두 칸 · 후보 묶음 id만).
+const zfWaveNotes = { loaded: false, byId: new Map(), asked: new Set() };   // 공고 id → { n } · asked = 이미 물은 id(칩으로 목록이 바뀌면 빠진 id만 다시 묻는다)
+function zfWaveSlotHtml(id){ return `<p class="zf-wave-slot" data-wave-id="${zfAttr(String(id || ''))}" hidden></p>`; }
+function zfWaveIdsOf(row){
+  const D = zfRouteDefaultWin(row);
+  if(!D || D.i < 1) return null;
+  return [...new Set(D.W.merged.flatMap(m => m.ids || []).concat(String(row['announcement_id'] || '')).filter(Boolean))];
+}
+function zfLoadWaveNotes(){
+  if(!zfSide.routesReady) return Promise.resolve(zfWaveNotes);
+  const rows = typeof noticeData !== 'undefined' ? noticeData : [];
+  const ids = [...new Set(rows.flatMap(r => zfWaveIdsOf(r) || []))].filter(i => !zfWaveNotes.asked.has(i));
+  if(!ids.length){ zfWaveNotes.loaded = true; zfFillWaveSlots(); return Promise.resolve(zfWaveNotes); }
+  ids.forEach(i => zfWaveNotes.asked.add(i));
+  return fetch(`${SUPABASE_URL}/rest/v1/announcement_policies?select=announcement_id,category,content_raw&category=like.${encodeURIComponent('⚠️*')}&${idFilterFor(ids)}&order=seq`, {
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
+  }).then(r => r.ok ? r.json() : []).then(list => {
+    (Array.isArray(list) ? list : []).forEach(p => {
+      if(!p || !/차수/.test(p.category || '') || !/대상/.test(p.category || '')) return;
+      const id = String(p.announcement_id || '');
+      if(zfWaveNotes.byId.has(id)) return;
+      const m = /(\d[\d,]*)\s*호/.exec(String(p.content_raw || ''));
+      zfWaveNotes.byId.set(id, { n: m ? m[1] : '' });
+    });
+  }).catch(() => {}).then(() => { zfWaveNotes.loaded = true; zfFillWaveSlots(); return zfWaveNotes; });
+}
+function zfFillWaveSlots(){
+  if(!zfWaveNotes.loaded || !zfWaveNotes.byId.size) return;
+  const byId = new Map((typeof noticeData !== 'undefined' ? noticeData : []).map(r => [String(r['announcement_id'] || ''), r]));
+  document.querySelectorAll('.zf-wave-slot[data-wave-id]').forEach(el => {
+    if(el.dataset.filled === '1') return;
+    const row = byId.get(el.getAttribute('data-wave-id'));
+    const ids = row && zfWaveIdsOf(row);
+    const hit = ids && ids.map(i => zfWaveNotes.byId.get(i)).find(Boolean);
+    el.dataset.filled = '1';
+    if(!hit) return;
+    el.textContent = hit.n ? `⚠️ 이번 차수 대상 주택은 공지 목록 ${hit.n}호예요 — 지역·범위가 달라요` : '⚠️ 이번 차수 대상 주택은 따로 공지됐어요 — 지역·범위가 달라요';
+    el.hidden = false;
+  });
 }
 function zfTypeHtml(source, housingType, title){
   return `<span class="zf-type" data-type-src="${zfAttr(source)}" data-type-raw="${zfAttr(housingType)}" data-type-title="${zfAttr(title)}">${escapeHtml(zfTypeLabel(source, housingType, title))}</span>`;
@@ -4397,6 +4473,7 @@ function zfSavedCardFrom(sr, r){
     url:       r ? (r.url||'')          : '',
     apply_end: r ? (r.apply_end||'')    : '',
     source:    r ? (r.source||'')       : '',
+    org:       r ? (r.supply_org||'')   : '',   // 🔵 2026-10-22 — 관리 탭 바로가기 버튼(LH 공급인가)
     // 🔵 D-3 둘러보기 ④ 「나의 노선도」(d3) 가 읽는 날짜 — 같은 대표행 값 그대로(종전 화면은 쓰지 않는다)
     rid:       r ? String(r.announcement_id||'') : '',
     apply_start: r ? (r.apply_start||'') : '',
@@ -4621,7 +4698,7 @@ function renderSavedNotices(){
         <p class="hname">${escapeHtml(s.title||'(공고명 없음)')}</p>
         <button style="background:none;border:none;font-size:18px;cursor:pointer;padding:2px 4px;color:#ccc" title="저장 삭제" data-save-del="${zfAttr(s.id)}" onclick="toggleSaveNotice(this.dataset.saveDel).then(renderSavedNotices)">✕</button>
       </div>
-      <p class="haddr">${escapeHtml(s.cover||s.region||'')} · ${zfTypeHtml(s.source, s.type, s.title)}</p>
+      <p class="haddr">${escapeHtml(s.cover||s.region||'')} · ${zfTypeHtml(s.source, s.type, s.title)}</p>${zfOrgSupplyHtml(s.title)}
       ${(s.cancelled || zfCancelInfoFor(s.title||'', s.apply_end))
         ? `<div style="margin-top:6px">${cancelNoticeBadge(s.title||'', s.apply_end)}</div>` : ''}
       ${dateStr?`<p style="font-size:11px;color:#bbb;margin-top:4px">저장일: ${dateStr}</p>`:''}
@@ -4827,9 +4904,16 @@ function zfNotAnalyzedHtml(url, text){
 //    has_attachments = 그룹 구성원 누구든 첨부 목록이 있다 → 거짓이면 분석할 첨부 자체가 없다(원문 링크뿐)
 //    🔴 칸이 없는 옛 응답·조회 전·실패는 '' — 종전 문구 그대로. B62 ④ 게시물 링크가 붙는 카드도 '' — 링크를 그대로 둔다.
 const ZF_SUM_NO_UNITS   = '이 공고는 원문에 세대별 목록이 없어요 · 자격·일정은 펼쳐서 확인하세요';
-const ZF_SUM_LINK_ONLY  = '이 공고는 원문 링크만 제공해요 · 보증금·면적은 원문에서 확인해 주세요';
+// 🔵 2026-10-22(우편함 「표시층 — A(G2): 「링크만」 카드에 사실대로의 표지」) — 첨부 0 · 분석 없음 카드는 사실 둘만 말한다:
+//    꼭집이 아직 이 공고를 분석하지 않았다 · 원문은 공급기관 게시판에 있다. 「분석 중」이라 하지 않는다(발송 대상이 아니라 분석이 돌지 않는다).
+//    {org} = 카드 공급기관(수집값 · 없거나 LH·SH·MYHOME 이름뿐이면 「공급기관」). 머리 줄 표지 「꼭집 미분석」은 CSS(.hcard.zf-lo).
+const ZF_SUM_LINK_ONLY  = '꼭집이 아직 분석하지 않은 공고예요 · 원문은 {org} 게시판에 있어요';
 const ZF_SEC_NO_UNITS   = '이 공고는 원문에 세대별 목록이 없어요. 공급 주택은 공고문에서 확인해 주세요.';
-const ZF_SEC_LINK_ONLY  = '이 공고는 원문 링크만 제공해요. 공고 원문에서 확인해 주세요.';
+const ZF_SEC_LINK_ONLY  = '꼭집이 아직 분석하지 않은 공고예요. 원문은 공급기관 게시판에서 확인해 주세요.';
+function zfLinkOnlyText(org){
+  const o = String(org || '').trim();
+  return ZF_SUM_LINK_ONLY.replace('{org}', !o || /^(LH|SH|MYHOME)$/i.test(o) ? '공급기관' : escapeHtml(o));
+}
 function zfCardEmptyKind(s, key){
   if(!s || typeof s.analysis_done !== 'boolean') return '';
   if(zfPostLinkOrganized(key) === true) return '';
@@ -4901,6 +4985,8 @@ function zfFillSummarySlots(){
     const pend = zfAnaPending(s, el.getAttribute('data-sum-key')), card = el.closest('.hcard');
     if(card) card.classList.toggle('zf-ana-pending', pend);
     if(card) card.classList.toggle('zf-ana-no', zfAiOff(s, el.getAttribute('data-sum-key')));   // 🔵 2026-10-16 — 분석 없으면 「AI 정리 · 」 접음
+    // 🔵 2026-10-22 — 첨부 0 · 분석 없음(요약 줄도 없고 같은 게시물 LH 정리도 없음) 카드에 머리 줄 표지(.zf-lo)
+    if(card) card.classList.toggle('zf-lo', !(s && zfSummaryLine(s)) && zfPostLinkOrganized(el.getAttribute('data-sum-key')) !== true && zfCardEmptyKind(s, el.getAttribute('data-sum-key')) === 'link_only');
     if(pend){ el.innerHTML = zfAnaPendingHtml(url, el.getAttribute('data-sum-org') || ''); return; }
     const gTag = zfGroupTag.get(String(id)) || '';
     const line = s ? zfSummaryLine(s, zfDualIds.has(String(id))
@@ -4920,7 +5006,7 @@ function zfFillSummarySlots(){
           : zfPostLinkHtml(el.getAttribute('data-sum-key')) + (() => {
               // 🔵 2026-09-30 — LH 카드도 미분석이면 링크(같은 게시물) 아래에 종전 안내를 그대로 둔다.
               const kind = zfCardEmptyKind(s, el.getAttribute('data-sum-key'));
-              return zfNotAnalyzedHtml(url, kind === 'no_units' ? ZF_SUM_NO_UNITS : kind === 'link_only' ? ZF_SUM_LINK_ONLY : '');
+              return zfNotAnalyzedHtml(url, kind === 'no_units' ? ZF_SUM_NO_UNITS : kind === 'link_only' ? zfLinkOnlyText(el.getAttribute('data-sum-org')) : '');
             })());
   });
   zfRefreshCovers();   // 🔵 2026-09-30 — 세대 행 지역이 방금 왔을 수 있다(표지 대표·곳 수)
@@ -5110,7 +5196,7 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
            그중 49건은 「기타」로 뭉개져 「도시형생활주택」 같은 실재하는 이름을 잃는다.
            🔵 추천 탭·저장 목록이 이미 원문 한 벌만 쓰고 있어, 여섯 자리가 한 어휘로 모인다.
            🔴 classifyNoticeType 은 유형 칩·설정 매칭에서 그대로 쓴다 — 바꾼 것은 표시 문자열뿐이다. -->
-      <p class="haddr">${zfCoverPlace(n['region_names'], zfComplexCount(n), n['sido_nm'], n['sigungu_nm'], n['지역'], n['announcement_id'])} · ${zfTypeHtml(n['source'], n['공급유형'], n['공고명']||n['name'])}</p>
+      <p class="haddr">${zfCoverPlace(n['region_names'], zfComplexCount(n), n['sido_nm'], n['sigungu_nm'], n['지역'], n['announcement_id'])} · ${zfTypeHtml(n['source'], n['공급유형'], n['공고명']||n['name'])}</p>${zfOrgSupplyHtml(n['공고명']||n['name'])}${isCancelRow ? '' : zfWaveSlotHtml(n['announcement_id'])}
       <div class="chip-row" style="margin:8px 0;gap:5px">${isCancelRow ? cancelRowChip() : `
         ${hasCancel?cancelNoticeBadge(n['공고명']||'', n['apply_end']):''}
         ${n['building_name']?`<span class="chip" style="cursor:default;padding:4px 10px;font-size:11px">🏢 ${zfBuildingLabel(n['building_name'], zfComplexCount(n))}</span>`:''}
@@ -5534,7 +5620,7 @@ function renderPersonalizedRecommendations(){
         <p class="hname">${escapeHtml(n['공고명']||n['name']||'')||'(공고명 없음)'}</p>
         ${(t => `<span class="htag ${t.closed?'tag-mix':'tag-apt'}">${escapeHtml(t.text)}</span>`)(zfStatusTag(n))}
       </div>
-      <p class="haddr">${zfCoverPlace(n['region_names'], zfComplexCount(n), n['sido_nm'], n['sigungu_nm'], n['지역'], n['announcement_id'])} · ${zfTypeHtml(n['source'], n['공급유형'], n['공고명']||n['name'])}</p>
+      <p class="haddr">${zfCoverPlace(n['region_names'], zfComplexCount(n), n['sido_nm'], n['sigungu_nm'], n['지역'], n['announcement_id'])} · ${zfTypeHtml(n['source'], n['공급유형'], n['공고명']||n['name'])}</p>${zfOrgSupplyHtml(n['공고명']||n['name'])}
       <div class="chip-row" style="margin:6px 0;gap:5px">
         ${hasCancel?cancelNoticeBadge(n['공고명']||'', n['apply_end']):''}
         ${isNewNotice(n)?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
@@ -10495,7 +10581,7 @@ function renderMatchResults(rows){
         ${(t => `<span class="htag ${t.closed?'tag-mix':'tag-apt'}">${escapeHtml(t.text)}</span>`)(zfStatusTag(n))}
       </div>
       <!-- 🔴 공고 탭과 같은 규칙 — 유형은 원문 한 번만(2026-09-16). -->
-      <p class="haddr">${zfCoverPlace(n.region_names, zfComplexCount(n), n.sido_nm, n.sigungu_nm, n.region, n.announcement_id)} · ${zfTypeHtml(n.source, n.housing_type, n.title)}</p>
+      <p class="haddr">${zfCoverPlace(n.region_names, zfComplexCount(n), n.sido_nm, n.sigungu_nm, n.region, n.announcement_id)} · ${zfTypeHtml(n.source, n.housing_type, n.title)}</p>${zfOrgSupplyHtml(n.title)}
       <div class="chip-row" style="margin:8px 0;gap:5px">
         ${hasCancel?cancelNoticeBadge(n.title||'', n.apply_end):''}
         ${n.building_name?`<span class="chip" style="cursor:default;padding:4px 10px;font-size:11px">🏢 ${zfBuildingLabel(n.building_name, zfComplexCount(n))}</span>`:''}
@@ -10760,7 +10846,7 @@ function buildChecklist(){
   const apLines = [...new Set(apRows.map(r => {
     const lab = [r.phase_text, r.site_text, r.route === '전체' ? '' : r.route].map(x => String(x || '').trim()).filter(Boolean).join(' · ');
     const span = r.start_date && r.end_date && r.start_date !== r.end_date ? `${zfMdDow(r.start_date)}~${zfMdDow(r.end_date)}` : zfMdDow(r.start_date || r.end_date);
-    const hm = zf3EndHm(r.period_text);
+    const hm = zf3EndHm(r.period_text);   // 이 판의 zf3EndHm 은 C 묶음 5 로 고쳐져 있다(main 의 zfChkEndHm 거름이 필요 없다)
     const where = String(r.place_text || '').trim() || (r.route === '전체' ? String(r.note_text || '').trim() : '');
     const past = r.end_date && (zfKstDayDiff(r.end_date) ?? 0) < 0;   // 끝난 창은 남기되 지났다고 적는다(차수가 나뉜 공고의 앞 창)
     return [lab, span ? span + (hm ? ` · ${hm}까지` : '') + (past ? ' · 지났어요' : '') : '', where && (r.route === '전체' ? where : `접수 장소 ${where}`)].filter(Boolean).join(' — ');
@@ -10778,14 +10864,71 @@ function buildChecklist(){
   }
 
   // 신청 링크
-  const applyUrl = sel.source==='LH' ? 'https://apply.lh.or.kr' : 'https://www.myhome.go.kr';
-  const applyLabel = sel.source==='LH' ? 'LH청약플러스 바로가기 →' : '마이홈포털 바로가기 →';
+  // 🔵 2026-10-22(우편함 「표시층 — A(G3 셋)」 3 덧) — 청약 사이트 버튼은 LH 공급이고(수집처 LH 또는 공급기관 LH) 인터넷 접수가 있을 때만
+  //    (경로 행이 없으면 종전처럼 LH 공급이면 띄운다). SH·지방공사 공고를 마이홈포털로 보내지 않는다 — 버튼 대신 한 줄.
+  const lhSup = sel.source === 'LH' || /^\s*(LH|한국토지주택공사)/.test(sel.org || '');
+  const showSite = lhSup && (!apRows.length || apOnline);
+  const siteAlt = apRows.length ? (apOnline ? '인터넷 신청처는 공고 원문에서 확인하세요' : '신청처는 위 접수 장소예요') : '신청처는 공고 원문에서 확인하세요';
   document.getElementById('checklist-apply-btn').innerHTML = `
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:1.25rem">
-      <button class="btn btn-sec" onclick="window.open('${applyUrl}','_blank')">${applyLabel}</button>
+      ${showSite ? `<button class="btn btn-sec" onclick="window.open('https://apply.lh.or.kr','_blank')">LH청약플러스 바로가기 →</button>` : `<p class="zf-chk-site" style="font-size:12px;color:#666;margin:0;align-self:center">${siteAlt}</p>`}
       ${zfSafeUrl(sel.url)?`<a class="detail-link" href="${zfSafeHref(sel.url)}" target="_blank" data-ai-for="${zfAttr(sel.id)}" data-ai-key="${zfAttr(zfDedupKey(sel.title||''))}"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`:''}
     </div>`;
   zfAiLabelSync();   // 🔵 2026-10-16 — 분석 없는 공고는 「원문 보기」만
+  zfChkDocs(sel);
+  zfChkOrgSupply(sel);
+}
+// 🔵 2026-10-22(우편함 「표시층 — A(G3 셋)」 3 · C 묶음 6 1 — claude.ai 판정 「공고 선택 때 2건」) — 관리 탭 제출서류를 그 공고 원문의 정책 행으로.
+//    요청 2건(묶음 id · 정책 행 — 서버에서 category 로 거르고 두 칸만) · 공고마다 한 번(세션 캐시). 원문 글자 그대로 접어서 보인다(지어 바꾸지 않는다).
+//    category 규칙: 「서류」·「증명서」가 들어가고, 질문 꼴(…?로 끝남)·⚠️ 표기 주의·「발표」·「평가항목」·「불이익」이 아닌 것. 행이 없거나 실패하면 종전 화면(유형별 예시).
+const ZF_DOC_CAT_SKIP = /\?\s*$|^\s*⚠️|발표|평가항목|불이익/;
+const zfChkDocCache = new Map();   // 대표 id → Promise<[{category, content_raw}]>
+function zfChkDocRows(id){
+  if(!id) return Promise.resolve([]);
+  if(zfChkDocCache.has(id)) return zfChkDocCache.get(id);
+  const p = resolveAnnouncementIds(id, true).then(ids => fetch(`${SUPABASE_URL}/rest/v1/announcement_policies?select=category,content_raw&category=match.${encodeURIComponent('서류|증명서')}&${idFilterFor(ids)}&order=seq`, {
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
+  })).then(r => r.ok ? r.json() : []).then(rows => {
+    const seen = new Set();
+    return (Array.isArray(rows) ? rows : []).filter(r => r && r.category && !ZF_DOC_CAT_SKIP.test(r.category) && String(r.content_raw || '').trim()).filter(r => {
+      const k = r.category + '|' + r.content_raw;
+      if(seen.has(k)) return false;
+      seen.add(k); return true;
+    });
+  }).catch(() => []);
+  zfChkDocCache.set(id, p);
+  return p;
+}
+function zfChkDocs(sel){
+  const ul = document.getElementById('checklist-common');
+  const head = ul && ul.previousElementSibling, note = head && head.previousElementSibling;
+  if(!ul || !sel) return;
+  if(head && !head.dataset.zfOrig) head.dataset.zfOrig = head.textContent;
+  if(note && note.classList.contains('zf-doc-note') && !note.dataset.zfOrig) note.dataset.zfOrig = note.textContent;
+  if(ZF_ORG_SUPPLY_RE.test(sel.title || '')) return;   // 기관공급 — 아래 zfChkOrgSupply 가 이 칸을 대신한다
+  const myId = sel.id;
+  zfChkDocRows(sel.rid || sel.id).then(rows => {
+    const cur = document.getElementById('noticeSelect');
+    if(!rows.length || (cur && cur.value && cur.value !== myId)) return;
+    const byCat = [];
+    rows.forEach(r => { let g = byCat.find(x => x.c === r.category); if(!g){ g = { c: r.category, t: [] }; byCat.push(g); } g.t.push(String(r.content_raw).trim()); });
+    ul.innerHTML = byCat.map(g => `<li class="zf-doc-orig" style="display:block"><details><summary style="cursor:pointer;font-weight:600">${escapeHtml(g.c)}</summary><div style="white-space:pre-wrap;font-size:12px;line-height:1.6;color:#444;margin-top:6px">${escapeHtml(g.t.join('\n'))}</div></details></li>`).join('');
+    if(head) head.textContent = '📋 이 공고 원문의 제출서류';
+    if(note && note.classList.contains('zf-doc-note')) note.textContent = '공고 원문의 제출서류 항목을 그대로 옮겼어요 — 눌러서 펼쳐 보세요 · 최종 확인은 공고 원문에서';
+  });
+  if(head && head.dataset.zfOrig) head.textContent = head.dataset.zfOrig;
+  if(note && note.dataset.zfOrig) note.textContent = note.dataset.zfOrig;
+}
+// 🔵 2026-10-22(우편함 「표시층 — A(G3 셋)」 2) — 기관공급(기업이 신청하는 공고)은 관리 탭의 개인용 안내(유형별 서류 예시 · 혼인 상태별 서류 · 인증서)를 끈다.
+function zfChkOrgSupply(sel){
+  if(!sel || !ZF_ORG_SUPPLY_RE.test(sel.title || '')) return;
+  const ul = document.getElementById('checklist-common');
+  const head = ul && ul.previousElementSibling, note = head && head.previousElementSibling;
+  if(ul) ul.innerHTML = `<li><span class="cicon ccond">!</span><span>${ZF_ORG_SUPPLY_TEXT} — 개인 신청 서류가 아니라 공고 원문의 기업 제출서류를 확인하세요</span></li>`;
+  if(head) head.textContent = '📋 제출서류';
+  if(note && note.classList.contains('zf-doc-note')) note.textContent = '기업이 신청하는 공고예요 — 공고 원문에서 확인하세요';
+  ['checklist-cond', 'checklist-cond-title'].forEach(i => { const e = document.getElementById(i); if(e) e.style.display = 'none'; });
+  document.querySelectorAll('#checklist-apply li').forEach(li => { if(/인증서/.test(li.textContent)) li.remove(); });
 }
 
 loadRegionsFromSupabase(); // ② 전국 지역 동적 로드 후 buildChipOptions() 호출
@@ -12299,7 +12442,7 @@ function zf3DecorateIn(list, rowsMap, isMatch){
         card.dataset.zf3Branch = '1';
         const ann = zf3Real(zfNoticeDate(n) || n['announcement_date']);
         route.innerHTML = `<p class="zf3-bhead">📑 공고문 ${nl.length}개 · 공고문마다 접수일이 달라요</p>`
-          + nl.map(x => `<div class="zf3-branch"><p class="zf3-bn"><span title="${zfAttr(x.title)}">${escapeHtml(x.name || x.title)}</span>${zfNoticeStateBadge(x.state, x.end, x.hmPassed)}</p>${zf3LineHTML([{ k: '공고', d: ann }, { k: '접수', d: zf3Real(x.start), u: '미상' }, { k: '마감', d: zf3Real(x.end), u: '미상' }], x.name || x.title)}</div>`).join('');
+          + nl.map(x => `<div class="zf3-branch"><p class="zf3-bn"><span title="${zfAttr(x.title)}">${escapeHtml(x.name || x.title)}</span>${zfNoticeStateBadge(x.state, x.end, x.hmPassed, x.win2)}</p>${zf3LineHTML([{ k: '공고', d: ann }, { k: '접수', d: zf3Real(x.start), u: '미상' }, { k: '마감', d: zf3Real(x.end), u: '미상' }], x.name || x.title)}</div>`).join('');
         slot.classList.add('zf3-off');
       }
     }

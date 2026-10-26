@@ -13,6 +13,10 @@
 --      화면 점검 불능(배포 반영 기다림 초과)은 2026-10-20 뒤부터 DB 에 남는다(그 전에는 health-screen-blind 이슈로만).
 --   G2 열린 카드 전부 분석 완료 또는 「분석 중」 표시 · 판정 대기 0
 --      카드 요약 갈래(health-screen phrase 와 같은 식): 요약 · 목록없음 · 링크만 · 분석중 = 표지 있음 / 빈칸 · 미정리 = 위반.
+--      🔵 2026-10-22(우편함 「표시층 — A(G2): 「링크만」 카드에 사실대로의 표지」) — 「링크만」(첨부 0 · 분석 없음)은 그동안 화면에 표지 없이 초록으로 셌다(빈틈).
+--      이제 「링크만」이 표지 있음이 되려면 화면이 「꼭집 미분석」 표지 + 「꼭집이 아직 분석하지 않은 공고예요 · 원문은 … 게시판」을 달아야 하고,
+--      그 판정은 SQL 이 못 보므로 health-screen phrase 가 한다(표지 없는 링크만 카드 = phrase 실패 = G1 화면 실패로 드러남).
+--      g2.linkonly = 그 카드 수(따로 센다 · blank 에 넣지 않는다) — G2 초록 = blank 0 ∧ 판정 대기 0 ∧ (linkonly 0 ∨ 마지막 health-screen phrase 통과).
 --      더함 둘(claude.ai 확정 2026-10-18): 「분석 중」은 대기열(analysis_dispatch_queue waiting·sent·claimed)에 있을 때만 약속이다(analyzing_not_queued = 0) ·
 --      판정 대기는 announcement_analysis.status = '완료(판정 대기)'로 센다(pending_fields 「[판정대기]」 표식으로 세지 않는다 — 표식은 판정 뒤에도 기록으로 남는다).
 --      열린 카드는 근사다: apply_end ≥ 오늘(KST) ∧ 제목에 「조기…마감」 없음(2026-10-18 화면 58 = 이 식 58). 정본은 health-screen phrase(공고 탭 전 카드).
@@ -99,6 +103,7 @@ from (
       'open_approx', (select count(*) from c),
       'by_cat', (select json_object_agg(cat, n) from (select cat, count(*) n from c group by cat) x),
       'blank', (select count(*) from c where cat in ('빈칸', '미정리')),
+      'linkonly', (select count(*) from c where cat = '링크만'),
       'analyzing_not_queued', (select count(*) from c join announcements a on a.announcement_id = c.aid
                                 where c.cat = '분석중'
                                   and not exists (select 1 from analysis_dispatch_queue q
