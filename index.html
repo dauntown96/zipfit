@@ -2474,11 +2474,13 @@ function zfLoadCardSide(){
   ]).then(async ([routes, links]) => {
     routes = routes || []; links = links || [];
     const ids = [...new Set(routes.map(r => r.announcement_id).concat(links.map(l => l.lh_announcement_id)))].filter(Boolean);
-    const anns = ids.length ? (await get(`announcements?select=announcement_id,title,url&${idFilterFor(ids)}`)) || [] : [];
+    // 🔴 2026-10-27(우편함 「표시층 — G3 회차 섞임 고침」) — apply_end 를 함께 받아 경로 행에 출처 공고 마감(_srcEnd)을 싣는다(zfRoundRows 가 카드 회차로 거른다 · 같은 요청).
+    const anns = ids.length ? (await get(`announcements?select=announcement_id,title,url,apply_end&${idFilterFor(ids)}`)) || [] : [];
     const annById = new Map(anns.map(a => [a.announcement_id, a]));
     routes.forEach(r => {
       const a = annById.get(r.announcement_id);
       if(!a) return;                                   // 제목을 모르면 어느 카드인지도 모른다 — 붙이지 않는다
+      r._srcEnd = a.apply_end || '';
       const k = zfDedupKey(a.title);
       if(!zfSide.routesByKey.has(k)) zfSide.routesByKey.set(k, []);
       zfSide.routesByKey.get(k).push(r);
@@ -2517,6 +2519,20 @@ function zfRoutesReadyMark(){
 }
 function zfLoadRoutes(){
   return Promise.race([zfRoutesReadyP, zfLoadCardSide().then(() => {}, () => {})]);
+}
+// 🔴 2026-10-27(우편함 「표시층 — G3 회차 섞임 고침」 · 조사 「실사용 10-27」 4) — 제목 키로 묶인 행 중 카드 회차의 것만.
+//    제목 키는 재공고(지난 회차·같은 제목)까지 묶는다 — 카드 1층 📅 한 줄이 지난 회차 현장 9/2 행으로 「10/29 하루」를 「10/29까지」로 넓혔고(…20886),
+//    관리 탭 제출서류에 지난 회차 발급 기준일 문단이 섞였다(…20922 · …20886). zfSplitByCardRound 와 같은 규칙:
+//    다른 회차 = 출처 공고 apply_end 를 알고 그것이 카드 apply_end 와 다름 · 카드 마감을 모르면 거르지 않음 · 이번 회차 행이 0이면 거르지 않음(정정으로 마감이 바뀐 공고).
+function zfRoundRows(rows, cardEnd, endOf){
+  const all = Array.isArray(rows) ? rows : [];
+  const ce = String(cardEnd || '').slice(0, 10);
+  if(!ce || !all.length) return all;
+  const cur = all.filter(r => { const e = endOf(r); return e == null || String(e).slice(0, 10) === ce; });
+  return cur.length ? cur : all;
+}
+function zfRoutesForCard(key, cardEnd){
+  return zfRoundRows(zfSide.routesByKey.get(key), cardEnd, r => r._srcEnd);
 }
 // 카드를 그린 뒤 부른다 — 곁 데이터가 이미 있으면 바로 채우고, 없으면 로드를 건다(도착하면 다시 채운다).
 function zfAfterCardsRender(){
@@ -2883,7 +2899,8 @@ function zfFillSideSlots(){
   document.querySelectorAll('.zf-route-slot[data-route-key]').forEach(el => {
     if(el.dataset.filled === '1') return;
     el.dataset.filled = '1';
-    const rows = zfSide.routesByKey.get(el.getAttribute('data-route-key'));
+    const hc = el.closest('.hcard');
+    const rows = zfRoutesForCard(el.getAttribute('data-route-key'), hc && hc.dataset.applyEnd);   // 🔴 2026-10-27 — 카드 회차 행만(zfRoundRows)
     const v = zfRouteVerdict(rows);
     if(!v.text) return;
     // 🔵 2026-10-07(Z-2 ③ 3 · 다운님 승인 3) — 현장 접수 줄(②-나·②-다·②-라) 끝에 접수 장소를 경로 칸 place_text 그대로 붙인다(여럿이면 「 / 」).
@@ -10428,7 +10445,7 @@ function buildChecklist(){
   // 🔵 2026-10-22(우편함 「표시층 C 묶음 6」 2) — 경로 표(announcement_apply_routes · 곁 데이터 — 새 요청 0) 행이 있으면 고정 안내 대신 경로·기간을 행마다.
   //    이름표 = 차수 · 단지 · 경로 원문 · 날짜 = 행 값 · 끝 시각 = period_text 원문에서 읽은 것(zf3EndHm — 카드 알약과 같은 규칙) · 장소·방법 = place_text(전체 행은 없으면 note_text) 원문.
   //    인증서 줄은 인터넷·모바일 경로가 있을 때만(현장·우편·이메일뿐인 공고에 「인증서 준비」라 단정하지 않는다). 행이 없으면 종전 고정 안내.
-  const apRows = zfSide.routesReady ? (zfSide.routesByKey.get(zfDedupKey(sel.title || '')) || []).slice().sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)) : [];
+  const apRows = zfSide.routesReady ? zfRoutesForCard(zfDedupKey(sel.title || ''), sel.apply_end).slice().sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)) : [];
   const apOnline = apRows.some(r => /인터넷|온라인|모바일/.test(r.route || ''));
   const apLines = [...new Set(apRows.map(r => {
     const lab = [r.phase_text, r.site_text, r.route === '전체' ? '' : r.route].map(x => String(x || '').trim()).filter(Boolean).join(' · ');
@@ -10475,21 +10492,26 @@ function zfChkEndHm(t){
 //    요청 2건(묶음 id · 정책 행 — 서버에서 category 로 거르고 두 칸만) · 공고마다 한 번(세션 캐시). 원문 글자 그대로 접어서 보인다(지어 바꾸지 않는다).
 //    category 규칙: 「서류」·「증명서」가 들어가고, 질문 꼴(…?로 끝남)·⚠️ 표기 주의·「발표」·「평가항목」·「불이익」이 아닌 것. 행이 없거나 실패하면 종전 화면(유형별 예시).
 const ZF_DOC_CAT_SKIP = /\?\s*$|^\s*⚠️|발표|평가항목|불이익/;
-const zfChkDocCache = new Map();   // 대표 id → Promise<[{category, content_raw}]>
-function zfChkDocRows(id){
+const zfChkDocCache = new Map();   // 대표 id|카드 마감 → Promise<[{category, content_raw}]>
+// 🔴 2026-10-27(우편함 「표시층 — G3 회차 섞임 고침」 1) — 정책 행을 카드 회차로 거른 뒤 겹침을 지운다(zfRoundRows · 출처 공고 apply_end = 카드 apply_end).
+//    묶음 id 의 회차 조회(fetchGroupRounds — 이미 있는 요청 꼴)를 한 번 더 한다 · 회차 조회가 실패하면 거르지 않는다(종전 그대로).
+function zfChkDocRows(id, cardEnd){
   if(!id) return Promise.resolve([]);
-  if(zfChkDocCache.has(id)) return zfChkDocCache.get(id);
-  const p = resolveAnnouncementIds(id, true).then(ids => fetch(`${SUPABASE_URL}/rest/v1/announcement_policies?select=category,content_raw&category=match.${encodeURIComponent('서류|증명서')}&${idFilterFor(ids)}&order=seq`, {
+  const ck = id + '|' + String(cardEnd || '').slice(0, 10);
+  if(zfChkDocCache.has(ck)) return zfChkDocCache.get(ck);
+  const p = resolveAnnouncementIds(id, true).then(ids => Promise.all([fetch(`${SUPABASE_URL}/rest/v1/announcement_policies?select=announcement_id,category,content_raw&category=match.${encodeURIComponent('서류|증명서')}&${idFilterFor(ids)}&order=seq`, {
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
-  })).then(r => r.ok ? r.json() : []).then(rows => {
+  }).then(r => r.ok ? r.json() : []), fetchGroupRounds(ids, ids.length >= 2 && !!cardEnd)])).then(([rows, roundMap]) => {
     const seen = new Set();
-    return (Array.isArray(rows) ? rows : []).filter(r => r && r.category && !ZF_DOC_CAT_SKIP.test(r.category) && String(r.content_raw || '').trim()).filter(r => {
+    rows = (Array.isArray(rows) ? rows : []).filter(r => r && r.category && !ZF_DOC_CAT_SKIP.test(r.category) && String(r.content_raw || '').trim());
+    if(roundMap) rows = zfRoundRows(rows, cardEnd, r => { const a = roundMap[r.announcement_id]; return a ? (a.apply_end || '') : null; });
+    return rows.filter(r => {
       const k = r.category + '|' + r.content_raw;
       if(seen.has(k)) return false;
       seen.add(k); return true;
     });
   }).catch(() => []);
-  zfChkDocCache.set(id, p);
+  zfChkDocCache.set(ck, p);
   return p;
 }
 function zfChkDocs(sel){
@@ -10500,7 +10522,7 @@ function zfChkDocs(sel){
   if(note && note.classList.contains('zf-doc-note') && !note.dataset.zfOrig) note.dataset.zfOrig = note.textContent;
   if(ZF_ORG_SUPPLY_RE.test(sel.title || '')) return;   // 기관공급 — 아래 zfChkOrgSupply 가 이 칸을 대신한다
   const myId = sel.id;
-  zfChkDocRows(sel.rid || sel.id).then(rows => {
+  zfChkDocRows(sel.rid || sel.id, sel.apply_end).then(rows => {
     const cur = document.getElementById('noticeSelect');
     if(!rows.length || (cur && cur.value && cur.value !== myId)) return;
     const byCat = [];
@@ -12010,7 +12032,7 @@ function zf3DecorateIn(list, rowsMap, isMatch){
     //    알약은 지금 창 안이면 「접수 중 · 이번 창 D-n」, 창 사이면 「다음 창 대기 · MM-DD」 · 노선 접수 역 = 이번·다음 창 시작(아래에 창 끝).
     if(card.dataset.zf3 === '1' && zfSide.loaded && card.dataset.zf3Win !== '1'){
       card.dataset.zf3Win = '1';
-      const rows = zfSide.routesByKey.get(zfDedupKey(n['공고명']));
+      const rows = zfRoutesForCard(zfDedupKey(n['공고명']), n['apply_end']);   // 🔴 2026-10-27 — 카드 회차 행만(zfRoundRows)
       const vk = rows && rows.length ? (zfRouteVerdict(rows, new Date()) || {}).kind || '' : '';
       const wins = /^②-마/.test(vk) ? zfRouteWindows(rows) : [];   // 순위·단지로 갈린 창(②-가·나)은 반복 창이 아니다
       if(wins.length >= 2 && n['apply_period_check'] !== true){
