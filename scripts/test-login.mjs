@@ -172,6 +172,13 @@ export async function applyPersona(page, persona) {
   return { saved: /저장됐어요/.test(msg || ''), msg: (msg || '').trim(), region, regionOk, birthYear }
 }
 
+/** 새로고침 — 세션(localStorage)은 남고 「세션 진입」이 다시 돈다(저장한 조건이 진단 칸에 채워지는 길 · G3-B 재현 꼴). 주소에 토큰이 없을 때만 부른다. */
+export async function reloadLoggedIn(page, { timeout = 30000 } = {}) {
+  await page.reload({ waitUntil: 'domcontentloaded', timeout })
+  await page.waitForFunction(() => typeof currentUser !== 'undefined' && currentUser && typeof zfProfileLoaded !== 'undefined' && zfProfileLoaded, null, { timeout })
+  await page.waitForTimeout(1000)
+}
+
 /** 추천 탭으로 가서 맞춤 추천이 그려질 때까지 — 카드 수와 안내 제목을 돌려준다. */
 export async function openRecommend(page) {
   await page.evaluate(() => goMain(1))
@@ -180,6 +187,20 @@ export async function openRecommend(page) {
     promptTitle: (document.getElementById('personalizedPromptTitle')?.offsetParent ? document.getElementById('personalizedPromptTitle').textContent.trim() : null),
     cards: document.querySelectorAll('#main1 [data-sum-for]').length,
     text: (document.getElementById('main1')?.innerText || '').replace(/\s+/g, ' ').slice(0, 400),
+    // 🔵 2026-10-28(우편함 「17:25 뒤 A 병합 둘」 덧 2) — 자격 진단 칸·결과 글자(G3-B 재현 판정용 · 페르소나 입력만 — 실사람 값 아님).
+    diag: (() => {
+      const v = id => document.getElementById(id)?.value ?? null
+      const res = document.getElementById('diag-result')
+      const t = res && !res.classList.contains('hidden') ? (res.innerText || '').replace(/\s+/g, ' ').trim() : ''
+      // 「✅ 신청 가능한 주택 유형 · 국민임대 · 영구임대 … 소득·자산·나이 기준을 충족한 유형이에요」 의 유형 목록
+      const m = t.match(/신청 가능한 주택 유형\s*·\s*(.*?)\s+소득·자산/)
+      const ok = m ? m[1].split(/\s*·\s*/).filter(Boolean) : null
+      return {
+        inputs: { marital: v('marital'), members: v('members'), income: v('income'), birthYear: v('birthYear') },
+        savedBar: !!document.querySelector('#panel1 .zf3-rsaved:not([hidden])'),
+        shown: !!t, okLine: ok, text: t.slice(0, 300),
+      }
+    })(),
   }))
 }
 

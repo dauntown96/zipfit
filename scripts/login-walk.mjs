@@ -7,19 +7,21 @@
 //                ⚠️ 로컬 판은 로그인까지만 된다 — 프로필 EF(save-user-profile)의 CORS 허용 목록이 배포 도메인 셋뿐이라 저장은 「불러오지 못함」으로 끝난다(2026-10-28 실측).
 //     --width    390(기본) · 1280
 //     --clock    KST 시각 고정(예 '2026-10-28 16:01')
+//     --reload   첫 페르소나 저장 뒤 한 번 새로고침(저장한 조건을 든 채 세션에 다시 들어온 꼴 — G3-B 「설정 바꿔 저장 → 진단 옛 값」 재현)
 //     --shot     캡처 폴더(쪽마다 png — 세션 scratchpad 를 준다 · 🔴 저장소 안에 두지 않는다)
 //   끝에 JSON 한 줄(링크·토큰·사용자 id 0)과 정리 결과(계정 0 · 링크 응답 행 0)를 찍고, 정리가 깨끗하지 않으면 종료 코드 1.
 // 🔴 규칙은 scripts/test-login.mjs 머리(⑦ 1-3 시험 계정 예외). 로컬 판은 미리 띄워 둔다(예: python3 -m http.server 8201 — 저장소 뿌리에서).
 import { readFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { createRequire } from 'node:module'
-import { withTestLogin, openLoggedIn, applyPersona, openRecommend, DEPLOYED } from './test-login.mjs'
+import { withTestLogin, openLoggedIn, applyPersona, openRecommend, reloadLoggedIn, DEPLOYED } from './test-login.mjs'
 
 const arg = (k, d = null) => { const i = process.argv.indexOf(`--${k}`); return i > 0 ? process.argv[i + 1] : d }
 const base = arg('base', DEPLOYED)
 const width = parseInt(arg('width', '390'))
 const clock = arg('clock')
 const shot = arg('shot')
+const reload = process.argv.includes('--reload')
 const ids = arg('persona', 'P2').split(',').map(s => s.trim()).filter(Boolean)
 const all = JSON.parse(readFileSync(new URL('./target-personas.json', import.meta.url), 'utf8')).personas
 const personas = ids.map(id => all.find(p => p.id === id) ?? (() => { throw new Error(`페르소나 없음: ${id}`) })())
@@ -53,7 +55,8 @@ try {
       if (shot) await page.screenshot({ path: join(shot, `${p.id}-settings-${width}.png`), fullPage: false })
       const rec = await openRecommend(page)
       if (shot) await page.screenshot({ path: join(shot, `${p.id}-recommend-${width}.png`), fullPage: true })
-      steps.push({ persona: p.id, saved: saved.saved, msg: saved.msg, region: saved.region, regionChip: saved.regionOk, cards: rec.cards, prompt: rec.promptTitle })
+      steps.push({ persona: p.id, saved: saved.saved, msg: saved.msg, region: saved.region, regionChip: saved.regionOk, cards: rec.cards, prompt: rec.promptTitle, diag: rec.diag })
+      if (reload && p === personas[0] && personas.length > 1) { await reloadLoggedIn(page); steps.push({ reloaded: true, diag: (await openRecommend(page)).diag }) }
     }
     // 이용 기록이 운영 표지를 달고 나갔는지 — 화면 함수로 직접 본다(보낸 본문은 찍지 않는다)
     const ops = await page.evaluate(() => (typeof zfOpsOn === 'function' ? zfOpsOn() : null))
@@ -68,6 +71,6 @@ try {
 } finally {
   await browser.close().catch(() => {})
 }
-const ok = out.clean && out.clean.test_accounts === 0 && out.clean.link_rows === 0 && out.result.steps.every(s => s.saved)
+const ok = out.clean && out.clean.test_accounts === 0 && out.clean.link_rows === 0 && out.result.steps.every(s => s.reloaded || s.saved)
 console.log(JSON.stringify({ ok, ...out }))
 process.exit(ok ? 0 : 1)
