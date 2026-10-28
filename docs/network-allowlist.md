@@ -27,6 +27,8 @@
 | `khdpjjyspmlqtzperoqg.supabase.co` | anon REST 확인(원칙 29) · 배포본 렌더 | 지금 | — | 2026-10-14 | 열림 404(루트) |
 | `apply.lh.or.kr` | 분석 · LH 공고 페이지 원문 | 지금 | 해외 IP 허용(실측) | 2026-10-14 | 열림 200 |
 | `kkokzip.com` | 배포본 렌더(Playwright) · 점검 | 지금 | — | 2026-10-14 | 열림 200 |
+| `apply.gh.or.kr` | GH 수집기 시험(`collect-gh-announcements` 로컬 probe) · GH 공고 상세 | 지금 | 해외 IP 미상(컨테이너 실측만) | 2026-10-28 | 열림 200 · robots `Allow: /*` |
+| `apply-cdn.gh.or.kr` | GH 공고문 첨부 받기 | 지금(2026-10-26 다운님 더함) | 해외 IP 미상 | 2026-10-28 | 열림 200(첫 호출은 `reset by peer` → 다시 200) |
 | `www.kkokzip.com` | 배포본 넘김 확인 | 지금 | — | 2026-10-14 | 열림 301 |
 | `dauntown96.github.io` | 옛 배포 주소 넘김 확인(뺄 것 후보) | 지금 | — | 2026-10-14 | 열림 404(루트) |
 | `cdn.jsdelivr.net` | 배포본 supabase-js | 지금 | — | 2026-10-14 | 열림 301 |
@@ -58,7 +60,6 @@
 | `www.bmc.busan.kr` | 국면 B′ 부산도시공사(지금은 EF `SEOUL_ONLY`) | 예정 | 🔴 둘 다 — 허용 목록 + 해외 IP 차단 | 2026-10-14 | 막힘(CONNECT 403) |
 | `www.gbdc.co.kr` | 국면 B′ 경북개발공사 게시판(지금은 DB `net.http_get`) | 예정 | 허용 목록 · 해외 IP 허용(DB에서 열림) | 2026-10-14 | 막힘(CONNECT 403) |
 | `www.gndc.co.kr` | 국면 B′ 경남개발공사 게시판(지금은 DB `net.http_get`) | 예정 | 허용 목록 · 해외 IP 허용(DB에서 열림) | 2026-10-14 | 막힘(CONNECT 403) |
-| `www.gh.or.kr` | 국면 B′ GH | 예정 | 허용 목록 · 미상 | 2026-10-14 | 막힘(CONNECT 403) |
 | `www.ih.co.kr` | 국면 B′ 인천도시공사 | 예정 | 허용 목록 · 미상 | 2026-10-14 | 막힘(CONNECT 403) |
 | `www.applyhome.co.kr` | 청약홈 · 분양 확장(L1 「분양 보류」) | 예정 | 허용 목록 · 미상 | 2026-10-14 | 막힘(CONNECT 403) |
 
