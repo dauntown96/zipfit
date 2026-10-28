@@ -834,7 +834,7 @@ html[data-ui="d3"] .zf3-card .chip-row .chip.zf3-minechip{background:var(--surfa
 .zf3-trpart{margin-top:8px}
 .zf3-xmiss{position:absolute;top:0;left:0;right:0;padding:3px 5px;background:var(--warn);color:var(--paper);font-size:var(--t-xs);font-weight:700;line-height:1.3}
 .zf3-xloose{position:absolute;top:0;left:0;right:0;padding:3px 5px;background:var(--surface-2);color:var(--ink);border-bottom:1px solid var(--line);font-size:var(--t-xs);font-weight:600;line-height:1.3}
-.zf3-xloose b{display:block;font-weight:800}
+.zf3-xloose b{display:block;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .extras-site-label{margin:10px 0 6px;padding-left:8px;border-left:3px solid var(--rail);font-size:var(--t-s);font-weight:700;color:var(--ink-2)}
 .extras-sites .extras-site-label:first-child{margin-top:4px}
 .zf3-hux{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 6px;font-size:var(--t-s);color:var(--ink-2)}
@@ -12381,7 +12381,9 @@ function zf3HourTimer(){
 //    단지명은 행의 site_label 원문 그대로 · 없으면 짓지 않는다(표지 글만).
 function zf3PlanLooseTag(it){
   const site = String((it && it.site_label) || '').trim();
-  return `<span class="zf3-xloose">${site ? `<b>${escapeHtml(site)}</b>` : ''}주택형에 못 붙인 평면도</span>`;
+  //    타일(390 폭 약 95px)을 덮지 않게 두 줄로 — 단지명 한 줄(넘치면 말줄임) + 「주택형 미연결」 · 온 문장은 title 에.
+  const full = (site ? site + ' · ' : '') + '세대 목록의 주택형에 못 붙인 평면도';
+  return `<span class="zf3-xloose" title="${zfAttr(full)}">${site ? `<b>${escapeHtml(site)}</b>` : ''}주택형 미연결</span>`;
 }
 function zf3PlanMissing(cap, keys){
   const m = /평면도\s*\(([^)]+)\)/.exec(String(cap || ''));
