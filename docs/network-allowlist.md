@@ -58,7 +58,6 @@
 | `www.bmc.busan.kr` | 국면 B′ 부산도시공사(지금은 EF `SEOUL_ONLY`) | 예정 | 🔴 둘 다 — 허용 목록 + 해외 IP 차단 | 2026-10-14 | 막힘(CONNECT 403) |
 | `www.gbdc.co.kr` | 국면 B′ 경북개발공사 게시판(지금은 DB `net.http_get`) | 예정 | 허용 목록 · 해외 IP 허용(DB에서 열림) | 2026-10-14 | 막힘(CONNECT 403) |
 | `www.gndc.co.kr` | 국면 B′ 경남개발공사 게시판(지금은 DB `net.http_get`) | 예정 | 허용 목록 · 해외 IP 허용(DB에서 열림) | 2026-10-14 | 막힘(CONNECT 403) |
-| `www.gh.or.kr` | 국면 B′ GH | 예정 | 허용 목록 · 미상 | 2026-10-14 | 막힘(CONNECT 403) |
 | `www.ih.co.kr` | 국면 B′ 인천도시공사 | 예정 | 허용 목록 · 미상 | 2026-10-14 | 막힘(CONNECT 403) |
 | `www.applyhome.co.kr` | 청약홈 · 분양 확장(L1 「분양 보류」) | 예정 | 허용 목록 · 미상 | 2026-10-14 | 막힘(CONNECT 403) |
 
