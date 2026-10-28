@@ -5107,6 +5107,21 @@ function zfPrefillMatchFromProfile(p){
   if(note) note.classList.toggle('hidden', n===0);
   if(n>0 && typeof zf3RecSaved === 'function') zf3RecSaved();   // 🔵 D-3 e — 저장 조건이 있으면 결과부터(d3)
 }
+// 🔴 2026-10-28(우편함 「표시층 — A(G3): 설정 저장 뒤 자격 진단 옛 값(G3-B)」) — 설정 탭에서 조건을 저장하면 진단 칸을 새 저장값으로 다시 채운다.
+//    종전에는 세션당 한 번(zfMatchPrefilled)만 채워 저장 뒤에도 「저장한 조건으로 확인한 결과예요」가 옛 값으로 판정했다.
+//    사용자가 만진 칸(zfMatchTouched)은 그대로 · 채운 값 그대로인 칸만 비우고 새 값으로 · 이미 진단했으면 결과를 다시 그린다.
+function zfRefillMatchFromProfile(p){
+  if(!zfMatchPrefilled){ zfPrefillMatchFromProfile(p); return; }
+  Object.entries(zfMatchFilledVals).forEach(([id,v])=>{
+    const el=document.getElementById(id);
+    if(!el || zfMatchTouched.has(id) || el.value!==v) return;
+    el.value = el.tagName==='SELECT' ? ([...el.options].find(o=>o.defaultSelected)||el.options[0]).value : '';
+  });
+  zfMatchFilledVals={}; zfMatchPrefilled=false;
+  zfPrefillMatchFromProfile(p);
+  const r=document.getElementById('diag-result');
+  if(r && !r.classList.contains('hidden')){ try{ diagnose(); }catch(e){} }
+}
 function zfClearMatchPrefill(){
   Object.entries(zfMatchFilledVals).forEach(([id,v])=>{
     const el=document.getElementById(id);
@@ -11301,6 +11316,7 @@ async function saveSettings(){
     max_deposit:payload.maxDeposit,
     birth_year:payload.birthYear,
     theme:payload.theme, font_size:payload.fontSize};
+  zfRefillMatchFromProfile(currentUser);   // 🔴 G3-B — 추천 탭 진단 칸·결과를 새 저장값으로
   msgEl.style.color='#0F6E56';
   msgEl.textContent='✅ 조건이 저장됐어요.';
 }
