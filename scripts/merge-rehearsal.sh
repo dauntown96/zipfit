@@ -7,6 +7,9 @@
 #   bash scripts/merge-rehearsal.sh --base origin/main #729 #682   # PR 번호(#N)도 된다 — refs/pull/N/head 를 가져온다
 # 출력: 한 줄에 하나 「<가지> 충돌 0」 또는 「<가지> 충돌 N: 파일 …」 · 끝에 「합계 충돌 N」.
 #   충돌이 난 머지는 되돌리고(abort) 다음 가지로 간다 — 「그 가지를 그 자리에 넣으면 충돌」을 보는 것이라, 뒤 가지는 그 가지 없이 이어 본다.
+#   🔵 2026-10-29(우편함 「코드·운영 — 런칭 전날」 3) — 머지가 된 가지마다 아래에 「  └ sw.js vN(직전 vM)」 한 줄 ·
+#   그 단계에서 index.html 이 바뀌었는데 판이 그대로면 「  ⚠️ index.html 이 바뀌었는데 sw.js 판 그대로(vN)」 한 줄(원칙 9 ·
+#   2026-10-28 v256 이 둘 합쳐진 사례) · 끝에 「판 경고 N」. 판 경고는 종료 코드에 넣지 않는다(충돌만 센다 — 종전 그대로).
 # 종료 코드: 충돌 0 이면 0 · 하나라도 있으면 1 · 사용법·가져오기 실패는 2.
 # 🔴 원격에 아무것도 올리지 않는다(fetch 만) · 임시 작업트리(mktemp)에서만 머지한다 · 끝나면(오류여도) 작업트리를 지운다 ·
 #   지금 작업트리·가지·인덱스는 건드리지 않는다.
@@ -17,7 +20,7 @@ refs=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --base) base="${2:?--base 다음에 기준 ref}"; shift 2 ;;
-    -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,15p' "$0"; exit 0 ;;
     *) refs+=("$1"); shift ;;
   esac
 done
@@ -43,12 +46,19 @@ cleanup() { git worktree remove --force "$wt" >/dev/null 2>&1 || rm -rf "$wt"; g
 trap cleanup EXIT
 git worktree add -q --detach "$wt" "$base"
 
+ver() { git -C "$wt" show "HEAD:sw.js" 2>/dev/null | sed -nE "s/^const CACHE_NAME = 'zipfit-v([0-9]+)';.*/\1/p" | head -1; }
 echo "기준 $base $(git rev-parse --short "$base")"
-total=0
+echo "  └ sw.js v$(ver)"
+total=0; warn=0
 for t in "${targets[@]}"; do
   ref=${t%%|*}; name=${t#*|}
+  before=$(git -C "$wt" rev-parse HEAD); v0=$(ver)
   if git -C "$wt" -c user.name=rehearsal -c user.email=rehearsal@localhost merge -q --no-edit "$ref" >/dev/null 2>&1; then
     echo "$name($(git rev-parse --short "$ref")) 충돌 0"
+    v1=$(ver); echo "  └ sw.js v${v1:-?}(직전 v${v0:-?})"
+    if ! git -C "$wt" diff --quiet "$before" HEAD -- index.html && [ "$v1" = "$v0" ]; then
+      echo "  ⚠️ index.html 이 바뀌었는데 sw.js 판 그대로(v${v1:-?})"; warn=$((warn + 1))
+    fi
   else
     files=$(git -C "$wt" diff --name-only --diff-filter=U | tr '\n' ' ')
     n=$(printf '%s' "$files" | wc -w)
@@ -58,4 +68,5 @@ for t in "${targets[@]}"; do
   fi
 done
 echo "합계 충돌 $total"
+echo "판 경고 $warn"
 [ "$total" -eq 0 ]
