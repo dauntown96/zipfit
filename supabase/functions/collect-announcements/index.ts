@@ -199,11 +199,13 @@ const LIST_TIMEOUT_MS = 12000
 //          2026-10-11 probe 실측: 06 7건 · 13 4건(MYHOME 으로만 알던 LH 8건이 전부 이 창에 있다 · 상세가 첨부를 준다).
 type ListWin = 'main' | 'long'
 function listWindow(win: ListWin) {
-  const today  = new Date()
+  // 🔵 2026-10-29(우편함 「코드·운영 — 런칭 뒤 묶음」 5 · 초안) — KST 날짜 축. Edge 런타임 시간대는 UTC 라 종전 getDate() 는 KST 00~09시에 하루 앞 날짜였다.
+  //    9시간 민 시각의 UTC 칸(getUTC*)을 읽으면 KST 날짜다.
+  const today  = new Date(Date.now() + 9 * 3600_000)
   const fmt    = (d: Date) =>
-    `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`
-  const ago    = (n: number) => { const d = new Date(today); d.setDate(today.getDate() - n); return fmt(d) }
-  const future = new Date(today); future.setDate(today.getDate() + 365)
+    `${d.getUTCFullYear()}${String(d.getUTCMonth()+1).padStart(2,'0')}${String(d.getUTCDate()).padStart(2,'0')}`
+  const ago    = (n: number) => { const d = new Date(today); d.setUTCDate(today.getUTCDate() - n); return fmt(d) }
+  const future = new Date(today); future.setUTCDate(today.getUTCDate() + 365)
   return win === 'long'
     ? { PAN_ST_DT: ago(365), PAN_ED_DT: ago(91), CLSG_ST_DT: fmt(today), CLSG_ED_DT: fmt(future) }
     : { PAN_ST_DT: ago(90), PAN_ED_DT: fmt(today), CLSG_ST_DT: ago(90), CLSG_ED_DT: fmt(future) }
@@ -708,7 +710,8 @@ async function fetchBoardHtml(url: string): Promise<{ html: string; finalUrl: st
 
 // 대상 게시글(url) 고르기 — write=false(probe)면 첨부가 이미 있는 게시글도 넣는다(읽기 대조용).
 async function boardTargets(write: boolean): Promise<{ urls: string[]; error?: string }> {
-  const today = new Date().toISOString().slice(0, 10)
+  // 🔵 2026-10-29(우편함 「코드·운영 — 런칭 뒤 묶음」 5 · 초안) — 「오늘」을 KST 날짜로(#772 markExpired 와 같은 꼴). 종전 UTC 는 KST 00~09시에 어제 끝난 게시글도 대상에 넣었다.
+  const today = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10)
   const byUrl = new Map<string, boolean>()   // url → 첨부 있는 행이 하나라도 있나
   for (const s of BOARD_SOURCES) {
     const { data, error } = await supabase.from('announcements')
