@@ -41,7 +41,8 @@ export function judgeRentNull(j) {
 //    열린 카드(목록 RPC 대표 · apply_end ≥ 오늘 KST · 제목 조기 마감 아님)의 묶음에서 다른 회차 ID(get_announcement_round_ids same_round 거짓)에
 //    경로 행(announcement_apply_routes) 또는 서류 정책 행(category ~ 서류|증명서 — 관리 탭 zfChkDocRows 와 같은 거름)이 있는 카드.
 //    그 카드들에서는 화면이 회차를 걸러야 한다 — 거르기를 빠뜨린 새 화면이 생기면 여기 카드에서 지난 회차 날짜·서류가 드러난다(2026-10-27 G3 · 관리 탭 서류 · 카드 1층 📅).
-//    🔴 데이터가 틀린 것이 아니다(지난 회차 산물은 그 ID 에 맞게 산다) — ⚠️ 경고만 · gate.mjs HARD 밖 · 못 읽으면 ⚠️ 점검 불능.
+//    🔴 데이터가 틀린 것이 아니다(지난 회차 산물은 그 ID 에 맞게 산다) — ℹ️ 정보만(판정하지 않는다 · claude.ai 2026-10-29 판정 — 화면 거르기가 실제로 빠진 것은 health-screen 몫) ·
+//       gate.mjs HARD 밖 · 못 읽으면 ⚠️ 점검 불능.
 //    목록 RPC 를 한 번 부른다(이 파일 위 두 줄과 달리 대표·카드 접수 끝이 있어야 회차를 가른다).
 export const ROUND_MIX_SQL = `
 with oc as materialized (select d.announcement_id cid, d.apply_end cend from public.get_announcements_deduped() d
@@ -56,8 +57,8 @@ select json_build_object('cards', (select count(*) from oc), 'other_cards', (sel
   'doc', (select coalesce(json_agg(cid order by cid) filter (where doc), '[]'::json) from hit)) j`
 
 export function judgeRoundMix(j) {
-  const rule = '0 — 열린 카드 묶음의 다른 회차 ID(get_announcement_round_ids)에 경로 행 또는 서류 정책 행 · 넘으면 ⚠️ 경고만(화면이 회차를 걸러야 하는 카드 — 데이터 오류 아님)'
+  const rule = '정보 — 판정하지 않는다 · 열린 카드 묶음의 다른 회차 ID(get_announcement_round_ids)에 경로 행 또는 서류 정책 행이 있는 카드(화면이 회차를 걸러야 하는 카드 — 데이터 오류 아님 · 진짜 빠짐은 health-screen)'
   const ids = [...new Set([...(j.route || []), ...(j.doc || [])])]
-  if (!ids.length) return { status: 'pass', value: `0(열린 카드 ${j.cards} · 다른 회차 ID 있는 카드 ${j.other_cards})`, rule }
-  return { status: 'warn', value: `${ids.length}: 경로 ${j.route.length}(${j.route.slice(0, 5).join(', ')}) · 서류 ${j.doc.length}(${j.doc.slice(0, 5).join(', ')}) — 화면 회차 거르기가 받쳐야 하는 카드`, rule }
+  if (!ids.length) return { status: 'info', value: `0(열린 카드 ${j.cards} · 다른 회차 ID 있는 카드 ${j.other_cards})`, rule }
+  return { status: 'info', value: `${ids.length}: 경로 ${j.route.length}(${j.route.slice(0, 5).join(', ')}) · 서류 ${j.doc.length}(${j.doc.slice(0, 5).join(', ')}) — 화면 회차 거르기가 받쳐야 하는 카드`, rule }
 }

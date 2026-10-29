@@ -909,7 +909,7 @@ try {
 for (const [id, name, sql, judge] of [
   ['elig_form_null', '열린 카드 자격 행 공급 형태(supply_form) 빔', ELIG_FORM_NULL_SQL, judgeEligFormNull],
   ['rent_null_not_jeonse', '열린 카드 전세 아닌 세대 행 월세(monthly_rent) 빔', RENT_NULL_SQL, judgeRentNull],
-  ['round_mix', '열린 카드 묶음에 다른 회차 경로·서류 행(화면 회차 거르기가 받쳐야 함)', ROUND_MIX_SQL, judgeRoundMix],   // 2026-10-29 ㉖
+  ['round_mix', '열린 카드 묶음에 다른 회차 경로·서류 행(정보 — 화면 회차 거르기가 받쳐야 함)', ROUND_MIX_SQL, judgeRoundMix],   // 2026-10-29 ㉖
 ]) {
   try {
     const [x] = await sqlRead(sql)

@@ -4,6 +4,7 @@ CREATE OR REPLACE FUNCTION zipfit_ops.metric_coverage_14d()
  STABLE
  SET search_path TO 'public', 'pg_temp'
 AS $function$
+-- 🔵 2026-10-29(우편함 「코드·운영 — 런칭 뒤 묶음」 덧 2) — 「오늘」은 KST 날짜(current_date 는 DB TimeZone UTC 라 KST 00~09시에 하루 늦었다).
 -- 🔵 2026-10-17(우편함 「코드·운영 — 목록 RPC 가볍게 …」 1) — announcements 행의 묶음 키는 title_dedup_key(저장 생성 칸 = announcement_dedup_key(title))를 읽는다(행마다 함수 호출 없음 · 결과 같음).
 -- 🔵 2026-10-16(우편함 「코드 — 관리자 페이지 (가) 첫 판 …」 2 ⓐ) — 14일 접수분 커버율 한 정의.
 --   supabase/metrics/analysis_rate.sql 둘째 문장을 여기로 옮겼다 — 그 파일과 상태판(ops_status_board)이 이 함수 하나를 부른다(산식 사본 없음).
@@ -27,10 +28,10 @@ keyed as materialized (
 ),
 reps as (
   select d.announcement_id, d.apply_start, d.apply_end, k.k,
-         case when d.apply_start > current_date then '접수 전' else '접수 중' end as phase
+         case when d.apply_start > (now() at time zone 'Asia/Seoul')::date then '접수 전' else '접수 중' end as phase
   from get_announcements_deduped(null, null, null) d
   join keyed k on k.announcement_id = d.announcement_id
-  where d.apply_end >= current_date and d.apply_start <= current_date + 14
+  where d.apply_end >= (now() at time zone 'Asia/Seoul')::date and d.apply_start <= (now() at time zone 'Asia/Seoul')::date + 14
 ),
 judged as (
   select r.*,
