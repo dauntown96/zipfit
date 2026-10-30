@@ -3,6 +3,7 @@ CREATE OR REPLACE FUNCTION public.analysis_dispatch_tick(p_force boolean DEFAULT
  LANGUAGE plpgsql
  SET search_path TO 'public', 'pg_temp'
 AS $function$
+-- 🔵 2026-10-29(우편함 「코드·운영 — 런칭 뒤 묶음」 덧 2) — 「오늘」은 KST 날짜(current_date 는 DB TimeZone UTC 라 KST 00~09시에 하루 늦었다).
 -- 공고 분석 감지 루틴 발송기 — cron zipfit-analysis-dispatch 가 10분마다 부른다(2026-10-01 운영 회차).
 -- ① 보낸 요청의 응답을 정리한다 ② 새 후보를 대기열에 넣고 더는 후보가 아닌 대기를 뺀다 ③ 보낼지 판정해 루틴 API 를 한 번 부른다.
 -- 후보 = ⑨ 5-2 분모(대표 ∧ 묶음 첨부 > 0 ∧ apply_end ≥ 오늘+3) ∧ 미분석(같은 회차 또는 링크로 붙은 구성원에 완료 계열 분석 없음).
@@ -223,10 +224,10 @@ begin
   ),
   reps as (
     select d.announcement_id, d.title, d.source, d.housing_type, d.apply_start, d.apply_end, d.announcement_date, k.k,
-           (d.apply_end is null or d.apply_end >= current_date + 3) as in_win
+           (d.apply_end is null or d.apply_end >= (now() at time zone 'Asia/Seoul')::date + 3) as in_win
     from get_announcements_deduped() d
     join keyed k on k.announcement_id = d.announcement_id
-    where d.apply_end >= current_date
+    where d.apply_end >= (now() at time zone 'Asia/Seoul')::date
        or (d.apply_end is null and d.source = 'SH' and d.status is distinct from '접수마감'
            and (select c.page_status from public.source_page_checks c
                  where c.source = 'SH' and c.card_id = d.announcement_id and c.error is null
@@ -273,7 +274,7 @@ begin
   ins as (
     insert into public.analysis_dispatch_queue (group_key, apply_end, announcement_id, title, apply_start, phase, needs_promo, note)
     select distinct on (c.k, c.apply_end) c.k, c.apply_end, c.announcement_id, c.title, c.apply_start,
-           case when c.noend then '접수기간 없음' when c.apply_start > current_date then '접수 전' else '접수 중' end,
+           case when c.noend then '접수기간 없음' when c.apply_start > (now() at time zone 'Asia/Seoul')::date then '접수 전' else '접수 중' end,
            (c.source = 'LH' and c.housing_type = '주거복지 - 매입임대'),
            case when c.rev then '정정본 — reverify 스킬 「정정공고」 갈래'
                 when c.noend then '접수기간 없음(SH 목록 모집중) — apply_end 9999-12-31 은 대기열 키 전용 · 접수기간은 원문으로 확정' end
@@ -379,8 +380,8 @@ begin
     select q.group_key, q.apply_end
       from public.analysis_dispatch_queue q
      where q.state = 'waiting' and q.ready_at is not null
-     order by (q.apply_start > current_date) desc nulls last,
-              case when q.apply_start > current_date then q.apply_start end,
+     order by (q.apply_start > (now() at time zone 'Asia/Seoul')::date) desc nulls last,
+              case when q.apply_start > (now() at time zone 'Asia/Seoul')::date then q.apply_start end,
               q.apply_end, q.enqueued_at, q.announcement_id
      limit greatest(coalesce(cfg.batch_size, 1), 1)
   )

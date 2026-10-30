@@ -12,7 +12,7 @@ import { SH_RUN_SQL, judgeShRun } from './sh-run.mjs'
 import { BACKLOG_SQL, judgeBacklog } from './collect-backlog.mjs'
 import { HARD, splitFailed } from './gate.mjs'
 import { lhGoneSql, judgeLhGone } from './lh-gone.mjs'
-import { ELIG_FORM_NULL_SQL, RENT_NULL_SQL, judgeEligFormNull, judgeRentNull } from './open-gaps.mjs'
+import { ELIG_FORM_NULL_SQL, RENT_NULL_SQL, ROUND_MIX_SQL, judgeEligFormNull, judgeRentNull, judgeRoundMix } from './open-gaps.mjs'
 import { readdirSync, readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 
@@ -206,8 +206,11 @@ try {
     `${list.status} · ${Array.isArray(list.data) ? list.data.length : 0}행 · ${list.ms}ms${list.snippet ? ' · ' + list.snippet : ''}`,
     '200 · 행 > 0 · 왕복 ≤ 10초(서버 한도 3초는 200 여부로 잰다 — 넘으면 500. 왕복은 러너↔싱가포르 1.9MB라 넉넉히)')
   // ③-2 화면이 실제로 보내는 인자 모양(2026-10-01 — 명시 null 은 함수가 인라인되지 않아 따로 잰다 · 우편함 「운영 — 감지 루틴 발송기」 3)
+  //    🔵 2026-10-29(우편함 「코드·운영 — 런칭 뒤 묶음」 3 · 백로그 「목록·인사이트가 limit 없이 전량」) — 세 모양은 announcement_id 칸만 받는다(?select=).
+  //    함수는 서버에서 끝까지 돌고(명시 null 은 인라인되지 않아 전 행 계산) 200·행 수 판정은 같다 · 받는 양만 1.9MB → 약 42KB(2026-10-29 실측).
+  //    전 칸 응답은 위 anon_list 한 번만 받는다(요약 50건 id 재료) — 실행 1회 목록 전송 약 7.6MB → 약 2.0MB.
   for (const [id, body] of [['anon_list_null', { p_region: null, p_type: null, p_status: null }], ['anon_list_region', { p_region: '경기도' }], ['anon_list_type', { p_type: '국민임대' }]]) {
-    const x = await anonRpc('get_announcements_deduped', body)
+    const x = await anonRpc('get_announcements_deduped?select=announcement_id', body)
     const ok = x.status === 200 && Array.isArray(x.data) && x.data.length > 0
     add(id, `비로그인 get_announcements_deduped ${JSON.stringify(body)}`, ok && x.ms <= 10000 ? 'pass' : 'fail',
       `${x.status} · ${Array.isArray(x.data) ? x.data.length : 0}행 · ${x.ms}ms${x.snippet ? ' · ' + x.snippet : ''}`,
@@ -323,7 +326,7 @@ try {
              join announcements a on a.announcement_id = z.card_id where z.end_diff and a.status <> '접수마감'))),
       -- 🔵 2026-10-06 정정본 분석 없음(A3) — 열린 대표 중 정정 행이 정정된 지 60분 넘었는데 정정본 분석이 없고, 같은 묶음에 정정 전 분석이 있는 것.
       'revision_gap', (with rv as materialized (select d.announcement_id from get_announcements_deduped() d join announcements a using (announcement_id)
-           where a.is_revised and a.revised_at < now() - interval '60 minutes' and d.apply_end >= current_date)
+           where a.is_revised and a.revised_at < now() - interval '60 minutes' and d.apply_end >= (now() at time zone 'Asia/Seoul')::date)
          select coalesce(json_agg(rv.announcement_id), '[]'::json) from rv where not get_revision_analysis_done(rv.announcement_id)
            and exists (select 1 from announcement_analysis aa where aa.announcement_id in (select g.announcement_id from get_announcement_group_ids(rv.announcement_id) g)
                        and aa.status in ('완료', '완료(보조 누락)', '완료(판정 대기)', '완료(소급)'))),
@@ -339,14 +342,14 @@ try {
              from announcements a left join lm on lm.aid = a.announcement_id where a.title is not null and a.hidden_from_listing is not true),
            rp as materialized (select d.announcement_id, d.apply_end, kd.k, a.is_revised, a.revised_at, a.created_at
              from get_announcements_deduped() d join kd using (announcement_id) join announcements a using (announcement_id)
-            where d.apply_end >= current_date)
+            where d.apply_end >= (now() at time zone 'Asia/Seoul')::date)
          select coalesce(json_agg(rp.announcement_id order by rp.announcement_id), '[]'::json) from rp
           where greatest(rp.created_at, coalesce(rp.revised_at, rp.created_at)) < now() - interval '60 minutes'
             and (select coalesce(sum(jsonb_array_length(g.attachment_urls)), 0) from kd g where g.k = rp.k and jsonb_typeof(g.attachment_urls) = 'array') > 0
             and ((rp.is_revised and rp.revised_at is not null and not get_revision_analysis_done(rp.announcement_id)
                   and exists (select 1 from kd g join announcement_analysis aa using (announcement_id)
                                where g.k = rp.k and aa.status in ('완료', '완료(보조 누락)', '완료(판정 대기)', '완료(소급)')))
-                 or (rp.apply_end >= current_date + 3 and not exists (select 1 from kd g join announcement_analysis aa using (announcement_id)
+                 or (rp.apply_end >= (now() at time zone 'Asia/Seoul')::date + 3 and not exists (select 1 from kd g join announcement_analysis aa using (announcement_id)
                                where g.k = rp.k and (g.apply_end = rp.apply_end or g.linked)
                                  and aa.status in ('완료', '완료(보조 누락)', '완료(판정 대기)', '완료(소급)'))))
             and not exists (select 1 from analysis_dispatch_queue q where q.announcement_id = rp.announcement_id and q.state in ('waiting', 'sent', 'claimed'))),
@@ -359,9 +362,9 @@ try {
            kd as materialized (select a.announcement_id, a.attachment_urls, coalesce(lm.lh_key, announcement_dedup_key(a.title)) k
              from announcements a left join lm on lm.aid = a.announcement_id where a.title is not null and a.hidden_from_listing is not true),
            rp as materialized (select d.announcement_id, d.supply_org, d.apply_start, kd.k
-             from get_announcements_deduped() d join kd using (announcement_id) where d.apply_end >= current_date)
+             from get_announcements_deduped() d join kd using (announcement_id) where d.apply_end >= (now() at time zone 'Asia/Seoul')::date)
          select coalesce(json_agg(json_build_object('id', rp.announcement_id, 'org', rp.supply_org, 'start', rp.apply_start) order by rp.apply_start nulls first, rp.announcement_id), '[]'::json) from rp
-          where (rp.apply_start is null or rp.apply_start <= current_date + 14)
+          where (rp.apply_start is null or rp.apply_start <= (now() at time zone 'Asia/Seoul')::date + 14)
             and (select coalesce(sum(jsonb_array_length(g.attachment_urls)), 0) from kd g where g.k = rp.k and jsonb_typeof(g.attachment_urls) = 'array') = 0
             and not exists (select 1 from kd g join announcement_analysis aa using (announcement_id)
                              where g.k = rp.k and aa.status in ('완료', '완료(보조 누락)', '완료(판정 대기)', '완료(소급)'))),
@@ -935,6 +938,7 @@ try {
 for (const [id, name, sql, judge] of [
   ['elig_form_null', '열린 카드 자격 행 공급 형태(supply_form) 빔', ELIG_FORM_NULL_SQL, judgeEligFormNull],
   ['rent_null_not_jeonse', '열린 카드 전세 아닌 세대 행 월세(monthly_rent) 빔', RENT_NULL_SQL, judgeRentNull],
+  ['round_mix', '열린 카드 묶음에 다른 회차 경로·서류 행(정보 — 화면 회차 거르기가 받쳐야 함)', ROUND_MIX_SQL, judgeRoundMix],   // 2026-10-29 ㉖
 ]) {
   try {
     const [x] = await sqlRead(sql)
@@ -943,6 +947,21 @@ for (const [id, name, sql, judge] of [
   } catch (e) {
     addBlind(id, `${name} — 점검 불능`, 'warn', String(e).slice(0, 200), '공고·자격·세대 표를 읽는다(못 읽으면 ⚠️)')
   }
+}
+
+// ㉗ 재고 통계 원천 판 날짜(2026-10-29 · 우편함 「코드·운영 — 런칭 뒤 묶음」 2ⓒ · 백로그 「임대주택 통계 이력이 안 쌓인다」).
+//    rental_housing_stats.source_updated_at 최댓값이 오늘(KST)에서 400일 넘게 그대로면 ⚠️ — 포털 원천은 해마다 갱신되는데(정기 조사)
+//    collect-rental-stats 가 판 날짜를 상수(index.ts SOURCE_UPDATED_AT)로 넣어 cron 이 매주 성공해도 새 판을 못 받는다(이력도 안 쌓인다).
+//    문턱 400일 = 연 1회 갱신 + 한 달 여유(제안값 — 판정은 claude.ai). ⚠️ 경고만 · gate.mjs HARD 밖 · 못 읽으면 ⚠️ 점검 불능.
+try {
+  const [x] = await sqlRead(`select json_build_object('src', max(source_updated_at)::date, 'days', (now() at time zone 'Asia/Seoul')::date - max(source_updated_at)::date,
+      'rows', count(*), 'collected_age_h', round((extract(epoch from now() - max(collected_at)) / 3600)::numeric, 1)) j from public.rental_housing_stats`)
+  const j = x.j
+  const rule = '≤ 400일 — 재고 통계 원천 판 날짜(source_updated_at 최댓값)가 오늘(KST)에서 400일 넘게 그대로면 ⚠️(연 1회 갱신 + 여유 · 판 날짜가 코드 상수라 새 판을 못 받는 꼴)'
+  add('rental_stats_src', '재고 통계 원천 판 날짜 경과(일)', j.days != null && j.days <= 400 ? 'pass' : 'warn',
+    `${j.days ?? '판 날짜 없음'}일(판 ${j.src ?? '—'} · ${j.rows}행 · 마지막 수집 ${j.collected_age_h ?? '—'}시간 전)`, rule)
+} catch (e) {
+  addBlind('rental_stats_src', '재고 통계 원천 판 날짜 — 점검 불능', 'warn', String(e).slice(0, 200), '재고 통계 표를 읽는다(못 읽으면 ⚠️)')
 }
 
 // ⑲ 인스턴스 메모리(2026-10-17 · 같은 우편 1 · 조사 「인스턴스 지표 경로」 ⓑ) — 관리 API 지표 끝점(베타)에서 숫자만 골라(instance.mjs) zipfit_ops.instance_metrics_log 에 한 행.
