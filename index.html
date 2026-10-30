@@ -8372,11 +8372,19 @@ function loadAnnouncementExtras(annId, detailEl, id, useGroup){
     // Drive ID 추출 실패율은 1,152행에서 0%였다(전부 drive.google.com/file/d/<ID>/… 형태).
     // 🔴 2026-09-22: 키에 extra_type을 더했다. 합본 파일(한 PDF에 평면도+주택사진)을 두 행으로
     // 넣으면 종전 키로는 한쪽이 사라졌다. 파이프라인 중복은 같은 파일·같은 타입이라 여전히 걸린다.
-    const seen = new Set();
+    // 🔵 2026-10-30(우편함 「표시층 — 같은 파일 다른 주택형 칩」) — LH가 같은 파일을 두 주택형 칸에 올리면(화성동탄 C26 31A형·31A-1형 ·
+    //    …20802 라움·더하이 동) 키가 다른 둘째 행이 여기서 접혀 그 세대 머리에 칩이 없었다. 접힌 행 중 unit_key 가 남은 행과 다른 것은
+    //    따로 모아 두고, 남은 행이 칩으로 갈 때만 그 행도 제 머리 칩에 단다(갤러리·「N건은 … 📷 칩에」 셈은 파일 하나 = 한 장 그대로).
+    const seen = new Map();
+    const dupKeyed = [];
     rows = rows.filter(r => {
       const key = (driveFileIdFrom(r.file_url) || r.id) + '|' + (r.extra_type || '');
-      if(seen.has(key)) return false;
-      seen.add(key);
+      const kept = seen.get(key);
+      if(kept){
+        if(r.unit_key && kept.unit_key && r.unit_key !== kept.unit_key) dupKeyed.push({ r, kept });
+        return false;
+      }
+      seen.set(key, r);
       return true;
     });
     // 🔵 B28 — 세대 머리에 닿는 행은 칩으로 보내고 갤러리에서 뺀다. 닿지 않는 행(키 없음·머리 없음)은
@@ -8393,13 +8401,22 @@ function loadAnnouncementExtras(annId, detailEl, id, useGroup){
         return false;
       });
     }
-    let linkedCount = 0;
+    const chipped = new Set();
+    byKey.forEach(g => g.items.forEach(it => chipped.add(it)));
+    dupKeyed.forEach(({ r, kept }) => {
+      if(!chipped.has(kept)) return;   // 남은 행이 갤러리로 갔으면 같은 그림을 칩에 또 걸지 않는다
+      const k = r.unit_key;
+      const kind = keys.building.has(k) ? '건물' : (keys.types.has(k) ? '주택형' : '');
+      if(!kind) return;
+      if(!byKey.has(k)) byKey.set(k, { kind, items: [] });
+      byKey.get(k).items.push(r);
+    });
+    let linkedCount = chipped.size;
     byKey.forEach(g => {
       // 모달에서 넘기는 순서는 갤러리와 같게 — 사진 먼저, 그다음 평면도
       g.items.sort((a, b) => (a.extra_type || '').localeCompare(b.extra_type || '') * -1 || (a.building_address || '').localeCompare(b.building_address || ''));
       g.gid = 'eg' + (extrasGroupSeq++);
       extrasGroupsRegistry[g.gid] = g.items;
-      linkedCount += g.items.length;
     });
     if(byKey.size){
       extrasByUnitKey[id] = byKey;
