@@ -362,9 +362,9 @@ try {
            kd as materialized (select a.announcement_id, a.attachment_urls, coalesce(lm.lh_key, announcement_dedup_key(a.title)) k
              from announcements a left join lm on lm.aid = a.announcement_id where a.title is not null and a.hidden_from_listing is not true),
            rp as materialized (select d.announcement_id, d.supply_org, d.apply_start, kd.k
-             from get_announcements_deduped() d join kd using (announcement_id) where d.apply_end >= current_date)
+             from get_announcements_deduped() d join kd using (announcement_id) where d.apply_end >= (now() at time zone 'Asia/Seoul')::date)
          select coalesce(json_agg(json_build_object('id', rp.announcement_id, 'org', rp.supply_org, 'start', rp.apply_start) order by rp.apply_start nulls first, rp.announcement_id), '[]'::json) from rp
-          where (rp.apply_start is null or rp.apply_start <= current_date + 14)
+          where (rp.apply_start is null or rp.apply_start <= (now() at time zone 'Asia/Seoul')::date + 14)
             and (select coalesce(sum(jsonb_array_length(g.attachment_urls)), 0) from kd g where g.k = rp.k and jsonb_typeof(g.attachment_urls) = 'array') = 0
             and not exists (select 1 from kd g join announcement_analysis aa using (announcement_id)
                              where g.k = rp.k and aa.status in ('완료', '완료(보조 누락)', '완료(판정 대기)', '완료(소급)'))),
