@@ -7904,7 +7904,7 @@ function loadGroupRevisionNote(cardEl, id){
   if(cardEl.dataset.revisionNoteFull) return;
   const annId = cardEl.dataset.announcementId || '';
   if(!annId){ appendSpecialNoteItem(id, revisionNoteItemHtml(null)); return; }
-  resolveAnnouncementIds(annId, true).then(ids => fetch(
+  resolveAnnouncementIds(annId, true, true).then(ids => fetch(
     `${SUPABASE_URL}/rest/v1/announcements?select=announcement_id,source,revision_note,revised_at,revised_at_source&${idFilterFor(ids)}`,
     { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
   )).then(r => r.ok ? r.json() : []).then(rows => {
@@ -8130,16 +8130,41 @@ function driveFileIdFrom(url){
 // get_announcement_group_ids로 같은 공고의 모든 announcement_id를 구해 in.() 조회한다.
 // 단, 김포마송처럼 블록별로 분리 표시해야 하는 toggleBlockGroup() 경로는 useGroup을 넘기지 않아
 // 기존처럼 해당 블록의 announcement_id 단건(eq.)만 조회하도록 유지한다.
-function resolveAnnouncementIds(annId, useGroup){
-  if(!useGroup) return Promise.resolve([annId]);
-  return fetch(`${SUPABASE_URL}/rest/v1/rpc/get_announcement_group_ids`, {
+// 🔵 2026-10-29(우편함 「표시층 — resolveAnnouncementIds가 회차 사슬 RPC를 읽기」 · B′) — 회차 사슬 RPC
+//    get_announcement_round_chain_ids(카드 묶음 ∪ 회차 링크 표로 이어진 지난 회차 묶음 · hop 0 = 카드 묶음)를 먼저 묻는다.
+//    지난 회차 행은 종전처럼 zfRoundSplit(마감 축)·배너가 「🕘 다른 회차」로 가른다 — 새 꼴 0.
+//    함수가 없으면(404 · PGRST202 — 표 병합 전) 그 페이지 동안 다시 묻지 않고 종전 get_announcement_group_ids 로 내려간다.
+//    빈 답·실패도 종전 함수로 — 사슬 RPC 가 무엇을 돌려주든 종전보다 좁아지지 않게.
+let zfRoundChainOff = false, zfRoundChainKnown = false, zfRoundChainProbe = null;
+function zfGroupIdsRpc(fn, annId){
+  return fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
     method: 'POST',
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ p_announcement_id: annId })
-  }).then(r => r.ok ? r.json() : null).then(rows => {
+  });
+}
+// curOnly = 이번 묶음(hop 0)만 — 회차로 거르지 않는 쓰임(정정 사유 고르기 · 블록 밖 세대 대체)은 지난 회차 id 를 받지 않는다.
+function resolveAnnouncementIds(annId, useGroup, curOnly){
+  if(!useGroup) return Promise.resolve([annId]);
+  const group = () => zfGroupIdsRpc('get_announcement_group_ids', annId).then(r => r.ok ? r.json() : null).then(rows => {
     if(Array.isArray(rows) && rows.length > 0) return rows.map(r => r.announcement_id);
     return [annId];
   }).catch(() => [annId]);
+  if(zfRoundChainOff) return group();
+  // 함수가 있는지 아직 모르면 첫 요청의 답을 기다린다 — 카드 하나를 열 때 로더 넷이 함께 불러 404 가 넷 나지 않게.
+  if(zfRoundChainProbe && !zfRoundChainKnown) return zfRoundChainProbe.then(() => resolveAnnouncementIds(annId, useGroup, curOnly));
+  const req = zfGroupIdsRpc('get_announcement_round_chain_ids', annId).then(r => {
+    zfRoundChainKnown = true;
+    if(r.status === 404){ zfRoundChainOff = true; return null; }
+    return r.ok ? r.json() : null;
+  });
+  if(!zfRoundChainKnown) zfRoundChainProbe = req.catch(() => { zfRoundChainKnown = true; });
+  return req.then(rows => {
+    if(!Array.isArray(rows) || rows.length === 0) return group();
+    const ids = [...new Set(rows.filter(r => r && (!curOnly || Number(r.hop) === 0)).map(r => r.announcement_id).filter(Boolean))];
+    if(!ids.includes(annId)) ids.unshift(annId);
+    return ids;
+  }).catch(() => group());
 }
 
 function idFilterFor(ids){
@@ -8721,7 +8746,7 @@ function zfBlockSiteNames(blkIds){
 }
 // 블록 ID 세대 0 ∧ 블록 밖 그룹 ID 세대 > 0 인가. 조회 실패는 false — 종전 화면 그대로다.
 function zfBlockHuFallback(annId, blkIds){
-  return resolveAnnouncementIds(annId, true).then(ids => {
+  return resolveAnnouncementIds(annId, true, true).then(ids => {
     const outside = ids.filter(x => blkIds.indexOf(x) === -1);
     if(!outside.length) return false;
     return fetch(`${SUPABASE_URL}/rest/v1/housing_units?select=announcement_id&${idFilterFor(ids)}&limit=5000`, {
