@@ -7,6 +7,7 @@
 // 규칙(CLAUDE.md 원칙 26): 대역은 fetch/RPC 응답까지만 — 응답은 **운영 anon 응답 그대로**(첫 호출의 요청을 그대로 보내 받은 바이트를 캐시 파일에 둔다) · 화면 매핑은 배포 코드 그대로 거친다.
 // 🔴 운영 화면 자체를 재는 것(health-screen · 배포본 실사용 점검)은 이것을 쓰지 않는다 — 그건 측정이다.
 //
+// 🔴 이용 기록(usage_events) 송신도 여기서 받아 끝낸다(운영 기록에 쓰지 않는다 · 2026-10-20).
 // 쓰는 법(Playwright):
 //   import { stubListRpc } from '/home/user/zipfit/scripts/render-list-stub.mjs'
 //   const info = await stubListRpc(page)          // page.goto 전에 — 목록 POST 를 인자별 캐시로 돌려준다
@@ -74,6 +75,10 @@ export async function stubListRpc(page, { dir, maxAgeMin = 30 } = {}) {
     return { status: 200, body, cached: false }
   }
 
+  // 🔵 2026-10-20(우편함 「표시층 — S1 첫 묶음」 4 · 백로그 「이용 기록에서 운영·시험 세션을 가를 수 없다」 ③) — 로컬 렌더는 운영 이용 기록(usage_events)에
+  //    쓰지 않는다(health-screen 과 같은 꼴 · keepalive 송신도 이 가로챔에 걸린다 — 실측 3/3). 2026-10-20 실측: 이 대역 없이 띄운 세션 렌더가
+  //    10분 단위 10 · 27 · 19 세션으로 이용 기록에 남았다(ops 표지 0). 화면 동작은 그대로(송신은 fire-and-forget).
+  await page.route(/\/rest\/v1\/usage_events(\?|$)/, r => r.fulfill({ status: 201, body: '' }))
   await page.route(`**${RPC}*`, async route => {
     const req = route.request()
     const key = req.method() === 'POST' ? argKey(req.postData()) : null

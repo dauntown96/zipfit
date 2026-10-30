@@ -33,8 +33,20 @@ AS $function$
   --   **두 판정을 전 그룹으로 대조하는 것**이 이 사본의 검증 방법이다(회차마다 다시 돌린다).
   -- 🔴 2026-09-30(코드 — 같은 게시물은 LH 카드 한 장) — 그룹 키 = 링크 표에 있는 MYHOME 행이면 LH 행의 제목 키
   --   (get_announcement_group_ids 와 같은 규칙). LH 카드 요약에 붙은 공고문의 세대 행이 함께 든다.
-  with ids as (
-    select distinct x as aid from unnest(p_ids) x where x is not null
+  -- 🔵 2026-10-28(우편함 「코드·운영 — 런칭 뒤 첫 주 DB 쪽 묶음」 4 · 백로그 「가격 요약 RPC … 익명 … 배열 길이 상한이 없다」 · G8 발견 4) — 배열 상한 2000.
+  --   익명이 부를 수 있는 정의자 함수라 배열 길이에 비례해 CPU 를 쓴다(2026-10-28 anon 실측: 가짜 id 2000 → 0.4초 · 10000 → 1.9초 · 화면 실제 977 → 0.3초).
+  --   2000 = 지금 화면이 한 번에 넘기는 최대(목록 대표 전부 · 977)의 약 두 배 — 화면을 고치지 않고 걸 수 있는 값이다. 넘으면 오류(22P02 · 메시지에 「2000개 초과」)로
+  --   거절한다 — 잘라서 일부만 돌려주면 화면이 나머지를 「세대정보 없음」으로 읽는다(zfEnsurePriceSummaries). 목록이 2000 에 다가가면 화면 나눠 부르기와 함께 다시 본다.
+  --   🔴 SQL 함수라 raise 가 없다 — guard 의 cast 가 넘을 때만 실패한다. 두 가지를 지킨다(2026-10-28 단독 SQL 시험):
+  --     ① cast 문자열에 배열 길이를 섞는다 — 상수 문자열이면 계획 단계에서 접혀(constant folding) 넘지 않아도 늘 실패했다.
+  --     ② ids 가 guard.over 를 조건에서 읽는다 — 안 읽으면 그 칸 계산이 빠져 넘어도 통과했다(977 · 2000 통과 · 2001 오류 · 0 통과 실측).
+  --   (plpgsql 로 바꾸면 계획이 달라진다 — 종전 SQL 함수 그대로 둔다.)
+  with guard as (
+    select case when coalesce(cardinality(p_ids), 0) > 2000
+                then cast('p_ids ' || cardinality(p_ids) || '개 — 2000개 초과 · 나눠 부른다' as integer) end as over
+  ),
+  ids as (
+    select distinct x as aid from unnest(p_ids) x, guard where x is not null and guard.over is null
   ),
   link_map as materialized (
     select distinct on (l.linked_announcement_id)

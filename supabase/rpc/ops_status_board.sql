@@ -23,10 +23,17 @@ AS $function$
 --   secrets 는 zipfit_ops.secret_expiry_list() 그대로(Vault 밖 만료는 표 zipfit_ops.secret_expiry_external — 종전 이 함수 안 values 다섯 줄을 옮겼다 · health-ops 와 한 정의).
 --   instance — 인스턴스 지표 최근 행(zipfit_ops.instance_metrics_log · health-ops 30분) · swap 사용 = SwapTotal − SwapFree · 24시간 swap 들고 남(쪽 · 4 KB)
 --   = zipfit_ops.instance_metrics_rates 의 이웃 행 차이 합(누적값이 줄면 그 차이는 빼고 센다 — 재시작). 기록이 없으면 null.
+-- 🔵 2026-10-28(우편함 「코드·운영 — 런칭 뒤 첫 주 DB 쪽 묶음」 3 · 백로그 「설정 탭 운영 상태판에 이용자 지표」 다운님 결정 안 A) — users 칸 하나:
+--   「가입 n · 사람 세션 오늘 n / 7일 n · 로그인 n · 저장 n」 — 합계만(원칙 36 — 회원 id · 세션 id · 값 0).
+--   signups = user_profiles 행 수 · signups_7d = 그중 created_at 7일 안 · saved = saved_announcements 행 수.
+--   sessions_today(KST 오늘 0시부터) · sessions_7d · logged_in_7d(세션 중 user_id 있는 것) — supabase/metrics/usage_weekly.sql 과 같은 셈:
+--   7일 창 안에서 props 에 ops 키가 있거나 운영자 계정(zipfit_ops.admins) 행이 있는 세션은 그 세션 전체를 뺀다.
+--   🔴 sessions_* 는 #682(자동 브라우저 운영 표지) 병합 뒤부터 사람 세션으로 믿는다(백로그 메모) — 그 전 값은 무인 브라우저가 섞인다.
+--   new_orgs_7d = 공급기관(supply_org) 중 전 DB 첫 행이 7일 안에 들어온 것(백로그 「첨부를 못 받는 공고 …」 ② 「새 공급기관 n」 · 이름 · 첫 공고 id).
 declare
   v_uid uuid := auth.uid();
   cfg public.analysis_dispatch_config%rowtype;
-  v_cov jsonb; v_disp jsonb; v_health jsonb; v_col jsonb; v_fu jsonb; v_hides jsonb; v_rates jsonb; v_runs jsonb; v_secrets jsonb; v_inst jsonb;
+  v_cov jsonb; v_disp jsonb; v_health jsonb; v_col jsonb; v_fu jsonb; v_hides jsonb; v_rates jsonb; v_runs jsonb; v_secrets jsonb; v_inst jsonb; v_users jsonb;
   v_run record; v_last record;
   n_wait int; n_ready int; n_promo int; n_sent int; n_fu_wait int; n_reclaim int; v_failing boolean; v_wait text;
   v_fu_since timestamptz;
@@ -130,8 +137,32 @@ begin
     into v_inst
     from zipfit_ops.instance_metrics_log l order by l.scraped_at desc limit 1;
 
+  with ev as (
+    select u.session_id, u.user_id, u.occurred_at, u.props from public.usage_events u
+     where u.occurred_at >= now() - interval '7 days'
+  ), ops_s as (
+    select distinct e.session_id from ev e
+     where e.props ? 'ops' or e.user_id in (select a.user_id from zipfit_ops.admins a)
+  ), r as (select * from ev where session_id not in (select session_id from ops_s))
+  select jsonb_build_object(
+    'signups', (select count(*) from public.user_profiles),
+    'signups_7d', (select count(*) from public.user_profiles p where p.created_at >= now() - interval '7 days'),
+    'sessions_today', (select count(distinct r.session_id) from r
+                        where r.occurred_at >= (date_trunc('day', now() at time zone 'Asia/Seoul') at time zone 'Asia/Seoul')),
+    'sessions_7d', (select count(distinct r.session_id) from r),
+    'logged_in_7d', (select count(distinct r.session_id) from r where r.user_id is not null),
+    'saved', (select count(*) from public.saved_announcements),
+    'new_orgs_7d', (select coalesce(jsonb_agg(jsonb_build_object('org', f.supply_org, 'first_id', f.announcement_id, 'first_at', f.created_at)
+                                              order by f.created_at desc), '[]'::jsonb)
+                      from (select distinct on (a.supply_org) a.supply_org, a.announcement_id, a.created_at
+                              from public.announcements a where a.supply_org is not null
+                             order by a.supply_org, a.created_at, a.announcement_id) f
+                     where f.created_at >= now() - interval '7 days'))
+    into v_users;
+
   return jsonb_build_object('now', now(), 'coverage', v_cov, 'dispatch', v_disp, 'health', v_health,
                             'collected', v_col, 'followups_unreported', v_fu, 'hides', v_hides,
-                            'rates', v_rates, 'recent_runs', v_runs, 'secrets', v_secrets, 'instance', v_inst);
+                            'rates', v_rates, 'recent_runs', v_runs, 'secrets', v_secrets, 'instance', v_inst,
+                            'users', v_users);
 end
 $function$
