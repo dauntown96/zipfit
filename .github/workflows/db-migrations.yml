@@ -62,6 +62,12 @@ jobs:
           fi
           printf '%s\n' "$out" | while IFS= read -r l; do echo "::error::$l"; done
           exit 1
+      # 🔵 2026-10-29(우편함 「코드·운영 — 런칭 전날」 2) — index.html · sw.js 를 바꾼 PR 은 head CACHE_NAME = base + 1(원칙 9). 두 파일을 안 건드리면 건너뜀.
+      #    DB 를 부르지 않는다 · scripts/ 파일이라 아래 「DB 파일을 건드렸나」의 다섯 경로에 들지 않는다.
+      - name: CACHE 판(+1)
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: bash scripts/cache-bump-check.sh
       - name: DB 파일을 건드렸나
         id: scope
         env:
