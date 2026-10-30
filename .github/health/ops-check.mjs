@@ -308,7 +308,11 @@ try {
          'since_cron_min', (select extract(epoch from now() - min(applied_at))/60 from zipfit_ops.schema_migrations where filename = '2026-10-08_02_source_page_checks_cron.sql'),
          'closed', (select coalesce(json_agg(z.source_key || ' ' || coalesce(z.page_status, '')), '[]'::json) from (select distinct on (c.source_key) c.* from source_page_checks c
              where c.checked_at > now() - interval '26 hours' and c.error is null order by c.source_key, c.checked_at desc) z
-             join announcements a on a.announcement_id = z.card_id where z.closed_mismatch and a.status <> '접수마감'),
+             join announcements a on a.announcement_id = z.card_id where z.closed_mismatch and a.status <> '접수마감'
+               -- 🔵 2026-10-29(우편함 「코드·운영 — 런칭 전날」 1) — 자연 마감은 세지 않는다: 카드 접수 끝이 오늘(KST)보다 앞 ∧ 끝 날짜가 같음(end_diff 참 아님).
+               --    카드가 「열림」으로 남은 것은 MYHOME 대표 status 「공고중」이 굳은 탓(10-29 태백철암1 …20735 · 대표 21199_1 apply_end 10-28)이지 원문과 갈린 것이 아니다.
+               --    백로그 「원문 키 사이클」 트리거 식과 같은 조건(claude.ai 10-29).
+               and not (coalesce(z.card_apply_end < (now() at time zone 'Asia/Seoul')::date, false) and z.end_diff is not true)),
          -- 🔵 2026-10-08(운영 기반 후속 6) — 같은 공고 묶음에 접수 끝 갈림을 알리는 ⚠️ 정책 행(분류 「⚠️ … 기간 끝 날짜 …」)이 이미 있으면 known(알고 있음).
          --    화면이 사용자에게 이미 알리고 있는 갈림이다 — 경고 대신 정보로 세고 개수는 남긴다. ⚠️ 행이 없는 갈림만 경고다.
          'enddiff', (select coalesce(json_agg(json_build_object('t', z.source_key || ' 카드 ' || coalesce(z.card_apply_end::text, '-') || ' ↔ 페이지 ' || coalesce(z.page_apply_end::text, '-'),
@@ -524,7 +528,7 @@ try {
     const cl = x.closed || [], edAll = x.enddiff || []
     const ed = edAll.filter(e => !e.known).map(e => e.t), edKnown = edAll.filter(e => e.known).map(e => e.t)
     add('source_closed', '열린 카드인데 공급기관 페이지가 접수마감', cl.length === 0 ? 'pass' : 'warn', cl.length ? `${cl.length}: ${cl.slice(0, 5).join(', ')}` : 0,
-      '0 — 키마다 26시간 안 마지막 대조 · 카드가 아직 열림 · 넘으면 ⚠️ 경고만(값 반영은 2단계)')
+      '0 — 키마다 26시간 안 마지막 대조 · 카드가 아직 열림 · 자연 마감(카드 접수 끝 < 오늘 KST ∧ 끝 날짜 같음)은 뺀다 · 넘으면 ⚠️ 경고만(값 반영은 2단계)')
     add('source_end_diff', '열린 카드 접수 끝 ≠ 공급기관 페이지', ed.length === 0 ? 'pass' : 'warn',
       (ed.length ? `${ed.length}: ${ed.slice(0, 5).join(', ')}` : '0') + (edKnown.length ? ` · 알고 있음 ${edKnown.length}(⚠️ 정책 행 있음): ${edKnown.slice(0, 5).join(', ')}` : ''),
       '0 — 페이지 일정 중 가장 늦은 접수 끝 ≠ 카드 apply_end · 넘으면 ⚠️ 경고만(값 반영은 2단계) · 같은 공고 묶음에 「⚠️ … 기간 끝 날짜 …」 정책 행이 있으면 알고 있음(정보)')
