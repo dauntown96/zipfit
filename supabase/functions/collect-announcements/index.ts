@@ -199,11 +199,13 @@ const LIST_TIMEOUT_MS = 12000
 //          2026-10-11 probe 실측: 06 7건 · 13 4건(MYHOME 으로만 알던 LH 8건이 전부 이 창에 있다 · 상세가 첨부를 준다).
 type ListWin = 'main' | 'long'
 function listWindow(win: ListWin) {
-  const today  = new Date()
+  // 🔵 2026-10-29(우편함 「코드·운영 — 런칭 뒤 묶음」 5 · 초안) — KST 날짜 축. Edge 런타임 시간대는 UTC 라 종전 getDate() 는 KST 00~09시에 하루 앞 날짜였다.
+  //    9시간 민 시각의 UTC 칸(getUTC*)을 읽으면 KST 날짜다.
+  const today  = new Date(Date.now() + 9 * 3600_000)
   const fmt    = (d: Date) =>
-    `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`
-  const ago    = (n: number) => { const d = new Date(today); d.setDate(today.getDate() - n); return fmt(d) }
-  const future = new Date(today); future.setDate(today.getDate() + 365)
+    `${d.getUTCFullYear()}${String(d.getUTCMonth()+1).padStart(2,'0')}${String(d.getUTCDate()).padStart(2,'0')}`
+  const ago    = (n: number) => { const d = new Date(today); d.setUTCDate(today.getUTCDate() - n); return fmt(d) }
+  const future = new Date(today); future.setUTCDate(today.getUTCDate() + 365)
   return win === 'long'
     ? { PAN_ST_DT: ago(365), PAN_ED_DT: ago(91), CLSG_ST_DT: fmt(today), CLSG_ED_DT: fmt(future) }
     : { PAN_ST_DT: ago(90), PAN_ED_DT: fmt(today), CLSG_ST_DT: ago(90), CLSG_ED_DT: fmt(future) }
@@ -708,7 +710,8 @@ async function fetchBoardHtml(url: string): Promise<{ html: string; finalUrl: st
 
 // 대상 게시글(url) 고르기 — write=false(probe)면 첨부가 이미 있는 게시글도 넣는다(읽기 대조용).
 async function boardTargets(write: boolean): Promise<{ urls: string[]; error?: string }> {
-  const today = new Date().toISOString().slice(0, 10)
+  // 🔵 2026-10-29(우편함 「코드·운영 — 런칭 뒤 묶음」 5 · 초안) — 「오늘」을 KST 날짜로(#772 markExpired 와 같은 꼴). 종전 UTC 는 KST 00~09시에 어제 끝난 게시글도 대상에 넣었다.
+  const today = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10)
   const byUrl = new Map<string, boolean>()   // url → 첨부 있는 행이 하나라도 있나
   for (const s of BOARD_SOURCES) {
     const { data, error } = await supabase.from('announcements')
@@ -764,7 +767,11 @@ async function probeBoard() {
 }
 
 async function markExpired(): Promise<number> {
-  const today = new Date().toISOString().slice(0, 10)
+  // 🔵 2026-10-29(우편함 「코드·운영 — 런칭 전날」 4 · claude.ai 판정 「병합 허용」 · 2026-10-30 #772 병합) — 「오늘」을 KST 날짜로.
+  //    종전 toISOString() 은 UTC 날짜라 KST 00:00~09:00 에는 어제 끝난 행(10-28 끝 43행 · MYHOME 32)을 하루 늦게 닫았다
+  //    — 10-29 06:30 원문 대조가 태백철암1(대표 21199_1 · apply_end 10-28)을 「열린 카드인데 접수마감」으로 잡고 09:0x 수집 뒤 풀렸다.
+  //    MYHOME 응답에서 빠진 행도 apply_end 만 있으면 여기서 닫힌다(소스·응답과 무관 · apply_end NULL 은 손대지 않음 — 종전 그대로).
+  const today = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10)
   const { data } = await supabase
     .from('announcements')
     .update({ status: '접수마감', updated_at: new Date().toISOString() })

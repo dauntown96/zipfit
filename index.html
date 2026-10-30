@@ -853,6 +853,10 @@ html[data-ui="d3"] .zf3-card .chip-row .chip.zf3-minechip{background:var(--surfa
 .zf3-trnav button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 .zf3-trpart{margin-top:8px}
 .zf3-xmiss{position:absolute;top:0;left:0;right:0;padding:3px 5px;background:var(--warn);color:var(--paper);font-size:var(--t-xs);font-weight:700;line-height:1.3}
+.zf3-xloose{position:absolute;top:0;left:0;right:0;padding:3px 5px;background:var(--surface-2);color:var(--ink);border-bottom:1px solid var(--line);font-size:var(--t-xs);font-weight:600;line-height:1.3}
+.zf3-xloose b{display:block;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.extras-site-label{margin:10px 0 6px;padding-left:8px;border-left:3px solid var(--rail);font-size:var(--t-s);font-weight:700;color:var(--ink-2)}
+.extras-sites .extras-site-label:first-child{margin-top:4px}
 .zf3-hux{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 6px;font-size:var(--t-s);color:var(--ink-2)}
 .zf3-hux b{color:var(--ink)}
 .zf3-hux button{all:unset;box-sizing:border-box;min-height:var(--hit);padding:0 12px;border:1px solid var(--line);border-radius:999px;font-size:var(--t-s);font-weight:700;color:var(--ink);cursor:pointer;display:inline-flex;align-items:center}
@@ -8393,11 +8397,19 @@ function loadAnnouncementExtras(annId, detailEl, id, useGroup){
     // Drive ID 추출 실패율은 1,152행에서 0%였다(전부 drive.google.com/file/d/<ID>/… 형태).
     // 🔴 2026-09-22: 키에 extra_type을 더했다. 합본 파일(한 PDF에 평면도+주택사진)을 두 행으로
     // 넣으면 종전 키로는 한쪽이 사라졌다. 파이프라인 중복은 같은 파일·같은 타입이라 여전히 걸린다.
-    const seen = new Set();
+    // 🔵 2026-10-30(우편함 「표시층 — 같은 파일 다른 주택형 칩」) — LH가 같은 파일을 두 주택형 칸에 올리면(화성동탄 C26 31A형·31A-1형 ·
+    //    …20802 라움·더하이 동) 키가 다른 둘째 행이 여기서 접혀 그 세대 머리에 칩이 없었다. 접힌 행 중 unit_key 가 남은 행과 다른 것은
+    //    따로 모아 두고, 남은 행이 칩으로 갈 때만 그 행도 제 머리 칩에 단다(갤러리·「N건은 … 📷 칩에」 셈은 파일 하나 = 한 장 그대로).
+    const seen = new Map();
+    const dupKeyed = [];
     rows = rows.filter(r => {
       const key = (driveFileIdFrom(r.file_url) || r.id) + '|' + (r.extra_type || '');
-      if(seen.has(key)) return false;
-      seen.add(key);
+      const kept = seen.get(key);
+      if(kept){
+        if(r.unit_key && kept.unit_key && r.unit_key !== kept.unit_key) dupKeyed.push({ r, kept });
+        return false;
+      }
+      seen.set(key, r);
       return true;
     });
     // 🔵 B28 — 세대 머리에 닿는 행은 칩으로 보내고 갤러리에서 뺀다. 닿지 않는 행(키 없음·머리 없음)은
@@ -8414,13 +8426,22 @@ function loadAnnouncementExtras(annId, detailEl, id, useGroup){
         return false;
       });
     }
-    let linkedCount = 0;
+    const chipped = new Set();
+    byKey.forEach(g => g.items.forEach(it => chipped.add(it)));
+    dupKeyed.forEach(({ r, kept }) => {
+      if(!chipped.has(kept)) return;   // 남은 행이 갤러리로 갔으면 같은 그림을 칩에 또 걸지 않는다
+      const k = r.unit_key;
+      const kind = keys.building.has(k) ? '건물' : (keys.types.has(k) ? '주택형' : '');
+      if(!kind) return;
+      if(!byKey.has(k)) byKey.set(k, { kind, items: [] });
+      byKey.get(k).items.push(r);
+    });
+    let linkedCount = chipped.size;
     byKey.forEach(g => {
       // 모달에서 넘기는 순서는 갤러리와 같게 — 사진 먼저, 그다음 평면도
       g.items.sort((a, b) => (a.extra_type || '').localeCompare(b.extra_type || '') * -1 || (a.building_address || '').localeCompare(b.building_address || ''));
       g.gid = 'eg' + (extrasGroupSeq++);
       extrasGroupsRegistry[g.gid] = g.items;
-      linkedCount += g.items.length;
     });
     if(byKey.size){
       extrasByUnitKey[id] = byKey;
@@ -8433,12 +8454,27 @@ function loadAnnouncementExtras(annId, detailEl, id, useGroup){
     const photos = rows.filter(r => r.extra_type === 'photo');
     const floorplans = rows.filter(r => r.extra_type === 'floorplan');
     const pamphlets = rows.filter(r => r.extra_type === 'pamphlet');
+    // 🔵 2026-10-28(우편함 「표시층 — 상세 사진 갤러리를 단지별로 …」 ①) — 사진에 단지명(site_label)이 둘 이상이면 단지마다 소제목을 달아 가른다
+    //    (화성동탄 행복 …20958 사진 42장 · 8단지가 한 줄로 섞여 어느 단지 그림인지 몰랐다). 단지명은 행의 site_label 원문 그대로 ·
+    //    site_label 이 빈 사진은 이름을 짓지 않고 맨 끝 「단지 구분 없음」에 둔다 · 단지가 하나뿐이면 종전 그대로(소제목 없음).
+    //    모달 넘기기는 묶음 하나(gid 하나)로 단지 순서대로 이어진다.
+    const zfPhotoSites = items => {
+      const names = [];
+      items.forEach(it => { const n = String(it.site_label || '').trim(); if(n && names.indexOf(n) === -1) names.push(n); });
+      if(names.length < 2) return null;
+      names.sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));   // 영문 블록명 먼저(A4-1 · A53 …) · 숫자는 크기순
+      const out = names.map(n => ({ name: n, items: items.filter(it => String(it.site_label || '').trim() === n) }));
+      const rest = items.filter(it => !String(it.site_label || '').trim());
+      if(rest.length) out.push({ name: '', items: rest });
+      return out;
+    };
     const renderGroup = (label, items) => {
       if(items.length === 0) return '';
+      const sites = label === '사진' ? zfPhotoSites(items) : null;
+      if(sites) items = [].concat(...sites.map(s => s.items));
       const gid = 'eg' + (extrasGroupSeq++);
       extrasGroupsRegistry[gid] = items;
-      return `<div class="extras-group-label" data-label="${label}">${label} (${items.length}건)</div><div class="extras-grid">` +
-        items.map((it, idx) => {
+      const tile = (it, idx) => {
           const fid = driveFileIdFrom(it.file_url);
           const thumbSrc = fid ? `https://drive.google.com/thumbnail?id=${fid}&sz=w300` : '';
           const caption = [it.building_address, it.dong_ho].filter(Boolean).join(' ');
@@ -8449,8 +8485,18 @@ function loadAnnouncementExtras(annId, detailEl, id, useGroup){
             ${thumbSrc
               ? `<img src="${zfAttr(thumbSrc)}" loading="lazy" alt="${zfAttr(caption)}" onerror="extrasThumbFailed(this)">`
               : `<span class="extras-thumb-missing-mark">불러올 수 없음</span>`}
-            ${caption ? `<span class="extras-thumb-label">${escapeHtml(caption)}</span>` : ''}${it.extra_type === 'floorplan' && !it.unit_key && typeof zf3On === 'function' && zf3On() && zf3PlanMissing(it.building_address, keys) ? '<span class="zf3-xmiss">이번 모집 세대 목록에 없는 주택형</span>' : ''}
+            ${caption ? `<span class="extras-thumb-label">${escapeHtml(caption)}</span>` : ''}${it.extra_type === 'floorplan' && !it.unit_key && typeof zf3On === 'function' && zf3On() ? (zf3PlanMissing(it.building_address, keys) ? '<span class="zf3-xmiss">이번 모집 세대 목록에 없는 주택형</span>' : zf3PlanLooseTag(it)) : ''}
           </a>`;
+      };
+      if(!sites) return `<div class="extras-group-label" data-label="${label}">${label} (${items.length}건)</div><div class="extras-grid">` + items.map(tile).join('') + `</div>`;
+      let at = 0;
+      return `<div class="extras-group-label" data-label="${label}">${label} (${items.length}건)</div><div class="extras-sites">` +
+        sites.map(s => {
+          const base = s.name || '단지 구분 없음';
+          const html = `<div class="extras-site-label" data-label="${zfAttr(base)}">${escapeHtml(base)} (${s.items.length}건)</div><div class="extras-grid">` +
+            s.items.map((it, k) => tile(it, at + k)).join('') + `</div>`;
+          at += s.items.length;
+          return html;
         }).join('') + `</div>`;
     };
     const wrap = document.createElement('details');
@@ -8538,6 +8584,14 @@ function extrasThumbFailed(img){
 function refreshExtrasCounts(wrap){
   if(!wrap) return;
   let shown = 0, missing = 0, noPreview = 0;
+  // 🔵 2026-10-28 — 단지별로 갈린 사진(.extras-sites)은 단지 소제목마다 세고, 묶음 이름표(사진)는 단지들을 더해 센다.
+  const sums = new Map();
+  const setLabel = (label, all, gone, np) => {
+    const base = label.getAttribute('data-label') || '';
+    label.textContent = `${base} (${all - gone}건)`
+      + (np ? ` · ${np}건 미리보기 없음` : '')
+      + (gone ? ` · ${gone}건은 지금 불러올 수 없어요` : '');
+  };
   wrap.querySelectorAll('.extras-grid').forEach(grid => {
     const all = grid.querySelectorAll('.extras-thumb').length;
     const gone = grid.querySelectorAll('.extras-thumb-missing').length;
@@ -8546,13 +8600,14 @@ function refreshExtrasCounts(wrap){
     missing += gone;
     noPreview += np;
     const label = grid.previousElementSibling;
-    if(label && label.classList.contains('extras-group-label')){
-      const base = label.getAttribute('data-label') || '';
-      label.textContent = `${base} (${all - gone}건)`
-        + (np ? ` · ${np}건 미리보기 없음` : '')
-        + (gone ? ` · ${gone}건은 지금 불러올 수 없어요` : '');
+    if(label && label.classList.contains('extras-site-label')) setLabel(label, all, gone, np);
+    const box = grid.parentElement && grid.parentElement.classList.contains('extras-sites') ? grid.parentElement.previousElementSibling : label;
+    if(box && box.classList.contains('extras-group-label')){
+      const s = sums.get(box) || [0, 0, 0];
+      sums.set(box, [s[0] + all, s[1] + gone, s[2] + np]);
     }
   });
+  sums.forEach((s, label) => setLabel(label, s[0], s[1], s[2]));
   const title = wrap.querySelector('.extras-title');
   if(title) title.textContent = `📷 사진·평면도·팸플릿 (${shown}건)`
     + (noPreview ? ` · ${noPreview}건 미리보기 없음` : '')
@@ -12957,8 +13012,10 @@ function zf3TickHour(pill){
   const hm = pill.dataset.zf3Hm, end = new Date(pill.dataset.zf3End + ':00+09:00');   // 원문 시각은 한국 시각
   const left = end.getTime() - Date.now();
   if(left > 0){
-    const h = Math.floor(left / 3600000), m = Math.floor(left % 3600000 / 60000);
-    pill.textContent = `오늘 ${hm}까지 · ${h ? h + '시간' : m + '분'} 남음`;
+    // 🔵 2026-10-28(우편함 「표시층 — … 오늘 마감 「N시간 M분 남음」」 ③ · 다운님 결정 A) — 시간을 내려 버리지 않는다(6시간 19분이 「6시간」으로 보였다).
+    //    1시간 아래는 분만 · 0분이면 「N시간」만. 분은 올림이다 — 15:59:30 이 「0분 남음」이 되지 않게(남은 것이 있으면 1분 이상).
+    const mins = Math.ceil(left / 60000), h = Math.floor(mins / 60), m = mins % 60;
+    pill.textContent = `오늘 ${hm}까지 · ${h ? h + '시간' + (m ? ' ' + m + '분' : '') : m + '분'} 남음`;
   } else pill.textContent = `오늘 ${hm} 마감 시각 지남`;
 }
 let zf3HourT = null;
@@ -12969,6 +13026,15 @@ function zf3HourTimer(){
 // 아이디어 2회차 ② — 세대 머리에 붙지 않은 평면도(unit_key 없음)의 설명글 「평면도(36A)」 주택형이 이 공고 세대 목록 어디에도 없을 때만 꼬리.
 //    표기가 제각각이라(「26형」·「26」·「29T」·「19평」·「전체형」) 글자가 아니라 **면적 숫자**로만 견준다 — 숫자가 세대 머리 어디든 있으면 꼬리 없음.
 //    읽을 수 없는 꼴(평·iso·공용·전체형·소수)은 꼬리를 달지 않는다(모르면 말하지 않는다).
+// 🔵 2026-10-28(우편함 「표시층 — 상세 사진 갤러리를 단지별로 …」 ②) — 세대 행에 안 붙은 평면도(unit_key 없음) 표지. 주택형이 세대 목록에 없다고
+//    읽히면 위 꼬리(zf3PlanMissing)가 먼저다 — 그 밖의 안 붙은 평면도는 어느 세대 행의 그림인지 화면이 모른다는 것만 말한다.
+//    단지명은 행의 site_label 원문 그대로 · 없으면 짓지 않는다(표지 글만).
+function zf3PlanLooseTag(it){
+  const site = String((it && it.site_label) || '').trim();
+  //    타일(390 폭 약 95px)을 덮지 않게 두 줄로 — 단지명 한 줄(넘치면 말줄임) + 「주택형 미연결」 · 온 문장은 title 에.
+  const full = (site ? site + ' · ' : '') + '세대 목록의 주택형에 못 붙인 평면도';
+  return `<span class="zf3-xloose" title="${zfAttr(full)}">${site ? `<b>${escapeHtml(site)}</b>` : ''}주택형 미연결</span>`;
+}
 function zf3PlanMissing(cap, keys){
   const m = /평면도\s*\(([^)]+)\)/.exec(String(cap || ''));
   if(!m || !keys || !keys.types || !keys.types.size) return false;
