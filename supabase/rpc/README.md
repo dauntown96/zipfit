@@ -2,8 +2,8 @@
 
 ## 🔴 이 파일들은 기록이지 배포 경로가 아니다
 
-여기를 고쳐도 **DB는 바뀌지 않는다.** 마이그레이션 러너가 없고, 일부러 두지 않았다.
-DB를 바꾸려면 Supabase에서 직접 실행해야 한다.
+여기를 고쳐도 **DB는 바뀌지 않는다.** 이 폴더는 적용 경로가 아니라 사본이다.
+DB를 바꾸는 길은 `supabase/migrations/` 적용 파일 + PR 병합 하나다(`CLAUDE.md` 원칙 32 · 2026-09-30 — 병합하면 `db-migrations.yml`이 적용한다).
 
 ## 🔴 DB 함수를 고치기 전에 현재 정의를 여기 먼저 커밋한다
 
@@ -450,7 +450,7 @@ usageLogConsent: { col: 'usage_log_consent', conv: toBool },
 'usage_log_consent',
 ```
 
-⚠️ EF 배포는 `CLAUDE.md` 원칙 23의 「되돌리기 어려운 것」이라 확인을 받고 한다.
+⚠️ EF는 직접 배포하지 않는다 — `supabase/functions/**`를 고친 PR을 병합하면 `deploy-functions.yml`이 배포한다(`CLAUDE.md` 원칙 31 · 2026-09-29).
 
 #### 되돌리기
 
