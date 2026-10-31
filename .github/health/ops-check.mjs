@@ -243,6 +243,13 @@ try {
          and exists (select 1 from jsonb_array_elements_text(r.errors) e where e ilike '%upsert%' or e ilike '%insert%' or e like '%예상치 못한 오류%' or e like 'MYHOME: %')),
       'lh0_today', (select count(*) from collection_run_log where (run_at at time zone 'Asia/Seoul')::date = (now() at time zone 'Asia/Seoul')::date and coalesce(lh_fetched,0) = 0),
       'mh0_today', (select count(*) from collection_run_log where (run_at at time zone 'Asia/Seoul')::date = (now() at time zone 'Asia/Seoul')::date and coalesce(myhome_fetched,0) = 0),
+      -- 🔵 2026-10-30(우편함 「코드·운영 — 런칭 날 마감」 B · 이슈 #792) — 판정은 「최근 런부터 이어진 0건 런 수」(마지막으로 1건 이상 받은 런 뒤의 런 · 24시간 안).
+      --    하루 누적(*_today)은 18:10~18:30 503 세 번 뒤 18:40 회복해도 자정까지 ❌였다 — 누적 수는 값 칸에만 남긴다.
+      --    수집이 쉬는 밤(KST 19~09시 — 아침 워밍·야간 1회뿐)에는 마지막 저녁 런들의 상태가 그대로 남는다(끝이 0건 셋이면 아침 첫 정상 런까지 ❌ — 원천이 정말 안 돌아온 것).
+      'lh0_streak', (select count(*) from collection_run_log r where r.run_at > now() - interval '24 hours'
+         and r.run_at > coalesce((select max(run_at) from collection_run_log where coalesce(lh_fetched,0) > 0 and run_at > now() - interval '24 hours'), '-infinity'::timestamptz)),
+      'mh0_streak', (select count(*) from collection_run_log r where r.run_at > now() - interval '24 hours'
+         and r.run_at > coalesce((select max(run_at) from collection_run_log where coalesce(myhome_fetched,0) > 0 and run_at > now() - interval '24 hours'), '-infinity'::timestamptz)),
       'detail_stale', (select count(*) from announcements where source='LH' and status in ('공고중','접수중','정정공고중')
          and (detail_fetch_last_attempt is null or detail_fetch_last_attempt < now() - interval '6 hours')),
       'jobs', (select json_agg(json_build_object('name', jobname, 'active', active)) from cron.job),
@@ -387,8 +394,8 @@ try {
   add('collect_slow', '24시간 안 140초 넘은 수집 런', d.slow_runs_24h === 0 ? 'pass' : 'fail', d.slow_runs_24h, '0(7일 최대 97.2초 · 150초에서 함수가 죽는다)')
   add('collect_write_err', '24시간 안 DB 쓰기 오류가 적힌 수집 런', d.write_err_runs_24h === 0 ? 'pass' : 'fail', d.write_err_runs_24h, '0(upsert·insert·예상치 못한 오류·MYHOME 예외 — 7일 0)')
   // ② 공공데이터포털 관찰 기준(백로그 「공공데이터포털 간헐 응답 장애」)
-  add('portal_lh0', '오늘(KST) LH 목록 0건 런', d.lh0_today < 3 ? 'pass' : 'fail', d.lh0_today, '< 3회/일(백로그 기준 · 7일 최대 1)')
-  add('portal_mh0', '오늘(KST) MYHOME 목록 0건 런', d.mh0_today < 3 ? 'pass' : 'fail', d.mh0_today, '< 3회/일(7일 0)')
+  add('portal_lh0', '최근 런부터 이어진 LH 목록 0건 런', d.lh0_streak < 3 ? 'pass' : 'fail', `연속 ${d.lh0_streak} · 오늘(KST) 누적 ${d.lh0_today}`, '연속 < 3(30분 · 하루 누적은 값만 — 2026-10-30 #792)')
+  add('portal_mh0', '최근 런부터 이어진 MYHOME 목록 0건 런', d.mh0_streak < 3 ? 'pass' : 'fail', `연속 ${d.mh0_streak} · 오늘(KST) 누적 ${d.mh0_today}`, '연속 < 3(30분 · 하루 누적은 값만 — 2026-10-30 #792)')
   if (hourUtc >= 1 && hourUtc <= 10) {
     add('portal_detail', '활성 LH 공고 중 6시간 넘게 상세조회 안 된 수', d.detail_stale <= 5 ? 'pass' : 'fail', d.detail_stale, '≤ 5(백로그 기준 · 2026-09-29 3)')
   } else {
