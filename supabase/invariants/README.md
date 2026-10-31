@@ -13,7 +13,10 @@
 
 | 파일 | 무엇 |
 |---|---|
-| **`v3.14.sql`** | **현행.** v3.13 + **V16** 순위·차수 접수 창(일정 표 · 서로 다른 `start_date`·`end_date`)이 둘 이상인 열린 공고 그룹에 경로 표 0행 → 위반 |
+| **`v3.17.sql`** | **현행.** v3.16 + `allow_exec_funcs`에 `get_announcement_round_chain_ids`(회차 사슬 · 마이그레이션 `2026-10-29_03`) |
+| `v3.16.sql` | v3.15 + `allow_exec_funcs`에 `get_announcement_round_ids` · V1이 뷰·구체화 뷰·외부 표까지 · **V17** postgres 기본 권한이 공개 역할에 표 SELECT 밖·함수·시퀀스를 열면 위반 · **V18** 공개 역할의 public·zipfit_ops CREATE · zipfit_ops USAGE |
+| `v3.15.sql` | v3.14 + `allow_exec_funcs`에 `listing_hidden_keys`·`ops_is_admin`·`ops_status_board`·`ops_listing_hide` |
+| `v3.14.sql` | v3.13 + **V16** 순위·차수 접수 창(일정 표 · 서로 다른 `start_date`·`end_date`)이 둘 이상인 열린 공고 그룹에 경로 표 0행 → 위반 |
 | `v3.13.sql` | v3.12 + **V15b** category가 「⚠️」로 시작하지 않는 정책 행 `content_raw`에 「⚠️」 0 |
 | `v3.12.sql` | v3.11 + **V15** 정책 행 `content_raw`에 우리 판단 문장 표지(🔴·🔵·「확정:」·「애초에」·「로 읽으시기 바랍니다」) 0 |
 | `v3.11.sql` | v3.10 + `allow_exec_funcs`에 `get_last_collected_at` 한 줄(2026-10-13 마지막 수집 시각 RPC) |
@@ -54,6 +57,8 @@
 | **v3.12** | **V15** 정책 행 `content_raw`에 우리 판단 문장의 표지가 있으면 위반 — 🔴 · 🔵 · 「확정:」 · 「애초에」 · 「로 읽으시기 바랍니다」를 `strpos`로 글자 그대로 찾는다(정규식 아님 · 허용 목록 없음). run 198 뒤 네 줄을 손으로 걷었고(2026-10-14) 새 분석이 다시 넣는 것을 막는다. 🔴 「⚠️」는 넣지 않았다 — 2026-10-14 9행에 있다(원문 표와 첨부의 차이를 적은 메모) · 무엇을 남길지는 판정 몫 |
 | **v3.13** | **V15b** category가 「⚠️」로 시작하지 않는 정책 행(일반 행)의 `content_raw`에 「⚠️」가 있으면 위반 — 허용 목록 없음. 비교 글자는 U+26A0 한 글자(`U&'\26A0'`)라 「⚠️」(FE0F 꼴)와 「⚠」를 함께 잡는다. 「⚠️」 category 행은 보지 않는다(원문 갈림을 알리는 정식 장치). 2026-10-14 일반 행 ⚠️ 9행을 걷은 뒤 새 분석이 다시 넣는 것을 막는다 · 운영 DB 0행 · 롤백 시험에서 심은 일반 행 2(FE0F 꼴·맨 글자)를 잡고 ⚠️ category 행 1은 잡지 않음 |
 | **v3.14** | **V16** 일정 표(`announcement_schedule`) 접수 행 중 `scope_text`가 순위·차수 글자(「순위」·「차수」·「숫자+차」)인 행의 **서로 다른 창** `(start_date, end_date)`이 같은 회차 그룹(`get_announcement_group_ids`)에서 둘 이상인데, 그룹의 경로 표(`announcement_apply_routes`)가 0행이고 그룹에 접수 마감이 오늘 이후인 행이 있으면 위반(스킬 규칙 12-3). 🔴 세는 단위는 「서로 다른 창」 — 순위 행 수·정형 문장(「신청순위별로 신청접수일이 서로 다르며」)·「1차 … 심사」 낱말로 세지 않는다(`…20879`는 순위 행 둘이 같은 날 창 하나 · claude.ai 판정 2026-10-15). V10c(단지 축)가 못 보던 순위 축을 일정 표로 본다. 2026-10-15 운영 DB 0행(순위 창 둘 이상 6공고 — 모두 경로 표 있음) · 롤백 시험: 가짜 대표 순위 창 2·경로 0 → 1 · 같은 창 둘 → 0 · 경로 1행 → 0 |
+| **v3.17** | `allow_exec_funcs`에 `get_announcement_round_chain_ids` — 그 한 줄뿐이다. 회차 링크 표 `announcement_round_links`의 권한·RLS는 V1·V5·V6이 본다 · 표 데이터 줄(양끝 공고 있음)은 표가 생긴 뒤 별도 판(v3.10 선례) |
+| **v3.16** | 권한 불변식(백로그 「권한 불변식 SQL」 · 우편함 「코드·운영 — 런칭 뒤 묶음」 4) — `allow_exec_funcs`에 `get_announcement_round_ids`(같은 회차 ID · 마이그레이션 `2026-10-29_01`) · **V1** relkind를 r·p → r·p·v·m·f(뷰도 쓰기 권한을 본다) · **V17** postgres가 public·zipfit_ops·전역에 둔 기본 권한(`pg_default_acl`)이 anon·authenticated에 표 SELECT 밖·함수 EXECUTE·시퀀스를 주면 위반(원칙 15 「새 테이블은 쓰기 권한 없이 태어난다」의 장치 · supabase_admin 기본 권한은 고칠 수 없어 보지 않는다) · **V18** anon·authenticated의 public·zipfit_ops CREATE · zipfit_ops USAGE. 허용 목록(V1)은 그대로(saved_announcements authenticated INSERT·DELETE + usage_events anon·authenticated INSERT 컬럼 단위). 2026-10-29 운영 DB 0행 · 롤백 시험: 기본 권한 anon INSERT · authenticated public CREATE · 뷰 anon UPDATE 를 심으니 V17·V18·V1 각 1행 |
 | **v3.5** | **V12**를 좁혔다 — 홍보물 행 주소(`dng_hs_adr`, 없으면 `row_address`)와 같은 그룹 세대 행 주소(`housing_units.address`)가 맞는 홍보물이 있는 공고만 센다. 키 = 첫 「(」 앞 도로명 주소의 공백을 모두 뺀 것. 목록 밖 건물의 홍보물(제주 `…0835` 소노빌 — 외도일동 · 세대 행은 이도일동)은 잇지 않는 것이 맞아 위반이 아니다(B73 검증 판정). 그룹 ID는 공고마다 한 번만 펼친다. 🔴 주소 꼴이 안 맞는 홍보물(지번만 등)과 세대 행이 없는 공고는 이 검사에서 빠진다 — 넓던 v3.4보다 덜 잡는 쪽이다 |
 | **v3.4** | 공고 분석 스킬 v9.4 불변식 12를 DB 전체 검사로 — **V12** `announcement_analysis.status`가 「완료」로 시작하는 공고 중 `announcement_promo_files` 행이 있는데 같은 그룹(`get_announcement_group_ids`)의 `announcement_extras`가 0인 공고. 🔴 목록만 낸다(고치지 않는다). 그룹 ID를 **먼저 펼쳐** id 같음으로 찾는다 — `x.announcement_id in (select get_…(…))` 꼴은 관리 API 한도를 넘겼다(2026-09-29 실측) |
 | **v3.3** | 공고 분석 스킬 v9.3 불변식 10·11을 DB 전체 검사로 — **V9** `announcement_extras.unit_key`가 같은 `announcement_id` 세대 행의 건물 머리 키(또는 `건물::주택형`)에 닿지 않는 행 · **V10a** 경로 표 행의 `period/site/phase/note_text`가 근거 정책 행 `content_raw`의 부분 문자열이 아니거나, 근거 행이 없거나 category가 「모집일정」이 아니거나(스킬 규칙 12-2), `route`가 3값 밖 · **V10c** 같은 그룹 모집일정 행의 「단지명 :」 값이 둘 이상인데 경로 행이 0인 활성 공고. 🔴 V10c는 **단지 축만** 보는 근사다 — 순위·경로 축 누락은 SQL로 가르지 않았다(원문 문장이 제각각이라 과잉 탐지) |

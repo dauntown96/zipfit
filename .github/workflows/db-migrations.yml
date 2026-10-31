@@ -34,6 +34,11 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      # 🔵 2026-10-30(우편함 「코드·운영 — #762 DB 묶음 병합」 덧 · #785) — PR 이 새로 더한 .md 줄의 {{ · {% (Pages Jekyll Liquid 빌드 실패 꼴). DB 를 부르지 않는다.
+      - name: Pages Liquid 글자
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: bash scripts/pages-liquid-check.sh
       # 🔵 2026-10-13(우편함 「코드 — 카드 머리 세대수」 0장 2) — CLAUDE.md 「최근 작업 이력」 꼴(그 절 머리 아래 표 한 벌 · 3행 · 행당 600B · 최신부터).
       #    검사는 .claude/hooks/rule-check.py 의 history_problems() 한 벌(커밋 훅과 같은 함수 · 표준 라이브러리만 · DB 를 부르지 않는다).
       #    처음 한 주는 경고만 — HISTORY_FAIL_FROM(KST 날짜)부터는 같은 문제를 실패로 낸다. 날짜를 옮기려면 이 값 한 줄만 고친다.
@@ -57,6 +62,12 @@ jobs:
           fi
           printf '%s\n' "$out" | while IFS= read -r l; do echo "::error::$l"; done
           exit 1
+      # 🔵 2026-10-29(우편함 「코드·운영 — 런칭 전날」 2) — index.html · sw.js 를 바꾼 PR 은 head CACHE_NAME = base + 1(원칙 9). 두 파일을 안 건드리면 건너뜀.
+      #    DB 를 부르지 않는다 · scripts/ 파일이라 아래 「DB 파일을 건드렸나」의 다섯 경로에 들지 않는다.
+      - name: CACHE 판(+1)
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: bash scripts/cache-bump-check.sh
       - name: DB 파일을 건드렸나
         id: scope
         env:

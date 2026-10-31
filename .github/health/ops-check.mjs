@@ -12,7 +12,7 @@ import { SH_RUN_SQL, judgeShRun } from './sh-run.mjs'
 import { BACKLOG_SQL, judgeBacklog } from './collect-backlog.mjs'
 import { HARD, splitFailed } from './gate.mjs'
 import { lhGoneSql, judgeLhGone } from './lh-gone.mjs'
-import { ELIG_FORM_NULL_SQL, RENT_NULL_SQL, judgeEligFormNull, judgeRentNull } from './open-gaps.mjs'
+import { ELIG_FORM_NULL_SQL, RENT_NULL_SQL, ROUND_MIX_SQL, judgeEligFormNull, judgeRentNull, judgeRoundMix } from './open-gaps.mjs'
 import { readdirSync, readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 
@@ -206,8 +206,11 @@ try {
     `${list.status} · ${Array.isArray(list.data) ? list.data.length : 0}행 · ${list.ms}ms${list.snippet ? ' · ' + list.snippet : ''}`,
     '200 · 행 > 0 · 왕복 ≤ 10초(서버 한도 3초는 200 여부로 잰다 — 넘으면 500. 왕복은 러너↔싱가포르 1.9MB라 넉넉히)')
   // ③-2 화면이 실제로 보내는 인자 모양(2026-10-01 — 명시 null 은 함수가 인라인되지 않아 따로 잰다 · 우편함 「운영 — 감지 루틴 발송기」 3)
+  //    🔵 2026-10-29(우편함 「코드·운영 — 런칭 뒤 묶음」 3 · 백로그 「목록·인사이트가 limit 없이 전량」) — 세 모양은 announcement_id 칸만 받는다(?select=).
+  //    함수는 서버에서 끝까지 돌고(명시 null 은 인라인되지 않아 전 행 계산) 200·행 수 판정은 같다 · 받는 양만 1.9MB → 약 42KB(2026-10-29 실측).
+  //    전 칸 응답은 위 anon_list 한 번만 받는다(요약 50건 id 재료) — 실행 1회 목록 전송 약 7.6MB → 약 2.0MB.
   for (const [id, body] of [['anon_list_null', { p_region: null, p_type: null, p_status: null }], ['anon_list_region', { p_region: '경기도' }], ['anon_list_type', { p_type: '국민임대' }]]) {
-    const x = await anonRpc('get_announcements_deduped', body)
+    const x = await anonRpc('get_announcements_deduped?select=announcement_id', body)
     const ok = x.status === 200 && Array.isArray(x.data) && x.data.length > 0
     add(id, `비로그인 get_announcements_deduped ${JSON.stringify(body)}`, ok && x.ms <= 10000 ? 'pass' : 'fail',
       `${x.status} · ${Array.isArray(x.data) ? x.data.length : 0}행 · ${x.ms}ms${x.snippet ? ' · ' + x.snippet : ''}`,
@@ -240,6 +243,13 @@ try {
          and exists (select 1 from jsonb_array_elements_text(r.errors) e where e ilike '%upsert%' or e ilike '%insert%' or e like '%예상치 못한 오류%' or e like 'MYHOME: %')),
       'lh0_today', (select count(*) from collection_run_log where (run_at at time zone 'Asia/Seoul')::date = (now() at time zone 'Asia/Seoul')::date and coalesce(lh_fetched,0) = 0),
       'mh0_today', (select count(*) from collection_run_log where (run_at at time zone 'Asia/Seoul')::date = (now() at time zone 'Asia/Seoul')::date and coalesce(myhome_fetched,0) = 0),
+      -- 🔵 2026-10-30(우편함 「코드·운영 — 런칭 날 마감」 B · 이슈 #792) — 판정은 「최근 런부터 이어진 0건 런 수」(마지막으로 1건 이상 받은 런 뒤의 런 · 24시간 안).
+      --    하루 누적(*_today)은 18:10~18:30 503 세 번 뒤 18:40 회복해도 자정까지 ❌였다 — 누적 수는 값 칸에만 남긴다.
+      --    수집이 쉬는 밤(KST 19~09시 — 아침 워밍·야간 1회뿐)에는 마지막 저녁 런들의 상태가 그대로 남는다(끝이 0건 셋이면 아침 첫 정상 런까지 ❌ — 원천이 정말 안 돌아온 것).
+      'lh0_streak', (select count(*) from collection_run_log r where r.run_at > now() - interval '24 hours'
+         and r.run_at > coalesce((select max(run_at) from collection_run_log where coalesce(lh_fetched,0) > 0 and run_at > now() - interval '24 hours'), '-infinity'::timestamptz)),
+      'mh0_streak', (select count(*) from collection_run_log r where r.run_at > now() - interval '24 hours'
+         and r.run_at > coalesce((select max(run_at) from collection_run_log where coalesce(myhome_fetched,0) > 0 and run_at > now() - interval '24 hours'), '-infinity'::timestamptz)),
       'detail_stale', (select count(*) from announcements where source='LH' and status in ('공고중','접수중','정정공고중')
          and (detail_fetch_last_attempt is null or detail_fetch_last_attempt < now() - interval '6 hours')),
       'jobs', (select json_agg(json_build_object('name', jobname, 'active', active)) from cron.job),
@@ -308,7 +318,11 @@ try {
          'since_cron_min', (select extract(epoch from now() - min(applied_at))/60 from zipfit_ops.schema_migrations where filename = '2026-10-08_02_source_page_checks_cron.sql'),
          'closed', (select coalesce(json_agg(z.source_key || ' ' || coalesce(z.page_status, '')), '[]'::json) from (select distinct on (c.source_key) c.* from source_page_checks c
              where c.checked_at > now() - interval '26 hours' and c.error is null order by c.source_key, c.checked_at desc) z
-             join announcements a on a.announcement_id = z.card_id where z.closed_mismatch and a.status <> '접수마감'),
+             join announcements a on a.announcement_id = z.card_id where z.closed_mismatch and a.status <> '접수마감'
+               -- 🔵 2026-10-29(우편함 「코드·운영 — 런칭 전날」 1) — 자연 마감은 세지 않는다: 카드 접수 끝이 오늘(KST)보다 앞 ∧ 끝 날짜가 같음(end_diff 참 아님).
+               --    카드가 「열림」으로 남은 것은 MYHOME 대표 status 「공고중」이 굳은 탓(10-29 태백철암1 …20735 · 대표 21199_1 apply_end 10-28)이지 원문과 갈린 것이 아니다.
+               --    백로그 「원문 키 사이클」 트리거 식과 같은 조건(claude.ai 10-29).
+               and not (coalesce(z.card_apply_end < (now() at time zone 'Asia/Seoul')::date, false) and z.end_diff is not true)),
          -- 🔵 2026-10-08(운영 기반 후속 6) — 같은 공고 묶음에 접수 끝 갈림을 알리는 ⚠️ 정책 행(분류 「⚠️ … 기간 끝 날짜 …」)이 이미 있으면 known(알고 있음).
          --    화면이 사용자에게 이미 알리고 있는 갈림이다 — 경고 대신 정보로 세고 개수는 남긴다. ⚠️ 행이 없는 갈림만 경고다.
          'enddiff', (select coalesce(json_agg(json_build_object('t', z.source_key || ' 카드 ' || coalesce(z.card_apply_end::text, '-') || ' ↔ 페이지 ' || coalesce(z.page_apply_end::text, '-'),
@@ -319,7 +333,7 @@ try {
              join announcements a on a.announcement_id = z.card_id where z.end_diff and a.status <> '접수마감'))),
       -- 🔵 2026-10-06 정정본 분석 없음(A3) — 열린 대표 중 정정 행이 정정된 지 60분 넘었는데 정정본 분석이 없고, 같은 묶음에 정정 전 분석이 있는 것.
       'revision_gap', (with rv as materialized (select d.announcement_id from get_announcements_deduped() d join announcements a using (announcement_id)
-           where a.is_revised and a.revised_at < now() - interval '60 minutes' and d.apply_end >= current_date)
+           where a.is_revised and a.revised_at < now() - interval '60 minutes' and d.apply_end >= (now() at time zone 'Asia/Seoul')::date)
          select coalesce(json_agg(rv.announcement_id), '[]'::json) from rv where not get_revision_analysis_done(rv.announcement_id)
            and exists (select 1 from announcement_analysis aa where aa.announcement_id in (select g.announcement_id from get_announcement_group_ids(rv.announcement_id) g)
                        and aa.status in ('완료', '완료(보조 누락)', '완료(판정 대기)', '완료(소급)'))),
@@ -335,17 +349,32 @@ try {
              from announcements a left join lm on lm.aid = a.announcement_id where a.title is not null and a.hidden_from_listing is not true),
            rp as materialized (select d.announcement_id, d.apply_end, kd.k, a.is_revised, a.revised_at, a.created_at
              from get_announcements_deduped() d join kd using (announcement_id) join announcements a using (announcement_id)
-            where d.apply_end >= current_date)
+            where d.apply_end >= (now() at time zone 'Asia/Seoul')::date)
          select coalesce(json_agg(rp.announcement_id order by rp.announcement_id), '[]'::json) from rp
           where greatest(rp.created_at, coalesce(rp.revised_at, rp.created_at)) < now() - interval '60 minutes'
             and (select coalesce(sum(jsonb_array_length(g.attachment_urls)), 0) from kd g where g.k = rp.k and jsonb_typeof(g.attachment_urls) = 'array') > 0
             and ((rp.is_revised and rp.revised_at is not null and not get_revision_analysis_done(rp.announcement_id)
                   and exists (select 1 from kd g join announcement_analysis aa using (announcement_id)
                                where g.k = rp.k and aa.status in ('완료', '완료(보조 누락)', '완료(판정 대기)', '완료(소급)')))
-                 or (rp.apply_end >= current_date + 3 and not exists (select 1 from kd g join announcement_analysis aa using (announcement_id)
+                 or (rp.apply_end >= (now() at time zone 'Asia/Seoul')::date + 3 and not exists (select 1 from kd g join announcement_analysis aa using (announcement_id)
                                where g.k = rp.k and (g.apply_end = rp.apply_end or g.linked)
                                  and aa.status in ('완료', '완료(보조 누락)', '완료(판정 대기)', '완료(소급)'))))
             and not exists (select 1 from analysis_dispatch_queue q where q.announcement_id = rp.announcement_id and q.state in ('waiting', 'sent', 'claimed'))),
+      -- 🔵 2026-10-28(우편함 「코드·운영 — 런칭 뒤 첫 주 DB 쪽 묶음」 2 · 백로그 「첨부를 못 받는 공고는 …」) — 첨부 0 · 미분석 열린 대표.
+      --    발송기 후보(analysis_dispatch_tick cand)와 dispatch_orphan 이 같은 「묶음 첨부 > 0」 조건이라, 첨부를 못 받는 호스트의 공고는 어디에도 안 잡힌다.
+      --    열린 대표(apply_end ≥ 오늘) ∧ 같은 묶음(링크 키 포함) 첨부 0 ∧ 완료 계열 분석 0 ∧ 접수 시작이 오늘+14일 안(이미 시작 포함 · NULL 은 빼지 않고 센다).
+      'attach0_unanalyzed', (with lm as (select distinct on (l.linked_announcement_id) l.linked_announcement_id aid, announcement_dedup_key(lh.title) lh_key
+             from announcement_post_links l join announcements lh on lh.announcement_id = l.lh_announcement_id
+            where lh.title is not null and lh.hidden_from_listing is not true order by l.linked_announcement_id, l.lh_announcement_id),
+           kd as materialized (select a.announcement_id, a.attachment_urls, coalesce(lm.lh_key, announcement_dedup_key(a.title)) k
+             from announcements a left join lm on lm.aid = a.announcement_id where a.title is not null and a.hidden_from_listing is not true),
+           rp as materialized (select d.announcement_id, d.supply_org, d.apply_start, kd.k
+             from get_announcements_deduped() d join kd using (announcement_id) where d.apply_end >= (now() at time zone 'Asia/Seoul')::date)
+         select coalesce(json_agg(json_build_object('id', rp.announcement_id, 'org', rp.supply_org, 'start', rp.apply_start) order by rp.apply_start nulls first, rp.announcement_id), '[]'::json) from rp
+          where (rp.apply_start is null or rp.apply_start <= (now() at time zone 'Asia/Seoul')::date + 14)
+            and (select coalesce(sum(jsonb_array_length(g.attachment_urls)), 0) from kd g where g.k = rp.k and jsonb_typeof(g.attachment_urls) = 'array') = 0
+            and not exists (select 1 from kd g join announcement_analysis aa using (announcement_id)
+                             where g.k = rp.k and aa.status in ('완료', '완료(보조 누락)', '완료(판정 대기)', '완료(소급)'))),
       -- 🔵 2026-10-15(우편함 「코드 — 불변식 … · health-ops-soft 「판정완료인데 판정 대기」 감지」 2) — 판정 대기 잔존.
       --    done = 상태 「완료(판정 대기)」인데 pending_fields 에 「[판정완료] YYYY-MM-DD …」 줄(2026-10-15 규약 — 판정이 난 날 · 근거 페이지)이 있는 공고.
       --    「[판정완료]」 바로 뒤 날짜로 가린다 — 2026-09 분석들의 「[판정완료] <설명>」(분석자가 스스로 정한 것을 적은 옛 꼴)은 세지 않는다.
@@ -365,8 +394,8 @@ try {
   add('collect_slow', '24시간 안 140초 넘은 수집 런', d.slow_runs_24h === 0 ? 'pass' : 'fail', d.slow_runs_24h, '0(7일 최대 97.2초 · 150초에서 함수가 죽는다)')
   add('collect_write_err', '24시간 안 DB 쓰기 오류가 적힌 수집 런', d.write_err_runs_24h === 0 ? 'pass' : 'fail', d.write_err_runs_24h, '0(upsert·insert·예상치 못한 오류·MYHOME 예외 — 7일 0)')
   // ② 공공데이터포털 관찰 기준(백로그 「공공데이터포털 간헐 응답 장애」)
-  add('portal_lh0', '오늘(KST) LH 목록 0건 런', d.lh0_today < 3 ? 'pass' : 'fail', d.lh0_today, '< 3회/일(백로그 기준 · 7일 최대 1)')
-  add('portal_mh0', '오늘(KST) MYHOME 목록 0건 런', d.mh0_today < 3 ? 'pass' : 'fail', d.mh0_today, '< 3회/일(7일 0)')
+  add('portal_lh0', '최근 런부터 이어진 LH 목록 0건 런', d.lh0_streak < 3 ? 'pass' : 'fail', `연속 ${d.lh0_streak} · 오늘(KST) 누적 ${d.lh0_today}`, '연속 < 3(30분 · 하루 누적은 값만 — 2026-10-30 #792)')
+  add('portal_mh0', '최근 런부터 이어진 MYHOME 목록 0건 런', d.mh0_streak < 3 ? 'pass' : 'fail', `연속 ${d.mh0_streak} · 오늘(KST) 누적 ${d.mh0_today}`, '연속 < 3(30분 · 하루 누적은 값만 — 2026-10-30 #792)')
   if (hourUtc >= 1 && hourUtc <= 10) {
     add('portal_detail', '활성 LH 공고 중 6시간 넘게 상세조회 안 된 수', d.detail_stale <= 5 ? 'pass' : 'fail', d.detail_stale, '≤ 5(백로그 기준 · 2026-09-29 3)')
   } else {
@@ -463,6 +492,16 @@ try {
       ids.length ? `${ids.length}: ${ids.slice(0, 5).join(', ')}` : 0,
       '0 — 대표 ∧ 들어온·정정된 지 60분 ∧ 묶음 첨부 > 0 ∧ (정정본 분석 없음(apply_end ≥ 오늘) ∨ 같은 회차 완료 분석 없음(apply_end ≥ 오늘+3)) ∧ 대기열 waiting·sent·claimed 행 없음 · 넘으면 ❌(health-ops-soft — 루틴 착수를 막지 않는다)')
   }
+  // ⑧-2a′ 첨부 0 · 미분석 열린 대표(2026-10-28 · 우편함 「코드·운영 — 런칭 뒤 첫 주 DB 쪽 묶음」 2) — 발송기·dispatch_orphan 이 둘 다 「묶음 첨부 > 0」을 보아
+  //    첨부를 못 받는 호스트(나라키움 kohom · 제천 cbdc — 그 기관의 DB 첫 행)의 공고는 조용히 미분석으로 남았다(화면은 「꼭집 미분석」 표지).
+  //    🔴 ⚠️ 경고만이다(이슈를 열지 않는다 · gate.mjs HARD 밖) — 고치는 길이 사람 손(원문 1회 받기 · 호스트 허용)이라 루틴을 멈출 까닭이 없다.
+  //    기대값(2026-10-28 15:4x KST 관리 API 실측): 열린 대표 68 중 2 — 21471_1_서울특별시_영등포구(한국자산관리공사 · 접수 11-09) · 18430_1_충청북도_제천시(충북개발공사 · 2025-07-03 시작 상시).
+  {
+    const xs = d.attach0_unanalyzed || []
+    add('attach0_unanalyzed', '첨부 0 · 미분석 열린 대표(접수 시작 14일 안) — 원문을 사람이 받아야 함', xs.length === 0 ? 'pass' : 'warn',
+      xs.length ? `${xs.length}: ${xs.slice(0, 5).map(x => `${x.id}(${x.org ?? '기관 없음'} · ${x.start ?? '시작 모름'})`).join(', ')}` : 0,
+      '0 — 대표 ∧ apply_end ≥ 오늘 ∧ (apply_start ≤ 오늘+14 ∨ NULL) ∧ 같은 묶음(링크 키 포함) 첨부 0 ∧ 완료 계열 분석 0 · 넘으면 ⚠️ 경고만(이슈를 열지 않는다 — 발송기가 집지 못하는 공고를 알리는 자리)')
+  }
   // ⑧-2b 판정 대기 잔존(2026-10-15 · 우편함 「코드 — 불변식 … · health-ops-soft 「판정완료인데 판정 대기」 감지」 2).
   //    🔴 ⚠️ 경고만이다(이슈를 열지 않는다 — revision_gap·followup_unreported 와 같은 처리) — 고치는 길이 코드가 아니라 「운영 — 데이터 쓰기」(상태만)라
   //    이슈로 열면 판정과 데이터 쓰기 사이 내내 열린 채 회차마다 ②에 걸린다. 결과 파일·요약 표·ops_health_findings 에 남는다.
@@ -499,7 +538,7 @@ try {
     const cl = x.closed || [], edAll = x.enddiff || []
     const ed = edAll.filter(e => !e.known).map(e => e.t), edKnown = edAll.filter(e => e.known).map(e => e.t)
     add('source_closed', '열린 카드인데 공급기관 페이지가 접수마감', cl.length === 0 ? 'pass' : 'warn', cl.length ? `${cl.length}: ${cl.slice(0, 5).join(', ')}` : 0,
-      '0 — 키마다 26시간 안 마지막 대조 · 카드가 아직 열림 · 넘으면 ⚠️ 경고만(값 반영은 2단계)')
+      '0 — 키마다 26시간 안 마지막 대조 · 카드가 아직 열림 · 자연 마감(카드 접수 끝 < 오늘 KST ∧ 끝 날짜 같음)은 뺀다 · 넘으면 ⚠️ 경고만(값 반영은 2단계)')
     add('source_end_diff', '열린 카드 접수 끝 ≠ 공급기관 페이지', ed.length === 0 ? 'pass' : 'warn',
       (ed.length ? `${ed.length}: ${ed.slice(0, 5).join(', ')}` : '0') + (edKnown.length ? ` · 알고 있음 ${edKnown.length}(⚠️ 정책 행 있음): ${edKnown.slice(0, 5).join(', ')}` : ''),
       '0 — 페이지 일정 중 가장 늦은 접수 끝 ≠ 카드 apply_end · 넘으면 ⚠️ 경고만(값 반영은 2단계) · 같은 공고 묶음에 「⚠️ … 기간 끝 날짜 …」 정책 행이 있으면 알고 있음(정보)')
@@ -906,6 +945,7 @@ try {
 for (const [id, name, sql, judge] of [
   ['elig_form_null', '열린 카드 자격 행 공급 형태(supply_form) 빔', ELIG_FORM_NULL_SQL, judgeEligFormNull],
   ['rent_null_not_jeonse', '열린 카드 전세 아닌 세대 행 월세(monthly_rent) 빔', RENT_NULL_SQL, judgeRentNull],
+  ['round_mix', '열린 카드 묶음에 다른 회차 경로·서류 행(정보 — 화면 회차 거르기가 받쳐야 함)', ROUND_MIX_SQL, judgeRoundMix],   // 2026-10-29 ㉖
 ]) {
   try {
     const [x] = await sqlRead(sql)
@@ -914,6 +954,21 @@ for (const [id, name, sql, judge] of [
   } catch (e) {
     addBlind(id, `${name} — 점검 불능`, 'warn', String(e).slice(0, 200), '공고·자격·세대 표를 읽는다(못 읽으면 ⚠️)')
   }
+}
+
+// ㉗ 재고 통계 원천 판 날짜(2026-10-29 · 우편함 「코드·운영 — 런칭 뒤 묶음」 2ⓒ · 백로그 「임대주택 통계 이력이 안 쌓인다」).
+//    rental_housing_stats.source_updated_at 최댓값이 오늘(KST)에서 400일 넘게 그대로면 ⚠️ — 포털 원천은 해마다 갱신되는데(정기 조사)
+//    collect-rental-stats 가 판 날짜를 상수(index.ts SOURCE_UPDATED_AT)로 넣어 cron 이 매주 성공해도 새 판을 못 받는다(이력도 안 쌓인다).
+//    문턱 400일 = 연 1회 갱신 + 한 달 여유(제안값 — 판정은 claude.ai). ⚠️ 경고만 · gate.mjs HARD 밖 · 못 읽으면 ⚠️ 점검 불능.
+try {
+  const [x] = await sqlRead(`select json_build_object('src', max(source_updated_at)::date, 'days', (now() at time zone 'Asia/Seoul')::date - max(source_updated_at)::date,
+      'rows', count(*), 'collected_age_h', round((extract(epoch from now() - max(collected_at)) / 3600)::numeric, 1)) j from public.rental_housing_stats`)
+  const j = x.j
+  const rule = '≤ 400일 — 재고 통계 원천 판 날짜(source_updated_at 최댓값)가 오늘(KST)에서 400일 넘게 그대로면 ⚠️(연 1회 갱신 + 여유 · 판 날짜가 코드 상수라 새 판을 못 받는 꼴)'
+  add('rental_stats_src', '재고 통계 원천 판 날짜 경과(일)', j.days != null && j.days <= 400 ? 'pass' : 'warn',
+    `${j.days ?? '판 날짜 없음'}일(판 ${j.src ?? '—'} · ${j.rows}행 · 마지막 수집 ${j.collected_age_h ?? '—'}시간 전)`, rule)
+} catch (e) {
+  addBlind('rental_stats_src', '재고 통계 원천 판 날짜 — 점검 불능', 'warn', String(e).slice(0, 200), '재고 통계 표를 읽는다(못 읽으면 ⚠️)')
 }
 
 // ⑲ 인스턴스 메모리(2026-10-17 · 같은 우편 1 · 조사 「인스턴스 지표 경로」 ⓑ) — 관리 API 지표 끝점(베타)에서 숫자만 골라(instance.mjs) zipfit_ops.instance_metrics_log 에 한 행.
