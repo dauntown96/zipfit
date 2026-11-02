@@ -120,6 +120,9 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           LOGIN_WALK_SIMULATE: ${{ inputs.simulate == 'login_fail' && 'fail' || '' }}
         run: |
+          # 🔴 GitHub 기본 셸은 bash -e 다 — 로그인 스크립트가 실패(exit 1)하면 그 줄에서 단계가 끝나 결과 파일에 실패를 더하지 못했다
+          #    (2026-11-02 첫 실패 대역 run 41408017907 — 판정 ok=true 로 남고 이슈가 안 열림). 실패도 끝까지 받아 결과 파일에 싣는다.
+          set +e
           set -uo pipefail
           out=$(timeout 300 node scripts/login-walk.mjs --persona P2 2>/dev/null | tail -1)
           code=$?
