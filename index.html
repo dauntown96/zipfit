@@ -9787,15 +9787,13 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
         //    `area_sqm`·`unit_group`·`supply_target`·`group_recruit_count` 를 더했다. 키가 좁아지는
         //    일은 없으므로(더하기만 한다) 남는 행이 줄지 않고, 실측으로도 **전 표에서 이 네 칸만
         //    다른 행 묶음이 0** 이라 다른 공고의 결과는 글자까지 그대로다.
-        const key = [u.building_name, u.address, u.floor_info, u.unit_type, u.area_sqm, u.deposit, u.monthly_rent, u.deposit_priority1, u.rent_priority1, u.unit_group, u.supply_target, u.group_recruit_count].join('|');
-        const prev = seenHu.get(key);
-        if(prev){
-          // 값까지 똑같은 세대가 두 회차에 다 있으면 남는 행의 회차를 최신 쪽으로 올린다.
-          // 🔴 행 수는 그대로다 — 남은 행이 "지난 회차"로 잘못 찍히는 것만 막는다.
-          if(roundDateOf(u) > (prev.zfRoundDate || '')) prev.zfRoundDate = roundDateOf(u);
-          return;
-        }
-        u.zfRoundDate = roundDateOf(u);
+        // 🔵 2026-11-02 — 키 맨 앞에 회차 날짜를 둔다. 합치는 것은 **같은 회차** 형제 ID의 중복 백필뿐이다 —
+        //    다른 회차의 같은 값 세대는 따로 남아 「다른 회차 보기」에 원문 행 수대로 보인다(종전에는 이번 회차 행에
+        //    합쳐져 지난 회차 쪽에서 사라졌다 · 익산제3 …20850 ↔ 4월 …19778 36B 고령자). 이번 회차 쪽 행 수는 그대로다.
+        const rd = roundDateOf(u);
+        const key = [rd, u.building_name, u.address, u.floor_info, u.unit_type, u.area_sqm, u.deposit, u.monthly_rent, u.deposit_priority1, u.rent_priority1, u.unit_group, u.supply_target, u.group_recruit_count].join('|');
+        if(seenHu.has(key)) return;
+        u.zfRoundDate = rd;
         seenHu.set(key, u);
         keptHu.push(u);
       });
@@ -12076,6 +12074,12 @@ initNoticeFilters();
   window.addEventListener('scroll', later, { passive: true });
   window.addEventListener('resize', later, { passive: true });
   document.addEventListener('click', later, true);   // 카드를 펼치고 접어 단추 자리가 바뀌는 경우
+  // 🔵 2026-11-02 — 스크롤 없이 카드 자리가 바뀌는 경우도 다시 잰다: 늦게 온 내용·목록 다시 그리기로 본문 높이가 바뀜(ResizeObserver) ·
+  //    카드 등장 애니메이션·단추 보임 전환이 끝남(animationend·transitionend). 종전에는 스크롤·창 크기·클릭 때만 재서,
+  //    스크롤 뒤 카드가 밀려 「›」이 단추 밑으로 들어와도 단추가 그대로 보였다(합성 시험 8/8 — 우편함 「표시층 — … 맨 위로 잔여」).
+  try{ if(window.ResizeObserver) new ResizeObserver(later).observe(document.body); }catch(e){}
+  document.addEventListener('animationend', later, true);
+  document.addEventListener('transitionend', later, true);
   update();
 })();
 function zfScrollToTop(){
