@@ -353,6 +353,10 @@ body.theme-dark .extras-missing-note{color:#d8c48a;background:#2a2721;border-col
 .policy-round-head{font-size:12px;font-weight:600;color:#777;margin:10px 0 6px}
 .hu-past-only{padding:2px 9px;font-size:11px;cursor:default;display:inline-block;margin-left:6px;background:#f0efe9;color:#777;border-color:#ddd}
 /* 🔵 2026-11-02 — 2주차 화면 판 ②③④: 자격 머리 칩 · 정책 칸 위 원문 근거 줄(접힘 밖 · 경고 / 안내 두 꼴) */
+.zf-rent-line{font-size:11.5px;color:#4f6b62;margin:-2px 0 6px;padding:0 2px;line-height:1.5}
+.zf-rent-line b{font-weight:700;color:#1F5E4A}
+body.theme-dark .zf-rent-line{color:#9fb8b0}
+body.theme-dark .zf-rent-line b{color:#7fd8b5}
 .zf-exempt-chip{padding:2px 9px;font-size:11px;cursor:default;display:inline-block;margin-left:6px;background:#e7f5ef;color:#0F6E56;border-color:#bfe3d4;font-weight:600}
 .zf-pol-notes{margin:0 0 8px}
 .zf-pol-note{font-size:12px;line-height:1.55;margin:0 0 6px;padding:7px 10px;border-radius:8px;background:#f4f4f2;color:#555}
@@ -5052,6 +5056,63 @@ function zfAnaPendingHtml(url, org){
     : '';
   return `<div class="zf-ana-box"><span class="zf-ana-pill">분석 중</span>${org ? `<span class="zf-ana-org">${escapeHtml(org)}</span>` : ''}<span class="zf-ana-t">공고 원문을 정리하고 있어요 · 일정·자격은 원문에서 확인해 주세요</span>${link}</div>`;
 }
+// 🔵 2026-11-02(우편함 「표시층 — ㎡당 월세 중앙값 …」 A) — 카드 가격 요약 아래 한 줄 「㎡당 월 ○원 · 전국 같은 유형 열린 공고 중앙값 ○원(N곳) — 낮은 편/비슷/높은 편」.
+//    카드 값 = RPC rent_per_sqm_med(가격 범위와 같은 pick 행 · 주 조건 월세 ÷ 전용면적 중앙값 · 영구임대는 나군 행만 — rent_basis 'na').
+//    전국 값 = 목록 응답 뒤 한 번, 열린 카드 전부의 같은 RPC 를 받아 유형(표준 유형 · 영구임대 나군은 나군끼리)마다 카드 값의 중앙값·사분위.
+//    🔴 이번 회차 값(round_state 'current')만 세고 그린다 · 표본 5곳 미만이면 숨긴다 · 위치는 사분위 밖일 때만 「낮은/높은 편」, 안이면 「비슷」.
+//    이 요청은 캐시(zfPriceCache)를 채우지 않는다 — 카드 요약의 두 임대조건·군 이름표 재료는 카드가 보일 때 따로 받는다(그 흐름 그대로).
+const zfRentStats = new Map();   // 유형 키 → { n, med, q1, q3 }
+let zfRentStatsState = 0;        // 0 아직 · 1 받는 중 · 2 끝
+function zfRentTypeKey(row, basis){
+  const raw = (row && row['공급유형']) || '';
+  const std = zfTypeStd.get(String((row && row['source']) || '') + '\u0001' + raw) || raw;
+  return std ? std + (basis === 'na' ? '\u0001na' : '') : '';
+}
+function zfQuantile(sorted, q){
+  if(!sorted.length) return null;
+  const pos = (sorted.length - 1) * q, lo = Math.floor(pos), hi = Math.ceil(pos);
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
+}
+function zfLoadRentStats(){
+  if(zfRentStatsState) return;
+  zfRentStatsState = 1;
+  zfAfterFirstList().then(async () => {
+    for(let i = 0; i < 40 && !zfTypeStd.size; i++) await new Promise(r => setTimeout(r, 250));   // 유형 표준표를 기다린다(최대 10초 · 없으면 원값 유형)
+    const rows = (noticeData || []).filter(n => !isHiddenAsClosed(n) && !zfIsCancelRow(n['공고명']));
+    const byId = new Map(rows.map(n => [String(n['announcement_id'] || ''), n]));
+    const ids = [...byId.keys()].filter(Boolean);
+    if(!ids.length){ zfRentStatsState = 2; return; }
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_announcement_price_summary`, { method: 'POST', headers: zfAnonHeaders(), body: JSON.stringify({ p_ids: ids }) });
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const out = await res.json();
+    if(!Array.isArray(out)) throw new Error('예상치 못한 응답');
+    const vals = new Map();
+    out.forEach(r => {
+      if(!r || r.round_state !== 'current' || r.rent_per_sqm_med == null) return;
+      const k = zfRentTypeKey(byId.get(String(r.announcement_id)), r.rent_basis);
+      if(!k) return;
+      if(!vals.has(k)) vals.set(k, []);
+      vals.get(k).push(Number(r.rent_per_sqm_med));
+    });
+    vals.forEach((v, k) => {
+      if(v.length < 5) return;
+      v.sort((a, b) => a - b);
+      zfRentStats.set(k, { n: v.length, med: zfQuantile(v, 0.5), q1: zfQuantile(v, 0.25), q3: zfQuantile(v, 0.75) });
+    });
+    zfRentStatsState = 2;
+    if(zfRentStats.size) zfFillSummarySlots();
+  }).catch(err => { zfRentStatsState = 2; console.warn('ZipFit ㎡당 통계 로드 실패(줄 없이 그린다):', err); });
+}
+function zfRentLineHtml(id, s){
+  if(!s || s.round_state !== 'current' || s.rent_per_sqm_med == null || !zfRentStats.size) return '';
+  const row = (noticeData || []).find(n => String(n['announcement_id']) === String(id));
+  const st = row && zfRentStats.get(zfRentTypeKey(row, s.rent_basis));
+  if(!st) return '';
+  const v = Number(s.rent_per_sqm_med);
+  const pos = v < st.q1 ? '낮은 편' : (v > st.q3 ? '높은 편' : '비슷');
+  const won = x => Math.round(x).toLocaleString() + '원';
+  return `<div class="zf-rent-line" data-zf-rent="${zfAttr(pos)}">㎡당 월 ${won(v)}${s.rent_basis === 'na' ? '(나군)' : ''} · 전국 같은 유형 열린 공고 중앙값 ${won(st.med)}(${st.n}곳) — <b>${pos}</b></div>`;
+}
 function zfFillSummarySlots(){
   document.querySelectorAll('[data-sum-for]').forEach(el => {
     const id = el.getAttribute('data-sum-for');
@@ -5077,7 +5138,7 @@ function zfFillSummarySlots(){
       : 'font-size:12.5px;font-weight:600;color:#1F5E4A;background:#F2F9F6;border:1px solid #DCEDE6;border-radius:8px;padding:6px 10px;margin-bottom:6px';
     // 🔵 B62 ④ — 미분석 MYHOME 카드가 같은 게시물의 LH 카드에 함께 정리돼 있으면 그리로 보낸다.
     el.innerHTML = line
-      ? `<div style="${box}">${line}${s ? zfRoundTagHtml(s) : ''}</div>`
+      ? `<div style="${box}">${line}${s ? zfRoundTagHtml(s) : ''}</div>${zfRentLineHtml(id, s)}`
       : (zfPostLinkOrganized(el.getAttribute('data-sum-key')) === true
           ? zfPostLinkHtml(el.getAttribute('data-sum-key'))
           : zfPostLinkHtml(el.getAttribute('data-sum-key')) + (() => {
@@ -5470,6 +5531,7 @@ function fmtR(n){return (Math.round(n/1000)/10).toLocaleString()+'만원';}
 const SUPABASE_URL='https://khdpjjyspmlqtzperoqg.supabase.co';
 const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtoZHBqanlzcG1scXR6cGVyb3FnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxMTYyNDUsImV4cCI6MjA5NzY5MjI0NX0.XwSOuOk2UJiR8vTnwwqDZayJWOUstzD2DeB1COG4azs';
 zfLoadTypeStd();   // 🔵 2026-09-30 — 카드 유형 표준(zfTypeLabel). 목록과 따로 한 번만 받는다.
+zfLoadRentStats();   // 🔵 2026-11-02 — ㎡당 월세 전국 같은 유형 통계(목록 응답 뒤 한 번 · 위 zfRentLineHtml).
 
 let allRegions=[]; // Supabase에서 로드한 전국 지역 목록
 let settingsRegions=new Set();
@@ -9249,7 +9311,7 @@ function zfPolToggleAll(btn){
 
 // ===== 🔵 2026-11-02 — 2주차 화면 판 ②③④(우편함 「표시층 — 2주차 화면 판 넷」 · 다운님 승인 2026-11-02) =====
 // 🔴 공통: 원문(이번 회차 자격·정책 행 · 세대 행)에 근거가 있을 때만 그린다 — 근거가 없으면 아무것도 그리지 않는다(종전 화면 그대로).
-// ② 「소득·자산 무관 신청 가능」 — 이번 회차 · 중복 제거 뒤 자격 행 **전부**가 그 축 배제(*_limit_exempt === true)일 때만.
+// ② 「소득·자산 기준 없음」(2026-11-02 바꿈 — 「신청 가능」은 자격 판정처럼 읽혀 계층 한정 공고 …20945·…19376 에서 「아무나」로 읽혔다) — 이번 회차 · 중복 제거 뒤 자격 행 **전부**가 그 축 배제(*_limit_exempt === true)일 때만.
 //    한 공고 안에서 계층마다 다르면(영구임대 수급자만 배제 등) 카드 전체 말로 바꿀 수 없어 그리지 않는다.
 //    한 축만 전부 배제면 그 축만 · 차량가액(car_limit) 행이 있으면 「자동차 기준은 있어요」 꼬리(자격완화 150%형과 배제형을 가른다 — 💡 B69).
 function zfEligExemptChip(rows){
@@ -9257,7 +9319,7 @@ function zfEligExemptChip(rows){
   const inc = rows.every(r => r && r.income_limit_exempt === true);
   const ast = rows.every(r => r && r.asset_limit_exempt === true);
   if(!inc && !ast) return '';
-  const label = inc && ast ? '소득·자산 무관 신청 가능' : (inc ? '소득 기준 무관 신청 가능' : '자산 기준 무관 신청 가능');
+  const label = inc && ast ? '소득·자산 기준 없음' : (inc ? '소득 기준 없음' : '자산 기준 없음');
   const car = rows.some(r => r && r.car_limit) ? ' · 자동차 기준은 있어요' : '';
   return `<span class="chip zf-exempt-chip">${label}${car}</span>`;
 }
@@ -9721,15 +9783,22 @@ function zfFillUnitChips(id){
 // 🔴 블록 경로는 `id` 가 `카드id-blk{n}` 이라 그 id 로는 상세 div 를 못 찾는다. 지도 대상 id 가
 //    곧 진짜 카드이므로 그것으로 찾는다(한 칸 경로에서는 둘이 같다).
 function zfOwnerCardId(id){ return huMapTargetId[id] || id; }
+// 🔵 2026-11-02(우편함 「표시층 — ㎡당 월세 중앙값 … 공유 링크 정책 칸 두 번」 C) — 기준에 상세 div **요소 표지**(zfTok)를 함께 싣는다.
+//    공유 링크(?n=)로 열면 목록이 다시 그려지는 사이 카드가 세 번 열렸고(…20850 실측), 앞 렌더의 로더 응답이 같은 id 의 **새** 칸에 써서
+//    정책·자격·세대 칸이 셋씩 그려졌다 — 공고 id 만 견주던 가드는 「다시 그려진 같은 카드」를 가르지 못했다. 다시 그려진 카드는 새로 열리며
+//    로더가 다시 돌므로(펼침 표지 dataset 도 새 요소에 없다) 앞 응답은 버려도 빠지는 칸이 없다.
+let zfTokSeq = 0;
 function zfCardAnn(id){
   const el = document.getElementById(zfOwnerCardId(id));
-  return el ? (el.dataset.annId || '') : null;
+  if(!el) return null;
+  if(!el.dataset.zfTok) el.dataset.zfTok = String(++zfTokSeq);
+  return (el.dataset.annId || '') + '#' + el.dataset.zfTok;
 }
 // 🔵 호출 시점에 상세 div 를 못 읽었으면(null) 막지 않는다 — 없는 근거로 화면을 비우지 않는다.
 function zfStillOurs(id, annId){
   if(annId === null || annId === undefined) return true;
   const el = document.getElementById(zfOwnerCardId(id));
-  return !!(el && el.dataset.annId === annId);
+  return !!(el && ((el.dataset.annId || '') + '#' + (el.dataset.zfTok || '')) === annId);
 }
 
 // 🔴 **2단계 — 안정 키.** 카드 id 를 목록 안 인덱스가 아니라 `announcement_id` 에서 만든다.
