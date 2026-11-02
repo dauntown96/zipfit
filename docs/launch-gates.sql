@@ -14,6 +14,7 @@
 --      점검 불능(2026-10-20 · 우편함 「코드·운영 — 미착수 회차 … 점검 불능 분리」 ⓓ) = ops_health_runs.blind 에 든 ❌(마이그레이션 2026-10-20_01 뒤) ·
 --      운영 runner 는 그 전 행도 점검 불능으로 센다(gate.mjs 가 늘 blind 로 갈랐다). 실패와 따로 blind_7d 로 낸다 — 「실패 0」이어도 점검 불능이 크면 잰 것이 아니다.
 --      화면 점검 불능(배포 반영 기다림 초과)은 2026-10-20 뒤부터 DB 에 남는다(그 전에는 health-screen-blind 이슈로만).
+--      화면을 잰 적 없는 날(2026-11-02 · 11-01 #799): g1_screen.missing_7d = 7일 안 화면 점검 발송(204) 중 90분 안 기록 0 인 수 — 「실패 0」이어도 > 0 이면 G1 화면을 잰 것이 아니다.
 --      점검 불능 문턱(2026-10-27 다운님 결정 · L0 G1 줄): 운영은 「연속 3회 또는 5%」, 화면은 「연속 3회」만 — 넘으면 G1 을 잰 것으로 치지 않는다.
 --   G2 열린 카드 전부 분석 완료 또는 「분석 중」 표시 · 판정 대기 0
 --      카드 요약 갈래(health-screen phrase 와 같은 식): 요약 · 목록없음 · 링크만 · 분석중 = 표지 있음 / 빈칸 · 미정리 = 위반.
@@ -97,6 +98,12 @@ from (
       'real_fail_7d', (select count(*) from r where kind = 'screen' and coalesce(cardinality(realf), 0) > 0),
       'last_real_fail_kst', (select to_char(max(run_at) at time zone 'Asia/Seoul', 'MM-DD HH24:MI') from r where kind = 'screen' and coalesce(cardinality(realf), 0) > 0),
       'blind_7d', (select count(*) from r where kind = 'screen' and coalesce(cardinality(blindf), 0) > 0),
+      -- 🔵 2026-11-02(우편함 「코드·운영 — 점검 빈틈 묶음」 A) — 화면을 잰 적 없는 날: 7일 안 화면 점검 발송(ops_dispatch_log health-screen.yml · 204) 중
+      --    발송 뒤 90분 안에 kind='screen' 행이 0 인 발송 수(11-01 #799 꼴). 「실패 0」이어도 이것이 있으면 G1 화면을 잰 것으로 치지 않는다(blind 와 같은 축).
+      --    발송 기록은 ops_health_dispatch() 가 7일 넘게 두지 않는다 · 90분 안 발송(아직 모름)은 세지 않는다 · 같은 문턱 = health-ops screen_run_missing.
+      'missing_7d', (select count(*) from ops_dispatch_log l where l.target = 'health-screen.yml' and l.status_code = 204
+                       and l.at > now() - interval '7 days' and l.at < now() - interval '90 minutes'
+                       and not exists (select 1 from ops_health_runs h where h.kind = 'screen' and h.run_at >= l.at and h.run_at < l.at + interval '90 minutes')),
       'last_run', (select json_build_object('at_kst', to_char(run_at at time zone 'Asia/Seoul', 'MM-DD HH24:MI'), 'failed', failed, 'warned', warned)
                      from r where kind = 'screen' order by run_at desc limit 1),
       -- 통과 항목은 ops_health_findings 에 남지 않는다(경고·실패만) → 마지막 화면 점검이 있고 그 행이 없으면 「통과」.

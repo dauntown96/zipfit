@@ -33,6 +33,11 @@ select json_build_object(
   'search', (select count(*) from r where event = 'search'),
   'sessions_with_notice_open', (select count(distinct session_id) from r where event = 'notice_open'),
   'sessions_logged_in', (select count(distinct session_id) from r where user_id is not null),
+  -- 🔵 2026-11-02(우편함 「코드·운영 — 점검 빈틈 묶음」 C · 방향서 v1 3절 · 📈 「북극성 주간」) — 북극성: 창 안에서 추천 결과에서 공고 상세를 연
+  --    사람 세션 수(notice_open ∧ props.from = 'match' · 운영·자동 세션은 위 ops_sessions 규칙 그대로 뺀다). 「추천이 쓸모 있었나」를 세션 단위로 센다.
+  --    🔴 작아도 실패가 아니다 — 런칭 첫 주는 표본이 작고, 이 수는 방향(오르나 내리나)을 보는 지표다. 0 이면 먼저 계측 경로(index.html 의
+  --    from='match' 태그가 지금 추천 카드에서 남는지 — 백로그 「북극성 계측 경로 확인」 · 표시층 회차 D)를 의심한다. 값 해석은 그 확인 뒤.
+  'north_star_sessions', (select count(distinct session_id) from r where event = 'notice_open' and r.props->>'from' = 'match'),
   'sessions_by_day_kst', (select json_object_agg(d, n order by d) from (
       select to_char(occurred_at at time zone 'Asia/Seoul', 'MM-DD') d, count(distinct session_id) n from r group by 1) x)
 );
