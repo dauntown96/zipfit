@@ -9654,9 +9654,37 @@ function zfPruneCardCaches(){
 // 🔵 2026-10-19 — 주택형 끝 「형」 유무는 같게 본다(익산부송3 …20895 「39」 ↔ 직전 회차 …20624 「39형」 — 원문 표기만 달라 「같은 세대 없음」이 떴다).
 //    비교 키에만 쓴다 — 원문 값·중복제거 키·화면 글자는 그대로다. 다른 꼴(A·B 붙임 등)은 바꾸지 않는다.
 //    ⚠️ 그래서 위 「중복제거 키 − 금액」 관계에서 이 한 칸만 넓다 — 한 회차 안에서는 두 표기가 같이 오지 않아(실측 0) 중복제거는 그대로 둔다.
-function huCompareKey(u){
+// 🔵 2026-11-02 — 단지명은 회차 사이에 원문 표기가 바뀐다(전주1산단 …20916 「전주1산단(전주팔복)」 ↔ 4월 …19802 「전주팔복(1산단)」 —
+//    형·금액이 다 같은데 「같은 세대 없음」이 떴다). 같은 단지임은 회차 묶음(그룹 함수 · 회차 사슬)이 이미 보증하므로
+//    단지명 없이 짝짓는다(withName=false). 🔴 다단지 공고는 단지명이 단지를 가르는 축이라, 주소가 그 일을 대신할 수
+//    있을 때만 뺀다(huCompareNeedsName). 원문 값·중복제거 키·화면 글자는 그대로다.
+function huCompareKey(u, withName){
   const ut = u.unit_type == null ? u.unit_type : String(u.unit_type).replace(/\s*형$/, '');
-  return [u.building_name, u.address, u.floor_info, ut, u.area_sqm].join('|');
+  return (withName === false ? [u.address, u.floor_info, ut, u.area_sqm]
+                             : [u.building_name, u.address, u.floor_info, ut, u.area_sqm]).join('|');
+}
+// 회차마다 본다 — 그 회차의 단지명이 하나면 단지명이 가를 것이 없다. 여럿이면 모든 행에 주소가 있고
+// 주소 하나가 단지명 하나에만 붙을 때만(주소가 단지를 가른다) 뺄 수 있다. 하나라도 아니면 종전 키(단지명 포함).
+function huCompareNeedsName(rows){
+  const byRound = new Map();
+  rows.forEach(u => {
+    const r = u.zfRoundDate || '';
+    if(!byRound.has(r)) byRound.set(r, []);
+    byRound.get(r).push(u);
+  });
+  for(const list of byRound.values()){
+    const names = new Set(list.map(u => String(u.building_name || '').trim()));
+    if(names.size <= 1) continue;
+    const addrName = new Map();
+    for(const u of list){
+      const a = String(u.address || '').trim();
+      const n = String(u.building_name || '').trim();
+      if(!a) return true;
+      if(addrName.has(a) && addrName.get(a) !== n) return true;
+      addrName.set(a, n);
+    }
+  }
+  return false;
 }
 // 값이 양쪽에 다 있는 필드만 비교한다. 한쪽이 NULL이면 「0이 됐다」가 아니라 「모른다」이므로 건너뛴다.
 const HU_DIFF_FIELDS = [
@@ -9671,16 +9699,18 @@ const HU_DIFF_FIELDS = [
 // 🔴 비교 상대는 「직전 회차」다 — 지난 회차가 여럿이면 이번 회차 바로 앞의 것 하나만 본다.
 // 가장 오래된 회차와 비교하면 그 사이의 변화가 한 덩어리로 뭉개진다.
 function attachRoundDiffs(current, past){
+  const withName = huCompareNeedsName(current.concat(past));
+  const keyOf = u => huCompareKey(u, withName);
   const curCount = new Map();
-  current.forEach(u => { const k = huCompareKey(u); curCount.set(k, (curCount.get(k) || 0) + 1); });
+  current.forEach(u => { const k = keyOf(u); curCount.set(k, (curCount.get(k) || 0) + 1); });
   const pastByKey = new Map();
   past.forEach(u => {
-    const k = huCompareKey(u);
+    const k = keyOf(u);
     if(!pastByKey.has(k)) pastByKey.set(k, []);
     pastByKey.get(k).push(u);
   });
   current.forEach(u => {
-    const k = huCompareKey(u);
+    const k = keyOf(u);
     const rows = pastByKey.get(k);
     if(!rows || curCount.get(k) !== 1) return;
     let prevDate = '';
@@ -9697,7 +9727,7 @@ function attachRoundDiffs(current, past){
     });
     if(parts.length) u.zfDiff = { date: prevDate, parts: parts };
   });
-  past.forEach(p => { if(!curCount.has(huCompareKey(p))) p.zfPastOnly = true; });
+  past.forEach(p => { if(!curCount.has(keyOf(p))) p.zfPastOnly = true; });
 }
 function renderHuDiffHtml(diff){
   if(!diff || !diff.parts.length) return '';
