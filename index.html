@@ -352,6 +352,19 @@ body.theme-dark .extras-missing-note{color:#d8c48a;background:#2a2721;border-col
 .hu-past-list .hu-row{background:#fafaf6}
 .policy-round-head{font-size:12px;font-weight:600;color:#777;margin:10px 0 6px}
 .hu-past-only{padding:2px 9px;font-size:11px;cursor:default;display:inline-block;margin-left:6px;background:#f0efe9;color:#777;border-color:#ddd}
+/* 🔵 2026-11-02 — 2주차 화면 판 ②③④: 자격 머리 칩 · 정책 칸 위 원문 근거 줄(접힘 밖 · 경고 / 안내 두 꼴) */
+.zf-exempt-chip{padding:2px 9px;font-size:11px;cursor:default;display:inline-block;margin-left:6px;background:#e7f5ef;color:#0F6E56;border-color:#bfe3d4;font-weight:600}
+.zf-pol-notes{margin:0 0 8px}
+.zf-pol-note{font-size:12px;line-height:1.55;margin:0 0 6px;padding:7px 10px;border-radius:8px;background:#f4f4f2;color:#555}
+.zf-pol-note.warn{background:#FFF3F3;border:1px solid #F5C2C2;color:#A32D2D}
+.zf-pol-note .zf-pol-src{display:block;margin-top:3px;font-size:11px;color:#777}
+.zf-pol-note.warn .zf-pol-src{color:#8a4b4b}
+.zf-pol-note button{all:unset;cursor:pointer;text-decoration:underline;margin-right:8px;color:inherit}
+.zf-pol-note button:focus-visible{outline:2px solid #5DCAA5;outline-offset:2px}
+body.theme-dark .zf-exempt-chip{background:#173a30;color:#7fd8b5;border-color:#2c5a4b}
+body.theme-dark .zf-pol-note{background:#262932;color:#cfcfcf}
+body.theme-dark .zf-pol-note.warn{background:#3a2326;border-color:#6b3a3f;color:#f0b4b4}
+body.theme-dark .zf-pol-note .zf-pol-src{color:#9a9a9a}
 /* 🔵 카드 1층 회차 칩 — 상세 아코디언의 「지난 회차」 배지(.hu-round-old)와 **같은 색**을 쓴다.
    한 카드 안에서 같은 뜻이 두 색으로 보이면 안 된다. */
 .zf-sch-rawmark{font-weight:400;font-size:11px;opacity:.75;white-space:nowrap}
@@ -9234,6 +9247,98 @@ function zfPolToggleAll(btn){
   btn.textContent = open ? '모두 접기' : '모두 펼치기';
 }
 
+// ===== 🔵 2026-11-02 — 2주차 화면 판 ②③④(우편함 「표시층 — 2주차 화면 판 넷」 · 다운님 승인 2026-11-02) =====
+// 🔴 공통: 원문(이번 회차 자격·정책 행 · 세대 행)에 근거가 있을 때만 그린다 — 근거가 없으면 아무것도 그리지 않는다(종전 화면 그대로).
+// ② 「소득·자산 무관 신청 가능」 — 이번 회차 · 중복 제거 뒤 자격 행 **전부**가 그 축 배제(*_limit_exempt === true)일 때만.
+//    한 공고 안에서 계층마다 다르면(영구임대 수급자만 배제 등) 카드 전체 말로 바꿀 수 없어 그리지 않는다.
+//    한 축만 전부 배제면 그 축만 · 차량가액(car_limit) 행이 있으면 「자동차 기준은 있어요」 꼬리(자격완화 150%형과 배제형을 가른다 — 💡 B69).
+function zfEligExemptChip(rows){
+  if(!Array.isArray(rows) || rows.length === 0) return '';
+  const inc = rows.every(r => r && r.income_limit_exempt === true);
+  const ast = rows.every(r => r && r.asset_limit_exempt === true);
+  if(!inc && !ast) return '';
+  const label = inc && ast ? '소득·자산 무관 신청 가능' : (inc ? '소득 기준 무관 신청 가능' : '자산 기준 무관 신청 가능');
+  const car = rows.some(r => r && r.car_limit) ? ' · 자동차 기준은 있어요' : '';
+  return `<span class="chip zf-exempt-chip">${label}${car}</span>`;
+}
+// ③ 다른 공고와의 신청 제한 — 원문 문장을 그대로 인용한다(바꿔 말하지 않는다). 지금 꼴은 매입·든든전세의
+//    「… 서류제출까지 완료한 경우, 예비입주자 순번 발표 시까지 동일 유형 타 매입임대주택 공고의 신청이 불가」 한 갈래다(…20918 · …20923).
+//    한 공고 안 「1세대 1주택 · 중복신청 무효」는 그 공고 안의 말이라 여기 올리지 않는다(정책 안내 본문에 그대로 있다).
+const ZF_CROSS_APPLY_RE = /동일\s*유형\s*타\s*매입임대주택\s*공고의?\s*신청이?\s*불가/;
+function zfSentenceAround(text, re){
+  const t = String(text || '').replace(/\s+/g, ' ');
+  const m = re.exec(t);
+  if(!m) return '';
+  const cut = /[.。]|■|•|※|\(중복신청 불가\)/g;
+  let st = 0, en = t.length, x;
+  while((x = cut.exec(t))){ const e = x.index + x[0].length; if(e <= m.index) st = e; else if(x.index >= m.index + m[0].length){ en = x.index + (x[0] === '.' || x[0] === '。' ? 1 : 0); break; } }
+  return t.slice(st, en).trim();
+}
+// ③ 같은 날 함께 나온 같은 꼴 공고 — 경고가 아니라 링크다(원문에 서로 제한하는 문장이 없으면 「제한」을 말하지 않는다).
+//    같은 꼴 = 같은 공고일 ∧ 같은 공급유형 ∧ 제목에서 지역 낱말(시·도 줄임 · …시/군/구/읍/면/동 · …지역본부)과 꺾쇠·괄호를 걷은 나머지가 같음.
+const ZF_SIDO_SHORT = new Set(['서울','부산','대구','인천','광주','대전','울산','세종','경기','강원','충북','충남','전북','전남','경북','경남','제주']);
+function zfSeriesKey(title){
+  return String(title || '').replace(/\[[^\]]*\]|\([^)]*\)|（[^）]*）/g, ' ').split(/\s+/)
+    .filter(w => w && !ZF_SIDO_SHORT.has(w) && !/(특별자치도|특별자치시|광역시|특별시|지역본부|[시군구읍면동도])$/.test(w)).join(' ');
+}
+function zfSameDaySeries(annId){
+  const me = (noticeData || []).find(n => String(n['announcement_id']) === String(annId));
+  if(!me || !me['announcement_date']) return [];
+  const key = zfSeriesKey(me['공고명']);
+  if(key.replace(/\s/g, '').length < 8) return [];
+  const myDk = zfDedupKey(me['공고명']);
+  const seen = new Set([myDk]);
+  return (noticeData || []).filter(n => {
+    if(n['announcement_date'] !== me['announcement_date'] || (n['공급유형'] || '') !== (me['공급유형'] || '')) return false;
+    if(typeof isHiddenAsClosed === 'function' && isHiddenAsClosed(n)) return false;
+    if(zfSeriesKey(n['공고명']) !== key) return false;
+    const dk = zfDedupKey(n['공고명']);
+    if(seen.has(dk)) return false;
+    seen.add(dk);
+    return true;
+  });
+}
+// ④ 주거약자용 칸 한 줄 — 이번 회차 세대 행에 주거약자 주택형이 있고, 이번 회차 정책 행에 아래 토막의 원문 문장이 있을 때만.
+//    토막: 「주거약자 신청자 전용」(「주거약자 전용」·「주거약자만 신청」) · 「배점 따로」(「주거약자용(형) (주택) 배점」) ·
+//    「일반과 중복신청 불가」(한 문장 안에 주거약자 ∧ 일반 ∧ 중복·이중 신청 불가). 호수는 이번 회차 모집호수 합이 0보다 클 때만.
+//    세대 행은 세대 로더가 채운 huUnitsCache 를 기다려 읽는다(새 요청 0 · 6초 안 못 받으면 그리지 않는다 · 단지 블록 카드는 블록을 펼쳐야 세대가 와서 그리지 않는다).
+function zfWeakHousingLine(units, pols){
+  const wk = (units || []).filter(u => u && !(u.zfRoundLabel && !u.zfRoundCurrent) && /주거약자/.test([u.unit_type, u.unit_group, u.supply_target].join(' ')));
+  if(!wk.length) return '';
+  const text = (pols || []).map(p => String((p && p.content_raw) || '').replace(/\s+/g, ' ')).join('\n');
+  const sents = text.split(/[.。\n]|■|•|※/);
+  const toks = [];
+  if(/주거약자\s*전용|주거약자만\s*신청/.test(text)) toks.push('주거약자 신청자 전용');
+  if(/주거약자(?:용|형)\s*(?:주택(?:공급)?\s*)?배점/.test(text)) toks.push('배점 따로');
+  if(sents.some(x => /주거약자/.test(x) && /일반/.test(x) && /(?:중복|이중)\s*(?:으로\s*)?신청[^.。]{0,6}불가/.test(x))) toks.push('일반과 중복신청 불가');
+  if(!toks.length) return '';
+  const n = wk.reduce((a, u) => a + (Number(u.recruit_count) > 0 ? Number(u.recruit_count) : 0), 0);
+  return `<div class="zf-pol-note" data-zf-weak="1">🏷️ 주거약자용 ${n > 0 ? `${n.toLocaleString()}호 · ` : '주택 · '}${toks.join(' · ')}<span class="zf-pol-src">공고문의 주거약자용 주택 조항 기준이에요. 아래 「📋 정책 안내」에서 원문을 볼 수 있어요.</span></div>`;
+}
+function zfPolicyNotes(curRows, annId, id, ownerAnn, slot, wrap){
+  const parts = [];
+  const cross = (curRows || []).map(p => zfSentenceAround(p && p.content_raw, ZF_CROSS_APPLY_RE)).find(Boolean);
+  if(cross) parts.push(`<div class="zf-pol-note warn" data-zf-cross="1">⚠️ 이 공고는 다른 공고 신청을 제한해요.<span class="zf-pol-src">원문: 「${escapeHtml(cross)}」</span></div>`);
+  const same = zfSameDaySeries(annId);
+  if(same.length){
+    const btns = same.map(n => `<button type="button" data-k="${zfAttr(zfDedupKey(n['공고명']))}">${escapeHtml(n['공고명'] || '')}</button>`).join('');
+    parts.push(`<div class="zf-pol-note" data-zf-sameday="1">📅 같은 날 함께 나온 같은 꼴 공고 ${same.length}건<span class="zf-pol-src">${btns}</span></div>`);
+  }
+  const put = html => {
+    if(!html || !zfStillOurs(id, ownerAnn)) return;
+    let box = slot.querySelector('.zf-pol-notes');
+    if(!box){ box = document.createElement('div'); box.className = 'zf-pol-notes'; slot.insertBefore(box, wrap); }
+    box.insertAdjacentHTML('beforeend', html);
+    box.querySelectorAll('button[data-k]').forEach(b => { if(!b.dataset.zfBound){ b.dataset.zfBound = '1'; b.addEventListener('click', ev => { ev.stopPropagation(); zfOpenNoticeByKey(b.dataset.k); }); } });
+  };
+  put(parts.join(''));
+  if(!(curRows || []).some(p => /주거약자/.test(String((p && p.content_raw) || '')))) return;
+  const d = huKeysReady[id];
+  Promise.race([d ? d.promise : Promise.resolve(null), new Promise(r => setTimeout(r, 6000))]).then(() => {
+    const units = huUnitsCache[id];
+    if(Array.isArray(units)) put(zfWeakHousingLine(units, curRows));
+  });
+}
 function loadAnnouncementPolicies(annId, detailEl, id, useGroup){
   if(!annId) return;
   const ownerAnn = zfCardAnn(id);
@@ -9356,6 +9461,7 @@ function loadAnnouncementPolicies(annId, detailEl, id, useGroup){
         zfPolicyBodyHtml(curRows, cls, id) + otherHtml;
       const slot = document.getElementById('policy-slot-'+id);
       if(slot) slot.appendChild(wrap);
+      if(slot) zfPolicyNotes(curRows, annId, id, ownerAnn, slot, wrap);
     });
   }).catch(err => {
     console.error('ZipFit 정책안내 로드 실패:', err);
@@ -9529,7 +9635,7 @@ function loadPreciseEligibility(annId, detailEl, id, useGroup){
     }
     const wrap = document.createElement('details');
     wrap.className = 'elig-wrap';
-    wrap.innerHTML = `<summary class="elig-title">🎯 이 공고 정밀 자격기준 (${rows.length}건)</summary>` + staleHtml +
+    wrap.innerHTML = `<summary class="elig-title">🎯 이 공고 정밀 자격기준 (${rows.length}건)${zfEligExemptChip(rows)}</summary>` + staleHtml +
       rows.map(eligItemHtml).join('') + otherEligHtml;
     const slot = document.getElementById('elig-slot-'+id);
     if(slot) slot.appendChild(wrap);
@@ -12080,6 +12186,15 @@ initNoticeFilters();
   try{ if(window.ResizeObserver) new ResizeObserver(later).observe(document.body); }catch(e){}
   document.addEventListener('animationend', later, true);
   document.addEventListener('transitionend', later, true);
+  // 🔵 2026-11-02(우편함 「표시층 — 2주차 화면 판 넷」 덧 B) — 새로 연 첫 바퀴에만 겹침이 남았다(claude.ai v264 5/60 · 둘째 바퀴 0 · 그 자리를 다시 가면 곧 숨음).
+  //    크기·애니메이션·전환 신호 없이 자리가 바뀌는 경우(카드에 꺾쇠 단추·칩이 늦게 끼워짐)를 위해 목록 DOM 변화와
+  //    스크롤이 멎은 뒤(250·600ms) 한 번씩 더 잰다. 모두 rAF 한 번으로 묶인다.
+  try{ if(window.MutationObserver) new MutationObserver(later).observe(document.body, { childList: true, subtree: true }); }catch(e){}
+  let settleT1 = 0, settleT2 = 0;
+  window.addEventListener('scroll', () => {
+    clearTimeout(settleT1); clearTimeout(settleT2);
+    settleT1 = setTimeout(later, 250); settleT2 = setTimeout(later, 600);
+  }, { passive: true });
   update();
 })();
 function zfScrollToTop(){
