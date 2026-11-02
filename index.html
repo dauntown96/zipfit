@@ -8850,6 +8850,9 @@ function zfBlockHuFallback(annId, blkIds){
 // 블록이 2개 이상이면 카드 전체 섹션은 생략(블록별 섹션에서만 표시), 1개(일반적인 경우)면 그대로 표시.
 function loadAnnouncementBlocks(annId, id, detailEl){
   if(!annId){ loadHousingUnits(annId, detailEl, id, true); loadAnnouncementExtras(annId, detailEl, id, true); return; }
+  // 🔵 2026-11-02(C) — 응답 뒤 세대·첨부 로더를 부르는 자리라 이 로더도 부를 때의 상세 칸을 기준으로 잡는다(zfCardAnn 요소 표지).
+  //    다시 그려진 카드의 새 칸에서 앞 렌더의 세대 로더가 한 번 더 돌아 세대 칸이 둘·셋 그려졌다(?n= …20977 등).
+  const blkOwner = zfCardAnn(id);
   // 🔵 2026-10-06(Z-1 PR-B ②) — 블록 목록은 get_announcement_sites 가 준다(블록 모양이면 get_announcement_blocks 행 그대로 + site_label NULL).
   //    그 RPC 가 실패하면 종전 get_announcement_blocks 로 한 번 더 묻는다 — 보이던 블록을 잃지 않는다.
   const blkReq = fn => fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
@@ -8860,6 +8863,7 @@ function loadAnnouncementBlocks(annId, id, detailEl){
   blkReq('get_announcement_sites')
     .then(r => r.ok ? r : blkReq('get_announcement_blocks'))
     .then(r => r.ok ? r.json() : []).then(blocks => {
+    if(!zfStillOurs(id, blkOwner)) return;
     if(!Array.isArray(blocks) || blocks.length < 2){
       loadHousingUnits(annId, detailEl, id, true);
       loadAnnouncementExtras(annId, detailEl, id, true);
@@ -8885,6 +8889,7 @@ function loadAnnouncementBlocks(annId, id, detailEl){
       zfBlockHuFallback(annId, blkIds),
       zfIsPostMerged(annId) ? zfBlockSiteNames(blkIds) : Promise.resolve(null)
     ]).then(([roundMap, recruitSums, huFallback, siteNames]) => {
+      if(!zfStillOurs(id, blkOwner)) return;
       blockHuFallback[id] = huFallback === true;
       if(siteNames) blocks.forEach(b => { b._zfSite = siteNames.get(b.announcement_id) || ''; });
       // 단지 모양 블록의 단지명 칩은 site_label 그대로다(블록 모양의 「블록 ID 세대 building_name 하나」와 같은 이름 · 같은 조건 — 묶인 카드만).
@@ -8902,6 +8907,7 @@ function loadAnnouncementBlocks(annId, id, detailEl){
     });
   }).catch(err => {
     console.error('ZipFit 블록정보 로드 실패:', err);
+    if(!zfStillOurs(id, blkOwner)) return;
     loadHousingUnits(annId, detailEl, id, true);
     loadAnnouncementExtras(annId, detailEl, id, true);
   });
