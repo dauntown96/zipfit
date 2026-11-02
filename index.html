@@ -193,6 +193,17 @@ select:focus,input:focus{border-color:#5DCAA5}
 /* 🔵 B62 ⑦ — 정책 안내: 고정 → 검색 → 칩 → 제목 목록(누르면 펼침) */
 .pol-pinned{border-color:#F0D9A8;background:#FFFBF1}
 .pol-search{width:100%;box-sizing:border-box;font-size:13px;padding:7px 10px;border:1px solid #d8d8d0;border-radius:8px;margin:2px 0 8px}
+/* 🔵 2026-11-02(우편함 「표시층 — … 검색창 × …」 B) — 검색 칸 오른쪽 끝 지우기(×). 글자가 있을 때만(:placeholder-shown — 코드가 칸을 비워도 저절로 숨는다) · 누름 칸 40px */
+.zf-clr-wrap{position:relative;flex:1;min-width:0;display:block}
+.zf-clr-wrap>input,.zf-clr-wrap>#noticeSearchInput{width:100%!important;box-sizing:border-box;padding-right:40px!important}
+.zf-clr{position:absolute;right:0;top:50%;transform:translateY(-50%);width:40px;height:40px;padding:0;border:0;background:transparent;color:#888;font-size:20px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:50%}
+.zf-clr:hover{color:#333}
+.zf-clr:focus-visible{outline:2px solid #5DCAA5;outline-offset:-4px}
+.zf-clr-wrap>input:placeholder-shown+.zf-clr{display:none}
+.pol-search::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none;display:none}
+.zf-clr-block>.pol-search{margin:0}
+.zf-clr-block{margin:2px 0 8px}
+body.theme-dark .zf-clr{color:#aaa}
 .pol-chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}
 .pol-chip{padding:4px 10px;font-size:11px}
 .pol-chip[disabled]{opacity:.4;cursor:default}
@@ -1406,8 +1417,8 @@ html[data-ui="d3"] .pg-btn{min-width:var(--hit);height:var(--hit);font-size:var(
          모바일 입력기는 단어를 다 칠 때까지 조합을 이어 가 input 이 전부 건너뛰어졌다. 중복 입력(#491)의 원인은 그리는 쪽이 칸 value 를 다시 쓴 것이었고
          그 줄은 걷혀 있다 — 그리는 쪽은 칸 value 를 쓰지 않는다(applyNoticeSubFilters 의 q 인자). -->
     <div style="display:flex;gap:8px;margin-bottom:0.75rem">
-      <input type="text" id="noticeSearchInput" placeholder="공고명, 지역 등으로 검색" aria-label="공고 검색" oninput="applyNoticeFiltersAndRender();zfLogSearchSoon(this.value)"
-        style="flex:1;min-width:0;padding:9px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px">
+      <span class="zf-clr-wrap"><input type="text" id="noticeSearchInput" placeholder="공고명, 지역 등으로 검색" aria-label="공고 검색" oninput="applyNoticeFiltersAndRender();zfLogSearchSoon(this.value)" onkeydown="zfClearKey(event,this)"
+        style="flex:1;min-width:0;padding:9px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px"><button type="button" class="zf-clr" aria-label="검색어 지우기" onmousedown="event.preventDefault()" onclick="zfClearSearch(this,event)">×</button></span>
       <select id="noticeSearchScopeSel" aria-label="검색 범위" onchange="applyNoticeFiltersAndRender()"
         style="font-size:13px;padding:5px 8px;border:1px solid #e0e0e0;border-radius:8px;background:#fff;color:#333;cursor:pointer">
         <option value="title">제목만</option>
@@ -9199,7 +9210,7 @@ function zfPolicyBodyHtml(rows, cls, id){
   //    맨 위 자리는 그대로 두고 펼침만 걷었다. 검색 중 맞은 행 펼침·「모두 펼치기」는 사용자 동작이라 그대로다.
   let html = pinned.map(p => zfPolItemHtml(p, { pinned: true })).join('');
   if(rows.length >= 10){
-    html += `<input type="search" class="pol-search" placeholder="정책 안내에서 찾기" aria-label="정책 안내 검색" data-pol-id="${zfAttr(id)}" oninput="zfPolSearch(this)" onclick="event.stopPropagation()">`;
+    html += `<span class="zf-clr-wrap zf-clr-block"><input type="search" class="pol-search" placeholder="정책 안내에서 찾기" aria-label="정책 안내 검색" data-pol-id="${zfAttr(id)}" oninput="zfPolSearch(this)" onkeydown="zfClearKey(event,this)" onclick="event.stopPropagation()"><button type="button" class="zf-clr" aria-label="검색어 지우기" onmousedown="event.preventDefault()" onclick="zfClearSearch(this,event)">×</button></span>`;
   }
   if(chips.length){
     const cnt = n => rest.filter(p => chipsOf(p).indexOf(n) !== -1).length;
@@ -9302,6 +9313,22 @@ function zfPolPickName(el){
   const box = document.querySelector(`.pol-chips[data-pol-id="${CSS.escape(el.dataset.polId || '')}"]`);
   const b = box && [...box.querySelectorAll('.pol-chip')].find(x => x.dataset.chip === el.dataset.chip);
   if(b) zfPolPick(b);
+}
+// 🔵 2026-11-02 — 검색 칸 지우기(×): 비우고 칸의 input 처리기를 그대로 불러 결과를 되돌린다 · 초점은 칸에 남긴다(누를 때 mousedown 을 막아 키보드가 닫히지 않게).
+function zfClearSearch(btn, ev){
+  if(ev) ev.stopPropagation();
+  const input = btn && btn.parentElement && btn.parentElement.querySelector('input');
+  if(!input) return;
+  input.value = '';
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  try{ input.focus({ preventScroll: true }); }catch(e){ input.focus(); }
+}
+// Esc — 글자가 있을 때만 지우고 그 키를 먹는다(비어 있으면 종전대로 위로 흘린다 — 시트 닫기 등).
+function zfClearKey(ev, input){
+  if(ev.key !== 'Escape' || !input.value) return;
+  ev.preventDefault(); ev.stopPropagation();
+  const btn = input.parentElement && input.parentElement.querySelector('.zf-clr');
+  if(btn) zfClearSearch(btn); else { input.value = ''; input.dispatchEvent(new Event('input', { bubbles: true })); }
 }
 function zfPolSearch(input){
   const id = input.dataset.polId;
@@ -9843,7 +9870,8 @@ function zfPruneCardCaches(){
 //    단지명 없이 짝짓는다(withName=false). 🔴 다단지 공고는 단지명이 단지를 가르는 축이라, 주소가 그 일을 대신할 수
 //    있을 때만 뺀다(huCompareNeedsName). 원문 값·중복제거 키·화면 글자는 그대로다.
 function huCompareKey(u, withName){
-  const ut = u.unit_type == null ? u.unit_type : String(u.unit_type).replace(/\s*형$/, '');
+  // 🔵 2026-11-02 — 「(복층)」 표기 유무도 같게 본다(화성동탄 A4-1 …20958 10월 「41A/41B(복층) …」 ↔ 7월 「41A/41B …」 · 금액 같음 · 한 공고 안에 두 표기가 같이 오는 묶음 0 실측).
+  const ut = u.unit_type == null ? u.unit_type : String(u.unit_type).replace(/\(복층\)/g, '').replace(/\s*형$/, '');
   return (withName === false ? [u.address, u.floor_info, ut, u.area_sqm]
                              : [u.building_name, u.address, u.floor_info, ut, u.area_sqm]).join('|');
 }
@@ -9921,6 +9949,42 @@ function renderHuDiffHtml(diff){
   return `<div class="hu-diff"><span class="hu-diff-head">다른 회차(${escapeHtml(diff.date)}) 대비</span>${items}</div>`;
 }
 
+// 🔵 2026-11-02(우편함 「표시층 — 다단지 블록 카드 지난 회차 세대(회차 사슬) …」 A) — 블록 본문에 남길 세대 행.
+//    ① 이 블록 행 = 종전과 같다(블록 id 의 행 · 단지 모양이면 그 단지명 행) — 이번 회차 블록 세대 건수 불변.
+//    ② 이 블록의 지난 회차 행 = 블록 id 밖(회차 사슬로 온 행) ∧ 회차 날짜가 카드 회차와 다름(같은 회차 형제는 넣지 않는다) ∧
+//       (단지 모양이면 단지명이 같거나) 주소가 ① 행의 주소와 같음 — 그 주소가 이 카드의 다른 블록 행에도 있으면(주소가 블록을 못 가름) 주소로는 잇지 않는다
+//       (#803 huCompareNeedsName 과 같은 축 — 단지명이 하나면 이름, 여럿이면 주소가 갈라줄 때 주소).
+//    회차를 모르는 행(roundMap 에 없음)은 넣지 않는다 — 모르는 것을 이 블록 것처럼 보이지 않게.
+function zfBlockUnits(id, units, annId, roundMap, cardDate){
+  if(!Array.isArray(units)) return units;
+  const owner = huMapTargetId[id] || '';
+  const site = zfSiteFilter[id] || '';
+  const nm = u => String((u && u.building_name) || '').trim();
+  const ad = u => String((u && u.address) || '').trim();
+  const aid = u => String((u && u.announcement_id) || '');
+  const blockIds = new Set((blockAnnIds[owner] || []).map(String));
+  const blockNames = new Set((blockSites[owner] || []).filter(Boolean));
+  const isOwn = u => aid(u) === String(annId) && (!site || nm(u) === site);
+  // 주소 → 이 카드 이번 회차 블록 행의 블록 표지(단지 모양 = 단지명 · 블록 모양 = 블록 id)
+  const addrBlocks = new Map();
+  units.forEach(u => {
+    if(!blockIds.has(aid(u))) return;
+    const k = site ? (blockNames.has(nm(u)) ? nm(u) : '') : aid(u);
+    if(!k || !ad(u)) return;
+    if(!addrBlocks.has(ad(u))) addrBlocks.set(ad(u), new Set());
+    addrBlocks.get(ad(u)).add(k);
+  });
+  const myAddrs = new Set();
+  units.forEach(u => { if(isOwn(u) && ad(u) && (addrBlocks.get(ad(u)) || new Set()).size <= 1) myAddrs.add(ad(u)); });
+  const roundOf = u => (roundMap && roundMap[aid(u)]) ? (zfNoticeDate(roundMap[aid(u)]) || '') : '';
+  return units.filter(u => {
+    if(isOwn(u)) return true;
+    if(blockIds.has(aid(u))) return false;
+    const r = roundOf(u);
+    if(!r || !cardDate || r === cardDate) return false;
+    return (site && nm(u) === site) || (ad(u) && myAddrs.has(ad(u)));
+  });
+}
 function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
   if(!annId) return;
   huMapTargetId[id] = mapId || id;   // 지도용 id 등록 (없으면 자기 자신)
@@ -9933,7 +9997,9 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
   const huKeys = zfNewHuKeys(id);
   // 🔴 회차는 announcements를 한 번 더 조회해 얻는다(그룹함수 미접촉). 세대정보 조회와 나란히
   // 보내므로 왕복이 늘지 않고, 그룹이 아니거나 형제가 하나면 요청 자체를 보내지 않는다.
-  resolveAnnouncementIds(annId, useGroup).then(ids => Promise.all([
+  // 🔵 2026-11-02(우편함 「표시층 — 다단지 블록 카드 지난 회차 세대(회차 사슬) …」 A) — 블록 경로도 회차 사슬 id 를 받는다(지난 회차 행을 이 블록에 붙이려고 ·
+  //    무엇을 남길지는 아래 zfBlockUnits 가 정한다 — 이번 회차 블록 행은 종전과 같다).
+  resolveAnnouncementIds(annId, useGroup || huIsBlock).then(ids => Promise.all([
     // 🔵 2026-10-07 — 둘째 키 seq(들어간 순서 · 마이그레이션 2026-10-07_02). 보증금이 같은 행끼리의 순서를 DB 물리 위치에 맡기지 않는다(Z-1 ③ 이전 UPDATE가 그것을 흔들었다).
     fetch(`${SUPABASE_URL}/rest/v1/housing_units?${idFilterFor(ids)}&order=deposit.asc,seq`, {
       headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
@@ -9950,7 +10016,11 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
     const huFetchFailed = (units === null);
     if(huFetchFailed) units = [];
     // 🔵 2026-10-06(Z-1 PR-B ②) — 단지 모양 블록 본문은 그 단지(building_name) 행만(toggleBlockGroup 이 거르개를 건다).
-    if(zfSiteFilter[id]) units = units.filter(u => String((u && u.building_name) || '').trim() === zfSiteFilter[id]);
+    // 🔵 2026-11-02 — 블록 경로는 zfBlockUnits 가 고른다(이 블록 행 + 이 블록의 지난 회차 행).
+    if(huIsBlock){
+      const ce0 = cardElFor(huCardId);
+      units = zfBlockUnits(id, units, annId, roundMap, (ce0 && (ce0.dataset.roundDate || ce0.dataset.announcementDate)) || '');
+    } else if(zfSiteFilter[id]) units = units.filter(u => String((u && u.building_name) || '').trim() === zfSiteFilter[id]);
     // 🔴 이 공고 자신의 회차는 카드가 들고 있다. 2026-09-17부터 축이 **회차 날짜**라
     //    data-round-date 를 읽는다(값은 카드를 그릴 때 zfNoticeDate 가 만든 것이다).
     //    ⚠️ data-announcement-date 로 떨어지는 폴백을 남긴다 — 옛 캐시의 카드 HTML 이 남아 있으면
@@ -14102,7 +14172,9 @@ function zf3Init(){
     //    화면 키보드가 열리면(390×420 꼴) 칸이 가운데로 올라와 공고 탭 머리의 수가 화면 밖으로 밀린다 — 시트를 닫지 않아도 치는 대로 수가 보이게.
     head.innerHTML = '<b>조건</b><span class="zf3-sheet-n" data-zf3-sheetcount aria-live="polite"></span><button type="button" class="zf3-sheet-x">닫기</button>';
     head.querySelector('button').addEventListener('click', () => zf3ToggleSheet(false));
-    const searchRow = document.getElementById('noticeSearchInput')?.parentElement;
+    // 🔵 2026-11-02 — 검색 칸은 지우기 단추 감싸개(.zf-clr-wrap) 안에 있다 — 줄은 감싸개의 부모다.
+    const searchIn = document.getElementById('noticeSearchInput');
+    const searchRow = searchIn ? (searchIn.closest('.zf-clr-wrap') || searchIn).parentElement : null;
     const sortRow = document.getElementById('noticeSortSel')?.parentElement;
     panel.prepend(head);
     // 🔵 2026-10-16(우편함 「표시층 — 실사용 2회차 다듬기 묶음」 A3 · N16) — 검색 줄은 시트가 아니라 공고 탭 머리 바로 위에 둔다(처음 온 사람은 검색을 「필터」 안에서 찾지 않는다).
