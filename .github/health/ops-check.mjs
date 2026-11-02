@@ -196,6 +196,7 @@ const EXPECTED_JOBS = [
   'zipfit-net-purge-secrets',    // 2026-10-17 pg_net 응답 표 비밀값 응답 거두기(마이그레이션 2026-10-17_01 · ⑮ net_secret)
   'zipfit-list-rpc-probe',       // 2026-10-17 공개 목록 RPC anon 실행 시간 기록(마이그레이션 2026-10-17_01 · ⑭ list_rpc_time)
   'zipfit-purge-cron-run-details',   // 2026-11-02 pg_cron 실행 기록 30일 보관(마이그레이션 2026-11-02_01)
+  'zipfit-purge-collection-run-log', // 2026-11-02 LH·MYHOME 수집 런 로그 90일 보관(마이그레이션 2026-11-02_02)
 ]
 
 // ③④ 관리 API 가 필요 없는 점검(비로그인 목록·요약 · 배포 사이트)은 DB 점검과 다른 try 로 먼저 돈다
