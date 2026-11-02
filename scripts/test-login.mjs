@@ -31,7 +31,11 @@ class LinkSecret {
 }
 
 async function sql(query) {
-  const r = await fetch(QUERY_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query }) })
+  // 🔵 2026-11-02(우편함 「코드·운영 — health-screen 로그인 흐름(Actions 연결) …」 A) — 컨테이너에서는 프록시가 인증을 넣는다(헤더 없음).
+  //    GitHub Actions(health-screen)에서는 기존 비밀 SUPABASE_ACCESS_TOKEN 을 헤더로 싣는다 — 값은 출력하지 않는다.
+  const headers = { 'Content-Type': 'application/json' }
+  if (process.env.SUPABASE_ACCESS_TOKEN) headers.Authorization = `Bearer ${process.env.SUPABASE_ACCESS_TOKEN}`
+  const r = await fetch(QUERY_URL, { method: 'POST', headers, body: JSON.stringify({ query }) })
   const text = await r.text()
   // 🔴 실패 본문은 SQL 오류문이다(링크가 들어 있을 수 없는 문장만 보낸다) — 그래도 길이를 자른다.
   if (r.status !== 201 && r.status !== 200) throw new Error(`관리 API ${r.status}: ${text.slice(0, 300)}`)

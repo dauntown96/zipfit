@@ -33,7 +33,9 @@ const stub = local ? (await import('./render-list-stub.mjs')).stubListRpc : null
 // playwright 는 저장소에 없다 — 컨테이너 전역 것을 쓴다(scripts/target-persona-check.mjs 와 같은 꼴).
 const req = createRequire(import.meta.url)
 const { chromium } = (() => {
-  for (const p of ['playwright', '/opt/node22/lib/node_modules/playwright']) { try { return req(p) } catch {} }
+  // Actions(health-screen)는 Playwright 를 $RUNNER_TEMP/pw 에 깔고 NODE_PATH 로 알린다(2026-11-02) — 그 자리도 본다.
+  const extra = (process.env.NODE_PATH || '').split(':').filter(Boolean).map(d => d.replace(/\/$/, '') + '/playwright')
+  for (const p of ['playwright', '/opt/node22/lib/node_modules/playwright', ...extra]) { try { return req(p) } catch {} }
   throw new Error('playwright 를 찾지 못했다(컨테이너: /opt/node22/lib/node_modules/playwright)')
 })()
 const browser = await chromium.launch()
@@ -50,6 +52,8 @@ try {
     })
     const { page, state } = await openLoggedIn(context, link, { base, clock, stub: stub ? (pg) => stub(pg) : null })
     const steps = []
+    // 🔵 2026-11-02 — 알림 경로 시험: LOGIN_WALK_SIMULATE=fail 이면 로그인 뒤 일부러 실패한다(정리·확인은 withTestLogin 이 그대로 돈다).
+    if (process.env.LOGIN_WALK_SIMULATE === 'fail') throw new Error('시험 실패(LOGIN_WALK_SIMULATE=fail) — 로그인 뒤 일부러 멈춤')
     for (const p of personas) {
       const saved = await applyPersona(page, p)
       if (shot) await page.screenshot({ path: join(shot, `${p.id}-settings-${width}.png`), fullPage: false })
