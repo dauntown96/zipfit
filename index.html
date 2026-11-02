@@ -5077,6 +5077,9 @@ function zfLoadRentStats(){
   if(zfRentStatsState) return;
   zfRentStatsState = 1;
   zfAfterFirstList().then(async () => {
+    // 🔴 2026-11-02 — zfAfterFirstList 는 시간 상한(ZF_SIDE_DEFER_MAX_MS)으로도 풀린다 — 목록이 늦으면 빈 noticeData 를 보고 통계를 포기했다(배포본 v266 실측 · 줄 0).
+    //    목록이 실제로 온 뒤(noticeLoaded ∧ 행 있음 · 최대 60초)에 센다.
+    for(let i = 0; i < 240 && !(noticeLoaded && (noticeData || []).length); i++) await new Promise(r => setTimeout(r, 250));
     for(let i = 0; i < 40 && !zfTypeStd.size; i++) await new Promise(r => setTimeout(r, 250));   // 유형 표준표를 기다린다(최대 10초 · 없으면 원값 유형)
     const rows = (noticeData || []).filter(n => !isHiddenAsClosed(n) && !zfIsCancelRow(n['공고명']));
     const byId = new Map(rows.map(n => [String(n['announcement_id'] || ''), n]));
