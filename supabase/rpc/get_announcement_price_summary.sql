@@ -1,5 +1,5 @@
 CREATE OR REPLACE FUNCTION public.get_announcement_price_summary(p_ids text[])
- RETURNS TABLE(announcement_id text, deposit_min bigint, deposit_max bigint, rent_min bigint, rent_max bigint, area_min numeric, area_max numeric, round_state text, source_round date, analysis_done boolean, has_attachments boolean, unit_places jsonb)
+ RETURNS TABLE(announcement_id text, deposit_min bigint, deposit_max bigint, rent_min bigint, rent_max bigint, area_min numeric, area_max numeric, round_state text, source_round date, analysis_done boolean, has_attachments boolean, unit_places jsonb, rent_per_sqm_med bigint, rent_basis text)
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
@@ -159,6 +159,17 @@ AS $function$
     where exists (select 1 from known_sg k where k.sg = pl.sg or k.sg like pl.sg || ' %')
     group by pl.aid
   ),
+  -- 🔵 2026-11-02(우편함 「표시층 — ㎡당 월세 중앙값 …」 A) — rent_per_sqm_med = 위 가격 범위와 같은 pick 행의 monthly_rent / area_sqm 중앙값(원 · 반올림).
+  --    주 조건 월세만(rent_priority1 은 섞지 않는다) · 월세 0(전세형)·면적 없음은 뺀다 · 영구임대는 「나군」 표기 행만(가군은 몇 값에 모여 위치가 뜻이 없다).
+  --    rent_basis = 'primary'(주 조건) · 'na'(영구임대 나군) · 셀 행이 없으면 둘 다 null.
+  perm as (
+    select t.aid,
+           coalesce(mp.std_type, a.housing_type) = '영구임대' as is_perm
+    from (select distinct aid from target) t
+    join public.announcements a on a.announcement_id = t.aid
+    left join public.housing_type_map mp
+      on mp.source_table = 'announcements' and mp.source = a.source and mp.housing_type = a.housing_type
+  ),
   agg as (
   select p.aid,
          -- 🔵 2026-09-29 코드 회차 — 세대 하나에 임대조건 두 벌(deposit/monthly_rent + deposit_priority1/rent_priority1)이면
@@ -179,12 +190,24 @@ AS $function$
          case
            when o.own_date is null or ch.aid is not null then null
            else max(p.gdate)
-         end as source_round
+         end as source_round,
+         round(percentile_cont(0.5) within group (order by h.monthly_rent::numeric / h.area_sqm)
+               filter (where h.area_sqm > 0 and h.monthly_rent > 0
+                         and (not coalesce(pm.is_perm, false)
+                              or concat_ws(' ', h.unit_group, h.supply_target, h.unit_type) ~ '나군')))::bigint as rent_per_sqm_med,
+         case
+           when count(*) filter (where h.area_sqm > 0 and h.monthly_rent > 0
+                                   and (not coalesce(pm.is_perm, false)
+                                        or concat_ws(' ', h.unit_group, h.supply_target, h.unit_type) ~ '나군')) = 0 then null
+           when coalesce(pm.is_perm, false) then 'na'
+           else 'primary'
+         end as rent_basis
   from pick p
   join public.housing_units h on h.announcement_id = p.gid
   join own o on o.aid = p.aid
   left join cur_has ch on ch.aid = p.aid
-  group by p.aid, o.own_date, ch.aid
+  left join perm pm on pm.aid = p.aid
+  group by p.aid, o.own_date, ch.aid, pm.is_perm
   )
   -- 🔴 2026-09-29 코드 회차 2 — 세대정보가 없는 카드도 한 행을 돌려준다(값 칸은 전부 NULL · round_state NULL).
   --   그래야 analysis_done·has_attachments 가 그 카드에 닿는다. 세대정보가 있는 카드의 값 칸은 종전과 한 글자도 같다.
@@ -193,7 +216,8 @@ AS $function$
          g.deposit_min, g.deposit_max, g.rent_min, g.rent_max, g.area_min, g.area_max,
          g.round_state, g.source_round,
          coalesce(f.analysis_done, false), coalesce(f.has_attachments, false),
-         pa.unit_places
+         pa.unit_places,
+         g.rent_per_sqm_med, g.rent_basis
   from (select distinct aid from target) t
   left join agg g   on g.aid = t.aid
   left join flags f on f.aid = t.aid
