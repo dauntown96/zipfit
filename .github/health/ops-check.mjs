@@ -13,6 +13,7 @@ import { BACKLOG_SQL, judgeBacklog } from './collect-backlog.mjs'
 import { HARD, splitFailed } from './gate.mjs'
 import { lhGoneSql, judgeLhGone } from './lh-gone.mjs'
 import { waveNoticeSql, judgeWaveNotice } from './wave-notice.mjs'
+import { screenRunSql, judgeScreenRun } from './screen-run.mjs'
 import { ELIG_FORM_NULL_SQL, RENT_NULL_SQL, ROUND_MIX_SQL, judgeEligFormNull, judgeRentNull, judgeRoundMix } from './open-gaps.mjs'
 import { readdirSync, readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
@@ -951,6 +952,15 @@ try {
   add('wave_notice_missing', '매입 순위별 둘째 이후 창 — 대상주택 게시가 지났는데 「⚠️ 이번 차수 대상」 행 없음', j.status, j.value, j.rule)
 } catch (e) {
   addBlind('wave_notice_missing', '매입 순위별 후속 공지 미반영 — 점검 불능', 'warn', String(e).slice(0, 200), '목록 함수·경로·일정·정책 표를 읽는다(못 읽으면 ⚠️)')
+}
+
+// ㉙ 화면 점검 「발송했는데 기록 없음」(2026-11-02) — 판정·SQL 은 screen-run.mjs 머리 주석. ⚠️만 · 못 읽으면 ⚠️ 점검 불능.
+try {
+  const [x] = await sqlRead(screenRunSql())
+  const j = judgeScreenRun(x.j)
+  add('screen_run_missing', '화면 점검 발송(204) 뒤 기록 없음', j.status, j.value, j.rule)
+} catch (e) {
+  addBlind('screen_run_missing', '화면 점검 발송 뒤 기록 없음 — 점검 불능', 'warn', String(e).slice(0, 200), '발송 기록·점검 실행 표를 읽는다(못 읽으면 ⚠️)')
 }
 
 // ㉔·㉕ 열린 카드 데이터 빈칸 둘(2026-10-22) — 판정·SQL 은 open-gaps.mjs 머리 주석. ⚠️만 · 못 읽으면 ⚠️ 점검 불능.
