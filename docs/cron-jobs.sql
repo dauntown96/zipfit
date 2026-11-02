@@ -1,4 +1,4 @@
--- pg_cron 잡 사본 — 정본은 DB `cron.job` (뽑은 시각 2026-10-21 15:30 KST · pg_cron 1.6.4 · 23잡)
+-- pg_cron 잡 사본 — 정본은 DB `cron.job` (뽑은 시각 2026-10-21 15:30 KST · pg_cron 1.6.4 · 23잡 · 2026-11-02 대조 23잡 일치 뒤 24째 zipfit-purge-cron-run-details 더함 → 24잡)
 -- 2026-10-21 신설 (우편함 「코드·운영 — 문서·SQL만(B): docs/cron-jobs.sql … + docs/ops-audit.sql …」 · 근거 조사 「런칭 전 점검 ① Supabase」 회신 ② · claude.ai 판정 1).
 -- 왜: 백업(zipfit-backup backup.yml)은 public·zipfit_ops 만 덤프한다 — cron 스키마는 담기지 않아, DB를 복원해도 자동화(수집 · 분석 발송 · 점검 · 백업 깨우기)가
 --   살아나지 않는다. 수집 잡 4·8·11·12·13 은 만든 SQL도 저장소에 없었다. 이 파일이 그 구멍을 메운다.
@@ -22,7 +22,7 @@
 --   4. 이 파일을 postgres 역할로 한 번 돌린다 — `cron.schedule(이름, 주기, 명령)`은 같은 이름이 있으면 그 잡을 고쳐 쓴다(다시 돌려도 겹치지 않는다).
 --      ⚠️ jobid 는 새로 매겨진다(아래 주석의 jobid 는 뽑은 때 번호 — 문서·점검이 jobid 로 부르는 곳이 있으면 이름으로 바꿔 찾는다).
 --   5. 주기는 UTC 다(Supabase pg_cron). 각 잡 머리 주석에 KST 를 적었다.
---   6. 끝에 「대조」 SELECT 로 23잡 · command md5 가 이 파일과 같은지 본다.
+--   6. 끝에 「대조」 SELECT 로 24잡 · command md5 가 이 파일과 같은지 본다.
 
 
 -- jobid 4 · zipfit-collect-announcements · '*/10 0-9 * * *' = KST 09:00~18:50 10분마다 · active=true · command md5 cb52125abe49d37f49a3748c819e15ec
@@ -204,9 +204,13 @@ select cron.schedule('zipfit-net-purge-secrets', '*/5 * * * *', $cmd$select zipf
 -- jobid 68 · zipfit-list-rpc-probe · '5-59/10 * * * *' = 10분마다(5분부터) · active=true · command md5 0f147f2975b9c6b50731cc990d6d2727
 select cron.schedule('zipfit-list-rpc-probe', '5-59/10 * * * *', $cmd$select zipfit_ops.list_rpc_probe()$cmd$);
 
--- 대조(읽기 전용) — DB 의 잡이 이 파일과 같은지. 23행 · 이름 · 주기 · active · command md5 가 위 주석과 같아야 한다.
+-- jobid 적용 때 매김 · zipfit-purge-cron-run-details · '17 15 * * *' = KST 00:17 · active=true · command md5 b5fa07bbafad629a56302ddc9ab8a69c
+--   2026-11-02 신설(supabase/migrations/2026-11-02_01_purge_cron_run_details.sql) — pg_cron 실행 기록 30일 보관(소비처 가장 긴 창 8일 · 그 파일 머리 주석).
+select cron.schedule('zipfit-purge-cron-run-details', '17 15 * * *', $cmd$delete from cron.job_run_details where start_time < now() - interval '30 days'$cmd$);
+
+-- 대조(읽기 전용) — DB 의 잡이 이 파일과 같은지. 24행 · 이름 · 주기 · active · command md5 가 위 주석과 같아야 한다.
 --   빠진 잡(파일에 있는데 DB 에 없음)은 missing 행으로, 더 있는 잡(DB 에만 있음)은 extra 행으로 나온다.
 -- select coalesce(j.jobname, f.n) jobname, j.schedule, j.active, md5(j.command) cmd_md5,
 --        case when j.jobid is null then 'missing' when f.n is null then 'extra' else 'ok' end state
---   from cron.job j full join unnest(array['zipfit-collect-announcements', 'zipfit-collect-sh-announcements', 'zipfit-collect-rental-stats', 'zipfit-collect-announcements-warmup', 'zipfit-collect-announcements-night', 'zipfit-purge-usage-events', 'zipfit-purge-sh-run-log', 'zipfit-sh-close-missing', 'zipfit-collect-lh-promo', 'zipfit-refresh-post-links', 'zipfit-analysis-dispatch', 'zipfit-collect-lh-images', 'zipfit-health-ops-dispatch', 'zipfit-health-screen-dispatch', 'zipfit-check-source-pages', 'zipfit-uptime-ping', 'zipfit-backup-dispatch', 'zipfit-heartbeat-dispatch', 'zipfit-backup-poll', 'zipfit-purge-stale-sessions', 'zipfit-check-source-pages-new-sh', 'zipfit-net-purge-secrets', 'zipfit-list-rpc-probe']) f(n) on f.n = j.jobname
+--   from cron.job j full join unnest(array['zipfit-collect-announcements', 'zipfit-collect-sh-announcements', 'zipfit-collect-rental-stats', 'zipfit-collect-announcements-warmup', 'zipfit-collect-announcements-night', 'zipfit-purge-usage-events', 'zipfit-purge-sh-run-log', 'zipfit-sh-close-missing', 'zipfit-collect-lh-promo', 'zipfit-refresh-post-links', 'zipfit-analysis-dispatch', 'zipfit-collect-lh-images', 'zipfit-health-ops-dispatch', 'zipfit-health-screen-dispatch', 'zipfit-check-source-pages', 'zipfit-uptime-ping', 'zipfit-backup-dispatch', 'zipfit-heartbeat-dispatch', 'zipfit-backup-poll', 'zipfit-purge-stale-sessions', 'zipfit-check-source-pages-new-sh', 'zipfit-net-purge-secrets', 'zipfit-list-rpc-probe', 'zipfit-purge-cron-run-details']) f(n) on f.n = j.jobname
 --  order by 1;
