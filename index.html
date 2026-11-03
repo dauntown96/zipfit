@@ -8137,12 +8137,18 @@ function zfScheduleItemHTML(r, showScope){
   const sc = [showScope ? r.scope_text : '', r.site_label].filter(Boolean).map(escapeHtml).join(' · ');
   const rawMark = ZF_RAW_REPEAT.test(r.stage_text || '') ? ' <span class="zf-sch-rawmark" title="공고문에 적힌 글자 그대로예요">(원문 표기)</span>' : '';
   const head = `<span class="policy-category">${ZF_STAGE_ICON[r.stage] ? ZF_STAGE_ICON[r.stage] + ' ' : ''}${escapeHtml(r.stage_text || '')}${rawMark}${sc ? ` <span class="zf-sch-scope">${sc}</span>` : ''}</span>`;
-  const dl = zfSchDateLine(r), raw = (r._raws || [r.period_text || '']).map(escapeHtml).join('<br>');
+  // 🔵 2026-11-03 — 합친 역(r._grp)은 행 id 를 모두 싣고(data-sch-ids) 「원문」 펼침을 행마다 가른다(data-sch-rid) · 경로 대상 글(_notes)은 따로 —
+  //    health-screen sched_line 이 역 id·원문 글 = DB period_text 를 행마다 잰다(원칙 33).
+  const grp = r._grp || null, notes = r._notes || [];
+  const raw = (grp || notes.length)
+    ? (grp || [r]).map(g => `<span class="zf-sch-rawrow" data-sch-rid="${zfAttr(g.id)}">${escapeHtml(g.period_text || '')}</span>`).join('<br>') + notes.map(t => `<br><span class="zf-sch-note">${escapeHtml(t)}</span>`).join('')
+    : escapeHtml(r.period_text || '');
+  const dl = zfSchDateLine(r);
   const rl = (r._routes || []).length ? `<span class="zf-sch-routes">${r._routes.map(x => `<span class="zf-sch-route"><b>${escapeHtml(x.name)}</b> ${escapeHtml(x.dl)}${x.place ? ' — ' + escapeHtml(x.place) : ''}</span>`).join('')}</span>` : '';
   const inner = dl
     ? `<summary>${head}<span class="policy-content">${escapeHtml(dl)}<span class="zf-sch-more" aria-hidden="true">원문</span></span>${rl}</summary><div class="zf-sch-raw">${raw}</div>`
     : `<summary>${head}<span class="policy-content zf-sch-nd">${raw}</span></summary>`;
-  return `<div class="policy-item" data-zf-d="${zfAttr(d1)}" data-zf-e="${zfAttr(d2)}"${r.id != null ? ` data-sch-id="${zfAttr(r.id)}"` : ''}><details class="zf-sch-stop">${inner}</details></div>`;
+  return `<div class="policy-item" data-zf-d="${zfAttr(d1)}" data-zf-e="${zfAttr(d2)}"${r.id != null ? ` data-sch-id="${zfAttr(r.id)}"` : ''}${grp ? ` data-sch-ids="${zfAttr(grp.map(g => g.id).join(' '))}"` : ''}><details class="zf-sch-stop">${inner}</details></div>`;
 }
 // 🔵 2026-11-03(우편함 「표시층 — 다음 판 시안」 A · 백로그 「상세 「공급일정」 노선에서 현장 접수가 별 역으로 서…」) — 접수 단계에서 경로만 다른 행은 한 역.
 //    일정 표 접수 행이 이어서 둘 이상이고 날짜 창이 서로 겹치면(인터넷 11-16~18 · 현장 11-17 — …20896) 한 역으로 합치고(날짜 = 가장 이른 시작 ~ 가장 늦은 끝 ·
@@ -8164,7 +8170,6 @@ function zfSchMergeApply(list, routes){
       m.start_date = m._grp.map(r => r.start_date || r.end_date).sort()[0];
       m.end_date = m._grp.map(r => r.end_date || r.start_date).sort().slice(-1)[0];
       m.stage_text = [...new Set(m._grp.map(r => r.stage_text || ''))].filter(Boolean).join(' · ');
-      m._raws = m._grp.map(r => r.period_text || '');
       out[out.length - 1] = { r: m, s: false };
       return;
     }
@@ -8177,7 +8182,7 @@ function zfSchMergeApply(list, routes){
     if(new Set(hit.map(rt => rt.route)).size >= 2){
       lines = hit.map(rt => ({ name: [rt.route, rt.phase_text].filter(Boolean).join(' '), dl: zfSchDateLine(rt), place: rt.place_text || '' }));
       const notes = [...new Set(hit.map(rt => rt.note_text).filter(Boolean))];
-      if(notes.length) x = { r: Object.assign({}, x.r, { _raws: (x.r._raws || [x.r.period_text || '']).concat(notes) }), s: x.s };
+      if(notes.length) x = { r: Object.assign({}, x.r, { _notes: notes }), s: x.s };
     } else if(x.r._grp){
       lines = x.r._grp.map(r => ({ name: r.scope_text || r.stage_text || '', dl: zfSchDateLine(r), place: '' }));
     }
