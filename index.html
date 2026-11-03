@@ -371,6 +371,8 @@ body.theme-dark .zf-rent-line{color:#9fb8b0}
 body.theme-dark .zf-rent-line b{color:#7fd8b5}
 .zf-exempt-chip{padding:2px 9px;font-size:11px;cursor:default;display:inline-block;margin-left:6px;background:#e7f5ef;color:#0F6E56;border-color:#bfe3d4;font-weight:600}
 .zf-pol-notes{margin:0 0 8px}
+.hu-list>.zf-weak-head{margin:0 0 8px}
+.zf-weak-chip{font-size:var(--t-xs,11px);padding:1px 6px;background:#EEF2FB;border-color:#CFD9F0;color:#2B4C8C}
 .zf-pol-note{font-size:12px;line-height:1.55;margin:0 0 6px;padding:7px 10px;border-radius:8px;background:#f4f4f2;color:#555}
 .zf-pol-note.warn{background:#FFF3F3;border:1px solid #F5C2C2;color:#A32D2D}
 .zf-pol-note .zf-pol-src{display:block;margin-top:3px;font-size:11px;color:#777}
@@ -437,6 +439,8 @@ body.theme-dark .hu-x-chip{background:#1f2229;border-color:#2c2f38;color:#5DCAA5
 .hu-ug-target{font-weight:600;color:#333;flex:0 0 auto}
 .hu-ug-area{color:#888;flex:0 0 auto}
 .hu-ug-price{color:#333;flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
+.hu-sqm{color:#6a6a6a;font-size:var(--t-xs,11px);white-space:nowrap}
+.zf-rent-basis{color:#777}
 .hu-ug-sub{font-size:11px;color:#888;margin-top:2px}
 body.theme-dark .hu-ug,body.theme-dark .hu-ug>summary{background:#1f2229;border-color:#2c2f38}
 body.theme-dark .hu-ug-name,body.theme-dark .hu-ug-target,body.theme-dark .hu-ug-price{color:#e8e8e8}
@@ -5151,12 +5155,16 @@ function zfLoadRentStats(){
     const out = await res.json();
     if(!Array.isArray(out)) throw new Error('예상치 못한 응답');
     const vals = new Map();
+    // 🔵 2026-11-03(우편함 「표시층 — 다운님 실사용 넷」 D ③ · 💡 시안) — 같은 시·도 같은 유형 묶음도 함께 센다(키 끝에 「\u0002시·도」) · 그리는 쪽이 표본 5곳 이상이면 그쪽을 먼저.
+    const push = (k, v) => { if(!vals.has(k)) vals.set(k, []); vals.get(k).push(v); };
     out.forEach(r => {
       if(!r || r.round_state !== 'current' || r.rent_per_sqm_med == null) return;
-      const k = zfRentTypeKey(byId.get(String(r.announcement_id)), r.rent_basis);
+      const row = byId.get(String(r.announcement_id));
+      const k = zfRentTypeKey(row, r.rent_basis);
       if(!k) return;
-      if(!vals.has(k)) vals.set(k, []);
-      vals.get(k).push(Number(r.rent_per_sqm_med));
+      push(k, Number(r.rent_per_sqm_med));
+      const sd = zfCanonSido((row && row['sido_nm']) || '');
+      if(sd) push(k + '\u0002' + sd, Number(r.rent_per_sqm_med));
     });
     vals.forEach((v, k) => {
       if(v.length < 5) return;
@@ -5170,12 +5178,18 @@ function zfLoadRentStats(){
 function zfRentLineHtml(id, s){
   if(!s || s.round_state !== 'current' || s.rent_per_sqm_med == null || !zfRentStats.size) return '';
   const row = (noticeData || []).find(n => String(n['announcement_id']) === String(id));
-  const st = row && zfRentStats.get(zfRentTypeKey(row, s.rent_basis));
+  const tk = row && zfRentTypeKey(row, s.rent_basis);
+  const sd = row ? zfCanonSido(row['sido_nm'] || '') : '';
+  // 🔵 2026-11-03(같은 시안 D ①③) — 기준을 줄에 밝힌다: 이 공고 세대 행(주택형·계층마다)의 기본 임대조건 월세 ÷ 전용면적 중앙값 ·
+  //    비교 = 같은 시·도 같은 유형(표본 5곳 이상일 때) → 아니면 전국 같은 유형. 표본 수 함께.
+  const stS = tk && sd && zfRentStats.get(tk + '\u0002' + sd);
+  const st = stS || (tk && zfRentStats.get(tk));
   if(!st) return '';
   const v = Number(s.rent_per_sqm_med);
   const pos = v < st.q1 ? '낮은 편' : (v > st.q3 ? '높은 편' : '비슷');
   const won = x => Math.round(x).toLocaleString() + '원';
-  return `<div class="zf-rent-line" data-zf-rent="${zfAttr(pos)}">㎡당 월 ${won(v)}${s.rent_basis === 'na' ? '(나군)' : ''} · 전국 같은 유형 열린 공고 중앙값 ${won(st.med)}(${st.n}곳) — <b>${pos}</b></div>`;
+  const where = stS ? zf3ShortSido(sd.split(' ')[0]) : '전국';
+  return `<div class="zf-rent-line" data-zf-rent="${zfAttr(pos)}">㎡당 월 ${won(v)}${s.rent_basis === 'na' ? '(나군)' : ''}<span class="zf-rent-basis"> · 이 공고 주택형·계층별 기본 임대조건 중앙값</span> · ${escapeHtml(where)} 같은 유형 열린 공고 중앙값 ${won(st.med)}(${st.n}곳) — <b>${pos}</b></div>`;
 }
 function zfFillSummarySlots(){
   document.querySelectorAll('[data-sum-for]').forEach(el => {
@@ -9602,7 +9616,28 @@ function zfWeakHousingLine(units, pols){
   if(sents.some(x => /주거약자/.test(x) && /일반/.test(x) && /(?:중복|이중)\s*(?:으로\s*)?신청[^.。]{0,6}불가/.test(x))) toks.push('일반과 중복신청 불가');
   if(!toks.length) return '';
   const n = wk.reduce((a, u) => a + (Number(u.recruit_count) > 0 ? Number(u.recruit_count) : 0), 0);
-  return `<div class="zf-pol-note" data-zf-weak="1">🏷️ 주거약자용 ${n > 0 ? `${n.toLocaleString()}호 · ` : '주택 · '}${toks.join(' · ')}<span class="zf-pol-src">공고문의 주거약자용 주택 조항 기준이에요. 아래 「📋 정책 안내」에서 원문을 볼 수 있어요.</span></div>`;
+  // 🔵 2026-11-03(우편함 「표시층 — 다운님 실사용 넷」 A · 💡 새 문구 — 다운님 승인 전 시안) — 「공고 안에 주거약자용 물량이 따로 있다」는 세대 일부 사실이라
+  //    문장으로 말한다(종전 「🏷️ 주거약자용 주택 · 주거약자 신청자 전용 · …」은 공고 전체가 주거약자 전용처럼 읽혔다 · 다운님 11-03).
+  //    🔴 토막은 원문에 있을 때만(위 toks 판정 그대로) · 호수는 이번 회차 세대 행 모집호수 합이 있을 때만.
+  const only = toks.includes('주거약자 신청자 전용'), dup = toks.includes('일반과 중복신청 불가'), score = toks.includes('배점 따로');
+  const tail = [only && dup ? '주거약자만 신청할 수 있고, 일반 물량과 함께 신청할 수 없어요' : only ? '주거약자만 신청할 수 있어요' : dup ? '일반 물량과 함께 신청할 수 없어요' : '', score ? '배점은 따로 매겨요' : ''].filter(Boolean).join(' · ');
+  return `<div class="zf-pol-note zf-weak-head" data-zf-weak="1">🏷️ 이 공고에는 주거약자용 주택${n > 0 ? ` ${n.toLocaleString()}호` : ''}가 따로 있어요${tail ? ' — ' + tail : ''}<span class="zf-pol-src">공고문의 주거약자용 주택 조항 기준이에요. 아래 「📋 정책 안내」에서 원문을 볼 수 있어요.</span></div>`;
+}
+const zfWeakHeadPending = {};
+function zfPlaceWeakHead(id){
+  const html = zfWeakHeadPending[id];
+  const list = document.getElementById('hu-list-' + id);
+  if(!html || !list) return false;
+  list.querySelectorAll(':scope > .zf-weak-head').forEach(b => b.remove());
+  list.insertAdjacentHTML('afterbegin', html);
+  // 주거약자용 주택형 묶음 머리에 칩 — 묶음 이름에 이미 「주거약자」가 있으면 달지 않는다(같은 낱말 두 번)
+  list.querySelectorAll('details.hu-ug > summary').forEach(sm => {
+    const nm = (sm.querySelector('.hu-ug-name') || {}).textContent || '';
+    const rows = sm.parentElement.querySelectorAll('.hu-ug-target');
+    if(/주거약자/.test(nm) || sm.querySelector('.zf-weak-chip')) return;
+    if([...rows].some(r => /주거약자/.test(r.textContent))) sm.querySelector('.hu-ug-name').insertAdjacentHTML('afterend', ' <span class="chip zf-weak-chip">주거약자용</span>');
+  });
+  return true;
 }
 function zfPolicyNotes(curRows, annId, id, ownerAnn, slot, wrap){
   const parts = [];
@@ -9632,12 +9667,10 @@ function zfPolicyNotes(curRows, annId, id, ownerAnn, slot, wrap){
     const html = zfWeakHousingLine(units, curRows);
     const hu = document.getElementById('hu-slot-' + id);
     if(!html || !zfStillOurs(id, ownerAnn)) return;
-    if(!hu || !hu.parentNode){ put(html); return; }
-    hu.parentNode.querySelectorAll(':scope > .zf-weak-box').forEach(b => b.remove());
-    const box = document.createElement('div');
-    box.className = 'zf-pol-notes zf-weak-box';
-    box.innerHTML = html;
-    hu.parentNode.insertBefore(box, hu);
+    // 🔵 2026-11-03(같은 시안 A) — 자리 = 「🏠 세대별 정보」 칸 안 맨 위(세대 목록 머리 · 주거약자용 주택형 묶음과 같은 칸). 자격 칸 쪽 줄은 걷는다.
+    //    세대 칸이 아직 없거나(늦게 옴) 다시 그려지면 그 칸이 그려질 때 다시 단다(zfWeakHeadPending).
+    zfWeakHeadPending[id] = html;
+    if(!zfPlaceWeakHead(id)){ if(!hu || !hu.parentNode) put(html); }
   });
 }
 function loadAnnouncementPolicies(annId, detailEl, id, useGroup){
@@ -10411,6 +10444,7 @@ function renderHousingGroupRows(id, visibleCount, mapOnly){
     listEl.innerHTML = (rentHead ? `<div class="zf-rentlow-head">${rentHead}</div>` : '')
       + `<div class="hu-x-single">${zfUnitChipSlot(g.label)}</div>` + renderHousingUnitList(g.units);
     zfFillUnitChips(id);
+    if(zfWeakHeadPending[id]) zfPlaceWeakHead(id);
     const addr = g.address || g.building_name;
     if(addr){
       setActiveHousingGroup(id, 0);
@@ -10439,6 +10473,7 @@ function renderHousingGroupRows(id, visibleCount, mapOnly){
   }
   listEl.innerHTML = html;
   zfFillUnitChips(id);   // 🔵 B28 — 「더 보기」로 새로 그린 머리에도 칩을 단다
+  if(zfWeakHeadPending[id]) zfPlaceWeakHead(id);   // 🔵 2026-11-03 시안 A — 세대 목록을 다시 그리면 주거약자 머리 줄을 다시 단다
   // "더보기"로 목록을 다시 그려도 기존에 선택돼있던 건물의 강조 표시는 유지
   const activeIdx = huActiveGroup[id];
   if(activeIdx != null){
@@ -10584,6 +10619,13 @@ const ZF_UNKNOWN_PRICE = '확인 필요';
 const huMoneyText = (v, rent) => v == null ? (rent == null ? ZF_UNKNOWN_PRICE : '-') : Number(v).toLocaleString() + '원';
 const huRentText  = (v, dep) => v == null ? ZF_UNKNOWN_PRICE
                                : Number(v) === 0 ? '월세없음' : Number(v).toLocaleString() + '원';
+// 🔵 2026-11-03(우편함 「표시층 — 다운님 실사용 넷」 D ② · 💡 시안) — 세대 줄마다 ㎡당 월세(기본 임대조건 월세 ÷ 전용면적 · 원 반올림).
+//    월세 0(전세형)·NULL · 면적 없음이면 그리지 않는다 · 두 번째 조건(rent_priority1)은 섞지 않는다(카드 값과 같은 축).
+function huSqmText(u){
+  const r = Number(u && u.monthly_rent), a = parseFloat(u && u.area_sqm);
+  if(!(r > 0) || !(a > 0)) return '';
+  return `<span class="hu-sqm"> · ㎡당 월 ${Math.round(r / a).toLocaleString()}원</span>`;
+}
 function huPriceText(u){
   const base = `보증금 ${huMoneyText(u.deposit, u.monthly_rent)} · 월 ${huRentText(u.monthly_rent, u.deposit)}`;
   if(u.deposit_priority1 == null && u.rent_priority1 == null) return base;
@@ -10656,7 +10698,7 @@ function renderHousingUnitGroup(g){
       <div class="hu-ug-line">
         <span class="hu-ug-target">${escapeHtml(u.supply_target || u.unit_type || '')}</span>
         ${area}
-        <span class="hu-ug-price">${huPriceText(u)}</span>
+        <span class="hu-ug-price">${huPriceText(u)}${huSqmText(u)}</span>
         ${recruitBadge}${zfWaitReserveHtml(ln.units || [u])}${roundBadge}${pastOnlyBadge}
       </div>
       ${dual}
@@ -10705,7 +10747,7 @@ function renderHousingUnitRow(u){
   const depositRent = hasPriority1
     ? `<div class="hu-item hu-item-wide"><span class="hu-label">임대조건</span><span class="hu-value">보증금 ${deposit}·월 ${rent} 또는 보증금 ${depositP1}·월 ${rentP1}<br><span style="font-size:11px;color:#888">어느 조건이 적용되는지는 비고·공고문에서 확인하세요</span></span></div>`
     : `<div class="hu-item"><span class="hu-label">보증금</span><span class="hu-value">${deposit}</span></div>
-      <div class="hu-item"><span class="hu-label">월임대료</span><span class="hu-value">${rent}</span></div>`;
+      <div class="hu-item"><span class="hu-label">월임대료</span><span class="hu-value">${rent}${huSqmText(u)}</span></div>`;
   const conv = u.conversion_date ? `<div class="hu-item"><span class="hu-label">분양전환</span><span class="hu-value">${escapeHtml(u.conversion_date)}</span></div>` : '';
   const floor = u.floor_info ? `<div class="hu-item"><span class="hu-label">동호수</span><span class="hu-value">${escapeHtml(u.floor_info)}</span></div>` : '';
   const unitType = u.unit_type ? `<div class="hu-item"><span class="hu-label">주택유형</span><span class="hu-value">${escapeHtml(u.unit_type)}</span></div>` : '';
