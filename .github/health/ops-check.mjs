@@ -1047,6 +1047,7 @@ for (const [id, name, sql, judge] of [
 
 // ㉚ 자격 행 결론 낱말(2026-11-03 · 우편함 「코드·운영 — GH 2-0 관찰 장치 · … · 결론 낱말 ⚠️」 4 · 분석 스킬 v11.1 「없음 결론 금지」의 기계 감시).
 //    eligibility_criteria.verification_requirements 의 문자열 값 전체가 결론 낱말 하나(배제 · 완화 · 불요 · 필수 · 없음 · 미혼 — 앞뒤 공백·괄호·마침표만 허용)인 키
+//    🔵 2026-11-03(「결론 낱말 ⚠️ 넓힘」 1) — 결론 낱말 + 괄호 해설 꼴도 센다(예 「배제(신청자 본인 자동차 미소유 필수)」 · 그 뒤 공백·마침표만).
 //    ∧ 행 created_at 14일 안(새 분석 행만)이 0 이면 통과 · 아니면 ⚠️(공고 ID · 키). 객체 꼴 「공급대상」 키는 셈 밖. 14일 밖 옛 행 수는 값 칸에만.
 //    ⚠️ 경고만 · gate.mjs HARD 밖 · 못 읽으면 ⚠️ 점검 불능.
 try {
@@ -1055,14 +1056,14 @@ try {
         from public.eligibility_criteria e,
              jsonb_each(case when jsonb_typeof(e.verification_requirements) = 'object' then e.verification_requirements else '{}'::jsonb end) kv
        where kv.key <> '공급대상' and jsonb_typeof(kv.value) = 'string'
-         and (kv.value #>> '{}') ~ '^[[:space:]()（）\\[\\].]*(배제|완화|불요|필수|없음|미혼)[[:space:]()（）\\[\\].]*$')
+         and (kv.value #>> '{}') ~ '^[[:space:]()（）\\[\\].]*(배제|완화|불요|필수|없음|미혼)([[:space:]]*[(（].*[)）])?[[:space:]()（）\\[\\].]*$')
     select json_build_object('recent', (select count(*) from k where recent), 'all', (select count(*) from k),
       'all_ann', (select count(distinct a) from k),
       'list', (select json_agg(a || ' · ' || k order by a, k) from (select a, k from k where recent limit 10) s)) j`)
   const j = x.j
-  add('elig_conclusion_word', '자격 행 값이 결론 낱말 하나뿐(새 분석 14일)', j.recent === 0 ? 'pass' : 'warn',
+  add('elig_conclusion_word', '자격 행 값이 결론 낱말 하나뿐 · 낱말 + 괄호 해설(새 분석 14일)', j.recent === 0 ? 'pass' : 'warn',
     j.recent === 0 ? `0(14일 밖 옛 행 ${j.all}키 · ${j.all_ann}공고)` : `${j.recent}키 — ${(j.list || []).join(', ')}(전체 ${j.all}키 · ${j.all_ann}공고)`,
-    '0 — verification_requirements 문자열 값이 「배제·완화·불요·필수·없음·미혼」 낱말 하나뿐인 키(공급대상 밖) · 행 created_at 14일 안 — 원문 문장 대신 결론만 적은 꼴')
+    '0 — verification_requirements 문자열 값이 「배제·완화·불요·필수·없음·미혼」 낱말 하나뿐이거나 낱말 + 괄호 해설뿐인 키(공급대상 밖) · 행 created_at 14일 안 — 원문 문장 대신 결론만 적은 꼴')
 } catch (e) {
   addBlind('elig_conclusion_word', '자격 행 결론 낱말 — 점검 불능', 'warn', String(e).slice(0, 200), '자격 표를 읽는다(못 읽으면 ⚠️)')
 }
