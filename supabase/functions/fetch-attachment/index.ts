@@ -171,6 +171,45 @@ const sha256Hex = async (bytes: Uint8Array): Promise<string> => {
     .join('')
 }
 
+// ───────────────────────── 같은 내용 파일 재사용(content_sha256) ─────────────────────────
+// 🔵 2026-11-03(우편함 「코드·운영 — … 이미지 같은 파일 공유(content_sha256 · 다운님 결정 안 ① 2026-11-03)」 B 3)
+//   같은 단지 이미지·팸플릿이 회차·공고마다 따로 내려받혀 Drive 에 쌓였다(조사 11-02: 측정 범위 1.14GB 중 중복 사본 261MB ·
+//   팸플릿은 LH 가 새 fileid 로 다시 올려 fileid 축으로는 못 잡음 → 내용 sha256 축).
+//   mode=upload 는 받은 바이트의 sha256 과 같은 announcement_extras.content_sha256 행이 있으면 Drive 에 올리지 않고
+//   그 행의 file_url 을 돌려준다(drive.action = 'reused_existing'). 새 extras 행에는 부르는 쪽이 응답의 content_sha256 을 적는다.
+//   🔴 이 함수는 DB 에 쓰지 않는다 — 읽기 한 번(service_role · 같은 프로젝트 REST)뿐이다. `reuse=off` 면 찾지 않는다(종전 동작).
+//   읽기가 실패하면 재사용 없이 종전대로 올리고 그 사실을 응답 reuse.error 에 남긴다(조용히 넘어가지 않는다).
+const SHA_HEX_RE = /^[0-9a-f]{64}$/
+type ReuseHit = { file_url: string; file_id: string | null; announcement_id: string; extra_type: string }
+const DRIVE_FILE_ID_IN_URL = /\/d\/([^/]+)\//
+const findReusable = async (sha: string): Promise<{ hit: ReuseHit | null; error: string | null }> => {
+  if (!SHA_HEX_RE.test(sha)) return { hit: null, error: 'sha256 형식 아님' }
+  const base = Deno.env.get('SUPABASE_URL')
+  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  if (!base || !key) return { hit: null, error: '환경변수 SUPABASE_URL·SUPABASE_SERVICE_ROLE_KEY 없음 — 재사용 확인 못 함' }
+  try {
+    const r = await fetch(
+      `${base}/rest/v1/announcement_extras?select=file_url,announcement_id,extra_type&content_sha256=eq.${sha}&file_url=not.is.null&order=id.asc&limit=1`,
+      { headers: { apikey: key, Authorization: `Bearer ${key}` } },
+    )
+    if (!r.ok) return { hit: null, error: `extras 읽기 HTTP ${r.status}` }
+    const rows = await r.json() as Array<{ file_url: string; announcement_id: string; extra_type: string }>
+    if (!rows.length) return { hit: null, error: null }
+    const m = rows[0].file_url.match(DRIVE_FILE_ID_IN_URL)
+    return { hit: { ...rows[0], file_id: m ? m[1] : null }, error: null }
+  } catch (e) {
+    return { hit: null, error: `extras 읽기 실패: ${String(e instanceof Error ? e.message : e).slice(0, 120)}` }
+  }
+}
+const reusedDrive = (hit: ReuseHit) => ({
+  action: 'reused_existing',
+  file_id: hit.file_id,
+  web_view_link: hit.file_url,
+  reused_file_url: hit.file_url,
+  reused_from_announcement_id: hit.announcement_id,
+  reused_from_extra_type: hit.extra_type,
+})
+
 // 상한을 넘으면 그 자리에서 멈춘다. 다 받아놓고 버리지 않는다.
 // Content-length가 없는 응답이 있어서 헤더만으로는 못 막는다.
 const readCapped = async (
@@ -684,7 +723,7 @@ const handleResumable = async (
   res: Response,
   base: Record<string, unknown>,
   declaredLen: number | null,
-  p: { announcementId: string; folderId: string; nameOverride: string | null; onDupe: string; current: URL },
+  p: { announcementId: string; folderId: string; nameOverride: string | null; onDupe: string; current: URL; reuseOn: boolean },
   started: number,
   ac: AbortController,
   timer: number,
@@ -754,7 +793,24 @@ const handleResumable = async (
       action = same ? 'skipped_identical' : 'conflict'
       file = existing
     }
+    // 🔵 2026-11-03 — 같은 내용 재사용(findReusable). 분할 경로는 원본 해시를 미리 못 내므로 **올린 뒤** Drive 가 계산한 sha256 으로 찾고,
+    //   이미 같은 내용의 extras 행이 있으면 방금 올린 새 파일만 지우고 그 file_url 을 돌려준다(기존 파일은 건드리지 않는다).
+    const contentSha = typeof uploaded.sha256Checksum === 'string' ? (uploaded.sha256Checksum as string).toLowerCase() : null
+    if (action === 'uploaded' && p.reuseOn && contentSha) {
+      const rr = await findReusable(contentSha)
+      if (rr.hit) {
+        await deleteDriveFile(uploaded.id as string, token, secrets)
+        return finish({
+          bytes: r.sent, sha256: null, content_sha256: contentSha, uploaded: false, body_included: false,
+          reason: 'uploaded_via_drive', transfer_ms: transferMs, chunks: r.chunks, chunk_bytes: RESUMABLE_CHUNK_BYTES,
+          reuse: { checked: true, hit: true, error: null, after_upload: true },
+          drive: { ...reusedDrive(rr.hit), secret_source: secrets.source, folder_source: 'param', notice_folder_id: p.folderId, uploaded_then_deleted: uploaded.id ?? null },
+        })
+      }
+      out.reuse = { checked: rr.error === null, hit: false, error: rr.error, after_upload: true }
+    }
     return finish({
+      content_sha256: contentSha,
       bytes: r.sent,
       sha256: null,
       uploaded: action === 'uploaded' || action === 'replaced',
@@ -932,6 +988,8 @@ Deno.serve(async (req: Request) => {
   const nameOverride = reqUrl.searchParams.get('filename')
   // 같은 이름이 이미 있고 내용이 다를 때만 의미가 있다. 기본은 건드리지 않는 것.
   const onDupe = reqUrl.searchParams.get('on_dupe') ?? 'skip'
+  // 🔵 2026-11-03 — 같은 내용 파일 재사용(위 findReusable). 기본 켬 · `reuse=off` 면 종전대로 늘 올린다.
+  const reuseOn = reqUrl.searchParams.get('reuse') !== 'off'
   // 🔴 미리 확보해 둔 공고 폴더의 ID. 오면 폴더를 찾지도 만들지도 않는다.
   const folderIdParam = reqUrl.searchParams.get('folder_id')
   // 🔴 큰 첨부 분할 업로드. 이 값이 없으면 아래 종전 경로가 한 줄도 달라지지 않는다.
@@ -1103,6 +1161,7 @@ Deno.serve(async (req: Request) => {
         nameOverride,
         onDupe,
         current,
+        reuseOn,
       }, started, ac, timer)
     }
 
@@ -1154,7 +1213,18 @@ Deno.serve(async (req: Request) => {
         .join(''),
     }
 
-    if (wantUpload) {
+    payload.content_sha256 = srcSha
+    let reuseHit: ReuseHit | null = null
+    if (wantUpload && reuseOn) {
+      const r = await findReusable(srcSha)
+      reuseHit = r.hit
+      payload.reuse = { checked: r.error === null, hit: !!r.hit, error: r.error }
+    }
+    if (wantUpload && reuseHit) {
+      // 🔴 같은 내용이 이미 extras 에 있다 — Drive 를 부르지 않는다(폴더도 만들지 않는다).
+      payload.uploaded = false
+      payload.drive = reusedDrive(reuseHit)
+    } else if (wantUpload) {
       const filename = safeName(
         nameOverride ||
         filenameFromDisposition(res.headers.get('content-disposition')) ||
