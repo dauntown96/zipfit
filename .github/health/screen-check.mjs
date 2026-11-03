@@ -29,7 +29,9 @@ const SCHED_DAY_SQL = (A, G) => `(select case when count(distinct coalesce(s.sta
 const ROUTE_GUARD_SQL = `lg as (select aid, max(gid) gid, max(wd) wd from g group by aid),
       gd as (select lg.aid, coalesce(${SCHED_DAY_SQL('lg.aid', 'lg.gid')}, lg.wd) gd from lg),`
 // 콘솔 오류 제외 — 카카오맵 SDK(지도만 빠진다).
-const CONSOLE_IGNORE = [/dapi\.kakao\.com/, /kakao/i]
+const CONSOLE_IGNORE = [/dapi\.kakao\.com/, /kakao/i,
+  // 🔵 2026-11-03 — 브랜치 점검(입력 ref · 러너 안 127.0.0.1:8201)은 카카오 지도 키의 등록 도메인 밖이라 SDK 가 안 온다 → 화면이 남기는 그 실패 한 줄만 뺀다.
+  ...(/^http:\/\/127\.0\.0\.1:8201\//.test(SITE) ? [/카카오맵 SDK 로드 실패/] : [])]
 const checks = []
 const add = (id, name, status, value, rule) => checks.push({ id, name, status, value, rule })
 // 🔴 ④ 링크 문구는 두 갈래다(화면 zfPostLinkHtml) — LH 카드에 요약이 있으면 「함께 정리돼 있어요」, 없으면 「같은 게시물에 올라왔어요」.
