@@ -24,6 +24,16 @@ on:
         type: choice
         options: [none, fail, notice, zipfit, stale_date, objobj, target_out, open_count, route_gap, relax_badge, sched_line, rev_date, geo_names, ana_pending, route_win, mq_half, login_fail]
         default: none
+      # 🔵 2026-11-03(우편함 「코드·운영 — … health-screen 브랜치 점검 입력(site)」 3) — 병합 전 브랜치를 잰다.
+      site:
+        description: '잴 주소 — 비우면 배포본(https://kkokzip.com/) · 브랜치는 githack 커밋 주소(https://raw.githack.com/dauntown96/zipfit/<커밋>/index.html) · 이 주소를 주면 DB 기록·이슈·로그인 한 바퀴는 하지 않는다(G1 상시 셈 밖)'
+        type: string
+        default: ''
+      record:
+        description: 'DB 실행 요약·이슈를 남길까 — 배포본 점검은 true(기본) · site 를 주면 이 값과 상관없이 남기지 않는다'
+        type: choice
+        options: ['true', 'false']
+        default: 'true'
 
 permissions:
   contents: read
@@ -37,6 +47,10 @@ concurrency:
 jobs:
   screen:
     runs-on: ubuntu-latest
+    env:
+      # 브랜치 점검(site 입력)이면 기록·이슈·로그인 한 바퀴를 하지 않는다 — G1 화면 셈(ops_health_runs kind=screen ref=main)에 들어가지 않게.
+      SCREEN_SITE: ${{ inputs.site || '' }}
+      SCREEN_RECORD_ON: ${{ (inputs.site == '' || inputs.site == null) && inputs.record != 'false' && '1' || '0' }}
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
@@ -118,7 +132,7 @@ jobs:
       #    판정(login_walk 항목) · DB 실행 요약 한 행 · 결과 파일·요약(이슈 머리)은 다음 「마무리」 단계가 한 번에 한다.
       - name: 로그인 흐름 한 바퀴
         id: login
-        if: always() && steps.deploy.outputs.blind != '1' && github.event_name == 'workflow_dispatch'
+        if: always() && steps.deploy.outputs.blind != '1' && github.event_name == 'workflow_dispatch' && env.SCREEN_RECORD_ON == '1'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           LOGIN_WALK_SIMULATE: ${{ inputs.simulate == 'login_fail' && 'fail' || '' }}
@@ -141,6 +155,7 @@ jobs:
           LW_RAN: ${{ steps.login.outputs.ran }}
           LW_CODE: ${{ steps.login.outputs.code }}
           LW_SIMULATE: ${{ inputs.simulate || '' }}
+          SCREEN_RECORD: ${{ env.SCREEN_RECORD_ON }}
         run: node .github/health/screen-finish.mjs
       - name: 결과 올리기
         if: always()
@@ -154,7 +169,7 @@ jobs:
           retention-days: 14
       - name: 알림(이슈 열기·닫기)
         # 🔵 2026-10-06 — health-ops 와 같이 main 에서만 이슈를 연다·닫는다. 가지에서 수동 실행(모의 simulate 포함)은 결과만 남긴다.
-        if: always() && github.ref == 'refs/heads/main'
+        if: always() && github.ref == 'refs/heads/main' && env.SCREEN_RECORD_ON == '1'
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

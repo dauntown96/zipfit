@@ -154,6 +154,17 @@ const typeReject = (u: URL, contentType: string | null): string | null => {
   return `이미지 경로인데 응답 형식이 그림·PDF가 아니다: ${t || '(없음)'}`
 }
 
+// 🔵 2026-11-03(우편함 「코드·운영 — fetch-attachment 잘림·HTML 거름 …」 1) — 원문 대신 온 HTML 쪽 가리기.
+//   LH 가 내린 파일의 fileid 는 200 · text/html · 2,541B 안내 쪽을 준다(…20749·…20750 평면도) — 그대로 올리면 Drive 에 「원문」 이름의 HTML 이 생긴다.
+//   🔴 업로드(mode=upload)에서만 쓴다 — fetch 모드는 게시판 상세(HTML)를 읽는 데도 쓰인다(부산·제주 view).
+//   판정은 본문 머리(공백·BOM 뒤 앞 64자)가 `<!doctype html` · `<html` 꼴일 때만 — content-type 만으로 막지 않는다
+//   (옛 서버가 hwp·pdf 를 text/html 로 내보내는 꼴이 있어도 막히지 않게 · 그때는 응답에 content_type_html 표지만).
+const looksLikeHtml = (bytes: Uint8Array): boolean => {
+  const head = new TextDecoder('utf-8', { fatal: false }).decode(bytes.subarray(0, 512))
+    .replace(/^[\ufeff\s]+/, '').slice(0, 64).toLowerCase()
+  return head.startsWith('<!doctype html') || head.startsWith('<html')
+}
+
 const toBase64 = (bytes: Uint8Array): string => {
   // 큰 배열을 String.fromCharCode(...bytes)로 한 번에 넘기면 스택이 터진다.
   const CHUNK = 0x8000
@@ -795,6 +806,13 @@ const handleResumable = async (
       action = same ? 'skipped_identical' : 'conflict'
       file = existing
     }
+    // 🔵 2026-11-03(「잘림·HTML 거름」 1) — 분할 경로는 선언 크기와 보낸 바이트가 다르면 잘린 것이다 — 방금 올린(또는 덮은) 파일을 남기지 않는다.
+    //   새로 올린 것만 지운다(replace 는 기존 파일 id 에 덮었으므로 지우지 않고 오류만 — 그 경우 Drive 가 선언 크기와 다른 끝을 거부하는 것이 보통).
+    if (declaredLen !== null && Number.isFinite(declaredLen) && declaredLen !== r.sent) {
+      if (action === 'uploaded' && uploaded.id) await deleteDriveFile(uploaded.id as string, token, secrets)   // 같은 이름 갈래에서 이미 지웠으면 다시 안 지움
+      return finish({ ok: false, uploaded: false, body_included: false, reason: 'truncated', bytes: r.sent,
+        detail: `보낸 ${r.sent}B ≠ Content-Length ${declaredLen}B — 받기가 중간에 끊겼다(${action === 'uploaded' ? '방금 올린 파일 지움' : '기존 파일은 그대로 둠'} · 다시 부를 것)` }, 502)
+    }
     // 🔵 2026-11-03 — 같은 내용 재사용(findReusable). 분할 경로는 원본 해시를 미리 못 내므로 **올린 뒤** Drive 가 계산한 sha256 으로 찾고,
     //   이미 같은 내용의 extras 행이 있으면 방금 올린 새 파일만 지우고 그 file_url 을 돌려준다(기존 파일은 건드리지 않는다).
     const contentSha = typeof uploaded.sha256Checksum === 'string' ? (uploaded.sha256Checksum as string).toLowerCase() : null
@@ -1215,6 +1233,22 @@ Deno.serve(async (req: Request) => {
         .join(''),
     }
 
+    // 🔵 2026-11-03 — 받은 바이트가 Content-Length 와 다르면(받기가 중간에 끊김 · 11-03 채움 실측 49,152·270,336·565,272B) 잘린 것이다.
+    const lengthMatch = declaredLen === null || !Number.isFinite(declaredLen) ? null : declaredLen === bytes.length
+    payload.length_match = lengthMatch
+    const ctHtml = /^\s*text\/html\b/i.test(res.headers.get('content-type') ?? '')
+    if (ctHtml) payload.content_type_html = true
+    if (wantUpload && lengthMatch === false) {
+      // 🔴 올리지 않는다 — 잘린 파일이 「원문」으로 Drive 에 남는다. 다시 부르는 것은 호출하는 쪽 몫(이 함수는 재시도하지 않는다).
+      return json({ ...payload, ok: false, uploaded: false, body_included: false, reason: 'truncated',
+        detail: `받은 ${bytes.length}B ≠ Content-Length ${declaredLen}B — 받기가 중간에 끊겼다(올리지 않음 · 다시 부를 것)`,
+        elapsed_ms: Date.now() - started }, 502)
+    }
+    if (wantUpload && looksLikeHtml(bytes)) {
+      return json({ ...payload, ok: false, uploaded: false, body_included: false, reason: 'html_response',
+        detail: `원문 대신 HTML 쪽(${bytes.length}B · ${res.headers.get('content-type') ?? '형식 없음'})을 받았다 — 원본이 내려갔거나 오류 쪽이다(올리지 않음)`,
+        elapsed_ms: Date.now() - started }, 422)
+    }
     payload.content_sha256 = srcSha
     let reuseHit: ReuseHit | null = null
     if (wantUpload && reuseOn) {
