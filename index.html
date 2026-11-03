@@ -409,6 +409,8 @@ body.theme-dark .hu-past-title{color:#cfcfcf}
 .hu-x-single{display:flex;justify-content:flex-end}
 .hu-x-single:has(.hu-x-slot:empty){display:none}
 .extras-linked-note{font-size:11px;color:#1D6F55;margin:0 0 8px}
+.zf-extras-onlychips{padding:8px 0}
+.zf-extras-goto-hu{border:0;background:none;color:#0F6E56;font-size:inherit;font-weight:600;text-decoration:underline;padding:4px 2px;min-height:var(--hit,32px);cursor:pointer}
 body.theme-dark .hu-x-chip{background:#1f2229;border-color:#2c2f38;color:#5DCAA5}
 .hu-group-body{display:flex;flex-direction:column;gap:6px;padding:8px;background:#fff}
 .hu-group-body .hu-row{background:#fafaf6}
@@ -7274,13 +7276,23 @@ function zfTargetUnknownConds(g, f){
   });
   return out;
 }
+// 🔵 2026-11-03(우편함 「표시층 — 자격 키 정렬 + 「신혼·신생아 대상 모집」 문구」 B · 💡 시안 — 다운님 승인 전) — 대상 코드 「신혼·신생아」는
+//    공급대상 어휘 여덟 중 하나라 원문에 「신생아」가 없는 공고(익산 …19778 · 전주팔복 …19802 등)에서도 「신혼·신생아 대상 모집」으로 그려져
+//    신생아 가구가 대상처럼 읽혔다. 보이는 이름만 그 행 원문 낱말로 고른다(판정 코드는 그대로):
+//    그 행 글(공급대상.원문 + 갈래 확인필요)에 「신생아」가 있으면 그대로 · 「신혼」만 있으면 「신혼부부」 · 둘 다 없으면 「신혼부부 등」.
+function zfTargetShowName(code, g){
+  if(code !== '신혼·신생아') return code;
+  const txt = [g && g['원문']].concat(((g && g['갈래']) || []).map(b => b && b['확인필요'])).filter(Boolean).join(' ');
+  if(/신생아/.test(txt)) return code;
+  return /신혼/.test(txt) ? '신혼부부' : '신혼부부 등';
+}
 // rows = 그 카드 자신의 자격 행 공급대상 칸 배열(객체가 아니면 「키 없음」). 판정하지 않으면 null.
 function zfTargetVerdict(rows, f){
   if(!Array.isArray(rows) || !rows.length) return null;
   if(rows.some(g => !g || typeof g !== 'object' || Array.isArray(g))) return null;
   const st = rows.map(g => zfTargetRowState(g, f));
   const names = s => [...new Set(rows.filter((g, i) => st[i] === s || s === '*')
-    .flatMap(g => (g['갈래'] || []).map(b => b && b['대상']).filter(Boolean)))];
+    .flatMap(g => (g['갈래'] || []).map(b => b && b['대상'] ? zfTargetShowName(b['대상'], g) : '').filter(Boolean)))];
   const quotes = [...new Set(rows.map(g => g['원문']).filter(Boolean))];
   if(st.every(s => s === 'no')) return { state: 'no', names: names('*'), quotes };
   if(st.includes('ok')) return { state: 'ok', names: names('ok'), quotes };
@@ -8676,7 +8688,28 @@ function loadAnnouncementExtras(annId, detailEl, id, useGroup){
       extrasByUnitKey[id] = byKey;
       zfFillUnitChips(id);
     }
-    if(rows.length === 0) return;   // 전부 세대 머리로 갔다 — 갤러리를 따로 두지 않는다
+    // 🔵 2026-11-03(우편함 「표시층 — 자격 키 정렬 + …」 C · 💡 시안 — 다운님 승인 전) — 전부 세대 머리로 갔으면 갤러리 칸을 두지 않는데,
+    //    그러면 사진이 있는 공고가 「사진 없음」처럼 보였다(…20927 경기남부 든든전세 — 49행 모두 세대 칩 · 칩은 세대 목록 쪽 넘김 뒤).
+    //    그 자리에 종전 안내 한 줄(갤러리 머리의 「N건은 위 세대 목록의 📷 칩에 있어요」와 같은 문장)과 세대 목록으로 가는 단추를 둔다.
+    if(rows.length === 0){
+      const sl0 = document.getElementById('extras-slot-' + id);
+      if(sl0 && linkedCount && !/-blk\d+$/.test(id)){
+        sl0.querySelectorAll(':scope > .zf-extras-onlychips').forEach(x => x.remove());
+        const d0 = document.createElement('div');
+        d0.className = 'extras-linked-note zf-extras-onlychips';
+        d0.innerHTML = `📷 건물·주택형별 사진·평면도 ${linkedCount}건은 위 세대 목록의 📷 칩에 있어요. <button type="button" class="zf-extras-goto-hu">세대 목록 보기</button>`;
+        d0.querySelector('button').addEventListener('click', ev => {
+          ev.stopPropagation();
+          const hu = document.getElementById('hu-slot-' + id);
+          const det = hu && hu.querySelector('details');
+          if(det) det.open = true;
+          const chip = hu && hu.querySelector('.hu-x-chip');
+          (chip || hu || sl0).scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+        sl0.appendChild(d0);
+      }
+      return;
+    }
     const linkedHtml = linkedCount
       ? `<div class="extras-linked-note">건물·주택형별 사진·평면도 ${linkedCount}건은 위 세대 목록의 📷 칩에 있어요.</div>`
       : '';
