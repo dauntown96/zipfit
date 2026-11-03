@@ -179,6 +179,8 @@ const sha256Hex = async (bytes: Uint8Array): Promise<string> => {
 //   그 행의 file_url 을 돌려준다(drive.action = 'reused_existing'). 새 extras 행에는 부르는 쪽이 응답의 content_sha256 을 적는다.
 //   🔴 이 함수는 DB 에 쓰지 않는다 — 읽기 한 번(service_role · 같은 프로젝트 REST)뿐이다. `reuse=off` 면 찾지 않는다(종전 동작).
 //   읽기가 실패하면 재사용 없이 종전대로 올리고 그 사실을 응답 reuse.error 에 남긴다(조용히 넘어가지 않는다).
+//   🔵 2026-11-03(뒤정리) — 같은 sha 행이 여럿이면 created_at 오름차순 첫 행(가장 먼저 올린 파일)을 고른다 —
+//   Drive 정리 규칙 「extras 참조 0인 파일만 지움」과 맞춰, 새 행이 늘 한 파일(가장 오래된 것)로 모이게.
 const SHA_HEX_RE = /^[0-9a-f]{64}$/
 type ReuseHit = { file_url: string; file_id: string | null; announcement_id: string; extra_type: string }
 const DRIVE_FILE_ID_IN_URL = /\/d\/([^/]+)\//
@@ -189,7 +191,7 @@ const findReusable = async (sha: string): Promise<{ hit: ReuseHit | null; error:
   if (!base || !key) return { hit: null, error: '환경변수 SUPABASE_URL·SUPABASE_SERVICE_ROLE_KEY 없음 — 재사용 확인 못 함' }
   try {
     const r = await fetch(
-      `${base}/rest/v1/announcement_extras?select=file_url,announcement_id,extra_type&content_sha256=eq.${sha}&file_url=not.is.null&order=id.asc&limit=1`,
+      `${base}/rest/v1/announcement_extras?select=file_url,announcement_id,extra_type&content_sha256=eq.${sha}&file_url=not.is.null&order=created_at.asc,id.asc&limit=1`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } },
     )
     if (!r.ok) return { hit: null, error: `extras 읽기 HTTP ${r.status}` }
