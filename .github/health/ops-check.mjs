@@ -880,6 +880,54 @@ select jsonb_build_object(
   add('source_text_taint', '열린 공고 원문 문자열 오염 — 제목 꺾쇠 · http 아닌 URL · 따옴표 든 URL(정보)', 'info', String(e).slice(0, 200), '공고 표를 읽는다(못 읽어도 정보)')
 }
 
+// ㉑ 갤러리 새 행 내용 해시 빔(2026-11-03 · 우편함 「코드·운영 — 점검 세 줄 …」 1 · ⚠️ 경고만 · gate.mjs HARD 밖) —
+//    announcement_extras.content_sha256(같은 내용 재사용 축 · 마이그레이션 2026-11-03_01)은 분석 스킬이 업로드 응답의 content_sha256 을 적는다.
+//    7일 안 새 행 중 원본 위치(source_url)가 있는데 해시가 빈 행 = 그 문장이 빠진 회차 → 다음 회차가 채움 스크립트(LH 원본 sha · Drive 크기 대조)로 메운다.
+//    11-03 채움 때 크기 다름으로 일부러 둔 NULL 7행은 created_at 이 7일 창 밖(10-27 이전)이라 세지 않는다.
+try {
+  const [x] = await sqlRead(`select jsonb_build_object(
+  'n', count(*),
+  'ids', coalesce(jsonb_agg(distinct e.announcement_id), '[]'::jsonb)
+) as j from public.announcement_extras e
+ where e.created_at > now() - interval '7 days' and e.source_url is not null and e.content_sha256 is null`)
+  const c = x.j
+  add('extras_sha_null', '갤러리 새 행 내용 해시(content_sha256) 빔 — 원본 위치 있음 · 7일 안', c.n === 0 ? 'pass' : 'warn',
+    c.n === 0 ? 0 : `${c.n}행: ${c.ids.slice(0, 5).join(', ')}${c.ids.length > 5 ? ` 외 ${c.ids.length - 5}` : ''}`,
+    '0 — created_at 7일 안 ∧ source_url 있음 ∧ content_sha256 NULL · 넘으면 ⚠️ 경고만(업로드 응답 content_sha256 을 적는 스킬 문장 몫 · 메우기는 채움 스크립트)')
+} catch (e) {
+  add('extras_sha_null', '갤러리 새 행 내용 해시(content_sha256) 빔 — 원본 위치 있음 · 7일 안', 'warn', String(e).slice(0, 200), 'announcement_extras 를 읽는다(못 읽으면 ⚠️)')
+}
+
+// ㉒ 같은 평면도 파일이 다른 주택형 둘 이상에(2026-11-03 · 우편함 「코드·운영 — 점검 세 줄 …」 2 · ℹ️ 정보 — 판정하지 않음) —
+//    열린 카드(목록 RPC · apply_end ≥ 오늘 KST)마다 회차 사슬(get_announcement_round_chain_ids) 안 floorplan 행을 같은 content_sha256 으로 묶어
+//    unit_key 주택형 부분(:: 뒤)이 둘 이상인 묶음을 센다. 단 묶음의 주택형 표기(블록 이름 뒤 마지막 낱말)가 전부 **한** 캡션에 들어 있으면
+//    뺀다(한 장에 여러 형을 그린 합본 — 예 …20958 「평면도(31A형, 31A-1형(주거약자))」 · 「(복층)」 꼴). 형마다 캡션이 따로면(…20198 「(21A)2」·「(26A)1」) 빼지 않는다.
+//    남는 것 = 면적이 다른 형에 같은 그림이 붙은 의심.
+try {
+  const [x] = await sqlRead(`with op as (select d.announcement_id from public.get_announcements_deduped() d
+                  where d.apply_end >= (now() at time zone 'Asia/Seoul')::date),
+ch as (select distinct op.announcement_id rep, c.announcement_id aid from op cross join lateral public.get_announcement_round_chain_ids(op.announcement_id) c),
+fp as (select ch.rep, e.content_sha256 sha, substring(nullif(split_part(e.unit_key, '::', 2), '') from '([^ ]+)$') ty, e.building_address cap
+         from ch join public.announcement_extras e on e.announcement_id = ch.aid
+        where e.extra_type = 'floorplan' and e.content_sha256 is not null and e.unit_key like '%::%'),
+g as (select rep, sha, array_agg(distinct ty order by ty) tys, array_agg(distinct cap) caps from fp where ty is not null
+       group by rep, sha having count(distinct ty) >= 2),
+r as (select g.*, exists (select 1 from unnest(g.caps) c
+                    where not exists (select 1 from unnest(g.tys) t
+                                       where position(regexp_replace(t, '\\s', '', 'g') in regexp_replace(coalesce(c, ''), '\\s', '', 'g')) = 0)) all_in_cap from g)
+select jsonb_build_object(
+  'groups', (select count(*) from r),
+  'excluded', (select count(*) from r where all_in_cap),
+  'hits', (select coalesce(jsonb_agg(jsonb_build_object('rep', rep, 'sha', left(sha, 8), 'types', tys) order by rep, sha), '[]'::jsonb) from r where not all_in_cap)
+) as j`)
+  const c = x.j
+  add('floorplan_multi_type', '같은 평면도 파일이 다른 주택형 둘 이상에(열린 카드 · 정보)', 'info',
+    `${c.hits.length}${c.hits.length ? ': ' + c.hits.slice(0, 5).map(h => `${h.rep}(${h.types.join(' / ')})`).join(', ') : ''} · 캡션에 형이 다 든 합본 제외 ${c.excluded}`,
+    '정보 — 판정하지 않는다(0이 정상 · 같은 content_sha256 floorplan 이 unit_key 주택형 둘 이상 · 한 캡션에 그 형들이 다 있으면 합본으로 뺀다)')
+} catch (e) {
+  add('floorplan_multi_type', '같은 평면도 파일이 다른 주택형 둘 이상에(열린 카드 · 정보)', 'info', String(e).slice(0, 200), '목록 RPC·회차 사슬·갤러리를 읽는다(못 읽어도 정보)')
+}
+
 // ㉑ 한부모 갈래 나이 조건 누락(2026-10-19 · 우편함 「코드·운영 — CLAUDE.md 원칙 「개인정보 값 출력 금지」 · 점검 항목 …」 2 · 조사 「큐 B 첫 회차」 회신 ②(c)).
 //    원문이 「한부모 … N세 이하」(자녀 나이)를 말하는데 키 갈래 {"대상":"한부모"}에 확인필요가 없으면 화면이 자녀 나이를 안 보고 ok·no 를 낸다
 //    (2026-10-19 열린 5공고 14행 — 같은 날 확인필요를 채웠다). 재발 막기는 코드 안전망이 아니라 이 점검이다.
