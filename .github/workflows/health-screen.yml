@@ -25,8 +25,12 @@ on:
         options: [none, fail, notice, zipfit, stale_date, objobj, target_out, open_count, route_gap, relax_badge, sched_line, rev_date, geo_names, ana_pending, route_win, mq_half, login_fail]
         default: none
       # 🔵 2026-11-03(우편함 「코드·운영 — … health-screen 브랜치 점검 입력(site)」 3) — 병합 전 브랜치를 잰다.
+      ref:
+        description: '잴 브랜치·커밋 — 주면 그 커밋을 받아 러너 안 http://127.0.0.1:8201/ 에서 띄우고 잰다(브랜치 점검 · DB 기록·이슈·로그인 한 바퀴 0 · G1 상시 셈 밖) · 비우면 배포본'
+        type: string
+        default: ''
       site:
-        description: '잴 주소 — 비우면 배포본(https://kkokzip.com/) · 브랜치는 githack 커밋 주소(https://raw.githack.com/dauntown96/zipfit/<커밋>/index.html) · 이 주소를 주면 DB 기록·이슈·로그인 한 바퀴는 하지 않는다(G1 상시 셈 밖)'
+        description: '잴 주소(ref 가 비었을 때만) — 비우면 배포본(https://kkokzip.com/) · githack 커밋 주소도 받지만 자동 브라우저에는 githack 이 「External Content Notice」 중간 쪽을 보여 화면이 안 열린다(2026-11-03 실측 raw·rawcdn 둘 다) — 브랜치는 ref 를 쓴다 · 주면 DB 기록·이슈·로그인 0'
         type: string
         default: ''
       record:
@@ -49,11 +53,25 @@ jobs:
     runs-on: ubuntu-latest
     env:
       # 브랜치 점검(site 입력)이면 기록·이슈·로그인 한 바퀴를 하지 않는다 — G1 화면 셈(ops_health_runs kind=screen ref=main)에 들어가지 않게.
-      SCREEN_SITE: ${{ inputs.site || '' }}
-      SCREEN_RECORD_ON: ${{ (inputs.site == '' || inputs.site == null) && inputs.record != 'false' && '1' || '0' }}
+      SCREEN_SITE: ${{ inputs.ref && 'http://127.0.0.1:8201/index.html' || inputs.site || '' }}
+      SCREEN_RECORD_ON: ${{ !inputs.ref && !inputs.site && inputs.record != 'false' && '1' || '0' }}
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
+      # 🔵 2026-11-03 — 브랜치 점검(ref): 그 커밋을 site-src 에 받아 러너 안에서 띄운다(점검 스크립트는 위 main 체크아웃의 것을 쓴다 — 잴 것만 브랜치).
+      - name: 브랜치 받기(ref)
+        if: inputs.ref
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+          path: site-src
+          persist-credentials: false
+      - name: 브랜치 띄우기(127.0.0.1:8201)
+        if: inputs.ref
+        run: |
+          nohup python3 -m http.server 8201 --bind 127.0.0.1 --directory site-src > /dev/null 2>&1 &
+          for i in $(seq 1 20); do curl -fsS -o /dev/null http://127.0.0.1:8201/index.html && { echo "브랜치 $(git -C site-src rev-parse --short HEAD) 띄움"; exit 0; }; sleep 1; done
+          echo "::error::브랜치를 띄우지 못했다"; exit 1
       - uses: actions/setup-node@v6
         with:
           node-version: '20'
