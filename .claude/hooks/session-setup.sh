@@ -20,6 +20,12 @@ PY=/usr/bin/python3
     timeout 120 "$PY" -m pip install -q --disable-pip-version-check "${need[@]}" 2>&1 | grep -v 'Running pip as the' || true
     "$PY" -c 'import pdfplumber, pgdumplib, hwpx.hwp5.package; print("확인: 셋 다 import 됨")' 2>&1
   fi
+  # 🔵 2026-11-03 — Deno CLI(EF 타입 검사 · 파서 시험)를 버전 고정으로 미리 받아 둔다(우편함 「코드·운영 — GH 수집 켜기 1단계 …」 1 ⑤).
+  #    컨테이너에 deno 가 없다 — 쓰는 법: NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt npx -y deno@2.1.4 check supabase/functions/<함수>/index.ts
+  if command -v npx >/dev/null 2>&1; then
+    v=$(NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt timeout 120 npx -y deno@2.1.4 --version 2>/dev/null | head -1)
+    echo "deno: ${v:-받지 못함(npx deno@2.1.4)}"
+  fi
   # 🔵 2026-10-14 — 허용 목록 실측(우편함 「코드 — … 허용 목록 점검 장치 …」 3). 도메인은 docs/network-allowlist.md 표 첫 칸에서 읽는다.
   #    판별: CONNECT 403 = 허용 목록이 막음 · 서버 응답(200·301·302·400·401·403·404) = 열림 · 그 밖의 000 = 판정 보류.
   #    8개씩 나란히 · 한 호스트 8초 상한 · 판정 보류면 한 번 더(apis.data.go.kr 은 절반쯤 11초 뒤 서버가 끊는다 — 2026-10-14) — 지금 35개가 약 3~20초.
