@@ -64,6 +64,10 @@ const ALLOWED: Record<string, string[] | null> = {
   // 🔵 2026-10-22(우편함 「코드·운영 — A(G2): … 제주개발공사 …」 1) — 제주특별자치도개발공사 게시판. 상세(act=view)·받기(act=download)가
   //   같은 경로다. 싱가포르 DB `net.http_get`·서울 탐침 모두 200 → SEOUL_ONLY 아님.
   'www.jpdc.co.kr': ['/open/news/notice.htm'],
+  // 🔵 2026-10-28(우편함 「코드·운영(브랜치만 · 병합 0) — GH 수집기 …」) — GH 청약센터 공고문 받기(collect-gh-announcements 가 싣는 selectFileDown.do).
+  //   robots `Allow: /*`(2026-10-28) · 받기 경로 둘뿐(임대주택 · 매입임대) — 단지 이미지(/sb/sr/…/selectAtchImage.do)는 열지 않는다.
+  //   해외 IP 축은 미상(싱가포르 EF로 잰 적 없음) — 켜는 회차의 첫 확인(막히면 SEOUL_ONLY 에 더한다 · 부산 꼴).
+  'apply-cdn.gh.or.kr': ['/sr/sr7150/selectFileDown.do', '/sr/sr7155/selectFileDown.do'],
 }
 
 // 국내 IP만 받는 호스트 — 실행 지역(SB_REGION · Supabase 런타임 변수)이 서울일 때만 연다.

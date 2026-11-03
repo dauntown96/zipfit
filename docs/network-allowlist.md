@@ -28,6 +28,7 @@
 | `khdpjjyspmlqtzperoqg.supabase.co` | anon REST 확인(원칙 29) · 배포본 렌더 | 지금 | — | 2026-10-14 | 열림 404(루트) |
 | `apply.lh.or.kr` | 분석 · LH 공고 페이지 원문 | 지금 | 해외 IP 허용(실측) | 2026-10-14 | 열림 200 |
 | `kkokzip.com` | 배포본 렌더(Playwright) · 점검 | 지금 | — | 2026-10-14 | 열림 200 |
+| `apply.gh.or.kr` | GH 수집기 시험(`collect-gh-announcements` 로컬 probe) · GH 공고 상세 | 지금 | 해외 IP 미상(컨테이너 실측만) | 2026-10-28 | 열림 200 · robots `Allow: /*` |
 | `www.kkokzip.com` | 배포본 넘김 확인 | 지금 | — | 2026-10-14 | 열림 301 |
 | `dauntown96.github.io` | 옛 배포 주소 넘김 확인(뺄 것 후보) | 지금 | — | 2026-10-14 | 열림 404(루트) |
 | `cdn.jsdelivr.net` | 배포본 supabase-js | 지금 | — | 2026-10-14 | 열림 301 |

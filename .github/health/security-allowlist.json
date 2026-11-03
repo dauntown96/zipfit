@@ -132,6 +132,11 @@
    "why": "내부 표 — anon·authenticated 권한 0 · 화면(index.html) 참조 0 · DB 함수·pg_cron·운영 점검(postgres)만 쓰고 읽는다. 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15)"
   },
   {
+   "key": "rls_enabled_no_policy_public_gh_collection_run_log",
+   "kind": "intended",
+   "why": "내부 표 — anon·authenticated 권한 0 · 화면(index.html) 참조 0 · 수집 EF collect-gh-announcements(service_role · 2026-10-28 브랜치). 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15)"
+  },
+  {
    "key": "rls_enabled_no_policy_public_sh_collection_run_log",
    "kind": "intended",
    "why": "내부 표 — anon·authenticated 권한 0 · 화면(index.html) 참조 0 · 수집 EF collect-sh-announcements(service_role). 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15)"

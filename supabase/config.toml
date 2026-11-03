@@ -15,6 +15,10 @@ verify_jwt = false
 [functions.collect-lh-promo]
 verify_jwt = false
 
+# 2026-10-28 신설(브랜치 — 켜기는 런칭 뒤) — GH(경기주택도시공사) 청약센터 공고 수집. 다른 수집 함수와 같이 x-cron-secret 으로 막는다(JWT 없음).
+[functions.collect-gh-announcements]
+verify_jwt = false
+
 # 2026-10-02 신설 — LH 단지형 공고 이미지 탭 목록 수집. collect-lh-promo 와 같이 x-cron-secret 으로 막는다(JWT 없음).
 [functions.collect-lh-images]
 verify_jwt = false
