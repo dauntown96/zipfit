@@ -7802,9 +7802,36 @@ const eligFold = (summary, inner) =>
 // 🔴 2026-10-08(표시층 긴급 2 · 1) — 자격 행 verification_requirements 중 화면에 그릴 키·값. 값이 객체인 「공급대상」은
 //    매칭 판정 전용 데이터라 그리지 않는다(분석 스킬 v9.8 규약). 값이 문자열인 옛 「공급대상」(…20386 주거약자용 —
 //    사람이 읽는 원문 문장)은 종전처럼 그린다. 화면 점검기(health-screen `obj_text`)가 같은 함수로 DB 전 행을 그려 본다.
+// 🔵 2026-11-03(우편함 「표시층 — 자격 키 원문 순서 정렬」 A · 분석 묶음 3회차 회신 3) — jsonb 는 키를 길이·바이트 순으로 둬
+//    원문 번호 순서가 깨진다(광명 20647_1 대학생 「② → ③ → ④ → ①-㉮ → …」 · 번호 머리를 붙여도 못 지킴). 반환 전에 정렬한다:
+//    ① 머리 키(일반공급대상자 · 신청자격 · 자격요건 · 공급대상자) 맨 위 ② 원문 번호 표지로 시작하는 키를 표지 순
+//    (①~⑳ · ➀=① · 「①-㉮」<「①-㉯」<「②」 · 「가.」~「타.」 · 「다-1)」 · 「1순위」<「2순위」) ③ 나머지는 지금 순서 그대로 뒤.
+//    🔴 키·값은 그대로 — 순서만(판정 입력 키는 이름으로 읽혀 무관).
+const ZF_ELIG_HEAD_RE = /^(일반공급대상자|신청자격|자격요건|공급대상자)(?=$|\s|\(|:)/;
+const ZF_ELIG_HANGUL = '가나다라마바사아자차카타파하';
+function zfEligKeyMark(k){
+  const t = String(k || '').trim();
+  let m = /^([\u2460-\u2473\u2780-\u2789])(?:\s*-\s*([\u326E-\u327B]))?/.exec(t);
+  if(m){
+    const c = m[1].charCodeAt(0), n = c >= 0x2780 ? c - 0x2780 + 1 : c - 0x2460 + 1;
+    return [1, n, m[2] ? m[2].charCodeAt(0) - 0x326E + 1 : 0];
+  }
+  m = new RegExp('^([' + ZF_ELIG_HANGUL + '])(?:\\s*-\\s*(\\d+)\\)|\\.)').exec(t);
+  if(m) return [2, ZF_ELIG_HANGUL.indexOf(m[1]) + 1, m[2] ? +m[2] : 0];
+  m = /^(\d+)\s*순위/.exec(t);
+  if(m) return [3, +m[1], 0];
+  return null;
+}
 function zfEligVrEntries(vr){
   if(!vr || typeof vr !== 'object') return [];
-  return Object.entries(vr).filter(([k,v]) => !(k === '공급대상' && v !== null && typeof v === 'object'));
+  const es = Object.entries(vr).filter(([k,v]) => !(k === '공급대상' && v !== null && typeof v === 'object'));
+  const rank = es.map(([k], i) => {
+    if(ZF_ELIG_HEAD_RE.test(String(k).trim())) return [0, 0, 0, 0, i];
+    const mk = zfEligKeyMark(k);
+    return mk ? [1, mk[0], mk[1], mk[2], i] : [2, 0, 0, 0, i];
+  });
+  const ord = es.map((e, i) => i).sort((a, b) => { const x = rank[a], y = rank[b]; for(let j = 0; j < 5; j++){ if(x[j] !== y[j]) return x[j] - y[j]; } return 0; });
+  return ord.map(i => es[i]);
 }
 
 // 🔴 2026-10-20(우편함 「표시층 — G3 고침」 2) — 키 이름이 「(만원)」으로 끝나면 그 아래 숫자는 이미 만원 단위다(원문 표의 단위 머리).
