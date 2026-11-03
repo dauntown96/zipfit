@@ -162,9 +162,10 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-11-03 | **코드·운영 — GH 2-0 관찰 장치 · nexacro XML 거름 · 점검 둘 [완료]** — `collect-gh-announcements ?mode=observe` + cron `zipfit-gh-observe`(KST 09·12·15·18시 31분 · announcements 쓰기 0 · 첫 행 열린 5 · 새로 5 · 사라짐 0) · `fetch-attachment` nexacro XML 오류 422(`GH_823` PDF 막힘 · 정상 PDF 통과) · ops-check `gh_runs` 문턱 · `elig_conclusion_word` ⚠️(지금 0) · ② 표 50 · PR #860 |
 | 2026-11-03 | **분석 묶음 — 원문화 7회차(끝) [완료]** — 분류표 밖 결론값 13키(「배제」·「완화」 낱말 하나뿐) → 0 · 당진석문3 외 5행 · 화성서부권 · 군산나운4 · 물금2 2행을 계층별 원문 문장으로 · 충북 `…20267` note 걷음 · 남은 요약 14 = 공급대상 12 · 기장 2(보류) · 불변식 0 · PR #859 |
 | 2026-11-03 | **분석 묶음 — 원문화 6회차(끝 묶음) [완료]** — 요약 19키 원문화(10행) + 같은 꼴 8행(부천 「혼인상태」 걷음 · 김포·물금 「소득요건: 배제」·「주택소유: 완화」 → 계층별 원문 문장) · 경남 1순위 income_pct NULL 유지(계층 섞임) · 남은 요약 34 → 15(공급대상 매칭 키 12 · 열린 카드 2 · 원문 문장 없음 1 — 보류) · 불변식 0 · PR #857 |
-| 2026-11-03 | **코드·운영 — GH 수집 켜기 1단계 + 화면 점검 PR 실행 [완료]** — 표 `gh_collection_run_log` 적용 · EF `collect-gh-announcements` 배포(cron 0 · GH 행 0) · probe 200(열린 5건 전부 마감 「-」 · 해외 IP 막힘 없음 · 충돌 0) · `apply-cdn.gh.or.kr` meta PDF 통과(원본 깨진 277B XML 1건 관측) · health-screen `pull_request`(index.html·sw.js → PR head 를 러너 안에서 잼 · 기록·이슈 0 · 시험 #856 통과·닫음) · PR #854 · #855 |
+
 ---
 
 ## 🚫 코딩 원칙
