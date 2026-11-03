@@ -169,6 +169,17 @@ const looksLikeHtml = (bytes: Uint8Array): boolean => {
   return head.startsWith('<!doctype html') || head.startsWith('<html')
 }
 
+// 🔵 2026-11-03(우편함 「코드·운영 — GH 2-0 관찰 장치 · nexacro XML 거름 …」 1) — 원문 대신 온 nexacro XML 오류 가리기.
+//   GH(apply-cdn.gh.or.kr) 는 받기 실패를 200 · application/octet-stream · 277B `<?xml …><Root xmlns="http://www.nexacroplatform.com/…">`
+//   `<Parameter id="ErrorMsg">err.파일.다운로드.실패</Parameter>` 로 준다(GH_823 공고문 PDF — 원본 쪽 고장 · GH 상세도 「277 Byte」 표시).
+//   🔴 `<?xml` 머리만으로는 막지 않는다 — 일반 XML 첨부가 있을 수 있다. 머리 `<?xml` ∧ 앞 512B 안 nexacro 표지(`nexacroplatform` 또는 `>err.`) 둘 다일 때만.
+//   hwpx·docx 는 zip(PK) 이라 머리가 `<?xml` 이 아니다.
+const looksLikeNexacroError = (bytes: Uint8Array): boolean => {
+  const head = new TextDecoder('utf-8', { fatal: false }).decode(bytes.subarray(0, 512)).replace(/^[\ufeff\s]+/, '')
+  if (!head.toLowerCase().startsWith('<?xml')) return false
+  return head.includes('nexacroplatform') || head.includes('>err.')
+}
+
 const toBase64 = (bytes: Uint8Array): string => {
   // 큰 배열을 String.fromCharCode(...bytes)로 한 번에 넘기면 스택이 터진다.
   const CHUNK = 0x8000
@@ -1242,6 +1253,8 @@ Deno.serve(async (req: Request) => {
     payload.length_match = lengthMatch
     const ctHtml = /^\s*text\/html\b/i.test(res.headers.get('content-type') ?? '')
     if (ctHtml) payload.content_type_html = true
+    const nexErr = looksLikeNexacroError(bytes)
+    if (nexErr) payload.nexacro_error = true
     if (wantUpload && lengthMatch === false) {
       // 🔴 올리지 않는다 — 잘린 파일이 「원문」으로 Drive 에 남는다. 다시 부르는 것은 호출하는 쪽 몫(이 함수는 재시도하지 않는다).
       return json({ ...payload, ok: false, uploaded: false, body_included: false, reason: 'truncated',
@@ -1251,6 +1264,11 @@ Deno.serve(async (req: Request) => {
     if (wantUpload && looksLikeHtml(bytes)) {
       return json({ ...payload, ok: false, uploaded: false, body_included: false, reason: 'html_response',
         detail: `원문 대신 HTML 쪽(${bytes.length}B · ${res.headers.get('content-type') ?? '형식 없음'})을 받았다 — 원본이 내려갔거나 오류 쪽이다(올리지 않음)`,
+        elapsed_ms: Date.now() - started }, 422)
+    }
+    if (wantUpload && nexErr) {
+      return json({ ...payload, ok: false, uploaded: false, body_included: false, reason: 'xml_error_response',
+        detail: `원문 대신 nexacro XML 오류(${bytes.length}B)를 받았다 — 원본 쪽 받기 실패다(올리지 않음)`,
         elapsed_ms: Date.now() - started }, 422)
     }
     payload.content_sha256 = srcSha
