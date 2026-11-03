@@ -162,9 +162,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-11-03 | **분석 묶음 — 원문화 6회차(끝 묶음) [완료]** — 요약 19키 원문화(10행) + 같은 꼴 8행(부천 「혼인상태」 걷음 · 김포·물금 「소득요건: 배제」·「주택소유: 완화」 → 계층별 원문 문장) · 경남 1순위 income_pct NULL 유지(계층 섞임) · 남은 요약 34 → 15(공급대상 매칭 키 12 · 열린 카드 2 · 원문 문장 없음 1 — 보류) · 불변식 0 · PR #857 |
 | 2026-11-03 | **코드·운영 — GH 수집 켜기 1단계 + 화면 점검 PR 실행 [완료]** — 표 `gh_collection_run_log` 적용 · EF `collect-gh-announcements` 배포(cron 0 · GH 행 0) · probe 200(열린 5건 전부 마감 「-」 · 해외 IP 막힘 없음 · 충돌 0) · `apply-cdn.gh.or.kr` meta PDF 통과(원본 깨진 277B XML 1건 관측) · health-screen `pull_request`(index.html·sw.js → PR head 를 러너 안에서 잼 · 기록·이슈 0 · 시험 #856 통과·닫음) · PR #854 · #855 |
 | 2026-11-03 | **코드·운영 — fetch-attachment 잘림·HTML 거름 + sha 4행 + health-screen 브랜치 점검 [완료]** — 업로드 때 Content-Length 어긋남 `truncated` · HTML 머리 `html_response`로 안 올림(PR #848) · extras sha 4행 씀(남은 빈 행 = HTML 3) · health-screen 입력 `ref`(커밋을 러너 안 127.0.0.1에서 띄워 잼 · 기록·이슈 0 · githack은 중간 안내 쪽 때문에 못 씀) · PR #850 · #851 · #852 |
-| 2026-11-03 | **분석 묶음 — 원문화 5회차 [완료]** — ⚠️ 「LH에 확인」 207행 감사(열린 51행 전부 원문 문의처에 LH — 쓰기 0) · 김포 여기가 닫힌 11행 확인처 → 「운영기관(사회복지법인 프리웰)」 · 요약 키 둘째 묶음 6공고 18행 39키 원문화 · `…20336` 「청약통장: 불요」 걷음 · `scripts/soguep-vr-status.py` · 남은 요약 73 → 34 · 불변식 0 · PR #849 |
 ---
 
 ## 🚫 코딩 원칙
