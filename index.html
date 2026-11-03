@@ -781,6 +781,9 @@ html[data-ui="d3"] .hcard.zf-lo .zf3-ctop::after{background:var(--ink-2);color:v
 .zf-sch-stop .zf-sch-more::after{content:" ▾"}
 .zf-sch-stop[open] .zf-sch-more::after{content:" ▴"}
 .zf-sch-stop:not([open]) .zf-sch-nd{white-space:nowrap!important;overflow:hidden;text-overflow:ellipsis}
+.zf-sch-stop>summary>.zf-sch-routes{display:block;margin-top:2px}   /* 2026-11-03(우편함 「표시층 — 다음 판 시안」 A) — 한 역 안 경로 줄 */
+.zf-sch-route{display:block;font-size:var(--t-xs,12px);line-height:1.5;color:var(--ink-2,#555)}
+.zf-sch-route b{font-weight:600;color:var(--ink,#222)}
 .zf-sch-stop .zf-sch-raw{margin-top:4px;font-size:12px;line-height:1.55;color:var(--ink-2,#555);white-space:normal;overflow-wrap:anywhere}
 .zf3-none{margin:8px 0;padding:10px 12px;font-size:12px;color:var(--ink-2);background:var(--surface-2);border-radius:var(--r-1);word-break:keep-all;line-height:1.5}
 .zf3-maplbl{margin-left:14px;padding:2px 8px;font:700 12px/18px var(--f-ui);color:var(--paper);background:var(--ink);border-radius:999px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.18);max-width:60vw;overflow:hidden;text-overflow:ellipsis}
@@ -2678,7 +2681,7 @@ function zfLoadCardSide(){
     routes.forEach(r => {
       const a = annById.get(r.announcement_id);
       if(!a) return;                                   // 제목을 모르면 어느 카드인지도 모른다 — 붙이지 않는다
-      r._srcEnd = a.apply_end || '';
+      r._srcEnd = a.apply_end || null;   // 🔵 2026-11-03 — 마감 NULL 공고는 이번 회차 쪽(RPC get_announcement_round_ids 와 한 벌 · zfRoundEndOf 주석)
       const k = zfDedupKey(a.title);
       if(!zfSide.routesByKey.has(k)) zfSide.routesByKey.set(k, []);
       zfSide.routesByKey.get(k).push(r);
@@ -3116,6 +3119,34 @@ function zfRouteMethodOf(rows){
   const txt = [...new Set(rows.map(r => String(r.place_text || '').trim() || String(r.note_text || '').trim()).filter(Boolean))];
   return txt.length ? { kind: '④', text: '접수 방법 · ' + txt.join(' / ') } : null;
 }
+// 🔵 2026-11-03(우편함 「표시층 — 다음 판 시안」 C · 💡 새 문구 — 다운님 승인 전 시안) — 경로 표가 우편뿐인 카드 1층에 「📮 우편으로만 받아요」 한 줄.
+//    🔴 토막은 그 공고 원문(정책 행 content_raw)에 있을 때만: 「등기」 = 접수를 등기우편에 한한다는 문장 · 「소인」 = 마감일(경로 행 end_date)과 같은 날짜 + 소인 문장.
+//    🔴 「만」 = 원문이 접수 방법을 여러 곳에서 다르게 적었다는 정책 행(분석 주의 문장)이 있으면 뺀다(「우편으로 받아요」) — 우리가 「만」이라 단정하지 않는다.
+//    재료 요청 = 우편 전용 카드의 공고 id 로 정책 행 중 「등기·소인·서로 다르게」가 든 것만(카드 하나에 한 번 · 다른 카드는 요청 0).
+const zfPostOnlyMemo = new Map();
+function zfPostOnlyFill(el, rows){
+  const ids = [...new Set(rows.map(r => r.announcement_id).filter(Boolean))];
+  if(!ids.length) return;
+  const k = ids.join(',');
+  if(!zfPostOnlyMemo.has(k)) zfPostOnlyMemo.set(k, fetch(`${SUPABASE_URL}/rest/v1/announcement_policies?select=content_raw&${idFilterFor(ids)}&or=(content_raw.ilike.*등기*,content_raw.ilike.*소인*,content_raw.ilike.*서로%20다르게*)`, { headers: zfAnonHeaders() })
+    .then(r => r.ok ? r.json() : null).catch(() => null));
+  zfPostOnlyMemo.get(k).then(pol => {
+    if(!Array.isArray(pol) || !el.isConnected) return;
+    const sents = pol.flatMap(p => String((p && p.content_raw) || '').split(/[\n。]|■|•|※|(?<=\D)\.\s(?=\D)/));
+    const reg = sents.some(x => /접수/.test(x) && /등기\s*우편에\s*한/.test(x));
+    const conflict = pol.some(p => /접수\s*방법을\s*여러\s*곳에서\s*서로\s*다르게/.test(String((p && p.content_raw) || '')));
+    const end = rows.map(r => r.end_date || '').filter(Boolean).sort().slice(-1)[0] || '';
+    let stamp = '';
+    if(end){
+      const [, ey, em, ed] = /^(\d{4})-(\d{2})-(\d{2})/.exec(end) || [];
+      const hit = String(pol.map(p => p.content_raw || '').join('\n')).match(/(\d{4})\s*\.\s*(\d{1,2})\s*\.\s*(\d{1,2})\s*\.?\s*(?:\([^)]*\))?\s*(?:우체국\s*)?소인/);
+      if(hit && +hit[1] === +ey && +hit[2] === +em && +hit[3] === +ed) stamp = ` · ${zfMdDow(end)} 우체국 소인까지`;
+    }
+    const text = `${reg ? '우편(등기)' : '우편'}으로${conflict ? '' : '만'} 받아요${stamp}`;
+    el.innerHTML = `<p class="zf-route-line" data-route-kind="⑥-우편" title="${zfAttr(text)}" onclick="event.stopPropagation();this.classList.toggle('open')"><span class="zf-route-text">📮 ${escapeHtml(text)}</span><span class="zf-route-more" aria-hidden="true"></span></p>`;
+    zfMarkRouteFits(el.firstElementChild);
+  });
+}
 function zfFillSideSlots(){
   if(!zfSide.loaded) return;
   document.querySelectorAll('.zf-route-slot[data-route-key]').forEach(el => {
@@ -3129,6 +3160,7 @@ function zfFillSideSlots(){
     //    🔴 경로 행이 아직 없는 카드(분석 전)는 LH 원소가 유일한 신호라 그대로 둔다(위험한 쪽 — 표지 없이 한 단지 일정만 보이는 꼴을 만들지 않는다).
     const vSites = new Set((rows || []).map(r => String((r && r.site_text) || '').trim()).filter(Boolean));
     if(hc && Array.isArray(rows) && rows.length && vSites.size < 2) hc.querySelectorAll('.zf-varies').forEach(t => { t.style.display = 'none'; });
+    if(!v.text && Array.isArray(rows) && rows.length && rows.every(r => r && r.route === '우편')){ zfPostOnlyFill(el, rows); return; }   // ⑥ 우편 전용(2026-11-03 시안)
     if(!v.text){ const m = zfRouteMethodOf(rows); if(!m) return; v = m; }   // ④ 「전체」 경로만 있는 카드 — 접수 방법 한 줄(아래)
     // 🔵 2026-10-07(Z-2 ③ 3 · 다운님 승인 3) — 현장 접수 줄(②-나·②-다·②-라) 끝에 접수 장소를 경로 칸 place_text 그대로 붙인다(여럿이면 「 / 」).
     const places = (v.kind === '②-나' || v.kind === '②-다' || v.kind === '②-라' || v.kind === '②-마')
@@ -8104,11 +8136,52 @@ function zfScheduleItemHTML(r, showScope){
   const sc = [showScope ? r.scope_text : '', r.site_label].filter(Boolean).map(escapeHtml).join(' · ');
   const rawMark = ZF_RAW_REPEAT.test(r.stage_text || '') ? ' <span class="zf-sch-rawmark" title="공고문에 적힌 글자 그대로예요">(원문 표기)</span>' : '';
   const head = `<span class="policy-category">${ZF_STAGE_ICON[r.stage] ? ZF_STAGE_ICON[r.stage] + ' ' : ''}${escapeHtml(r.stage_text || '')}${rawMark}${sc ? ` <span class="zf-sch-scope">${sc}</span>` : ''}</span>`;
-  const dl = zfSchDateLine(r), raw = escapeHtml(r.period_text || '');
+  const dl = zfSchDateLine(r), raw = (r._raws || [r.period_text || '']).map(escapeHtml).join('<br>');
+  const rl = (r._routes || []).length ? `<span class="zf-sch-routes">${r._routes.map(x => `<span class="zf-sch-route"><b>${escapeHtml(x.name)}</b> ${escapeHtml(x.dl)}${x.place ? ' — ' + escapeHtml(x.place) : ''}</span>`).join('')}</span>` : '';
   const inner = dl
-    ? `<summary>${head}<span class="policy-content">${escapeHtml(dl)}<span class="zf-sch-more" aria-hidden="true">원문</span></span></summary><div class="zf-sch-raw">${raw}</div>`
+    ? `<summary>${head}<span class="policy-content">${escapeHtml(dl)}<span class="zf-sch-more" aria-hidden="true">원문</span></span>${rl}</summary><div class="zf-sch-raw">${raw}</div>`
     : `<summary>${head}<span class="policy-content zf-sch-nd">${raw}</span></summary>`;
   return `<div class="policy-item" data-zf-d="${zfAttr(d1)}" data-zf-e="${zfAttr(d2)}"${r.id != null ? ` data-sch-id="${zfAttr(r.id)}"` : ''}><details class="zf-sch-stop">${inner}</details></div>`;
+}
+// 🔵 2026-11-03(우편함 「표시층 — 다음 판 시안」 A · 백로그 「상세 「공급일정」 노선에서 현장 접수가 별 역으로 서…」) — 접수 단계에서 경로만 다른 행은 한 역.
+//    일정 표 접수 행이 이어서 둘 이상이고 날짜 창이 서로 겹치면(인터넷 11-16~18 · 현장 11-17 — …20896) 한 역으로 합치고(날짜 = 가장 이른 시작 ~ 가장 늦은 끝 ·
+//    단계 이름은 원문 글자를 겹치지 않게 「 · 」로), 역 안에 경로 줄을 둔다. 🔴 날짜가 겹치지 않는 창(순위·차수 — phase)은 종전처럼 따로 역이다.
+//    경로 줄 재료 = 경로 표(announcement_apply_routes · 같은 회차) 중 그 역 날짜와 겹치는 행 — 경로 이름 · 날짜 · 장소(place_text 원문 그대로).
+//    경로 표 행이 그 역에 둘 이상일 때만 단다(하나면 역 날짜와 같은 말이다) · 경로 표가 없으면 합친 일정 행 글자(scope_text · 없으면 stage_text)를 경로 줄로.
+//    대상 글(note_text)은 「원문」 펼침에 함께 — 글자는 그대로.
+function zfSchOverlap(a, b){
+  const as = a.start_date || a.end_date, ae = a.end_date || a.start_date, bs = b.start_date || b.end_date, be = b.end_date || b.start_date;
+  return !!(as && ae && bs && be) && as <= be && bs <= ae;
+}
+function zfSchMergeApply(list, routes){
+  const out = [];
+  list.forEach(x => {
+    const last = out[out.length - 1];
+    if(last && x.r.stage === '접수' && last.r.stage === '접수' && (last.r.site_label || '') === (x.r.site_label || '') && zfSchOverlap(last.r, x.r)){
+      const m = last.r._grp ? last.r : Object.assign({}, last.r, { _grp: [last.r] });
+      m._grp.push(x.r);
+      m.start_date = m._grp.map(r => r.start_date || r.end_date).sort()[0];
+      m.end_date = m._grp.map(r => r.end_date || r.start_date).sort().slice(-1)[0];
+      m.stage_text = [...new Set(m._grp.map(r => r.stage_text || ''))].filter(Boolean).join(' · ');
+      m._raws = m._grp.map(r => r.period_text || '');
+      out[out.length - 1] = { r: m, s: false };
+      return;
+    }
+    out.push(x);
+  });
+  return out.map(x => {
+    if(x.r.stage !== '접수') return x;
+    const hit = (routes || []).filter(rt => zfSchOverlap(rt, x.r));
+    let lines = null;
+    if(new Set(hit.map(rt => rt.route)).size >= 2){
+      lines = hit.map(rt => ({ name: [rt.route, rt.phase_text].filter(Boolean).join(' '), dl: zfSchDateLine(rt), place: rt.place_text || '' }));
+      const notes = [...new Set(hit.map(rt => rt.note_text).filter(Boolean))];
+      if(notes.length) x = { r: Object.assign({}, x.r, { _raws: (x.r._raws || [x.r.period_text || '']).concat(notes) }), s: x.s };
+    } else if(x.r._grp){
+      lines = x.r._grp.map(r => ({ name: r.scope_text || r.stage_text || '', dl: zfSchDateLine(r), place: '' }));
+    }
+    return lines ? { r: Object.assign({}, x.r, { _routes: lines }), s: x.s } : x;
+  });
 }
 function zfScheduleMarkLine(box){
   const today = zf3Today();
@@ -8129,8 +8202,10 @@ function loadScheduleLine(annId, cardEl, id){
     fetch(`${SUPABASE_URL}/rest/v1/announcement_schedule?select=id,announcement_id,stage,stage_text,period_text,start_date,end_date,scope_text,site_label,sort_order&${idFilterFor(ids)}&order=announcement_id,sort_order`, { headers: zfAnonHeaders() })
       .then(r => r.ok ? r.json() : null).catch(() => null),
     fetchGroupRounds(ids, Array.isArray(ids) && ids.length >= 2),
-    Promise.resolve(ids)
-  ])).then(([rows, roundMap, ids]) => {
+    Promise.resolve(ids),
+    fetch(`${SUPABASE_URL}/rest/v1/announcement_apply_routes?select=announcement_id,route,phase_text,start_date,end_date,place_text,note_text,sort_order&${idFilterFor(ids)}&order=announcement_id,sort_order`, { headers: zfAnonHeaders() })
+      .then(r => r.ok ? r.json() : []).catch(() => [])
+  ])).then(([rows, roundMap, ids, apRoutes]) => {
     if(!zfStillOurs(id, ownerAnn) || !Array.isArray(rows) || !rows.length) return;
     const cardEnd = cardEl.dataset.applyEnd || '';
     let cur = rows;
@@ -8142,12 +8217,18 @@ function loadScheduleLine(annId, cardEl, id){
     const seen = new Set();
     cur = cur.filter(r => { const k = [r.stage_text, r.period_text, r.scope_text || '', r.site_label || ''].join('|'); if(seen.has(k)) return false; seen.add(k); return true; });
     if(!cur.length) return;
+    // 경로 줄(A) — 일정 행과 같은 회차 축(그룹이면 출처 공고 apply_end = 카드 apply_end)
+    let apCur = Array.isArray(apRoutes) ? apRoutes : [];
+    if(ids.length >= 2) apCur = apCur.filter(r => { const a = roundMap[r.announcement_id]; return !!a && (a.apply_end || '') === cardEnd; });
+    const rSeen = new Set();
+    apCur = apCur.filter(r => { const k = [r.route, r.phase_text || '', r.start_date || '', r.end_date || '', r.place_text || ''].join('|'); if(rSeen.has(k)) return false; rSeen.add(k); return true; });
     const ord = new Map(); cur.forEach((r, i) => ord.set(r, i));
     // 접수 행이 없으면 카드 접수기간(확정값)을 첫 「접수 뒤」 단계 앞에 종전 이름으로
     const aS = cardEl.dataset.applyStart || '', aE = cardEl.dataset.applyEnd || '';
     const extraApply = !cur.some(r => r.stage === '접수') && (aS || aE)
       ? `<div class="policy-item" data-zf-d="${zfAttr(aS || aE)}" data-zf-e="${zfAttr(aE || aS)}"><div class="policy-category">📅 접수기간</div><div class="policy-content">${escapeHtml(`${aS || '-'} ~ ${aE || '-'}`)}</div></div>` : '';
     const withApply = list => {
+      list = zfSchMergeApply(list, apCur);
       if(!extraApply) return list.map(r => zfScheduleItemHTML(r.r, r.s)).join('');
       const k = list.findIndex(x => ZF_STAGE_AFTER_APPLY.includes(x.r.stage));
       const parts = list.map(x => zfScheduleItemHTML(x.r, x.s));
@@ -8444,7 +8525,11 @@ function zfSplitByCardRound(rows, roundMap, cardEl){
   return zfRoundSplit(rows, cardEnd, zfRoundEndOf(roundMap));
 }
 // 회차 조회(roundMap)에서 행 출처 공고의 마감 — 조회에 없는 행은 null(이번 회차 쪽).
-function zfRoundEndOf(roundMap){ return r => { const a = roundMap && r && roundMap[r.announcement_id]; return a ? (a.apply_end || '') : null; }; }
+// 🔵 2026-11-03(우편함 「표시층 — 다음 판 시안」 D 1 · 백로그 「회차 거르기 규칙을 한 벌로」) — 마감(apply_end)이 NULL 인 공고도 null(이번 회차 쪽).
+//    종전에는 '' 로 돌려 「카드 마감과 다름 = 다른 회차」로 셌다 — DB 함수 get_announcement_round_ids(#779)는 「r.e is null → same_round」라 한 벌이 아니었다.
+//    이제 줄 단위 규칙이 그 함수와 같다(다른 회차 = 마감을 알고 카드 마감과 다름 · 카드 마감 모름 → 전부 이번 · 이번 회차 0 → 거르지 않음).
+//    열린 카드 전수 대조(2026-11-03): 갈리는 ID 2(SH_310107 묶음의 마감 NULL 둘) · 그 ID 의 산물 행 0 → 「다른 회차」 블록이 바뀌는 카드 0.
+function zfRoundEndOf(roundMap){ return r => { const a = roundMap && r && roundMap[r.announcement_id]; return a ? (a.apply_end || null) : null; }; }
 
 // 사진·평면도·팸플릿 그룹별 아이템 목록 — 모달의 이전/다음 넘기기가 참조하는 레지스트리
 const extrasGroupsRegistry = {};
@@ -8526,6 +8611,27 @@ function loadAnnouncementExtras(annId, detailEl, id, useGroup){
       if(!byKey.has(k)) byKey.set(k, { kind, items: [] });
       byKey.get(k).items.push(r);
     });
+    // 🔵 2026-11-03(우편함 「표시층 — 다음 판 시안」 E · 💡 새 문구 — 다운님 승인 전 시안 · 백로그 「사진·평면도」 ⑥) — 같은 그림이 두 머리 칩에 붙으면
+    //    모달 캡션에 「(31A형과 같은 파일)」. 같은 그림 = 내용 해시(content_sha256 · #829) 같음 — 없으면 Drive 파일 ID.
+    //    Drive ID 축은 같은 그림의 다른 Drive 사본(…20198 · …20224)을 못 잡는다 — 해시가 그 자리를 잡는다.
+    {
+      //    두 축을 함께 본다(해시가 NULL 인 행 7 · 같은 Drive 파일인데 한쪽만 해시가 있는 꼴) — 어느 한 축이라도 같으면 같은 파일.
+      const sameKeys = r => [r.content_sha256 ? 's:' + r.content_sha256 : '', driveFileIdFrom(r.file_url) ? 'f:' + driveFileIdFrom(r.file_url) : ''].filter(Boolean);
+      const owners = new Map();
+      byKey.forEach((g, k) => g.items.forEach(it => sameKeys(it).forEach(h => { if(!owners.has(h)) owners.set(h, new Set()); owners.get(h).add(k); })));
+      //    이름 = 머리 키의 주택형 부분(앞에 건물 이름이 되풀이되면 뗀다 — 「화성동탄2 C26블록 31A형」 → 「31A형」) · 「형」이 없으면 괄호 앞에 붙인다(「46A2(주거약자)」 → 「46A2형(주거약자)」).
+      const label = k => {
+        const [bld, ...rest] = String(k).split('::');
+        if(!rest.length) return bld.trim();
+        let t = rest.join('::').trim();
+        if(bld && t.startsWith(bld.trim() + ' ')) t = t.slice(bld.trim().length).trim();
+        return /형/.test(t) ? t : t.replace(/^([^(]+)(\(.*)?$/, (m, a, b) => a.trim() + '형' + (b || ''));
+      };
+      byKey.forEach((g, k) => g.items.forEach(it => {
+        const o = new Set(); sameKeys(it).forEach(h => (owners.get(h) || []).forEach(x => { if(x !== k) o.add(x); }));
+        it._sameAs = o.size ? [...o].map(label) : null;
+      }));
+    }
     let linkedCount = chipped.size;
     byKey.forEach(g => {
       // 모달에서 넘기는 순서는 갤러리와 같게 — 사진 먼저, 그다음 평면도
@@ -8751,7 +8857,7 @@ function renderExtrasModal(){
   document.getElementById('extrasModalPrev').style.display = multiple ? 'flex' : 'none';
   document.getElementById('extrasModalNext').style.display = multiple ? 'flex' : 'none';
   document.getElementById('extrasModalCounter').textContent = multiple ? `${extrasModalIndex+1} / ${extrasModalItems.length}` : '';
-  document.getElementById('extrasModalCaption').textContent = caption;
+  document.getElementById('extrasModalCaption').textContent = caption + (it._sameAs && it._sameAs.length ? ` (${it._sameAs.join('·')}과 같은 파일)` : '');
   document.getElementById('extrasModalDriveLink').href = zfSafeUrl(it.file_url) || '#';
   // 이미지는 원본 화질(uc?export=view)을 우선 시도하고, CORS/권한 등으로 로드 실패 시에만
   // 기존 미리보기용 thumbnail URL로 자동 폴백한다. 그 폴백마저 실패하면 깨진 <img>로 두지 않고
@@ -9435,7 +9541,19 @@ function zfPolicyNotes(curRows, annId, id, ownerAnn, slot, wrap){
   const d = huKeysReady[id];
   Promise.race([d ? d.promise : Promise.resolve(null), new Promise(r => setTimeout(r, 6000))]).then(() => {
     const units = huUnitsCache[id];
-    if(Array.isArray(units)) put(zfWeakHousingLine(units, curRows));
+    if(!Array.isArray(units)) return;
+    // 🔵 2026-11-03(우편함 「표시층 — 다음 판 시안」 B · 다운님 실사용 11-02) — 「📷 사진·평면도·팸플릿」과 「📋 정책 안내」 사이에 서면
+    //    사진 칸 설명처럼 읽혔다 → 「🏠 세대별 정보」 머리(세대 칸 바로 위 · 주거약자용 주택형·호수와 함께 보이는 자리)로. 문구는 그대로.
+    //    세대 칸 자리가 없으면(블록 카드 등) 종전 자리(정책 칸 위).
+    const html = zfWeakHousingLine(units, curRows);
+    const hu = document.getElementById('hu-slot-' + id);
+    if(!html || !zfStillOurs(id, ownerAnn)) return;
+    if(!hu || !hu.parentNode){ put(html); return; }
+    hu.parentNode.querySelectorAll(':scope > .zf-weak-box').forEach(b => b.remove());
+    const box = document.createElement('div');
+    box.className = 'zf-pol-notes zf-weak-box';
+    box.innerHTML = html;
+    hu.parentNode.insertBefore(box, hu);
   });
 }
 function loadAnnouncementPolicies(annId, detailEl, id, useGroup){
@@ -11994,6 +12112,17 @@ function zfOpsHtml(b, issues){
     const human = Number((/사람 브라우저 (\d+)/.exec(luf.value || '') || [])[1] || 0);
     const txt = luf.warned ? zfOpsEsc(String(luf.value || '경고').replace(/^목록 RPC 사용자 실패[^—]*—\s*/, '')) : '24시간 0';
     out.push(line(luf.warned ? (human > 0 ? 'orange' : 'yellow') : 'ok', '목록 사용자 실패', (human > 0 ? `<b>${txt}</b>` : txt) + ` <span style="color:#888">(점검 ${zfOpsTime(luf.run_at)})</span>`));
+  }
+  // ⓒ-2b 새 공급기관(2026-11-03 · 우편함 「표시층 — 다음 판 시안」 D 2 · 백로그 「첨부를 못 받는 공고…」 ②) — 정의 = health-ops attach0_unanalyzed(#762)와 같은 셈
+  //    (열린 대표 ∧ 접수 시작 14일 안 ∧ 같은 묶음 첨부 0 ∧ 완료 계열 분석 0 — 처음 본 기관의 공고는 첨부를 못 받아 여기 걸린다).
+  //    수는 마지막 점검 기록 문구(「— n: id(기관 · 시작)…」)에서 읽는다 — 상태판 함수가 그 문구를 돌려줄 때(health.attach0 · 읽기 RPC 칸 따로 회신).
+  //    그 칸이 아직 없으면 마지막 점검의 경고 목록으로만: 경고 아님 = 0 · 경고 = 「있음」.
+  if(h.run_at){
+    const a0 = (b.health || {}).attach0, warned0 = (h.warned || []).includes('attach0_unanalyzed');
+    const m0 = a0 && /—\s*(\d+):\s*(.*)$/.exec(String(a0.value || ''));
+    const orgs0 = m0 ? [...new Set([...m0[2].matchAll(/\(([^·()]+?)\s*·/g)].map(x => x[1].trim()))] : [];
+    const txt0 = m0 ? `${m0[1]}${orgs0.length ? ' — ' + zfOpsEsc(orgs0.join(', ')) : ''}` : warned0 ? '있음 — 운영 점검 경고 attach0_unanalyzed' : '0';
+    out.push(line(m0 || warned0 ? 'yellow' : 'ok', '새 공급기관', `${txt0} <span style="color:#888">(첨부 0 · 미분석 열린 대표 · 점검 ${zfOpsTime(h.run_at)})</span>`));
   }
   // ⓒ-3 인스턴스 메모리 · ⓒ-4 비밀값 만료(2026-10-17 상태판 새 칸 — PR #603 instance · secrets)
   if('instance' in b){ const im = zfOpsInstanceHtml(b.instance, (h.warned || []).includes('instance_mem')); out.push(line(im.color, '인스턴스 메모리', im.html)); }
