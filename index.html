@@ -307,6 +307,7 @@ body.theme-dark .extras-missing-note{color:#d8c48a;background:#2a2721;border-col
 .extras-modal-next{right:8px}
 .extras-modal-footer{display:flex;align-items:center;gap:10px;padding:10px 14px;background:#1a1a1a;color:#ddd;font-size:12px}
 .extras-modal-caption{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.extras-modal-caption .extras-modal-same{display:block;white-space:normal;overflow-wrap:anywhere;opacity:.85}   /* 2026-11-03 — 「(○○형과 같은 파일)」 꼬리는 말줄임 밖 한 줄(390px에서 잘리면 뜻이 사라짐 · claude.ai 판정) */
 .extras-modal-counter{color:#999}
 .extras-modal-drive-link{color:#5DCAA5;white-space:nowrap;text-decoration:none}
 .hu-list{display:flex;flex-direction:column;gap:8px}
@@ -8857,7 +8858,11 @@ function renderExtrasModal(){
   document.getElementById('extrasModalPrev').style.display = multiple ? 'flex' : 'none';
   document.getElementById('extrasModalNext').style.display = multiple ? 'flex' : 'none';
   document.getElementById('extrasModalCounter').textContent = multiple ? `${extrasModalIndex+1} / ${extrasModalItems.length}` : '';
-  document.getElementById('extrasModalCaption').textContent = caption + (it._sameAs && it._sameAs.length ? ` (${it._sameAs.join('·')}과 같은 파일)` : '');
+  // 같은 파일 꼬리는 따로 한 줄(말줄임 밖) — 파일 이름이 길어도 잘리지 않게(2026-11-03 · 390px).
+  { const capEl = document.getElementById('extrasModalCaption');
+    capEl.textContent = caption;
+    capEl.title = caption;
+    if(it._sameAs && it._sameAs.length){ const t = document.createElement('span'); t.className = 'extras-modal-same'; t.textContent = `(${it._sameAs.join('·')}과 같은 파일)`; capEl.appendChild(t); capEl.title = caption + ' ' + t.textContent; } }
   document.getElementById('extrasModalDriveLink').href = zfSafeUrl(it.file_url) || '#';
   // 이미지는 원본 화질(uc?export=view)을 우선 시도하고, CORS/권한 등으로 로드 실패 시에만
   // 기존 미리보기용 thumbnail URL로 자동 폴백한다. 그 폴백마저 실패하면 깨진 <img>로 두지 않고
