@@ -264,6 +264,11 @@ try {
       'images_last_run_age_min', (select extract(epoch from now() - max(d.start_time))/60 from cron.job_run_details d join cron.job j using (jobid) where j.jobname = 'zipfit-collect-lh-images'),
       'images_fail_24h', (select count(*) from announcement_complex_image_fetch where not ok and fetched_at > now() - interval '24 hours'),
       'sh_last_run_age_min', (select extract(epoch from now() - max(run_at))/60 from sh_collection_run_log),
+      -- 🔵 2026-11-03(우편함 「GH 수집 켜기 1단계」 ④) — GH(경기주택도시공사) 수집기: cron 이 붙기 전(1단계)이라 정보만 · 들인 공고 행은 0 이어야 한다.
+      'gh', (select json_build_object('last_run_age_min', (select extract(epoch from now() - max(run_at))/60 from gh_collection_run_log),
+                 'runs_24h', (select count(*) from gh_collection_run_log where run_at > now() - interval '24 hours'),
+                 'rows', (select count(*) from announcements where source = 'GH'),
+                 'job', (select count(*) from cron.job where jobname like '%collect-gh%'))),
       'ops_dispatch', (select json_build_object('age_min', extract(epoch from now() - l.at)/60, 'status', coalesce(l.status_code, r.status_code), 'pending', l.status_note is null and r.id is null,
                               'err', left(coalesce(l.error_msg, r.error_msg, case when r.status_code >= 300 then r.content end), 200))
                          from ops_dispatch_log l left join net._http_response r on r.id = l.net_request_id and r.created >= l.at - interval '1 minute' and r.created < l.at + interval '10 minutes'
@@ -421,6 +426,13 @@ try {
   add('images_fail', '24시간 안 실패한 단지 이미지 목록 수집(공고)', d.images_fail_24h < 3 ? 'pass' : 'fail', d.images_fail_24h, '< 3(2026-10-02 시험 38쪽 파싱 실패 0)')
   add('sh_fresh', 'SH 수집 마지막 런 경과(분)', d.sh_last_run_age_min != null && d.sh_last_run_age_min <= 960 ? 'pass' : 'fail',
     d.sh_last_run_age_min == null ? '기록 없음' : Math.round(d.sh_last_run_age_min), '≤ 960분(하루 4회 09·12·15·18시 KST — 18시 → 다음날 09시 = 900분 · 밤 점검(23:55)이 밀려 00시 첫 런 직전에 돌 여유 60분)')
+  // 2026-11-03 GH 수집기 1단계 — cron 없음 · 공고 행 0 이 맞는 상태(정보). 2단계(cron 등록)에서 문턱 있는 판정으로 바꾼다.
+  {
+    const g = d.gh || {}
+    add('gh_runs', 'GH(경기주택도시공사) 수집 최근 런 · 들인 공고 행(정보)', 'info',
+      `최근 런 ${g.last_run_age_min == null ? '없음' : Math.round(g.last_run_age_min) + '분 전'} · 24시간 런 ${g.runs_24h ?? '?'} · 공고 행 ${g.rows ?? '?'} · cron ${g.job ?? '?'}`,
+      '1단계: cron 0 · 공고 행 0(probe 만 — DB 쓰기 없음) · 2단계에서 판정 문턱')
+  }
   // ⑧ 공고 분석 루틴 발송기(2026-10-01) — 스위치가 켜져 있을 때만 판정한다(꺼진 동안 대기는 정상).
   {
     const x = d.dispatch
