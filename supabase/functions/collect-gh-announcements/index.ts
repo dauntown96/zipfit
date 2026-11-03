@@ -220,6 +220,44 @@ async function collect() {
   }
 }
 
+/**
+ * 🔵 2026-11-03(우편함 「코드·운영 — GH 2-0 관찰 장치(카드 0) …」 2) — 관찰(?mode=observe): probe 와 같이 목록·상세를 읽되
+ * 🔴 announcements 에는 쓰지 않고, 요약 한 행만 gh_collection_run_log(mode='observe')에 남긴다.
+ * 왜: 열린 GH 공고가 전부 마감 「-」(운영기관 상시 접수)라 다운님 결정 ③ 「1~2주 동안 GH 가 그 공고를 언제 내리나 보고 다시 판정」의 재는 장치.
+ * observed = 지금 열린 공고 [{id, board, status_raw(목록 상태 칸 · 「-」), close_raw(마감일 칸 · 「-」), title, hidden}] ·
+ * appeared / disappeared = 직전 관찰 행 대비(첫 행은 전부 appeared) — 목록 오류가 있는 런은 「사라짐」을 말할 수 없어 disappeared=null.
+ */
+async function observe() {
+  const startedAt = Date.now()
+  const errors: string[] = []
+  const L = await readLists(new Set(), startedAt, errors)
+  const rows: Mapped[] = L.rows.map(r => mapRow(r, L.today))
+  const detail = await readDetails(L.rows, rows, startedAt, L.today)
+  const observed = L.rows.map(r => ({ id: `GH_${r.pbancNo}`, board: r.board, status_raw: r.status || '-', close_raw: r.closeDate ?? '-',
+    title: r.title, hidden: isHidden(r) }))
+  const ids = observed.map(o => o.id)
+  let appeared: string[] | null = null
+  let disappeared: string[] | null = null
+  let prevNote: string | null = null
+  const { data: prev, error: pErr } = await supabase.from('gh_collection_run_log').select('id, observed')
+    .eq('mode', 'observe').not('observed', 'is', null).order('id', { ascending: false }).limit(1)
+  if (pErr) prevNote = `직전 관찰 행 읽기 실패: ${pErr.message}`
+  else {
+    const before: string[] = prev?.[0] ? ((prev[0].observed as { id: string }[]) ?? []).map(o => o.id) : []
+    appeared = ids.filter(i => !before.includes(i))
+    disappeared = errors.length ? null : before.filter(i => !ids.includes(i))
+    if (!prev?.[0]) prevNote = '첫 관찰 행'
+  }
+  const result = {
+    mode: 'observe', pages: L.pages, parsed: L.parsed, picked: rows.length, upserted: null,
+    hidden: rows.filter(r => r.hidden_from_listing).length, visible: rows.filter(r => !r.hidden_from_listing).length,
+    duration_ms: Date.now() - startedAt, errors, observed, appeared, disappeared,
+  }
+  await logRun({ ...result, detail: { ...detail, prev: prevNote } })
+  console.log(`[GH observe] ${JSON.stringify({ ...result, observed: ids })}`)
+  return { ...result, detail, prev: prevNote }
+}
+
 /** DB 를 읽지도 쓰지도 않는다 — robots · 목록(열린 공고) · 상세(열린 공고 · 또는 ?pbanc=<board>:<pbancNo>:<pbancKndCd>:<bizTyNm>) 매핑 결과만 돌려준다. */
 async function probe(params: URLSearchParams) {
   const startedAt = Date.now()
@@ -251,6 +289,7 @@ Deno.serve(async (req: Request) => {
   if (mode === 'authcheck') return authcheckResponse()
   try {
     if (mode === 'probe') return new Response(JSON.stringify({ mode, ...(await probe(params)) }), { headers: { 'Content-Type': 'application/json' } })
+    if (mode === 'observe') return new Response(JSON.stringify(await observe()), { headers: { 'Content-Type': 'application/json' } })
     if (mode === 'collect') return new Response(JSON.stringify({ mode, ...(await collect()) }), { headers: { 'Content-Type': 'application/json' } })
     return new Response(JSON.stringify({ error: `미구현 mode: ${mode}` }), { status: 400 })
   } catch (e) {

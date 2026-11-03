@@ -265,10 +265,14 @@ try {
       'images_fail_24h', (select count(*) from announcement_complex_image_fetch where not ok and fetched_at > now() - interval '24 hours'),
       'sh_last_run_age_min', (select extract(epoch from now() - max(run_at))/60 from sh_collection_run_log),
       -- 🔵 2026-11-03(우편함 「GH 수집 켜기 1단계」 ④) — GH(경기주택도시공사) 수집기: cron 이 붙기 전(1단계)이라 정보만 · 들인 공고 행은 0 이어야 한다.
+      -- 🔵 2026-11-03(「GH 2-0 관찰 장치」 2) — 관찰 cron(zipfit-gh-observe) 뒤: 최근 행 · 그 행 목록 오류 수 · 열린 공고 수 · 새로/사라짐.
       'gh', (select json_build_object('last_run_age_min', (select extract(epoch from now() - max(run_at))/60 from gh_collection_run_log),
+                 'last', (select json_build_object('mode', mode, 'errors', jsonb_array_length(errors), 'open', jsonb_array_length(observed),
+                                                   'appeared', jsonb_array_length(appeared), 'disappeared', jsonb_array_length(disappeared))
+                            from gh_collection_run_log order by id desc limit 1),
                  'runs_24h', (select count(*) from gh_collection_run_log where run_at > now() - interval '24 hours'),
                  'rows', (select count(*) from announcements where source = 'GH'),
-                 'job', (select count(*) from cron.job where jobname like '%collect-gh%'))),
+                 'job', (select count(*) from cron.job where jobname ~ '(^|-)gh-'))),
       'ops_dispatch', (select json_build_object('age_min', extract(epoch from now() - l.at)/60, 'status', coalesce(l.status_code, r.status_code), 'pending', l.status_note is null and r.id is null,
                               'err', left(coalesce(l.error_msg, r.error_msg, case when r.status_code >= 300 then r.content end), 200))
                          from ops_dispatch_log l left join net._http_response r on r.id = l.net_request_id and r.created >= l.at - interval '1 minute' and r.created < l.at + interval '10 minutes'
@@ -426,12 +430,15 @@ try {
   add('images_fail', '24시간 안 실패한 단지 이미지 목록 수집(공고)', d.images_fail_24h < 3 ? 'pass' : 'fail', d.images_fail_24h, '< 3(2026-10-02 시험 38쪽 파싱 실패 0)')
   add('sh_fresh', 'SH 수집 마지막 런 경과(분)', d.sh_last_run_age_min != null && d.sh_last_run_age_min <= 960 ? 'pass' : 'fail',
     d.sh_last_run_age_min == null ? '기록 없음' : Math.round(d.sh_last_run_age_min), '≤ 960분(하루 4회 09·12·15·18시 KST — 18시 → 다음날 09시 = 900분 · 밤 점검(23:55)이 밀려 00시 첫 런 직전에 돌 여유 60분)')
-  // 2026-11-03 GH 수집기 1단계 — cron 없음 · 공고 행 0 이 맞는 상태(정보). 2단계(cron 등록)에서 문턱 있는 판정으로 바꾼다.
+  // 2026-11-03 GH — 1단계(정보) → 2-0 관찰 장치(「GH 2-0 관찰 장치」 2): 최근 행 ≤ 960분 ∧ 그 행 목록 오류 0 이면 통과 · 아니면 ⚠️
+  //   (실패 아님 — GH 카드 0 이라 사용자 영향이 없다 · 공고 행은 0 이어야 한다).
   {
     const g = d.gh || {}
-    add('gh_runs', 'GH(경기주택도시공사) 수집 최근 런 · 들인 공고 행(정보)', 'info',
-      `최근 런 ${g.last_run_age_min == null ? '없음' : Math.round(g.last_run_age_min) + '분 전'} · 24시간 런 ${g.runs_24h ?? '?'} · 공고 행 ${g.rows ?? '?'} · cron ${g.job ?? '?'}`,
-      '1단계: cron 0 · 공고 행 0(probe 만 — DB 쓰기 없음) · 2단계에서 판정 문턱')
+    const l = g.last || {}
+    const ok = g.last_run_age_min != null && g.last_run_age_min <= 960 && l.errors === 0
+    add('gh_runs', 'GH(경기주택도시공사) 관찰 — 최근 런 · 목록 오류 · 들인 공고 행', ok ? 'pass' : 'warn',
+      `최근 런 ${g.last_run_age_min == null ? '없음' : Math.round(g.last_run_age_min) + '분 전'}(${l.mode ?? '?'}) · 목록 오류 ${l.errors ?? '?'} · 열린 ${l.open ?? '?'} · 새로 ${l.appeared ?? '?'} · 사라짐 ${l.disappeared ?? '?'} · 24시간 런 ${g.runs_24h ?? '?'} · 공고 행 ${g.rows ?? '?'} · cron ${g.job ?? '?'}`,
+      '최근 런 ≤ 960분(하루 4회 09·12·15·18시 31분 KST) ∧ 목록 오류 0 — 아니면 ⚠️(카드 0 · 2-0 은 관찰만 · 공고 행 0)')
   }
   // ⑧ 공고 분석 루틴 발송기(2026-10-01) — 스위치가 켜져 있을 때만 판정한다(꺼진 동안 대기는 정상).
   {
@@ -1036,6 +1043,28 @@ for (const [id, name, sql, judge] of [
   } catch (e) {
     addBlind(id, `${name} — 점검 불능`, 'warn', String(e).slice(0, 200), '공고·자격·세대 표를 읽는다(못 읽으면 ⚠️)')
   }
+}
+
+// ㉚ 자격 행 결론 낱말(2026-11-03 · 우편함 「코드·운영 — GH 2-0 관찰 장치 · … · 결론 낱말 ⚠️」 4 · 분석 스킬 v11.1 「없음 결론 금지」의 기계 감시).
+//    eligibility_criteria.verification_requirements 의 문자열 값 전체가 결론 낱말 하나(배제 · 완화 · 불요 · 필수 · 없음 · 미혼 — 앞뒤 공백·괄호·마침표만 허용)인 키
+//    ∧ 행 created_at 14일 안(새 분석 행만)이 0 이면 통과 · 아니면 ⚠️(공고 ID · 키). 객체 꼴 「공급대상」 키는 셈 밖. 14일 밖 옛 행 수는 값 칸에만.
+//    ⚠️ 경고만 · gate.mjs HARD 밖 · 못 읽으면 ⚠️ 점검 불능.
+try {
+  const [x] = await sqlRead(`with k as (
+      select e.announcement_id a, kv.key k, e.created_at > now() - interval '14 days' recent
+        from public.eligibility_criteria e,
+             jsonb_each(case when jsonb_typeof(e.verification_requirements) = 'object' then e.verification_requirements else '{}'::jsonb end) kv
+       where kv.key <> '공급대상' and jsonb_typeof(kv.value) = 'string'
+         and (kv.value #>> '{}') ~ '^[[:space:]()（）\\[\\].]*(배제|완화|불요|필수|없음|미혼)[[:space:]()（）\\[\\].]*$')
+    select json_build_object('recent', (select count(*) from k where recent), 'all', (select count(*) from k),
+      'all_ann', (select count(distinct a) from k),
+      'list', (select json_agg(a || ' · ' || k order by a, k) from (select a, k from k where recent limit 10) s)) j`)
+  const j = x.j
+  add('elig_conclusion_word', '자격 행 값이 결론 낱말 하나뿐(새 분석 14일)', j.recent === 0 ? 'pass' : 'warn',
+    j.recent === 0 ? `0(14일 밖 옛 행 ${j.all}키 · ${j.all_ann}공고)` : `${j.recent}키 — ${(j.list || []).join(', ')}(전체 ${j.all}키 · ${j.all_ann}공고)`,
+    '0 — verification_requirements 문자열 값이 「배제·완화·불요·필수·없음·미혼」 낱말 하나뿐인 키(공급대상 밖) · 행 created_at 14일 안 — 원문 문장 대신 결론만 적은 꼴')
+} catch (e) {
+  addBlind('elig_conclusion_word', '자격 행 결론 낱말 — 점검 불능', 'warn', String(e).slice(0, 200), '자격 표를 읽는다(못 읽으면 ⚠️)')
 }
 
 // ㉗ 재고 통계 원천 판 날짜(2026-10-29 · 우편함 「코드·운영 — 런칭 뒤 묶음」 2ⓒ · 백로그 「임대주택 통계 이력이 안 쌓인다」).
