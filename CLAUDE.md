@@ -162,10 +162,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-11-03 | **코드·운영 — GH 수집 켜기 1단계 + 화면 점검 PR 실행 [완료]** — 표 `gh_collection_run_log` 적용 · EF `collect-gh-announcements` 배포(cron 0 · GH 행 0) · probe 200(열린 5건 전부 마감 「-」 · 해외 IP 막힘 없음 · 충돌 0) · `apply-cdn.gh.or.kr` meta PDF 통과(원본 깨진 277B XML 1건 관측) · health-screen `pull_request`(index.html·sw.js → PR head 를 러너 안에서 잼 · 기록·이슈 0 · 시험 #856 통과·닫음) · PR #854 · #855 |
 | 2026-11-03 | **코드·운영 — fetch-attachment 잘림·HTML 거름 + sha 4행 + health-screen 브랜치 점검 [완료]** — 업로드 때 Content-Length 어긋남 `truncated` · HTML 머리 `html_response`로 안 올림(PR #848) · extras sha 4행 씀(남은 빈 행 = HTML 3) · health-screen 입력 `ref`(커밋을 러너 안 127.0.0.1에서 띄워 잼 · 기록·이슈 0 · githack은 중간 안내 쪽 때문에 못 씀) · PR #850 · #851 · #852 |
 | 2026-11-03 | **분석 묶음 — 원문화 5회차 [완료]** — ⚠️ 「LH에 확인」 207행 감사(열린 51행 전부 원문 문의처에 LH — 쓰기 0) · 김포 여기가 닫힌 11행 확인처 → 「운영기관(사회복지법인 프리웰)」 · 요약 키 둘째 묶음 6공고 18행 39키 원문화 · `…20336` 「청약통장: 불요」 걷음 · `scripts/soguep-vr-status.py` · 남은 요약 73 → 34 · 불변식 0 · PR #849 |
-| 2026-11-03 | **표시층 — 자격 키 원문 순서 · 「신혼·신생아」 보이는 이름 · 사진 길잡이 [완료]** — 자격 칸 키를 머리 키 → 원문 번호 표지 순(①-㉮ · 가. · N순위)으로 정렬(1,061행 키·값 변화 0 · 순서 322) · 원문에 「신생아」 없으면 「신혼부부」(열린 10장 · 판정 변화 0) · 사진이 모두 세대 칩이면 길잡이 줄 + 「세대 목록 보기」 · PR #845 · #847 |
-
 ---
 
 ## 🚫 코딩 원칙
