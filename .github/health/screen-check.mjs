@@ -99,14 +99,22 @@ try {
 
   // 🔵 2026-10-19(우편함 「표시층 — 화면 점검 오탐 막기」 3) — 첫 열기가 시간 초과면 20초 뒤 한 번만 다시 연다(점검 도중 다른 push 의 Pages 배포와 겹친 경우).
   //    두 번째도 안 열리면 종전대로 「점검 실행」 실패다 — 배포본이 정말 안 열리는 것은 숨기지 않는다.
-  try { await page.goto(SITE + '?health=' + Date.now(), { waitUntil: 'networkidle', timeout: 90000 }) }
+  let mainRes = null
+  try { mainRes = await page.goto(SITE + '?health=' + Date.now(), { waitUntil: 'networkidle', timeout: 90000 }) }
   catch (e) {
     if (!/Timeout/i.test(String(e && e.message))) throw e
     console.log('첫 열기 시간 초과 — 20초 뒤 한 번 다시 연다:', String(e.message).slice(0, 120))
     await page.waitForTimeout(20000)
-    await page.goto(SITE + '?health=' + Date.now(), { waitUntil: 'networkidle', timeout: 90000 })
+    mainRes = await page.goto(SITE + '?health=' + Date.now(), { waitUntil: 'networkidle', timeout: 90000 })
   }
-  await page.waitForFunction(() => typeof noticeData !== 'undefined' && noticeData.length > 0, null, { timeout: 60000 })
+  try { await page.waitForFunction(() => typeof noticeData !== 'undefined' && noticeData.length > 0, null, { timeout: 60000 }) }
+  catch (e) {
+    // 🔵 2026-11-03(브랜치 점검 site 입력) — 목록이 안 차면 문서 응답 상태·형식·CSP·화면 글자 앞부분을 실패 문구에 싣는다(githack 첫 실행이 단서 없이 끝났다).
+    const h = mainRes ? mainRes.headers() : {}
+    const st = await page.evaluate(() => ({ nd: typeof noticeData === 'undefined' ? 'undef' : noticeData.length, title: document.title,
+      txt: (document.body?.innerText || '').replace(/\s+/g, ' ').slice(0, 120) })).catch(() => ({}))
+    throw new Error(`${String(e.message).slice(0, 80)} · 문서 ${mainRes ? mainRes.status() : '?'} ${h['content-type'] || ''}${h['content-security-policy'] ? ' · CSP ' + h['content-security-policy'].slice(0, 80) : ''} · noticeData ${st.nd} · 제목 「${st.title || ''}」 · 글자 「${st.txt || ''}」`)
+  }
   flOpen = false
   try {
     const sizes = await Promise.all(flReq.map(x => x.r.sizes().then(s => s.responseHeadersSize + s.responseBodySize).catch(() => 0)))
