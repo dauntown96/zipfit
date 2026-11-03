@@ -9615,7 +9615,9 @@ function zfWeakHousingLine(units, pols){
   if(/주거약자(?:용|형)\s*(?:주택(?:공급)?\s*)?배점/.test(text)) toks.push('배점 따로');
   if(sents.some(x => /주거약자/.test(x) && /일반/.test(x) && /(?:중복|이중)\s*(?:으로\s*)?신청[^.。]{0,6}불가/.test(x))) toks.push('일반과 중복신청 불가');
   if(!toks.length) return '';
-  const n = wk.reduce((a, u) => a + (Number(u.recruit_count) > 0 ? Number(u.recruit_count) : 0), 0);
+  let n = wk.reduce((a, u) => a + (Number(u.recruit_count) > 0 ? Number(u.recruit_count) : 0), 0);
+  // 세대 행 모집호수가 비면 주택형 묶음 모집호수(group_recruit_count · 묶음마다 한 번 — 세대 칸 머리 「모집 N세대」와 같은 값)
+  if(!n){ const seen = new Map(); wk.forEach(u => { const g = u.unit_group || u.unit_type || ''; if(!seen.has(g) && Number(u.group_recruit_count) > 0) seen.set(g, Number(u.group_recruit_count)); }); n = [...seen.values()].reduce((a, b) => a + b, 0); }
   // 🔵 2026-11-03(우편함 「표시층 — 다운님 실사용 넷」 A · 💡 새 문구 — 다운님 승인 전 시안) — 「공고 안에 주거약자용 물량이 따로 있다」는 세대 일부 사실이라
   //    문장으로 말한다(종전 「🏷️ 주거약자용 주택 · 주거약자 신청자 전용 · …」은 공고 전체가 주거약자 전용처럼 읽혔다 · 다운님 11-03).
   //    🔴 토막은 원문에 있을 때만(위 toks 판정 그대로) · 호수는 이번 회차 세대 행 모집호수 합이 있을 때만.
