@@ -17,6 +17,13 @@ on:
       - 'sw.js'
       - 'CNAME'
       - 'geo/**'
+  # 🔵 2026-11-03(우편함 「코드·운영 — GH 수집 켜기 1단계 … + 표시층 PR 브랜치 화면 점검 자동」 2) — 화면 파일을 고친 PR 은
+  #    그 PR head 커밋을 러너 안 127.0.0.1:8201 에서 띄워 잰다(ref 입력과 같은 길 · DB 기록·이슈·로그인 한 바퀴 0 · PR 체크로만 보인다).
+  #    부하: PR 커밋 하나당 화면 한 번 = 목록 RPC 1회(+ 기대값 계산 관리 API 읽기 · read only). 같은 PR 새 커밋이 오면 앞 실행을 취소한다.
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'sw.js'
   workflow_dispatch:
     inputs:
       simulate:
@@ -44,30 +51,33 @@ permissions:
   issues: write
   actions: read   # 배포(pages-build-deployment) 진행 여부를 본다(2026-10-19)
 
+# PR 점검은 PR 마다 따로(정기·수동·병합 뒤 실행과 서로 밀어내지 않는다) · 같은 PR 은 새 커밋이 앞 실행을 취소한다.
 concurrency:
-  group: health-screen
-  cancel-in-progress: false
+  group: ${{ github.event_name == 'pull_request' && format('health-screen-pr-{0}', github.event.pull_request.number) || 'health-screen' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   screen:
     runs-on: ubuntu-latest
     env:
       # 브랜치 점검(site 입력)이면 기록·이슈·로그인 한 바퀴를 하지 않는다 — G1 화면 셈(ops_health_runs kind=screen ref=main)에 들어가지 않게.
-      SCREEN_SITE: ${{ inputs.ref && 'http://127.0.0.1:8201/index.html' || inputs.site || '' }}
-      SCREEN_RECORD_ON: ${{ !inputs.ref && !inputs.site && inputs.record != 'false' && '1' || '0' }}
+      # PR 실행은 PR head 커밋을 ref 로 쓴다(입력이 없다).
+      SITE_REF: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || inputs.ref || '' }}
+      SCREEN_SITE: ${{ (github.event_name == 'pull_request' || inputs.ref) && 'http://127.0.0.1:8201/index.html' || inputs.site || '' }}
+      SCREEN_RECORD_ON: ${{ github.event_name != 'pull_request' && !inputs.ref && !inputs.site && inputs.record != 'false' && '1' || '0' }}
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
       # 🔵 2026-11-03 — 브랜치 점검(ref): 그 커밋을 site-src 에 받아 러너 안에서 띄운다(점검 스크립트는 위 main 체크아웃의 것을 쓴다 — 잴 것만 브랜치).
-      - name: 브랜치 받기(ref)
-        if: inputs.ref
+      - name: 브랜치 받기(ref · PR head)
+        if: env.SITE_REF != ''
         uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ env.SITE_REF }}
           path: site-src
           persist-credentials: false
       - name: 브랜치 띄우기(127.0.0.1:8201)
-        if: inputs.ref
+        if: env.SITE_REF != ''
         run: |
           nohup python3 -m http.server 8201 --bind 127.0.0.1 --directory site-src > /dev/null 2>&1 &
           for i in $(seq 1 20); do curl -fsS -o /dev/null http://127.0.0.1:8201/index.html && { echo "브랜치 $(git -C site-src rev-parse --short HEAD) 띄움"; exit 0; }; sleep 1; done
@@ -80,8 +90,10 @@ jobs:
       #    main 에 무엇이 push 되든(이력·점검 파일만이어도) Pages 는 다시 배포한다 — 이 워크플로가 안 도는 push 의 배포와도 겹친다.
       #    🔴 10분 넘게 반영되지 않으면 점검하지 않고 「점검 불능」(라벨 health-screen-blind · 루틴 안 막음 · 다음에 점검이 돌아 통과하면 닫힘)으로 남긴다 —
       #       배포를 기다리다 넘긴 것은 화면이 틀렸다는 뜻이 아니다. 배포가 끝난 뒤 배포본이 안 열리면 그것은 종전대로 「점검 실행」 실패(멈춤)다.
+      # 브랜치 점검(ref · PR)은 배포본을 열지 않으므로 기다리지 않는다.
       - name: 배포 반영 기다리기
         id: deploy
+        if: env.SITE_REF == ''
         env:
           GH_TOKEN: ${{ github.token }}
           EVENT: ${{ github.event_name }}
