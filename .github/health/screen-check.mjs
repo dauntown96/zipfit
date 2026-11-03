@@ -1201,7 +1201,10 @@ add('console', '콘솔 오류(카카오맵 제외)', consoleErrors.length === 0 
   const run_url = process.env.GITHUB_SERVER_URL && process.env.GITHUB_RUN_ID
     ? `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}` : null
   const all = checks.map(c => ({ id: c.id, name: c.name, status: c.status, value: String(c.value ?? '') }))
-  try {
+  // 🔵 2026-11-03(우편함 「코드·운영 — 로그인 결과 DB 기록 · 이슈 머리 · 찜 바퀴 …」 A ①) — health-screen 워크플로는 SCREEN_RECORD_DEFER=1 로
+  //    기록을 마무리 단계(screen-finish.mjs)로 미룬다: 로그인 흐름 결과(login_walk)까지 한 행에 싣기 위해서다(그 전에는 로그인 실패가 DB 에 안 실렸다).
+  if (process.env.SCREEN_RECORD_DEFER === '1') console.log('실행 요약 DB 기록은 마무리 단계(screen-finish.mjs)가 한다')
+  else try {
     const n = await recordFindings({ kind: 'screen', at: new Date().toISOString(), run_url, ref: process.env.GITHUB_REF_NAME || null, checks: all })
     console.log(`경고·실패 기록 ${n}행(kind=screen)`)
   } catch (e) {
