@@ -17,6 +17,8 @@ export const DEFAULT_SITE = 'https://kkokzip.com/'
 export function siteFrom(v) {
   if (!v) return DEFAULT_SITE
   const u = new URL(v)
+  // 🔵 2026-11-03 — 브랜치 점검(health-screen 입력 ref)은 러너 안 http://127.0.0.1:8201/ 에서 띄운 그 커밋을 잰다.
+  if (u.protocol === 'http:' && u.hostname === '127.0.0.1' && u.port === '8201') return u.toString()
   const ok = u.protocol === 'https:' && (
     u.hostname === 'kkokzip.com' ||
     (['raw.githack.com', 'rawcdn.githack.com'].includes(u.hostname) && u.pathname.startsWith('/dauntown96/zipfit/')))
