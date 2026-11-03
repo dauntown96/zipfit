@@ -1027,8 +1027,15 @@ try {
           const closed = !!wrap && !wrap.open
           if (wrap) { wrap.open = true; wrap.querySelectorAll('details.zf-sch-stop').forEach(d => { d.open = true }) }
           const raw = {}
-          items.forEach(i => { if (i.dataset.schId) { const el = i.querySelector('.zf-sch-raw') || i.querySelector('.zf-sch-nd'); raw[i.dataset.schId] = el ? el.textContent : null } })
-          return { aid, closed, raw, ids: wrap ? [...new Set(items.map(i => Number(i.dataset.schId)).filter(n => !isNaN(n)))].sort((a, b) => a - b) : null,
+          // 🔵 2026-11-03(PR #837 뒤 · 이슈 #840) — 접수 경로 갈래를 합친 역은 행 id 를 모두 싣고(data-sch-ids) 「원문」 펼침을 행마다 가른다(data-sch-rid).
+          //    경로 대상 글(.zf-sch-note)은 일정 행 글이 아니라 재지 않는다.
+          const idsOf = i => (i.dataset.schIds || i.dataset.schId || '').split(' ').filter(Boolean)
+          items.forEach(i => {
+            const rows = i.querySelectorAll('[data-sch-rid]')
+            if (rows.length) { rows.forEach(x => { raw[x.dataset.schRid] = x.textContent }); return }
+            if (i.dataset.schId) { const el = i.querySelector('.zf-sch-raw') || i.querySelector('.zf-sch-nd'); raw[i.dataset.schId] = el ? el.textContent : null }
+          })
+          return { aid, closed, raw, ids: wrap ? [...new Set(items.flatMap(idsOf).map(Number).filter(n => !isNaN(n)))].sort((a, b) => a - b) : null,
             bad: ((slot ? slot.innerText : '').match(/�|\[object|undefined/g) || []).length }
         }, [w.aid, cid]))
       }
