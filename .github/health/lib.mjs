@@ -10,7 +10,20 @@ export const PROJECT_REF = 'khdpjjyspmlqtzperoqg'
 export const SUPABASE_URL = `https://${PROJECT_REF}.supabase.co`
 // 공개 anon 키 — index.html 과 CLAUDE.md 에 이미 공개된 값이다(비밀 아님).
 export const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtoZHBqanlzcG1scXR6cGVyb3FnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxMTYyNDUsImV4cCI6MjA5NzY5MjI0NX0.XwSOuOk2UJiR8vTnwwqDZayJWOUstzD2DeB1COG4azs'
-export const SITE = 'https://kkokzip.com/'
+// 🔵 2026-11-03(우편함 「코드·운영 — … health-screen 브랜치 점검 입력(site)」 3) — 화면 점검을 병합 전 브랜치에 돌릴 수 있게
+//   환경 SCREEN_SITE(health-screen.yml 입력 site)로 바꾼다. 허용 = 배포본 kkokzip.com · githack 커밋 주소(raw.githack.com ·
+//   rawcdn.githack.com 의 /dauntown96/zipfit/ 아래)만 — 그 밖이면 던진다(점검이 아무 데나 열지 않게). 비면 배포본.
+export const DEFAULT_SITE = 'https://kkokzip.com/'
+export function siteFrom(v) {
+  if (!v) return DEFAULT_SITE
+  const u = new URL(v)
+  const ok = u.protocol === 'https:' && (
+    u.hostname === 'kkokzip.com' ||
+    (['raw.githack.com', 'rawcdn.githack.com'].includes(u.hostname) && u.pathname.startsWith('/dauntown96/zipfit/')))
+  if (!ok) throw new Error(`SCREEN_SITE 허용 밖: ${u.hostname}${u.pathname.slice(0, 40)}(kkokzip.com · githack 의 dauntown96/zipfit 만)`)
+  return u.toString()
+}
+export const SITE = siteFrom(process.env.SCREEN_SITE)
 
 export async function sqlRead(query) {
   const token = process.env.SUPABASE_ACCESS_TOKEN

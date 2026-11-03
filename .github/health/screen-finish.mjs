@@ -60,7 +60,7 @@ if (process.env.SCREEN_RECORD !== '0') {
   } catch (e) {
     all.push({ id: 'findings_log', name: '실행 요약·경고·실패 DB 기록(ops_health_runs kind=screen)', status: 'warn', value: String(e).slice(0, 200), rule: '기록 실패는 ⚠️ 경고만 — 판정은 결과 파일·이슈가 낸다' })
   }
-} else console.log('SCREEN_RECORD=0 — DB 기록 안 함(로컬 시험)')
+} else console.log('SCREEN_RECORD=0 — DB 기록 안 함(브랜치 점검 site · record=false · 로컬 시험)')
 
 // ③ 결과 파일·요약 다시 쓰기 — 머리가 로그인까지 센 결과
 report('screen', 'A. 화면 점검', all, extra)
