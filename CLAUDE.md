@@ -162,9 +162,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-11-03 | **코드·운영 — 결론 낱말 ⚠️ 넓힘 · 스킬 🔴 군 꼬리 점검 스크립트 [완료]** — ops-check `elig_conclusion_word`가 낱말 + 괄호 해설 꼴도 센다(14일 안 0 · 전체 15키 · 7공고 · ⚠️만) · `scripts/skill-red-tails.py`(🔴 줄 끝 〔G###〕 — 없음·목록 밖·형식 · 읽기 전용) + `docs/principles/immutable-groups.txt`(불변 28군) — 설치본 🔴 187줄 · 꼬리 없음 187 · PR #862 |
 | 2026-11-03 | **코드·운영 — GH 2-0 관찰 장치 · nexacro XML 거름 · 점검 둘 [완료]** — `collect-gh-announcements ?mode=observe` + cron `zipfit-gh-observe`(KST 09·12·15·18시 31분 · announcements 쓰기 0 · 첫 행 열린 5 · 새로 5 · 사라짐 0) · `fetch-attachment` nexacro XML 오류 422(`GH_823` PDF 막힘 · 정상 PDF 통과) · ops-check `gh_runs` 문턱 · `elig_conclusion_word` ⚠️(지금 0) · ② 표 50 · PR #860 |
 | 2026-11-03 | **분석 묶음 — 원문화 7회차(끝) [완료]** — 분류표 밖 결론값 13키(「배제」·「완화」 낱말 하나뿐) → 0 · 당진석문3 외 5행 · 화성서부권 · 군산나운4 · 물금2 2행을 계층별 원문 문장으로 · 충북 `…20267` note 걷음 · 남은 요약 14 = 공급대상 12 · 기장 2(보류) · 불변식 0 · PR #859 |
-| 2026-11-03 | **분석 묶음 — 원문화 6회차(끝 묶음) [완료]** — 요약 19키 원문화(10행) + 같은 꼴 8행(부천 「혼인상태」 걷음 · 김포·물금 「소득요건: 배제」·「주택소유: 완화」 → 계층별 원문 문장) · 경남 1순위 income_pct NULL 유지(계층 섞임) · 남은 요약 34 → 15(공급대상 매칭 키 12 · 열린 카드 2 · 원문 문장 없음 1 — 보류) · 불변식 0 · PR #857 |
 
 ---
 
