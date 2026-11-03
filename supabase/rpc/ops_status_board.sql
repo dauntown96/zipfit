@@ -93,7 +93,13 @@ begin
     'list_user_fail', (select jsonb_build_object('run_at', h.run_at, 'warned', 'list_user_fail' = any(h.warned),
                                                  'value', (select f.reason from public.ops_health_findings f
                                                             where f.run_at = h.run_at and f.item = 'list_user_fail' limit 1))
-                         from public.ops_health_runs h where h.ref = 'main' and h.kind = 'ops' order by h.run_at desc limit 1))
+                         from public.ops_health_runs h where h.ref = 'main' and h.kind = 'ops' order by h.run_at desc limit 1),
+    -- 🔵 2026-11-03(우편함 「코드·운영 — 점검 세 줄 …」 3 · 표시층 시안 회신 D2) — health.attach0: 마지막 운영 점검(main)의 attach0_unanalyzed
+    --   경고 기록 문구(「… — n: id(기관 · 시작), …」 · 경고가 아니면 value = null). 관리자 상태판 「새 공급기관」 줄이 이 문구에서 수·기관을 읽는다.
+    'attach0', (select jsonb_build_object('run_at', h.run_at,
+                                          'value', (select f.reason from public.ops_health_findings f
+                                                     where f.run_at = h.run_at and f.item = 'attach0_unanalyzed' limit 1))
+                  from public.ops_health_runs h where h.ref = 'main' and h.kind = 'ops' order by h.run_at desc limit 1))
     into v_health;
 
   select coalesce(jsonb_agg(jsonb_build_object('source', c.source, 'at', c.last_collected_at) order by c.source), '[]'::jsonb)
