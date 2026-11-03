@@ -103,50 +103,45 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SIMULATE: ${{ inputs.simulate || 'none' }}
+          # 2026-11-03 — 실행 요약 DB 기록은 마무리 단계(screen-finish.mjs)가 로그인 결과까지 실어 한다
+          SCREEN_RECORD_DEFER: '1'
         run: |
           # ESM 은 NODE_PATH 를 보지 않는다 — 설치한 곳에 링크를 둔다.
           ln -sfn "$RUNNER_TEMP/pw/node_modules" .github/health/node_modules
           node .github/health/screen-check.mjs
       # 🔵 2026-11-02(우편함 「코드·운영 — health-screen 로그인 흐름(Actions 연결) …」 A · 💡 「health-screen에 로그인 흐름 한 바퀴」) —
-      #    하루 1회(workflow_dispatch = pg_cron 발송 · 수동)만 시험 계정으로 로그인 → 조건 저장(P2) → 추천 → 정리를 한 바퀴 돈다(scripts/login-walk.mjs).
+      #    하루 1회(workflow_dispatch = pg_cron 발송 · 수동)만 시험 계정으로 로그인 → 조건 저장(P2) → 추천 → 찜 저장·해제(2026-11-03 --save) → 정리를 한 바퀴 돈다(scripts/login-walk.mjs).
       #    push(병합 뒤) 실행에는 붙이지 않는다 — 운영 배포본에 시험 계정을 만드는 일이라 하루 한 번이면 된다.
       #    규칙은 scripts/test-login.mjs 머리(⑦ 1-3 시험 계정 예외): 1회용 링크는 프로세스 메모리에만 · 정리(계정 삭제 · 저장·프로필 FK CASCADE)와
-      #    확인(시험 계정 0 · 링크 응답 행 0)이 끝까지 돈다 · 이용 기록은 props.ops=1(집계에서 빠짐). 관리 API 는 기존 SUPABASE_ACCESS_TOKEN.
-      #    🔴 실패(로그인·저장 실패 · 정리가 깨끗하지 않음 · 스크립트가 죽음)는 결과 파일에 login_walk 실패로 더해 health-screen 이슈 경로를 탄다.
-      #    DB 실행 요약(ops_health_runs)은 점검 단계가 이미 남겼다 — 이 단계는 거기 더하지 않는다(결과 파일 · 요약 · 이슈만).
+      #    확인(시험 계정 0 · 링크 응답 행 0 · 계정 없는 찜 0)이 끝까지 돈다 · 이용 기록은 props.ops=1(집계에서 빠짐). 관리 API 는 기존 SUPABASE_ACCESS_TOKEN.
+      #    🔵 2026-11-03(우편함 「코드·운영 — 로그인 결과 DB 기록 · 이슈 머리 · 찜 바퀴 …」 A) — 이 단계는 결과 JSON·종료 코드만 남긴다.
+      #    판정(login_walk 항목) · DB 실행 요약 한 행 · 결과 파일·요약(이슈 머리)은 다음 「마무리」 단계가 한 번에 한다.
       - name: 로그인 흐름 한 바퀴
+        id: login
         if: always() && steps.deploy.outputs.blind != '1' && github.event_name == 'workflow_dispatch'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           LOGIN_WALK_SIMULATE: ${{ inputs.simulate == 'login_fail' && 'fail' || '' }}
         run: |
-          # 🔴 GitHub 기본 셸은 bash -e 다 — 로그인 스크립트가 실패(exit 1)하면 그 줄에서 단계가 끝나 결과 파일에 실패를 더하지 못했다
-          #    (2026-11-02 첫 실패 대역 run 41408017907 — 판정 ok=true 로 남고 이슈가 안 열림). 실패도 끝까지 받아 결과 파일에 싣는다.
+          # 🔴 GitHub 기본 셸은 bash -e 다 — 로그인 스크립트가 실패(exit 1)해도 끝까지 받아 다음 단계에 넘긴다(2026-11-02 run 41408017907).
           set +e
           set -uo pipefail
-          out=$(timeout 300 node scripts/login-walk.mjs --persona P2 2>/dev/null | tail -1)
+          out=$(timeout 300 node scripts/login-walk.mjs --persona P2 --save 2>/dev/null | tail -1)
           code=$?
           printf '%s' "$out" > login-walk.json
-          LW_CODE="$code" node --input-type=module -e "
-            import { readFileSync, writeFileSync, existsSync, appendFileSync } from 'node:fs'
-            let j = null
-            try { j = JSON.parse(readFileSync('login-walk.json', 'utf8')) } catch {}
-            const ok = !!(j && j.ok === true && process.env.LW_CODE === '0')
-            const clean = j && j.clean ? j.clean : null
-            const step = j && j.result && j.result.steps ? j.result.steps[0] : null
-            const why = ok ? '' : (j && j.error ? String(j.error).slice(0, 200) : (j ? '정리 확인 실패 또는 저장 실패' : '결과 없음(스크립트가 죽음 · 시간 초과 300초)'))
-            const line = ok
-              ? '- ✅ 로그인 흐름 한 바퀴 — 로그인 → 조건 저장(' + (step && step.msg ? step.msg : '저장') + ') → 추천 ' + (step ? step.cards : '?') + '장 → 정리(시험 계정 ' + clean.test_accounts + ' · 링크 응답 행 ' + clean.link_rows + ')'
-              : '- ❌ 로그인 흐름 한 바퀴 — ' + why + (clean ? ' · 정리 뒤 시험 계정 ' + clean.test_accounts + ' · 링크 응답 행 ' + clean.link_rows : '')
-            const p = 'health-result.json'
-            const r = existsSync(p) ? JSON.parse(readFileSync(p, 'utf8')) : { ok: false, failed: ['runner'], warned: [] }
-            r.login_walk = { ok, why: why || null, clean }
-            if (!ok) { r.ok = false; r.failed = [...new Set([...(r.failed || []), 'login_walk'])] }
-            writeFileSync(p, JSON.stringify(r))
-            appendFileSync('health-summary.md', '\n### 로그인 흐름 한 바퀴(하루 1회)\n\n' + line + '\n')
-            if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\n### 로그인 흐름 한 바퀴\n\n' + line + '\n')
-            console.log(line)
-          "
+          echo "ran=1" >> "$GITHUB_OUTPUT"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "로그인 흐름 종료 코드 $code"
+      # 🔵 2026-11-03 — 마무리: login_walk 항목(통과/실패/건너뜀)을 더하고 → ops_health_record(kind=screen) 한 행 → 결과 파일·요약 다시 쓰기.
+      #    로그인만 실패해도 DB 행 ok=false · 이슈 머리 「실패」가 된다(.github/health/screen-finish.mjs 머리).
+      - name: 마무리(로그인 결과 · DB 실행 요약 · 결과 파일)
+        if: always() && steps.deploy.outputs.blind != '1'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          LW_RAN: ${{ steps.login.outputs.ran }}
+          LW_CODE: ${{ steps.login.outputs.code }}
+          LW_SIMULATE: ${{ inputs.simulate || '' }}
+        run: node .github/health/screen-finish.mjs
       - name: 결과 올리기
         if: always()
         uses: actions/upload-artifact@v6

@@ -4,8 +4,8 @@
 
 ## 쓰는 법 — 세 줄
 
-1. 배포본 한 바퀴: `NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt node scripts/login-walk.mjs --persona P2` — 로그인 → 설정 저장(페르소나 정본 `scripts/target-personas.json`) → 추천 탭 → 정리. 끝 JSON의 `ok`가 참이고 `clean`이 `{test_accounts: 0, link_rows: 0}`이면 통과다(아니면 종료 코드 1).
-2. 고르는 칸: `--persona P1,P2,P4`(한 세션에서 차례로) · `--width 1280` · `--clock '2026-10-28 16:01'`(KST 시계 고정) · `--shot <세션 scratchpad 폴더>`(캡처 — 저장소 안에 두지 않는다) · `--base http://127.0.0.1:8201`(로컬 판 · 로그인까지만 — 아래 ⚠️).
+1. 배포본 한 바퀴: `NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt node scripts/login-walk.mjs --persona P2` — 로그인 → 설정 저장(페르소나 정본 `scripts/target-personas.json`) → 추천 탭 → 정리. 끝 JSON의 `ok`가 참이고 `clean`이 `{test_accounts: 0, link_rows: 0, saved_orphans: 0}`이면 통과다(`saved_orphans` = 계정 없는 찜 행 수 · 2026-11-03)(아니면 종료 코드 1).
+2. 고르는 칸: `--save`(마지막에 찜 한 바퀴 — 공고 하나 저장 → 서버 1행 → 해제 → 서버 0행 · health-screen 하루 1회가 켠다 · 2026-11-03) · `--persona P1,P2,P4`(한 세션에서 차례로) · `--width 1280` · `--clock '2026-10-28 16:01'`(KST 시계 고정) · `--shot <세션 scratchpad 폴더>`(캡처 — 저장소 안에 두지 않는다) · `--base http://127.0.0.1:8201`(로컬 판 · 로그인까지만 — 아래 ⚠️).
 3. 직접 짤 때: `withTestLogin(async link => { const { page } = await openLoggedIn(context, link); await applyPersona(page, persona) … })` — 링크 받기와 끝 정리·확인을 `withTestLogin`이 맡는다(오류가 나도 정리한다).
 
 ## 지키는 것 (⑦ 1-3 시험 계정 예외 · 다운님 승인 2026-10-13)

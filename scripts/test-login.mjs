@@ -84,11 +84,13 @@ export async function cleanup() {
   return { found: !!r.body?.found, account_deleted: r.body?.account_deleted ?? 0, usage_events_deleted: r.body?.usage_events_deleted ?? 0 }
 }
 
-/** 끝 확인 — 시험 주소 계정 수 · 링크가 든 응답 행 수(둘 다 0 이어야 한다). 개인정보 표는 count 만 본다(원칙 36). */
+/** 끝 확인 — 시험 주소 계정 수 · 링크가 든 응답 행 수 · 계정 없는 찜 행 수(셋 다 0 이어야 한다). 개인정보 표는 count 만 본다(원칙 36). */
 export async function verifyClean() {
   const [row] = await sql(
     `select (select count(*) from auth.users where lower(email) = 'zf-test-login@example.com')::int as test_accounts,` +
-    ` (select count(*) from net._http_response where content like '%action_link%')::int as link_rows`)
+    ` (select count(*) from net._http_response where content like '%action_link%')::int as link_rows,` +
+    // 2026-11-03 — 찜 바퀴 뒤: 계정 없는 찜 행(FK CASCADE 가 지웠어야 할 것) 수 · 0 이어야 한다(개수만 — 원칙 36)
+    ` (select count(*) from public.saved_announcements s where not exists (select 1 from auth.users u where u.id = s.user_id))::int as saved_orphans`)
   return row
 }
 
@@ -206,6 +208,36 @@ export async function openRecommend(page) {
       }
     })(),
   }))
+}
+
+/**
+ * 찜 한 바퀴 — 공고 하나를 저장 → 서버에 1행 → 해제 → 서버에 0행(2026-11-03 우편함 「코드·운영 — 로그인 결과 DB 기록 · … 찜 바퀴」 A ③).
+ * 화면의 저장 버튼이 부르는 함수(toggleSaveNotice)를 그대로 부르고, 서버 행 수는 그 세션 토큰으로 saved_announcements 를 읽어 센다
+ * (RLS 가 본인 행으로 한정 · 개수만 돌려준다 — 원칙 36). 공고 id 는 추천 탭 카드의 저장 버튼 → 없으면 공고 목록 첫 행.
+ */
+export async function saveCycle(page, { timeout = 15000 } = {}) {
+  return page.evaluate(async (timeout) => {
+    const id = document.querySelector('#main1 [data-save-id]')?.getAttribute('data-save-id')
+      || document.querySelector('[data-save-id]')?.getAttribute('data-save-id')
+      || (typeof noticeData !== 'undefined' && noticeData[0] ? noticeData[0].announcement_id : null)
+    if (!id) return { ok: false, why: '저장할 공고를 찾지 못함' }
+    const count = async () => {
+      const token = await zfAccessToken()
+      const r = await fetch(`${zfSavedApiUrl()}?select=announcement_id`, { headers: zfSavedHeaders(token) })
+      if (!r.ok) throw new Error('찜 읽기 HTTP ' + r.status)
+      return (await r.json()).length
+    }
+    const before = await count()
+    const wait = async (pred) => { const t0 = Date.now(); while (Date.now() - t0 < timeout) { if (pred(await count())) return true; await new Promise(r => setTimeout(r, 500)) } return false }
+    if (savedIds.has(id)) await toggleSaveNotice(id)            // 시험 계정은 새로 만든 것이라 비어 있어야 하지만 남아 있으면 먼저 푼다
+    await toggleSaveNotice(id)                                   // 저장
+    const savedOk = await wait(n => n >= 1)
+    const afterSave = await count()
+    await toggleSaveNotice(id)                                   // 해제
+    const clearedOk = await wait(n => n === 0)
+    const afterClear = await count()
+    return { ok: savedOk && clearedOk && afterSave >= 1 && afterClear === 0, before, afterSave, afterClear }
+  }, timeout)
 }
 
 /** 시계 고정 — KST 로 적은 시각(예 '2026-10-28 16:01'). page.goto 전에 부른다. */
