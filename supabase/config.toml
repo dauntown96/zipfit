@@ -23,6 +23,10 @@ verify_jwt = false
 [functions.collect-lh-images]
 verify_jwt = false
 
+# 2026-11-04 신설 — LH 건설임대 당첨 합격점수(커트라인) 주 1회 수집. x-cron-secret 으로 막는다(JWT 없음).
+[functions.collect-lh-cutoff]
+verify_jwt = false
+
 [functions.collect-rental-stats]
 verify_jwt = false
 

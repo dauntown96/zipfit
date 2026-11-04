@@ -198,6 +198,7 @@ const EXPECTED_JOBS = [
   'zipfit-list-rpc-probe',       // 2026-10-17 공개 목록 RPC anon 실행 시간 기록(마이그레이션 2026-10-17_01 · ⑭ list_rpc_time)
   'zipfit-purge-cron-run-details',   // 2026-11-02 pg_cron 실행 기록 30일 보관(마이그레이션 2026-11-02_01)
   'zipfit-purge-collection-run-log', // 2026-11-02 LH·MYHOME 수집 런 로그 90일 보관(마이그레이션 2026-11-02_02)
+  'zipfit-collect-lh-cutoff',      // 2026-11-04 LH 건설임대 당첨 합격점수 주 1회(마이그레이션 2026-11-04_04 · ㉔ lh_cutoff)
 ]
 
 // ③④ 관리 API 가 필요 없는 점검(비로그인 목록·요약 · 배포 사이트)은 DB 점검과 다른 try 로 먼저 돈다
@@ -917,6 +918,39 @@ try {
     '0 — 넘으면 ⚠️(안 멈춤) · 같은 행 주소 원문의 「시 구」로 고칠 몫(분석 묶음 2026-11-04 산식)')
 } catch (e) {
   add('unit_sigungu_city_only', '세대 행 시군구가 「시」만(주소에 같은 시 + 구 있음)', 'warn', String(e).slice(0, 200), 'housing_units 를 읽는다(못 읽으면 ⚠️)')
+}
+
+// ㉔ LH 합격점수 수집(2026-11-04 · 우편함 「코드·운영 — LH 건설임대 당첨 합격점수 수집 장치」 4 · ⚠️만 · gate.mjs HARD 밖) —
+//    lh_cutoff_run_log 의 years_ago = 0(주 1회 정기 · 최근 1년 창) 마지막 런: 8일 넘게 없음 · 시도 호출 실패(ok_calls < calls) · errors 비지 않음 = ⚠️.
+//    거름 위반(남긴 글자 중 금지 낱말 · 신청 5명 이하 · 상태 불일치) = 0 이 아니면 ⚠️(CHECK 가 막으므로 0 이 정상 — 거름이 풀리면 보이게).
+//    표 행 수 = 직전 정기 런의 total_after 와의 차(값만). 표·런이 없으면(적용 전 · 첫 정기 런 전) ℹ️ · 표가 있을 때만 둘째 쿼리(실행당 관리 API +1~2).
+try {
+  const [t] = await sqlRead(`select to_regclass('public.lh_cutoff_run_log') is not null as ok`)
+  const [x] = !t.ok ? [{ j: null }] : await sqlRead(`select jsonb_build_object(
+      'runs', (select count(*) from public.lh_cutoff_run_log),
+      'last', (select to_jsonb(r) - 'errors' || jsonb_build_object('errors', jsonb_array_length(r.errors), 'age_h', round(extract(epoch from now() - r.run_at) / 3600))
+                 from public.lh_cutoff_run_log r where r.years_ago = 0 order by r.id desc limit 1),
+      'prev_total', (select r.total_after from public.lh_cutoff_run_log r where r.years_ago = 0 order by r.id desc offset 1 limit 1),
+      'rows', (select count(*) from public.lh_cutoff_scores),
+      'bad', (select count(*) from public.lh_cutoff_scores where (cutoff_text is not null and (coalesce(rqpr_cnt, 0) <= 5 or cutoff_text ~ '(전입|연령|나이|세대구성원|자녀|여부|당해지역|당해단지|거주기간|생년|출생|장애|추천순번)'))
+                                                             or ((cutoff_state = 'ok') <> (cutoff_text is not null)))
+    ) as j`)
+  const c = x.j
+  if (!c) add('lh_cutoff', 'LH 합격점수 수집(주 1회) · 거름 위반', 'info', '표 없음(마이그레이션 2026-11-04_04 적용 전)', '적용 뒤 판정')
+  else if (!c.last) add('lh_cutoff', 'LH 합격점수 수집(주 1회) · 거름 위반', c.bad ? 'warn' : 'info', `정기 런 전 · 행 ${c.rows} · 거름 위반 ${c.bad} · 런 ${c.runs}(소급 포함)`, '첫 정기 런(월 05:13 KST) 뒤 판정 · 거름 위반은 지금도 0 이 정상')
+  else {
+    const L = c.last, bad = []
+    if (L.age_h > 192) bad.push(`마지막 정기 런 ${L.age_h}시간 전`)
+    if (L.ok_calls < L.calls) bad.push(`시도 호출 실패 ${L.calls - L.ok_calls}/${L.calls}`)
+    if (L.errors) bad.push(`errors ${L.errors}`)
+    if (c.bad) bad.push(`거름 위반 ${c.bad}`)
+    const delta = c.prev_total != null && L.total_after != null ? L.total_after - c.prev_total : null
+    add('lh_cutoff', 'LH 합격점수 수집(주 1회) · 거름 위반', bad.length ? 'warn' : 'pass',
+      `${bad.length ? bad.join(' · ') + ' · ' : ''}행 ${c.rows}(직전 정기 런 대비 ${delta == null ? '—' : (delta >= 0 ? '+' : '') + delta}) · 마지막 ${L.window_from}~${L.window_to} 받음 ${L.rows_in} · 남김 ${L.kept} · 거름 ${L.dropped_filter} · 5명 이하 ${L.dropped_small} · ${L.age_h}시간 전`,
+      '정기 런 ≤ 8일 ∧ 시도 호출 실패 0 ∧ errors 0 ∧ 거름 위반 0 — 넘으면 ⚠️(안 멈춤) · 행 수 증감은 값만')
+  }
+} catch (e) {
+  add('lh_cutoff', 'LH 합격점수 수집(주 1회) · 거름 위반', 'warn', String(e).slice(0, 200), 'lh_cutoff_run_log · lh_cutoff_scores 를 읽는다(못 읽으면 ⚠️)')
 }
 
 // ㉓ 화면 빈칸 점검 셋 — 한 쿼리(2026-11-04 · 우편함 「옛 주소 걷기·화면 빈칸 점검」 3~5 · 전부 안 멈춤 — gate.mjs HARD 밖).
