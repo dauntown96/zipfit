@@ -4480,7 +4480,9 @@ function zfNewSid(){
   return 'zf-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10);
 }
 // 🔴 sessionStorage 다 — 탭을 닫으면 사라져 방문과 방문을 잇지 않는다.
-//    잇는 순간 개인 식별에 가까워진다(localStorage 를 쓰지 않는 이유).
+//    잇는 순간 개인 식별에 가까워진다(세션 id 에 localStorage 를 쓰지 않는 이유).
+//    🔵 2026-11-04 — 처리방침 시행일(ZF_PRIVACY_V2_START) 뒤 localStorage 에 두는 것은 지난 방문 날짜(zf_last_visit · 날짜 하나)뿐이고,
+//    그 날짜도 이 브라우저 안에서 「재방문 간격」 구간 이름으로 바꿔 보낸다(zfLoadBuckets) — 세션 id 는 여전히 방문마다 새로 만든다.
 function zfSessionId(){
   if(zfSidMem) return zfSidMem;
   let id=null;
