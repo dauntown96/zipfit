@@ -30,6 +30,7 @@ on:
           - collect-sh-announcements
           - delete-account
           - fetch-attachment
+          - public-status
           - save-user-profile
           - test-login
 
@@ -42,7 +43,7 @@ concurrency:
 
 env:
   PROJECT_REF: khdpjjyspmlqtzperoqg
-  ALLOWED: check-source-pages collect-announcements collect-gh-announcements collect-lh-images collect-lh-promo collect-rental-stats collect-sh-announcements delete-account fetch-attachment save-user-profile test-login
+  ALLOWED: check-source-pages collect-announcements collect-gh-announcements collect-lh-images collect-lh-promo collect-rental-stats collect-sh-announcements delete-account fetch-attachment public-status save-user-profile test-login
 
 jobs:
   deploy:

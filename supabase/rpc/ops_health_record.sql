@@ -12,6 +12,9 @@ AS $function$
 -- 🔵 2026-10-20(우편함 「코드·운영 — 미착수 회차(사용량 소진) 조사 · 점검 불능 분리 …」 ⓓ) — 항목에 blind = true 가 붙으면(점검 불능 —
 --   그 항목을 재지 못했다 · 화면·운영 「점검 실행」 runner 가 배포 기다림·관리 API 예외로 끊김 · list_user_fail 로그 조회 실패) ops_health_runs.blind 에 그 id 를 남긴다.
 --   failed·warned·ok 는 종전 그대로(그 항목도 ❌·⚠️로 남는다 — 상태판·결과 파일과 같은 뜻) · 게이트 셈(docs/launch-gates.sql)이 blind 를 빼고 센다.
+-- 🔵 2026-11-04(우편함 「코드·운영 — 점검 시험 실행(simulate) 표지 …」 1) — p_result.simulate(health-ops·health-screen 수동 입력 simulate 값 · 'none'·빈 값은 NULL)를
+--   ops_health_runs.simulate 에 남긴다 — 시험 실행 표지. failed·warned·ok 는 종전 그대로(시험이 실패를 낸 것을 그대로 본다) ·
+--   게이트 셈(docs/launch-gates.sql)과 상태판(ops_status_board — 마지막 운영 점검)이 simulate 있는 행을 뺀다.
 -- 넣기 전에 30일 넘은 행을 두 표에서 지운다(보관 30일 — 별도 cron 없음). 넣은 경고·실패 행 수를 돌려준다.
 declare
   n int;
@@ -31,7 +34,7 @@ begin
     from jsonb_array_elements(v_checks) c
    where c->>'status' in ('warn', 'fail');
   get diagnostics n = row_count;
-  insert into public.ops_health_runs (run_at, ref, ok, n_pass, n_warn, n_fail, n_skip, failed, warned, run_url, kind, blind)
+  insert into public.ops_health_runs (run_at, ref, ok, n_pass, n_warn, n_fail, n_skip, failed, warned, run_url, kind, blind, simulate)
   select v_at, p_result->>'ref',
          count(*) filter (where c->>'status' = 'fail') = 0,
          count(*) filter (where c->>'status' = 'pass'), count(*) filter (where c->>'status' = 'warn'),
@@ -39,7 +42,8 @@ begin
          coalesce(array_agg(c->>'id') filter (where c->>'status' = 'fail'), '{}'),
          coalesce(array_agg(c->>'id') filter (where c->>'status' = 'warn'), '{}'),
          p_result->>'run_url', v_kind,
-         coalesce(array_agg(c->>'id') filter (where c->>'status' in ('warn', 'fail') and c->>'blind' = 'true'), '{}')
+         coalesce(array_agg(c->>'id') filter (where c->>'status' in ('warn', 'fail') and c->>'blind' = 'true'), '{}'),
+         nullif(nullif(btrim(p_result->>'simulate'), ''), 'none')
     from jsonb_array_elements(v_checks) c;
   return n;
 end

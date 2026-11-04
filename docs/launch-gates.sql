@@ -72,7 +72,8 @@ from (
                'list_user_fail' = any(warned) luf_warn,
                'list_user_fail' = any(blind) or exists (select 1 from ops_health_findings x where x.kind = 'ops' and x.run_at = ops_health_runs.run_at
                                                           and x.item = 'list_user_fail' and x.reason like '%Error:%') luf_blind
-          from ops_health_runs where ref = 'main' and run_at > now() - interval '7 days'),
+          -- 🔵 2026-11-04(우편함 「코드·운영 — 점검 시험 실행(simulate) 표지 …」 1) — 시험 실행(simulate 칸 있음)은 통째로 뺀다(실행 수·실패·불능 모두).
+          from ops_health_runs where ref = 'main' and run_at > now() - interval '7 days' and simulate is null),
   o as (select d.announcement_id aid, d.title from get_announcements_deduped() d, kst
          where d.apply_end >= kst.d and d.title not like '%조기%마감%'),
   p as (select * from get_announcement_price_summary((select array_agg(aid) from o))),

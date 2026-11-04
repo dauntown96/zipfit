@@ -82,9 +82,10 @@ begin
                'finished_at', v_last.finished_at, 'done', v_last.done) end);
 
   select jsonb_build_object(
+    -- 🔵 2026-11-04(우편함 「코드·운영 — 점검 시험 실행(simulate) 표지 …」 1) — 아래 셋(last_run · list_user_fail · attach0)은 시험 실행(simulate 칸 있음)을 뺀 마지막 운영 점검이다.
     'last_run', (select jsonb_build_object('run_at', h.run_at, 'ok', h.ok, 'n_fail', h.n_fail, 'n_warn', h.n_warn,
                                            'failed', to_jsonb(h.failed), 'warned', to_jsonb(h.warned), 'run_url', h.run_url)
-                   from public.ops_health_runs h where h.ref = 'main' and h.kind = 'ops' order by h.run_at desc limit 1),
+                   from public.ops_health_runs h where h.ref = 'main' and h.kind = 'ops' and h.simulate is null order by h.run_at desc limit 1),
     'dispatch_log', (select coalesce(jsonb_agg(jsonb_build_object('target', z.target, 'at', z.at, 'status_code', z.status_code) order by z.target), '[]'::jsonb)
                        from (select distinct on (l.target) l.target, l.at, l.status_code from public.ops_dispatch_log l
                               order by l.target, l.at desc) z),
@@ -93,13 +94,13 @@ begin
     'list_user_fail', (select jsonb_build_object('run_at', h.run_at, 'warned', 'list_user_fail' = any(h.warned),
                                                  'value', (select f.reason from public.ops_health_findings f
                                                             where f.run_at = h.run_at and f.item = 'list_user_fail' limit 1))
-                         from public.ops_health_runs h where h.ref = 'main' and h.kind = 'ops' order by h.run_at desc limit 1),
+                         from public.ops_health_runs h where h.ref = 'main' and h.kind = 'ops' and h.simulate is null order by h.run_at desc limit 1),
     -- 🔵 2026-11-03(우편함 「코드·운영 — 점검 세 줄 …」 3 · 표시층 시안 회신 D2) — health.attach0: 마지막 운영 점검(main)의 attach0_unanalyzed
     --   경고 기록 문구(「… — n: id(기관 · 시작), …」 · 경고가 아니면 value = null). 관리자 상태판 「새 공급기관」 줄이 이 문구에서 수·기관을 읽는다.
     'attach0', (select jsonb_build_object('run_at', h.run_at,
                                           'value', (select f.reason from public.ops_health_findings f
                                                      where f.run_at = h.run_at and f.item = 'attach0_unanalyzed' limit 1))
-                  from public.ops_health_runs h where h.ref = 'main' and h.kind = 'ops' order by h.run_at desc limit 1))
+                  from public.ops_health_runs h where h.ref = 'main' and h.kind = 'ops' and h.simulate is null order by h.run_at desc limit 1))
     into v_health;
 
   select coalesce(jsonb_agg(jsonb_build_object('source', c.source, 'at', c.last_collected_at) order by c.source), '[]'::jsonb)
