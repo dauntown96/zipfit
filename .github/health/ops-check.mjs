@@ -1198,7 +1198,8 @@ if (process.env.SIMULATE === 'notify') add('simulate', '시험 — 알림 확인
   // 🔵 2026-10-06 1-C 3 — 전 항목을 넘긴다: 함수가 경고·실패는 ops_health_findings 에, 실행 요약(통과 포함)은 ops_health_runs 에 1행.
   const all = checks.map(c => ({ id: c.id, name: c.name, status: c.status, value: String(c.value ?? ''), ...(c.blind ? { blind: true } : {}) }))
   try {
-    const n = await recordFindings({ at: now.toISOString(), run_url, ref: process.env.GITHUB_REF_NAME || null, checks: all })
+    // 🔵 2026-11-04 — 시험 실행(수동 입력 simulate)이면 그 값을 실행 요약 표지로(ops_health_runs.simulate · 게이트 셈·상태판이 뺀다)
+    const n = await recordFindings({ at: now.toISOString(), run_url, ref: process.env.GITHUB_REF_NAME || null, simulate: process.env.SIMULATE || null, checks: all })
     console.log(`경고·실패 기록 ${n}행`)
   } catch (e) {
     add('findings_log', '경고·실패 DB 기록(ops_health_findings)', 'warn', String(e).slice(0, 200), '기록 실패는 ⚠️ 경고만 — 판정은 결과 파일·이슈가 낸다')

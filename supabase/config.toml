@@ -35,6 +35,11 @@ verify_jwt = true
 [functions.fetch-attachment]
 verify_jwt = false
 
+# 2026-11-04 신설 — 바깥 가용성 감시(Better Stack)용 키 없는 공개 상태 끝점(우편함 「코드·운영 — 점검 시험 실행 표지 · … 공개 상태 끝점」 2).
+#   몸은 {"ok":true|false} 뿐 · 목록 RPC 결과를 60초 담아 둔다 · 비밀값 0.
+[functions.public-status]
+verify_jwt = false
+
 [functions.save-user-profile]
 verify_jwt = true
 

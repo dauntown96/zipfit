@@ -1222,7 +1222,7 @@ add('console', '콘솔 오류(카카오맵 제외)', consoleErrors.length === 0 
   //    기록을 마무리 단계(screen-finish.mjs)로 미룬다: 로그인 흐름 결과(login_walk)까지 한 행에 싣기 위해서다(그 전에는 로그인 실패가 DB 에 안 실렸다).
   if (process.env.SCREEN_RECORD_DEFER === '1') console.log('실행 요약 DB 기록은 마무리 단계(screen-finish.mjs)가 한다')
   else try {
-    const n = await recordFindings({ kind: 'screen', at: new Date().toISOString(), run_url, ref: process.env.GITHUB_REF_NAME || null, checks: all })
+    const n = await recordFindings({ kind: 'screen', at: new Date().toISOString(), run_url, ref: process.env.GITHUB_REF_NAME || null, simulate: process.env.SIMULATE || null, checks: all })
     console.log(`경고·실패 기록 ${n}행(kind=screen)`)
   } catch (e) {
     add('findings_log', '실행 요약·경고·실패 DB 기록(ops_health_runs kind=screen)', 'warn', String(e).slice(0, 200), '기록 실패는 ⚠️ 경고만 — 판정은 결과 파일·이슈가 낸다')

@@ -84,6 +84,7 @@
 - ⚠️ **Drive `download_file_content`는 약 14KB 이하 작은 파일을 파일로 떨어뜨리지 않고 대화로 들인다**(B51 원주문막1 평면도) — base64를 되살릴 수 없어 판독 불가다. 서브에이전트에 맡기거나 다른 경로(`fetch-attachment` 등)로 받는다.
 - 🔵 **Notion 파일 업로드가 된다**(2026-10-08 실측 18/18 — 환경 네트워크 허용에 `api.notion.com` 추가 뒤 · 그 전 세션은 프록시 403이었다): `notion-create-file-upload`로 받은 업로드 URL에 multipart POST · 🔴 mp4는 `video/mp4`를 명시한다 · 업로드 URL은 약 23분 산다.
 - 🔴 **Node `fetch`는 프록시 환경변수를 저절로 쓰지 않는다**(2026-10-08 · 점검기 로컬 시험에서 `TypeError: fetch failed`) — `NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt`를 붙이고, 로컬 서버를 함께 쓰면 `NO_PROXY=127.0.0.1,localhost`. curl·Playwright(Chromium)는 그대로 된다.
+- 🔴 **저장소는 얕은 클론(깊이 50)이다 — 오래된 가지를 머지하기 전에 `git fetch --deepen=N origin main <가지>`부터**(2026-11-04 · #873 — #732 가지 머지가 「refusing to merge unrelated histories」로 거부됐는데 환경 탓이었다 · `--deepen=400`으로 기준점이 보인 뒤 정상 머지). `git rev-parse --is-shallow-repository`가 `true`면 기준점(`git merge-base`)이 비는지 먼저 본다.
 - 🔴 **백업 덤프(`zipfit-backup/dumps/*.dump` — pg_dump 17 형식)를 조사에 쓸 때 컨테이너 `pg_restore` 16은 못 읽는다**(`unsupported version (1.16) in file header` — 2026-09-30 실측). **`pgdumplib`로 읽는다**(위 세션 준비 스크립트가 깐다) — `pgdumplib.load(경로)`.
 - **국토부 아파트 전월세 실거래 API** — 컨테이너 환경변수 `MOLIT_RENT_API_KEY`(이름만 적는다) · `https://apis.data.go.kr/1613000/RTMSDataSvcAptRent/getRTMSDataSvcAptRent`(`LAWD_CD` 5자리 · `DEAL_YMD` YYYYMM) · 🔴 **전북은 새 코드 `52xxx`**(군산 `52130` — 2026-08 totalCount 293, B51 실측) · 금액은 만원 단위 쉼표 문자열(`deposit`·`monthlyRent`).
 
