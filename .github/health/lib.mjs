@@ -51,6 +51,13 @@ export async function recordInstanceMetrics(payload) {
   return callJsonbFn('zipfit_ops.instance_metrics_record', payload)
 }
 
+// 🔵 2026-11-04 — 개수만 넘기는 기록 함수(zipfit_ops.edge_request_daily_record 등)를 같은 길로 부른다 · 함수 이름은 zipfit_ops. 아래 허용 목록만.
+const RECORD_FNS = new Set(['zipfit_ops.edge_request_daily_record'])
+export async function callRecord(fn, payload) {
+  if (!RECORD_FNS.has(fn)) throw new Error(`기록 함수 허용 밖: ${fn}`)
+  return callJsonbFn(fn, payload)
+}
+
 async function callJsonbFn(fn, payload) {
   const token = process.env.SUPABASE_ACCESS_TOKEN
   if (!token) throw new Error('SUPABASE_ACCESS_TOKEN 이 없다')
