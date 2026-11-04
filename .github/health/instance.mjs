@@ -31,7 +31,8 @@ export const SERIES = [
 //      Nano(10-18~21) — 가용 최소 82~117 MB · 평균 132~144 MB · swapin 30분당 중앙 9만~11만 · 최대 52만~91만 쪽 · 탐침 p50 1.25초(성능에 닿던 꼴)
 //      Small(10-23~11-04) — 가용 최소 690 MB(10-29) · 평균 979~1,079 MB · swapin 30분당 최대 1,870 쪽(11-02) · 탐침 p50 0.40~0.47초
 //    ⚠️ = swapin > 5,000 쪽/30분(≈ 20 MB · 지금 최대의 약 2.7배 · Nano 중앙의 약 1/18) ∨ 가용 < 400 MB(지금 최소 690의 약 0.6배)
-//    「Nano 꼴」(❌ 상당) = swapin > 50,000 쪽/30분 ∨ 가용 < 200 MB — 🔴 이번엔 ⚠️로만 내고 값에 「Nano 꼴」을 적는다(❌·HARD 승격은 제안만 · gate.mjs HARD 밖).
+//    「Nano 꼴」 = swapin > 50,000 쪽/30분 ∨ 가용 < 200 MB → ❌ 안 멈춤(2026-11-04 우편함 「코드·운영 — 가격 요약 RPC known_sg …」 4 · gate.mjs HARD 밖 → 라벨 health-ops-soft ·
+//    ops_health_runs.ok=false · 게이트 셈 real_fail_7d 에 든다 — 사용자가 느리게 겪는 상태라서). 그 사이(⚠️ 문턱 넘음)는 ⚠️.
 //    swap 사용량·commit 비율은 값 문구에 그대로 보이되 판정에서 뺀다(swap 은 낮 봉우리마다 계단으로 올라 내려오지 않는 래칫이라 「양」은 성능과 상관이 약하다 —
 //    탐침 지연과 상관 0.22 · commit 은 Small 이후 내내 1.04~1.24배라 매 회차 ⚠️ 였다).
 export const SWAPIN_WARN = 5000        // 쪽/30분
@@ -78,7 +79,7 @@ export function pickMetrics(text) {
 }
 
 const MB = b => Math.round(b / 1048576)
-// v = pickMetrics().values · rate = swapinRate() 결과(쪽/30분 또는 null) → { status: warn|pass, value, rule, severe }
+// v = pickMetrics().values · rate = swapinRate() 결과(쪽/30분 또는 null) → { status: fail|warn|pass, value, rule, severe }
 export function judgeInstance(v, rate = null) {
   const swapUsed = v.swap_total != null && v.swap_free != null ? v.swap_total - v.swap_free : null
   const swapRatio = swapUsed != null && v.swap_total > 0 ? swapUsed / v.swap_total : null
@@ -87,15 +88,15 @@ export function judgeInstance(v, rate = null) {
   const severe = (rate != null && rate > SWAPIN_SEVERE) || (availMb != null && availMb < AVAIL_SEVERE_MB)
   const warn = severe || (rate != null && rate > SWAPIN_WARN) || (availMb != null && availMb < AVAIL_WARN_MB)
   const parts = []
-  if (severe) parts.push('Nano 꼴(❌ 상당 — 이번엔 ⚠️만)')
+  if (severe) parts.push('Nano 꼴')
   if (v.mem_total != null) parts.push(`메모리 가용 ${MB(v.mem_available ?? 0)}/${MB(v.mem_total)} MB`)
   parts.push(rate != null ? `swapin ${Math.round(rate).toLocaleString('en-US')}쪽/30분` : 'swapin 속도 못 잼(직전 기록 없음·간격 밖·재시작)')
   if (swapUsed != null) parts.push(`swap 사용 ${MB(swapUsed)}/${MB(v.swap_total)} MB(${Math.round(swapRatio * 100)}% · 판정 밖)`)
   if (commitRatio != null) parts.push(`commit ${(v.committed_as / 1073741824).toFixed(2)}/${(v.commit_limit / 1073741824).toFixed(2)} GB(${commitRatio.toFixed(2)}배 · 판정 밖)`)
   return {
-    status: warn ? 'warn' : 'pass',
+    status: severe ? 'fail' : warn ? 'warn' : 'pass',
     severe,
     value: parts.join(' · '),
-    rule: `swapin ≤ ${SWAPIN_WARN.toLocaleString('en-US')}쪽/30분 ∧ 가용 ≥ ${AVAIL_WARN_MB} MB — 넘으면 ⚠️ · ${SWAPIN_SEVERE.toLocaleString('en-US')}쪽 넘음 ∨ ${AVAIL_SEVERE_MB} MB 밑 = Nano 꼴(⚠️로 표시 · ❌ 없음) · swap 양·commit 은 판정 밖(2026-11-04) · 숫자는 zipfit_ops.instance_metrics_log`,
+    rule: `swapin ≤ ${SWAPIN_WARN.toLocaleString('en-US')}쪽/30분 ∧ 가용 ≥ ${AVAIL_WARN_MB} MB — 넘으면 ⚠️ · ${SWAPIN_SEVERE.toLocaleString('en-US')}쪽 넘음 ∨ ${AVAIL_SEVERE_MB} MB 밑 = Nano 꼴 ❌(안 멈춤 · health-ops-soft) · swap 양·commit 은 판정 밖(2026-11-04) · 숫자는 zipfit_ops.instance_metrics_log`,
   }
 }
