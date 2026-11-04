@@ -162,9 +162,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-11-04 | **코드·운영 — swap 처방 1·2·6·⑦1 [완료] · 처방 4 멈춤** — 병합 뒤 화면 점검 = push 실행 하나(원칙 13) · instance_mem = swapin 30분당 5,000쪽 ∨ 가용 400 MB ⚠️(Small 기록 재생 ⚠️ 0) · 목록 호출 4→2 · `zipfit_ops.edge_request_daily` 일일 셈(개수만) · tick 은 후보 판정이 빈 대기열에서도 해야 할 일이라 멈춤 · PR #865 |
 | 2026-11-04 | **분석 묶음 — 세대 행 시군구 「시」 → 「시 구」 664행 [완료]** — 같은 행 주소 원문의 구로(10개 시 · 16공고) · 산식 829 중 165행 뺌(가격 요약 `known_sg`에 없는 고양 일산동구·안양 동안구·화성 병점구 + 같은 공고·시 짝) · 재셈 165 · 지도 「(구 미상)」 열린 카드 0 · 되돌림 `docs/rollback/2026-11-04_housing_units_sigungu.sql` · PR #866 |
 | 2026-11-03 | **코드·운영 — 결론 낱말 ⚠️ 넓힘 · 스킬 🔴 군 꼬리 점검 스크립트 [완료]** — ops-check `elig_conclusion_word`가 낱말 + 괄호 해설 꼴도 센다(14일 안 0 · 전체 15키 · 7공고 · ⚠️만) · `scripts/skill-red-tails.py`(🔴 줄 끝 〔G###〕 — 없음·목록 밖·형식 · 읽기 전용) + `docs/principles/immutable-groups.txt`(불변 28군) — 설치본 🔴 187줄 · 꼬리 없음 187 · PR #862 |
-| 2026-11-03 | **코드·운영 — GH 2-0 관찰 장치 · nexacro XML 거름 · 점검 둘 [완료]** — `collect-gh-announcements ?mode=observe` + cron `zipfit-gh-observe`(KST 09·12·15·18시 31분 · announcements 쓰기 0 · 첫 행 열린 5 · 새로 5 · 사라짐 0) · `fetch-attachment` nexacro XML 오류 422(`GH_823` PDF 막힘 · 정상 PDF 통과) · ops-check `gh_runs` 문턱 · `elig_conclusion_word` ⚠️(지금 0) · ② 표 50 · PR #860 |
 
 ---
 
