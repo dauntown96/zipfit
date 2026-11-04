@@ -600,12 +600,9 @@ span.zf3-mi{cursor:default}
 .zf3-lh{margin:0;font-size:var(--t-l);font-weight:700;color:var(--ink)}
 .zf3-lh .zf3-of{font-weight:500;color:var(--ink-3);font-size:var(--t-m)}
 .zf3-lsub{margin:2px 0 0;font-size:var(--t-xs);color:var(--ink-3)}
-.zf3-tblock{display:grid;grid-template-columns:auto 1fr;border:1px solid var(--ink);border-radius:var(--r-1);font-size:12px;margin:6px 0 8px;overflow:hidden;background:var(--paper)}
-.zf3-tblock>div{display:flex;gap:6px;align-items:baseline;padding:3px 8px;min-width:0}
-.zf3-tblock>div+div{border-left:1px solid var(--ink)}
-.zf3-tblock .k{color:var(--ink-3);white-space:nowrap}
-.zf3-tblock .v{font-weight:700;color:var(--ink)}
-.zf3-tblock .v.led{font-family:var(--f-led)}
+/* 🔵 2026-11-04(우편함 「표시층 — 실사용 7회차 고침」 3) — 「마지막 수집」을 한 칸 상자(.zf3-tblock)에서 이 줄 오른쪽 끝 작은 회색 글자로(글자 같음) */
+.zf3-lsub.zf3-lsub-row{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;column-gap:10px;margin-bottom:6px}
+.zf3-coll{margin-left:auto;font-size:11px;color:var(--ink-3);white-space:nowrap}
 .zf-win-other{display:block;font-size:11px;font-weight:400;opacity:.8;margin-top:2px;line-height:1.4}
 .zf3-chips{display:flex;gap:6px;overflow-x:auto;padding:2px 0 8px;scrollbar-width:none}
 .zf3-chips::-webkit-scrollbar{display:none}
@@ -1399,13 +1396,10 @@ html[data-ui="d3"] .pg-btn{min-width:var(--hit);height:var(--hit);font-size:var(
         <option value="date-desc">최신 공고순</option>
         <option value="end-asc">마감 임박순</option>
         <option value="start-asc">접수 시작순</option>
-        <option value="units-desc">세대수 많은순</option>
         <option value="deposit-asc">보증금 낮은순</option>
         <option value="rent-asc">월임대료 낮은순</option>
-        <option value="area-desc">단지 면적 넓은순</option>
+        <option value="area-desc">전용면적 넓은순</option>
         <option value="region-asc">지역명순</option>
-        <option value="org-asc">공급기관순</option>
-        <option value="revised-first">정정공고 우선</option>
       </select>
     </div>
     <div id="match-result" class="result hidden"></div>
@@ -1482,13 +1476,10 @@ html[data-ui="d3"] .pg-btn{min-width:var(--hit);height:var(--hit);font-size:var(
         <option value="date-desc">최신 공고순</option>
         <option value="end-asc">마감 임박순</option>
         <option value="start-asc">접수 시작순</option>
-        <option value="units-desc">세대수 많은순</option>
         <option value="deposit-asc">보증금 낮은순</option>
         <option value="rent-asc">월임대료 낮은순</option>
-        <option value="area-desc">단지 면적 넓은순</option>
+        <option value="area-desc">전용면적 넓은순</option>
         <option value="region-asc">지역명순</option>
-        <option value="org-asc">공급기관순</option>
-        <option value="revised-first">정정공고 우선</option>
       </select>
     </div>
     <div id="notice-status" class="rbox warn"><p class="rtitle">⏳ 공고 데이터 불러오는 중...</p></div>
@@ -3218,6 +3209,20 @@ function zfMarkRouteFits(p){
     p.classList.toggle('zf-fits', t.scrollHeight <= t.clientHeight + 1);
   });
 }
+// 🔵 2026-11-04(우편함 「표시층 — 실사용 7회차 고침」 4) — 다시 재기. 그려질 때 안 보이던 줄(다른 탭 · 지도 보기 동안 도착 → 높이 0이라 못 잼)은
+//    ▾가 남아 한 줄에 들어가는데도 펼침 표시가 섰다(다운님 2026-11-04 · 창 절반 폭 · 지도 → 목록 · 충주연수2).
+//    공고 목록·탭 칸의 크기가 바뀔 때(숨김 → 보임 · 폭 변경 — ResizeObserver 하나) · 글꼴이 다 온 뒤 보이는 접힌 줄을 다시 잰다. 높이 0이면 종전대로 재지 않는다(표지 그대로).
+function zfRemeasureRouteFits(){
+  document.querySelectorAll('.zf-route-line:not(.open)').forEach(p => zfMarkRouteFits(p));
+}
+(function(){
+  let t = null;
+  const kick = () => { clearTimeout(t); t = setTimeout(zfRemeasureRouteFits, 120); };
+  try{ if(document.fonts && document.fonts.ready) document.fonts.ready.then(kick); }catch(e){}
+  if(!('ResizeObserver' in window)) return;
+  const ro = new ResizeObserver(kick);
+  ['notice-list', 'main1', 'main2', 'main3', 'main4', 'main5'].forEach(k => { const el = document.getElementById(k); if(el) ro.observe(el); });
+})();
 // 표시층 B ① — 카드 폭보다 길어 말줄임이 된 칩에만 전문 툴팁을 단다(이미 툴팁이 있으면 앞에 전문을 붙인다).
 function zfTitleClippedChips(){
   requestAnimationFrame(() => {
@@ -4167,6 +4172,7 @@ function applyNoticeFiltersAndRender(keepPage){
   //    접수 중 공고보다 앞에 섰다(태백 …020645 8/31). 취소공고끼리는 고른 정렬 그대로다.
   const cancelLast = (a,b) => (zfIsCancelRow(a['공고명']) ? 1 : 0) - (zfIsCancelRow(b['공고명']) ? 1 : 0);
   filtered = [...filtered].sort((a,b) => cancelLast(a,b) || noticeSortCmp(a,b));
+  if(sortVal==='deposit-asc' || sortVal==='rent-asc') zfSortPriceFill(filtered);   // 🔵 2026-11-04 — 재료 없는 행만 한 번 물어 다시 줄 세운다(아래)
   function noticeSortCmp(a,b){
     // 🔴 접수 단계 그룹 선비교(applyWindowRank)를 **공고 탭에서 걷었다**(2026-09-16).
     //    「최신 공고순」을 골랐는데 최신 공고가 위에 안 오던 것이 이것이었다 — 정렬 위에
@@ -4202,8 +4208,10 @@ function applyNoticeFiltersAndRender(keepPage){
     }
     // 🔴 네 수치 정렬은 zfNumOrNull 한 벌을 쓴다 — 0 은 값이고 빈 값만 모름이다(2026-09-16).
     if(sortVal==='units-desc')    return nullLast(a,b,n=>zfNumOrNull(n['total_units']),true);
-    if(sortVal==='deposit-asc')   return nullLast(a,b,n=>zfNumOrNull(n['deposit_min']),false);
-    if(sortVal==='rent-asc')      return nullLast(a,b,n=>zfNumOrNull(n['rent_min']),false);
+    // 🔵 2026-11-04(우편함 「표시층 — 실사용 7회차 고침」 1 · 기준 위반) — 보증금·월임대료는 카드 머리 가격 줄과 같은 재료(get_announcement_price_summary 최솟값)로 줄 세운다.
+    //    종전 공고 칸 deposit_min·rent_min 은 열린 57 중 4만 차 있어 순서가 틀렸다(강릉 매입 58만이 영등포 4,650만 아래). 가격 없는 카드는 뒤(종전 그대로).
+    if(sortVal==='deposit-asc')   return nullLast(a,b,n=>zfSortPriceOf(n,'deposit_min'),false);
+    if(sortVal==='rent-asc')      return nullLast(a,b,n=>zfSortPriceOf(n,'rent_min'),false);
     if(sortVal==='area-desc')     return nullLast(a,b,n=>zfNumOrNull(n['area_max']),true);
     if(sortVal==='region-asc'){
       const regionA = (a['sido_nm']||a['지역']||'') + ' ' + (a['sigungu_nm']||'');
@@ -5138,6 +5146,29 @@ function zfQuantile(sorted, q){
   const pos = (sorted.length - 1) * q, lo = Math.floor(pos), hi = Math.ceil(pos);
   return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
 }
+// 🔵 2026-11-04(같은 회차 1) — 정렬 재료. 아래 ㎡당 통계가 열린 공고 전부의 가격 요약을 한 번에 받으므로 그 응답의 최솟값을 남겨 쓴다(새 호출 0).
+//    카드 요약 캐시(zfPriceCache — 보이는 카드)가 있으면 그쪽이 먼저(같은 RPC · 같은 값) · 둘 다 없으면 모름(뒤로).
+const zfSortPrice = new Map();   // announcement_id → { deposit_min, rent_min }
+function zfSortPriceOf(n, k){
+  const id = String((n && n['announcement_id']) || '');
+  const s = zfPriceCache.get(id);
+  if(s && typeof s === 'object') return zfNumOrNull(s[k]);
+  const p = zfSortPrice.get(id);
+  return p ? zfNumOrNull(p[k]) : null;
+}
+// 거름(유형·지역 재질의 · 마감 포함)으로 들어온 행은 열린 전체 목록의 통계 응답에 없을 수 있다(묶음 대표가 갈림 등 — 2026-11-04 매입 거름 실측 3행).
+//    가격 정렬일 때 재료가 없는 행만 한 번 묻고 도착하면 다시 줄 세운다(같은 id 는 두 번 묻지 않는다). 통계가 아직이면 거기서 다시 줄 세우니 기다린다.
+const zfSortPriceAsked = new Set();
+function zfSortPriceFill(rows){
+  if(zfRentStatsState !== 2) return;
+  const need = (rows || []).map(n => String((n && n['announcement_id']) || '')).filter(id => id && !zfSortPrice.has(id) && !zfPriceCache.has(id) && !zfSortPriceAsked.has(id));
+  if(!need.length) return;
+  need.forEach(id => zfSortPriceAsked.add(id));
+  zfEnsurePriceSummaries(need).then(ok => {
+    const sv = (document.getElementById('noticeSortSel') || {}).value;
+    if(ok && (sv === 'deposit-asc' || sv === 'rent-asc')) applyNoticeFiltersAndRender(noticePage);
+  });
+}
 function zfLoadRentStats(){
   if(zfRentStatsState) return;
   zfRentStatsState = 1;
@@ -5157,6 +5188,9 @@ function zfLoadRentStats(){
     const vals = new Map();
     // 🔵 2026-11-03(우편함 「표시층 — 다운님 실사용 넷」 D ③ · 다운님 승인 2026-11-04) — 같은 시·도 같은 유형 묶음도 함께 센다(키 끝에 「\u0002시·도」) · 그리는 쪽이 표본 5곳 이상이면 그쪽을 먼저.
     const push = (k, v) => { if(!vals.has(k)) vals.set(k, []); vals.get(k).push(v); };
+    out.forEach(r => { if(r && r.announcement_id) zfSortPrice.set(String(r.announcement_id), { deposit_min: r.deposit_min, rent_min: r.rent_min }); });
+    // 가격 정렬을 고른 채 재료가 늦게 왔으면 한 번만 다시 줄 세운다(쪽은 그대로) — 그 뒤로는 흔들리지 않는다.
+    { const sv = (document.getElementById('noticeSortSel') || {}).value; if(noticeLoaded && (sv === 'deposit-asc' || sv === 'rent-asc')) applyNoticeFiltersAndRender(noticePage); }
     out.forEach(r => {
       if(!r || r.round_state !== 'current' || r.rent_per_sqm_med == null) return;
       const row = byId.get(String(r.announcement_id));
@@ -7746,10 +7780,8 @@ function toggleDetail(id, card, from){
     const annId = cardEl.dataset.announcementId || '';
     loadAnnouncementPolicies(annId, detailEl, id, true);
   }
-  if(!open && !detailEl.dataset.docsLoaded && cardEl){
-    detailEl.dataset.docsLoaded = '1';
-    loadDocumentTemplates(cardEl.dataset.housingType || '', id);
-  }
+  // 🔵 2026-11-04(우편함 「표시층 — 실사용 7회차 고침」 2) — 유형별 템플릿 「📄 제출서류 미리보기」(loadDocumentTemplates)를 공고 카드에서 걷었다 —
+  //    다른 공고·다른 모집방식 표본 서류가 「필수」로 이 공고 원문 서류 옆에 섰다. 자리(docs-slot)는 원문 서류 아코디언(zfDocsFromPolicies)이 쓴다.
   if(!open && !detailEl.dataset.eligLoaded && cardEl){
     detailEl.dataset.eligLoaded = '1';
     const annId = cardEl.dataset.announcementId || '';
@@ -9798,49 +9830,37 @@ function loadAnnouncementPolicies(annId, detailEl, id, useGroup){
       const slot = document.getElementById('policy-slot-'+id);
       if(slot) slot.appendChild(wrap);
       if(slot) zfPolicyNotes(curRows, annId, id, ownerAnn, slot, wrap);
+      zfDocsFromPolicies(curRows, id);   // 🔵 2026-11-04 (가) — 이번 회차 서류 칸만 「📄 이 공고의 제출서류(원문)」로
     });
   }).catch(err => {
     console.error('ZipFit 정책안내 로드 실패:', err);
   });
 }
 
-// 제출서류 미리보기 — document_templates는 공고별 기록이 아니라 (주택유형 × 모집방식)으로
-// 분류된 서식 카탈로그라 announcement_id로 조인할 수 없다. 공고의 주택유형으로 매칭한다.
-// announcements에는 모집방식(recruitment_mode) 컬럼 자체가 없어 2번째 인자는 항상 null.
-function loadDocumentTemplates(housingType, id){
-  if(!housingType) return;
-  fetch(`${SUPABASE_URL}/rest/v1/rpc/get_document_templates_for`, {
-    method: 'POST',
-    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ p_housing_type: housingType, p_recruitment_mode: null })
-  }).then(r => r.ok ? r.json() : []).then(rows => {
-    if(!Array.isArray(rows) || rows.length === 0) return;
-    // 유형 무관 공용 서식(위임장 2건)은 어떤 주택유형으로 조회해도 항상 걸린다.
-    // 그것만 남는 경우는 "이 유형의 서류 데이터가 아직 없음"이지 "제출서류가 위임장뿐"이
-    // 아니므로, 필수 서류가 하나도 없으면 섹션 자체를 띄우지 않는다.
-    if(!rows.some(r => r.requirement_level === '필수')) return;
-    const groups = [];
-    rows.forEach(r => {
-      const lv = r.requirement_level || '기타';
-      let g = groups.find(x => x.level === lv);
-      if(!g){ g = { level: lv, items: [] }; groups.push(g); }
-      g.items.push(r.doc_category || '');
-    });
-    const wrap = document.createElement('details');
-    wrap.className = 'docs-wrap';
-    wrap.innerHTML = `<summary class="docs-title">📄 제출서류 미리보기 (${rows.length}건)</summary>` +
-      groups.map(g => `
-        <div class="docs-group${g.level === '필수' ? ' docs-group-required' : ''}">
-          <div class="docs-level">${escapeHtml(g.level)}</div>
-          <ul class="docs-list">${g.items.map(t => `<li>${escapeHtml(t)}</li>`).join('')}</ul>
-        </div>
-      `).join('') +
-      `<div class="docs-note">ℹ️ 유사 공고에서 수집한 서류 목록입니다. 실제 제출서류는 공고 원문을 확인해 주세요.</div>`;
-    const slot = document.getElementById('docs-slot-'+id);
-    if(slot) slot.appendChild(wrap);
-  }).catch(err => {
-    console.error('ZipFit 제출서류 로드 실패:', err);
-  });
+// 🔵 2026-11-04(우편함 「표시층 — 실사용 7회차 고침」 (가) · 다운님 승인 2026-11-04) — 「📄 이 공고의 제출서류(원문)」.
+//    이번 회차 정책 행 중 서류 칸(신청서류 · 공통 제출서류 · 추가 제출서류 · 구비서류 · 확인서류 등 — 칸 이름이 「…서류」로 끝나거나 「서류의 종류」)만 모아
+//    원문 칸 이름 그대로 소제목으로 단다. 필수/조건부는 짓지 않는다 · 방법·장소·발표 칸과 묻는 꼴(「…?」) 칸은 서류 목록이 아니라 뺀다.
+//    같은 조항은 「📋 정책 안내」에도 그대로 있다(지우지 않는다).
+function zfIsDocCategory(c){
+  c = String(c || '').trim();
+  if(!c || /[?？]/.test(c) || /방법|장소|발표|시각/.test(c)) return false;
+  return /서류(\s*(등|안내|목록))?$/.test(c) || /서류의 종류/.test(c);
+}
+function zfDocsFromPolicies(rows, id){
+  const slot = document.getElementById('docs-slot-' + id);
+  if(!slot) return;
+  slot.querySelectorAll(':scope > .docs-wrap').forEach(e => e.remove());
+  const docs = (rows || []).filter(p => zfIsDocCategory(p && p.category));
+  if(!docs.length) return;
+  const wrap = document.createElement('details');
+  wrap.className = 'docs-wrap';
+  wrap.innerHTML = `<summary class="docs-title">📄 이 공고의 제출서류(원문) (${docs.length}건)</summary>` +
+    docs.map(p => `
+        <div class="policy-item">
+          <div class="policy-category">${escapeHtml(p.category || '')}${typeof p._zfSite === 'string' && p._zfSite ? ` · ${escapeHtml(p._zfSite)}` : ''}</div>
+          <div class="policy-content">${escapeHtml(p.content_raw || '')}</div>
+        </div>`).join('');
+  slot.appendChild(wrap);
 }
 
 function loadPreciseEligibility(annId, detailEl, id, useGroup){
@@ -13468,9 +13488,8 @@ function zf3RenderNoticeHead(filtered){
   const sn = document.querySelector('[data-zf3-sheetcount]');
   if(sn) sn.textContent = chips.length ? `조건에 맞는 ${n.toLocaleString()}건` : (closedExcluded ? `열린 공고 ${o.n.toLocaleString()}건` : `마감 포함 ${n.toLocaleString()}건`);
   el.innerHTML = `<div class="zf3-lhrow"><p class="zf3-lh">${head}</p><span class="zf3-vseg" role="group" aria-label="보기"><button type="button" data-act="view" data-v="list" aria-pressed="${zf3View !== 'map'}">목록</button><button type="button" data-act="view" data-v="map" aria-pressed="${zf3View === 'map'}">지도</button></span></div>`
-    + `<p class="zf3-lsub">${closedExcluded ? '' : `열린 ${o.n.toLocaleString()}건: `}${zf3StLink('접수 중', '접수 중', o.a)} · ${zf3StLink('예정', '접수 예정', o.b)}${o.k ? ` · ${zf3StLink('미상', '접수기간 미상', o.k)}` : ''}</p>`
+    + `<p class="zf3-lsub zf3-lsub-row"><span>${closedExcluded ? '' : `열린 ${o.n.toLocaleString()}건: `}${zf3StLink('접수 중', '접수 중', o.a)} · ${zf3StLink('예정', '접수 예정', o.b)}${o.k ? ` · ${zf3StLink('미상', '접수기간 미상', o.k)}` : ''}</span><span class="zf3-coll" role="note">마지막 수집 <span data-zf3-coll>${escapeHtml(zf3CollText())}</span></span></p>`
     + zf3StatChips(filtered, chips)
-    + `<div class="zf3-tblock" role="note"><div><span class="k">마지막 수집</span><span class="v led" data-zf3-coll>${escapeHtml(zf3CollText())}</span></div></div>`
     + `<div class="zf3-ctl"><button type="button" class="zf3-chip add zf3-fbtn" data-act="sheet" aria-expanded="${sheetOpen}" aria-controls="noticeFilterPanel">${ZF3_ICO_FILTER}필터${chips.length ? ` <b>${chips.length}</b>` : ''}</button>`
     + (sortOpts ? `<span class="zf3-sortsel">${ZF3_ICO_SORT}<select data-act="sortsel" autocomplete="off" aria-label="정렬">${sortOpts}</select><span class="cv" aria-hidden="true">▾</span></span>` : '') + `</div>`
     + (chips.length ? `<div class="zf3-chips" role="group" aria-label="걸린 조건">${chips.map(([k, t]) => `<button type="button" class="zf3-chip on" data-act="clear" data-k="${k}" aria-label="${zfAttr(t)} 조건 빼기">${escapeHtml(t)}<span aria-hidden="true">✕</span></button>`).join('')}</div>` : '');
