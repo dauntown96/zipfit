@@ -4693,7 +4693,7 @@ function zfFbAttachReaction(detailEl, annId){
     zfLog('card_reaction', ks.length ? {v:'down', wrong:ks} : {v:'down'}, annId);
     return ks;
   };
-  box.querySelector('.zf-fb-send').addEventListener('click', () => { sendDown(); finish('고마워요. 알려 주신 칸은 공고 원문과 다시 맞춰 볼게요.'); });
+  box.querySelector('.zf-fb-send').addEventListener('click', () => { sendDown(); finish('고마워요. 알려 주신 칸은 공고 원문과 다시 맞춰 보는 데 써요.'); });
   box.querySelector('.zf-fb-more').addEventListener('click', () => { const ks = sendDown(); finish('고마워요. 아래 창에 자세히 적어 주세요.'); zfFbOpen(annId, ks); });
   detailEl.appendChild(box);
 }
@@ -4716,7 +4716,7 @@ function zfFbOpen(annId, wrongKeys){
       + '<div class="zf-fb-count" id="zfFbCount" aria-live="polite">0 / 1000</div>'
       + '<label for="zfFbMail">답변받을 이메일 <span class="zf-fb-opt">(선택)</span></label>'
       + '<input id="zfFbMail" type="email" inputmode="email" autocomplete="email" maxlength="254" placeholder="답변이 필요할 때만 적어 주세요">'
-      + '<p class="zf-fb-note" id="zfFbNote">받는 것: 의견 · 보낸 화면·공고 · (적으시면) 답변 이메일 — 서비스 개선과 답변에만 써요. 보내 주신 의견은 받은 날부터 1년 보관한 뒤 지워요. 글 속 전화번호 · 이메일 주소 · 긴 숫자는 가린 뒤 저장해요. '
+      + '<p class="zf-fb-note" id="zfFbNote">보내시면 받는 것: 의견 · 보낸 화면·공고 · (적으시면) 답변 이메일 — 서비스 개선과 답변에만 써요. 보내 주신 의견은 받은 날부터 1년 보관한 뒤 지워요. 글 속 전화번호 · 이메일 주소 · 긴 숫자는 가린 뒤 저장해요. '
       + '보내지 않아도 다른 기능은 그대로 쓸 수 있어요. <a href="./privacy.html" target="_blank" rel="noopener">개인정보 처리방침</a></p>'
       + '<p class="zf-fb-err" role="alert" hidden></p>'
       + '<button type="submit" class="zf-fb-submit">보내기</button></form>'
@@ -4769,12 +4769,12 @@ function zfFbSubmit(ov){
     .then(r => {
       btn.disabled = false;
       if(r.status === 409){ showErr('같은 의견을 이미 받았어요. 고마워요.'); return; }
-      if(r.status === 429){ showErr('지금은 의견이 몰려 받지 못했어요. 조금 뒤 다시 눌러 주세요.'); return; }
+      if(r.status === 429){ showErr('잠시 뒤 다시 보내 주세요(짧은 시간에 여러 번 보내면 잠시 막혀요).'); return; }
       if(!r.ok){ showErr('보내지 못했어요. 잠시 뒤 다시 눌러 주세요.'); return; }
       ov.querySelector('#zfFbBody').value = ''; ov.querySelector('#zfFbMail').value = '';
       ov.querySelector('.zf-fb-form').hidden = true;
       const s = ov.querySelector('.zf-fb-sent');
-      s.textContent = mail ? '보냈어요. 적어 주신 이메일로 답할게요.' : '보냈어요. 고마워요 — 화면과 공고 정리를 고치는 데 쓸게요.';
+      s.textContent = mail ? '보냈어요. 적어 주신 이메일로 답이 필요하면 연락드릴게요.' : '보냈어요. 고마워요 — 화면과 공고 정리를 고치는 데 쓸게요.';
       s.hidden = false; ov.querySelector('.zf-fb-x').focus();
     })
     .catch(() => { btn.disabled = false; showErr('보내지 못했어요. 잠시 뒤 다시 눌러 주세요.'); });
