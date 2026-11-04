@@ -5,8 +5,8 @@
 //   「상세조회 마감 … 미시도」 오류는 441런 중 193런(하루 최대 59런)이라 런 단위로는 기준이 되지 않는다 →
 //   「활성 LH 공고 중 6시간 넘게 상세조회를 시도하지 않은 수」(지금 3)로 잰다.
 // 🔴 첫 주는 넉넉하게 — 오탐이 잦으면 알림이 읽히지 않는다.
-import { sqlRead, anonRpc, report, recordFindings, recordInstanceMetrics, SITE, PROJECT_REF, ANON_KEY } from './lib.mjs'
-import { METRICS_PATH, pickMetrics, judgeInstance } from './instance.mjs'
+import { sqlRead, anonRpc, report, recordFindings, recordInstanceMetrics, callRecord, SITE, PROJECT_REF, ANON_KEY } from './lib.mjs'
+import { METRICS_PATH, pickMetrics, judgeInstance, swapinRate } from './instance.mjs'
 import { YEARLY_SQL, judgeYearly } from './yearly.mjs'
 import { SH_RUN_SQL, judgeShRun } from './sh-run.mjs'
 import { BACKLOG_SQL, judgeBacklog } from './collect-backlog.mjs'
@@ -209,16 +209,20 @@ try {
   add('anon_list', '비로그인 get_announcements_deduped', listOk && list.ms <= 10000 ? 'pass' : 'fail',
     `${list.status} · ${Array.isArray(list.data) ? list.data.length : 0}행 · ${list.ms}ms${list.snippet ? ' · ' + list.snippet : ''}`,
     '200 · 행 > 0 · 왕복 ≤ 10초(서버 한도 3초는 200 여부로 잰다 — 넘으면 500. 왕복은 러너↔싱가포르 1.9MB라 넉넉히)')
-  // ③-2 화면이 실제로 보내는 인자 모양(2026-10-01 — 명시 null 은 함수가 인라인되지 않아 따로 잰다 · 우편함 「운영 — 감지 루틴 발송기」 3)
-  //    🔵 2026-10-29(우편함 「코드·운영 — 런칭 뒤 묶음」 3 · 백로그 「목록·인사이트가 limit 없이 전량」) — 세 모양은 announcement_id 칸만 받는다(?select=).
-  //    함수는 서버에서 끝까지 돌고(명시 null 은 인라인되지 않아 전 행 계산) 200·행 수 판정은 같다 · 받는 양만 1.9MB → 약 42KB(2026-10-29 실측).
-  //    전 칸 응답은 위 anon_list 한 번만 받는다(요약 50건 id 재료) — 실행 1회 목록 전송 약 7.6MB → 약 2.0MB.
-  for (const [id, body] of [['anon_list_null', { p_region: null, p_type: null, p_status: null }], ['anon_list_region', { p_region: '경기도' }], ['anon_list_type', { p_type: '국민임대' }]]) {
+  // ③-2 화면이 실제로 보내는 인자 모양 — 칩을 고른 목록(loadNoticeData · matchHouses)은 p_region · p_type 을 붙여 부른다(index.html zfRpcArgs).
+  //    🔵 2026-11-04(우편함 「코드·운영 — swap 처방 …」 4 · 처방 6 — 목록 호출 4 → 2) — 종전 셋(명시 null · 지역 · 유형)을 「인자 있는 길」 하나로 합친다.
+  //    · 명시 null 모양은 뺀다 — 화면은 2026-10-01 뒤 null 인자를 빼고 보낸다(index.html zfRpcArgs) · 인라인이 막히는 회귀는 마이그레이션 check
+  //      (-- zipfit:anon 줄 · 적용 전후 비율 · Function Scan ⚠️)와 탐침(list_rpc_time · 10분)이 잡는다.
+  //    · 지역 · 유형은 한 호출에 함께 싣는다 — 인자를 상수로 넘겨 WHERE 가 서버에서 도는 길(판정 의미: 「인자 있는 호출이 3초 한도 안 200 · 행 > 0」)은 같다.
+  //      전 칸 응답(위 anon_list)에서 지역·유형을 걸러 나눠 쓰지 않는 이유: 그러면 서버의 인자 길을 한 번도 안 부른다(판정 의미가 바뀐다).
+  //    announcement_id 칸만 받는다(?select=) — 받는 양 약 42KB → 그보다 작다.
+  {
+    const body = { p_region: '경기도', p_type: '국민임대' }
     const x = await anonRpc('get_announcements_deduped?select=announcement_id', body)
     const ok = x.status === 200 && Array.isArray(x.data) && x.data.length > 0
-    add(id, `비로그인 get_announcements_deduped ${JSON.stringify(body)}`, ok && x.ms <= 10000 ? 'pass' : 'fail',
+    add('anon_list_args', `비로그인 get_announcements_deduped ${JSON.stringify(body)}`, ok && x.ms <= 10000 ? 'pass' : 'fail',
       `${x.status} · ${Array.isArray(x.data) ? x.data.length : 0}행 · ${x.ms}ms${x.snippet ? ' · ' + x.snippet : ''}`,
-      '200 · 행 > 0(서버 한도 3초는 200 여부로 잰다) — 명시 null 은 2026-10-01 이전 4.6초 500 이었다')
+      '200 · 행 > 0(서버 한도 3초는 200 여부로 잰다) — 칩을 고른 목록과 같은 인자 길 · 2026-11-04 뒤 명시 null·지역·유형 셋을 이 하나로')
   }
   const ids = listOk ? list.data.slice(0, 50).map(r => r.announcement_id) : []
   const sum = ids.length ? await anonRpc('get_announcement_price_summary', { p_ids: ids }) : { status: 0, ms: 0, data: null, snippet: '목록 실패로 건너뜀' }
@@ -849,6 +853,56 @@ try {
   addBlind('list_user_fail', '목록 RPC 사용자 실패(5xx · 57014) 24시간 — 점검 불능(로그 조회 실패)', 'warn', String(e).slice(0, 200), '관리 API 로그(postgrest_logs)를 읽는다(경고만)')
 }
 
+// ㉑ 엣지 요청 일일 셈(2026-11-04 · 우편함 「코드·운영 — swap 처방 …」 5 · 조사 「DB 인스턴스 swap 증가」 ⑦1) — 실사용 성장을 우리 장치 요청과 떼어 읽는다.
+//    KST 하루(전날)의 edge_logs 요청 수를 「전체 · 헤드리스(UA HeadlessChrome) · 스크립트(curl·python·Deno·pg_net·node 등) · 나머지」 개수로만 세어
+//    zipfit_ops.edge_request_daily 에 한 행(🔴 UA·IP·경로 값은 SELECT 결과에도 없다 — countIf 만 · 원칙 36).
+//    언제: KST 01시 뒤 실행마다 「지난 7일 중 아직 못 센 날」을 새 날부터 최대 2개 — 셌으면 그날은 다시 안 센다(하루 평시 로그 조회 1회).
+//    로그 끝점 429·오류는 ok=false(개수 NULL · 0 으로 적지 않음)로 남기고 다음 실행이 다시 센다 · 429 면 그 실행은 더 묻지 않는다.
+//    ℹ️만(판정 없음 · gate.mjs HARD 밖).
+const EDGE_SCRIPT_RE = '(?i)(curl/|python|aiohttp|node-fetch|undici|axios/|go-http-client|deno|wget/|okhttp|java/|libwww|postmanruntime|pg_net|[^a-z0-9_-]node[^a-z0-9_-])'
+try {
+  const token = process.env.SUPABASE_ACCESS_TOKEN
+  if (!token) throw new Error('SUPABASE_ACCESS_TOKEN 이 없다')
+  const kst = new Date(now.getTime() + 9 * 3600 * 1000)
+  const today = kst.toISOString().slice(0, 10)
+  const days = []
+  for (let i = 1; i <= 7; i++) days.push(new Date(Date.parse(today + 'T00:00:00Z') - i * 86400000).toISOString().slice(0, 10))
+  const have = await sqlRead(`select day::text d, ok, total, headless, script, other, tries from zipfit_ops.edge_request_daily where day >= '${days[6]}'::date order by day`)
+  const okDays = new Set(have.filter(r => r.ok).map(r => r.d))
+  const todo = kst.getUTCHours() >= 1 ? days.filter(d => !okDays.has(d)).slice(0, 2) : []
+  const done = []
+  for (const d of todo) {
+    const start = new Date(Date.parse(d + 'T00:00:00Z') - 9 * 3600 * 1000).toISOString()
+    const end = new Date(Date.parse(d + 'T00:00:00Z') + 15 * 3600 * 1000).toISOString()
+    const sql = `select count() total, countIf(event_message like '%HeadlessChrome%') headless,
+      countIf(event_message not like '%HeadlessChrome%' and match(event_message, '${EDGE_SCRIPT_RE}')) script
+      from logs where source = 'edge_logs'`
+    const q = new URLSearchParams({ sql, iso_timestamp_start: start, iso_timestamp_end: end })
+    let rec
+    const res = await fetch(`https://api.supabase.com/v1/projects/${PROJECT_REF}/analytics/endpoints/logs?${q}`, { headers: { Authorization: `Bearer ${token}` } })
+    const text = await res.text()
+    let body = null
+    try { body = JSON.parse(text) } catch { body = null }
+    if (res.ok && body && !body.error && Array.isArray(body.result) && body.result[0]) {
+      const r = body.result[0]
+      rec = { day: d, ok: true, total: Number(r.total), headless: Number(r.headless), script: Number(r.script), note: '관리 API 로그 edge_logs' }
+    } else {
+      rec = { day: d, ok: false, note: `못 셈 — 로그 끝점 ${res.status}${body && body.error ? ' ' + String(body.error).slice(0, 80) : ''}` }
+    }
+    const out = await callRecord('zipfit_ops.edge_request_daily_record', rec)
+    done.push(`${d.slice(5)} ${rec.ok ? `${rec.total}(헤드리스 ${rec.headless} · 스크립트 ${rec.script})` : rec.note}${out === 'kept' ? ' · 앞 셈 유지' : ''}`)
+    if (res.status === 429) break
+  }
+  const y = done.length ? null : have.find(r => r.d === days[0])
+  add('edge_daily', '엣지 요청 일일 셈(전날 KST · 개수만)', 'info',
+    done.length ? `이번에 셈 ${done.join(' · ')}`
+      : y && y.ok ? `${days[0].slice(5)} 전체 ${y.total} · 헤드리스 ${y.headless} · 스크립트 ${y.script} · 나머지 ${y.other}`
+      : `${days[0].slice(5)} 아직 못 셈(${kst.getUTCHours() < 1 ? 'KST 01시 전' : '다음 실행이 다시'})`,
+    '판정 없음(ℹ️) — zipfit_ops.edge_request_daily · 지난 7일 중 못 센 날을 실행마다 최대 2개 · 429 는 못 셈으로 남기고 다음 실행이 다시')
+} catch (e) {
+  add('edge_daily', '엣지 요청 일일 셈(전날 KST · 개수만)', 'info', String(e).slice(0, 200), '관리 API 로그(edge_logs) · 실패면 ℹ️만')
+}
+
 // ⑱ 비밀값 만료(2026-10-17 · 우편함 「코드·운영 — 인스턴스 지표 정기 기록 · Vault 밖 만료 표 · 비밀값 30일 전 ⚠️ …」 3) — zipfit_ops.secret_expiry_list() 한 정의
 //    (Vault 설명칸 「expires=…」 + Vault 밖 표 zipfit_ops.secret_expiry_external · 관리자 상태판 secrets 와 같다)를 읽는다.
 //    날짜 있는 것 중 남은 날 ≤ 30 = ⚠️(이름·날짜) · 지난 것 = ❌(안 멈춤 — gate.mjs HARD 밖) · 설명칸 꼴이 없는 Vault 비밀(missing) = ⚠️.
@@ -1101,12 +1155,15 @@ try {
   const { values, missing } = pickMetrics(text)
   text = null
   if (values.mem_total == null) throw new Error(`지표 끝점 200 · 고를 계열 없음(${missing.length}/${missing.length + Object.keys(values).length})`)
+  // 🔵 2026-11-04(swap 처방 2) — swapin 속도는 직전 기록과의 차이다(기록 전에 읽는다 · 못 읽으면 속도 없이 가용 하한만 본다).
+  let prev = null
+  try { [prev] = await sqlRead(`select scraped_at, pswpin from zipfit_ops.instance_metrics_log order by scraped_at desc limit 1`) } catch { prev = null }
   const id = await recordInstanceMetrics({ scraped_at, ...values })
-  const j = judgeInstance(values)
-  add('instance_mem', '인스턴스 메모리(swap · commit)', j.status,
+  const j = judgeInstance(values, swapinRate(prev, { scraped_at, pswpin: values.pswpin }))
+  add('instance_mem', '인스턴스 메모리(swapin 속도 · 가용)', j.status,
     `${j.value} · 계열 ${Object.keys(values).length}개${missing.length ? `(없음 ${missing.join(',')})` : ''} · 기록 #${id}`, j.rule)
 } catch (e) {
-  add('instance_mem', '인스턴스 메모리(swap · commit)', 'info', String(e).slice(0, 200), '관리 API 지표 끝점(베타) — 실패면 ℹ️만(점검을 막지 않는다)')
+  add('instance_mem', '인스턴스 메모리(swapin 속도 · 가용)', 'info', String(e).slice(0, 200), '관리 API 지표 끝점(베타) — 실패면 ℹ️만(점검을 막지 않는다)')
 }
 
 if (process.env.SIMULATE === 'fail') add('simulate', '실패 흉내(수동 입력 simulate=fail) — 안 멈추는 실패', 'fail', '시험', '알림 경로 확인용 — 평소에는 없다 · 라벨 health-ops-soft')
