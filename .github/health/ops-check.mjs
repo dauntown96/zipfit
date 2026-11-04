@@ -903,6 +903,22 @@ try {
   add('edge_daily', '엣지 요청 일일 셈(전날 KST · 개수만)', 'info', String(e).slice(0, 200), '관리 API 로그(edge_logs) · 실패면 ℹ️만')
 }
 
+// ㉒ 세대 행 시군구가 「시」만인데 같은 행 주소에 그 시 + 「△△구」가 있다(2026-11-04 · 우편함 「코드·운영 — 가격 요약 RPC known_sg …」 3 · 재발 감시).
+//    산식 = 분석 묶음 「세대 행 시군구 … 829행」과 같다: btrim(sigungu_nm) ~ '시$' ∧ address ~ (sigungu_nm || '\s*\S+구(\s|$)') — 기대값 0(그 회차 664행 + 이 회차 165행 뒤).
+//    0이 아니면 ⚠️ + 공고 ID 상위 5(행 수 순). 원인은 분석이 세대 행 시군구를 시까지만 적은 것(스킬 규칙 없음 — 백로그 「공고 분석 스킬 개정 후보」 11-04 줄).
+//    안 멈춤(⚠️만 · gate.mjs HARD 밖) · 쿼리 하나(housing_units 전 행 · 결과 한 줄).
+try {
+  const [x] = await sqlRead(`with t as (select h.announcement_id aid from public.housing_units h
+      where btrim(h.sigungu_nm) ~ '시$' and h.address ~ (btrim(h.sigungu_nm) || '\\s*\\S+구(\\s|$)'))
+    select (select count(*) from t)::int n, (select count(distinct aid) from t)::int a,
+      (select coalesce(string_agg(aid || '(' || c || ')', ', ' order by c desc, aid), '') from (select aid, count(*) c from t group by aid order by c desc, aid limit 5) z) top`)
+  add('unit_sigungu_city_only', '세대 행 시군구가 「시」만(주소에 같은 시 + 구 있음)', x.n > 0 ? 'warn' : 'pass',
+    x.n > 0 ? `${x.n}행 · ${x.a}공고 — ${x.top}` : '0',
+    '0 — 넘으면 ⚠️(안 멈춤) · 같은 행 주소 원문의 「시 구」로 고칠 몫(분석 묶음 2026-11-04 산식)')
+} catch (e) {
+  add('unit_sigungu_city_only', '세대 행 시군구가 「시」만(주소에 같은 시 + 구 있음)', 'warn', String(e).slice(0, 200), 'housing_units 를 읽는다(못 읽으면 ⚠️)')
+}
+
 // ⑱ 비밀값 만료(2026-10-17 · 우편함 「코드·운영 — 인스턴스 지표 정기 기록 · Vault 밖 만료 표 · 비밀값 30일 전 ⚠️ …」 3) — zipfit_ops.secret_expiry_list() 한 정의
 //    (Vault 설명칸 「expires=…」 + Vault 밖 표 zipfit_ops.secret_expiry_external · 관리자 상태판 secrets 와 같다)를 읽는다.
 //    날짜 있는 것 중 남은 날 ≤ 30 = ⚠️(이름·날짜) · 지난 것 = ❌(안 멈춤 — gate.mjs HARD 밖) · 설명칸 꼴이 없는 Vault 비밀(missing) = ⚠️.
@@ -1138,7 +1154,7 @@ try {
 }
 
 // ⑲ 인스턴스 메모리(2026-10-17 · 같은 우편 1 · 조사 「인스턴스 지표 경로」 ⓑ) — 관리 API 지표 끝점(베타)에서 숫자만 골라(instance.mjs) zipfit_ops.instance_metrics_log 에 한 행.
-//    🔴 본문 원문은 어디에도 남기지 않는다(값 칸은 고른 숫자 요약뿐 · 실패하면 HTTP 상태만). ⚠️만(❌ 없음 · 문턱 잠정 — instance.mjs).
+//    🔴 본문 원문은 어디에도 남기지 않는다(값 칸은 고른 숫자 요약뿐 · 실패하면 HTTP 상태만). 판정 문턱 = instance.mjs(⚠️ · 「Nano 꼴」 ❌ 안 멈춤 — 2026-11-04).
 //    베타 끝점이라 받기·고르기·기록이 실패하면 이 항목만 ℹ️ — 점검 전체를 막지 않는다.
 try {
   const token = process.env.SUPABASE_ACCESS_TOKEN

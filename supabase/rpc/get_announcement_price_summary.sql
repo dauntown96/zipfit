@@ -139,6 +139,9 @@ AS $function$
   --   값 계산(보증금·월세·면적·회차·flags)은 이 CTE 를 읽지 않는다. 시도 옛 이름(광주광역시 등)은 화면이 맞춘다.
   --   🔴 시군구는 수집(announcements.sigungu_nm)에 실재하는 이름만 받는다(같거나 「이름 + 공백」으로 시작) — 옛 분석분
   --      세대 행에 「경기수원시」·「매입다가구(대구수성구)」 같은 값이 있다(2026-09-30 실측 23쌍 중 시도 옛 이름 아닌 것 전부).
+  --   🔵 2026-11-04(우편함 「코드·운영 — 가격 요약 RPC known_sg …」 1) — 「○○시 △△구」(마디 둘 · 뒤가 구 하나) 꼴은 앞 「○○시」가 수집 이름에
+  --      실재하면(같거나 「○○시 」로 시작) 받는다 — 새 구(화성시 병점구 등)·공고 행에 없는 구(고양시 일산동구 등)가 원문 주소대로 보이게.
+  --      옛 쓰레기 값(「경기수원시」·「매입다가구(…)」·「양산」)은 이 꼴도 아니고 앞 마디도 수집 이름에 없어 종전대로 버린다(2026-11-04 전수 17값 중 새로 받는 것 「화성시 병점구」 하나).
   known_sg as materialized (
     select distinct btrim(sigungu_nm) as sg
     from public.announcements
@@ -157,6 +160,8 @@ AS $function$
     select pl.aid, jsonb_agg(jsonb_build_array(pl.sd || ' ' || pl.sg, pl.n) order by pl.n desc, pl.sd || ' ' || pl.sg) as unit_places
     from places pl
     where exists (select 1 from known_sg k where k.sg = pl.sg or k.sg like pl.sg || ' %')
+       or exists (select 1 from known_sg k
+                   where k.sg = substring(pl.sg from '^(\S+시) \S+구$') or k.sg like substring(pl.sg from '^(\S+시) \S+구$') || ' %')
     group by pl.aid
   ),
   -- 🔵 2026-11-02(우편함 「표시층 — ㎡당 월세 중앙값 …」 A) — rent_per_sqm_med = 위 가격 범위와 같은 pick 행의 monthly_rent / area_sqm 중앙값(원 · 반올림).
