@@ -68,6 +68,14 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: bash scripts/cache-bump-check.sh
+      # 🔵 2026-11-04(우편함 「코드·운영 — #732 지방공사 받기 …」 6 ② · 백로그 「네트워크 허용 문서가 낡았고 … 「{{」를 막는 PR 검사가 없다」) —
+      #    고지 문서(privacy.html · terms.html · notices.json)에 자리 표시 「{{」가 남은 채 main 으로 가면 실패. DB 를 부르지 않는다(grep 한 줄).
+      - name: 고지 문서 자리 표시 「{{」
+        run: |
+          hits=$(grep -n '{{' privacy.html terms.html notices.json 2>/dev/null || true)
+          if [ -z "$hits" ]; then echo "고지 문서 자리 표시 「{{」 0 — 통과"; exit 0; fi
+          printf '%s\n' "$hits" | while IFS= read -r l; do echo "::error::자리 표시가 남았다 — $l"; done
+          exit 1
       - name: DB 파일을 건드렸나
         id: scope
         env:
