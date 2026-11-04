@@ -38,13 +38,15 @@ const ADDED = {
     { host: 'www.gndc.co.kr', viewPath: '/boardview/boardview.do', parser: 'cms_download' },
   ],
   EXTRA_CA: ['www.gmcc.co.kr'],
+  // 🔵 2026-11-04 — 광주는 해외 IP 를 끊는다(배포 뒤 실측 · 기본 지역 3/3 reset · 서울 3/3 200)
+  SEOUL_ONLY: ['www.gmcc.co.kr'],
 }
 
 const sortObj = o => Object.fromEntries(Object.entries(o).sort(([a], [b]) => a.localeCompare(b)))
 const byHost = a => [...a].sort((x, y) => x.host.localeCompare(y.host))
 const cases = [
   ['ALLOWED = 종전 + 더한 셋', sortObj(allowedPaths()), sortObj({ ...OLD.ALLOWED, ...ADDED.ALLOWED })],
-  ['SEOUL_ONLY 같음', [...seoulOnlyHosts()].sort(), [...OLD.SEOUL_ONLY].sort()],
+  ['SEOUL_ONLY = 종전 + 광주', [...seoulOnlyHosts()].sort(), [...OLD.SEOUL_ONLY, ...ADDED.SEOUL_ONLY].sort()],
   ['PROBE_HOSTS 같음(18)', [...probeHosts()].sort(), [...OLD.PROBE_HOSTS].sort()],
   ['BOARD_SOURCES = 종전 + 더한 셋', byHost(boardSourceList()), byHost([...OLD.BOARD_SOURCES, ...ADDED.BOARD_SOURCES])],
   ['추가 인증서는 광주 한 호스트만', HOSTS.filter(h => h.extraCaPem).map(h => h.host), ADDED.EXTRA_CA],

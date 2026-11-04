@@ -79,7 +79,9 @@ export const HOSTS: HostConf[] = [
     board: { viewPath: '/open/news/notice.htm', parser: 'jpdc' } },
   // 🔵 2026-10-26 ⓒ 광주광역시도시공사 — 상세 /board.es?…&act=view&list_no=N · 받기 /boardDownload.es?bid=&list_no=&seq=.
   //   robots.txt 는 Googlebot 에만 「/」 막음(우리 UA 규칙 없음 · 2026-10-26 확인).
-  { host: 'www.gmcc.co.kr', paths: ['/board.es', '/boardDownload.es'], probe: true, extraCaPem: GMCC_INTERMEDIATE_PEM,
+  //   🔵 2026-11-04(#873 배포 뒤 실측) — 해외 IP 를 끊는다: 같은 글 fetch 모드 기본 지역(ap-southeast-1) 3/3 502 「Connection reset by peer」 ·
+  //   서울(ap-northeast-2) 3/3 200(222,674B) · 병합 뒤 수집 런 셋(11:10·11:20·11:30 KST) 모두 같은 reset → seoulOnly(부산 꼴).
+  { host: 'www.gmcc.co.kr', paths: ['/board.es', '/boardDownload.es'], seoulOnly: true, probe: true, extraCaPem: GMCC_INTERMEDIATE_PEM,
     board: { viewPath: '/board.es', parser: 'gmcc' } },
   // 🔵 2026-10-26 ⓑ 경상북도개발공사 · 경상남도개발공사 — 같은 CMS(상세 /boardview/boardview.do · 받기 /common/download.do?fileVirtualPath=…).
   //   robots.txt 없음(2026-10-26 · 에러 화면). 싱가포르 DB net.http_get 으로 본문을 받은 적이 있어 서울 전용 아님(B56).
