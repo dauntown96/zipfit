@@ -12,11 +12,16 @@
 //    요청서가 더한 조건(#711 회신 ⑦) — 화면 정의를 바꾸지 않고 「공지가 이미 나왔어야 하는 때」로 좁히기만 한다:
 //      매입     = 대표 housing_type 에 「매입」
 //      순위별   = 그 id 들의 일정 표(announcement_schedule) 대상주택게시 행의 scope_text 가 둘 이상
-//      게시 지남 = 창 i 의 대상주택게시 행(scope_text ∈ 창 i 의 phase_text — zfRouteSchedOf 와 같은 짝짓기) 중 하나라도 시작일 ≤ 오늘
+//      게시 지남 = 창 i 의 대상주택게시 행(scope_text ∈ 창 i 의 phase_text — zfRouteSchedOf 와 같은 짝짓기) 중 하나라도 게시 시각 ≤ 지금(KST)
+//                  게시 시각 = 시작일 + period_text 의 첫 「HH:MM」(「(15:00 이후)」 · 「(10:00)」 꼴) · 시각이 없으면 시작일 0시(= 종전 「시작일 ≤ 오늘」)
+//                  (2026-11-05 · 우편함 「코드·운영 — 합격점수 문서 칸 …」 2장 — …20882 「‘26.11.05(목) [LH청약플러스] (15:00 이후)」가 00:25부터 ⚠️였다)
 //      창 끝 전  = 오늘 ≤ 창 i 끝(오늘이 그 창 안 ∨ 그 창 시작 전)
 //    🔴 ⚠️ 경고만 · gate.mjs HARD 밖(안 멈춤 — 고치는 길이 공지를 읽고 정책 행을 쓰는 운영 데이터 쓰기 몫) · SQL 이 실패하면 ⚠️ 점검 불능.
-//    대역 시험이 이 SQL 을 그대로 쓴다 — today = 오늘 식(날짜 리터럴로 바꿔 과거·미래 재현) · dropWarn = ⚠️ 행을 없는 셈 칠 공고 id 배열(가지 대역).
-export const waveNoticeSql = ({ today = `(now() at time zone 'Asia/Seoul')::date`, dropWarn = [] } = {}) => {
+//    대역 시험이 이 SQL 을 그대로 쓴다 — today = 오늘 식(날짜 리터럴로 바꿔 과거·미래 재현) · dropWarn = ⚠️ 행을 없는 셈 칠 공고 id 배열(가지 대역) ·
+//    now = 지금 식(KST timestamp · today 만 바꾸면 그날 23:59:59 — 종전 「시작일 ≤ 오늘」과 같은 결과).
+export const waveNoticeSql = ({ today = `(now() at time zone 'Asia/Seoul')::date`, dropWarn = [], now } = {}) => {
+  const nowX = now ?? (today.startsWith('(now()') ? `(now() at time zone 'Asia/Seoul')` : `((${today})::date + time '23:59:59')`)
+  const postAt = `(s.start_date + coalesce(substring(s.period_text from '([0-9]{1,2}:[0-5][0-9])')::time, time '00:00'))`
   const drop = dropWarn.length ? `and p.announcement_id not in (${dropWarn.map(s => `'${String(s).replace(/'/g, "''")}'`).join(', ')})` : ''
   return `
 with c as materialized (select d.announcement_id, d.title, d.apply_start s0, d.apply_end e0, public.announcement_dedup_key(d.title) k
@@ -49,7 +54,7 @@ hit as (select cw.*,
           and (select count(distinct s.scope_text) from public.announcement_schedule s
                 where s.announcement_id = any(cw.allids) and s.stage = '대상주택게시') >= 2
           and exists (select 1 from public.announcement_schedule s
-                       where s.announcement_id = any(cw.allids) and s.stage = '대상주택게시' and s.scope_text = any(cw.phs) and s.start_date <= ${today})
+                       where s.announcement_id = any(cw.allids) and s.stage = '대상주택게시' and s.scope_text = any(cw.phs) and ${postAt} <= ${nowX})
           and not exists (select 1 from public.announcement_policies p
                            where p.announcement_id = any(cw.allids) and p.category like '⚠️%' and p.category like '%차수%' and p.category like '%대상%' ${drop}))
 select json_build_object(
@@ -62,7 +67,7 @@ select json_build_object(
 
 // 판정 — 0 이면 통과 · 넘으면 ⚠️(공고 ID · 몇째 창 · 게시일 · 창 — 사람이 읽고 공지를 찾아 정책 행을 쓰게).
 export function judgeWaveNotice(j) {
-  const rule = '0 — 열린 매입 대표 ∧ 경로 창 둘 이상 ∧ 기본 창이 둘째 이후(화면 zfRouteDefaultWin) ∧ 대상주택게시 scope 둘 이상 ∧ 그 창 게시일 ≤ 오늘 ∧ 오늘 ≤ 그 창 끝 ∧ 「⚠️ … 차수 … 대상」 정책 행 없음 · 넘으면 ⚠️ 경고만(공지 목록을 읽고 정책 행을 쓰는 것은 운영 데이터 쓰기 몫)'
+  const rule = '0 — 열린 매입 대표 ∧ 경로 창 둘 이상 ∧ 기본 창이 둘째 이후(화면 zfRouteDefaultWin) ∧ 대상주택게시 scope 둘 이상 ∧ 그 창 게시 시각(시작일 + period_text 「HH:MM」 · 없으면 0시) ≤ 지금(KST) ∧ 오늘 ≤ 그 창 끝 ∧ 「⚠️ … 차수 … 대상」 정책 행 없음 · 넘으면 ⚠️ 경고만(공지 목록을 읽고 정책 행을 쓰는 것은 운영 데이터 쓰기 몫)'
   if (j.n === 0) return { status: 'pass', value: `0(열린 매입 카드 ${j.cards} · 둘째 이후 창 ${j.wave})`, rule }
   const v = j.ids.slice(0, 5).map(x => `${x.id}(${x.win}째 창 ${x.from}~${x.to} · 대상주택 게시 ${x.post} · ⚠️ 차수 행 없음)`).join(', ')
   return { status: 'warn', value: `${j.n}: ${v}`, rule }

@@ -13,6 +13,7 @@ import { BACKLOG_SQL, judgeBacklog } from './collect-backlog.mjs'
 import { HARD, splitFailed } from './gate.mjs'
 import { lhGoneSql, judgeLhGone } from './lh-gone.mjs'
 import { waveNoticeSql, judgeWaveNotice } from './wave-notice.mjs'
+import { LH_LEASE_MATCH_SQL, judgeLhLeaseMatch } from './lh-lease-match.mjs'
 import { screenRunSql, judgeScreenRun } from './screen-run.mjs'
 import { ELIG_FORM_NULL_SQL, RENT_NULL_SQL, ROUND_MIX_SQL, judgeEligFormNull, judgeRentNull, judgeRoundMix } from './open-gaps.mjs'
 import { readdirSync, readFileSync } from 'node:fs'
@@ -951,6 +952,15 @@ try {
   }
 } catch (e) {
   add('lh_cutoff', 'LH 합격점수 수집(주 1회) · 거름 위반', 'warn', String(e).slice(0, 200), 'lh_cutoff_run_log · lh_cutoff_scores 를 읽는다(못 읽으면 ⚠️)')
+}
+
+// ㉛ 기본 임대조건 ↔ LH 합격점수 API 대조(2026-11-05) — 판정·SQL 은 lh-lease-match.mjs 머리 주석. ℹ️ 정보만 · 표가 없거나 못 읽어도 ℹ️(판정 전 단계).
+try {
+  const [x] = await sqlRead(LH_LEASE_MATCH_SQL)
+  const j = judgeLhLeaseMatch(x.j)
+  add('lh_lease_match', 'LH 합격점수 API 기본 임대조건 ↔ 세대 행(열린 국민·영구·통합공공 · 정보)', j.status, j.value, j.rule)
+} catch (e) {
+  add('lh_lease_match', 'LH 합격점수 API 기본 임대조건 ↔ 세대 행(열린 국민·영구·통합공공 · 정보)', 'info', String(e).slice(0, 200), '목록 RPC · 합격점수 · 세대 표를 읽는다(못 읽어도 정보)')
 }
 
 // ㉓ 화면 빈칸 점검 셋 — 한 쿼리(2026-11-04 · 우편함 「옛 주소 걷기·화면 빈칸 점검」 3~5 · 전부 안 멈춤 — gate.mjs HARD 밖).
