@@ -4172,7 +4172,7 @@ function applyNoticeFiltersAndRender(keepPage){
   //    접수 중 공고보다 앞에 섰다(태백 …020645 8/31). 취소공고끼리는 고른 정렬 그대로다.
   const cancelLast = (a,b) => (zfIsCancelRow(a['공고명']) ? 1 : 0) - (zfIsCancelRow(b['공고명']) ? 1 : 0);
   filtered = [...filtered].sort((a,b) => cancelLast(a,b) || noticeSortCmp(a,b));
-  if(sortVal==='deposit-asc' || sortVal==='rent-asc') zfSortPriceFill(filtered);   // 🔵 2026-11-04 — 재료 없는 행만 한 번 물어 다시 줄 세운다(아래)
+  if(sortVal==='deposit-asc' || sortVal==='rent-asc' || sortVal==='area-desc') zfSortPriceFill(filtered);   // 🔵 2026-11-04 — 재료 없는 행만 한 번 물어 다시 줄 세운다(아래)
   function noticeSortCmp(a,b){
     // 🔴 접수 단계 그룹 선비교(applyWindowRank)를 **공고 탭에서 걷었다**(2026-09-16).
     //    「최신 공고순」을 골랐는데 최신 공고가 위에 안 오던 것이 이것이었다 — 정렬 위에
@@ -4212,7 +4212,7 @@ function applyNoticeFiltersAndRender(keepPage){
     //    종전 공고 칸 deposit_min·rent_min 은 열린 57 중 4만 차 있어 순서가 틀렸다(강릉 매입 58만이 영등포 4,650만 아래). 가격 없는 카드는 뒤(종전 그대로).
     if(sortVal==='deposit-asc')   return nullLast(a,b,n=>zfSortPriceOf(n,'deposit_min'),false);
     if(sortVal==='rent-asc')      return nullLast(a,b,n=>zfSortPriceOf(n,'rent_min'),false);
-    if(sortVal==='area-desc')     return nullLast(a,b,n=>zfNumOrNull(n['area_max']),true);
+    if(sortVal==='area-desc')     return nullLast(a,b,n=>zfSortPriceOf(n,'area_max'),true);   // 🔵 2026-11-05 — 카드 머리 「전용」 재료(가격 요약 area_max · 목록 RPC area_max 는 분석분이 빈다)
     if(sortVal==='region-asc'){
       const regionA = (a['sido_nm']||a['지역']||'') + ' ' + (a['sigungu_nm']||'');
       const regionB = (b['sido_nm']||b['지역']||'') + ' ' + (b['sigungu_nm']||'');
@@ -5166,7 +5166,7 @@ function zfSortPriceFill(rows){
   need.forEach(id => zfSortPriceAsked.add(id));
   zfEnsurePriceSummaries(need).then(ok => {
     const sv = (document.getElementById('noticeSortSel') || {}).value;
-    if(ok && (sv === 'deposit-asc' || sv === 'rent-asc')) applyNoticeFiltersAndRender(noticePage);
+    if(ok && (sv === 'deposit-asc' || sv === 'rent-asc' || sv === 'area-desc')) applyNoticeFiltersAndRender(noticePage);
   });
 }
 function zfLoadRentStats(){
@@ -5188,9 +5188,9 @@ function zfLoadRentStats(){
     const vals = new Map();
     // 🔵 2026-11-03(우편함 「표시층 — 다운님 실사용 넷」 D ③ · 다운님 승인 2026-11-04) — 같은 시·도 같은 유형 묶음도 함께 센다(키 끝에 「\u0002시·도」) · 그리는 쪽이 표본 5곳 이상이면 그쪽을 먼저.
     const push = (k, v) => { if(!vals.has(k)) vals.set(k, []); vals.get(k).push(v); };
-    out.forEach(r => { if(r && r.announcement_id) zfSortPrice.set(String(r.announcement_id), { deposit_min: r.deposit_min, rent_min: r.rent_min }); });
+    out.forEach(r => { if(r && r.announcement_id) zfSortPrice.set(String(r.announcement_id), { deposit_min: r.deposit_min, rent_min: r.rent_min, area_max: r.area_max }); });   // 🔵 2026-11-05 area_max — 전용면적 정렬 재료
     // 가격 정렬을 고른 채 재료가 늦게 왔으면 한 번만 다시 줄 세운다(쪽은 그대로) — 그 뒤로는 흔들리지 않는다.
-    { const sv = (document.getElementById('noticeSortSel') || {}).value; if(noticeLoaded && (sv === 'deposit-asc' || sv === 'rent-asc')) applyNoticeFiltersAndRender(noticePage); }
+    { const sv = (document.getElementById('noticeSortSel') || {}).value; if(noticeLoaded && (sv === 'deposit-asc' || sv === 'rent-asc' || sv === 'area-desc')) applyNoticeFiltersAndRender(noticePage); }
     out.forEach(r => {
       if(!r || r.round_state !== 'current' || r.rent_per_sqm_med == null) return;
       const row = byId.get(String(r.announcement_id));
@@ -5260,6 +5260,126 @@ function zfFillSummarySlots(){
             })());
   });
   zfRefreshCovers();   // 🔵 2026-09-30 — 세대 행 지역이 방금 왔을 수 있다(표지 대표·곳 수)
+  zfCutoffKick();      // 🔵 2026-11-05 — 카드 「지난 회차」 줄(LH 합격점수)
+}
+
+// 🔵 2026-11-05(우편함 「표시층 — 커트라인 시안 A」 · 다운님 승인 2026-11-05) — 카드 「🕘 지난 회차」 한 줄 + 상세 「지난 회차」 표.
+//    재료 = RPC get_announcement_cutoff_rounds(p_ids) — 묶음 세대 행 단지명·시군구 ↔ LH 합격점수 · 같은 유형 · 이 공고보다 앞선 가장 최근 한 회차.
+//    🔴 커트라인 글은 DB 값 그대로 따옴표로 · 「미달·당첨·경쟁」을 풀어 쓰지 않는다 · 「공급·경쟁률」은 신청유형이 「예비자」가 아닌 행만.
+//    맞는 회차가 없는 카드는 자리를 만들지 않는다(빈 상자 0).
+const zfCutoffCache = new Map();   // announcement_id → 행 배열(없으면 []) · 조회 중 undefined
+const ZF_CUTOFF_NOTE = '지난 회차 기록이에요 — 이번 공고의 선정 기준·결과와 다를 수 있어요.';
+// 주택형 맞춤 키 — 첫 숫자(소수 허용) + 바로 뒤 영문 한 글자(46A) + 「약자」 여부. 「46」·「46형」·「46㎡」 = 같은 키 · 「46A」 ≠ 「46」 · 「29(주거약자)」 = 「29(주거약자용)」.
+function zfUnitKey(t){
+  const s = String(t || '').replace(/\s+/g, '');
+  const m = s.match(/(\d+(?:\.\d+)?)(?:형|㎡|m²)?([A-Za-z])?/);
+  if(!m) return '';
+  return String(Number(m[1])) + (m[2] ? m[2].toUpperCase() : '') + (/약자/.test(s) ? '|약자' : '');
+}
+// 커트라인 칸 글자 — 원문(거른 값) 그대로 따옴표, 비었으면 사유(승인본 규칙 3 순서) · 그 밖은 null(「—」).
+function zfCutoffWhy(r){
+  if(r.cutoff_text) return null;
+  const n = Number(r.spl_rmno);
+  if(n >= 1 && n <= 4) return '공급이 5호 미만이라 LH가 커트라인을 공개하지 않아요';
+  if(String(r.spl_tp_nm || '').includes('행복주택')) return '행복주택은 추첨이라 커트라인이 없어요';
+  if(r.cutoff_state === 'small_applicants') return '신청이 적어 꼭집이 표시하지 않아요';
+  return null;
+}
+function zfCutoffCell(r){
+  if(r.cutoff_text) return '「' + escapeHtml(r.cutoff_text) + '」';
+  const w = zfCutoffWhy(r);
+  return w ? escapeHtml(w) : '—';
+}
+// 대표 행(카드 한 줄) — 카드 세대 행 주택형(세대 행 순서) 중 지난 회차에 같은 주택형이 있는 첫 것 · 그 주택형 안에서 커트라인 글 있는 행 → 신청 많은 행.
+//    맞는 주택형이 없으면 그 회차 전 행에서 같은 순서(커트라인 글 → 신청)로 고른다.
+function zfCutoffPick(rows){
+  const byNum = (a, b) => (a.cutoff_text ? 0 : 1) - (b.cutoff_text ? 0 : 1) || (Number(b.rqpr_cnt) || 0) - (Number(a.rqpr_cnt) || 0);
+  const units = (rows[0] && rows[0].unit_types) || [];
+  for(const u of units){
+    const k = zfUnitKey(u);
+    if(!k) continue;
+    const hit = rows.filter(r => zfUnitKey(r.ltst_nm) === k);
+    if(hit.length) return hit.sort(byNum)[0];
+  }
+  return [...rows].sort(byNum)[0] || null;
+}
+function zfCutoffLineHtml(rows){
+  const r = zfCutoffPick(rows);
+  if(!r) return '';
+  const why = zfCutoffWhy(r);
+  const tail = r.cutoff_text ? `LH 공개 커트라인 「${escapeHtml(r.cutoff_text)}」` : (why ? escapeHtml(why) : 'LH 공개 커트라인 —');
+  return `<div class="zf-cut-line" style="font-size:12px;color:var(--ink-2,#555);background:var(--surface,#f7f6f2);border:1px solid var(--line-2,#e2e3e6);border-radius:8px;padding:6px 10px;margin-bottom:6px;line-height:1.5">`
+    + `🕘 지난 회차(${escapeHtml(r.rcr_pan_dt || '')} · ${escapeHtml(r.ltst_nm || '')} · ${escapeHtml(r.rqs_tp_nm || '')}) 신청 ${Number(r.rqpr_cnt) || 0}명 · ${tail}`
+    + `<div style="font-size:11px;color:var(--ink-3,#888);margin-top:2px">${ZF_CUTOFF_NOTE}</div></div>`;
+}
+const zfCutoffAsked = new Set();
+async function zfEnsureCutoff(ids){
+  const need = [...new Set((ids || []).map(String).filter(id => id && !zfCutoffAsked.has(id)))];
+  if(!need.length) return false;
+  need.forEach(id => zfCutoffAsked.add(id));
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_announcement_cutoff_rounds`,
+      {method:'POST', headers: zfAnonHeaders(), body: JSON.stringify({p_ids: need})});
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const rows = await res.json();
+    if(!Array.isArray(rows)) throw new Error('예상치 못한 응답');
+    need.forEach(id => zfCutoffCache.set(id, []));
+    rows.forEach(r => { if(r && r.announcement_id){ const a = String(r.announcement_id); zfCutoffCache.get(a).push(r); } });
+    return true;
+  }catch(err){
+    need.forEach(id => zfCutoffAsked.delete(id));   // 실패는 안 물어본 것과 같게 — 다음 렌더가 다시 묻는다(자리는 그리지 않는다)
+    console.warn('ZipFit 지난 회차 로드 실패:', err);
+    return false;
+  }
+}
+// 요약 자리([data-sum-for]) 바로 뒤에 한 줄 자리를 둔다 — 요약 자리는 innerHTML 을 다시 쓰므로 그 안에 두지 않는다.
+function zfFillCutoffSlots(){
+  document.querySelectorAll('[data-sum-for]').forEach(el => {
+    const id = el.getAttribute('data-sum-for') || '';
+    const rows = zfCutoffCache.get(id);
+    let slot = el.nextElementSibling;
+    if(!(slot && slot.getAttribute('data-cut-for') === id)) slot = null;
+    if(!rows || !rows.length){ if(slot) slot.remove(); return; }
+    if(!slot){ slot = document.createElement('div'); slot.setAttribute('data-cut-for', id); el.after(slot); }
+    const html = zfCutoffLineHtml(rows);
+    if(slot.innerHTML !== html) slot.innerHTML = html;
+  });
+}
+function zfCutoffKick(){
+  const ids = [...document.querySelectorAll('[data-sum-for]')].map(el => el.getAttribute('data-sum-for'));
+  zfFillCutoffSlots();
+  zfEnsureCutoff(ids).then(ok => { if(ok) zfFillCutoffSlots(); });
+}
+// 상세 「지난 회차」 접기 — 열 = 주택형 · 모집공고일 · 신청유형 · 신청 · 공급·경쟁률 · LH 공개 커트라인. 주택형 큰 순.
+//    카드 세대 행과 주택형이 맞는 행은 굵게(그 회차 전 주택형을 다 보여 준다).
+async function zfRenderCutoffDetail(annId, id){
+  const slot = document.getElementById('cutoff-slot-' + id);
+  if(!slot || !annId) return;
+  if(!zfCutoffCache.has(String(annId))) await zfEnsureCutoff([annId]);
+  const rows = zfCutoffCache.get(String(annId)) || [];
+  if(!rows.length){ slot.innerHTML = ''; return; }
+  const byCx = new Map();
+  rows.forEach(r => { const k = r.complex_name || ''; if(!byCx.has(k)) byCx.set(k, []); byCx.get(k).push(r); });
+  // 좁은 화면(390)에서도 여섯 칸이 폭 안에 들게 줄바꿈을 허용한다 — 가로 스크롤 뒤에 커트라인 칸이 숨지 않게.
+  const th = 'text-align:left;font-weight:600;padding:4px 4px;border-bottom:1px solid var(--line-2,#e2e3e6);vertical-align:bottom;word-break:keep-all';
+  const td = 'padding:4px 4px;border-bottom:1px solid var(--line-2,#e2e3e6);vertical-align:top;word-break:keep-all';
+  let body = '';
+  byCx.forEach((rs, cx) => {
+    const mine = new Set(((rs[0] && rs[0].unit_types) || []).map(zfUnitKey).filter(Boolean));
+    const sorted = [...rs].sort((a, b) => (parseFloat(b.ltst_nm) || 0) - (parseFloat(a.ltst_nm) || 0)
+      || String(a.ltst_nm).localeCompare(String(b.ltst_nm), 'ko') || String(a.rqs_tp_nm).localeCompare(String(b.rqs_tp_nm), 'ko'));
+    const trs = sorted.map(r => {
+      const pre = r.rqs_tp_nm === '예비자';
+      const sup = pre ? '—' : `${r.spl_rmno != null ? Number(r.spl_rmno) + '호' : '—'}${r.competition_ratio != null ? ' · ' + Number(r.competition_ratio) + ':1' : ''}`;
+      const b = mine.has(zfUnitKey(r.ltst_nm)) ? 'font-weight:600;' : '';
+      return `<tr style="${b}"><td style="${td};word-break:break-all;min-width:3em">${escapeHtml(r.ltst_nm || '')}</td><td style="${td};white-space:nowrap">${escapeHtml(r.rcr_pan_dt || '')}</td><td style="${td}">${escapeHtml(r.rqs_tp_nm || '')}</td><td style="${td};white-space:nowrap">${Number(r.rqpr_cnt) || 0}명</td><td style="${td}">${sup}</td><td style="${td}">${zfCutoffCell(r)}</td></tr>`;
+    }).join('');
+    body += (byCx.size > 1 ? `<div style="font-size:12px;font-weight:600;margin:8px 0 4px">${escapeHtml(cx)}</div>` : '')
+      + `<div style="overflow-x:auto;margin-top:6px"><table style="border-collapse:collapse;font-size:11px;width:100%"><thead><tr>`
+      + `<th style="${th}">주택형</th><th style="${th}">모집공고일</th><th style="${th}">신청유형</th><th style="${th}">신청</th><th style="${th}">공급·경쟁률</th><th style="${th}">LH 공개 커트라인</th></tr></thead><tbody>${trs}</tbody></table></div>`;
+  });
+  slot.innerHTML = `<details class="hu-past zf-cut-detail"><summary class="hu-past-title">🕘 지난 회차 — LH 공개 커트라인</summary>${body}`
+    + `<p style="font-size:11px;color:var(--ink-3,#888);margin-top:6px;line-height:1.5">출처 LH 공공데이터(건설임대 당첨 합격점수) · ${ZF_CUTOFF_NOTE}</p></details>`;
 }
 
 // 아직 모르는 id만 골라 한 번에 묻는다. 카드마다 부르면 목록 1회에 87번이 된다.
@@ -7633,7 +7753,7 @@ function sortMatchRows(rows, sortVal){
     //    목록 RPC deposit_min·rent_min 은 분석분이 비어 사실상 모름 순서로 섰다. matchHouses 가 렌더 전에 요약을 받아 두므로 채우기(zfSortPriceFill)는 두지 않는다.
     if(sortVal==='deposit-asc')   return nullLast(a,b,n=>zfSortPriceOf(n,'deposit_min'),false);
     if(sortVal==='rent-asc')      return nullLast(a,b,n=>zfSortPriceOf(n,'rent_min'),false);
-    if(sortVal==='area-desc')     return nullLast(a,b,n=>zfNumOrNull(n.area_max),true);
+    if(sortVal==='area-desc')     return nullLast(a,b,n=>zfSortPriceOf(n,'area_max'),true);   // 🔵 2026-11-05 — 공고 탭과 같은 재료
     if(sortVal==='region-asc'){
       const regionA = (a.sido_nm||a.region||'') + ' ' + (a.sigungu_nm||'');
       const regionB = (b.sido_nm||b.region||'') + ' ' + (b.sigungu_nm||'');
@@ -7756,6 +7876,7 @@ function toggleDetail(id, card, from){
       `<div id="elig-slot-${id}"></div>` +
       `<div id="blocks-slot-${id}"></div>` +
       `<div id="hu-slot-${id}"></div>` +
+      `<div id="cutoff-slot-${id}"></div>` +
       `<div id="attachments-slot-${id}"></div>` +
       `<div id="extras-slot-${id}"></div>` +
       `<div id="policy-slot-${id}"></div>` +
@@ -7766,6 +7887,7 @@ function toggleDetail(id, card, from){
     loadScheduleLine(cardEl.dataset.announcementId || '', cardEl, id);
     zfOpsDetailHide(cardEl, id, detailEl);   // 🔵 2026-10-16 — 관리자에게만 「이 묶음 숨기기」(비관리자는 아무것도 그리지 않는다)
     renderAttachments(cardEl, id);
+    zfRenderCutoffDetail(cardEl.dataset.announcementId || '', id);   // 🔵 2026-11-05 — 「지난 회차」(LH 합격점수)
   }
   // 🔵 2026-10-13 — MYHOME 다구 묶음의 머리 「모집 세대수」를 같은 회차 분할 행 합으로(zfRecruitBundleSum 주석).
   if(!open && !detailEl.dataset.unitsLoaded && cardEl){
