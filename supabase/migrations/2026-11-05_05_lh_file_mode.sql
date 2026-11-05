@@ -1,16 +1,39 @@
--- LH 첨부 경로(lhFile.do) 사용 중단 스위치(2026-11-05 · 우편함 「코드·운영 — LH 첨부 경로(lhFile.do) 사용 중단 …」 2장 · 다운님 결정 2026-11-05
---   「robots 안내문을 무시하고 LH 첨부 수집 링크를 쓰는 것은 잠시 중단」). apply.lh.or.kr/robots.txt: Disallow: /lhapply/lhFile.do · /lhapply/apply/csvc/lhFile.do.
--- ① analysis_dispatch_config.lh_file_paused boolean not null default true — 참 = 멈춤(기본 · 이 파일 적용과 함께 멈춘다).
---    EF fetch-attachment 가 같은 칸을 읽어 그 두 경로 요청에 「robots 멈춤」(403)을 돌려준다(같은 PR · 칸을 못 읽으면 멈춤으로 본다).
--- ② analysis_needs_lh_file(공고, 키) — 몫이 lhFile.do 를 받아야 하는가(같은 묶음 첨부 · #차수 몫) · 발송기와 health-ops 가 함께 부른다.
--- ③ analysis_dispatch_tick — 멈춤 동안 그 몫은 ready 가 되지 않고(이미 ready 면 거둠) 대기열에 남는다. SH · 지방공사 · MYHOME 단독은 그대로.
--- 풀기: update public.analysis_dispatch_config set lh_file_paused = false, updated_at = now() where id = 1;(데이터 쓰기 · 다운님 결정 뒤)
--- 되돌리기: analysis_dispatch_tick 을 2026-11-05_04 판으로 · drop function analysis_needs_lh_file(text, text) · alter table … drop column lh_file_paused.
+-- LH 첨부 경로(lhFile.do) 쓰임 가름(2026-11-05 · 우편함 「코드·운영 — LH 첨부 경로(lhFile.do) 사용 중단 …」 「🔴 요청 고침」 2장 · 다운님 결정 2026-11-05
+--   「robots 안내문을 무시하고 LH 첨부 수집 링크를 쓰는 것은 잠시 중단 · LH 공식 문의 · 대체 경로 조사」 → 「문의 답 전까지 중간 길」). robots.txt: Disallow: /lhapply/lhFile.do · /lhapply/apply/csvc/lhFile.do.
+-- ① analysis_dispatch_config.lh_file_mode text — 'essential'(기본 · 지금 값) · 'paused' · 'normal'. 값 바꾸기는 데이터 쓰기(claude.ai 요청).
+-- ② 표 lh_file_fetch_log — lhFile.do 를 받으려 한 때마다 한 행(파일 번호 · 쓰임 · 공고 · 모드 · 허락 · 사유 · 결과) · RLS 켬 · 정책 0 · service_role 만.
+-- ③ lh_file_gate(url, 목적) · lh_file_gate_done(행, 결과) — EF fetch-attachment 가 그 두 경로 앞뒤에서 부른다(같은 PR).
+-- ④ analysis_needs_lh_file(공고, 키) · analysis_dispatch_tick — paused 면 LH 원문 몫 · essential 이면 #차수 몫을 발송하지 않고 대기열에 둔다.
+-- 되돌리기: analysis_dispatch_tick 을 2026-11-05_04 판으로 · drop function lh_file_gate_done(bigint, text), lh_file_gate(text, text), analysis_needs_lh_file(text, text) ·
+--   drop table lh_file_fetch_log · alter table analysis_dispatch_config drop column lh_file_mode.
 -- zipfit:function analysis_needs_lh_file(text,text) acl={postgres=X/postgres,service_role=X/postgres} secdef=false
+-- zipfit:function lh_file_gate(text,text) acl={postgres=X/postgres,service_role=X/postgres} secdef=false
+-- zipfit:function lh_file_gate_done(bigint,text) acl={postgres=X/postgres,service_role=X/postgres} secdef=false
 -- zipfit:function analysis_dispatch_tick(boolean) acl={postgres=X/postgres,service_role=X/postgres} secdef=false
-alter table public.analysis_dispatch_config add column lh_file_paused boolean not null default true;
-comment on column public.analysis_dispatch_config.lh_file_paused is
-  'LH 첨부 경로(lhFile.do) 멈춤(2026-11-05 · 기본 true = 멈춤) — 참이면 fetch-attachment 가 그 경로를 받지 않고(robots 멈춤) 발송기가 LH 원문 몫을 보내지 않는다';
+alter table public.analysis_dispatch_config add column lh_file_mode text not null default 'essential'
+  constraint analysis_dispatch_config_lh_file_mode check (lh_file_mode in ('essential', 'paused', 'normal'));
+comment on column public.analysis_dispatch_config.lh_file_mode is
+  'LH 첨부 경로(lhFile.do) 쓰임(2026-11-05 · 기본 essential) — essential = 열린 공고 첨부만 파일당 한 번(+재시도 한 번) · paused = 다 멈춤(LH 원문 몫 발송 대기) · normal = 종전';
+
+create table public.lh_file_fetch_log (
+  id              bigint generated always as identity primary key,
+  at              timestamptz not null default now(),
+  file_id         text,
+  kind            text        not null,
+  announcement_id text,
+  mode            text        not null,
+  purpose         text        not null default 'fetch',
+  allowed         boolean     not null,
+  reason          text        not null,
+  outcome         text,
+  outcome_at      timestamptz
+);
+create index lh_file_fetch_log_file_id on public.lh_file_fetch_log (file_id);
+create index lh_file_fetch_log_at on public.lh_file_fetch_log (at);
+comment on table public.lh_file_fetch_log is 'lhFile.do 받기 시도 기록(2026-11-05) — lh_file_gate 가 결정마다 한 행 · 결과는 lh_file_gate_done · 주소·본문 없음(파일 번호만) · LH 문의용 실측 빈도';
+alter table public.lh_file_fetch_log enable row level security;
+revoke all on table public.lh_file_fetch_log from public, anon, authenticated;
+grant select, insert, update on table public.lh_file_fetch_log to service_role;
 
 CREATE OR REPLACE FUNCTION public.analysis_needs_lh_file(p_announcement_id text, p_group_key text DEFAULT NULL::text)
  RETURNS boolean
@@ -20,7 +43,7 @@ CREATE OR REPLACE FUNCTION public.analysis_needs_lh_file(p_announcement_id text,
 AS $function$
 -- 이 분석 몫이 LH 첨부 경로(lhFile.do)를 받아야 하는가(2026-11-05 · 우편함 「코드·운영 — LH 첨부 경로(lhFile.do) 사용 중단 …」 2장 · 다운님 결정).
 -- apply.lh.or.kr/robots.txt 가 Disallow: /lhapply/lhFile.do · /lhapply/apply/csvc/lhFile.do 를 건다(2025-09~10 부터) — 멈춤 칸
--- analysis_dispatch_config.lh_file_paused 가 참인 동안 이 함수가 참인 몫은 발송하지 않는다(analysis_dispatch_tick ready_at) · health-ops lh_file_paused 가 센다.
+-- analysis_dispatch_config.lh_file_mode = 'paused' 동안 이 함수가 참인 몫은 발송하지 않는다(analysis_dispatch_tick ready_at) · health-ops lh_file_mode 가 센다.
 --   참 = #차수 몫(공지 첨부 목록을 읽는 몫) ∨ 같은 묶음(get_announcement_group_ids) 공고의 첨부 중 하나라도 lhFile.do 주소.
 --   SH(innoFD.do) · 지방공사 게시판 · MYHOME 단독 첨부는 거짓 — 그대로 발송한다.
 select coalesce(p_group_key like '% #차수 %', false)
@@ -30,8 +53,80 @@ select coalesce(p_group_key like '% #차수 %', false)
                  cross join lateral jsonb_array_elements(case when jsonb_typeof(a.attachment_urls) = 'array' then a.attachment_urls else '[]'::jsonb end) e
                 where coalesce(e->>'url', e#>>'{}') ~* '^https?://apply\.lh\.or\.kr/lhapply/(apply/csvc/)?lhfile\.do');
 $function$;
+CREATE OR REPLACE FUNCTION public.lh_file_gate(p_url text, p_purpose text DEFAULT 'fetch'::text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+-- LH 첨부 경로(lhFile.do) 문지기(2026-11-05 · 우편함 「코드·운영 — LH 첨부 경로(lhFile.do) 사용 중단 …」 「🔴 요청 고침」 2장 · 다운님 결정 「문의 답 전까지 중간 길」).
+-- apply.lh.or.kr/robots.txt 가 Disallow: /lhapply/lhFile.do · /lhapply/apply/csvc/lhFile.do 를 건다. EF fetch-attachment 가 그 경로를 받기 전에 부른다(service_role)
+-- — 허락 여부를 돌려주고 결정을 lh_file_fetch_log 에 한 행 남긴다(받은 결과는 lh_file_gate_done 이 같은 행에 적는다).
+-- 모드 = analysis_dispatch_config.lh_file_mode(행이 없거나 못 읽으면 essential):
+--   normal    = 다 허락(종전) — 기록만 · 같은 파일 재사용은 호출 쪽 몫
+--   paused    = 다 막음(robots 멈춤) — 발송기는 LH 원문 몫을 보내지 않는다(analysis_dispatch_tick)
+--   essential = 유지 몫만 허락 — 열린 공고(apply_end ≥ 오늘 KST 또는 없음)의 첨부(announcements.attachment_urls 의 같은 fileid)를 그 파일당 한 번(+ 재시도 한 번).
+--               막는 것: 첨부가 아닌 파일(단지·홍보물 이미지 · 공지 첨부 · 그 밖) · 지난 회차(소급) 첨부 · 이미 갤러리(announcement_extras.source_url)에 있는 파일(재사용) ·
+--               이미 받은 파일(lh_file_fetch_log 성공 행) · 받기 실패·잘림 두 번 뒤(재시도 한 번까지) · 운영 탐침(p_purpose 'probe').
+-- 반환: {allow, reason, kind, mode, announcement_id, reuse_url, log_id}
+declare
+  v_mode text; v_fid text; v_kind text := 'other'; v_aid text; v_open boolean := false; v_reuse text;
+  v_ok boolean; v_fail int; v_allow boolean; v_reason text; v_id bigint;
+  v_today date := (now() at time zone 'Asia/Seoul')::date;
+begin
+  select coalesce((select lh_file_mode from public.analysis_dispatch_config where id = 1), 'essential') into v_mode;
+  v_fid := substring(coalesce(p_url, '') from '[?&]fileid=([0-9]+)');
+  if v_fid is not null then
+    select a.announcement_id, (a.apply_end is null or a.apply_end >= v_today)
+      into v_aid, v_open
+      from public.announcements a
+      cross join lateral jsonb_array_elements(case when jsonb_typeof(a.attachment_urls) = 'array' then a.attachment_urls else '[]'::jsonb end) e
+     where coalesce(e->>'url', e#>>'{}') ~ ('[?&]fileid=' || v_fid || '($|&)')
+     order by (a.apply_end is null or a.apply_end >= v_today) desc, a.apply_end desc nulls first
+     limit 1;
+    if v_aid is not null then v_kind := 'attachment';
+    elsif exists (select 1 from public.announcement_complex_images where file_sn::text = v_fid) then v_kind := 'complex_image';
+    elsif exists (select 1 from public.announcement_promo_files where file_sn::text = v_fid) then v_kind := 'promo_file';
+    end if;
+    select x.file_url into v_reuse from public.announcement_extras x
+     where x.source_url ~ ('[?&]fileid=' || v_fid || '($|&)') and x.file_url is not null order by x.created_at limit 1;
+    select bool_or(l.outcome = 'ok'), count(*) filter (where l.allowed and l.outcome is distinct from 'ok')
+      into v_ok, v_fail from public.lh_file_fetch_log l where l.file_id = v_fid;
+  end if;
+  if v_mode = 'normal' then v_allow := true; v_reason := 'normal';
+  elsif v_mode = 'paused' then v_allow := false; v_reason := 'paused — robots 멈춤(모든 lhFile.do)';
+  elsif p_purpose = 'probe' then v_allow := false; v_reason := 'essential — 운영 탐침은 받지 않음';
+  elsif v_fid is null then v_allow := false; v_reason := 'essential — fileid 를 읽지 못함';
+  elsif v_kind <> 'attachment' then v_allow := false; v_reason := 'essential — 공고 첨부가 아님(' || v_kind || ')';
+  elsif not v_open then v_allow := false; v_reason := 'essential — 지난 회차(소급) 공고 첨부';
+  elsif v_reuse is not null then v_allow := false; v_reason := 'essential — 재사용(갤러리에 같은 파일)';
+  elsif coalesce(v_ok, false) then v_allow := false; v_reason := 'essential — 이미 받은 파일(반복)';
+  elsif coalesce(v_fail, 0) >= 2 then v_allow := false; v_reason := 'essential — 재시도는 한 번까지';
+  else v_allow := true; v_reason := 'essential — 열린 공고 첨부' || case when coalesce(v_fail, 0) = 1 then '(재시도)' else '' end;
+  end if;
+  insert into public.lh_file_fetch_log (file_id, kind, announcement_id, mode, purpose, allowed, reason)
+  values (v_fid, v_kind, v_aid, v_mode, coalesce(p_purpose, 'fetch'), v_allow, v_reason)
+  returning id into v_id;
+  return jsonb_build_object('allow', v_allow, 'reason', v_reason, 'kind', v_kind, 'mode', v_mode,
+                            'announcement_id', v_aid, 'reuse_url', v_reuse, 'log_id', v_id);
+end
+$function$;
+CREATE OR REPLACE FUNCTION public.lh_file_gate_done(p_log_id bigint, p_outcome text)
+ RETURNS void
+ LANGUAGE sql
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+-- lh_file_gate 가 허락한 받기의 결과를 같은 기록 행에 적는다(2026-11-05) — EF fetch-attachment 가 응답을 돌려주기 직전에 부른다.
+-- p_outcome = 'ok'(받음 · 올림) 또는 실패 사유(fail · truncated · html_response · http_4xx …) — 실패 행은 「재시도 한 번까지」 셈에 든다.
+update public.lh_file_fetch_log
+   set outcome = left(coalesce(p_outcome, 'fail'), 60), outcome_at = now()
+ where id = p_log_id and allowed and outcome is null;
+$function$;
 revoke execute on function public.analysis_needs_lh_file(text, text) from public, anon, authenticated;
 grant execute on function public.analysis_needs_lh_file(text, text) to service_role;
+revoke execute on function public.lh_file_gate(text, text) from public, anon, authenticated;
+grant execute on function public.lh_file_gate(text, text) to service_role;
+revoke execute on function public.lh_file_gate_done(bigint, text) from public, anon, authenticated;
+grant execute on function public.lh_file_gate_done(bigint, text) to service_role;
 
 CREATE OR REPLACE FUNCTION public.analysis_dispatch_tick(p_force boolean DEFAULT false)
  RETURNS jsonb
@@ -115,9 +210,11 @@ AS $function$
 --   루틴은 group_key 의 ' #차수 ' 를 보고 신규 분석이 아니라 reverify 스킬 「차수 공지」 갈래로 처리한다(공지 첨부를 다 읽고 ⚠️ 차수 행을 쓴다).
 --   🔴 켜기 칸 analysis_dispatch_config.wave_notice_enabled 가 참일 때만 후보가 생긴다(기본 거짓 — 루틴 v2.15 · reverify v5.3 교체 뒤 켠다).
 --   꺼져 있으면 맞은 공지는 lh_notice_matches 에 쌓이기만 하고 대기열 0 · ⚠️ 차수 행이 쓰이면 대상에서 빠져 waiting 몫은 ② 정리가 dropped 로 옮긴다.
--- 🔴 LH 첨부 경로 멈춤(2026-11-05 · 우편함 「코드·운영 — LH 첨부 경로(lhFile.do) 사용 중단 …」 2장 · 다운님 결정) — analysis_dispatch_config.lh_file_paused 가 참이면
---   analysis_needs_lh_file(공고, 키) 가 참인 대기 몫(같은 묶음 첨부에 lhFile.do · #차수 몫)은 ready 가 되지 않고, 이미 ready 인 것도 ready_at 을 거둔다 —
---   발송하지 않고 대기열에 둔다(루틴이 원문을 못 받아 반쪽 분석을 남기지 않게). SH · 지방공사 · MYHOME 단독 원문은 그대로 나간다. 칸을 거짓으로 돌리면 다음 판정에서 ready.
+-- 🔴 LH 첨부 경로 쓰임 가름(2026-11-05 · 우편함 「코드·운영 — LH 첨부 경로(lhFile.do) 사용 중단 …」 「🔴 요청 고침」 2장 · 다운님 결정) — analysis_dispatch_config.lh_file_mode:
+--   'paused' 면 analysis_needs_lh_file(공고, 키) 가 참인 대기 몫(같은 묶음 첨부에 lhFile.do · #차수 몫)은 ready 가 되지 않고, 이미 ready 인 것도 ready_at 을 거둔다 —
+--   발송하지 않고 대기열에 둔다(루틴이 원문을 못 받아 반쪽 분석을 남기지 않게). SH · 지방공사 · MYHOME 단독 원문은 그대로 나간다.
+--   'essential' 이면 새 공고 몫은 그대로 나가고(fetch-attachment 가 lh_file_gate 로 열린 공고 첨부를 파일당 한 번 받는다) #차수 몫만 대기(공지 첨부는 멈춤 몫).
+--   'normal' 이면 종전 그대로. 값을 바꾸면 다음 판정에서 ready.
 -- 비밀값: Vault zipfit_routine_fire_url · zipfit_routine_fire_token(값은 표·반환에 싣지 않는다).
 declare
   cfg public.analysis_dispatch_config%rowtype;
@@ -354,12 +451,13 @@ begin
   )
   select (select count(*) from ins), (select count(*) from drp) into n_new, n_drop;
 
-  -- ②-1 LH 첨부 경로 멈춤(2026-11-05) — 멈춤 동안 LH 원문 몫은 ready 를 거둔다(발송 0 · 대기열 그대로)
-  if cfg.lh_file_paused is true then
+  -- ②-1 LH 첨부 경로 쓰임 가름(2026-11-05) — paused 면 LH 원문 몫 · essential 이면 #차수 몫의 ready 를 거둔다(발송 0 · 대기열 그대로)
+  if coalesce(cfg.lh_file_mode, 'essential') <> 'normal' then
     update public.analysis_dispatch_queue q
        set ready_at = null
      where q.state = 'waiting' and q.ready_at is not null
-       and public.analysis_needs_lh_file(q.announcement_id, q.group_key);
+       and (q.group_key like '% #차수 %'
+            or (coalesce(cfg.lh_file_mode, 'essential') = 'paused' and public.analysis_needs_lh_file(q.announcement_id, q.group_key)));
   end if;
 
   update public.analysis_dispatch_queue q
@@ -367,7 +465,8 @@ begin
    where q.state = 'waiting' and q.ready_at is null
      and (not q.needs_promo
           or exists (select 1 from public.announcement_promo_fetch f where f.announcement_id = q.announcement_id and f.ok))
-     and not (cfg.lh_file_paused is true and public.analysis_needs_lh_file(q.announcement_id, q.group_key));
+     and not (coalesce(cfg.lh_file_mode, 'essential') <> 'normal' and q.group_key like '% #차수 %')
+     and not (coalesce(cfg.lh_file_mode, 'essential') = 'paused' and public.analysis_needs_lh_file(q.announcement_id, q.group_key));
 
   -- ②-2 🔵 2026-10-08(표시층 긴급 2 · 4 · 다운님 결정 처방 ⑴) — 매입 홍보물 즉시 수집. 이 실행에서 새로 든(enqueued_at = now()) needs_promo 대기 중
   --   아직 ready 가 아닌 것만 collect-lh-promo 를 한 번 부른다(응답은 기다리지 않는다 · 성공하면 다음 tick 이 위 규칙으로 ready_at 을 세운다).
