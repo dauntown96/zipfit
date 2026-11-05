@@ -18,7 +18,6 @@ const SUPABASE_SERVICE_ROLE_KEY = requireEnv('SUPABASE_SERVICE_ROLE_KEY')
 
 // CORS — save-user-profile 과 같은 허용 목록(요청 Origin 과 문자열로 완전히 같을 때만 돌려준다 · '*' 금지).
 const ALLOWED_ORIGINS = new Set([
-  'https://dauntown96.github.io',
   'https://kkokzip.com',
   'https://www.kkokzip.com',
 ])
