@@ -5350,6 +5350,16 @@ function zfCutoffKick(){
   zfFillCutoffSlots();
   zfEnsureCutoff(ids).then(ok => { if(ok) zfFillCutoffSlots(); });
 }
+// 🔵 2026-11-05(우편함 「표시층 — 「얼마·될까」 상세 묶음」 2 · 다운님 승인 2026-11-05) — 같은 주택형 지난 신청 수 추이 한 줄.
+//    카드 대표 행(zfCutoffPick — 카드 한 줄과 같은 행)의 history(RPC · 같은 단지 번호·주택형·신청유형 · 회차별 신청 수 · 오래된 것부터)를 그대로 잇는다.
+//    회차가 하나뿐이면(또는 history 칸이 없는 옛 응답이면) 그리지 않는다 · 풀이 글을 붙이지 않는다.
+function zfCutoffTrendHtml(rows){
+  const r = zfCutoffPick(rows || []);
+  const h = (r && Array.isArray(r.history)) ? r.history.filter(x => x && x.d && x.n != null) : [];
+  if(h.length < 2) return '';
+  const ym = d => String(d).slice(0, 7);
+  return `<p class="zf-cut-trend" style="font-size:12px;color:var(--ink-2,#555);margin-top:8px;line-height:1.5">같은 주택형 지난 신청: ${h.map(x => Number(x.n)).join(' → ')}명 (${escapeHtml(ym(h[0].d))} ~ ${escapeHtml(ym(h[h.length - 1].d))} · ${h.length}회)</p>`;
+}
 // 상세 「지난 회차」 접기 — 열 = 주택형 · 모집공고일 · 신청유형 · 신청 · 공급·경쟁률 · LH 공개 커트라인. 주택형 큰 순.
 //    카드 세대 행과 주택형이 맞는 행은 굵게(그 회차 전 주택형을 다 보여 준다).
 async function zfRenderCutoffDetail(annId, id){
@@ -5378,7 +5388,7 @@ async function zfRenderCutoffDetail(annId, id){
       + `<div style="overflow-x:auto;margin-top:6px"><table style="border-collapse:collapse;font-size:11px;width:100%"><thead><tr>`
       + `<th style="${th}">주택형</th><th style="${th}">모집공고일</th><th style="${th}">신청유형</th><th style="${th}">신청</th><th style="${th}">공급·경쟁률</th><th style="${th}">LH 공개 커트라인</th></tr></thead><tbody>${trs}</tbody></table></div>`;
   });
-  slot.innerHTML = `<details class="hu-past zf-cut-detail"><summary class="hu-past-title">🕘 지난 회차 — LH 공개 커트라인</summary>${body}`
+  slot.innerHTML = `<details class="hu-past zf-cut-detail"><summary class="hu-past-title">🕘 지난 회차 — LH 공개 커트라인</summary>${body}${zfCutoffTrendHtml(rows)}`
     + `<p style="font-size:11px;color:var(--ink-3,#888);margin-top:6px;line-height:1.5">출처 LH 공공데이터(건설임대 당첨 합격점수) · ${ZF_CUTOFF_NOTE}</p></details>`;
 }
 
@@ -10849,6 +10859,7 @@ function renderHousingUnitGroup(g){
       </div>
       ${dual}
       ${floor}
+      ${zfMaxConvHtml(u)}
       ${renderHuDiffHtml(u.zfDiff)}
       ${note}
     </div>`;
@@ -10874,6 +10885,20 @@ function zfWaitReserveHtml(units){
     return `<span class="chip hu-wait-badge" title="${zfAttr('원문: ' + items.map(i => i.text).filter(Boolean).join(' / '))}">대기 예비자 ${escapeHtml(String(items[0].value))}명 (원문)</span>`;
   }
   return items.map(i => `<span class="chip hu-wait-badge" title="원문 문구 그대로예요">${escapeHtml(String(i.text || i.value))} (원문)</span>`).join('');
+}
+
+// 🔵 2026-11-05(우편함 「표시층 — 「얼마·될까」 상세 묶음」 3 · 다운님 승인 2026-11-05) — 공고문 최대 전환 한 줄(세대 줄 아래 · 펼쳤을 때만).
+//    재료 = extracted_facts.최대전환(원문 문장 text + 증액·감액 {보증금, 월임대료}) · 금액 줄임은 카드 요약과 같은 zfPriceRange · 원 단위 원문은 title.
+//    배열이 하나가 아니거나 두 쪽 다 없으면 그리지 않는다 · 한쪽만 있으면 있는 쪽만.
+function zfMaxConvHtml(u){
+  const a = u && u.extracted_facts && u.extracted_facts['최대전환'];
+  if(!Array.isArray(a) || a.length !== 1 || !a[0] || typeof a[0] !== 'object') return '';
+  const f = a[0];
+  const side = (o, word) => (o && o['보증금'] != null && o['월임대료'] != null)
+    ? `${word} ${zfPriceRange(o['보증금'], o['보증금'], 10000, 0, '만', true)} · 월 ${zfPriceRange(o['월임대료'], o['월임대료'], 10000, 1, '만', true)}` : '';
+  const parts = [side(f['증액'], '올리면'), side(f['감액'], '내리면')].filter(Boolean);
+  if(!parts.length) return '';
+  return `<div class="hu-ug-sub zf-maxconv"${f.text ? ` title="${zfAttr(f.text)}"` : ''}>공고문 최대 전환 · 보증금 ${parts.join(' / ')}</div>`;
 }
 
 function renderHousingUnitRow(u){
@@ -10924,6 +10949,7 @@ function renderHousingUnitRow(u){
       ${unitType}
       ${elevator}
     </div>
+    ${zfMaxConvHtml(u)}
     ${diffHtml}
     ${extraNote}
   </div>`;
