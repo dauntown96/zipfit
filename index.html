@@ -3724,7 +3724,34 @@ function zfWaveIdsOf(row){
   if(!D || D.i < 1) return null;
   return [...new Set(D.W.merged.flatMap(m => m.ids || []).concat(String(row['announcement_id'] || '')).filter(Boolean))];
 }
+// 🔵 2026-11-05(우편함 「표시층 — 「읽기 쉽게」 판」 ⑥ · 다운님 승인 2026-11-05) — 대상 주택 게시 전 한 줄.
+//    일정 표 stage='대상주택게시' 행의 게시 시각(start_date + period_text 의 「HH:MM」 · 없으면 그날 끝)이 지금보다 뒤인 카드에
+//    「🏘️ 이번 차수 대상 주택은 M/D(요일) H시[ 이후] LH 공지에 따로 올라와요 — 공고문 전체 목록과 다를 수 있어요」.
+//    「이후」는 원문 period_text 가 「이후」를 쓸 때만 · 게시 시각이 지나면 이 줄은 사라지고 ⚠️ 행(있으면) 문구가 선다.
+const zfWavePending = { loaded: false, byId: new Map() };   // 공고 id → { at: ms, text }
+let zfWavePendingP = null;
+function zfWavePendingLoad(){
+  if(zfWavePendingP) return zfWavePendingP;
+  const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);   // KST 날짜
+  zfWavePendingP = fetch(`${SUPABASE_URL}/rest/v1/announcement_schedule?select=announcement_id,start_date,period_text&stage=eq.${encodeURIComponent('대상주택게시')}&start_date=gte.${today}`, { headers: zfAnonHeaders() })
+    .then(r => r.ok ? r.json() : []).then(list => {
+      (Array.isArray(list) ? list : []).forEach(x => {
+        if(!x || !x.announcement_id || !/^\d{4}-\d{2}-\d{2}$/.test(String(x.start_date || ''))) return;
+        const pt = String(x.period_text || '');
+        const hm = /(\d{1,2}):(\d{2})/.exec(pt);
+        const d = String(x.start_date);
+        const at = Date.parse(d + 'T' + (hm ? hm[1].padStart(2, '0') + ':' + hm[2] : '23:59') + ':00+09:00');
+        const wd = '일월화수목금토'[new Date(d + 'T12:00:00+09:00').getUTCDay()];
+        const when = `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}(${wd})` + (hm ? ` ${Number(hm[1])}시${hm[2] !== '00' ? ' ' + Number(hm[2]) + '분' : ''}${/이후/.test(pt) ? ' 이후' : ''}` : '');
+        const id = String(x.announcement_id);
+        const prev = zfWavePending.byId.get(id);
+        if(!prev || at < prev.at) zfWavePending.byId.set(id, { at, text: `🏘️ 이번 차수 대상 주택은 ${when} LH 공지에 따로 올라와요 — 공고문 전체 목록과 다를 수 있어요` });
+      });
+    }).catch(() => {}).then(() => { zfWavePending.loaded = true; zfFillWaveSlots(); });
+  return zfWavePendingP;
+}
 function zfLoadWaveNotes(){
+  zfWavePendingLoad();
   if(!zfSide.routesReady) return Promise.resolve(zfWaveNotes);
   const rows = typeof noticeData !== 'undefined' ? noticeData : [];
   const ids = [...new Set(rows.flatMap(r => zfWaveIdsOf(r) || []))].filter(i => !zfWaveNotes.asked.has(i));
@@ -3743,11 +3770,21 @@ function zfLoadWaveNotes(){
   }).catch(() => {}).then(() => { zfWaveNotes.loaded = true; zfFillWaveSlots(); return zfWaveNotes; });
 }
 function zfFillWaveSlots(){
-  if(!zfWaveNotes.loaded || !zfWaveNotes.byId.size) return;
+  const pendingOn = zfWavePending.loaded && zfWavePending.byId.size;
+  if(!pendingOn && (!zfWaveNotes.loaded || !zfWaveNotes.byId.size)) return;
   const byId = new Map((typeof noticeData !== 'undefined' ? noticeData : []).map(r => [String(r['announcement_id'] || ''), r]));
+  const now = Date.now();
   document.querySelectorAll('.zf-wave-slot[data-wave-id]').forEach(el => {
     if(el.dataset.filled === '1') return;
-    const row = byId.get(el.getAttribute('data-wave-id'));
+    const wid = el.getAttribute('data-wave-id');
+    const row = byId.get(wid);
+    // ⑥ 게시 전 — 카드 id(또는 그 카드의 창 묶음 id)의 일정 행 게시 시각이 지금보다 뒤면 이 줄이 먼저다.
+    if(pendingOn){
+      const pids = [wid].concat((row && zfWaveIdsOf(row)) || []);
+      const pend = pids.map(i => zfWavePending.byId.get(i)).find(p => p && p.at > now);
+      if(pend){ el.textContent = pend.text; el.hidden = false; el.dataset.filled = '1'; return; }
+    }
+    if(!zfWaveNotes.loaded || !zfWaveNotes.byId.size) return;   // ⚠️ 행 재료가 아직이면 칸을 비워 둔다(다음 채움이 다시 본다)
     const ids = row && zfWaveIdsOf(row);
     const hit = ids && ids.map(i => zfWaveNotes.byId.get(i)).find(Boolean);
     el.dataset.filled = '1';
@@ -5279,9 +5316,10 @@ function zfUnitKey(t){
 // 커트라인 칸 글자 — 원문(거른 값) 그대로 따옴표, 비었으면 사유(승인본 규칙 3 순서) · 그 밖은 null(「—」).
 function zfCutoffWhy(r){
   if(r.cutoff_text) return null;
+  // 🔵 2026-11-05(우편함 「표시층 — 「읽기 쉽게」 판」) — 행복주택이면 공급 수와 관계없이 추첨 사유가 먼저(공급 1~4 행에 「5호 미만」이 섞였다).
+  if(String(r.spl_tp_nm || '').includes('행복주택')) return '행복주택은 추첨이라 커트라인이 없어요';
   const n = Number(r.spl_rmno);
   if(n >= 1 && n <= 4) return '공급이 5호 미만이라 LH가 커트라인을 공개하지 않아요';
-  if(String(r.spl_tp_nm || '').includes('행복주택')) return '행복주택은 추첨이라 커트라인이 없어요';
   if(r.cutoff_state === 'small_applicants') return '신청이 적어 꼭집이 표시하지 않아요';
   return null;
 }
@@ -5303,14 +5341,31 @@ function zfCutoffPick(rows){
   }
   return [...rows].sort(byNum)[0] || null;
 }
+// 🔵 2026-11-05(우편함 「표시층 — 「읽기 쉽게」 판」 ① · 다운님 승인 2026-11-05) — 두 줄 → 한 줄 「🕘 지난 회차(YYYY-MM) 주택형 n개 · 신청 기록 보기 ›」.
+//    날짜 = 대표 행(zfCutoffPick)의 회차 연-월 · 주택형 수 = 그 단지·그 회차의 서로 다른 ltst_nm 수 · 누르면 상세 「지난 회차」를 연다 · 주의 문구는 상세에만.
 function zfCutoffLineHtml(rows){
   const r = zfCutoffPick(rows);
   if(!r) return '';
-  const why = zfCutoffWhy(r);
-  const tail = r.cutoff_text ? `LH 공개 커트라인 「${escapeHtml(r.cutoff_text)}」` : (why ? escapeHtml(why) : 'LH 공개 커트라인 —');
-  return `<div class="zf-cut-line" style="font-size:12px;color:var(--ink-2,#555);background:var(--surface,#f7f6f2);border:1px solid var(--line-2,#e2e3e6);border-radius:8px;padding:6px 10px;margin-bottom:6px;line-height:1.5">`
-    + `🕘 지난 회차(${escapeHtml(r.rcr_pan_dt || '')} · ${escapeHtml(r.ltst_nm || '')} · ${escapeHtml(r.rqs_tp_nm || '')}) 신청 ${Number(r.rqpr_cnt) || 0}명 · ${tail}`
-    + `<div style="font-size:11px;color:var(--ink-3,#888);margin-top:2px">${ZF_CUTOFF_NOTE}</div></div>`;
+  const same = rows.filter(x => x.complex_name === r.complex_name && x.rcr_pan_dt === r.rcr_pan_dt);
+  const types = new Set(same.map(x => x.ltst_nm)).size;
+  return `<button type="button" class="zf-cut-line" onclick="zfOpenCutoffDetail(this,event)" style="display:block;width:100%;text-align:left;font:inherit;font-size:12px;color:var(--ink-2,#555);background:var(--surface,#f7f6f2);border:1px solid var(--line-2,#e2e3e6);border-radius:8px;padding:6px 10px;margin-bottom:6px;line-height:1.5;cursor:pointer">`
+    + `🕘 지난 회차(${escapeHtml(String(r.rcr_pan_dt || '').slice(0, 7))}) 주택형 ${types}개 · 신청 기록 보기 ›</button>`;
+}
+// 카드 한 줄을 누르면 — 카드가 접혀 있으면 펼치고(종전 펼침과 같은 길) 상세 「지난 회차」 접힘을 열어 그 자리로.
+function zfOpenCutoffDetail(btn, ev){
+  if(ev){ ev.stopPropagation(); ev.preventDefault(); }
+  const card = btn && btn.closest('[data-card-id]');
+  if(!card) return;
+  const did = card.getAttribute('data-card-id');
+  const det = document.getElementById(did);
+  if(det && det.style.display !== 'block') toggleDetail(did, card);
+  let tries = 0;
+  const go = () => {
+    const d = document.querySelector('#cutoff-slot-' + CSS.escape(did) + ' details.zf-cut-detail');
+    if(d){ d.open = true; d.scrollIntoView({ block: 'start', behavior: 'smooth' }); return; }
+    if(++tries < 40) setTimeout(go, 150);
+  };
+  go();
 }
 const zfCutoffAsked = new Set();
 async function zfEnsureCutoff(ids){
@@ -5373,20 +5428,46 @@ async function zfRenderCutoffDetail(annId, id){
   // 좁은 화면(390)에서도 여섯 칸이 폭 안에 들게 줄바꿈을 허용한다 — 가로 스크롤 뒤에 커트라인 칸이 숨지 않게.
   const th = 'text-align:left;font-weight:600;padding:4px 4px;border-bottom:1px solid var(--line-2,#e2e3e6);vertical-align:bottom;word-break:keep-all';
   const td = 'padding:4px 4px;border-bottom:1px solid var(--line-2,#e2e3e6);vertical-align:top;word-break:keep-all';
+  // 🔵 2026-11-05(우편함 「표시층 — 「읽기 쉽게」 판」 ②③④ · 다운님 승인 2026-11-05)
+  //    ② 커트라인 칸이 단지 표에서 전부 비면 그 열을 빼고, 행복주택이면 표 위에 한 번 「행복주택은 추첨이라 LH가 커트라인을 공개하지 않아요」 ·
+  //       일부만 비면 칸은 「—」이고 사유(5호 미만 · 신청 적음)는 표 아래 한 줄로 모은다.
+  //    ③ 이번 공고와 같은 주택형 = 굵게 대신 행 앞 「●」 + 표 위 범례 한 줄.
+  //    ④ 공급·경쟁률은 「일반공급」 행만 — 공고문 공급표(일반공급 · 당첨자 칸)와 맞는 행이 그것뿐이다(정선사북 · 화성서부권 · 인천가정2 · 성남금토 대조).
+  //       예비자·계층 행은 「—」(문구 없음).
+  const note = 'font-size:11px;color:var(--ink-3,#888);margin-top:4px;line-height:1.5';
   let body = '';
   byCx.forEach((rs, cx) => {
     const mine = new Set(((rs[0] && rs[0].unit_types) || []).map(zfUnitKey).filter(Boolean));
     const sorted = [...rs].sort((a, b) => (parseFloat(b.ltst_nm) || 0) - (parseFloat(a.ltst_nm) || 0)
       || String(a.ltst_nm).localeCompare(String(b.ltst_nm), 'ko') || String(a.rqs_tp_nm).localeCompare(String(b.rqs_tp_nm), 'ko'));
+    const noCut = rs.every(r => !r.cutoff_text);
+    const happy = rs.every(r => String(r.spl_tp_nm || '').includes('행복주택'));
+    const dropCut = noCut && happy;
+    const anyMine = sorted.some(r => mine.has(zfUnitKey(r.ltst_nm)));
+    const whyTypes = new Map();   // 사유 → 주택형 목록(표 아래 한 줄)
     const trs = sorted.map(r => {
-      const pre = r.rqs_tp_nm === '예비자';
-      const sup = pre ? '—' : `${r.spl_rmno != null ? Number(r.spl_rmno) + '호' : '—'}${r.competition_ratio != null ? ' · ' + Number(r.competition_ratio) + ':1' : ''}`;
-      const b = mine.has(zfUnitKey(r.ltst_nm)) ? 'font-weight:600;' : '';
-      return `<tr style="${b}"><td style="${td};word-break:break-all;min-width:3em">${escapeHtml(r.ltst_nm || '')}</td><td style="${td};white-space:nowrap">${escapeHtml(r.rcr_pan_dt || '')}</td><td style="${td}">${escapeHtml(r.rqs_tp_nm || '')}</td><td style="${td};white-space:nowrap">${Number(r.rqpr_cnt) || 0}명</td><td style="${td}">${sup}</td><td style="${td}">${zfCutoffCell(r)}</td></tr>`;
+      const gen = r.rqs_tp_nm === '일반공급';
+      const sup = gen ? `${r.spl_rmno != null ? Number(r.spl_rmno) + '호' : '—'}${r.competition_ratio != null ? ' · ' + Number(r.competition_ratio) + ':1' : ''}` : '—';
+      const dot = mine.has(zfUnitKey(r.ltst_nm)) ? '● ' : '';
+      let cutTd = '';
+      if(!dropCut){
+        if(!r.cutoff_text){
+          const w = zfCutoffWhy(r);
+          if(w){ if(!whyTypes.has(w)) whyTypes.set(w, new Set()); whyTypes.get(w).add(r.ltst_nm); }
+        }
+        cutTd = `<td style="${td}">${r.cutoff_text ? '「' + escapeHtml(r.cutoff_text) + '」' : '—'}</td>`;
+      }
+      return `<tr><td style="${td};word-break:break-all;min-width:3em">${dot}${escapeHtml(r.ltst_nm || '')}</td><td style="${td};white-space:nowrap">${escapeHtml(r.rcr_pan_dt || '')}</td><td style="${td}">${escapeHtml(r.rqs_tp_nm || '')}</td><td style="${td};white-space:nowrap">${Number(r.rqpr_cnt) || 0}명</td><td style="${td}">${sup}</td>${cutTd}</tr>`;
     }).join('');
+    const above = (dropCut ? `<p class="zf-cut-why" style="${note}">행복주택은 추첨이라 LH가 커트라인을 공개하지 않아요</p>` : '')
+      + (anyMine ? `<p class="zf-cut-legend" style="${note}">● 이번 공고와 같은 주택형</p>` : '');
+    const below = whyTypes.size
+      ? `<p class="zf-cut-why" style="${note}">— : ${[...whyTypes].map(([w, t]) => `${escapeHtml(w)}(${[...t].map(escapeHtml).join(' · ')})`).join(' / ')}</p>` : '';
     body += (byCx.size > 1 ? `<div style="font-size:12px;font-weight:600;margin:8px 0 4px">${escapeHtml(cx)}</div>` : '')
+      + above
       + `<div style="overflow-x:auto;margin-top:6px"><table style="border-collapse:collapse;font-size:11px;width:100%"><thead><tr>`
-      + `<th style="${th}">주택형</th><th style="${th}">모집공고일</th><th style="${th}">신청유형</th><th style="${th}">신청</th><th style="${th}">공급·경쟁률</th><th style="${th}">LH 공개 커트라인</th></tr></thead><tbody>${trs}</tbody></table></div>`;
+      + `<th style="${th}">주택형</th><th style="${th}">모집공고일</th><th style="${th}">신청유형</th><th style="${th}">신청</th><th style="${th}">공급·경쟁률</th>${dropCut ? '' : `<th style="${th}">LH 공개 커트라인</th>`}</tr></thead><tbody>${trs}</tbody></table></div>`
+      + below;
   });
   slot.innerHTML = `<details class="hu-past zf-cut-detail"><summary class="hu-past-title">🕘 지난 회차 — LH 공개 커트라인</summary>${body}${zfCutoffTrendHtml(rows)}`
     + `<p style="font-size:11px;color:var(--ink-3,#888);margin-top:6px;line-height:1.5">출처 LH 공공데이터(건설임대 당첨 합격점수) · ${ZF_CUTOFF_NOTE}</p></details>`;
@@ -10333,6 +10414,30 @@ function attachRoundDiffs(current, past){
   });
   past.forEach(p => { if(!curCount.has(keyOf(p))) p.zfPastOnly = true; });
 }
+// 🔵 2026-11-05(우편함 「표시층 — 「읽기 쉽게」 판」 ⑤ · 다운님 승인 2026-11-05) — 지난 회차 하나가 이번 회차와 「같은 조건」인가.
+//    attachRoundDiffs 와 같은 비교 키(huCompareKey)·같은 값 칸(HU_DIFF_FIELDS)으로 — 키 묶음(행 수 포함)이 같고 모든 짝의 값 차이가 0일 때만 참.
+//    한 키에 행이 여럿이면 값 목록을 정렬해 맞댄다(짝을 고르지 않는다). 하나라도 다르거나 짝이 없으면 거짓 — 그 회차는 종전처럼 따로 보인다.
+function zfPastRoundSame(current, roundUnits){
+  if(!current.length || !roundUnits.length || current.length !== roundUnits.length) return false;
+  const withName = huCompareNeedsName(current.concat(roundUnits));
+  const sig = u => HU_DIFF_FIELDS.map(([f]) => u[f] == null ? '' : String(Number(u[f]))).join('|');
+  const bag = rows => {
+    const m = new Map();
+    rows.forEach(u => { const k = huCompareKey(u, withName); if(!m.has(k)) m.set(k, []); m.get(k).push(sig(u)); });
+    m.forEach(v => v.sort());
+    return m;
+  };
+  const a = bag(current), b = bag(roundUnits);
+  if(a.size !== b.size) return false;
+  for(const [k, v] of a){ const w = b.get(k); if(!w || w.length !== v.length || w.some((x, i) => x !== v[i])) return false; }
+  return true;
+}
+function zfRoundSpan(dates){
+  const d = [...dates].sort();
+  if(d.length === 1) return d[0];
+  const a = d[0], z = d[d.length - 1];
+  return a + ' ~ ' + (a.slice(0, 4) === z.slice(0, 4) ? z.slice(5) : z);
+}
 function renderHuDiffHtml(diff){
   if(!diff || !diff.parts.length) return '';
   const items = diff.parts.map(p =>
@@ -10510,11 +10615,28 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
     // 접힌 안에서도 회차 배지를 그대로 단다 — 지난 회차가 여럿이면 그 안에서 또 갈려야 한다.
     // 🔴 A-2: 건수는 **그 목록이 실제로 그리는 줄 수**로 센다. 세 자리 전부 같은 함수가
     //    그리는 같은 목록이라 한 자리만 줄 수로 바꾸면 나머지와 갈린다.
-    const pastLineCount = countHousingUnitLines(pastUnits);
-    const pastHtml = pastUnits.length
-      ? `<details class="hu-past"><summary class="hu-past-title">🕘 다른 회차 보기 (${pastLineCount}건)</summary>`
-        + `<div class="hu-past-list">${renderHousingUnitList(pastUnits)}</div></details>`
+    // 🔵 2026-11-05(⑤) — 이번 회차와 값이 같은 지난 회차는 한 줄로 접는다(가르는 축 = 값 차이 → 공고일). 값이 다른 회차는 종전처럼 따로.
+    //    이번 회차 행이 없는(pastOnly) 경우는 비교할 것이 없어 종전 그대로다.
+    let samePast = [], diffPast = pastUnits;
+    if(!pastOnly && pastUnits.length && Array.isArray(units) && units.length){
+      const byDate = new Map();
+      pastUnits.forEach(u => { const d = u.zfRoundDate || ''; if(!byDate.has(d)) byDate.set(d, []); byDate.get(d).push(u); });
+      const sameDates = new Set([...byDate].filter(([d, rs]) => d && zfPastRoundSame(units, rs)).map(([d]) => d));
+      if(sameDates.size){
+        samePast = pastUnits.filter(u => sameDates.has(u.zfRoundDate || ''));
+        diffPast = pastUnits.filter(u => !sameDates.has(u.zfRoundDate || ''));
+      }
+    }
+    const sameDates = [...new Set(samePast.map(u => u.zfRoundDate))];
+    const sameHtml = samePast.length
+      ? `<details class="hu-past zf-past-same"><summary class="hu-past-title">🕘 지난 ${sameDates.length}회(${escapeHtml(zfRoundSpan(sameDates))}) 이번과 같은 조건 · 펼치기</summary>`
+        + `<div class="hu-past-list">${renderHousingUnitList(samePast)}</div></details>`
       : '';
+    const pastLineCount = countHousingUnitLines(diffPast);
+    const pastHtml = (diffPast.length
+      ? `<details class="hu-past"><summary class="hu-past-title">🕘 다른 회차 보기 (${pastLineCount}건)</summary>`
+        + `<div class="hu-past-list">${renderHousingUnitList(diffPast)}</div></details>`
+      : '') + sameHtml;
     // 🔵 2026-10-02 — 블록 카드의 대표 ID 세대(blockHuFallback)는 단지별로 나뉘지 않았다는 것을 제목과 한 줄로 밝힌다.
     const huAllBlocks = !huIsBlock && blockHuFallback[id] === true;
     const huTitle = pastOnly
