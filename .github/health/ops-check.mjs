@@ -974,6 +974,24 @@ try {
   addBlind('cutoff_chain_match', '회차 사슬 두 곳 대조 — 점검 불능', 'warn', String(e).slice(0, 200), '목록 RPC · 회차 링크 · 사본 파일을 읽는다(못 읽으면 ⚠️)')
 }
 
+// ㉝ LH 첨부 경로 멈춤(2026-11-05 · 우편함 「코드·운영 — LH 첨부 경로(lhFile.do) 사용 중단 …」 2장) — analysis_dispatch_config.lh_file_paused 상태와
+//    멈춤 때문에 발송하지 않고 대기열에 남은 몫 수(analysis_needs_lh_file — 발송기와 같은 함수). ℹ️ 정보만(분석률이 왜 내려가는지 보이게) · 못 읽어도 ℹ️.
+try {
+  const [x] = await sqlRead(`select json_build_object(
+      'paused', (select lh_file_paused from public.analysis_dispatch_config where id = 1),
+      'held', (select count(*) from public.analysis_dispatch_queue q where q.state = 'waiting' and q.ready_at is null
+                 and public.analysis_needs_lh_file(q.announcement_id, q.group_key)),
+      'waiting', (select count(*) from public.analysis_dispatch_queue where state = 'waiting'),
+      'ids', (select coalesce(json_agg(q.announcement_id order by q.enqueued_at), '[]'::json) from (select announcement_id, enqueued_at from public.analysis_dispatch_queue q
+                 where q.state = 'waiting' and q.ready_at is null and public.analysis_needs_lh_file(q.announcement_id, q.group_key) order by q.enqueued_at limit 5) q)) j`)
+  const c = x.j
+  add('lh_file_paused', 'LH 첨부 경로(lhFile.do) 멈춤 · LH 원문 대기 몫(정보)', 'info',
+    c.paused ? `멈춤 켜짐 — LH 원문 대기 ${c.held}(대기열 waiting ${c.waiting})${c.held ? ': ' + c.ids.join(', ') : ''}` : `멈춤 꺼짐 — 대기 waiting ${c.waiting}`,
+    '정보 — 판정하지 않는다 · 멈춤 칸 analysis_dispatch_config.lh_file_paused(참 = fetch-attachment 가 lhFile.do 를 받지 않고 발송기가 LH 원문 몫을 보내지 않음) · 대기 = waiting ∧ ready 없음 ∧ analysis_needs_lh_file')
+} catch (e) {
+  add('lh_file_paused', 'LH 첨부 경로(lhFile.do) 멈춤 · LH 원문 대기 몫(정보)', 'info', String(e).slice(0, 200), '설정 · 대기열 표를 읽는다(못 읽어도 정보)')
+}
+
 // ㉓ 화면 빈칸 점검 셋 — 한 쿼리(2026-11-04 · 우편함 「옛 주소 걷기·화면 빈칸 점검」 3~5 · 전부 안 멈춤 — gate.mjs HARD 밖).
 //    카드 = 목록 RPC 대표 · 같은 카드의 행 = 제목 키(announcement_dedup_key — 화면 zfDedupKey 와 한 벌)가 같은 공고 전부(화면 곁 데이터 붙이기와 같다).
 //    ⓐ deadline_hm_missing — 마감이 오늘·내일(KST)인 카드 중 그날 끝나는 경로 표 행 · 일정 표 「접수」 행이 **하나도 없는** 것 = ⚠️(화면이 「오늘 16:00까지」를 못 낸다 · …20923 꼴).

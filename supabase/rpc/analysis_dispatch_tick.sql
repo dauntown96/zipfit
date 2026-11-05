@@ -80,6 +80,9 @@ AS $function$
 --   루틴은 group_key 의 ' #차수 ' 를 보고 신규 분석이 아니라 reverify 스킬 「차수 공지」 갈래로 처리한다(공지 첨부를 다 읽고 ⚠️ 차수 행을 쓴다).
 --   🔴 켜기 칸 analysis_dispatch_config.wave_notice_enabled 가 참일 때만 후보가 생긴다(기본 거짓 — 루틴 v2.15 · reverify v5.3 교체 뒤 켠다).
 --   꺼져 있으면 맞은 공지는 lh_notice_matches 에 쌓이기만 하고 대기열 0 · ⚠️ 차수 행이 쓰이면 대상에서 빠져 waiting 몫은 ② 정리가 dropped 로 옮긴다.
+-- 🔴 LH 첨부 경로 멈춤(2026-11-05 · 우편함 「코드·운영 — LH 첨부 경로(lhFile.do) 사용 중단 …」 2장 · 다운님 결정) — analysis_dispatch_config.lh_file_paused 가 참이면
+--   analysis_needs_lh_file(공고, 키) 가 참인 대기 몫(같은 묶음 첨부에 lhFile.do · #차수 몫)은 ready 가 되지 않고, 이미 ready 인 것도 ready_at 을 거둔다 —
+--   발송하지 않고 대기열에 둔다(루틴이 원문을 못 받아 반쪽 분석을 남기지 않게). SH · 지방공사 · MYHOME 단독 원문은 그대로 나간다. 칸을 거짓으로 돌리면 다음 판정에서 ready.
 -- 비밀값: Vault zipfit_routine_fire_url · zipfit_routine_fire_token(값은 표·반환에 싣지 않는다).
 declare
   cfg public.analysis_dispatch_config%rowtype;
@@ -316,11 +319,20 @@ begin
   )
   select (select count(*) from ins), (select count(*) from drp) into n_new, n_drop;
 
+  -- ②-1 LH 첨부 경로 멈춤(2026-11-05) — 멈춤 동안 LH 원문 몫은 ready 를 거둔다(발송 0 · 대기열 그대로)
+  if cfg.lh_file_paused is true then
+    update public.analysis_dispatch_queue q
+       set ready_at = null
+     where q.state = 'waiting' and q.ready_at is not null
+       and public.analysis_needs_lh_file(q.announcement_id, q.group_key);
+  end if;
+
   update public.analysis_dispatch_queue q
      set ready_at = now()
    where q.state = 'waiting' and q.ready_at is null
      and (not q.needs_promo
-          or exists (select 1 from public.announcement_promo_fetch f where f.announcement_id = q.announcement_id and f.ok));
+          or exists (select 1 from public.announcement_promo_fetch f where f.announcement_id = q.announcement_id and f.ok))
+     and not (cfg.lh_file_paused is true and public.analysis_needs_lh_file(q.announcement_id, q.group_key));
 
   -- ②-2 🔵 2026-10-08(표시층 긴급 2 · 4 · 다운님 결정 처방 ⑴) — 매입 홍보물 즉시 수집. 이 실행에서 새로 든(enqueued_at = now()) needs_promo 대기 중
   --   아직 ready 가 아닌 것만 collect-lh-promo 를 한 번 부른다(응답은 기다리지 않는다 · 성공하면 다음 tick 이 위 규칙으로 ready_at 을 세운다).

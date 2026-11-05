@@ -172,6 +172,34 @@ const rejectReason = (u: URL): string | null => {
   return null
 }
 
+// 🔴 robots 멈춤(2026-11-05 · 우편함 「코드·운영 — LH 첨부 경로(lhFile.do) 사용 중단 …」 2장 · 다운님 결정) —
+//   apply.lh.or.kr/robots.txt 가 Disallow: /lhapply/lhFile.do · /lhapply/apply/csvc/lhFile.do 를 건다. analysis_dispatch_config.lh_file_paused 가 참이면
+//   그 두 경로(첫 주소 · 리다이렉트 다음 주소 모두)를 받지 않고 403 「robots 멈춤」을 돌려준다. 🔴 칸을 못 읽으면 멈춤으로 본다(닫힌 쪽).
+//   다른 LH 경로(/upload/Files/ 이미지 · 공고 페이지)와 다른 호스트는 그대로다. 칸은 함수 인스턴스 안에서 60초 캐시.
+const ROBOTS_DISALLOWED = (u: URL) => u.hostname === 'apply.lh.or.kr' && /^\/lhapply\/(apply\/csvc\/)?lhfile\.do$/i.test(u.pathname)
+let pausedCache: { v: boolean; at: number } | null = null
+const lhFilePaused = async (): Promise<boolean> => {
+  if (pausedCache && Date.now() - pausedCache.at < 60_000) return pausedCache.v
+  const base = Deno.env.get('SUPABASE_URL')
+  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  let v = true
+  if (base && key) {
+    try {
+      const r = await fetch(`${base}/rest/v1/analysis_dispatch_config?select=lh_file_paused&id=eq.1`, { headers: { apikey: key, Authorization: `Bearer ${key}` } })
+      if (r.ok) {
+        const rows = await r.json() as Array<{ lh_file_paused?: boolean }>
+        if (rows.length && typeof rows[0].lh_file_paused === 'boolean') v = rows[0].lh_file_paused
+      }
+    } catch { /* 못 읽으면 멈춤 */ }
+  }
+  pausedCache = { v, at: Date.now() }
+  return v
+}
+const ROBOTS_PAUSED_BODY = (u: URL) => ({
+  ok: false, status: 'robots_paused',
+  error: `robots 멈춤 — ${u.hostname}${u.pathname} 는 apply.lh.or.kr/robots.txt 가 막는 경로다(analysis_dispatch_config.lh_file_paused = true · 2026-11-05 다운님 결정)`,
+})
+
 // 이미지 경로의 형식 검사. 최종 URL(리다이렉트를 다 따라간 뒤)이 `/upload/Files/`일 때만 건다.
 // 통과하면 null, 막히면 사유 문자열.
 const IMAGE_ONLY_PREFIX = '/upload/Files/'
@@ -951,6 +979,7 @@ const hostProbe = async (target: string | null) => {
   if (!['https:', 'http:'].includes(u.protocol) || !PROBE_HOSTS.has(u.hostname)) {
     return { status: 400, body: { ok: false, error: `관측 밖 호스트: ${u.hostname}` } }
   }
+  if (ROBOTS_DISALLOWED(u) && await lhFilePaused()) return { status: 403, body: ROBOTS_PAUSED_BODY(u) }
   const region = Deno.env.get('SB_REGION') ?? '(없음)'
   const t0 = Date.now()
   const d = await probeFetch(u)
@@ -1149,6 +1178,7 @@ Deno.serve(async (req: Request) => {
 
   const firstReject = rejectReason(current)
   if (firstReject) return json({ ok: false, error: firstReject }, 403)
+  if (ROBOTS_DISALLOWED(current) && await lhFilePaused()) return json(ROBOTS_PAUSED_BODY(current), 403)
 
   const started = Date.now()
   const ac = new AbortController()
@@ -1176,6 +1206,10 @@ Deno.serve(async (req: Request) => {
           redirect_hops: hops,
           blocked_redirect_to: next.toString(),
         }, 403)
+      }
+      if (ROBOTS_DISALLOWED(next) && await lhFilePaused()) {
+        clearTimeout(timer)
+        return json({ ...ROBOTS_PAUSED_BODY(next), redirect_hops: hops }, 403)
       }
       hops.push(next.toString())
       current = next
