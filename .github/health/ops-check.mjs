@@ -201,6 +201,7 @@ const EXPECTED_JOBS = [
   'zipfit-purge-cron-run-details',   // 2026-11-02 pg_cron 실행 기록 30일 보관(마이그레이션 2026-11-02_01)
   'zipfit-purge-collection-run-log', // 2026-11-02 LH·MYHOME 수집 런 로그 90일 보관(마이그레이션 2026-11-02_02)
   'zipfit-collect-lh-cutoff',      // 2026-11-04 LH 건설임대 당첨 합격점수 주 1회(마이그레이션 2026-11-04_04 · ㉔ lh_cutoff)
+  'zipfit-collect-lh-notices',     // 2026-11-05 LH 대상주택 공지 감지 하루 4회(마이그레이션 2026-11-05_04 · ㉘ wave_notice_missing 값)
 ]
 
 // ③④ 관리 API 가 필요 없는 점검(비로그인 목록·요약 · 배포 사이트)은 DB 점검과 다른 try 로 먼저 돈다

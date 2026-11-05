@@ -74,6 +74,12 @@ AS $function$
 --   헛도는 비용 막기: 직전 미착수 회수 뒤 60분 안에는 거두지 않는다(사용량 창 5시간 안 최대 5번) · 6시간 안 미착수 회수가 6번이면 멈춘다
 --   (사용량 창보다 길게 안 뜨면 다른 원인 — health-ops dispatch ❌ 로 사람에게). 늦게 깨어난 옛 세션은 착수 심장박동(alive 거짓)에서 멈추고,
 --   잡기 가드(analysis_queue_claim(p_run_id))가 새 회차 몫을 잡지 못하게 한다. 45분: 정상 잡기 대기 p95 3분 · 최대 20분 밑(10-01 뒤 76회차 · 넘은 셋은 102~122분).
+-- 🔵 차수 대상주택 공지(2026-11-05 · 우편함 「코드·운영 — 대상주택 공지 감지 구현 …」 1장) — #차수 갈래:
+--   wave_notice_targets() 의 due ∧ not has_warn 행(매입 순위별 둘째 이후 창 · 게시 시각 지남 · ⚠️ 차수 행 없음) 중 lh_notice_matches 에 맞은 공지가 있는 (카드, scope) 를
+--   대기열 키 = 묶음 키 || ' #차수 ' || scope_text 로 올린다(apply_end = 대표 apply_end · note 에 공지 BBS_SN · 주소 · 후보 수).
+--   루틴은 group_key 의 ' #차수 ' 를 보고 신규 분석이 아니라 reverify 스킬 「차수 공지」 갈래로 처리한다(공지 첨부를 다 읽고 ⚠️ 차수 행을 쓴다).
+--   🔴 켜기 칸 analysis_dispatch_config.wave_notice_enabled 가 참일 때만 후보가 생긴다(기본 거짓 — 루틴 v2.15 · reverify v5.3 교체 뒤 켠다).
+--   꺼져 있으면 맞은 공지는 lh_notice_matches 에 쌓이기만 하고 대기열 0 · ⚠️ 차수 행이 쓰이면 대상에서 빠져 waiting 몫은 ② 정리가 dropped 로 옮긴다.
 -- 비밀값: Vault zipfit_routine_fire_url · zipfit_routine_fire_token(값은 표·반환에 싣지 않는다).
 declare
   cfg public.analysis_dispatch_config%rowtype;
@@ -261,22 +267,35 @@ begin
              and aa.status in ('완료', '완료(보조 누락)', '완료(판정 대기)', '완료(소급)'))
       and not public.get_revision_analysis_done(r.announcement_id)
   ),
+  wcand as (
+    select r.announcement_id, r.title, r.source, r.housing_type, r.apply_start, r.apply_end,
+           r.k || ' #차수 ' || t.scope_text as k,
+           (select '공지 ' || string_agg(m.bbs_sn || ' ' || coalesce(m.link_url, ''), ' / ' order by m.bbs_sn) || ' · 후보 ' || max(m.candidates)
+              from public.lh_notice_matches m where m.announcement_id = t.announcement_id and m.scope_text = t.scope_text) as wnote
+    from public.wave_notice_targets() t
+    join reps r on r.announcement_id = t.announcement_id
+    where cfg.wave_notice_enabled is true and t.due and not t.has_warn and r.apply_end is not null
+      and exists (select 1 from public.lh_notice_matches m where m.announcement_id = t.announcement_id and m.scope_text = t.scope_text)
+  ),
   allc as (
     select c.announcement_id, c.title, c.source, c.housing_type, c.apply_start,
            coalesce(c.apply_end, date '9999-12-31') as apply_end,
            case when c.apply_end is null then c.k || ' #접수기간 없음 ' || coalesce(c.announcement_date::text, '공고일 없음') else c.k end as k,
-           false as rev, (c.apply_end is null) as noend
+           false as rev, (c.apply_end is null) as noend, false as wave, null::text as wnote
     from cand c
     where not exists (select 1 from rcand x where x.announcement_id = c.announcement_id)
     union all
-    select x.announcement_id, x.title, x.source, x.housing_type, x.apply_start, x.apply_end, x.k, true, false from rcand x
+    select x.announcement_id, x.title, x.source, x.housing_type, x.apply_start, x.apply_end, x.k, true, false, false, null::text from rcand x
+    union all
+    select w.announcement_id, w.title, w.source, w.housing_type, w.apply_start, w.apply_end, w.k, false, false, true, w.wnote from wcand w
   ),
   ins as (
     insert into public.analysis_dispatch_queue (group_key, apply_end, announcement_id, title, apply_start, phase, needs_promo, note)
     select distinct on (c.k, c.apply_end) c.k, c.apply_end, c.announcement_id, c.title, c.apply_start,
            case when c.noend then '접수기간 없음' when c.apply_start > (now() at time zone 'Asia/Seoul')::date then '접수 전' else '접수 중' end,
            (c.source = 'LH' and c.housing_type = '주거복지 - 매입임대'),
-           case when c.rev then '정정본 — reverify 스킬 「정정공고」 갈래'
+           case when c.wave then '차수 대상주택 — reverify 스킬 「차수 공지」 갈래 · ' || coalesce(c.wnote, '')
+                when c.rev then '정정본 — reverify 스킬 「정정공고」 갈래'
                 when c.noend then '접수기간 없음(SH 목록 모집중) — apply_end 9999-12-31 은 대기열 키 전용 · 접수기간은 원문으로 확정' end
     from allc c
     order by c.k, c.apply_end, c.announcement_id
