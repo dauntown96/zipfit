@@ -53,7 +53,7 @@
 | 프론트엔드 | HTML/CSS/JS 단일 파일 (index.html) |
 | 공고 데이터 | Supabase RPC `get_announcements_deduped()` |
 | 데이터 수집 | **LH·MYHOME**은 Edge Function `collect-announcements`를 pg_cron이 주간(KST 09~18시) 10분 간격 + 아침 워밍 2회 + 야간 1회 부르고, **SH**는 `collect-sh-announcements`를 하루 4회(KST 09·12·15·18시) 부른다. **LH 매입 홍보물 목록**은 `collect-lh-promo`가 KST 09:05~18:35 30분마다 새 공고·첨부 바뀐 공고만 `announcement_promo_files`에 남긴다(목록만 — 받기·Drive·extras 연결은 분석 회차). **LH 단지형 이미지 탭 목록**(평면도·조감도·배치도 등 — 매입 밖)은 `collect-lh-images`가 KST 09:17~18:47 30분마다 같은 조건으로 `announcement_complex_images`에 남긴다(목록만 · 2026-10-02). 스케줄은 UTC로 등록돼 있고 현행 값은 `cron.job` 조회로 본다. 상세: ⑩ 「수집 크론은 언제 도나」 · **자동 점검**: GitHub Actions `health-ops.yml`(운영 · 30분마다 25·55분 UTC — 🔴 GitHub schedule이 아니라 Supabase pg_cron `zipfit-health-ops-dispatch`가 `ops_health_dispatch()`로 workflow_dispatch를 부른다 · GitHub schedule은 2시간마다 예비 · `ops_gap`은 ⚠️ 경고만 — 2026-10-03 #328) · `health-screen.yml`(배포본 화면 · 매일·병합 뒤) — 실패하면 라벨 `health-ops`/`health-screen` 이슈가 열리고 회복하면 닫힌다 · **DB 변경**: `db-migrations.yml`(PR 되돌리기 전용 체크 · 병합 뒤 적용 — 실패하면 라벨 `db-apply` 이슈 · 원칙 32) |
-| 사용자 프로필 | Edge Function `save-user-profile` (GET/POST, **`verify_jwt=true`**, 식별자는 JWT의 `auth.uid()` — 이메일 기반 식별은 2026-08-13 폐기, CORS는 EF 상수 `ALLOWED_ORIGINS` 허용 목록 — `https://dauntown96.github.io` · `https://kkokzip.com` · `https://www.kkokzip.com` 중 요청 Origin과 완전히 같은 것만 돌려준다 · `delete-account`도 같다 · 2026-10-06) |
+| 사용자 프로필 | Edge Function `save-user-profile` (GET/POST, **`verify_jwt=true`**, 식별자는 JWT의 `auth.uid()` — 이메일 기반 식별은 2026-08-13 폐기, CORS는 EF 상수 `ALLOWED_ORIGINS` 허용 목록 — `https://kkokzip.com` · `https://www.kkokzip.com` 중 요청 Origin과 완전히 같은 것만 돌려준다 · `delete-account`도 같다 · 2026-10-06 · 옛 `github.io`는 2026-11-04 걷음) |
 | 공고 첨부 수신 | Edge Function `fetch-attachment`는 호출자가 준 URL(허용목록 호스트만)의 바이트를 돌려주거나 `mode=upload`로 Google Drive `[임시] <announcement_id>` 폴더에 직접 올린다(폴더는 `mode=ensure_folder`로 먼저 확보해 `folder_id`로 넘긴다 · DB 쓰기 없음). 운반 상한은 기본 6MB이고 `mode=upload&large=resumable`만 200MB이며, 인증은 Vault `cron_secret_v2`의 `x-cron-secret`이다. 🔵 해외 IP를 막는 호스트(`SEOUL_ONLY` — 지금 `www.bmc.busan.kr` 부산도시공사)는 서울 지역(`ap-northeast-2`) 실행에서만 열고, 다른 지역에서 불리면 함수가 `x-region`으로 자신에게 한 번 넘긴다 — 호출하는 쪽은 그대로 부른다(2026-10-12). 상세: ⑩ 「공고 첨부 수신 — fetch-attachment는 무엇을 하고 어떻게 부르나」 |
 | 알림·트리거 | 🔴 **없음 — Make.com은 2026-08-27 미사용 확정**. 검토했고 안 쓰기로 한 것이지 미검토가 아니다(재검토 트리거는 📦 아카이브 「MCP 생태계 보류」에). 알림 경로는 미구현 상태이며 후보는 백로그 「카카오 알림톡」 |
 | 외부 API | LH 분양임대공고 API, 마이홈포털 API, 카카오맵 API |
@@ -163,9 +163,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
-| 2026-11-04 | **표시층 — 실사용 7회차 고침 [완료]** — 보증금·월세 정렬 = 카드 머리 가격 재료(통계 응답 재사용 · 새 호출 0 · 위 10장 오름차순) · 유형별 템플릿 서류 걷고 「📄 이 공고의 제출서류(원문)」 · 「마지막 수집」을 줄 오른쪽 끝으로(머리 −32px) · 접수 방법 ▾ 다시 재기(지도 → 목록 14 → 0) · 정렬 셋 빼고 「전용면적 넓은순」 · v276 |
-| 2026-11-04 | **운영 — 포항블루밸리 …20963 깨진 정책 행 · 예비신혼부부 4행 [완료]** — 「신청자격 및 입주자 선정방법」 글자마다 줄바꿈(1,741) → 이 공고 hwpx 같은 절 33줄(외국인 표 · 제외 5~7호 들어옴 · 같은 꼴 DB 1행뿐) · 신혼 갈래 「 · 예비신혼부부」 4행(…20963 · …20916 · …19802 · …19778) · 15:26 KST · 되돌림 `docs/rollback/2026-11-04_pohang_policy_prenewlywed4.sql` · PR #881 |
-| 2026-11-04 | **운영 — 일정 표 「접수」 행 [완료 1 · 쓰지 않음 2]** — `…20923`(대구경북 든든전세 비분양) 접수 행 1(원문 p.5 「신청접수 11.02(월) 10:00 ~ 11.04(수) 16:00」 · 15:01 KST · 뒤 다섯 행 순서만 +1) → 배포본 카드 「오늘 16:00까지」 · `…19412`·`…20850`은 상시·선착순(닫히는 날 없음)이라 쓰지 않음 · 원인 run 274가 p.5 「신청접수」 행만 빠뜨림 · 되돌림 `docs/rollback/2026-11-04_schedule_20923_jeopsu.sql` |
+| 2026-11-05 | **표시층 — 기준 위반: 맞춤 결과 보증금·월임대료 정렬 [완료]** — `sortMatchRows` 두 줄을 공고 탭(#882)과 같은 `zfSortPriceOf`(카드 머리 가격 재료)로 · v277 · 로컬 렌더 51행 위 10장 카드 머리 값 오름차순 · 모름 뒤 · 최신·마감 순서·결과 수 그대로 · 0장 #883 브랜치 `submit-feedback` 허용 출처 `github.io` 걷음(병합 0) · PR 이 회차 |
+| 2026-11-04 | **분석 묶음 — 회차 링크 지난 회차 소급 2차 [부분]** — 삼척도계·정선신동 `…19101` 완료(소급)(세대 7 · 정책 46 · ⚠️ 3 · 모집 205 · 증액 7% 원문 그대로 — 판정 요청 · 형제 …19307 대조) · 홍성 `…19505` 쓰기 0 멈춤(대행 한도 끊김 · 21:30 안 못 끝냄 · 재료 정리만) · 나머지 6 ID 다음 회차 · 불변식 0 · PR #889 |
+| 2026-11-04 | **코드·운영 — LH 건설임대 당첨 합격점수 수집 장치 [완료]** — EF `collect-lh-cutoff`(15160376 · 시도 16 × 1년 창 · 주 1회 월 05:13 KST) · 표 `lh_cutoff_scores`(경쟁률 = 신청 ÷ 공급 · RLS 정책 0) · 받는 자리 거름(화이트리스트 꼴만 · 신청 5명 이하 비움 · 원문 저장 0 · DB CHECK 같은 정규식) · 5년 소급 32,592행(남김 11,368 · 사람 속성 0) · 잇기 2026-04 이후 98% · PR #887 |
 ---
 
 ## 🚫 코딩 원칙

@@ -132,6 +132,16 @@
    "why": "내부 표 — anon·authenticated 권한 0 · 화면(index.html) 참조 0 · DB 함수·pg_cron·운영 점검(postgres)만 쓰고 읽는다. 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15)"
   },
   {
+   "key": "rls_enabled_no_policy_public_lh_cutoff_scores",
+   "kind": "intended",
+   "why": "LH 합격점수 표(2026-11-04) — anon·authenticated 권한 0 · 화면(index.html) 참조 0 · 수집 EF collect-lh-cutoff(service_role)만 쓴다. 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15) · 화면 회차가 읽기 정책을 같은 PR 에서 연다"
+  },
+  {
+   "key": "rls_enabled_no_policy_public_lh_cutoff_run_log",
+   "kind": "intended",
+   "why": "내부 표 — anon·authenticated 권한 0 · 화면(index.html) 참조 0 · 수집 EF collect-lh-cutoff(service_role) · 운영 점검(postgres)만. 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15)"
+  },
+  {
    "key": "rls_enabled_no_policy_public_gh_collection_run_log",
    "kind": "intended",
    "why": "내부 표 — anon·authenticated 권한 0 · 화면(index.html) 참조 0 · 수집 EF collect-gh-announcements(service_role · 2026-10-28 브랜치). 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15)"

@@ -83,7 +83,9 @@
 | `www.lh.or.kr` | 동향 — LH 보도자료 | 예정 | 허용 목록 · 미상 | 2026-10-14 | 막힘(CONNECT 403) |
 | `open.law.go.kr` | 백로그 「법령 원문 수집」(S1) | 예정 | 🔴 둘 다 — 허용 목록 + 서버 IP 등록·클라우드 IP 안티봇 | 2026-10-14 | 막힘(CONNECT 403) |
 | `business.juso.go.kr` | 도로명주소 API(세대 행 법정동) | 예정 | 허용 목록 · 미상 | 2026-10-14 | 막힘(CONNECT 403) |
-| `www.applyhome.co.kr` | 청약홈 · 분양 확장(L1 「분양 보류」) | 예정 | 허용 목록 · 미상 | 2026-10-14 | 막힘(CONNECT 403) |
+| `www.applyhome.co.kr` | 청약홈 · 분양 확장(L1 「분양 보류」) | 예정 | 허용 목록 · 미상 | 2026-11-04 | 막힘(CONNECT 403) |
+| `api.odcloud.kr` | data.go.kr 파일데이터 변환 API — 컨테이너에서 시험할 때(청약홈 후보 4 · HUG 든든전세 후보 10 · 수집 EF는 Supabase에서 돌아 해당 없음) | 예정 | 허용 목록 · 미상 | 2026-11-04 | 막힘(CONNECT 403) |
+| `infuser.odcloud.kr` | data.go.kr 파일데이터 내려받기(후보 10 HUG 든든전세 파일) | 예정 | 허용 목록 · 미상 | 2026-11-04 | 막힘(CONNECT 403) |
 
 ## 고칠 때
 

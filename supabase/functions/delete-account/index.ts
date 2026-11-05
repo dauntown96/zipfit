@@ -13,9 +13,9 @@ const SUPABASE_SERVICE_ROLE_KEY = requireEnv('SUPABASE_SERVICE_ROLE_KEY')
 
 // CORS는 배포 오리진 허용 목록으로 묶는다('*' 금지 — 이 함수는 계정을 지운다).
 // 요청 Origin이 목록과 문자열로 완전히 같을 때만 그 값을 돌려주고, 목록 밖이면 허용 헤더를 주지 않는다.
-// 2026-10-06 커스텀 도메인 전환 ① — 옛 주소(github.io)와 새 주소(kkokzip.com · www)를 함께 연다.
+// 2026-10-06 커스텀 도메인 전환 ① — 옛 주소(github.io)와 새 주소(kkokzip.com · www)를 함께 열었다.
+// 2026-11-04 옛 주소 걷기 — 옛 주소는 301로 새 주소에 넘어오므로 브라우저 Origin이 github.io일 일이 없다. 새 주소 둘만 둔다.
 const ALLOWED_ORIGINS = new Set([
-  'https://dauntown96.github.io',
   'https://kkokzip.com',
   'https://www.kkokzip.com',
 ])

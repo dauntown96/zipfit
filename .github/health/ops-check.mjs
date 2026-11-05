@@ -198,6 +198,7 @@ const EXPECTED_JOBS = [
   'zipfit-list-rpc-probe',       // 2026-10-17 공개 목록 RPC anon 실행 시간 기록(마이그레이션 2026-10-17_01 · ⑭ list_rpc_time)
   'zipfit-purge-cron-run-details',   // 2026-11-02 pg_cron 실행 기록 30일 보관(마이그레이션 2026-11-02_01)
   'zipfit-purge-collection-run-log', // 2026-11-02 LH·MYHOME 수집 런 로그 90일 보관(마이그레이션 2026-11-02_02)
+  'zipfit-collect-lh-cutoff',      // 2026-11-04 LH 건설임대 당첨 합격점수 주 1회(마이그레이션 2026-11-04_04 · ㉔ lh_cutoff)
 ]
 
 // ③④ 관리 API 가 필요 없는 점검(비로그인 목록·요약 · 배포 사이트)은 DB 점검과 다른 try 로 먼저 돈다
@@ -917,6 +918,108 @@ try {
     '0 — 넘으면 ⚠️(안 멈춤) · 같은 행 주소 원문의 「시 구」로 고칠 몫(분석 묶음 2026-11-04 산식)')
 } catch (e) {
   add('unit_sigungu_city_only', '세대 행 시군구가 「시」만(주소에 같은 시 + 구 있음)', 'warn', String(e).slice(0, 200), 'housing_units 를 읽는다(못 읽으면 ⚠️)')
+}
+
+// ㉔ LH 합격점수 수집(2026-11-04 · 우편함 「코드·운영 — LH 건설임대 당첨 합격점수 수집 장치」 4 · ⚠️만 · gate.mjs HARD 밖) —
+//    lh_cutoff_run_log 의 years_ago = 0(주 1회 정기 · 최근 1년 창) 마지막 런: 8일 넘게 없음 · 시도 호출 실패(ok_calls < calls) · errors 비지 않음 = ⚠️.
+//    거름 위반(남긴 글자 중 금지 낱말 · 신청 5명 이하 · 상태 불일치) = 0 이 아니면 ⚠️(CHECK 가 막으므로 0 이 정상 — 거름이 풀리면 보이게).
+//    표 행 수 = 마지막 정기 런 직전 런(소급 포함)의 total_after 와의 차(값만 — 5년 소급 뒤 첫 정기 런이 소급 전 값과 견주지 않게). 표·런이 없으면(적용 전 · 첫 정기 런 전) ℹ️ · 표가 있을 때만 둘째 쿼리(실행당 관리 API +1~2).
+try {
+  const [t] = await sqlRead(`select to_regclass('public.lh_cutoff_run_log') is not null as ok`)
+  const [x] = !t.ok ? [{ j: null }] : await sqlRead(`select jsonb_build_object(
+      'runs', (select count(*) from public.lh_cutoff_run_log),
+      'last', (select to_jsonb(r) - 'errors' || jsonb_build_object('errors', jsonb_array_length(r.errors), 'age_h', round(extract(epoch from now() - r.run_at) / 3600))
+                 from public.lh_cutoff_run_log r where r.years_ago = 0 order by r.id desc limit 1),
+      'prev_total', (select p.total_after from public.lh_cutoff_run_log p where p.id < (select max(r.id) from public.lh_cutoff_run_log r where r.years_ago = 0) order by p.id desc limit 1),
+      'rows', (select count(*) from public.lh_cutoff_scores),
+      'bad', (select count(*) from public.lh_cutoff_scores where (cutoff_text is not null and (coalesce(rqpr_cnt, 0) <= 5 or cutoff_text ~ '(전입|연령|나이|세대구성원|자녀|여부|당해지역|당해단지|거주기간|생년|출생|장애|추천순번)'))
+                                                             or ((cutoff_state = 'ok') <> (cutoff_text is not null)))
+    ) as j`)
+  const c = x.j
+  if (!c) add('lh_cutoff', 'LH 합격점수 수집(주 1회) · 거름 위반', 'info', '표 없음(마이그레이션 2026-11-04_04 적용 전)', '적용 뒤 판정')
+  else if (!c.last) add('lh_cutoff', 'LH 합격점수 수집(주 1회) · 거름 위반', c.bad ? 'warn' : 'info', `정기 런 전 · 행 ${c.rows} · 거름 위반 ${c.bad} · 런 ${c.runs}(소급 포함)`, '첫 정기 런(월 05:13 KST) 뒤 판정 · 거름 위반은 지금도 0 이 정상')
+  else {
+    const L = c.last, bad = []
+    if (L.age_h > 192) bad.push(`마지막 정기 런 ${L.age_h}시간 전`)
+    if (L.ok_calls < L.calls) bad.push(`시도 호출 실패 ${L.calls - L.ok_calls}/${L.calls}`)
+    if (L.errors) bad.push(`errors ${L.errors}`)
+    if (c.bad) bad.push(`거름 위반 ${c.bad}`)
+    const delta = c.prev_total != null && L.total_after != null ? L.total_after - c.prev_total : null
+    add('lh_cutoff', 'LH 합격점수 수집(주 1회) · 거름 위반', bad.length ? 'warn' : 'pass',
+      `${bad.length ? bad.join(' · ') + ' · ' : ''}행 ${c.rows}(직전 런 대비 ${delta == null ? '—' : (delta >= 0 ? '+' : '') + delta}) · 마지막 ${L.window_from}~${L.window_to} 받음 ${L.rows_in} · 남김 ${L.kept} · 거름 ${L.dropped_filter} · 5명 이하 ${L.dropped_small} · ${L.age_h}시간 전`,
+      '정기 런 ≤ 8일 ∧ 시도 호출 실패 0 ∧ errors 0 ∧ 거름 위반 0 — 넘으면 ⚠️(안 멈춤) · 행 수 증감은 값만')
+  }
+} catch (e) {
+  add('lh_cutoff', 'LH 합격점수 수집(주 1회) · 거름 위반', 'warn', String(e).slice(0, 200), 'lh_cutoff_run_log · lh_cutoff_scores 를 읽는다(못 읽으면 ⚠️)')
+}
+
+// ㉓ 화면 빈칸 점검 셋 — 한 쿼리(2026-11-04 · 우편함 「옛 주소 걷기·화면 빈칸 점검」 3~5 · 전부 안 멈춤 — gate.mjs HARD 밖).
+//    카드 = 목록 RPC 대표 · 같은 카드의 행 = 제목 키(announcement_dedup_key — 화면 zfDedupKey 와 한 벌)가 같은 공고 전부(화면 곁 데이터 붙이기와 같다).
+//    ⓐ deadline_hm_missing — 마감이 오늘·내일(KST)인 카드 중 그날 끝나는 경로 표 행 · 일정 표 「접수」 행이 **하나도 없는** 것 = ⚠️(화면이 「오늘 16:00까지」를 못 낸다 · …20923 꼴).
+//       그날 끝나는 행은 있는데 어느 글에도 시각(「16:00」·「16시」)이 없는 것 = ℹ️ 따로(원문에 시각이 없는 상시·선착순 꼴 — 값에 「시각 없음」으로만 센다).
+//       같은 자리 둘째 셈 — 열린 카드 ∧ 분석 완료 계열 ∧ 일정 표 행 있음 ∧ 「접수」 행 없음 ∧ 경로 표 0(마감 날이 멀어도 미리 잡는다 · …20923 은 이 꼴이었다).
+//    ⓑ unit_sigungu_unknown — 세대 행 시군구가 공고 행 시군구 이름(공백 무시)에도 경계 파일 geo/kr-2026-07.json 「cent」 시·군·구 이름에도 없는 것.
+//       예외 1: 「양산」(…19919 · 원문 주소에 「시」가 없다 — 2026-11-04 분석 묶음이 그대로 둠). unit_sigungu_city_only(「시」만 ∧ 주소에 구)와는 고칠 몫이 달라 따로 둔다.
+//    ⓒ round_policy_diff — 회차 링크 쌍(announcement_round_links)의 같은 칸 이름(category) 정책 글 길이가 크게 다름(짧은 쪽/긴 쪽 < 0.33 ∧ 긴 쪽 ≥ 500자) = ℹ️ 셈만
+//       (회차마다 원문이 실제로 다를 수 있어 판정하지 않는다) · 같은 자리 「글자마다 줄바꿈」(50자 이상 ∧ 줄바꿈/글자 > 0.3 · 포항블루밸리 …20963 꼴) 정책 행 수 = 0 넘으면 ⚠️.
+const UNIT_SG_EXCEPT = new Set(['2015122300019919|양산'])
+try {
+  const geoNames = Object.keys(JSON.parse(readFileSync(new URL('../../geo/kr-2026-07.json', import.meta.url), 'utf8')).cent).map(k => k.split('|')[1])
+  const lit = `array[${geoNames.map(s => `'${s.replace(/'/g, "''")}'`).join(',')}]::text[]`
+  const [x] = await sqlRead(`with t as (select (now() at time zone 'Asia/Seoul')::date d),
+op as (select x.announcement_id rep, x.apply_end dy, public.announcement_dedup_key(a.title) k
+         from public.get_announcements_deduped() x join public.announcements a on a.announcement_id = x.announcement_id, t
+        where x.apply_end >= t.d),
+g as (select op.rep, op.dy, a.announcement_id aid from op join public.announcements a on public.announcement_dedup_key(a.title) = op.k),
+r as (select g.rep, ro.period_text p from g join public.announcement_apply_routes ro on ro.announcement_id = g.aid and ro.end_date = g.dy, t where g.dy <= t.d + 1
+      union all
+      select g.rep, s.period_text from g join public.announcement_schedule s on s.announcement_id = g.aid and s.stage = '접수' and s.end_date = g.dy, t where g.dy <= t.d + 1),
+hm as (select op.rep, count(r.rep) n, count(*) filter (where r.p ~ '\\d{1,2}\\s*(:\\s*\\d{2}|시($|[^간]))') hm
+         from op join t on op.dy <= t.d + 1 left join r on r.rep = op.rep group by op.rep),
+gs as (select g.rep,
+         bool_or(exists (select 1 from public.announcement_analysis an where an.announcement_id = g.aid and an.status like '완료%')) done,
+         bool_or(exists (select 1 from public.announcement_schedule s where s.announcement_id = g.aid)) sched,
+         bool_or(exists (select 1 from public.announcement_schedule s where s.announcement_id = g.aid and s.stage = '접수')) jeopsu,
+         bool_or(exists (select 1 from public.announcement_apply_routes ro where ro.announcement_id = g.aid)) route
+         from g group by g.rep),
+ks as (select distinct replace(btrim(sigungu_nm), ' ', '') sg from public.announcements where nullif(btrim(sigungu_nm), '') is not null
+       union select unnest(${lit})),
+uu as (select h.announcement_id aid, btrim(h.sigungu_nm) sg, count(*) n from public.housing_units h
+        where nullif(btrim(h.sigungu_nm), '') is not null and replace(btrim(h.sigungu_nm), ' ', '') not in (select sg from ks) group by 1, 2),
+lk as (select earlier_announcement_id e, later_announcement_id la from public.announcement_round_links),
+pc as (select lk.e, lk.la, p.announcement_id aid, p.category, sum(length(p.content_raw)) n
+         from lk join public.announcement_policies p on p.announcement_id in (lk.e, lk.la) group by 1, 2, 3, 4),
+pd as (select a.e, a.la, a.category from pc a join pc b on b.e = a.e and b.la = a.la and b.category = a.category and a.aid = a.e and b.aid = a.la
+        where least(a.n, b.n)::numeric / greatest(a.n, b.n) < 0.33 and greatest(a.n, b.n) >= 500)
+select jsonb_build_object(
+  'hm_none', (select coalesce(jsonb_agg(rep order by rep), '[]'::jsonb) from hm where n = 0),
+  'hm_notime', (select coalesce(jsonb_agg(rep order by rep), '[]'::jsonb) from hm where n > 0 and hm = 0),
+  'hm_cards', (select count(*) from hm),
+  'no_jeopsu', (select coalesce(jsonb_agg(rep order by rep), '[]'::jsonb) from gs where done and sched and not jeopsu and not route),
+  'unit_unknown', (select coalesce(jsonb_agg(jsonb_build_array(aid, sg, n) order by n desc, aid), '[]'::jsonb) from uu),
+  'pd_cat', (select count(*) from pd), 'pd_links', (select count(distinct (e, la)) from pd), 'links', (select count(*) from lk),
+  'pd_top', (select coalesce(jsonb_agg(z.e || '→' || z.la order by z.e, z.la), '[]'::jsonb) from (select distinct e, la from pd) z),
+  'nl_char', (select coalesce(jsonb_agg(announcement_id order by announcement_id), '[]'::jsonb) from public.announcement_policies
+                where length(content_raw) >= 50 and (length(content_raw) - length(replace(content_raw, E'\\n', '')))::numeric / length(content_raw) > 0.3)
+) as j`)
+  const c = x.j
+  const top = (a, k = 5) => a.slice(0, k).join(', ') + (a.length > k ? ` 외 ${a.length - k}` : '')
+  const bad = c.hm_none.length + c.no_jeopsu.length
+  add('deadline_hm_missing', '마감 시각 재료 없음 — 오늘·내일 마감 카드 · 접수 행 없는 분석 완료 카드', bad ? 'warn' : 'pass',
+    [`오늘·내일 마감 ${c.hm_cards} 중 그날 끝나는 경로·접수 행 없음 ${c.hm_none.length}${c.hm_none.length ? ': ' + top(c.hm_none) : ''}`,
+     `ℹ️ 행은 있는데 원문 시각 없음 ${c.hm_notime.length}${c.hm_notime.length ? ': ' + top(c.hm_notime) : ''}`,
+     `열린 분석 완료 ∧ 일정 행 있음 ∧ 접수 행 없음 ∧ 경로 표 0 = ${c.no_jeopsu.length}${c.no_jeopsu.length ? ': ' + top(c.no_jeopsu) : ''}`].join(' · '),
+    '앞 셈 0 ∧ 끝 셈 0 — 넘으면 ⚠️(안 멈춤) · 원문 시각 없음은 ℹ️ 값만 · 카드 = 제목 키 같은 공고 전부(화면 zfEndHmOf 재료와 같다)')
+  const uu = c.unit_unknown.filter(([aid, sg]) => !UNIT_SG_EXCEPT.has(`${aid}|${sg}`))
+  add('unit_sigungu_unknown', '세대 행 시군구가 공고 행·경계 파일 어디에도 없는 이름', uu.length ? 'warn' : 'pass',
+    uu.length ? uu.slice(0, 5).map(([aid, sg, n]) => `${aid} 「${sg}」 ${n}행`).join(', ') + (uu.length > 5 ? ` 외 ${uu.length - 5}` : '') + ` · 예외 ${c.unit_unknown.length - uu.length}`
+      : `0 · 예외 ${c.unit_unknown.length - uu.length}(양산 …19919)`,
+    '0(예외 목록 밖) — 넘으면 ⚠️(안 멈춤) · 공백 무시 · 경계 geo/kr-2026-07.json cent 256 · 예외 = UNIT_SG_EXCEPT')
+  add('round_policy_diff', '회차 링크 쌍 같은 칸 정책 글 길이 크게 다름(셈) · 글자마다 줄바꿈 정책 행', c.nl_char.length ? 'warn' : 'info',
+    `길이 다름 ${c.pd_cat}칸 · ${c.pd_links}쌍(링크 ${c.links})${c.pd_top.length ? ': ' + top(c.pd_top, 3) : ''} · 글자마다 줄바꿈 ${c.nl_char.length}${c.nl_char.length ? ': ' + top([...new Set(c.nl_char)]) : ''}`,
+    '길이 다름 = 짧은/긴 < 0.33 ∧ 긴 ≥ 500자 — ℹ️ 셈만(판정 없음) · 글자마다 줄바꿈 = 50자 이상 ∧ 줄바꿈/글자 > 0.3 — 0 넘으면 ⚠️(안 멈춤)')
+} catch (e) {
+  add('screen_gaps', '화면 빈칸 점검 셋(마감 시각 · 세대 시군구 · 회차 정책 글)', 'warn', String(e).slice(0, 200), '공고·일정·경로·세대·정책 표를 읽는다(못 읽으면 ⚠️)')
 }
 
 // ⑱ 비밀값 만료(2026-10-17 · 우편함 「코드·운영 — 인스턴스 지표 정기 기록 · Vault 밖 만료 표 · 비밀값 30일 전 ⚠️ …」 3) — zipfit_ops.secret_expiry_list() 한 정의
