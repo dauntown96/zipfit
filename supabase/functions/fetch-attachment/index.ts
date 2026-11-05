@@ -172,6 +172,45 @@ const rejectReason = (u: URL): string | null => {
   return null
 }
 
+// 🔴 LH 첨부 경로 쓰임 가름(2026-11-05 · 우편함 「코드·운영 — LH 첨부 경로(lhFile.do) 사용 중단 …」 「🔴 요청 고침」 2장 · 다운님 결정 「문의 답 전까지 중간 길」) —
+//   apply.lh.or.kr/robots.txt 가 Disallow: /lhapply/lhFile.do · /lhapply/apply/csvc/lhFile.do 를 건다. 그 두 경로는 받기 전에 DB 문지기 lh_file_gate(url, 목적)를
+//   부른다(모드 analysis_dispatch_config.lh_file_mode — essential: 열린 공고 첨부를 파일당 한 번 + 재시도 한 번 · paused: 전부 막음 · normal: 종전).
+//   허락하지 않으면 403 {status:'lh_file_gate'} · 🔴 문지기를 못 부르면 받지 않는다(닫힌 쪽). 허락한 받기의 결과(ok · 실패 사유)는 응답 직전 lh_file_gate_done 이 적는다(Deno.serve).
+//   첫 주소 · 리다이렉트 다음 주소 · host_probe 모두. 다른 LH 경로(/upload/Files/ 이미지 · 공고 페이지)와 다른 호스트는 그대로.
+const ROBOTS_DISALLOWED = (u: URL) => u.hostname === 'apply.lh.or.kr' && /^\/lhapply\/(apply\/csvc\/)?lhfile\.do$/i.test(u.pathname)
+type LhGate = { allow: boolean; reason: string; kind: string | null; mode: string | null; reuse_url: string | null; log_id: number | null }
+const rpcPost = async (fn: string, args: Record<string, unknown>): Promise<unknown> => {
+  const base = Deno.env.get('SUPABASE_URL')
+  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  if (!base || !key) throw new Error('환경변수 SUPABASE_URL·SUPABASE_SERVICE_ROLE_KEY 없음')
+  const r = await fetch(`${base}/rest/v1/rpc/${fn}`, {
+    method: 'POST',
+    headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(args),
+  })
+  if (!r.ok) throw new Error(`${fn} HTTP ${r.status}`)
+  const t = await r.text()
+  return t ? JSON.parse(t) : null
+}
+const lhFileGate = async (u: URL, purpose: 'fetch' | 'probe'): Promise<LhGate> => {
+  try {
+    const g = await rpcPost('lh_file_gate', { p_url: u.toString(), p_purpose: purpose }) as LhGate
+    if (g && typeof g.allow === 'boolean') return g
+    return { allow: false, reason: '문지기 응답을 읽지 못함 — 받지 않음', kind: null, mode: null, reuse_url: null, log_id: null }
+  } catch (e) {
+    return { allow: false, reason: `문지기를 부르지 못함 — 받지 않음(${String(e instanceof Error ? e.message : e).slice(0, 80)})`, kind: null, mode: null, reuse_url: null, log_id: null }
+  }
+}
+const lhGateDone = async (logId: number, outcome: string) => {
+  try { await rpcPost('lh_file_gate_done', { p_log_id: logId, p_outcome: outcome }) } catch { /* 기록 실패는 응답을 바꾸지 않는다 */ }
+}
+const LH_GATE_BODY = (u: URL, g: LhGate) => ({
+  ok: false, status: 'lh_file_gate', reason: 'lh_file_gate', gate_mode: g.mode, gate_kind: g.kind, reuse_url: g.reuse_url,
+  error: `LH 첨부 경로 쓰임 가름(${g.mode ?? '?'}) — ${g.reason} · ${u.hostname}${u.pathname} 는 apply.lh.or.kr/robots.txt 가 막는 경로다(2026-11-05 다운님 결정)`,
+})
+// 허락한 lhFile.do 받기의 기록 행 — 요청마다 하나(응답 직전 결과를 적는다).
+const lhGateOf = new WeakMap<Request, number>()
+
 // 이미지 경로의 형식 검사. 최종 URL(리다이렉트를 다 따라간 뒤)이 `/upload/Files/`일 때만 건다.
 // 통과하면 null, 막히면 사유 문자열.
 const IMAGE_ONLY_PREFIX = '/upload/Files/'
@@ -951,6 +990,10 @@ const hostProbe = async (target: string | null) => {
   if (!['https:', 'http:'].includes(u.protocol) || !PROBE_HOSTS.has(u.hostname)) {
     return { status: 400, body: { ok: false, error: `관측 밖 호스트: ${u.hostname}` } }
   }
+  if (ROBOTS_DISALLOWED(u)) {
+    const g = await lhFileGate(u, 'probe')
+    if (!g.allow) return { status: 403, body: LH_GATE_BODY(u, g) }
+  }
   const region = Deno.env.get('SB_REGION') ?? '(없음)'
   const t0 = Date.now()
   const d = await probeFetch(u)
@@ -1001,7 +1044,7 @@ const hostProbe = async (target: string | null) => {
 
 // ───────────────────────── 본체 ─────────────────────────
 
-Deno.serve(async (req: Request) => {
+const handleRequest = async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', {
       headers: {
@@ -1149,6 +1192,11 @@ Deno.serve(async (req: Request) => {
 
   const firstReject = rejectReason(current)
   if (firstReject) return json({ ok: false, error: firstReject }, 403)
+  if (ROBOTS_DISALLOWED(current)) {
+    const g = await lhFileGate(current, 'fetch')
+    if (!g.allow) return json(LH_GATE_BODY(current, g), 403)
+    if (g.log_id != null) lhGateOf.set(req, g.log_id)
+  }
 
   const started = Date.now()
   const ac = new AbortController()
@@ -1176,6 +1224,14 @@ Deno.serve(async (req: Request) => {
           redirect_hops: hops,
           blocked_redirect_to: next.toString(),
         }, 403)
+      }
+      if (ROBOTS_DISALLOWED(next) && !lhGateOf.has(req)) {
+        const g = await lhFileGate(next, 'fetch')
+        if (!g.allow) {
+          clearTimeout(timer)
+          return json({ ...LH_GATE_BODY(next, g), redirect_hops: hops }, 403)
+        }
+        if (g.log_id != null) lhGateOf.set(req, g.log_id)
       }
       hops.push(next.toString())
       current = next
@@ -1446,4 +1502,20 @@ Deno.serve(async (req: Request) => {
       elapsed_ms: Date.now() - started,
     }, 502)
   }
+}
+
+// 🔵 2026-11-05 — lhFile.do 를 허락받아 받은 요청은 응답 직전 결과를 기록한다(lh_file_gate_done · 실패 셈 = 「재시도 한 번까지」).
+Deno.serve(async (req: Request) => {
+  const res = await handleRequest(req)
+  const logId = lhGateOf.get(req)
+  if (logId != null) {
+    let outcome = res.ok ? 'ok' : `http_${res.status}`
+    try {
+      const j = await res.clone().json() as Record<string, unknown>
+      if (j && j.ok === false) outcome = String(j.reason ?? j.error ?? outcome)
+      else if (j && j.uploaded === false && typeof j.reason === 'string') outcome = j.reason
+    } catch { /* 본문이 json 이 아니면 상태로만 */ }
+    await lhGateDone(logId, outcome.slice(0, 60))
+  }
+  return res
 })
