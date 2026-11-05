@@ -85,7 +85,7 @@ jobs:
           nohup python3 -m http.server 8201 --bind 127.0.0.1 --directory site-src > /dev/null 2>&1 &
           for i in $(seq 1 20); do curl -fsS -o /dev/null http://127.0.0.1:8201/index.html && { echo "브랜치 $(git -C site-src rev-parse --short HEAD) 띄움"; exit 0; }; sleep 1; done
           echo "::error::브랜치를 띄우지 못했다"; exit 1
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
       # 🔵 2026-10-19(우편함 「표시층 — 화면 점검 오탐 막기」 3) — 배포가 도는 동안 배포본을 열지 않는다(모든 실행 · push 는 sw.js 반영까지).
@@ -192,7 +192,7 @@ jobs:
         run: node .github/health/screen-finish.mjs
       - name: 결과 올리기
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: health-result
           path: |
