@@ -7629,8 +7629,10 @@ function sortMatchRows(rows, sortVal){
     if(sortVal==='start-asc')     return nullLast(a,b,n=>n.apply_start,false);
     // 🔵 공고 탭과 **같은 zfNumOrNull** 을 부른다 — 사본을 두지 않는다.
     if(sortVal==='units-desc')    return nullLast(a,b,n=>zfNumOrNull(n.total_units),true);
-    if(sortVal==='deposit-asc')   return nullLast(a,b,n=>zfNumOrNull(n.deposit_min),false);
-    if(sortVal==='rent-asc')      return nullLast(a,b,n=>zfNumOrNull(n.rent_min),false);
+    // 🔴 2026-11-05 — 보증금·월임대료는 공고 탭(#882)과 같은 zfSortPriceOf(카드 머리 가격 재료 — zfPriceCache 먼저)다.
+    //    목록 RPC deposit_min·rent_min 은 분석분이 비어 사실상 모름 순서로 섰다. matchHouses 가 렌더 전에 요약을 받아 두므로 채우기(zfSortPriceFill)는 두지 않는다.
+    if(sortVal==='deposit-asc')   return nullLast(a,b,n=>zfSortPriceOf(n,'deposit_min'),false);
+    if(sortVal==='rent-asc')      return nullLast(a,b,n=>zfSortPriceOf(n,'rent_min'),false);
     if(sortVal==='area-desc')     return nullLast(a,b,n=>zfNumOrNull(n.area_max),true);
     if(sortVal==='region-asc'){
       const regionA = (a.sido_nm||a.region||'') + ' ' + (a.sigungu_nm||'');
