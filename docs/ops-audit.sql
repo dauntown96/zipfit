@@ -4,7 +4,7 @@
 --   (관리 API는 마지막 문장의 결과만 돌려준다 — 여섯을 한 요청에 실으면 ⑥만 보인다). launch-gates.sql 과 짝 — 게이트는 그 파일, 시스템 구조·건강은 이 파일.
 -- 🔴 쓰기 0 · 개인정보 표(user_profiles · saved_announcements · usage_events — 정본 목록 zipfit-backup scripts/data_excluded.py — + auth.*)는
 --    개수·크기만 나온다(CLAUDE.md 원칙 36 — 값 · 회원 id · IP · 브라우저 정보 0). ⑤만 운영 목록 함수 get_announcements_deduped 를 한 번 부른다(약 3초) —
---    G1 보호: 탐침(:x5) · 운영 점검(:25 · :55) 직전 5분과 평일 12~14시를 피한다.
+--    G1 보호: 탐침(:x5) · 운영 점검(:25 · :55) 직전 5분을 피한다(「평일 12~14시 피함」은 2026-11-05 걷음 — 다운님 승인 · 7일 실측 12~14시 탐침 2초 넘음 0).
 -- 결과를 해석하는 자리: 판정 근거 = .github/health/security-allowlist.json(advisors 의도한 지적) · ② 「RLS 원칙」 · 우편함 「런칭 전 점검 ① Supabase」 회신 ①.
 --   경보선(DB 150MB 등)은 zipfit-audit 4절 표가 정본 — 여기 적지 않는다.
 

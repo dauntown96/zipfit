@@ -27,6 +27,10 @@ verify_jwt = false
 [functions.collect-lh-cutoff]
 verify_jwt = false
 
+# 2026-11-05 신설 — LH 대상주택 공지 감지(15058222 · 대상 창 있을 때만 하루 4회). x-cron-secret 으로 막는다(JWT 없음).
+[functions.collect-lh-notices]
+verify_jwt = false
+
 [functions.collect-rental-stats]
 verify_jwt = false
 
