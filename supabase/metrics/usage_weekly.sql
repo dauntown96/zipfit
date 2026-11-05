@@ -38,6 +38,17 @@ select json_build_object(
   --    🔴 작아도 실패가 아니다 — 런칭 첫 주는 표본이 작고, 이 수는 방향(오르나 내리나)을 보는 지표다. 0 이면 먼저 계측 경로(index.html 의
   --    from='match' 태그가 지금 추천 카드에서 남는지 — 백로그 「북극성 계측 경로 확인」 · 표시층 회차 D)를 의심한다. 값 해석은 그 확인 뒤.
   'north_star_sessions', (select count(distinct session_id) from r where event = 'notice_open' and r.props->>'from' = 'match'),
+  -- 🔵 2026-11-04(우편함 「표시층 — 의견 창구 #727 시행일 준비 당김」 5 · 백로그 「이용 기록 … 구간값 셋」 ② usage_weekly 셈) — 처리방침 시행일(2026-11-29) 뒤
+  --    처음 열기(page_view · props.nav = 'load')에 붙는 구간 이름별 개수 · 카드 반응 개수. 값은 처리방침 1 문구 그대로의 구간 이름이라 개인 값이 아니다.
+  --    시행일 전 창에서는 구간 키가 없어 「(없음)」 한 칸만 선다.
+  'load_by_revisit', (select json_object_agg(k, n order by k) from (
+      select coalesce(r.props->>'revisit', '(없음)') k, count(*) n from r where event = 'page_view' and r.props->>'nav' = 'load' group by 1) x),
+  'load_by_width', (select json_object_agg(k, n order by k) from (
+      select coalesce(r.props->>'width', '(없음)') k, count(*) n from r where event = 'page_view' and r.props->>'nav' = 'load' group by 1) x),
+  'load_by_via', (select json_object_agg(k, n order by k) from (
+      select coalesce(r.props->>'via', '(없음)') k, count(*) n from r where event = 'page_view' and r.props->>'nav' = 'load' group by 1) x),
+  'card_reaction', (select json_object_agg(k, n order by k) from (
+      select coalesce(r.props->>'v', '(없음)') k, count(*) n from r where event = 'card_reaction' group by 1) x),
   'sessions_by_day_kst', (select json_object_agg(d, n order by d) from (
       select to_char(occurred_at at time zone 'Asia/Seoul', 'MM-DD') d, count(distinct session_id) n from r group by 1) x)
 );
