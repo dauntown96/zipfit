@@ -3112,9 +3112,14 @@ function zfRouteSlotHtml(row, title){
 // 🔵 2026-10-21(우편함 「표시층 — S1 묶음 3」 ④ · 조사 「카드 표기 넷」 ④) — 경로 행이 전부 「전체」이면 zfRouteVerdict 는 줄을 내지 않는다(갈래가 순위 · 단지 · 현장 · 인터넷뿐).
 //    그래서 신청처(이메일 접수 · 외부 기관 누리집)가 카드에 안 보였다(SH 이메일 접수 3장 · 기장군 …20930). 그 행의 place_text(없으면 note_text)를
 //    원문 글자 그대로 「📅 접수 방법 · …」 한 줄로 — 현장 접수 줄과 같은 자리 · 같은 꼴. 우리 말을 덧붙이지 않는다. 여럿이면 「 / 」.
+// 🔵 2026-11-05(우편함 「표시층 — 세대 안내 배너 · 추이 줄 줄이기 · 이메일 접수 줄」 ③) — 경로 「이메일」 행(#899)도 같은 줄로: 원문 낱말 「이메일」 + 그 행 place_text(주소) 그대로.
+//    경로가 전부 「전체」 또는 「이메일」일 때만(다른 경로가 섞이면 종전 갈래가 판정한다).
 function zfRouteMethodOf(rows){
-  if(!Array.isArray(rows) || !rows.length || rows.some(r => !r || r.route !== '전체')) return null;
-  const txt = [...new Set(rows.map(r => String(r.place_text || '').trim() || String(r.note_text || '').trim()).filter(Boolean))];
+  if(!Array.isArray(rows) || !rows.length || rows.some(r => !r || (r.route !== '전체' && r.route !== '이메일'))) return null;
+  const txt = [...new Set(rows.map(r => {
+    if(r.route === '이메일'){ const a = String(r.place_text || '').trim(); return a ? '이메일 ' + a : '이메일'; }
+    return String(r.place_text || '').trim() || String(r.note_text || '').trim();
+  }).filter(Boolean))];
   return txt.length ? { kind: '④', text: '접수 방법 · ' + txt.join(' / ') } : null;
 }
 // 🔵 2026-11-03(우편함 「표시층 — 다음 판 시안」 C · 💡 새 문구 — 다운님 승인 전 시안) — 경로 표가 우편뿐인 카드 1층에 「📮 우편으로만 받아요」 한 줄.
@@ -5413,7 +5418,14 @@ function zfCutoffTrendHtml(rows){
   const h = (r && Array.isArray(r.history)) ? r.history.filter(x => x && x.d && x.n != null) : [];
   if(h.length < 2) return '';
   const ym = d => String(d).slice(0, 7);
-  return `<p class="zf-cut-trend" style="font-size:12px;color:var(--ink-2,#555);margin-top:8px;line-height:1.5">같은 주택형 지난 신청: ${h.map(x => Number(x.n)).join(' → ')}명 (${escapeHtml(ym(h[0].d))} ~ ${escapeHtml(ym(h[h.length - 1].d))} · ${h.length}회)</p>`;
+  const st = 'font-size:12px;color:var(--ink-2,#555);margin-top:8px;line-height:1.5';
+  // 🔵 2026-11-05(우편함 「표시층 — 세대 안내 배너 · 추이 줄 줄이기 …」 ② · 다운님 승인 2026-11-05) — 7회를 넘으면 최근 6회 + 전체 범위.
+  if(h.length > 7){
+    const last = h.slice(-6).map(x => Number(x.n));
+    const all = h.map(x => Number(x.n));
+    return `<p class="zf-cut-trend" style="${st}">같은 주택형 지난 신청: (최근 6회) ${last.join(' → ')}명 · 전체 ${h.length}회 범위 ${Math.min(...all)}~${Math.max(...all)}명 (${escapeHtml(ym(h[0].d))} ~ ${escapeHtml(ym(h[h.length - 1].d))})</p>`;
+  }
+  return `<p class="zf-cut-trend" style="${st}">같은 주택형 지난 신청: ${h.map(x => Number(x.n)).join(' → ')}명 (${escapeHtml(ym(h[0].d))} ~ ${escapeHtml(ym(h[h.length - 1].d))} · ${h.length}회)</p>`;
 }
 // 상세 「지난 회차」 접기 — 열 = 주택형 · 모집공고일 · 신청유형 · 신청 · 공급·경쟁률 · LH 공개 커트라인. 주택형 큰 순.
 //    카드 세대 행과 주택형이 맞는 행은 굵게(그 회차 전 주택형을 다 보여 준다).
@@ -10637,13 +10649,18 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
       ? `<details class="hu-past"><summary class="hu-past-title">🕘 다른 회차 보기 (${pastLineCount}건)</summary>`
         + `<div class="hu-past-list">${renderHousingUnitList(diffPast)}</div></details>`
       : '') + sameHtml;
+    // 🔵 2026-11-05(우편함 「표시층 — 세대 안내 배너 …」 ① · 다운님 승인 2026-11-05) — 지난 회차가 전부 「같은 조건」으로 접혀 「다른 회차 보기」가 없으면
+    //    배너가 가리키는 이름을 그 접힘 줄로(N·기간은 접힘 줄과 같은 값). 「다른 회차 보기」가 함께 있으면 종전 문구 그대로.
+    const bannerHtml = (samePast.length && !diffPast.length && staleHtml)
+      ? staleHtml.replace(escapeHtml('아래 「다른 회차 보기」를 펼쳐'), escapeHtml(`아래 「지난 ${sameDates.length}회(${zfRoundSpan(sameDates)}) 이번과 같은 조건」을 펼쳐`))
+      : staleHtml;
     // 🔵 2026-10-02 — 블록 카드의 대표 ID 세대(blockHuFallback)는 단지별로 나뉘지 않았다는 것을 제목과 한 줄로 밝힌다.
     const huAllBlocks = !huIsBlock && blockHuFallback[id] === true;
     const huTitle = pastOnly
       ? `🏠 세대별 정보${huAllBlocks ? ' — 단지 구분 전 전체' : ''} (다른 회차 ${pastLineCount}건)`
       : `🏠 세대별 정보${huAllBlocks ? ' — 단지 구분 전 전체' : ''} (${countHousingUnitLines(units)}건)`;
     const huAllNote = huAllBlocks ? `<p class="blk-round-note">이 공고의 세대 정보는 단지별로 나뉘어 있지 않아 공고 전체를 한 번에 보여 드려요.</p>` : '';
-    wrap.innerHTML = `<summary class="hu-title">${huTitle}</summary>` + huAllNote + staleHtml + `<div class="hu-list" id="hu-list-${id}"></div>` + pastHtml;
+    wrap.innerHTML = `<summary class="hu-title">${huTitle}</summary>` + huAllNote + bannerHtml + `<div class="hu-list" id="hu-list-${id}"></div>` + pastHtml;
     // 🔴 2026-09-30(표시층·필터) — 종전에는 건물이 하나이거나 다른 회차만 있으면 펼쳐 두었다. 이제 처음엔 늘 접힌다
     //    (다운님 지시 — 어떤 카드든). 다른 회차만 있는 카드의 배너는 「아래 「다른 회차 보기」에 있는 것은 …」이라
     //    접힌 상태와 어긋나지 않는다.
@@ -11837,7 +11854,8 @@ function buildChecklist(){
     const hm = zf3EndHm(r.period_text);   // 이 판의 zf3EndHm 은 C 묶음 5 로 고쳐져 있다(main 의 zfChkEndHm 거름이 필요 없다)
     const where = String(r.place_text || '').trim() || (r.route === '전체' ? String(r.note_text || '').trim() : '');
     const past = r.end_date && (zfKstDayDiff(r.end_date) ?? 0) < 0;   // 끝난 창은 남기되 지났다고 적는다(차수가 나뉜 공고의 앞 창)
-    return [lab, span ? span + (hm ? ` · ${hm}까지` : '') + (past ? ' · 지났어요' : '') : '', where && (r.route === '전체' ? where : `접수 장소 ${where}`)].filter(Boolean).join(' — ');
+    // 🔵 2026-11-05(③) — 이메일 행은 주소 앞에 「접수 장소」를 붙이지 않는다(주소만).
+    return [lab, span ? span + (hm ? ` · ${hm}까지` : '') + (past ? ' · 지났어요' : '') : '', where && (r.route === '전체' || r.route === '이메일' ? where : `접수 장소 ${where}`)].filter(Boolean).join(' — ');
   }).filter(Boolean))];
   document.getElementById('checklist-apply').innerHTML = apLines.length
     ? apLines.map(t => `<li><span class="cicon creq">✓</span><span>${escapeHtml(t)}</span></li>`).join('')
