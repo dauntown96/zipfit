@@ -13,7 +13,8 @@
 
 | 파일 | 무엇 |
 |---|---|
-| **`v3.18.sql`** | **현행.** v3.17 + `allow_exec_funcs`에 `get_announcement_cutoff_rounds`(카드 「지난 회차」 LH 합격점수 · 마이그레이션 `2026-11-05_01`) |
+| **`v3.19.sql`** | **현행.** v3.18 + V10a `route`에 「이메일」(마이그레이션 `2026-11-05_03` — 이메일 접수 경로) |
+| `v3.18.sql` | v3.17 + `allow_exec_funcs`에 `get_announcement_cutoff_rounds`(카드 「지난 회차」 LH 합격점수 · 마이그레이션 `2026-11-05_01`) |
 | `v3.17.sql` | v3.16 + `allow_exec_funcs`에 `get_announcement_round_chain_ids`(회차 사슬 · 마이그레이션 `2026-10-29_03`) |
 | `v3.16.sql` | v3.15 + `allow_exec_funcs`에 `get_announcement_round_ids` · V1이 뷰·구체화 뷰·외부 표까지 · **V17** postgres 기본 권한이 공개 역할에 표 SELECT 밖·함수·시퀀스를 열면 위반 · **V18** 공개 역할의 public·zipfit_ops CREATE · zipfit_ops USAGE |
 | `v3.15.sql` | v3.14 + `allow_exec_funcs`에 `listing_hidden_keys`·`ops_is_admin`·`ops_status_board`·`ops_listing_hide` |
