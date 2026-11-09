@@ -12668,6 +12668,11 @@ function zfOpsHtml(b, issues){
   // ⓒ-5 이용자 7일(2026-11-09 · 우편함 「표시층 — 상태판 이용자 지표 한 줄」 1 · #924 usage_7d) — 엣지 로그와 맞댄 KST 날짜 7일(어제까지) 합.
   //    사람 = other(봇·운영·헤드리스·스크립트를 뺀 세션) · 채워진 날이 7 미만이면 그 수가 보인다 · 이름을 「엣지 로그」로 붙여
   //    이용 기록만으로 센 users.sessions_*(「지금부터 7일」)와 창·셈이 다름을 드러낸다(개수만 · 원칙 36).
+  // 🔵 2026-11-09(우편함 「표시층 — 상태판 이용 기록 맞대기」) — 바로 아래 작은 글씨로 이용 기록(usage_events)만으로 센 「지금부터 7일」 세션(users.sessions_7d)을 맞댄다.
+  //    두 셈은 창이 다르다(이용 기록 = 지금부터 7일 · 엣지 로그 = KST 어제까지 7일) — 이름과 창을 같이 적는다 · users 칸이 없는 응답이면 줄 없음.
+  const us7 = (b.users && b.users.sessions_7d != null)
+    ? `<span style="font-size:12px;color:#888">이용 기록 7일 ${Number(b.users.sessions_7d) || 0} <span>(이용 기록만으로 센 세션 · 지금부터 7일 · 운영 표지·운영자 뺌)</span></span>` : '';
+  if(!b.usage_7d && us7) out.push(line('ok', '이용 기록 7일', us7));
   if(b.usage_7d){
     const u = b.usage_7d, days = Number(u.days) || 0, heavy = Number(u.other_heavy) || 0;
     const ux = days
@@ -12675,7 +12680,7 @@ function zfOpsHtml(b, issues){
         + ` <span style="color:#888">(${zfOpsEsc(u.from)}~${zfOpsEsc(u.to)} KST · 헤드리스 ${Number(u.headless) || 0} · 스크립트 ${Number(u.script) || 0})</span>`
         + (heavy > 0 ? `<br><span style="font-size:12px;color:#888">열기 많은 세션 ${heavy}</span>` : '')
       : '기록 없음 <span style="color:#888">(usage_ua_daily 7일 행 0)</span>';
-    out.push(line('ok', '이용자 7일(엣지 로그)', ux));
+    out.push(line('ok', '이용자 7일(엣지 로그)', ux + (us7 ? '<br>' + us7 : '')));
   }
   // ⓓ 수집 마지막 시각
   out.push(line('ok', '수집', (b.collected || []).map(x => `${zfOpsEsc(x.source)} ${zfOpsTime(x.at)}`).join(' · ') || '—'));
