@@ -1,4 +1,4 @@
--- pg_cron 잡 사본 — 정본은 DB `cron.job` (뽑은 시각 2026-10-21 15:30 KST · pg_cron 1.6.4 · 23잡 · 2026-11-02 대조 23잡 일치 뒤 24째 zipfit-purge-cron-run-details(jobid 71) · 2026-11-02 25째 zipfit-purge-collection-run-log 더함 → 25잡)
+-- pg_cron 잡 사본 — 정본은 DB `cron.job` (뽑은 시각 2026-10-21 15:30 KST · pg_cron 1.6.4 · 23잡 · 2026-11-02 대조 23잡 일치 뒤 24째 zipfit-purge-cron-run-details(jobid 71) · 2026-11-02 25째 zipfit-purge-collection-run-log 더함 → 25잡 · 2026-11-09 재추출 29잡 일치(26째 purge-lh-file-fetch-log 84 · 빠졌던 gh-observe 75 · collect-lh-cutoff 78 · collect-lh-notices 82 더함))
 -- 2026-10-21 신설 (우편함 「코드·운영 — 문서·SQL만(B): docs/cron-jobs.sql … + docs/ops-audit.sql …」 · 근거 조사 「런칭 전 점검 ① Supabase」 회신 ② · claude.ai 판정 1).
 -- 왜: 백업(zipfit-backup backup.yml)은 public·zipfit_ops 만 덤프한다 — cron 스키마는 담기지 않아, DB를 복원해도 자동화(수집 · 분석 발송 · 점검 · 백업 깨우기)가
 --   살아나지 않는다. 수집 잡 4·8·11·12·13 은 만든 SQL도 저장소에 없었다. 이 파일이 그 구멍을 메운다.
@@ -208,17 +208,54 @@ select cron.schedule('zipfit-list-rpc-probe', '5-59/10 * * * *', $cmd$select zip
 --   2026-11-02 신설(supabase/migrations/2026-11-02_01_purge_cron_run_details.sql) — pg_cron 실행 기록 30일 보관(소비처 가장 긴 창 8일 · 그 파일 머리 주석).
 select cron.schedule('zipfit-purge-cron-run-details', '17 15 * * *', $cmd$delete from cron.job_run_details where start_time < now() - interval '30 days'$cmd$);
 
--- jobid 적용 때 매김 · zipfit-purge-collection-run-log · '27 15 * * *' = KST 00:27 · active=true · command md5 bd14fc205549479e009d596f4fdb6fd2
+-- jobid 73 · zipfit-purge-collection-run-log · '27 15 * * *' = KST 00:27 · active=true · command md5 bd14fc205549479e009d596f4fdb6fd2
 --   2026-11-02 신설(supabase/migrations/2026-11-02_02_purge_collection_run_log.sql) — LH·MYHOME 수집 런 로그 90일 보관(소비처 가장 긴 창 7일 · 그 파일 머리 주석).
 select cron.schedule('zipfit-purge-collection-run-log', '27 15 * * *', $cmd$delete from public.collection_run_log where run_at < now() - interval '90 days'$cmd$);
 
--- jobid 적용 때 매김 · zipfit-purge-lh-file-fetch-log · '37 15 * * *' = KST 00:37 · active=true · command md5 06790822244fc8eccb6f15a57c2ca6d5
+-- jobid 84 · zipfit-purge-lh-file-fetch-log · '37 15 * * *' = KST 00:37 · active=true · command md5 06790822244fc8eccb6f15a57c2ca6d5
 --   2026-11-09 신설(supabase/migrations/2026-11-09_01_purge_lh_file_fetch_log.sql) — LH 첨부 문지기 기록 90일 보관(읽는 곳 · 문지기 재허락 뜻은 그 파일 머리 주석).
 select cron.schedule('zipfit-purge-lh-file-fetch-log', '37 15 * * *', $cmd$delete from public.lh_file_fetch_log where at < now() - interval '90 days'$cmd$);
 
--- 대조(읽기 전용) — DB 의 잡이 이 파일과 같은지. 25행 · 이름 · 주기 · active · command md5 가 위 주석과 같아야 한다.
+-- jobid 75 · zipfit-gh-observe · '31 0,3,6,9 * * *' = KST 09:31·12:31·15:31·18:31 · active=true · command md5 32c19763f9e323ab6ddcb57e723e1aae
+--   2026-11-03 신설(supabase/migrations/2026-11-03_04_gh_observe.sql) — GH 공고 목록 관찰만(announcements 쓰기 0) · 2026-11-09 사본 재추출로 더함.
+select cron.schedule('zipfit-gh-observe', '31 0,3,6,9 * * *', $cmd$
+  -- 시크릿은 Vault에서 실행 시점에 읽는다(다른 수집 잡과 같은 꼴). 관찰만 — announcements 쓰기 0.
+  SELECT net.http_post(
+    url := 'https://khdpjjyspmlqtzperoqg.supabase.co/functions/v1/collect-gh-announcements?mode=observe',
+    headers := jsonb_build_object('Content-Type','application/json','x-cron-secret',
+      (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'cron_secret_v2')),
+    body := '{}'::jsonb,
+    timeout_milliseconds := 120000
+  );
+$cmd$);
+
+-- jobid 78 · zipfit-collect-lh-cutoff · '13 20 * * 0' = KST 월 05:13(일 20:13 UTC) 주 1회 · active=true · command md5 31bfe212268599196b6ff8ad6769ea5d
+--   2026-11-04 신설(supabase/migrations/2026-11-04_04_lh_cutoff_scores.sql) — LH 건설임대 당첨 합격점수 · 2026-11-09 사본 재추출로 더함.
+select cron.schedule('zipfit-collect-lh-cutoff', '13 20 * * 0', $cmd$
+  SELECT net.http_post(
+    url := 'https://khdpjjyspmlqtzperoqg.supabase.co/functions/v1/collect-lh-cutoff?mode=collect',
+    headers := jsonb_build_object('Content-Type','application/json','x-cron-secret',
+      (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'cron_secret_v2')),
+    body := '{}'::jsonb,
+    timeout_milliseconds := 150000
+  );
+$cmd$);
+
+-- jobid 82 · zipfit-collect-lh-notices · '13 1,4,7,10 * * *' = KST 10·13·16·19시 13분 · active=true · command md5 daf7c21646ec75e55fb3294469f8219e
+--   2026-11-05 신설(supabase/migrations/2026-11-05_04_lh_notice_matches.sql) — LH 대상주택 공지 감지 · 2026-11-09 사본 재추출로 더함.
+select cron.schedule('zipfit-collect-lh-notices', '13 1,4,7,10 * * *', $cmd$
+  SELECT net.http_post(
+    url := 'https://khdpjjyspmlqtzperoqg.supabase.co/functions/v1/collect-lh-notices?mode=collect',
+    headers := jsonb_build_object('Content-Type','application/json','x-cron-secret',
+      (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'cron_secret_v2')),
+    body := '{}'::jsonb,
+    timeout_milliseconds := 120000
+  );
+$cmd$);
+
+-- 대조(읽기 전용) — DB 의 잡이 이 파일과 같은지. 29행 · 이름 · 주기 · active · command md5 가 위 주석과 같아야 한다.
 --   빠진 잡(파일에 있는데 DB 에 없음)은 missing 행으로, 더 있는 잡(DB 에만 있음)은 extra 행으로 나온다.
 -- select coalesce(j.jobname, f.n) jobname, j.schedule, j.active, md5(j.command) cmd_md5,
 --        case when j.jobid is null then 'missing' when f.n is null then 'extra' else 'ok' end state
---   from cron.job j full join unnest(array['zipfit-collect-announcements', 'zipfit-collect-sh-announcements', 'zipfit-collect-rental-stats', 'zipfit-collect-announcements-warmup', 'zipfit-collect-announcements-night', 'zipfit-purge-usage-events', 'zipfit-purge-sh-run-log', 'zipfit-sh-close-missing', 'zipfit-collect-lh-promo', 'zipfit-refresh-post-links', 'zipfit-analysis-dispatch', 'zipfit-collect-lh-images', 'zipfit-health-ops-dispatch', 'zipfit-health-screen-dispatch', 'zipfit-check-source-pages', 'zipfit-uptime-ping', 'zipfit-backup-dispatch', 'zipfit-heartbeat-dispatch', 'zipfit-backup-poll', 'zipfit-purge-stale-sessions', 'zipfit-check-source-pages-new-sh', 'zipfit-net-purge-secrets', 'zipfit-list-rpc-probe', 'zipfit-purge-cron-run-details', 'zipfit-purge-collection-run-log', 'zipfit-purge-lh-file-fetch-log']) f(n) on f.n = j.jobname
+--   from cron.job j full join unnest(array['zipfit-collect-announcements', 'zipfit-collect-sh-announcements', 'zipfit-collect-rental-stats', 'zipfit-collect-announcements-warmup', 'zipfit-collect-announcements-night', 'zipfit-purge-usage-events', 'zipfit-purge-sh-run-log', 'zipfit-sh-close-missing', 'zipfit-collect-lh-promo', 'zipfit-refresh-post-links', 'zipfit-analysis-dispatch', 'zipfit-collect-lh-images', 'zipfit-health-ops-dispatch', 'zipfit-health-screen-dispatch', 'zipfit-check-source-pages', 'zipfit-uptime-ping', 'zipfit-backup-dispatch', 'zipfit-heartbeat-dispatch', 'zipfit-backup-poll', 'zipfit-purge-stale-sessions', 'zipfit-check-source-pages-new-sh', 'zipfit-net-purge-secrets', 'zipfit-list-rpc-probe', 'zipfit-purge-cron-run-details', 'zipfit-purge-collection-run-log', 'zipfit-purge-lh-file-fetch-log', 'zipfit-gh-observe', 'zipfit-collect-lh-cutoff', 'zipfit-collect-lh-notices']) f(n) on f.n = j.jobname
 --  order by 1;

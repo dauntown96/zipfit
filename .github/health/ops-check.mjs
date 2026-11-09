@@ -203,6 +203,8 @@ const EXPECTED_JOBS = [
   'zipfit-collect-lh-cutoff',      // 2026-11-04 LH 건설임대 당첨 합격점수 주 1회(마이그레이션 2026-11-04_04 · ㉔ lh_cutoff)
   'zipfit-collect-lh-notices',     // 2026-11-05 LH 대상주택 공지 감지 하루 4회(마이그레이션 2026-11-05_04 · ㉘ wave_notice_missing 값)
   'zipfit-purge-lh-file-fetch-log', // 2026-11-09 LH 첨부 문지기 기록 90일 보관(마이그레이션 2026-11-09_01)
+  'zipfit-gh-observe',             // 2026-11-03 GH 공고 목록 관찰(마이그레이션 2026-11-03_04) — 2026-11-09 사본 재추출 때 빠진 것을 더함
+  'zipfit-purge-stale-sessions',   // 로그인 세션 30일 정리(jobid 57) — 2026-11-09 사본 재추출 때 빠진 것을 더함
 ]
 
 // ③④ 관리 API 가 필요 없는 점검(비로그인 목록·요약 · 배포 사이트)은 DB 점검과 다른 try 로 먼저 돈다
@@ -977,7 +979,7 @@ try {
 
 // ㉝ LH 첨부 경로 쓰임 가름(2026-11-05 · 우편함 「코드·운영 — LH 첨부 경로(lhFile.do) 사용 중단 …」 「🔴 요청 고침」 2장) — 모드(analysis_dispatch_config.lh_file_mode) ·
 //    지난 24시간 lhFile.do 받기 시도(lh_file_fetch_log — fetch-attachment 문지기 lh_file_gate 가 남긴 행): 허락(받음 · 실패) · 막음(사유별) — LH 문의 글에 넣을 실측 빈도 ·
-//    발송 대기 몫(paused = LH 원문 몫 · essential = #차수 몫 — 발송기와 같은 조건). ℹ️ 정보만 · 못 읽어도 ℹ️.
+//    발송 대기 몫(paused = LH 원문 몫(#차수 포함) · essential·normal = 0 — 발송기와 같은 조건 · 2026-11-09 essential 은 #차수를 거두지 않음). ℹ️ 정보만 · 못 읽어도 ℹ️.
 try {
   const [x] = await sqlRead(`with l as (select * from public.lh_file_fetch_log where at > now() - interval '24 hours'),
      m as (select coalesce((select lh_file_mode from public.analysis_dispatch_config where id = 1), 'essential') v)
@@ -987,12 +989,12 @@ try {
       'denied', (select count(*) from l where not allowed),
       'reasons', (select coalesce(json_agg(json_build_object('r', reason, 'n', n) order by n desc), '[]'::json) from (select reason, count(*) n from l where not allowed group by 1) z),
       'held', (select count(*) from public.analysis_dispatch_queue q, m where q.state = 'waiting' and q.ready_at is null
-                 and (m.v <> 'normal' and q.group_key like '% #차수 %' or m.v = 'paused' and public.analysis_needs_lh_file(q.announcement_id, q.group_key)))) j`)
+                 and m.v = 'paused' and public.analysis_needs_lh_file(q.announcement_id, q.group_key))) j`)
   const c = x.j
   const rs = c.reasons.slice(0, 4).map(r => `${String(r.r).replace(/^\w+ — /, '')} ${r.n}`).join(' · ')
   add('lh_file_mode', 'LH 첨부 경로(lhFile.do) 쓰임 가름 · 24시간 받기 시도(정보)', 'info',
     `모드 ${c.mode} — 허락 ${c.allowed}(받음 ${c.ok}) · 막음 ${c.denied}${rs ? '(' + rs + ')' : ''} · 발송 대기 몫 ${c.held}`,
-    '정보 — 판정하지 않는다 · 모드 essential = 열린 공고 첨부만 파일당 한 번(+재시도 한 번) · paused = 전부 막음(LH 원문 몫 발송 대기) · normal = 종전 · 셈 = lh_file_fetch_log 24시간')
+    '정보 — 판정하지 않는다 · 모드 essential = 열린 공고 첨부만 파일당 한 번(+재시도 한 번) · #차수 몫은 발송(공지 첨부는 막고 본문으로) · paused = 전부 막음(LH 원문 몫 · #차수 몫 발송 대기 — 「발송 대기 몫」이 그 수) · normal = 종전 · 셈 = lh_file_fetch_log 24시간')
 } catch (e) {
   add('lh_file_mode', 'LH 첨부 경로(lhFile.do) 쓰임 가름 · 24시간 받기 시도(정보)', 'info', String(e).slice(0, 200), '설정 · 받기 기록 · 대기열 표를 읽는다(못 읽어도 정보)')
 }
