@@ -109,7 +109,7 @@ async function run(browser, ref, personas) {
       document.querySelectorAll('#zfClassSet input[name="zfClass"]').forEach(i => { i.checked = (p.classes || []).includes(i.value) })
     }
     const words = v => !v ? [] : v.state === 'check'
-      ? [...(v.targets || []).map(t => '대상:' + t), ...(v.checks || []), ...(v.income ? ['소득:' + v.income.why] : [])]
+      ? [...(v.targets || []).map(t => '대상:' + t), ...(v.checks || []), ...(v.income ? ['소득:' + v.income.why] : []), ...(v.asset ? [(v.asset.kind === 'car' ? '자동차:' : '자산:') + v.asset.why] : [])]   // 🔵 2026-11-09 자산 축
       : (v.names || [])
     const box = document.createElement('div')
     const out = personas.map(p => {

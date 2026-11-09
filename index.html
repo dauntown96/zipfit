@@ -6169,7 +6169,7 @@ function renderPersonalizedRecommendations(){
   //    저장 조건에는 맞벌이·출산 가산 입력이 없어 가산 없는 기본 기준으로 잰다(기준이 낮게 잡히는 보수 방향 — 틀린 「맞아요」는 생기지 않는다).
   //    기준액 표를 아직 안 받았으면 받은 뒤 한 번 다시 그린다(받지 못하면 「계산하지 못했어요」 쪽).
   if(!_urbanIncome || !_medianIncome){ if(!zfRecIncomeAsked){ zfRecIncomeAsked = true; Promise.all([loadUrbanIncome(), loadMedianIncome()]).then(([u, m]) => { if(u && m) renderPersonalizedRecommendations(); }); } }
-  const recM = { src: 'profile', income: (parseFloat(currentUser.income) || 0) * 10000, members: Math.min(parseInt(currentUser.members) || 0, 8), dualApplied: false, birthTierApplied: 0 };
+  const recM = { src: 'profile', income: (parseFloat(currentUser.income) || 0) * 10000, assets: (parseFloat(currentUser.assets) || 0) * 10000, car: 0, members: Math.min(parseInt(currentUser.members) || 0, 8), dualApplied: false, birthTierApplied: 0 };
   const recTables = (_urbanIncome && _medianIncome) ? { '도시근로자': _urbanIncome, '기준중위소득': _medianIncome } : null;
   const recKeep = n => {
     if(!recDepOk(n)) return false;
@@ -6887,7 +6887,10 @@ function zfDiagMoneyInputs(){
   const birthInput=document.getElementById('birthAfterBase')?.value||'unknown';
   const birthTierApplied = birthInput==='yes' ? Math.max(1, Math.min(children, 2)) : 0;
   const income=(parseFloat(document.getElementById('income').value)||0)*10000;
-  return { children, members, dualInput, dualApplied, birthInput, birthTierApplied, income };
+  // 🔵 2026-11-09(우편함 「표시층 — 카드 ✓ 관문 자산 축」) — ✓ 관문 자산·자동차 축 입력(원 · 0 = 안 넣음 = 그 축은 안 봄). 진단은 따로 읽는다(값 같음).
+  const assets=(parseFloat(document.getElementById('assets')?.value)||0)*10000;
+  const car=(parseFloat(document.getElementById('carValue')?.value)||0)*10000;
+  return { children, members, dualInput, dualApplied, birthInput, birthTierApplied, income, assets, car };
 }
 async function diagnose(){
   const marital=document.getElementById('marital').value;
@@ -7718,7 +7721,8 @@ let zfTargetRowsP = null;
 const zfTargetRowsByAnn = new Map();
 const zfTargetRowsByKey = new Map();
 const zfTargetMoneyOf = new WeakMap();   // 키 배열 → 같은 순서의 소득 칸 행(N12)
-const ZF_TARGET_MONEY_COLS = 'income_base,income_pct,income_pct_dual_income,income_pct_household1_bonus,income_pct_household2_bonus,income_pct_birth1,income_pct_birth2,income_limit_exempt,cap:verification_requirements->가구원수별_가산상한';
+const ZF_TARGET_MONEY_COLS = 'income_base,income_pct,income_pct_dual_income,income_pct_household1_bonus,income_pct_household2_bonus,income_pct_birth1,income_pct_birth2,income_limit_exempt,cap:verification_requirements->가구원수별_가산상한'
+  + ',id,asset_limit,asset_limit_birth1,asset_limit_birth2,asset_limit_exempt,car_limit,car_limit_birth1,car_limit_birth2';   // 🔵 2026-11-09 자산·자동차 축
 function zfLoadTargetRows(){
   if(zfTargetRowsP) return zfTargetRowsP;
   const h = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
@@ -7768,13 +7772,65 @@ function zfTargetIncomeGate(v, annId, title, f, m, tables){
   if(!v || v.state !== 'ok') return v;
   const gk = zfTargetRowsFor(annId, title), money = gk && zfTargetMoneyOf.get(gk);
   const okRows = (gk && money) ? gk.map((g, i) => zfTargetRowState(g, f) === 'ok' ? money[i] : null).filter(Boolean) : [];
-  if(okRows.some(c => c.income_limit_exempt === true)) return v;
+  if(okRows.some(c => c.income_limit_exempt === true)) return zfTargetAssetGate(v, okRows, m);
   const lims = (m && tables) ? okRows.map(c => zfLimitsFor(c, m.birthTierApplied, m.dualApplied, m.members, tables).incLim).filter(x => x != null) : [];
   let why;
   if(!(m && m.income > 0)) why = 'unknown';
-  else if(lims.some(l => m.income <= l)) return v;
+  else if(lims.some(l => m.income <= l)) return zfTargetAssetGate(v, okRows, m);
   else why = lims.length ? 'over' : 'nocalc';
   return Object.assign({}, v, { state: 'check', income: { why, lim: lims.length ? Math.max(...lims) : null, src: (m && m.src) || 'diag' } });
+}
+// 🔵 2026-11-09(우편함 「표시층 — 카드 ✓ 관문 자산 축」 · 사용자에게 보이는 변경 — 다운님 승인 2026-11-09) — 소득 관문을 지난 「맞음」 카드에 자산·자동차 축.
+//    소득 축과 같은 꼴: 「맞음」 행 가운데 하나라도 자산·자동차 기준 안이면 그대로 · 아니면 「요건 확인 필요」(「아님」으로 빼지 않는다).
+//    한도 = zfLimitsFor(출산 가산 · 가구원수별 상한 그대로) · 기준 칸이 빈 행(NULL)과 자산기준 배제 행은 그 축을 보지 않는다(막지 않음).
+//    자산·자동차를 넣지 않았으면(0) 그 축은 안 본다 — 종전과 같다.
+//    🔴 출산 가산: 진단 「'23.3.28 이후 출산 = 예」(birthTierApplied > 0)인데 그 행의 출산 숫자 칸이 비어 있고 행에 출산 가산 문장(vr)이 있으면
+//    기본 기준을 넘어도 「출산 가산 금액을 몰라 못 잼」(why 'birth')으로 내린다(오산세교2 …20896 꼴 · 원문 밖 숫자 0). 문장은 zfTargetBirthVr(따로 받음).
+function zfTargetAssetGate(v, okRows, m){
+  const A = (m && m.assets > 0) ? m.assets : 0, C = (m && m.car > 0) ? m.car : 0;
+  if(!v || v.state !== 'ok' || (!A && !C) || !okRows.length) return v;
+  const tier = (m && m.birthTierApplied) || 0;
+  let fail = null;
+  for(const c of okRows){
+    const L = zfLimitsFor(c, tier, m.dualApplied, m.members || 1, {});
+    const bv = zfTargetBirthVr.get(String(c.id)) || {};
+    let f = null;
+    if(A && c.asset_limit_exempt !== true && L.assetLim != null && A > L.assetLim)
+      f = { kind: 'asset', why: (tier > 0 && c.asset_limit_birth1 == null && bv.asset) ? 'birth' : 'over', lim: L.assetLim };
+    else if(C && L.carLim != null && C > L.carLim)
+      f = { kind: 'car', why: (tier > 0 && c.car_limit_birth1 == null && bv.car) ? 'birth' : 'over', lim: L.carLim };
+    if(!f) return v;
+    fail = fail || f;
+  }
+  return Object.assign({}, v, { state: 'check', asset: Object.assign(fail, { src: (m && m.src) || 'diag' }) });
+}
+// 출산 가산 문장(vr) — 행 id → { asset, car }. 「출산·출생」과 「자산·가산·완화·우대·%p」(자동차는 「자동차」)가 한 항목(키+값)에 함께 있으면 그 축의 가산 문장으로 본다.
+//    vr 전체는 무거워(키 있는 공고 행 299 · 약 545KB · 2026-11-09 실측) 미리 받지 않는다 — 진단에서 출산 = 예 ∧ 자산·자동차를 넣었을 때만,
+//    출산 숫자 칸이 빈 행만 받는다.
+const zfTargetBirthVr = new Map();
+async function zfEnsureTargetBirthVr(){
+  const need = [];
+  zfTargetRowsByAnn.forEach(g => (zfTargetMoneyOf.get(g) || []).forEach(c => {
+    if(c && c.id != null && !zfTargetBirthVr.has(String(c.id)) && (c.asset_limit_birth1 == null || c.car_limit_birth1 == null)) need.push(String(c.id));
+  }));
+  for(let i = 0; i < need.length; i += 100){
+    const part = need.slice(i, i + 100);
+    try{
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/eligibility_criteria?select=id,vr:verification_requirements&id=in.(${part.join(',')})`, { headers: zfAnonHeaders() });
+      const rows = res.ok ? await res.json() : [];
+      part.forEach(id => zfTargetBirthVr.set(id, {}));
+      (rows || []).forEach(r => {
+        const out = {};
+        Object.entries((r && r.vr && typeof r.vr === 'object') ? r.vr : {}).forEach(([k, val]) => {
+          const t = k + ' ' + (typeof val === 'string' ? val : JSON.stringify(val));
+          if(!/출산|출생/.test(t)) return;
+          if(/자산|가산|완화|우대|%p/.test(t)) out.asset = true;
+          if(/자동차/.test(t)) out.car = true;
+        });
+        zfTargetBirthVr.set(String(r.id), out);
+      });
+    }catch(e){ console.warn('ZipFit 출산 가산 문장 로드 실패:', e); }
+  }
 }
 // 문구 — 다운님 승인 2026-10-08(우편함 「표시층 — 추천 매칭 2단계」 「## 승인」). 맞음 줄은 공급 대상만 본 판정이라
 //    「신청 자격 전체가 맞다」로 읽히지 않게 「대상 조건」이라고 쓴다.
@@ -7784,6 +7840,15 @@ function zfTargetNoteHtml(v){
   // 🔵 2026-10-15(우편함 「코드 — 공급대상 안내 이름 빈칸 …」 1) — 대상 이름이 없는 갈래(`{조건:{혼인:"혼인 중"}}` — Ⅱ 5순위 「그 밖의 혼인가구」)만으로
   //    판정되면 이름 자리를 뺀다(우리 말로 이름을 짓지 않는다). 종전에는 「👥 대상 모집 — …」처럼 빈 이름이 그대로 그려졌다.
   if(v.state === 'ok') return `<p class="zf-target-ok" style="font-size:12px;color:#0F6E56;background:#E6F4EE;border-radius:8px;padding:6px 10px;margin:0 0 8px">👥 ${nm ? `${nm} 대상 모집 — ` : ''}입력하신 정보로는 대상 조건에 맞아요</p>`;
+  if(v.state === 'check' && v.asset){
+    // 🔵 2026-11-09(우편함 「표시층 — 카드 ✓ 관문 자산 축」) — 대상·소득은 맞는데 자산·자동차가 이 공고 기준을 넘거나(출산 가산 금액을 몰라) 못 잰 카드.
+    const a = v.asset, prof = a.src === 'profile', what = a.kind === 'car' ? '자동차가액' : '자산';
+    const lim = a.lim != null ? fmtEok(a.lim) : '';
+    const tail = a.why === 'birth'
+      ? `${prof ? '저장한' : '입력하신'} ${what}이 이 공고 기본 ${what} 기준(${lim})을 넘어요 · 이 공고는 2023년 3월 28일 이후 출산 자녀가 있으면 ${what} 기준이 올라가는데 그 금액은 공고문에서 확인해야 해요`
+      : `${prof ? '저장한' : '입력하신'} ${what}이 이 공고 ${what} 기준(${lim})을 넘어요`;
+    return `<p class="zf-check-note" style="font-size:12px;color:#8A5A12;background:#FBF0DC;border-radius:8px;padding:6px 10px;margin:0 0 8px">📄 ${nm ? `${nm} ` : ''}대상 조건은 맞지만 ${escapeHtml(tail)} — 신청할 수 있는지 공고문에서 확인해 주세요</p>`;
+  }
   if(v.state === 'check' && v.income){
     // 🔵 2026-10-16(N12) — 대상 조건은 맞는데 소득을 볼 수 없거나 넘는 카드. 금액은 만원 단위 반올림(「약」)이다.
     const lim = v.income.lim != null ? `월 약 ${Math.round(v.income.lim / 10000).toLocaleString()}만 원` : '';
@@ -7912,6 +7977,7 @@ async function matchHouses(){
     if(seq !== zfMatchSeq) return;   // 늦게 온 앞 요청 — 버린다(N11)
     const tf = zfTargetDiagFacts();
     const tm = zfDiagMoneyInputs();
+    if(tm.birthTierApplied > 0 && (tm.assets > 0 || tm.car > 0)){ await zfEnsureTargetBirthVr(); if(seq !== zfMatchSeq) return; }
     const tTables = (urbanT && medianT) ? { '도시근로자': urbanT, '기준중위소득': medianT } : null;
     lastTargetOut = [];
     rows = rows.filter(r => {
