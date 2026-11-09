@@ -1,0 +1,10 @@
+-- 되돌림 기록(2026-11-09 · 우편함 「코드·운영 — fetch-attachment unzip_drive 모드 · 리츠 0000061201 홍보물 5개 …」 2·3 · 데이터 쓰기 11:44 KST).
+-- 쓴 것: announcement_extras pamphlet 5행(0000061201 · source_url fileid 69270227 · content_sha256 = Drive sha256) ·
+--        announcement_policies ⚠️ 「단지 홍보물 자료 시점」 1행 · policy_category_classes 2행(standard ⚠️ 원문 주의 · user 단지 정보) ·
+--        announcement_analysis.pending_fields 끝에 1줄. Drive 파일 5개(`[임시] 0000061201` 폴더 — 1CfstH4m… · 126sD4rS… · 12b-7cmA… · 1181NV8c… · 1UJjoYpd…)는 지우지 않는다.
+-- 되돌리려면(관리 API · 한 트랜잭션):
+-- delete from announcement_extras where announcement_id = '0000061201' and extra_type = 'pamphlet' and source_url = 'https://apply.lh.or.kr/lhapply/lhFile.do?fileid=69270227';
+-- delete from announcement_policies where announcement_id = '0000061201' and category = '⚠️ 단지 홍보물 자료 시점';
+-- delete from policy_category_classes where category = '⚠️ 단지 홍보물 자료 시점';
+-- update announcement_analysis set pending_fields = pending_fields[1:cardinality(pending_fields) - 1] where announcement_id = '0000061201'
+--    and pending_fields[cardinality(pending_fields)] like '2026-11-09 코드·운영(우편함 「fetch-attachment unzip_drive …」%';
