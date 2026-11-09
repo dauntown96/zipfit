@@ -52,7 +52,7 @@ export async function recordInstanceMetrics(payload) {
 }
 
 // 🔵 2026-11-04 — 개수만 넘기는 기록 함수(zipfit_ops.edge_request_daily_record 등)를 같은 길로 부른다 · 함수 이름은 zipfit_ops. 아래 허용 목록만.
-const RECORD_FNS = new Set(['zipfit_ops.edge_request_daily_record'])
+const RECORD_FNS = new Set(['zipfit_ops.edge_request_daily_record', 'zipfit_ops.usage_ua_daily_record'])
 export async function callRecord(fn, payload) {
   if (!RECORD_FNS.has(fn)) throw new Error(`기록 함수 허용 밖: ${fn}`)
   return callJsonbFn(fn, payload)

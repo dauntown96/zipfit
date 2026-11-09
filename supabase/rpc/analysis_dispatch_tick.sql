@@ -323,20 +323,19 @@ begin
   )
   select (select count(*) from ins), (select count(*) from drp) into n_new, n_drop;
 
-  -- ②-1 LH 첨부 경로 쓰임 가름(2026-11-05 · 2026-11-09 essential 은 거두지 않음) — paused 면 LH 원문 몫(analysis_needs_lh_file — #차수 몫 포함)의 ready 를 거둔다(발송 0 · 대기열 그대로)
-  if coalesce(cfg.lh_file_mode, 'essential') = 'paused' then
-    update public.analysis_dispatch_queue q
-       set ready_at = null
-     where q.state = 'waiting' and q.ready_at is not null
-       and public.analysis_needs_lh_file(q.announcement_id, q.group_key);
-  end if;
+  -- ②-1 LH 첨부 경로 쓰임 가름(2026-11-05 · 2026-11-09 essential 은 거두지 않음 · 2026-11-09 뜻은 lh_file_policy 한 곳) —
+  --   analysis_lh_file_hold(공고, 키)(= 정책 hold 'lh_file'(지금 paused) ∧ analysis_needs_lh_file — #차수 몫 포함)가 참인 몫의 ready 를 거둔다(발송 0 · 대기열 그대로)
+  update public.analysis_dispatch_queue q
+     set ready_at = null
+   where q.state = 'waiting' and q.ready_at is not null
+     and public.analysis_lh_file_hold(q.announcement_id, q.group_key);
 
   update public.analysis_dispatch_queue q
      set ready_at = now()
    where q.state = 'waiting' and q.ready_at is null
      and (not q.needs_promo
           or exists (select 1 from public.announcement_promo_fetch f where f.announcement_id = q.announcement_id and f.ok))
-     and not (coalesce(cfg.lh_file_mode, 'essential') = 'paused' and public.analysis_needs_lh_file(q.announcement_id, q.group_key));
+     and not public.analysis_lh_file_hold(q.announcement_id, q.group_key);
 
   -- ②-2 🔵 2026-10-08(표시층 긴급 2 · 4 · 다운님 결정 처방 ⑴) — 매입 홍보물 즉시 수집. 이 실행에서 새로 든(enqueued_at = now()) needs_promo 대기 중
   --   아직 ready 가 아닌 것만 collect-lh-promo 를 한 번 부른다(응답은 기다리지 않는다 · 성공하면 다음 tick 이 위 규칙으로 ready_at 을 세운다).
