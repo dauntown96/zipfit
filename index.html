@@ -10365,6 +10365,9 @@ function zfHuHeadKeys(groups, units, pastUnits, pastOnly){
   (units || []).concat(pastUnits || []).forEach(u => {
     const k = zfUnitTypeKey(u, u && u.unit_group);
     if(k) types.add(k);
+    // 🔵 2026-11-09(우편함 「표시층 — 묶음 안 행 평면도 칩 자리」) — 묶음 안 행의 형 키(건물::unit_type)도 머리로 센다.
+    //    한 묶음 안에서 형마다 평면이 다를 때(39A·39T) 그 형만의 평면을 그 행 끝 칩에 단다 · 묶음 머리 키는 그대로.
+    if(u && u.unit_group){ const kt = zfUnitTypeKey(u); if(kt) types.add(kt); }
   });
   return { building, types };
 }
@@ -11081,6 +11084,10 @@ function renderHousingUnitGroup(g){
       ? `<span class="chip hu-round-badge${u.zfRoundCurrent ? '' : ' hu-round-old'}">${escapeHtml(u.zfRoundLabel)}</span>`
       : '';
     const pastOnlyBadge = u.zfPastOnly ? `<span class="chip hu-past-only">이번 회차에 같은 세대 없음</span>` : '';
+    // 🔵 2026-11-09(우편함 「표시층 — 묶음 안 행 평면도 칩 자리」) — 행 칩 자리(건물::unit_type) · 한 줄에 합쳐진 행이면 형마다 하나.
+    //    형 이름이 묶음 이름과 같으면 머리 칩과 키가 같아(한 칩 두 자리) 행 자리를 두지 않는다.
+    const rowChips = [...new Set((ln.units || [u]).map(x => x && x.unit_type !== g.group ? zfUnitTypeKey(x) : '').filter(Boolean))]
+      .map(zfUnitChipSlot).join('');
     const dual = (u.deposit_priority1 != null || u.rent_priority1 != null)
       ? `<div class="hu-ug-sub">어느 조건이 적용되는지는 비고·공고문에서 확인하세요</div>` : '';
     const floor = u.floor_info ? `<div class="hu-ug-sub">동호수 ${escapeHtml(u.floor_info)}</div>` : '';
@@ -11094,7 +11101,7 @@ function renderHousingUnitGroup(g){
         <span class="hu-ug-target">${escapeHtml(u.supply_target || u.unit_type || '')}</span>
         ${area}
         <span class="hu-ug-price">${huPriceText(u)}${huSqmText(u)}</span>
-        ${recruitBadge}${zfWaitReserveHtml(ln.units || [u])}${roundBadge}${pastOnlyBadge}
+        ${recruitBadge}${zfWaitReserveHtml(ln.units || [u])}${roundBadge}${pastOnlyBadge}${rowChips}
       </div>
       ${dual}
       ${floor}
