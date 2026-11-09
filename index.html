@@ -5410,25 +5410,57 @@ function zfCutoffKick(){
   zfFillCutoffSlots();
   zfEnsureCutoff(ids).then(ok => { if(ok) zfFillCutoffSlots(); });
 }
-// 🔵 2026-11-05(우편함 「표시층 — 「얼마·될까」 상세 묶음」 2 · 다운님 승인 2026-11-05) — 같은 주택형 지난 신청 수 추이 한 줄.
-//    카드 대표 행(zfCutoffPick — 카드 한 줄과 같은 행)의 history(RPC · 같은 단지 번호·주택형·신청유형 · 회차별 신청 수 · 오래된 것부터)를 그대로 잇는다.
+// 🔵 2026-11-09(우편함 「표시층 — 커트라인 표 주택형 한 줄」 · 다운님 승인 2026-11-09) — 신청유형 가르기.
+//    일반공급 행 = 「일반공급」 · 「일반」(통합공공임대 원천 표기 — 조사 9회차) · 예비자 행 = 「예비자」 · 그 밖 = 계층(특별공급) 행.
+//    예비자 신청은 일반공급 신청에서 공급 수를 넘친 같은 사람이다(조사 9회차 — 신청 = max(일반 신청 − 일반 공급, 0)) — 화면에서 더하지 않는다.
+const ZF_CUT_GEN = new Set(['일반공급', '일반']);
+const zfCutKind = r => ZF_CUT_GEN.has(String(r && r.rqs_tp_nm || '').trim()) ? 'gen' : (String(r && r.rqs_tp_nm || '').trim() === '예비자' ? 'wait' : 'cls');
+const ZF_CUT_WAIT_NOTE = '예비자는 일반공급 신청자 가운데 공급 수를 넘친 분들이에요 — 따로 더하면 같은 사람을 두 번 세요.';
+// 🔵 2026-11-05(우편함 「표시층 — 「얼마·될까」 상세 묶음」 2) — 같은 주택형 지난 신청 수 추이 한 줄.
+//    🔵 2026-11-09 — 대상을 일반공급 행으로 고정하고 줄 앞에 이름을 붙인다(「31A 일반공급 신청 — 2025-11 45명 → …」).
+//    대상 = 대표 행(zfCutoffPick)과 같은 단지·회차·주택형의 일반공급 행 · 없으면 그 단지·회차에서 이번 공고 주택형과 맞는 첫 일반공급 행 ·
+//    일반공급 행이 그 회차에 하나도 없으면(예비입주자 모집만) 대표 주택형의 예비자 행을 「예비입주자 모집 신청」 이름으로.
 //    회차가 하나뿐이면(또는 history 칸이 없는 옛 응답이면) 그리지 않는다 · 풀이 글을 붙이지 않는다.
-function zfCutoffTrendHtml(rows){
+function zfCutoffTrendTarget(rows){
   const r = zfCutoffPick(rows || []);
+  if(!r) return null;
+  const same = rows.filter(x => x.complex_name === r.complex_name && x.rcr_pan_dt === r.rcr_pan_dt);
+  const gens = same.filter(x => zfCutKind(x) === 'gen');
+  let t = gens.find(x => x.ltst_nm === r.ltst_nm);
+  if(!t){
+    for(const u of ((r.unit_types) || [])){
+      const k = zfUnitKey(u);
+      t = k && gens.find(x => zfUnitKey(x.ltst_nm) === k);
+      if(t) break;
+    }
+  }
+  if(t) return { row: t, label: '일반공급 신청' };
+  if(gens.length) return null;
+  const w = same.find(x => x.ltst_nm === r.ltst_nm && zfCutKind(x) === 'wait');
+  return w ? { row: w, label: '예비입주자 모집 신청' } : null;
+}
+function zfCutoffTrendHtml(rows){
+  const tg = zfCutoffTrendTarget(rows || []);
+  const r = tg && tg.row;
   const h = (r && Array.isArray(r.history)) ? r.history.filter(x => x && x.d && x.n != null) : [];
   if(h.length < 2) return '';
   const ym = d => String(d).slice(0, 7);
+  const pt = x => `${escapeHtml(ym(x.d))} ${Number(x.n)}명`;
   const st = 'font-size:12px;color:var(--ink-2,#555);margin-top:8px;line-height:1.5';
+  const head = `${escapeHtml(r.ltst_nm || '')} ${tg.label} — `;
   // 🔵 2026-11-05(우편함 「표시층 — 세대 안내 배너 · 추이 줄 줄이기 …」 ② · 다운님 승인 2026-11-05) — 7회를 넘으면 최근 6회 + 전체 범위.
   if(h.length > 7){
-    const last = h.slice(-6).map(x => Number(x.n));
     const all = h.map(x => Number(x.n));
-    return `<p class="zf-cut-trend" style="${st}">같은 주택형 지난 신청: (최근 6회) ${last.join(' → ')}명 · 전체 ${h.length}회 범위 ${Math.min(...all)}~${Math.max(...all)}명 (${escapeHtml(ym(h[0].d))} ~ ${escapeHtml(ym(h[h.length - 1].d))})</p>`;
+    return `<p class="zf-cut-trend" style="${st}">${head}(최근 6회) ${h.slice(-6).map(pt).join(' → ')} · 전체 ${h.length}회 범위 ${Math.min(...all)}~${Math.max(...all)}명 (${escapeHtml(ym(h[0].d))}부터)</p>`;
   }
-  return `<p class="zf-cut-trend" style="${st}">같은 주택형 지난 신청: ${h.map(x => Number(x.n)).join(' → ')}명 (${escapeHtml(ym(h[0].d))} ~ ${escapeHtml(ym(h[h.length - 1].d))} · ${h.length}회)</p>`;
+  return `<p class="zf-cut-trend" style="${st}">${head}${h.map(pt).join(' → ')}</p>`;
 }
-// 상세 「지난 회차」 접기 — 열 = 주택형 · 모집공고일 · 신청유형 · 신청 · 공급·경쟁률 · LH 공개 커트라인. 주택형 큰 순.
-//    카드 세대 행과 주택형이 맞는 행은 굵게(그 회차 전 주택형을 다 보여 준다).
+// 상세 「지난 회차」 접기 — 🔵 2026-11-09(우편함 「표시층 — 커트라인 표 주택형 한 줄」 · 다운님 승인 2026-11-09 · 꼴 A)
+//    주택형 한 줄: 열 = 주택형 · 일반공급(「n명 신청 · n호 · n : 1」) · 예비자(「n명 선정」 = 예비자 행 공급) · 커트라인(글이 있는 행 이름을 앞에).
+//    예비자만 있는 주택형은 두 칸을 합쳐 「예비입주자 모집 — 신청 n명 · n명 선정」 · 단지 표 전체가 그렇면 열 머리를 「예비입주자 모집」 하나로.
+//    계층(특별공급) 행은 표 아래 접힘 「계층별 신청」 — 신청 수만(행복 계층 행 공급 칸은 원문 칸 미확인 · 공급·경쟁률을 쓰지 않는다).
+//    모집공고일은 단지마다 한 회차라(RPC가 단지마다 가장 최근 한 회차를 고른다) 표 위 한 줄로 올린다.
+//    🔴 커트라인 글은 DB 값 그대로 따옴표로 · 이번 공고와 같은 주택형 = 행 앞 「●」 + 범례(2026-11-05 ③ 그대로).
 async function zfRenderCutoffDetail(annId, id){
   const slot = document.getElementById('cutoff-slot-' + id);
   if(!slot || !annId) return;
@@ -5437,51 +5469,92 @@ async function zfRenderCutoffDetail(annId, id){
   if(!rows.length){ slot.innerHTML = ''; return; }
   const byCx = new Map();
   rows.forEach(r => { const k = r.complex_name || ''; if(!byCx.has(k)) byCx.set(k, []); byCx.get(k).push(r); });
-  // 좁은 화면(390)에서도 여섯 칸이 폭 안에 들게 줄바꿈을 허용한다 — 가로 스크롤 뒤에 커트라인 칸이 숨지 않게.
   const th = 'text-align:left;font-weight:600;padding:4px 4px;border-bottom:1px solid var(--line-2,#e2e3e6);vertical-align:bottom;word-break:keep-all';
   const td = 'padding:4px 4px;border-bottom:1px solid var(--line-2,#e2e3e6);vertical-align:top;word-break:keep-all';
-  // 🔵 2026-11-05(우편함 「표시층 — 「읽기 쉽게」 판」 ②③④ · 다운님 승인 2026-11-05)
-  //    ② 커트라인 칸이 단지 표에서 전부 비면 그 열을 빼고, 행복주택이면 표 위에 한 번 「행복주택은 추첨이라 LH가 커트라인을 공개하지 않아요」 ·
-  //       일부만 비면 칸은 「—」이고 사유(5호 미만 · 신청 적음)는 표 아래 한 줄로 모은다.
-  //    ③ 이번 공고와 같은 주택형 = 굵게 대신 행 앞 「●」 + 표 위 범례 한 줄.
-  //    ④ 공급·경쟁률은 「일반공급」 행만 — 공고문 공급표(일반공급 · 당첨자 칸)와 맞는 행이 그것뿐이다(정선사북 · 화성서부권 · 인천가정2 · 성남금토 대조).
-  //       예비자·계층 행은 「—」(문구 없음).
   const note = 'font-size:11px;color:var(--ink-3,#888);margin-top:4px;line-height:1.5';
+  const num = v => (v == null || v === '') ? null : Number(v);
   let body = '';
+  let anyWait = false;
   byCx.forEach((rs, cx) => {
     const mine = new Set(((rs[0] && rs[0].unit_types) || []).map(zfUnitKey).filter(Boolean));
-    const sorted = [...rs].sort((a, b) => (parseFloat(b.ltst_nm) || 0) - (parseFloat(a.ltst_nm) || 0)
-      || String(a.ltst_nm).localeCompare(String(b.ltst_nm), 'ko') || String(a.rqs_tp_nm).localeCompare(String(b.rqs_tp_nm), 'ko'));
+    // 주택형 한 줄로 모은다(ltst_nm 글자 그대로가 한 주택형).
+    const byT = new Map();
+    rs.forEach(r => {
+      const k = r.ltst_nm || '';
+      if(!byT.has(k)) byT.set(k, { name: k, gen: null, wait: null, cls: [] });
+      const g = byT.get(k), kind = zfCutKind(r);
+      if(kind === 'cls') g.cls.push(r);
+      else if(!g[kind]) g[kind] = r;
+    });
+    const types = [...byT.values()].filter(g => g.gen || g.wait)
+      .sort((a, b) => (parseFloat(b.name) || 0) - (parseFloat(a.name) || 0) || a.name.localeCompare(b.name, 'ko'));
+    const clsOnly = [...byT.values()].filter(g => !g.gen && !g.wait);
+    const waitOnlyAll = types.length > 0 && types.every(g => !g.gen);
     const noCut = rs.every(r => !r.cutoff_text);
     const happy = rs.every(r => String(r.spl_tp_nm || '').includes('행복주택'));
     const dropCut = noCut && happy;
-    const anyMine = sorted.some(r => mine.has(zfUnitKey(r.ltst_nm)));
+    const anyMine = types.some(g => mine.has(zfUnitKey(g.name)));
+    if(types.some(g => g.gen && g.wait)) anyWait = true;
     const whyTypes = new Map();   // 사유 → 주택형 목록(표 아래 한 줄)
-    const trs = sorted.map(r => {
-      const gen = r.rqs_tp_nm === '일반공급';
-      const sup = gen ? `${r.spl_rmno != null ? Number(r.spl_rmno) + '호' : '—'}${r.competition_ratio != null ? ' · ' + Number(r.competition_ratio) + ':1' : ''}` : '—';
-      const dot = mine.has(zfUnitKey(r.ltst_nm)) ? '● ' : '';
+    const genCell = r => {
+      const n = num(r.rqpr_cnt), sup = num(r.spl_rmno), cr = num(r.competition_ratio);
+      return [`${n != null ? n : 0}명 신청`, sup != null ? `${sup}호` : null, (cr != null && n) ? `${cr} : 1` : null].filter(Boolean).join(' · ');
+    };
+    // 예비자 공급 = 선정 수 · 다만 예비자 신청이 공급보다 적으면 그만큼 다 뽑히지 않으므로 「n명까지 선정」(신청 29명에 「60명 선정」이 되지 않게).
+    const waitSel = r => {
+      const n = num(r.rqpr_cnt), sup = num(r.spl_rmno);
+      if(sup == null) return null;
+      return (n != null && n < sup) ? `${sup}명까지 선정` : `${sup}명 선정`;
+    };
+    const waitOnlyCell = r => {
+      const n = num(r.rqpr_cnt), sel = waitSel(r);
+      return `신청 ${n != null ? n : 0}명${sel ? ` · ${sel}` : ''}`;
+    };
+    const trs = types.map(g => {
+      const dot = mine.has(zfUnitKey(g.name)) ? '●\u00a0' : '';   // 점과 주택형이 갈라지지 않게
+      let mid;
+      if(waitOnlyAll) mid = `<td style="${td}">${escapeHtml(waitOnlyCell(g.wait))}</td>`;
+      else if(!g.gen) mid = `<td style="${td}" colspan="2">예비입주자 모집 — ${escapeHtml(waitOnlyCell(g.wait))}</td>`;
+      else mid = `<td style="${td}">${escapeHtml(genCell(g.gen))}</td>`
+        + `<td style="${td};word-break:keep-all">${g.wait && waitSel(g.wait) ? waitSel(g.wait) : '—'}</td>`;
       let cutTd = '';
       if(!dropCut){
-        if(!r.cutoff_text){
-          const w = zfCutoffWhy(r);
-          if(w){ if(!whyTypes.has(w)) whyTypes.set(w, new Set()); whyTypes.get(w).add(r.ltst_nm); }
+        const parts = [g.gen, g.wait].filter(r => r && r.cutoff_text)
+          .map(r => `${zfCutKind(r) === 'gen' ? '일반공급' : '예비자'} — 「${escapeHtml(r.cutoff_text)}」`);
+        if(!parts.length){
+          const w = zfCutoffWhy(g.gen || g.wait);
+          if(w){ if(!whyTypes.has(w)) whyTypes.set(w, new Set()); whyTypes.get(w).add(g.name); }
         }
-        cutTd = `<td style="${td}">${r.cutoff_text ? '「' + escapeHtml(r.cutoff_text) + '」' : '—'}</td>`;
+        cutTd = `<td style="${td}">${parts.length ? parts.join('<br>') : '—'}</td>`;
       }
-      return `<tr><td style="${td};word-break:break-all;min-width:3em">${dot}${escapeHtml(r.ltst_nm || '')}</td><td style="${td};white-space:nowrap">${escapeHtml(r.rcr_pan_dt || '')}</td><td style="${td}">${escapeHtml(r.rqs_tp_nm || '')}</td><td style="${td};white-space:nowrap">${Number(r.rqpr_cnt) || 0}명</td><td style="${td}">${sup}</td>${cutTd}</tr>`;
+      return `<tr><td style="${td};overflow-wrap:break-word;min-width:4.5em">${dot}${escapeHtml(g.name)}</td>${mid}${cutTd}</tr>`;
     }).join('');
-    const above = (dropCut ? `<p class="zf-cut-why" style="${note}">행복주택은 추첨이라 LH가 커트라인을 공개하지 않아요</p>` : '')
+    const date = (rs[0] && rs[0].rcr_pan_dt) ? escapeHtml(String(rs[0].rcr_pan_dt)) : '';
+    const above = (date ? `<p class="zf-cut-date" style="${note}">모집공고 ${date}</p>` : '')
+      + (dropCut ? `<p class="zf-cut-why" style="${note}">행복주택은 추첨이라 LH가 커트라인을 공개하지 않아요</p>` : '')
       + (anyMine ? `<p class="zf-cut-legend" style="${note}">● 이번 공고와 같은 주택형</p>` : '');
     const below = whyTypes.size
       ? `<p class="zf-cut-why" style="${note}">— : ${[...whyTypes].map(([w, t]) => `${escapeHtml(w)}(${[...t].map(escapeHtml).join(' · ')})`).join(' / ')}</p>` : '';
+    // 계층(특별공급) 행 — 주택형마다 「계층 n명」 · 신청 많은 순 · 공급·경쟁률은 쓰지 않는다.
+    const clsLines = [...types, ...clsOnly].filter(g => g.cls.length).map(g => {
+      const items = [...g.cls].sort((a, b) => (num(b.rqpr_cnt) || 0) - (num(a.rqpr_cnt) || 0) || String(a.rqs_tp_nm).localeCompare(String(b.rqs_tp_nm), 'ko'))
+        .map(r => `${escapeHtml(r.rqs_tp_nm || '')} ${num(r.rqpr_cnt) || 0}명`).join(' · ');
+      return `<li style="margin:2px 0">${escapeHtml(g.name)} — ${items}</li>`;
+    });
+    const clsHtml = clsLines.length
+      ? `<details class="zf-cut-cls" style="margin-top:6px"><summary style="${note};cursor:pointer">계층별 신청(특별공급) 보기</summary>`
+        + `<ul style="font-size:11px;color:var(--ink-2,#555);margin:4px 0 0;padding-left:16px;line-height:1.5">${clsLines.join('')}</ul></details>` : '';
+    const head = waitOnlyAll
+      ? `<th style="${th}">예비입주자 모집</th>`
+      : `<th style="${th}">일반공급</th><th style="${th}">예비자</th>`;
     body += (byCx.size > 1 ? `<div style="font-size:12px;font-weight:600;margin:8px 0 4px">${escapeHtml(cx)}</div>` : '')
       + above
-      + `<div style="overflow-x:auto;margin-top:6px"><table style="border-collapse:collapse;font-size:11px;width:100%"><thead><tr>`
-      + `<th style="${th}">주택형</th><th style="${th}">모집공고일</th><th style="${th}">신청유형</th><th style="${th}">신청</th><th style="${th}">공급·경쟁률</th>${dropCut ? '' : `<th style="${th}">LH 공개 커트라인</th>`}</tr></thead><tbody>${trs}</tbody></table></div>`
-      + below;
+      + (types.length ? `<div style="overflow-x:auto;margin-top:6px"><table class="zf-cut-table" style="border-collapse:collapse;font-size:11px;width:100%"><thead><tr>`
+        + `<th style="${th}">주택형</th>${head}${dropCut ? '' : `<th style="${th}">커트라인</th>`}</tr></thead><tbody>${trs}</tbody></table></div>` : '')
+      + below + clsHtml;
   });
-  slot.innerHTML = `<details class="hu-past zf-cut-detail"><summary class="hu-past-title">🕘 지난 회차 — LH 공개 커트라인</summary>${body}${zfCutoffTrendHtml(rows)}`
+  const waitNote = anyWait ? `<p class="zf-cut-wait-note" style="font-size:11px;color:var(--ink-2,#555);margin-top:6px;line-height:1.5">ⓘ ${escapeHtml(ZF_CUT_WAIT_NOTE)}</p>` : '';
+  slot.innerHTML = `<details class="hu-past zf-cut-detail"><summary class="hu-past-title">🕘 지난 회차 — LH 공개 커트라인</summary>${body}${waitNote}${zfCutoffTrendHtml(rows)}`
     + `<p style="font-size:11px;color:var(--ink-3,#888);margin-top:6px;line-height:1.5">출처 LH 공공데이터(건설임대 당첨 합격점수) · ${ZF_CUTOFF_NOTE}</p></details>`;
 }
 

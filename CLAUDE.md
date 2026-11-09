@@ -163,9 +163,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-11-09 | **표시층 — 커트라인 표 주택형 한 줄(꼴 A) [완료]** — `zfRenderCutoffDetail` 주택형 한 줄(일반공급 「n명 신청 · n호 · n : 1」 · 예비자 「n명 선정」/신청 적으면 「n명까지 선정」 · 커트라인 행 이름 앞에) · 「일반」 = 일반공급 · 예비만 = 「예비입주자 모집」 · 계층 행 접힘(신청 수만) · 예비자 설명 한 줄 · 추이 줄 일반공급 고정 + 이름 · v282 · PR 이 회차 |
 | 2026-11-09 | **코드·운영 — 발송기 essential #차수 보류 줄 고침 · 백업 PG17 재시도·#36 · cron 사본 [완료]** — `analysis_dispatch_tick` 거두기를 paused만(essential에서 #차수 발송) · health-ops `lh_file_mode` 대기 몫 뜻 · 백업 설치 4번 재시도·같은 슬롯 성공이면 실패 이슈 닫기(`zipfit-backup` #37) · ② `lh_file_fetch_log` · cron 사본 29잡 = DB · PR 이 회차 |
 | 2026-11-09 | **분석 묶음 — 자동 run 406 · 후속 처리만 [완료]** — 「운영 — 데이터 쓰기」 …21025 경주·영천 판정 대기 닫기(공고문 값 유지 · ⚠️ 행 유지 → 「완료」 · `pending_fields` 맨 앞 [판정] 한 줄) + 갤러리 pamphlet 1행 `content_sha256`(Drive 사본) · 산물 변경 0 · g2 판정 대기 0 · 분석 몫 0 · PR 이 회차 |
-| 2026-11-09 | **코드·운영 — 차수 발송 다시 켜기(본문 처리) + 보안 권고 허용 목록 + 문지기 기록 90일 정리 [완료]** — `wave_notice_enabled = true` 09:04 KST(`lh_file_mode` essential 그대로 · 대기열 #차수 0) · 허용 목록 `lh_file_fetch_log` · 잡 `zipfit-purge-lh-file-fetch-log`(KST 00:37 · 90일) · 원천 문서 robots·약관 사실 · PR 이 회차 |
 ---
 
 ## 🚫 코딩 원칙
