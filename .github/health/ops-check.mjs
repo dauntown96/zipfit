@@ -15,6 +15,7 @@ import { lhGoneSql, judgeLhGone } from './lh-gone.mjs'
 import { waveNoticeSql, judgeWaveNotice } from './wave-notice.mjs'
 import { LH_LEASE_MATCH_SQL, judgeLhLeaseMatch } from './lh-lease-match.mjs'
 import { chainMatchSql, judgeChainMatch } from './chain-match.mjs'
+import { judgeCronNames } from './cron-names.mjs'
 import { screenRunSql, judgeScreenRun } from './screen-run.mjs'
 import { ELIG_FORM_NULL_SQL, RENT_NULL_SQL, ROUND_MIX_SQL, judgeEligFormNull, judgeRentNull, judgeRoundMix } from './open-gaps.mjs'
 import { readdirSync, readFileSync } from 'node:fs'
@@ -267,7 +268,7 @@ try {
          and r.run_at > coalesce((select max(run_at) from collection_run_log where coalesce(myhome_fetched,0) > 0 and run_at > now() - interval '24 hours'), '-infinity'::timestamptz)),
       'detail_stale', (select count(*) from announcements where source='LH' and status in ('공고중','접수중','정정공고중')
          and (detail_fetch_last_attempt is null or detail_fetch_last_attempt < now() - interval '6 hours')),
-      'jobs', (select json_agg(json_build_object('name', jobname, 'active', active)) from cron.job),
+      'jobs', (select json_agg(json_build_object('name', jobname, 'active', active, 'md5', md5(command))) from cron.job),
       'job_fail_24h', (select json_agg(json_build_object('name', j.jobname, 'n', x.n)) from (select jobid, count(*) n from cron.job_run_details
          where start_time > now() - interval '24 hours' and status not in ('succeeded','running','starting') group by jobid) x join cron.job j using (jobid)),
       'promo_last_run_age_min', (select extract(epoch from now() - max(d.start_time))/60 from cron.job_run_details d join cron.job j using (jobid) where j.jobname = 'zipfit-collect-lh-promo'),
@@ -429,6 +430,13 @@ try {
   const jobs = new Map((d.jobs || []).map(j => [j.name, j.active]))
   const missing = EXPECTED_JOBS.filter(n => jobs.get(n) !== true)
   add('cron_active', 'cron 잡 활성', missing.length === 0 ? 'pass' : 'fail', missing.length ? `비활성·없음: ${missing.join(', ')}` : `${EXPECTED_JOBS.length}개 모두 활성`, '기대 목록 전부 active')
+  // 🔵 2026-11-09(「모드 정의 하나 …」 2장 · #918 ⑦3) — 이름 집합 = 기대 목록 = 사본(docs/cron-jobs.sql · 명령 md5) · ⚠️ 경고만 · gate.mjs HARD 밖.
+  {
+    let sheet = null
+    try { sheet = readFileSync(new URL('../../docs/cron-jobs.sql', import.meta.url), 'utf8') } catch { sheet = null }
+    const j = judgeCronNames(d.jobs || [], EXPECTED_JOBS, sheet)
+    add('cron_names', 'cron 잡 이름 집합(DB = 기대 목록 = 사본)', j.status, j.value, j.rule)
+  }
   const jf = (d.job_fail_24h || [])
   add('cron_fail', '24시간 안 실패한 cron 실행', jf.length === 0 ? 'pass' : 'fail', jf.map(x => `${x.name} ${x.n}`).join(', ') || 0, '0(7일 0)')
   const promoLimit = FIRST_RUN_DONE ? 40 : 900
@@ -910,6 +918,52 @@ try {
   add('edge_daily', '엣지 요청 일일 셈(전날 KST · 개수만)', 'info', String(e).slice(0, 200), '관리 API 로그(edge_logs) · 실패면 ℹ️만')
 }
 
+// ㉞ 이용 기록 UA 갈래 일일 셈(2026-11-09 · 우편함 「코드·운영 — 모드 정의 하나 … · 이용 기록 갈라 보이기 …」 3장 ② · 조사 「이용 기록 자동 세션 원인」 ⑦1) —
+//    KST 하루(전날)의 엣지 로그 POST /rest/v1/usage_events 요청을 「시각 + 갈래(봇·헤드리스·스크립트·그 밖)」로만 받아(UA 원문은 질의 결과에 없다)
+//    zipfit_ops.usage_ua_daily_record 에 넘긴다 — 이용 기록과 ±2초로 맞대 세션 갈래 개수를 남기는 일은 DB 함수 안에서만(세션 id 는 DB 밖으로 안 나온다 · 원칙 36).
+//    언제: ㉑ 과 같다 — KST 01시 뒤 실행마다 지난 7일 중 못 센 날을 새 날부터 최대 2개(하루 평시 로그 조회 1 · DB 호출 1). 값 = 지난 7일 합. ℹ️만(gate.mjs HARD 밖).
+const UA_BOT_RE = '(?i)(bot|crawler|spider|slurp|google-inspectiontool|yeti|daum|facebookexternalhit|kakaotalk-scrap|bytespider|headless-shell)'
+try {
+  const token = process.env.SUPABASE_ACCESS_TOKEN
+  if (!token) throw new Error('SUPABASE_ACCESS_TOKEN 이 없다')
+  const kst = new Date(now.getTime() + 9 * 3600 * 1000)
+  const today = kst.toISOString().slice(0, 10)
+  const days = []
+  for (let i = 1; i <= 7; i++) days.push(new Date(Date.parse(today + 'T00:00:00Z') - i * 86400000).toISOString().slice(0, 10))
+  const have = await sqlRead(`select day::text d, ok from zipfit_ops.usage_ua_daily where day >= '${days[6]}'::date`)
+  const okDays = new Set(have.filter(r => r.ok).map(r => r.d))
+  const todo = kst.getUTCHours() >= 1 ? days.filter(d => !okDays.has(d)).slice(0, 2) : []
+  const done = []
+  for (const d of todo) {
+    const start = new Date(Date.parse(d + 'T00:00:00Z') - 9 * 3600 * 1000).toISOString()
+    const end = new Date(Date.parse(d + 'T00:00:00Z') + 15 * 3600 * 1000).toISOString()
+    const sql = `select toString(timestamp) t, multiIf(event_message like '%HeadlessChrome%', 'h', match(event_message, '${UA_BOT_RE}'), 'b',
+        match(event_message, '${EDGE_SCRIPT_RE}'), 's', 'o') c
+      from logs where source = 'edge_logs' and event_message like '%POST%' and event_message like '%/rest/v1/usage_events%' order by timestamp limit 10000`
+    const q = new URLSearchParams({ sql, iso_timestamp_start: start, iso_timestamp_end: end })
+    const res = await fetch(`https://api.supabase.com/v1/projects/${PROJECT_REF}/analytics/endpoints/logs?${q}`, { headers: { Authorization: `Bearer ${token}` } })
+    const text = await res.text()
+    let body = null
+    try { body = JSON.parse(text) } catch { body = null }
+    let rec
+    if (res.ok && body && !body.error && Array.isArray(body.result) && body.result.length < 10000) {
+      rec = { day: d, ok: true, hits: body.result.map(r => ({ t: String(r.t).slice(0, 23), c: r.c })), note: '관리 API 로그 edge_logs ↔ usage_events ±2초' }
+    } else {
+      rec = { day: d, ok: false, note: `못 셈 — 로그 끝점 ${res.status}${body && body.error ? ' ' + String(body.error).slice(0, 80) : ''}${body && Array.isArray(body.result) && body.result.length >= 10000 ? ' 1만 행 넘음' : ''}` }
+    }
+    const out = await callRecord('zipfit_ops.usage_ua_daily_record', rec)
+    done.push(`${d.slice(5)} ${rec.ok ? out : rec.note}`)
+    if (res.status === 429) break
+  }
+  const [w] = await sqlRead(`select count(*) filter (where ok) days, sum(sessions) s, sum(ops) ops, sum(bot) bot, sum(headless) hl, sum(script) sc,
+      sum(other) other, sum(other_heavy) heavy, sum(events) ev, sum(matched) m from zipfit_ops.usage_ua_daily where day >= '${days[6]}'::date and ok`)
+  add('usage_ua', '이용 기록 세션 UA 갈래(지난 7일 · 개수만)', 'info',
+    `${w.days}일 — 세션 ${w.s ?? 0}: 운영 표지 ${w.ops ?? 0} · 봇 ${w.bot ?? 0} · 헤드리스 ${w.hl ?? 0} · 스크립트 ${w.sc ?? 0} · 그 밖 ${w.other ?? 0}(열기 30회 이상 ${w.heavy ?? 0}) · 사건 ${w.ev ?? 0} 중 로그와 맞음 ${w.m ?? 0}${done.length ? ` · 이번에 셈 ${done.join(' · ')}` : ''}`,
+    '판정 없음(ℹ️) — zipfit_ops.usage_ua_daily · 갈래 우선순위 운영 표지 > 봇 > 헤드리스 > 스크립트 > 그 밖 · 자정을 넘는 세션은 두 날에 센다 · 지난 7일 중 못 센 날을 실행마다 최대 2개')
+} catch (e) {
+  add('usage_ua', '이용 기록 세션 UA 갈래(지난 7일 · 개수만)', 'info', String(e).slice(0, 200), '관리 API 로그(edge_logs) · 실패면 ℹ️만')
+}
+
 // ㉒ 세대 행 시군구가 「시」만인데 같은 행 주소에 그 시 + 「△△구」가 있다(2026-11-04 · 우편함 「코드·운영 — 가격 요약 RPC known_sg …」 3 · 재발 감시).
 //    산식 = 분석 묶음 「세대 행 시군구 … 829행」과 같다: btrim(sigungu_nm) ~ '시$' ∧ address ~ (sigungu_nm || '\s*\S+구(\s|$)') — 기대값 0(그 회차 664행 + 이 회차 165행 뒤).
 //    0이 아니면 ⚠️ + 공고 ID 상위 5(행 수 순). 원인은 분석이 세대 행 시군구를 시까지만 적은 것(스킬 규칙 없음 — 백로그 「공고 분석 스킬 개정 후보」 11-04 줄).
@@ -980,16 +1034,17 @@ try {
 // ㉝ LH 첨부 경로 쓰임 가름(2026-11-05 · 우편함 「코드·운영 — LH 첨부 경로(lhFile.do) 사용 중단 …」 「🔴 요청 고침」 2장) — 모드(analysis_dispatch_config.lh_file_mode) ·
 //    지난 24시간 lhFile.do 받기 시도(lh_file_fetch_log — fetch-attachment 문지기 lh_file_gate 가 남긴 행): 허락(받음 · 실패) · 막음(사유별) — LH 문의 글에 넣을 실측 빈도 ·
 //    발송 대기 몫(paused = LH 원문 몫(#차수 포함) · essential·normal = 0 — 발송기와 같은 조건 · 2026-11-09 essential 은 #차수를 거두지 않음). ℹ️ 정보만 · 못 읽어도 ℹ️.
+//    🔵 2026-11-09(「모드 정의 하나」 1장) — 모드·대기 몫은 DB 함수 lh_file_policy() · analysis_lh_file_hold() 를 부른다(발송기·문지기와 한 정의 · 여기서 모드 이름을 비교하지 않는다).
 try {
   const [x] = await sqlRead(`with l as (select * from public.lh_file_fetch_log where at > now() - interval '24 hours'),
-     m as (select coalesce((select lh_file_mode from public.analysis_dispatch_config where id = 1), 'essential') v)
+     m as (select public.lh_file_policy()->>'mode' v)
   select json_build_object(
       'mode', (select v from m),
       'allowed', (select count(*) from l where allowed), 'ok', (select count(*) from l where allowed and outcome = 'ok'),
       'denied', (select count(*) from l where not allowed),
       'reasons', (select coalesce(json_agg(json_build_object('r', reason, 'n', n) order by n desc), '[]'::json) from (select reason, count(*) n from l where not allowed group by 1) z),
-      'held', (select count(*) from public.analysis_dispatch_queue q, m where q.state = 'waiting' and q.ready_at is null
-                 and m.v = 'paused' and public.analysis_needs_lh_file(q.announcement_id, q.group_key))) j`)
+      'held', (select count(*) from public.analysis_dispatch_queue q where q.state = 'waiting' and q.ready_at is null
+                 and public.analysis_lh_file_hold(q.announcement_id, q.group_key))) j`)
   const c = x.j
   const rs = c.reasons.slice(0, 4).map(r => `${String(r.r).replace(/^\w+ — /, '')} ${r.n}`).join(' · ')
   add('lh_file_mode', 'LH 첨부 경로(lhFile.do) 쓰임 가름 · 24시간 받기 시도(정보)', 'info',

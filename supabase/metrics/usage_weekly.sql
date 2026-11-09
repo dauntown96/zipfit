@@ -38,6 +38,17 @@ select json_build_object(
   --    🔴 작아도 실패가 아니다 — 런칭 첫 주는 표본이 작고, 이 수는 방향(오르나 내리나)을 보는 지표다. 0 이면 먼저 계측 경로(index.html 의
   --    from='match' 태그가 지금 추천 카드에서 남는지 — 백로그 「북극성 계측 경로 확인」 · 표시층 회차 D)를 의심한다. 값 해석은 그 확인 뒤.
   'north_star_sessions', (select count(distinct session_id) from r where event = 'notice_open' and r.props->>'from' = 'match'),
+  -- 🔵 2026-11-09(우편함 「코드·운영 — 모드 정의 하나 … · 이용 기록 갈라 보이기 …」 3장 ① · 조사 「이용 기록 자동 세션 원인」 회신 1 초안) —
+  --    사람 세션을 갈라 보인다. 빼지는 않는다(usage_events 에 UA 가 없어 봇·튕김을 여기서 가를 수 없다 — 원칙 36 · 갈래 셈은 health-ops usage_ua_weekly).
+  --    ① 한 사건 세션(사건 1개 · 길이 0초) — 봇 렌더러(2026-11-09 조사: Googlebot 8)·첫 화면만 본 방문이 섞인다.
+  'sessions_single_event', (select count(*) from (select session_id from r group by session_id having count(*) = 1) q),
+  --    ② 두 사건 이상 세션 — 실사용 기준선으로 이쪽을 먼저 본다.
+  'sessions_engaged', (select count(*) from (select session_id from r group by session_id having count(*) >= 2) q),
+  --    ③ 열기 30회 이상 세션 — 운영 브라우저 표지 누락 의심(2026-11-09 조사: 2세션이 열기 157 중 80). 수와 그 열기 수만.
+  'heavy_sessions', (select count(*) from (select session_id from r where event = 'notice_open' group by session_id having count(*) >= 30) q),
+  'notice_open_in_heavy', (select coalesce(sum(n), 0) from (select count(*) n from r where event = 'notice_open' group by session_id having count(*) >= 30) q),
+  'notice_open_engaged_excl_heavy', (select count(*) from r where event = 'notice_open' and session_id not in
+      (select session_id from r where event = 'notice_open' group by session_id having count(*) >= 30)),
   'sessions_by_day_kst', (select json_object_agg(d, n order by d) from (
       select to_char(occurred_at at time zone 'Asia/Seoul', 'MM-DD') d, count(distinct session_id) n from r group by 1) x)
 );
