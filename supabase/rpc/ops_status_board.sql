@@ -35,6 +35,9 @@ AS $function$
 --   other(사람으로 볼 세션 · 열기 30회 이상 포함) · other_heavy(그중 열기 30회 이상 — 운영 브라우저 표지 누락 의심) · bot · ops(운영 표지) ·
 --   headless · script · sessions(갈래 합) · days(채워진 날 수 — 7 미만이면 그 수) · from·to(창 KST 날짜). 개수만(세션 id·UA 0 · 원칙 36).
 --   ⚠️ users.sessions_7d(이용 기록만으로 센 「지금부터 7일」)와 창·셈이 다르다 — 이쪽은 엣지 로그와 맞댄 KST 날짜 7일.
+-- 🔵 2026-11-09(우편함 「코드·운영 — 📚 사전 SQL 새 둘 + 개정 둘 · 상태판 이용 기록 같은 창 셈 …」 2 · #928 ⑦ 채택) — users.sessions_7d_kst 한 칸:
+--   이용 기록 세션 수를 usage_7d 와 같은 창(KST 날짜 · 어제까지 7일 = [오늘 0시 KST − 7일, 오늘 0시 KST))으로 — 운영 표지·운영자 세션 빼기는 sessions_7d 와 같은 셈을
+--   그 창 안에서 따로 한다(기존 sessions_* 는 창·셈 그대로). 개수만(원칙 36).
 declare
   v_uid uuid := auth.uid();
   cfg public.analysis_dispatch_config%rowtype;
@@ -163,6 +166,13 @@ begin
                         where r.occurred_at >= (date_trunc('day', now() at time zone 'Asia/Seoul') at time zone 'Asia/Seoul')),
     'sessions_7d', (select count(distinct r.session_id) from r),
     'logged_in_7d', (select count(distinct r.session_id) from r where r.user_id is not null),
+    'sessions_7d_kst', (with w as (select (((now() at time zone 'Asia/Seoul')::date - 7)::timestamp at time zone 'Asia/Seoul') as ws,
+                                          (((now() at time zone 'Asia/Seoul')::date)::timestamp at time zone 'Asia/Seoul') as we),
+                             ev2 as (select u.session_id, u.user_id, u.props from public.usage_events u, w
+                                      where u.occurred_at >= w.ws and u.occurred_at < w.we),
+                             ops2 as (select distinct e2.session_id from ev2 e2
+                                       where e2.props ? 'ops' or e2.user_id in (select a.user_id from zipfit_ops.admins a))
+                        select count(distinct e3.session_id) from ev2 e3 where e3.session_id not in (select o2.session_id from ops2 o2)),
     'saved', (select count(*) from public.saved_announcements),
     'new_orgs_7d', (select coalesce(jsonb_agg(jsonb_build_object('org', f.supply_org, 'first_id', f.announcement_id, 'first_at', f.created_at)
                                               order by f.created_at desc), '[]'::jsonb)
