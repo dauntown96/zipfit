@@ -163,9 +163,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-11-09 | **코드·운영 — 발송기 essential #차수 보류 줄 고침 · 백업 PG17 재시도·#36 · cron 사본 [완료]** — `analysis_dispatch_tick` 거두기를 paused만(essential에서 #차수 발송) · health-ops `lh_file_mode` 대기 몫 뜻 · 백업 설치 4번 재시도·같은 슬롯 성공이면 실패 이슈 닫기(`zipfit-backup` #37) · ② `lh_file_fetch_log` · cron 사본 29잡 = DB · PR 이 회차 |
 | 2026-11-09 | **분석 묶음 — 자동 run 406 · 후속 처리만 [완료]** — 「운영 — 데이터 쓰기」 …21025 경주·영천 판정 대기 닫기(공고문 값 유지 · ⚠️ 행 유지 → 「완료」 · `pending_fields` 맨 앞 [판정] 한 줄) + 갤러리 pamphlet 1행 `content_sha256`(Drive 사본) · 산물 변경 0 · g2 판정 대기 0 · 분석 몫 0 · PR 이 회차 |
 | 2026-11-09 | **코드·운영 — 차수 발송 다시 켜기(본문 처리) + 보안 권고 허용 목록 + 문지기 기록 90일 정리 [완료]** — `wave_notice_enabled = true` 09:04 KST(`lh_file_mode` essential 그대로 · 대기열 #차수 0) · 허용 목록 `lh_file_fetch_log` · 잡 `zipfit-purge-lh-file-fetch-log`(KST 00:37 · 90일) · 원천 문서 robots·약관 사실 · PR 이 회차 |
-| 2026-11-06 | **분석 묶음 — 자동 run 405 · 정정 몫 평택·안성 10년 공공임대 리츠 예비 `0000061206`(정정 전 `0000061201`) [완료(보조 누락)]** — 정정 = 첨부 파일 이름만(결재_261030 → 공고_261105) · hwpx 바이트 같음 · PDF 메타데이터만 · 산물 변경 0(원문 ID `…61201` 그대로) · 분석 행 `…61206` · 불변식 v3.19 0 · PR 이 회차 |
 ---
 
 ## 🚫 코딩 원칙
