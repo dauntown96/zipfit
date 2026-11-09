@@ -163,9 +163,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-11-09 | **분석 묶음 — 자동 run 409 · 경남개발공사 청년매입 `21512_경상남도_진주시` [완료(판정 대기)]** — 첫 경남개발공사 공고 · 원문 LH 행 없음 → 대표 ID 하나 · 오피스텔 2단지 40호 · 정책 32(⚠️ 3)·자격 4·세대 2·일정 8·경로 2·매핑 6 · 판정 대기 = 공급주택 목록 미게시 · 불변식 v3.20 위반 0(V10a 2 같은 회차 고침) · PR 이 회차 |
 | 2026-11-09 | **코드·운영 — 📚 사전 SQL 새 둘 + 개정 둘 · 상태판 같은 창 셈 [완료]** — 새 `purchase-general-rank.sql`(94·7·7·7·8) · `integrated-income-household.sql`(11·10·3·1·0·10·1) · 개정 `asset-birth-bonus.sql`(종전 6 + 문장·vr·숫자 칸 합 125) · `renewal-surcharge.sql`(종전 국민 56 + 문장 셈 합 254) · `ops_status_board().users.sessions_7d_kst`(마이그레이션 `2026-11-09_07` · 기존 칸 같음 · 27 vs 엣지 사람 19) · migrations README 낡은 판 번호 · PR 이 회차 |
 | 2026-11-09 | **코드·운영 — 쉽게 쓴 말 저장 칸 [완료]** — `announcement_policies`에 `content_plain`·`content_plain_at`·`content_plain_check`(마이그레이션 `2026-11-09_06` · ⚠️ 행 NULL·세 칸 함께 제약) · 불변식 v3.20 V19 · `scripts/plain-check.mjs`(쓰기 0 · 검사 ①~⑤ · 시험 11/11 · 실물 300쌍 항등 실패 0) · 공개 REST에 저절로 열림(값 NULL) · 데이터 쓰기 0 · PR 이 회차 |
-| 2026-11-09 | **표시층 — 상태판 이용 기록 맞대기 [완료]** — 「이용자 7일(엣지 로그)」 줄 아래 작은 글씨 「이용 기록 7일 n」(`users.sessions_7d` · 지금부터 7일 · 운영 표지·운영자 뺌) · `users` 칸 없으면 줄 없음 · v285 · PR 이 회차 |
 ---
 
 ## 🚫 코딩 원칙
