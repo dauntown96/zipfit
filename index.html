@@ -10990,8 +10990,12 @@ const HU_NOTE_INLINE_MAX = 28;
 function zfNoteSegHidden(seg, ctx){
   if(/^[^:]{1,20}:\s*-$/.test(seg) || /^[^:\d]{1,20}\s-$/.test(seg)) return true;   // 빈 값 「예비입주자: -」·「공가호수 -」
   if(!ctx) return false;
-  let m = seg.match(/^대기\s*중인\s*예비자수?\s*:?\s*([\d,]+)\s*명?$/);
-  if(m) return ctx.wait != null && Number(m[1].replace(/,/g, '')) === Number(ctx.wait);
+  const num = x => Number(String(x).replace(/,/g, ''));
+  let m = seg.match(/^(?:대기\s*중인|기존)\s*예비자수?\s*:?\s*([\d,]+)\s*명?$/);
+  if(m) return ctx.wait != null && num(m[1]) === Number(ctx.wait);
+  // 🔵 2026-11-09(우편함 「표시층 — 예비자 두 말」 ⓐ) — 「이번에 뽑는 예비자」로 보인 값과 같은 모집 예비자 조각.
+  m = seg.match(/^(?:모집할|금회\s*모집|모집)\s*예비자수?\s*:?\s*([\d,]+)\s*(?:명|호)?\s*(?:\([^)]*\))?$/) || seg.match(/^예비자\s*:?\s*([\d,]+)\s*(?:명|호)?$/);
+  if(m) return ctx.pick != null && num(m[1]) === Number(ctx.pick);
   m = seg.match(/^(?:금회\s*)?(?:공급|모집)\s*호수\s*:?\s*([\d,]+)\s*호?$/);
   if(m) return !!ctx.recruit && ctx.recruit.has(Number(m[1].replace(/,/g, '')));
   m = seg.match(/^입주\s*예정\s*:?\s*['‘’]?(\d{2}|\d{4})\.(\d{1,2})\.?$/);
@@ -10999,16 +11003,26 @@ function zfNoteSegHidden(seg, ctx){
   return false;
 }
 // 행(들)에서 ctx 를 만든다 — 대기 예비자 값은 zfWaitReserveHtml 이 배지 하나로 보이는 때(값 하나)만.
-function zfNoteCtxOf(units, recruitShown){
+// 🔵 2026-11-09(예비자 두 말 ⓐ) — 복합 조각 「공급호수: 입주자 N호·예비자 M호」·「모집호수 당첨자 N·예비자 M」은
+//    M 이 「이번에 뽑는 예비자」로 보인 값과 같을 때만 예비자 몫을 뗀다(남은 「공급호수: 입주자 N호」는 모집 수와 같으면 숨는다). 꼴이 다르면 그대로.
+function zfNoteSegTrim(seg, ctx){
+  if(zfNoteSegHidden(seg, ctx)) return null;
+  if(!ctx || ctx.pick == null) return seg;
+  const m = seg.match(/^(.*?(?:입주자|당첨자)\s*[\d,]+\s*호?)\s*·\s*예비자\s*([\d,]+)\s*(?:명|호)?$/);
+  if(!m || Number(m[2].replace(/,/g, '')) !== Number(ctx.pick)) return seg;
+  const rest = m[1].trim();
+  return zfNoteSegHidden(rest.replace(/(입주자|당첨자)\s*/, ''), ctx) ? null : rest;
+}
+function zfNoteCtxOf(units, recruitShown, pickShown){
   const vals = [];
   (units || []).forEach(u => { const a = u && u.extracted_facts && u.extracted_facts['대기예비자수']; if(Array.isArray(a)) a.forEach(it => { if(it && it.value != null) vals.push(String(it.value)); }); });
   const wv = [...new Set(vals)];
   const u0 = (units || [])[0];
-  return { wait: wv.length === 1 ? Number(wv[0]) : null, recruit: new Set((recruitShown || []).filter(x => x != null && x !== '').map(Number)), moveIn: (u0 && u0.zfCardMoveIn) || null };
+  return { wait: wv.length === 1 ? Number(wv[0]) : null, recruit: new Set((recruitShown || []).filter(x => x != null && x !== '').map(Number)), moveIn: (u0 && u0.zfCardMoveIn) || null, pick: pickShown != null ? Number(pickShown) : null };
 }
 function renderExtraNoteHtml(note, ctx){
   if(!note) return '';
-  const segments = note.split(/;\s*/).map(s => s.trim()).filter(Boolean).filter(seg => !zfNoteSegHidden(seg, ctx));
+  const segments = note.split(/;\s*/).map(s => s.trim()).filter(Boolean).map(seg => zfNoteSegTrim(seg, ctx)).filter(Boolean);
   return segments.map(seg => {
     const m = seg.match(/^([^:]+):\s*(.+)$/);
     if(m){
@@ -11169,7 +11183,13 @@ function renderHousingUnitGroup(g){
   const headAreas = allAreas.length ? ` · 전용 ${allAreas.join('·')}` : '';
   // 🔵 2026-10-08(표시층 긴급 3) — 머리 모집 = g.total(병합 칸 + 같은 형의 따로 칸). 종전 행만 있는 묶음은 g.recruit 와 같다.
   const headTotal = g.total !== undefined ? g.total : g.recruit;
-  const headCount = headTotal != null ? ` · 모집 ${Number(headTotal).toLocaleString()}세대` : '';
+  // 🔵 2026-11-09(우편함 「표시층 — 예비자 두 말」 ⓑ·ⓒ) — 묶음 안 모든 행이 같은 「모집예비자수」면 머리에 한 번(묶음 표지 「26A·26B」·「31A」 포함).
+  //    그 값이 머리 모집 수와 같고 원문 문구가 입주자·당첨자 수를 함께 말하지 않으면(예비입주자만 모집) 「예비 N명 모집」 — 아니면 「모집 N세대 · 예비 N명」.
+  const headPick = zfReserveCommon(g.units, '모집예비자수');
+  const headWait = zfReserveCommon(g.units, '대기예비자수');
+  const headReserveOnly = headPick && zfReserveOnly(headPick, headTotal);
+  const headCount = headReserveOnly ? ` · 예비 ${Number(headPick.value).toLocaleString()}명 모집`
+    : (headTotal != null ? ` · 모집 ${Number(headTotal).toLocaleString()}세대` : '') + (headPick ? ` · 예비 ${Number(headPick.value).toLocaleString()}명` : '');
   const body = lines.map(ln => {
     const u = ln.u;
     // 줄 면적은 **그룹 안에 면적이 둘 이상이고 이 줄이 그 전부를 덮지 않을 때만** 적는다.
@@ -11191,7 +11211,8 @@ function renderHousingUnitGroup(g){
       ? `<div class="hu-ug-sub">어느 조건이 적용되는지는 비고·공고문에서 확인하세요</div>` : '';
     const floor = u.floor_info ? `<div class="hu-ug-sub">동호수 ${escapeHtml(u.floor_info)}</div>` : '';
     // 🔵 2026-11-09(표기 1차) — 머리 「모집 N세대」·행 배지에 보인 모집 수 · 대기 예비자 배지 값과 같은 비고 조각은 숨긴다(다 숨으면 「비고」 자리도 없다).
-    const noteCtx = zfNoteCtxOf(ln.units || [u], [headTotal, u.recruit_count]);
+    const rowPick = headPick ? null : zfReserveCommon(ln.units || [u], '모집예비자수');
+    const noteCtx = zfNoteCtxOf(ln.units || [u], [headTotal, u.recruit_count], (headPick || rowPick || {}).value);
     const noteBlocks = ln.notes.map(n => renderExtraNoteHtml(n, noteCtx)).filter(Boolean);
     const note = noteBlocks.length
       ? `<div class="hu-note-wrap"><span class="hu-label">비고</span>`
@@ -11203,7 +11224,7 @@ function renderHousingUnitGroup(g){
         <span class="hu-ug-target">${escapeHtml(u.supply_target || u.unit_type || '')}</span>
         ${area}
         <span class="hu-ug-price">${huPriceText(u)}${huSqmText(u)}</span>
-        ${recruitBadge}${zfWaitReserveHtml(ln.units || [u])}${roundBadge}${pastOnlyBadge}${rowChips}
+        ${recruitBadge}${rowPick ? zfPickReserveHtml(rowPick) : ''}${headWait ? '' : zfWaitReserveHtml(ln.units || [u])}${roundBadge}${pastOnlyBadge}${rowChips}
       </div>
       ${dual}
       ${floor}
@@ -11213,11 +11234,29 @@ function renderHousingUnitGroup(g){
     </div>`;
   }).join('');
   return `<details class="hu-ug">
-    <summary><span class="hu-ug-name">${escapeHtml(g.group)}</span><span class="hu-ug-meta">${escapeHtml(headAreas + headCount)}</span>${zfUnitChipSlot(zfUnitTypeKey(g.units[0], g.group))}</summary>
+    <summary><span class="hu-ug-name">${escapeHtml(g.group)}</span><span class="hu-ug-meta"${headPick ? ` title="${zfAttr('원문: ' + headPick.texts.join(' / '))}"` : ''}>${escapeHtml(headAreas + headCount)}</span>${headWait ? zfWaitReserveHtml(g.units) : ''}${zfUnitChipSlot(zfUnitTypeKey(g.units[0], g.group))}</summary>
     <div class="hu-ug-list">${body}</div>
   </details>`;
 }
 
+// 🔵 2026-11-09(우편함 「표시층 — 예비자 두 말」) — 예비자 두 말: 모집예비자수 = 「이번에 뽑는 예비자」 · 대기예비자수 = 「지금 기다리는 예비자」.
+//    행들의 그 칸 값이 하나뿐이면 { value, texts } — 칸 없는 행이 하나라도 있거나 값이 둘 이상이면 null(그때는 종전처럼 행마다).
+function zfReserveCommon(units, key){
+  const vals = new Set(), texts = [];
+  for(const u of (units || [])){
+    const a = u && u.extracted_facts && u.extracted_facts[key];
+    if(!Array.isArray(a) || !a.length) return null;
+    for(const it of a){ if(!it || it.value == null) return null; vals.add(String(it.value)); if(it.text && texts.indexOf(it.text) === -1) texts.push(it.text); }
+  }
+  return vals.size === 1 ? { value: Number([...vals][0]), texts } : null;
+}
+// 머리·행의 모집 수가 곧 예비자 수인가 — 값이 같고 원문 문구가 입주자·당첨자 수를 함께 말하지 않을 때만(「공급호수: 입주자 9호·예비자 9호」는 아님).
+function zfReserveOnly(pick, shown){
+  return !!pick && shown != null && Number(shown) === Number(pick.value) && !pick.texts.some(t => /입주자|당첨자/.test(t));
+}
+function zfPickReserveHtml(pick){
+  return `<span class="chip hu-wait-badge hu-pick-badge" title="${zfAttr('원문: ' + pick.texts.join(' / '))}">이번에 뽑는 예비자 ${escapeHtml(Number(pick.value).toLocaleString())}명</span>`;
+}
 // 🔵 B62 ⑥ — 대기 예비자 수(extracted_facts.대기예비자수, 원문 값). 0도 그대로 적는다.
 //    🔴 예측·권유 문구를 붙이지 않는다. 값이 둘 이상이면 원문 문구(text)를 그대로 나란히 둔다.
 function zfWaitReserveHtml(units){
@@ -11230,7 +11269,7 @@ function zfWaitReserveHtml(units){
   if(!items.length) return '';
   const vals = [...new Set(items.map(i => String(i.value)))];
   if(vals.length === 1 && items[0].value != null){
-    return `<span class="chip hu-wait-badge" title="${zfAttr('원문: ' + items.map(i => i.text).filter(Boolean).join(' / '))}">대기 예비자 ${escapeHtml(String(items[0].value))}명 (원문)</span>`;
+    return `<span class="chip hu-wait-badge" title="${zfAttr('원문: ' + items.map(i => i.text).filter(Boolean).join(' / '))}">지금 기다리는 예비자 ${escapeHtml(String(items[0].value))}명</span>`;   // 🔵 2026-11-09(예비자 두 말) — 원문 문구는 title
   }
   return items.map(i => `<span class="chip hu-wait-badge" title="원문 문구 그대로예요">${escapeHtml(String(i.text || i.value))} (원문)</span>`).join('');
 }
@@ -11275,10 +11314,14 @@ function renderHousingUnitRow(u){
   const elevator = u.has_elevator != null ? `<div class="hu-item"><span class="hu-label">승강기</span><span class="hu-value">${u.has_elevator ? '있음' : '없음'}</span></div>` : '';
   // 🔴 C-1(2026-09-21): unit_group 이 NULL 인 경로도 묶음 경로와 같은 비고 표시를 쓴다.
   //    종전에는 여기만 종전 표시라 태백소도의 긴 조각이 알약 하나로 붙어 있었다.
-  const noteHtml = u.extra_note ? renderExtraNoteHtml(u.extra_note, zfNoteCtxOf([u], [u.recruit_count])) : '';   // 🔵 2026-11-09 표기 1차
+  // 🔵 2026-11-09(예비자 두 말 ⓐ·ⓒ) — 모집 수가 곧 예비자 수면 배지 「예비 N명 모집」 하나 · 아니면 「모집 N세대」 + 「이번에 뽑는 예비자 N명」.
+  const pick = zfReserveCommon([u], '모집예비자수');
+  const pickOnly = zfReserveOnly(pick, u.recruit_count);
+  const noteHtml = u.extra_note ? renderExtraNoteHtml(u.extra_note, zfNoteCtxOf([u], [u.recruit_count], pick && pick.value)) : '';   // 🔵 2026-11-09 표기 1차
   const extraNote = noteHtml ? `<div class="hu-note-wrap"><span class="hu-label">비고</span><div class="hu-note-block">${noteHtml}</div></div>` : '';
   // 금회 모집인원 — 경쟁률 가늠에 중요한 정보라 배지로 눈에 띄게 표시(기존 .chip 배지 스타일 재사용)
-  const recruitBadge = u.recruit_count != null ? `<span class="chip hu-recruit-badge">모집 ${escapeHtml(String(u.recruit_count))}세대</span>` : '';
+  const recruitBadge = pickOnly ? `<span class="chip hu-recruit-badge">예비 ${escapeHtml(Number(pick.value).toLocaleString())}명 모집</span>`
+    : (u.recruit_count != null ? `<span class="chip hu-recruit-badge">모집 ${escapeHtml(String(u.recruit_count))}세대</span>` : '') + (pick ? zfPickReserveHtml(pick) : '');
   // 회차 배지 — 한 블록에 회차가 섞였을 때만 loadHousingUnits가 zfRoundLabel을 붙인다.
   // 🔴 「2026-07-06 회차」라고만 쓰면 어느 쪽이 지금 것인지 모르므로 이번/지난을 함께 적고 색을 가른다.
   const roundBadge = u.zfRoundLabel
