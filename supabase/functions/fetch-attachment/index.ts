@@ -31,6 +31,7 @@ const requireEnv = (key: string): string => {
 }
 
 import { allowedPaths, seoulOnlyHosts, probeHosts, extraCaOf } from '../_shared/board-hosts.ts'
+import { findEocd, parseCentralDirectory, refusalOf, dataOffsetFromLocalHeader, baseName, EOCD_TAIL_BYTES, type ZipEntry } from './zip.ts'
 
 // 기존 수집 EF와 같은 기준 — verify_jwt=false + x-cron-secret 게이트.
 const CRON_SECRET = requireEnv('CRON_SECRET_V2')
@@ -731,6 +732,39 @@ const deleteDriveFile = async (id: string, token: string, s: DriveSecrets) => {
   await driveFetch(`https://www.googleapis.com/drive/v3/files/${id}`, { method: 'DELETE' }, token, s)
 }
 
+// ───────────────────────── Drive 안 zip 풀기(mode=unzip_drive) ─────────────────────────
+// 🔵 2026-11-09(우편함 「코드·운영 — fetch-attachment unzip_drive 모드 · 리츠 0000061201 홍보물 5개 …」 1 · #924 회신 3 꼴 · 다운님 결정 길 A).
+//   Drive 에 이미 있는 zip(이 앱이 올린 것 — drive.file 범위라 다른 앱·사람이 올린 파일은 404)을 LH 를 다시 부르지 않고 같은 폴더에 풀어 올린다.
+//   ① 파일 끝 EOCD_TAIL_BYTES 만 Range 로 받아 중앙 디렉터리를 읽는다(zip.ts) — entry 가 없으면 목록만 돌려준다(올림 0).
+//   ② entry=N 이면 그 항목의 압축 구간만 Range 로 받아 DecompressionStream('deflate-raw')(방식 8) 또는 그대로(방식 0)를
+//      기존 resumable 업로더(streamResumable · 8MB 청크)로 흘린다 — 메모리는 청크 하나 + 스트림 버퍼(항목 크기와 무관).
+//   거절(풀지 않음 · 422): 암호화 · zip64 · 방식 0·8 밖 · 원래 크기 > MAX_RESUMABLE_BYTES · 폴더 항목. 같은 이름 파일이 그 폴더에 있으면 올리지 않는다(skipped_existing).
+//   무결성: 푼 바이트 수 = 중앙 디렉터리 원래 크기 · Drive sha256Checksum 을 content_sha256 로 돌려준다(CRC32 는 EF 에서 계산하지 않는다 — CPU 2초).
+const driveMediaRange = async (
+  fileId: string, start: number, end: number, token: string, s: DriveSecrets, signal: AbortSignal,
+): Promise<Response> => {
+  const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+    headers: { 'Authorization': `Bearer ${token}`, 'Range': `bytes=${start}-${end}` }, signal,
+  })
+  if (res.status !== 206 && res.status !== 200) {
+    const t = await res.text()
+    throw new Error(`Drive 받기 ${res.status} bytes=${start}-${end}: ${redact(t.slice(0, 300), s)}`)
+  }
+  return res
+}
+const driveMediaBytes = async (
+  fileId: string, start: number, end: number, token: string, s: DriveSecrets, signal: AbortSignal,
+): Promise<Uint8Array> => {
+  const res = await driveMediaRange(fileId, start, end, token, s, signal)
+  const b = new Uint8Array(await res.arrayBuffer())
+  if (res.status === 200 && start > 0) throw new Error('Drive 가 Range 를 무시하고 전체를 돌려줬다')
+  return b
+}
+const zipEntryView = (e: ZipEntry) => ({
+  index: e.index, name: baseName(e.name), path: e.name, method: e.method, compressed: e.compressed, size: e.size,
+  utf8_name: e.utf8, refusal: refusalOf(e, MAX_RESUMABLE_BYTES),
+})
+
 // ───────────────────────── 파일명·형식 ─────────────────────────
 
 // 🔴 확장자를 먼저 본다. LH는 hwpx에도 application/octet-stream을 준다.
@@ -1158,6 +1192,106 @@ const handleRequest = async (req: Request): Promise<Response> => {
         error: redact(String(e instanceof Error ? e.message : e), secrets),
         elapsed_ms: Date.now() - startedAt,
       }, 502)
+    }
+  }
+
+  // 🔵 2026-11-09 — Drive 안 zip 풀기(위 「Drive 안 zip 풀기」 주석). file_id = zip · folder_id = 올릴 폴더(entry 가 있을 때) · entry = 항목 번호(없으면 목록만).
+  if (mode === 'unzip_drive') {
+    const startedAt = Date.now()
+    const fileId = reqUrl.searchParams.get('file_id') ?? ''
+    const entryParam = reqUrl.searchParams.get('entry')
+    if (!DRIVE_ID_RE.test(fileId)) return json({ ok: false, mode, error: 'file_id 가 Drive 파일 ID 꼴이 아니다' }, 400)
+    if (entryParam !== null && !/^\d{1,4}$/.test(entryParam)) return json({ ok: false, mode, error: 'entry 는 0 이상 정수' }, 400)
+    if (entryParam !== null && !(folderIdParam && DRIVE_ID_RE.test(folderIdParam))) {
+      return json({ ok: false, mode, error: 'entry 로 올리려면 folder_id(Drive 폴더 ID)가 필요하다' }, 400)
+    }
+    const ac = new AbortController()
+    const timer = setTimeout(() => ac.abort(), RESUMABLE_TIMEOUT_MS)
+    let secrets: DriveSecrets | null = null
+    let session: string | null = null
+    const memoryNow = () => { try { return (Deno as unknown as { memoryUsage?: () => unknown }).memoryUsage?.() ?? null } catch { return null } }
+    try {
+      secrets = await getDriveSecrets()
+      const token = await getAccessToken(secrets)
+      const meta = await driveFetch(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=id,name,size,mimeType,parents`, { method: 'GET' }, token, secrets)
+      const size = Number(meta.size)
+      if (!Number.isFinite(size) || size < 22) return json({ ok: false, mode, error: `zip 크기를 읽지 못했다(${meta.size})` }, 422)
+      const tailStart = Math.max(0, size - EOCD_TAIL_BYTES)
+      const tail = await driveMediaBytes(fileId, tailStart, size - 1, token, secrets, ac.signal)
+      const eocd = findEocd(tail)
+      if (eocd.zip64) return json({ ok: false, mode, reason: 'refused', refusal: 'zip64 — 끝 레코드가 zip64 확장(지원 밖)' }, 422)
+      const cd = eocd.cdOffset >= tailStart
+        ? tail.subarray(eocd.cdOffset - tailStart, eocd.cdOffset - tailStart + eocd.cdSize)
+        : await driveMediaBytes(fileId, eocd.cdOffset, eocd.cdOffset + eocd.cdSize - 1, token, secrets, ac.signal)
+      const entries = parseCentralDirectory(cd, eocd.count)
+      const zipInfo = { file_id: fileId, name: meta.name ?? null, size, parents: meta.parents ?? null, entries: entries.length }
+      if (entryParam === null) {
+        return json({ ok: true, mode, zip: zipInfo, entries: entries.map(zipEntryView), elapsed_ms: Date.now() - startedAt, memory: memoryNow() })
+      }
+      const e = entries[Number(entryParam)]
+      if (!e) return json({ ok: false, mode, zip: zipInfo, error: `entry ${entryParam} 없음(항목 ${entries.length})` }, 400)
+      const refusal = refusalOf(e, MAX_RESUMABLE_BYTES)
+      if (refusal) return json({ ok: false, mode, zip: zipInfo, entry: zipEntryView(e), reason: 'refused', refusal }, 422)
+      const name = baseName(e.name)
+      const folderId = folderIdParam as string
+      const existing = await findFileInFolder(name, folderId, token, secrets)
+      if (existing) {
+        return json({ ok: true, mode, zip: zipInfo, entry: zipEntryView(e), uploaded: false, reason: 'skipped_existing',
+          content_sha256: typeof existing.sha256Checksum === 'string' ? (existing.sha256Checksum as string).toLowerCase() : null,
+          drive: { action: 'skipped_existing', file_id: existing.id ?? null, file_name: existing.name ?? null,
+            file_size: existing.size === undefined ? null : Number(existing.size), web_view_link: existing.webViewLink ?? null },
+          elapsed_ms: Date.now() - startedAt })
+      }
+      const lh = await driveMediaBytes(fileId, e.localHeaderOffset, e.localHeaderOffset + 29, token, secrets, ac.signal)
+      const dataStart = dataOffsetFromLocalHeader(lh, e.localHeaderOffset)
+      const t0 = Date.now()
+      const mimeType = mimeFor(name, null)
+      session = await openResumable({ name, parent: folderId, mimeType, total: e.size, replaceFileId: null }, token, secrets)
+      let body: ReadableStream<Uint8Array>
+      if (e.compressed === 0) {
+        body = new Blob([]).stream()
+      } else {
+        const res = await driveMediaRange(fileId, dataStart, dataStart + e.compressed - 1, token, secrets, ac.signal)
+        if (!res.body) throw new Error('Drive 받기 응답에 본문이 없다')
+        body = e.method === 8 ? res.body.pipeThrough(new DecompressionStream('deflate-raw')) : res.body
+      }
+      const r = await streamResumable(body, session, token, secrets, ac.signal)
+      const transferMs = Date.now() - t0
+      const uploaded = (r.file ?? {}) as Record<string, unknown>
+      if (r.exceeded || r.sent !== e.size) {
+        if (!r.exceeded && uploaded.id) await deleteDriveFile(uploaded.id as string, token, secrets)
+        else await cancelResumable(session)
+        return json({ ok: false, mode, zip: zipInfo, entry: zipEntryView(e), uploaded: false, reason: 'size_mismatch',
+          detail: `푼 바이트 ${r.sent}B ≠ 원래 크기 ${e.size}B(올린 파일 지움)`, transfer_ms: transferMs, memory: memoryNow() }, 502)
+      }
+      const contentSha = typeof uploaded.sha256Checksum === 'string' ? (uploaded.sha256Checksum as string).toLowerCase() : null
+      let reuse: Record<string, unknown> | null = null
+      if (reuseOn && contentSha) {
+        const rr = await findReusable(contentSha)
+        if (rr.hit) {
+          await deleteDriveFile(uploaded.id as string, token, secrets)
+          return json({ ok: true, mode, zip: zipInfo, entry: zipEntryView(e), uploaded: false, reason: 'reused_existing', content_sha256: contentSha,
+            bytes: r.sent, transfer_ms: transferMs, chunks: r.chunks, memory: memoryNow(),
+            drive: { ...reusedDrive(rr.hit), uploaded_then_deleted: uploaded.id ?? null, notice_folder_id: folderId },
+            elapsed_ms: Date.now() - startedAt })
+        }
+        reuse = { checked: rr.error === null, hit: false, error: rr.error }
+      }
+      return json({
+        ok: true, mode, zip: zipInfo, entry: zipEntryView(e), uploaded: true, reason: 'unzipped_via_drive',
+        bytes: r.sent, content_sha256: contentSha, transfer_ms: transferMs, chunks: r.chunks, chunk_bytes: RESUMABLE_CHUNK_BYTES,
+        memory: memoryNow(), reuse,
+        drive: { action: 'uploaded', notice_folder_id: folderId, file_id: uploaded.id ?? null, file_name: uploaded.name ?? null,
+          file_size: uploaded.size === undefined ? null : Number(uploaded.size), file_mime_type: uploaded.mimeType ?? null,
+          file_sha256: uploaded.sha256Checksum ?? null, web_view_link: uploaded.webViewLink ?? null,
+          size_match: uploaded.size === undefined ? null : Number(uploaded.size) === e.size },
+        elapsed_ms: Date.now() - startedAt,
+      })
+    } catch (err) {
+      if (session) await cancelResumable(session)
+      return json({ ok: false, mode, error: redact(String(err instanceof Error ? err.message : err), secrets), elapsed_ms: Date.now() - startedAt, memory: memoryNow() }, 502)
+    } finally {
+      clearTimeout(timer)
     }
   }
 
