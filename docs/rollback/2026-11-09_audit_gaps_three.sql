@@ -1,0 +1,18 @@
+-- 되돌림 기록(2026-11-09 · 우편함 「코드·운영(데이터 쓰기) — 감사 빠짐 셋 …」 1·2·3).
+-- 쓴 것:
+--   housing_units 21512_경상남도_진주시 2행(a1785179 더퍼스트웰가시티 · e42ae6d6 에스제이테라스파크) deposit = 2,000,000 · deposit_priority1 = 1,000,000(쓰기 전 NULL)
+--     · extra_note 앞에 '1순위 시중 시세의 40% · 임대보증금 100만원 · 월 임대료 약 19만원 / 2·3순위 시중 시세의 50% · 임대보증금 200만원 · 월 임대료 약 23만원 · 확정된 임대료는 개별 안내 예정 · 우선 입주자의 경우 1순위 임대조건을 적용; '
+--     (쓰기 전 extra_note: a1785179 「공급호수 30호 · 모집인원 60명(예비 포함)」 · e42ae6d6 「공급호수 10호 · 모집인원 20명(예비 포함)」)
+--   announcement_policies 2행: …20996 「⚠️ 모집할 예비자수 표기 모순 주의」(888f6e13…) · …21024 「⚠️ 후순위 접수 여부 게시 시각 표기 주의」(2066c791…)
+--   policy_category_classes 2행: 「⚠️ 후순위 접수 여부 게시 시각 표기 주의」 standard ⚠️ 원문 주의 · user 일정·신청
+--   announcement_analysis.pending_fields 끝에 1줄씩(셋)
+-- 되돌리려면(관리 API · 한 트랜잭션):
+-- update housing_units set deposit = null, deposit_priority1 = null,
+--   extra_note = substr(extra_note, length('1순위 시중 시세의 40% · 임대보증금 100만원 · 월 임대료 약 19만원 / 2·3순위 시중 시세의 50% · 임대보증금 200만원 · 월 임대료 약 23만원 · 확정된 임대료는 개별 안내 예정 · 우선 입주자의 경우 1순위 임대조건을 적용; ') + 1)
+--   where announcement_id = '21512_경상남도_진주시' and extra_note like '1순위 시중 시세의 40%%';
+-- delete from announcement_policies where announcement_id = '2015122300020996' and category = '⚠️ 모집할 예비자수 표기 모순 주의';
+-- delete from announcement_policies where announcement_id = '2015122300021024' and category = '⚠️ 후순위 접수 여부 게시 시각 표기 주의';
+-- delete from policy_category_classes where category = '⚠️ 후순위 접수 여부 게시 시각 표기 주의';
+-- update announcement_analysis set pending_fields = pending_fields[1:cardinality(pending_fields) - 1]
+--   where announcement_id in ('21512_경상남도_진주시','2015122300020996','2015122300021024')
+--     and pending_fields[cardinality(pending_fields)] like '2026-11-09 운영 데이터 쓰기(우편함 「감사 빠짐 셋」)%';
