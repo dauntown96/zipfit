@@ -1,0 +1,13 @@
+-- 되돌림 기록(2026-11-09 · 우편함 「코드·운영(데이터 쓰기) — 영구 표준문 가구원 수 가산 칸 · …20920 고령자 car_limit …」 1·2).
+-- 쓴 것(쓰기 전 값은 모두 NULL — 가드로 확인):
+--   eligibility_criteria income_pct_household1_bonus = 20 · income_pct_household2_bonus = 10 —
+--     …19241 48b9571e · 4ef4c72e · 5179c9eb / …19412 15b3fb4b · 033906c0 · 70ed8393(원문 「가구원수별 가산비율 : 1인 가구 20%p, 2인 가구 10%p」)
+--   eligibility_criteria 9b6f45b5(…20920 고령자) car_limit = 45,420,000 · car_limit_birth1 = 49,962,000 · car_limit_birth2 = 54,504,000(원문 p14 고령자 계층 표)
+--   announcement_analysis.pending_fields 끝에 1줄씩(…19241 · …19412 · …20920)
+-- 되돌리려면(관리 API · 한 트랜잭션):
+-- update eligibility_criteria set income_pct_household1_bonus = null, income_pct_household2_bonus = null
+--   where announcement_id in ('2015122300019241','2015122300019412') and left(id::text,8) in ('48b9571e','4ef4c72e','5179c9eb','15b3fb4b','033906c0','70ed8393');
+-- update eligibility_criteria set car_limit = null, car_limit_birth1 = null, car_limit_birth2 = null where announcement_id = '2015122300020920' and left(id::text,8) = '9b6f45b5';
+-- update announcement_analysis set pending_fields = pending_fields[1:cardinality(pending_fields) - 1]
+--   where announcement_id in ('2015122300019241','2015122300019412','2015122300020920')
+--     and pending_fields[cardinality(pending_fields)] like '2026-11-09 운영 데이터 쓰기 — %우편함 「영구 표준문 가구원 수 가산 칸%';
