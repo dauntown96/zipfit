@@ -30,10 +30,15 @@ AS $function$
 --   7일 창 안에서 props 에 ops 키가 있거나 운영자 계정(zipfit_ops.admins) 행이 있는 세션은 그 세션 전체를 뺀다.
 --   🔴 sessions_* 는 #682(자동 브라우저 운영 표지) 병합 뒤부터 사람 세션으로 믿는다(백로그 메모) — 그 전 값은 무인 브라우저가 섞인다.
 --   new_orgs_7d = 공급기관(supply_org) 중 전 DB 첫 행이 7일 안에 들어온 것(백로그 「첨부를 못 받는 공고 …」 ② 「새 공급기관 n」 · 이름 · 첫 공고 id).
+-- 🔵 2026-11-09(우편함 「코드·운영 — 상태판 이용자 지표 재료(ops_status_board에 usage_ua 7일 합) …」 1 · #920 ⑦1 채택) — usage_7d 칸 하나:
+--   zipfit_ops.usage_ua_daily(health-ops usage_ua 가 하루 한 행) 의 지난 7일(KST 날짜 · 어제까지 · ok 행만) 합 —
+--   other(사람으로 볼 세션 · 열기 30회 이상 포함) · other_heavy(그중 열기 30회 이상 — 운영 브라우저 표지 누락 의심) · bot · ops(운영 표지) ·
+--   headless · script · sessions(갈래 합) · days(채워진 날 수 — 7 미만이면 그 수) · from·to(창 KST 날짜). 개수만(세션 id·UA 0 · 원칙 36).
+--   ⚠️ users.sessions_7d(이용 기록만으로 센 「지금부터 7일」)와 창·셈이 다르다 — 이쪽은 엣지 로그와 맞댄 KST 날짜 7일.
 declare
   v_uid uuid := auth.uid();
   cfg public.analysis_dispatch_config%rowtype;
-  v_cov jsonb; v_disp jsonb; v_health jsonb; v_col jsonb; v_fu jsonb; v_hides jsonb; v_rates jsonb; v_runs jsonb; v_secrets jsonb; v_inst jsonb; v_users jsonb;
+  v_cov jsonb; v_disp jsonb; v_health jsonb; v_col jsonb; v_fu jsonb; v_hides jsonb; v_rates jsonb; v_runs jsonb; v_secrets jsonb; v_inst jsonb; v_users jsonb; v_usage jsonb;
   v_run record; v_last record;
   n_wait int; n_ready int; n_promo int; n_sent int; n_fu_wait int; n_reclaim int; v_failing boolean; v_wait text;
   v_fu_since timestamptz;
@@ -167,9 +172,17 @@ begin
                      where f.created_at >= now() - interval '7 days'))
     into v_users;
 
+  select jsonb_build_object(
+    'from', (now() at time zone 'Asia/Seoul')::date - 7, 'to', (now() at time zone 'Asia/Seoul')::date - 1,
+    'days', count(*), 'sessions', coalesce(sum(u.sessions), 0), 'other', coalesce(sum(u.other), 0), 'other_heavy', coalesce(sum(u.other_heavy), 0),
+    'bot', coalesce(sum(u.bot), 0), 'ops', coalesce(sum(u.ops), 0), 'headless', coalesce(sum(u.headless), 0), 'script', coalesce(sum(u.script), 0))
+    into v_usage
+    from zipfit_ops.usage_ua_daily u
+   where u.ok and u.day between (now() at time zone 'Asia/Seoul')::date - 7 and (now() at time zone 'Asia/Seoul')::date - 1;
+
   return jsonb_build_object('now', now(), 'coverage', v_cov, 'dispatch', v_disp, 'health', v_health,
                             'collected', v_col, 'followups_unreported', v_fu, 'hides', v_hides,
                             'rates', v_rates, 'recent_runs', v_runs, 'secrets', v_secrets, 'instance', v_inst,
-                            'users', v_users);
+                            'users', v_users, 'usage_7d', v_usage);
 end
 $function$

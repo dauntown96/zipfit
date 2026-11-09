@@ -36,6 +36,7 @@
 | `t1.kakaocdn.net` | 카카오 지도 SDK 본체·마커 이미지 | 지금(2026-10-14 더함) | — | 2026-10-14 | 열림 403(서버 · 루트) · 배포본 렌더 200 |
 | `mts.kakaocdn.net` | 카카오 지도 그림 조각(타일) | 지금(2026-10-14 더함) | — | 2026-10-14 | 열림 404(루트) · 배포본 렌더 200 |
 | `drive.google.com` | 카드 썸네일 `drive.google.com/thumbnail?id=…` | 지금(2026-10-14 더함) | 해외 IP 무관(Google) | 2026-10-14 | 열림 302 · 브라우저 썸네일 200 image/jpeg |
+| `drive.usercontent.google.com` | 공개 링크 Drive 파일 받기 — `drive.google.com/uc?export=download&id=…`가 넘기는 대상 · 10MB 넘는 Drive 파일(바이러스 검사 안내 뒤 실제 내려받기) — Drive MCP `download_file_content` 상한 밖 파일을 컨테이너에서 받을 때(조사 「리츠 카탈로그 zip …」) | 지금(2026-11-09 더함 — 다운님 승인 카드 · 조사 회차) · 감지 루틴도 같은 환경(Default)이라 함께 열림 | 해외 IP 무관(Google) | 2026-11-09 | 열림 404(루트 · CONNECT 200) |
 | `lh3.googleusercontent.com` | 썸네일 넘김 대상(curl은 `drive.google.com` 302 → `lh3…/d/<id>=w300`) | 지금(2026-10-14 더함) | 해외 IP 무관(Google) | 2026-10-14 | 열림 400(루트) |
 | `housing.seoul.go.kr` | SH 공고 목록·페이지 원문 재확인 | 지금(2026-10-14 더함) | 해외 IP 허용(EF가 싱가포르에서 긁는다) | 2026-10-14 | 열림 200 |
 | `www.data.go.kr` | 공공데이터 포털 | 지금 | — | 2026-10-21 | 열림 200 — ⚠️ 활용사례 목록은 스크립트가 불러와 curl 본문에 없다 · 검색·데이터셋 페이지가 간헐로 `Connection reset by peer`(000)로 끊긴다(다시 부르면 200 · 2026-10-21) |
