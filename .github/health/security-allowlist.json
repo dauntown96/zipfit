@@ -162,6 +162,11 @@
    "why": "내부 표 — anon·authenticated 권한 0 · 화면(index.html) 참조 0 · 수집 EF collect-lh-notices(service_role) · 운영 점검(postgres)만. 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15)"
   },
   {
+   "key": "rls_enabled_no_policy_public_lh_file_fetch_log",
+   "kind": "intended",
+   "why": "LH 첨부 문지기 기록 표(2026-11-05 · lh_file_gate) — anon·authenticated 권한 0 · 화면(index.html) 참조 0 · EF fetch-attachment(service_role · lh_file_gate · lh_file_gate_done) · 정리 잡 zipfit-purge-lh-file-fetch-log(90일) · 운영 점검(postgres)만. 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15) — lh_notice_matches·lh_notice_run_log 와 같은 꼴"
+  },
+  {
    "key": "rls_enabled_no_policy_public_gh_collection_run_log",
    "kind": "intended",
    "why": "내부 표 — anon·authenticated 권한 0 · 화면(index.html) 참조 0 · 수집 EF collect-gh-announcements(service_role · 2026-10-28 브랜치). 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15)"

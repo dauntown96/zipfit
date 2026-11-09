@@ -212,9 +212,13 @@ select cron.schedule('zipfit-purge-cron-run-details', '17 15 * * *', $cmd$delete
 --   2026-11-02 신설(supabase/migrations/2026-11-02_02_purge_collection_run_log.sql) — LH·MYHOME 수집 런 로그 90일 보관(소비처 가장 긴 창 7일 · 그 파일 머리 주석).
 select cron.schedule('zipfit-purge-collection-run-log', '27 15 * * *', $cmd$delete from public.collection_run_log where run_at < now() - interval '90 days'$cmd$);
 
+-- jobid 적용 때 매김 · zipfit-purge-lh-file-fetch-log · '37 15 * * *' = KST 00:37 · active=true · command md5 06790822244fc8eccb6f15a57c2ca6d5
+--   2026-11-09 신설(supabase/migrations/2026-11-09_01_purge_lh_file_fetch_log.sql) — LH 첨부 문지기 기록 90일 보관(읽는 곳 · 문지기 재허락 뜻은 그 파일 머리 주석).
+select cron.schedule('zipfit-purge-lh-file-fetch-log', '37 15 * * *', $cmd$delete from public.lh_file_fetch_log where at < now() - interval '90 days'$cmd$);
+
 -- 대조(읽기 전용) — DB 의 잡이 이 파일과 같은지. 25행 · 이름 · 주기 · active · command md5 가 위 주석과 같아야 한다.
 --   빠진 잡(파일에 있는데 DB 에 없음)은 missing 행으로, 더 있는 잡(DB 에만 있음)은 extra 행으로 나온다.
 -- select coalesce(j.jobname, f.n) jobname, j.schedule, j.active, md5(j.command) cmd_md5,
 --        case when j.jobid is null then 'missing' when f.n is null then 'extra' else 'ok' end state
---   from cron.job j full join unnest(array['zipfit-collect-announcements', 'zipfit-collect-sh-announcements', 'zipfit-collect-rental-stats', 'zipfit-collect-announcements-warmup', 'zipfit-collect-announcements-night', 'zipfit-purge-usage-events', 'zipfit-purge-sh-run-log', 'zipfit-sh-close-missing', 'zipfit-collect-lh-promo', 'zipfit-refresh-post-links', 'zipfit-analysis-dispatch', 'zipfit-collect-lh-images', 'zipfit-health-ops-dispatch', 'zipfit-health-screen-dispatch', 'zipfit-check-source-pages', 'zipfit-uptime-ping', 'zipfit-backup-dispatch', 'zipfit-heartbeat-dispatch', 'zipfit-backup-poll', 'zipfit-purge-stale-sessions', 'zipfit-check-source-pages-new-sh', 'zipfit-net-purge-secrets', 'zipfit-list-rpc-probe', 'zipfit-purge-cron-run-details', 'zipfit-purge-collection-run-log']) f(n) on f.n = j.jobname
+--   from cron.job j full join unnest(array['zipfit-collect-announcements', 'zipfit-collect-sh-announcements', 'zipfit-collect-rental-stats', 'zipfit-collect-announcements-warmup', 'zipfit-collect-announcements-night', 'zipfit-purge-usage-events', 'zipfit-purge-sh-run-log', 'zipfit-sh-close-missing', 'zipfit-collect-lh-promo', 'zipfit-refresh-post-links', 'zipfit-analysis-dispatch', 'zipfit-collect-lh-images', 'zipfit-health-ops-dispatch', 'zipfit-health-screen-dispatch', 'zipfit-check-source-pages', 'zipfit-uptime-ping', 'zipfit-backup-dispatch', 'zipfit-heartbeat-dispatch', 'zipfit-backup-poll', 'zipfit-purge-stale-sessions', 'zipfit-check-source-pages-new-sh', 'zipfit-net-purge-secrets', 'zipfit-list-rpc-probe', 'zipfit-purge-cron-run-details', 'zipfit-purge-collection-run-log', 'zipfit-purge-lh-file-fetch-log']) f(n) on f.n = j.jobname
 --  order by 1;

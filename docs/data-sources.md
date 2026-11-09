@@ -9,6 +9,7 @@
 > 1. 새 호스트를 조사·수집·점검으로 열 때는 ① `robots.txt` → ② 목록 → ③ 첨부 호스트 판별 순서다.
 > 2. robots가 막는 경로는 자동 접근 0이다(Claude Code 세션 · 루틴 · EF · claude.ai Playwright 모두). 사람(다운님)의 브라우저 열람은 해당 없다.
 > 3. 계기: GH 조사에서 조사 세션과 claude.ai가 둘 다 `www.gh.or.kr`(robots `Disallow: /`)을 robots보다 먼저 열었다. robots가 특정 봇(예: `Googlebot`)에만 규칙을 두면 우리 UA(`ZipFitBot`)에는 막는 경로가 없다 — 그 사실을 그 호스트 줄에 적는다(광주 `www.gmcc.co.kr` 2026-10-26).
+> 4. 쓰던 원천도 robots·약관을 주기적으로 다시 본다(⑧ 2026-11-05 — LH `lhFile.do` `Disallow`가 쓰는 중에 생겼다) — 주기는 아래 「정기 조사」 체크리스트 6(분기 1회 · 계기형 ①②에도).
 
 ## 지금 쓰는 원천
 
@@ -16,12 +17,12 @@
 
 | # | 원천 | 받는 길 | 코드 위치 · 주기 | 키(이름) | 이용허락(포털 표시) | 활용가이드 날짜 | 마지막 확인 |
 |---|---|---|---|---|---|---|---|
-| 1 | LH 분양임대공고문 조회 — data.go.kr [15058530](https://www.data.go.kr/data/15058530/openapi.do) · `B552555/lhLeaseNoticeInfo1` | API | EF `collect-announcements` `fetchNoticeList` · 잡 `zipfit-collect-announcements`(+ `-warmup` · `-night`) | `LH_API_KEY`(EF 비밀값) | 이용허락범위 제한 없음 | 20260708(`OpenAPI활용가이드_…_분양임대공고조회_20260708.docx`) | 2026-10-21 |
+| 1 | LH 분양임대공고문 조회 — data.go.kr [15058530](https://www.data.go.kr/data/15058530/openapi.do) · `B552555/lhLeaseNoticeInfo1` | API | EF `collect-announcements` `fetchNoticeList` · 잡 `zipfit-collect-announcements`(+ `-warmup` · `-night`) | `LH_API_KEY`(EF 비밀값) | 이용허락범위 제한 없음 · 🔴 첨부 받기는 원천 6(robots `Disallow` · 문지기 — 2026-11-05) | 20260708(`OpenAPI활용가이드_…_분양임대공고조회_20260708.docx`) | 2026-10-21 |
 | 2 | LH 분양임대공고별 상세정보 조회 — [15057999](https://www.data.go.kr/data/15057999/openapi.do) · `B552555/lhLeaseNoticeDtlInfo1/getLeaseNoticeDtlInfo1` | API | 같은 EF(상세조회 캡 90) | `LH_API_KEY` | 이용허락범위 제한 없음 | 20260616 | 2026-10-21 |
-| 3 | 국토교통부 마이홈포털 공공주택 모집공고 조회 — [15108420](https://www.data.go.kr/data/15108420/openapi.do) · `1613000/HWSPR02/rsdtRcritNtcList` | API | 같은 EF `fetchMyHome` | `LH_API_KEY`(같은 서비스키) | 이용허락범위 제한 없음 | 페이지에서 가이드 파일명을 못 읽음(포털 수정일 2026-07-14) | 2026-10-21 |
+| 3 | 국토교통부 마이홈포털 공공주택 모집공고 조회 — [15108420](https://www.data.go.kr/data/15108420/openapi.do) · `1613000/HWSPR02/rsdtRcritNtcList` | API | 같은 EF `fetchMyHome` | `LH_API_KEY`(같은 서비스키) | 이용허락범위 제한 없음(API) · 🔴 `www.myhome.go.kr` 사이트는 robots `Allow : /`이나 이용약관이 영리 이용·복제를 사전 승인으로 묶음(국토부·LH 공동 운영) — 승인 전 사이트에서 받는 길 없음(2026-11-05) | 페이지에서 가이드 파일명을 못 읽음(포털 수정일 2026-07-14) | 2026-10-21 |
 | 4 | LH 마이홈포털 기존임대주택 목록 5종 — 영구임대 [15084928](https://www.data.go.kr/data/15084928/fileData.do) · 행복주택 [15084930](https://www.data.go.kr/data/15084930/fileData.do) · 장기전세 [15084929](https://www.data.go.kr/data/15084929/fileData.do) · 50년임대 [15084925](https://www.data.go.kr/data/15084925/fileData.do) · 국민임대 [15084926](https://www.data.go.kr/data/15084926/fileData.do) | API(파일데이터의 `api.odcloud.kr` 변환 API · `uddi:` 경로) | EF `collect-rental-stats` · 잡 `zipfit-collect-rental-stats`(주 1회) | `ODCLOUD_API_KEY` | 이용허락범위 제한 없음 | 파일데이터라 가이드 없음 · 포털 파일명 날짜 20260413(코드 상수 `SOURCE_UPDATED_AT` = 2026-05-14) | 2026-10-21 |
 | 5 | 국토교통부 아파트 전월세 실거래가 — [15126474](https://www.data.go.kr/data/15126474/openapi.do) · `1613000/RTMSDataSvcAptRent` | API | 코드 없음 — 분석 회차가 컨테이너에서 손으로 부른다(`CLAUDE.md` 컨테이너 환경 메모) | `MOLIT_RENT_API_KEY`(컨테이너 환경변수) | 이용허락범위 제한 없음 | 날짜 없는 기술문서(`아파트 전월세 실거래가 자료 기술문서.hwp` · 포털 수정일 2026-07-29) | 2026-10-21 |
-| 6 | LH 청약센터 공고 페이지 · 첨부 · 매입 홍보물 · 단지 이미지 탭 — `apply.lh.or.kr` | HTML · 바이트 | EF `check-source-pages`(잡 `zipfit-check-source-pages`) · `collect-lh-promo`(잡 `zipfit-collect-lh-promo`) · `collect-lh-images`(잡 `zipfit-collect-lh-images`) · `fetch-attachment`(허용 경로 `/lhapply/` · `/upload/Files/`) | 없음 | 표시 없음 | — | 2026-10-21 |
+| 6 | LH 청약센터 공고 페이지 · 첨부 · 매입 홍보물 · 단지 이미지 탭 — `apply.lh.or.kr` | HTML · 바이트 | EF `check-source-pages`(잡 `zipfit-check-source-pages`) · `collect-lh-promo`(잡 `zipfit-collect-lh-promo`) · `collect-lh-images`(잡 `zipfit-collect-lh-images`) · `fetch-attachment`(허용 경로 `/lhapply/` · `/upload/Files/`) | 없음 | 표시 없음 · 🔴 첨부 `/lhapply/lhFile.do` · `/lhapply/apply/csvc/lhFile.do` robots `Disallow`(Wayback: 2025-09-02~10-22 사이 생김) · 2026-11-05부터 문지기 `lh_file_mode` essential(`lh_file_gate` — 열린 공고 첨부만 파일당 한 번 + 재시도 한 번) · LH 공식 문의 2026-11-05 접수 | — | 2026-11-05 |
 | 7 | SH 서울주거포털 공고 목록 — `housing.seoul.go.kr` | HTML(robots 전면 허용 — 2026-08-19 확인) | EF `collect-sh-announcements`(잡 `zipfit-collect-sh-announcements`) · `check-source-pages` `parseShList`(잡 `zipfit-check-source-pages-new-sh`) · `fetch-attachment` | 없음 | 표시 없음 | — | 2026-10-21 |
 | 8 | SH 게시판 후속 공지 — `www.i-sh.co.kr` | HTML · 바이트 | EF `check-source-pages` `parseShBoard` · `matchFollowups` · `fetch-attachment` | 없음 | 표시 없음 | — | 2026-10-21 |
 | 9 | 지방공사 게시판 — 부산도시공사 `www.bmc.busan.kr` · 경북개발공사 · 경남개발공사 | HTML · 바이트 | 부산: EF `fetch-attachment` `SEOUL_ONLY`(서울 지역 실행) · 경북·경남: 분석 회차가 DB `net.http_get`으로 본문만(코드 없음) | 없음 | 표시 없음 | — | 2026-10-21 |
@@ -80,6 +81,7 @@
   3. 서비스키 활용신청 목록 · 만료(키마다 어느 API에 신청돼 있나 — 후보 2처럼 신청 안 된 API는 403).
   4. [`network-allowlist.md`](network-allowlist.md) — 후보가 쓰는 도메인이 「예정」 줄에 있는가.
   5. 해마다 고시 — 기준 중위소득(7~8월 결정 · 12월 넣기) · 도시근로자 월평균소득 기준표 · 공급 규칙 개정.
+  6. 지금 쓰는 호스트(원천 6 · 7 · 14 · `fetch-attachment` 허용 호스트)의 `robots.txt` · 이용약관 — 받는 경로가 새로 `Disallow`됐거나 약관이 영리 이용을 묶었는지(2026-11-05 LH `lhFile.do` 계기 · 바뀌었으면 그 경로 자동 접근을 멈추고 회신 ②).
 - **비용 가늠**: 2026-10-21 조사 회차 — data.go.kr 페이지 약 35 · API 시험 6호출 · 반나절 이하.
 
 ## 고칠 때
