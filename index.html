@@ -5514,7 +5514,8 @@ async function zfRenderCutoffDetail(annId, id){
     const happy = rs.every(r => String(r.spl_tp_nm || '').includes('행복주택'));
     const dropCut = noCut && happy;
     const anyMine = types.some(g => mine.has(zfUnitKey(g.name)));
-    if(types.some(g => g.gen && g.wait)) anyWait = true;
+    // 🔵 2026-11-09(우편함 「표시층 — 상태판 이용자 지표 한 줄 · 설명 줄 숨김」 2) — 넘친(일반공급 신청 > 공급) 주택형이 하나라도 있을 때만 설명 줄.
+    if(types.some(g => g.gen && g.wait && num(g.gen.rqpr_cnt) != null && num(g.gen.spl_rmno) != null && num(g.gen.rqpr_cnt) > num(g.gen.spl_rmno))) anyWait = true;
     const whyTypes = new Map();   // 사유 → 주택형 목록(표 아래 한 줄)
     const genCell = r => {
       const n = num(r.rqpr_cnt), sup = num(r.spl_rmno), cr = num(r.competition_ratio);
@@ -12664,6 +12665,18 @@ function zfOpsHtml(b, issues){
   // ⓒ-3 인스턴스 메모리 · ⓒ-4 비밀값 만료(2026-10-17 상태판 새 칸 — PR #603 instance · secrets)
   if('instance' in b){ const im = zfOpsInstanceHtml(b.instance, (h.warned || []).includes('instance_mem')); out.push(line(im.color, '인스턴스 메모리', im.html)); }
   if(b.secrets){ const sx = zfOpsSecretsHtml(b.secrets); out.push(line(sx.color, '비밀값 만료', sx.html)); }
+  // ⓒ-5 이용자 7일(2026-11-09 · 우편함 「표시층 — 상태판 이용자 지표 한 줄」 1 · #924 usage_7d) — 엣지 로그와 맞댄 KST 날짜 7일(어제까지) 합.
+  //    사람 = other(봇·운영·헤드리스·스크립트를 뺀 세션) · 채워진 날이 7 미만이면 그 수가 보인다 · 이름을 「엣지 로그」로 붙여
+  //    이용 기록만으로 센 users.sessions_*(「지금부터 7일」)와 창·셈이 다름을 드러낸다(개수만 · 원칙 36).
+  if(b.usage_7d){
+    const u = b.usage_7d, days = Number(u.days) || 0, heavy = Number(u.other_heavy) || 0;
+    const ux = days
+      ? `사람 ${Number(u.other) || 0}(봇 ${Number(u.bot) || 0} · 운영 ${Number(u.ops) || 0} 뺌) · ${days}일 셈${days < 7 ? '(7일 중)' : ''}`
+        + ` <span style="color:#888">(${zfOpsEsc(u.from)}~${zfOpsEsc(u.to)} KST · 헤드리스 ${Number(u.headless) || 0} · 스크립트 ${Number(u.script) || 0})</span>`
+        + (heavy > 0 ? `<br><span style="font-size:12px;color:#888">열기 많은 세션 ${heavy}</span>` : '')
+      : '기록 없음 <span style="color:#888">(usage_ua_daily 7일 행 0)</span>';
+    out.push(line('ok', '이용자 7일(엣지 로그)', ux));
+  }
   // ⓓ 수집 마지막 시각
   out.push(line('ok', '수집', (b.collected || []).map(x => `${zfOpsEsc(x.source)} ${zfOpsTime(x.at)}`).join(' · ') || '—'));
   // ⓔ 결과 없이 닫힌 후속 요청(결과 칸 도입 뒤 요청만)
