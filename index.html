@@ -4521,7 +4521,15 @@ function zfOpsOn(){
   zfOpsMem = on;
   return on;
 }
-function zfAutoBrowser(){ try{ return navigator.webdriver === true; }catch(e){ return false; } }
+// 🔵 2026-11-09(우편함 「표시층 — 커트라인 상자 빈 채 끝남 · 봇 걸러내기」 2) — Googlebot 렌더러·헤드리스 창은 webdriver 가 거짓이라 UA 낱말로도 가른다.
+//    브라우저 안 판정만 — UA 를 보내거나 저장하지 않는다(원칙 36). 휴대폰 모델명 「CUBOT」은 봇이 아니다 · 「DaumApps」(다음 앱)는 사람이다(「Daum/」·「Daumoa」만 봇).
+//    정규식에 뒤보기(lookbehind)를 쓰지 않는다 — 옛 사파리는 그 문법에서 스크립트 전체가 멈춘다.
+const ZF_BOT_UA = /googlebot|google-inspectiontool|bingbot|\byeti\b|daumoa|\bdaum\/|headlesschrome|bot\b|crawler|spider/i;
+function zfBotUA(ua){ const u = String(ua || ''); return ZF_BOT_UA.test(u.replace(/cubot/ig, '')); }
+function zfAutoBrowser(){
+  try{ if(navigator.webdriver === true) return true; }catch(e){}
+  try{ return zfBotUA(navigator.userAgent); }catch(e){ return false; }
+}
 function zfOpsBadge(){
   if(!zfOpsOn() || document.getElementById('zfOpsBadge')) return;
   // 🔵 2026-10-16(우편함 「표시층 — 실사용 2회차 다듬기 묶음」 A4 · N19) — d3 에서는 앱 머리 「꼭집」 옆 작은 점(누름 칸 44). 누르면 「운영 기기 · … 끄기」가 열린다.
@@ -5373,10 +5381,18 @@ function zfOpenCutoffDetail(btn, ev){
   go();
 }
 const zfCutoffAsked = new Set();
-async function zfEnsureCutoff(ids){
+// 🔵 2026-11-09(우편함 「표시층 — 커트라인 상자 빈 채 끝남 …」 1) — 진행 중 조회의 약속을 id 별로 든다.
+//    목록 조회가 끝나기 전에 상세를 펼치면 같은 id 를 다시 묻지 않고 그 약속을 기다린다(종전: 캐시가 비어 상자가 빈 채 끝났다).
+const zfCutoffInflight = new Map();   // announcement_id → 진행 중 조회 약속
+function zfEnsureCutoff(ids){
   const need = [...new Set((ids || []).map(String).filter(id => id && !zfCutoffAsked.has(id)))];
-  if(!need.length) return false;
+  if(!need.length) return Promise.resolve(false);
   need.forEach(id => zfCutoffAsked.add(id));
+  const pr = zfFetchCutoff(need).finally(() => { need.forEach(id => { if(zfCutoffInflight.get(id) === pr) zfCutoffInflight.delete(id); }); });
+  need.forEach(id => zfCutoffInflight.set(id, pr));
+  return pr;
+}
+async function zfFetchCutoff(need){
   try{
     const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_announcement_cutoff_rounds`,
       {method:'POST', headers: zfAnonHeaders(), body: JSON.stringify({p_ids: need})});
@@ -5464,8 +5480,12 @@ function zfCutoffTrendHtml(rows){
 async function zfRenderCutoffDetail(annId, id){
   const slot = document.getElementById('cutoff-slot-' + id);
   if(!slot || !annId) return;
-  if(!zfCutoffCache.has(String(annId))) await zfEnsureCutoff([annId]);
-  const rows = zfCutoffCache.get(String(annId)) || [];
+  const aid = String(annId);
+  if(!zfCutoffCache.has(aid)){
+    if(zfCutoffInflight.has(aid)) await zfCutoffInflight.get(aid);   // 목록이 묻는 중 — 같은 조회를 기다린다
+    else await zfEnsureCutoff([aid]);
+  }
+  const rows = zfCutoffCache.get(aid) || [];
   if(!rows.length){ slot.innerHTML = ''; return; }
   const byCx = new Map();
   rows.forEach(r => { const k = r.complex_name || ''; if(!byCx.has(k)) byCx.set(k, []); byCx.get(k).push(r); });
@@ -5515,8 +5535,14 @@ async function zfRenderCutoffDetail(annId, id){
       let mid;
       if(waitOnlyAll) mid = `<td style="${td}">${escapeHtml(waitOnlyCell(g.wait))}</td>`;
       else if(!g.gen) mid = `<td style="${td}" colspan="2">예비입주자 모집 — ${escapeHtml(waitOnlyCell(g.wait))}</td>`;
-      else mid = `<td style="${td}">${escapeHtml(genCell(g.gen))}</td>`
-        + `<td style="${td};word-break:keep-all">${g.wait && waitSel(g.wait) ? waitSel(g.wait) : '—'}</td>`;
+      else {
+        // 🔵 2026-11-09(우편함 「… 봇 걸러내기 · 미달 주택형 예비자 칸」 3 · 다운님 승인 2026-11-09) — 일반공급 신청 ≤ 공급이면 넘친 사람이 없다 → 「넘친 신청 없음(정원 n)」(n = 예비자 행 공급).
+        const gn = num(g.gen.rqpr_cnt), gs = num(g.gen.spl_rmno), ws = g.wait ? num(g.wait.spl_rmno) : null;
+        const under = gn != null && gs != null && gn <= gs;
+        const wcell = !g.wait ? '—' : (under ? `넘친 신청 없음${ws != null ? `(정원 ${ws})` : ''}` : (waitSel(g.wait) || '—'));
+        mid = `<td style="${td}">${escapeHtml(genCell(g.gen))}</td>`
+          + `<td style="${td};word-break:keep-all">${escapeHtml(wcell)}</td>`;
+      }
       let cutTd = '';
       if(!dropCut){
         const parts = [g.gen, g.wait].filter(r => r && r.cutoff_text)

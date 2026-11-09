@@ -163,9 +163,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-11-09 | **표시층 — 커트라인 상자 빈 채 끝남 · 봇 걸러내기 · 미달 예비자 칸 [완료]** — 진행 중 조회 약속을 id별로 기다림(`zfCutoffInflight` · 중복 조회 0) · `zfAutoBrowser()` UA 낱말 검사(`ZF_BOT_UA` · 보내지 않음) → `ops:'auto'` · 일반공급 미달 주택형 예비자 칸 「넘친 신청 없음(정원 n)」 · v283 · PR 이 회차 |
 | 2026-11-09 | **표시층 — 커트라인 표 주택형 한 줄(꼴 A) [완료]** — `zfRenderCutoffDetail` 주택형 한 줄(일반공급 「n명 신청 · n호 · n : 1」 · 예비자 「n명 선정」/신청 적으면 「n명까지 선정」 · 커트라인 행 이름 앞에) · 「일반」 = 일반공급 · 예비만 = 「예비입주자 모집」 · 계층 행 접힘(신청 수만) · 예비자 설명 한 줄 · 추이 줄 일반공급 고정 + 이름 · v282 · PR 이 회차 |
 | 2026-11-09 | **코드·운영 — 모드 정의 하나 · cron 이름 집합 경고 · 이용 기록 갈라 보이기 · 📚 #34·#19 [완료]** — `lh_file_policy()`·`analysis_lh_file_hold()`를 문지기·발송기·health-ops가 부름(전후 차이 0) · health-ops `cron_names` ⚠️ · `usage_weekly.sql` 다섯 칸 · `zipfit_ops.usage_ua_daily`(UA 갈래 일일 셈 · 개수만) · 사전 파일 둘 · PR 이 회차 |
-| 2026-11-09 | **코드·운영 — 발송기 essential #차수 보류 줄 고침 · 백업 PG17 재시도·#36 · cron 사본 [완료]** — `analysis_dispatch_tick` 거두기를 paused만(essential에서 #차수 발송) · health-ops `lh_file_mode` 대기 몫 뜻 · 백업 설치 4번 재시도·같은 슬롯 성공이면 실패 이슈 닫기(`zipfit-backup` #37) · ② `lh_file_fetch_log` · cron 사본 29잡 = DB · PR 이 회차 |
 ---
 
 ## 🚫 코딩 원칙
