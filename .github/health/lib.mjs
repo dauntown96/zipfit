@@ -74,20 +74,22 @@ async function callJsonbFn(fn, payload) {
   return JSON.parse(text)[0].n
 }
 
-export async function anonRpc(fn, body, timeoutMs = 30000) {
+// 🔵 2026-11-10 — opts.count: Prefer: count=exact 를 실어 content-range 의 전체 행 수(total)를 함께 돌려준다(응답이 상한에서 잘렸는지 본다 · 잘리면 206).
+export async function anonRpc(fn, body, timeoutMs = 30000, opts = {}) {
   const t0 = Date.now()
   const ctl = new AbortController()
   const timer = setTimeout(() => ctl.abort(), timeoutMs)
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
       method: 'POST', signal: ctl.signal,
-      headers: { apikey: ANON_KEY, Authorization: `Bearer ${ANON_KEY}`, 'Content-Type': 'application/json' },
+      headers: { apikey: ANON_KEY, Authorization: `Bearer ${ANON_KEY}`, 'Content-Type': 'application/json', ...(opts.count ? { Prefer: 'count=exact' } : {}) },
       body: JSON.stringify(body ?? {}),
     })
     const text = await res.text()
     let data = null
     try { data = JSON.parse(text) } catch { /* 본문이 JSON 이 아니면 null */ }
-    return { status: res.status, ms: Date.now() - t0, data, snippet: res.ok ? '' : text.slice(0, 200) }
+    const m = /\/(\d+)\s*$/.exec(res.headers.get('content-range') || '')
+    return { status: res.status, ms: Date.now() - t0, data, total: m ? Number(m[1]) : null, snippet: res.ok ? '' : text.slice(0, 200) }
   } catch (e) {
     return { status: 0, ms: Date.now() - t0, data: null, snippet: String(e).slice(0, 200) }
   } finally {

@@ -3364,19 +3364,38 @@ let zfAllRowsP = null, zfAllRowsAt = 0;
 //    정상이면 요청 하나 그대로 · 두 번째도 실패면 종전 오류 그대로(부른 쪽이 안내) · 직전 목록을 대신 보여 주지 않는다.
 //    목록 RPC 를 부르는 세 곳(전량 zfFetchAllNoticeRows · 칩 고른 목록 loadNoticeData · 매칭 matchHouses)만 쓴다 — 다른 호출에는 번지지 않는다.
 const ZF_LIST_RETRY_MS = 800;
+// 🔵 2026-11-10(우편함 「코드·운영 — 목록 RPC … 운영 REST 1000행 상한」 · health-screen #941) — 운영 REST 는 한 응답을 ZF_LIST_PAGE 행에서 자른다
+//    (PostgREST max_rows · 2026-11-09 DB 1,001행 ↔ 응답 1,000행). 함수 응답 순서는 상태가 아니라 제목 키 순이라 잘리는 행이 열린 공고일 수 있다.
+//    받은 행 수가 ZF_LIST_PAGE 의 배수면(= 잘렸을 수 있으면) 이어지는 쪽을 ?offset= 으로 더 받아 붙인다 — 짧은 쪽이 오면 끝.
+//    상한 안이면 요청은 종전 하나 그대로(첫 요청은 한 글자도 안 바뀐다) · 쪽 사이에 행이 밀려도 announcement_id 로 한 번만 담는다 ·
+//    이어 받기가 실패하면 잘린 목록을 보여 주지 않고 종전 오류 그대로(부른 쪽이 안내).
+const ZF_LIST_PAGE = 1000, ZF_LIST_PAGE_MAX = 10;
 async function zfListRpc(body){
-  const go = () => fetch(`${SUPABASE_URL}/rest/v1/rpc/get_announcements_deduped`,
+  const go = (offset) => fetch(`${SUPABASE_URL}/rest/v1/rpc/get_announcements_deduped${offset ? '?offset=' + offset : ''}`,
       {method:'POST', headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY,'Content-Type':'application/json'}, body});
-  try{
+  const page = async (offset) => {
     let res = null, netErr = null;
-    try{ res = await go(); }catch(e){ netErr = e; }
+    try{ res = await go(offset); }catch(e){ netErr = e; }
     if(netErr || res.status >= 500){
       console.warn('ZipFit 목록 RPC 한 번 다시 부름:', netErr ? String(netErr) : 'HTTP ' + res.status);
       await new Promise(r => setTimeout(r, ZF_LIST_RETRY_MS));
-      res = await go();
+      res = await go(offset);
     }
     if(!res.ok) throw new Error('HTTP '+res.status);
     return await res.json();
+  };
+  try{
+    let rows = await page(0);
+    if(!Array.isArray(rows)) return rows;
+    let got = rows.length, n = 1;
+    while(got > 0 && got % ZF_LIST_PAGE === 0 && n < ZF_LIST_PAGE_MAX){
+      const more = await page(got);
+      if(!Array.isArray(more) || !more.length) break;
+      const seen = new Set(rows.map(r => r.announcement_id));
+      rows = rows.concat(more.filter(r => !seen.has(r.announcement_id)));
+      got += more.length; n++;
+    }
+    return rows;
   }finally{ zfListSettledResolve(); }
 }
 // 🔵 2026-10-18(우편함 「표시층 — 첫 로드 2차」 1) — 첫 목록 응답이 끝났다는 신호(성공·실패 모두). 첫 그림의 판정에 쓰이지 않는 곁 요청
