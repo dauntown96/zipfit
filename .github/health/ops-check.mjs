@@ -1088,6 +1088,26 @@ try {
   addBlind('lh_file_block', 'LH 첨부(lhFile.do) 차단 감지 — 점검 불능', 'warn', String(e).slice(0, 200), '설정 · 받기 기록 표를 읽는다(못 읽으면 ⚠️)')
 }
 
+// ㉟ 공고끼리 같은 요약 정책 행 묶음(2026-11-10 · 우편함 「코드·운영 — 꼭 볼 것 key_rank 칸 … · 0장」 4 · 역전파 4회차 1 「의심 꼴」) — ℹ️ 셈만(판정하지 않는다).
+//    묶음 = content_raw(앞뒤 공백 뺀 것) md5 가 같은 정책 행 · 일정·⚠️·모집일정 밖 · 서로 다른 공고 둘 이상.
+//    의심 꼴 = 그 묶음 행이 전부 2026-09-18 이전에 만들어졌고 원문 파일(source_file)이 둘 이상 다름 — 다른 원문에서 글자째 같은 요약(옛 배치 요약 의심).
+//    역전파 회차가 공고마다 자기 원문으로 고치면 줄어든다(2026-11-10 46묶음 · 176행). 표준 공고문 문장의 정상 겹침(전체 묶음)은 값에 함께 보인다.
+try {
+  const [x] = await sqlRead(`with p as (
+      select p.announcement_id, p.source_file, p.created_at, md5(btrim(p.content_raw)) h from public.announcement_policies p
+       where coalesce(btrim(p.content_raw), '') <> '' and p.category !~ '^(⚠️|일정|모집일정)'),
+    g as (select h, count(*) n, count(distinct source_file) nf, bool_and(created_at < '2026-09-18') old
+            from p group by h having count(distinct announcement_id) > 1)
+  select json_build_object('groups', count(*) filter (where old and nf > 1), 'rows', coalesce(sum(n) filter (where old and nf > 1), 0),
+      'all_groups', count(*), 'all_rows', coalesce(sum(n), 0)) j from g`)
+  const c = x.j
+  add('policy_md5_dup_old', '공고끼리 같은 요약 정책 행 — 09-18 이전 · 원문 파일 다름(정보)', 'info',
+    `의심 묶음 ${c.groups} · ${c.rows}행(전체 겹침 묶음 ${c.all_groups} · ${c.all_rows}행 — 대부분 표준 문장)`,
+    '정보 — 판정하지 않는다 · content_raw md5 같은 정책 행 · 일정·⚠️·모집일정 밖 · 공고 둘 이상 · 의심 = 전부 2026-09-18 이전 ∧ source_file 둘 이상 · 역전파가 고치면 줄어든다(2026-11-10 46)')
+} catch (e) {
+  add('policy_md5_dup_old', '공고끼리 같은 요약 정책 행 — 09-18 이전 · 원문 파일 다름(정보)', 'info', String(e).slice(0, 200), '정책 표를 읽는다(실패면 ℹ️)')
+}
+
 // ㉓ 화면 빈칸 점검 셋 — 한 쿼리(2026-11-04 · 우편함 「옛 주소 걷기·화면 빈칸 점검」 3~5 · 전부 안 멈춤 — gate.mjs HARD 밖).
 //    카드 = 목록 RPC 대표 · 같은 카드의 행 = 제목 키(announcement_dedup_key — 화면 zfDedupKey 와 한 벌)가 같은 공고 전부(화면 곁 데이터 붙이기와 같다).
 //    ⓐ deadline_hm_missing — 마감이 오늘·내일(KST)인 카드 중 그날 끝나는 경로 표 행 · 일정 표 「접수」 행이 **하나도 없는** 것 = ⚠️(화면이 「오늘 16:00까지」를 못 낸다 · …20923 꼴).
