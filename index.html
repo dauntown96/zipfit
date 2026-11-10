@@ -11230,6 +11230,43 @@ function renderHousingGroupRows(id, visibleCount, mapOnly){
 // 🔵 금액 조각(「…: 보증금…/월…」)만은 길이와 무관하게 종전 2단 표시를 유지한다 —
 //    거기는 값이 이미 두 정보라 라벨과 값을 가르는 것이 원문을 흐리지 않는다.
 const HU_NOTE_INLINE_MAX = 28;
+// ===== 🔵 2026-11-10 비고 머리 표시 사전(용어집 v0 · 우편함 「표시층 — 12월 재편 A·B 1차」 ① · 다운님 승인 2026-11-10) =====
+// 🔴 저장은 원문 · 표시는 쉽게 — 비고 조각의 **머리(칸 이름)만** 표준 머리로 바꾸고 값(숫자·단위·괄호 안 값)은 원문 그대로 · 원문 조각은 title 「원문: …」.
+//    조각 첫머리(「;」로 가른 조각의 시작)만 본다 — 문장 중간의 같은 낱말(「복도식/개별난방. 최초입주 …」)은 그대로.
+//    매칭 안 된 머리는 그대로 · 뜻을 가를 근거가 없는 꼴은 넣지 않는다(추측 0):
+//      「면적계」(매입 공급목록 = 전용+공용 합 — 계약면적과 다름) · 「최대전환시(증액 연 N%)」 · 「1순위 최대전환시」 · 「전환가능 보증금 한도액」 · 「입주 'N(예정)」 · 「최초 입주지정기간 종료일」.
+//    같은 값 숨김(zfNoteSegTrim · #938·#945·#947)은 원문 조각으로 먼저 끝내고, 남은 조각에만 이 사전을 쓴다.
+//    한 줄 = { t: 주제, re: 원문 머리(조각 시작 고정), to: 표준 머리, sub: 같은 조각 안에서 함께 바꿀 소머리 [[정규식, 바꿀 말], …] }.
+const ZF_NOTE_SUB_UPDOWN = [[/증액(?=\s*(?:한도|\(|\+|[\d,]))/g, '올릴 때'], [/감액(?=\s*(?:한도|\(|-|[\d,]))/g, '낮출 때']];
+const ZF_NOTE_SUB_SIGN = [[/(^|[\s/])\(\+\)/g, '$1올릴 때(+)'], [/(^|[\s/])\(-\)/g, '$1낮출 때(-)']];
+const ZF_NOTE_HEADS = [
+  { t: '모집 수', re: /^건설\s*(?:호수|세대수)(?=\s*[:\d])/, to: '건설 호수' },
+  { t: '모집 수', re: /^공급호수(?=\s+(?:계\s|우선))/, to: '공급호수', sub: [[/우선\s*공급|우선(?=\s*[\d,])/g, '우선 공급'], [/일반\s*공급|일반(?=\s*[\d,])/g, '일반 공급']] },
+  { t: '계약금', re: /^계약금\s*:(?=\s*[\d,])/, to: '계약금' },
+  { t: '전환', re: /^전환\s*:(?=\s*증액|\s*감액)/, to: '보증금 전환 —', sub: ZF_NOTE_SUB_UPDOWN },
+  { t: '전환', re: /^최대\s*전환\s*시\s*—(?=\s*(?:증액|감액))/, to: '보증금 전환 —', sub: ZF_NOTE_SUB_UPDOWN },
+  { t: '전환', re: /^최대\s*전환\s*시\s*임대조건\s*(?=\((?:\+|-)\))/, to: '보증금 전환 — ', sub: ZF_NOTE_SUB_SIGN },
+  { t: '전환', re: /^최대\s*전환\s*시\s*(?=\((?:\+|-)\))/, to: '보증금 전환 — ', sub: ZF_NOTE_SUB_SIGN },
+  { t: '전환', re: /^최대\s*전환\s*시\s*임대조건(?=\s+\((?:\+|-)\))/, to: '보증금 전환 —', sub: ZF_NOTE_SUB_SIGN },
+  { t: '전환', re: /^무보증전환임대료(?=\s*[\d,])/, to: '보증금 없이(무보증 전환) 임대료' },
+  { t: '입주 시기', re: /^최초\s*입주(?:월|시기)?(?=\s*[:‘’'\d])/, to: '처음 입주한 때' },
+  { t: '입주 시기', re: /^(?:입주예정|당첨자\s*입주\s*예정)(?=\s*[:‘’'\d])/, to: '입주 예정' },
+  { t: '면적', re: /^세대\s*(?:당|별)\s*계약면적(?:\s*합계)?(?=\s*[:\d])/, to: '계약면적', sub: [[/주거전용/g, '전용'], [/주거공용/g, '공용']] },
+  { t: '구조·난방', re: /^(?:구조\s*및\s*난방(?:방식)?|구조\s*\/\s*난방|구조\s*,\s*난방|난방\s*·\s*구조)(?=\s*:|\s)/, to: '구조·난방' },
+  { t: '거주기간', re: /^최대거주기간/, to: '최대 거주기간' },
+];
+// 조각 → { text, topic } — 바뀌지 않으면 topic null.
+function zfNoteHeadStd(seg){
+  for(const h of ZF_NOTE_HEADS){
+    const m = seg.match(h.re);
+    if(!m) continue;
+    let rest = seg.slice(m[0].length);
+    (h.sub || []).forEach(([re, to]) => { rest = rest.replace(re, to); });
+    const text = (h.to + rest).replace(/\s{2,}/g, ' ');
+    return text === seg ? { text: seg, topic: null } : { text, topic: h.t };
+  }
+  return { text: seg, topic: null };
+}
 // 🔵 2026-11-09(우편함 「표시층 — 표기 1차」 ⓐ·ⓓ·덧 · 「조사 — 카드 표기 문법 전수」 4·5) — 행 머리·배지에 이미 같은 값으로 보인 비고 조각과 값이 빈 조각을 숨긴다.
 //    ctx = { wait: 배지 「대기 예비자 N명」의 N · recruit: 머리·배지에 보인 모집 수들 · moveIn: 카드 머리 LH 입주 'YYYYMM' }.
 //    🔴 값이 같을 때만 숨긴다 — 다르면 둘 다 보인다(원문 차이를 숨기지 않는다) · 꼴이 아래 정규식과 다르면(단위·덧붙은 말) 숨기지 않는다.
@@ -11319,7 +11356,10 @@ function zfNoteCtxOf(units, recruitShown, pickShown){
 function renderExtraNoteHtml(note, ctx){
   if(!note) return '';
   const segments = note.split(/;\s*/).map(s => s.trim()).filter(Boolean).map(seg => zfNoteSegTrim(seg, ctx)).filter(Boolean);
-  return segments.map(seg => {
+  return segments.map(orig => {
+    // 🔵 2026-11-10(12월 재편 A·B 1차 ①) — 머리만 표준 머리로 · 원문 조각은 title.
+    const std = zfNoteHeadStd(orig), seg = std.text;
+    const tt = std.topic ? ` title="${zfAttr('원문: ' + orig)}"` : '';
     const m = seg.match(/^([^:]+):\s*(.+)$/);
     if(m){
       const label = m[1].trim();
@@ -11327,15 +11367,15 @@ function renderExtraNoteHtml(note, ctx){
       const priceMatch = detail.match(/보증금\s*([\d,]+)\s*원?\s*\/?\s*월(?:임대료)?\s*([\d,]+)\s*원?/);
       if(priceMatch){
         const priceLine = `보증금 ${priceMatch[1]}원 · 월 ${priceMatch[2]}원`;
-        return `<div class="hu-note-item"><span class="chip hu-note-badge">${escapeHtml(label)}</span><div class="hu-note-price">${escapeHtml(priceLine)}</div></div>`;
+        return `<div class="hu-note-item"${tt}><span class="chip hu-note-badge">${escapeHtml(label)}</span><div class="hu-note-price">${escapeHtml(priceLine)}</div></div>`;
       }
       if(seg.length <= HU_NOTE_INLINE_MAX){
-        return `<span class="chip hu-note-badge">${escapeHtml(label)}: ${escapeHtml(detail)}</span>`;
+        return `<span class="chip hu-note-badge"${tt}>${escapeHtml(label)}: ${escapeHtml(detail)}</span>`;
       }
     } else if(seg.length <= HU_NOTE_INLINE_MAX){
-      return `<span class="chip hu-note-badge">${escapeHtml(seg)}</span>`;
+      return `<span class="chip hu-note-badge"${tt}>${escapeHtml(seg)}</span>`;
     }
-    return `<div class="hu-note-long">${escapeHtml(seg)}</div>`;
+    return `<div class="hu-note-long"${tt}>${escapeHtml(seg)}</div>`;
   }).join('');
 }
 
