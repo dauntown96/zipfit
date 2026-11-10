@@ -11032,8 +11032,36 @@ function zfNoteSegIsBadgeText(seg, ctx){
   if(!ctx || /(?<!예비)(?:입주자|당첨자)/.test(seg)) return false;   // 「예비입주자 34」·「예비당첨자 6」은 예비자 몫만 말한다
   return !!((ctx.pickTexts && ctx.pickTexts.has(seg)) || (ctx.waitTexts && ctx.waitTexts.has(seg)));
 }
+// 🔵 2026-11-10(우편함 「표시층 — 예비자 비고 남은 몫」 1) — 조각 안 어디든 「대기예비자수」 text(배지에 보인 값과 같은 항목)와 글자가 같은 몫을 뗀다.
+//    몫의 앞뒤가 조각 끝이거나 구분자(「·」「,」「.」「/」「;」 — 띄어쓰기 허용)일 때만 — 문장 속에 박힌 것(「현재 대기중 예비자 20명 별도 존재」)은 떼면 글이 깨져 그대로.
+//    text 끝의 「,」「.」는 구분자로 본다(「대기중예비자수9,」) · 「예비」 낱말 없는 text(숫자만)는 떼지 않는다 · 뗀 쪽의 구분자 하나를 함께 걷는다.
+const ZF_NOTE_SEP = /[·,.\/;]/;
+function zfNoteCutWait(seg, ctx){
+  if(!ctx || !ctx.waitTexts || !ctx.waitTexts.size) return seg;
+  let out = seg;
+  for(const t of ctx.waitTexts){
+    const core = String(t).replace(/[\s,.]+$/, '');
+    if(!core || !/예비/.test(core)) continue;
+    let from = 0, at;
+    while((at = out.indexOf(core, from)) !== -1){
+      const end = at + core.length;
+      let l = at; while(l > 0 && out[l - 1] === ' ') l--;
+      let r = end; while(r < out.length && out[r] === ' ') r++;
+      const leftOk = l === 0 || ZF_NOTE_SEP.test(out[l - 1]);
+      const rightOk = r === out.length || (ZF_NOTE_SEP.test(out[r]) && !/\d/.test(out[r + 1] || ''));
+      if(!leftOk || !rightOk){ from = end; continue; }
+      if(r < out.length){ let rr = r + 1; while(rr < out.length && out[rr] === ' ') rr++; out = out.slice(0, at) + out.slice(rr); }   // 뒤 구분자를 함께
+      else if(l > 0){ out = out.slice(0, l - 1).replace(/\s+$/, '') + (out[l - 1] === '.' ? '.' : ''); }   // 끝 몫 — 앞 구분자를 함께(앞 문장의 「.」는 남김)
+      else out = '';
+      from = at;
+    }
+  }
+  return out.trim();
+}
 function zfNoteSegTrim(seg, ctx){
   if(zfNoteSegHidden(seg, ctx)) return null;
+  const cut = zfNoteCutWait(seg, ctx);
+  if(cut !== seg){ if(!cut || zfNoteSegHidden(cut, ctx)) return null; seg = cut; }
   if(!ctx || ctx.pick == null) return seg;
   let rest = null;
   const m = seg.match(/^(.*?(?:입주자|당첨자)\s*[\d,]+\s*호?)\s*·\s*예비자\s*([\d,]+)\s*(?:명|호)?$/);
@@ -11293,7 +11321,7 @@ function zfReserveCommon(units, key){
 }
 // 머리·행의 모집 수가 곧 예비자 수인가 — 값이 같고 원문 문구가 입주자·당첨자 수를 함께 말하지 않을 때만(「공급호수: 입주자 9호·예비자 9호」는 아님).
 function zfReserveOnly(pick, shown){
-  return !!pick && shown != null && Number(shown) === Number(pick.value) && !pick.texts.some(t => /입주자|당첨자/.test(t));
+  return !!pick && shown != null && Number(shown) === Number(pick.value) && !pick.texts.some(t => /(?<!예비)(?:입주자|당첨자)/.test(t));   // 🔵 2026-11-10(… 남은 몫 2) — 「예비입주자 N」은 예비자 몫만 말한다
 }
 function zfPickReserveHtml(pick){
   return `<span class="chip hu-wait-badge hu-pick-badge" title="${zfAttr('원문: ' + pick.texts.join(' / '))}">이번에 뽑는 예비자 ${escapeHtml(Number(pick.value).toLocaleString())}명</span>`;
