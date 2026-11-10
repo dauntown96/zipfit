@@ -56,7 +56,7 @@ export const STATES = [
 //    초록 글자 #1D9E75 — 둘 다 violations 가 아니라 incomplete 에 있었다).
 //    판정 단위는 노드 수가 아니라 「갈래」 = 요소 꼴(태그.첫 클래스) · 글자색 — 노드 수는 그날 카드 수에 따라 흔들린다. 기준선에 없는 갈래가 생기면 실패(compare).
 //    고치는 것은 설계 ④ 색 뜻 표 뒤 표시층 — 그때 갈래가 줄면 기준선을 다시 쓴다.
-export function contrastKinds (incomplete) {
+export function contrastKinds (incomplete, colors = {}) {
   const v = (incomplete || []).find(x => x.id === 'color-contrast')
   const kinds = {}
   for (const n of (v && v.nodes) || []) {
@@ -64,7 +64,8 @@ export function contrastKinds (incomplete) {
     const html = String(n.html || '')
     const tag = (html.match(/^<([a-z0-9-]+)/i) || [])[1] || '?'
     const cls = (html.match(/class="([^" ]+)/) || [])[1]
-    const k = `${tag}${cls ? '.' + cls : ''}|${(d.fgColor || '?').toLowerCase()}`
+    const fg = d.fgColor || colors[(n.target || [])[0]] || '?'
+    const k = `${tag}${cls ? '.' + cls : ''}|${String(fg).toLowerCase()}`
     const e = kinds[k] || (kinds[k] = { nodes: 0, ratio: d.contrastRatio ?? null, bg: d.bgColor || null, why: d.messageKey || null })
     e.nodes++
   }
@@ -88,7 +89,15 @@ export async function measure (browser, url, { AxeBuilder }) {
       for (const v of res.violations) {
         rules[v.id] = { impact: v.impact, nodes: v.nodes.length, sample: (v.nodes[0]?.target || []).join(' ').slice(0, 90) }
       }
-      out[name] = { rules, contrast_incomplete: contrastKinds(res.incomplete) }
+      // 대비 미완 노드의 글자색은 axe 가 데이터로 주지 않는다(pseudoContent 등) — 같은 노드의 계산된 color 를 페이지에서 읽어 갈래 열쇠에 넣는다.
+      const ci = (res.incomplete || []).find(x => x.id === 'color-contrast')
+      const sels = [...new Set(((ci && ci.nodes) || []).map(n => (n.target || [])[0]).filter(t => typeof t === 'string'))]
+      const colors = sels.length ? await page.evaluate(ss => Object.fromEntries(ss.map(s => {
+        let c = null
+        try { const e = document.querySelector(s); if (e) { const m = getComputedStyle(e).color.match(/\d+(\.\d+)?/g) || []; c = '#' + m.slice(0, 3).map(x => Math.round(+x).toString(16).padStart(2, '0')).join('') } } catch (_) {}
+        return [s, c]
+      })), sels) : {}
+      out[name] = { rules, contrast_incomplete: contrastKinds(res.incomplete, colors) }
     } catch (e) {
       out[name] = { err: String(e).slice(0, 200) }
     } finally {
@@ -116,15 +125,21 @@ export function compare (got, baseline) {
     }
   }
   // 대비 「미완」 갈래 — 기준선(states[st].contrast_incomplete)에 없는 갈래 = 실패 · 기준선에 그 칸 자체가 없으면 경고(아직 안 잼)
-  const newKinds = [], noBase = []
+  //    · 기준선에 있는 요소 꼴(태그.클래스)인데 글자색이 새로우면 = 색 회귀 → 실패(그 요소의 색이 바뀌었다 — 데이터와 무관하게 정해진다)
+  //    · 요소 꼴 자체가 처음이면 → 경고(그날 카드 구성에 따라 처음 나타날 수 있다 — 새 화면이면 기준선을 다시 쓴다)
+  const newKinds = [], newTags = [], noBase = []
   let ciTotal = 0
+  const allBase = Object.values(baseline.states || {}).map(x => x.contrast_incomplete || {})
+  const baseTags = new Set(allBase.flatMap(x => Object.keys(x).map(k => k.split('|')[0])))
+  const baseKeys = new Set(allBase.flatMap(x => Object.keys(x)))
   for (const [st, r] of Object.entries(got)) {
     if (r.err || !r.contrast_incomplete) continue
     const bk = (baseline.states || {})[st]?.contrast_incomplete
     for (const [k, v] of Object.entries(r.contrast_incomplete)) {
       ciTotal += v.nodes
       if (!bk) { noBase.push(st); continue }
-      if (!bk[k]) newKinds.push(`${st} ${k}(${v.nodes}${v.ratio ? ' · ' + v.ratio + ':1' : ''})`)
+      if (baseKeys.has(k)) continue   // 다른 상태에서라도 아는 갈래면 같은 것
+      ;(baseTags.has(k.split('|')[0]) ? newKinds : newTags).push(`${st} ${k}(${v.nodes})`)
     }
   }
   const rulesNow = new Set(Object.values(got).flatMap(r => Object.keys(r.rules || {})))
@@ -133,8 +148,9 @@ export function compare (got, baseline) {
   const kindsNow = new Set(Object.values(got).flatMap(r => Object.keys(r.contrast_incomplete || {})))
   const head = `위반 규칙 ${rulesNow.size}종 · 요소 ${total} · critical ${crit.length ? crit.join(', ') : '0'} · 대비 미완 갈래 ${kindsNow.size}(요소 ${ciTotal})`
   if (crit.length) return { status: 'fail', value: `${head} · critical 은 실패`, increased: inc }
-  if (newKinds.length) return { status: 'fail', value: `${head} · 대비 미완 새 갈래 ${newKinds.length}: ${newKinds.slice(0, 4).join(' / ')}`, increased: inc.concat(newKinds) }
+  if (newKinds.length) return { status: 'fail', value: `${head} · 대비 미완 색 회귀(아는 요소에 새 글자색) ${newKinds.length}: ${newKinds.slice(0, 4).join(' / ')}`, increased: inc.concat(newKinds) }
   if (noBase.length) inc.push(`대비 미완 기준선 없음(${[...new Set(noBase)].join(', ')})`)
+  if (newTags.length) inc.push(`대비 미완 처음 보는 요소 꼴 ${newTags.length}: ${newTags.slice(0, 3).join(' / ')}`)
   if (errs.length) return { status: 'warn', value: `${head} · 못 잰 상태 ${errs.length}: ${errs.join(' / ')}`, increased: inc }
   if (inc.length) return { status: 'warn', value: `${head} · 기준선보다 늚 ${inc.length}: ${inc.slice(0, 4).join(' / ')}`, increased: inc }
   return { status: 'pass', value: `${head} · 기준선 이내`, increased: [] }
