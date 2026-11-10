@@ -132,7 +132,10 @@ async function main () {
         await page.evaluate(s => { const c = document.querySelector(s); toggleDetail(c.getAttribute('data-card-id'), c, 'visual') }, sel)
         await page.waitForLoadState('networkidle').catch(() => {})
         await page.waitForTimeout(2500)
-        shots.push({ name: base + '-open', buf: await stableShot(page, sel) })
+        // 넓은 화면(1280)은 상세가 카드 밖 옆 패널로 열린다 — 그때는 상세 요소를 찍는다(카드 안이면 카드째).
+        const openSel = await page.evaluate(s => { const c = document.querySelector(s); const d = document.getElementById(c.getAttribute('data-card-id'))
+          return d && !c.contains(d) && d.offsetParent !== null ? '#' + CSS.escape(d.id) : s }, sel)
+        shots.push({ name: base + '-open', buf: await stableShot(page, openSel) })
         await page.evaluate(s => { const c = document.querySelector(s); toggleDetail(c.getAttribute('data-card-id'), c, 'visual') }, sel)
         await page.waitForTimeout(600)
       }
@@ -206,6 +209,16 @@ async function main () {
 
 // 두 번 연달아 같은 그림이 나올 때까지 찍는다(최대 4번) — 늦게 붙는 곁 요청·글꼴로 흔들린 그림을 기준에 넣지 않게.
 async function stableShot (page, sel) {
+  // 화면에 붙은 요소(아래 탭 막대 · 「↑」 단추 · 머리 띠 등)는 찍는 동안 숨긴다 — 스크롤 자리에 따라 카드 위에 겹쳐 그림이 흔들린다.
+  //    찍을 요소 안의 것은 숨기지 않는다. 그 막대 자체의 모양은 이 장치가 재는 것이 아니다(카드 · 상세만).
+  await page.evaluate(sel => {
+    const t = document.querySelector(sel)
+    document.querySelectorAll('[data-vhide]').forEach(e => { e.style.visibility = e.dataset.vhide === '-' ? '' : e.dataset.vhide; delete e.dataset.vhide })
+    for (const e of document.body.querySelectorAll('*')) {
+      const p = getComputedStyle(e).position
+      if ((p === 'fixed' || p === 'sticky') && !(t && (t.contains(e) || e.contains(t)))) { e.dataset.vhide = e.style.visibility || '-'; e.style.visibility = 'hidden' }
+    }
+  }, sel)
   let prev = null
   for (let i = 0; i < 4; i++) {
     const buf = await page.locator(sel).screenshot({ animations: 'disabled', caret: 'hide' })
