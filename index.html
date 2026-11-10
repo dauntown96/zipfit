@@ -11029,7 +11029,7 @@ function zfNoteSegHidden(seg, ctx){
 // 🔵 2026-11-09(예비자 두 말 ⓐ) — 복합 조각 「공급호수: 입주자 N호·예비자 M호」·「모집호수 당첨자 N·예비자 M」은
 //    M 이 「이번에 뽑는 예비자」로 보인 값과 같을 때만 예비자 몫을 뗀다(남은 「공급호수: 입주자 N호」는 모집 수와 같으면 숨는다). 꼴이 다르면 그대로.
 function zfNoteSegIsBadgeText(seg, ctx){
-  if(!ctx || /입주자|당첨자/.test(seg)) return false;
+  if(!ctx || /(?<!예비)(?:입주자|당첨자)/.test(seg)) return false;   // 「예비입주자 34」·「예비당첨자 6」은 예비자 몫만 말한다
   return !!((ctx.pickTexts && ctx.pickTexts.has(seg)) || (ctx.waitTexts && ctx.waitTexts.has(seg)));
 }
 function zfNoteSegTrim(seg, ctx){
