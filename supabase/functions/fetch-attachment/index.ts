@@ -179,7 +179,7 @@ const rejectReason = (u: URL): string | null => {
 //   허락하지 않으면 403 {status:'lh_file_gate'} · 🔴 문지기를 못 부르면 받지 않는다(닫힌 쪽). 허락한 받기의 결과(ok · 실패 사유)는 응답 직전 lh_file_gate_done 이 적는다(Deno.serve).
 //   첫 주소 · 리다이렉트 다음 주소 · host_probe 모두. 다른 LH 경로(/upload/Files/ 이미지 · 공고 페이지)와 다른 호스트는 그대로.
 const ROBOTS_DISALLOWED = (u: URL) => u.hostname === 'apply.lh.or.kr' && /^\/lhapply\/(apply\/csvc\/)?lhfile\.do$/i.test(u.pathname)
-type LhGate = { allow: boolean; reason: string; kind: string | null; mode: string | null; reuse_url: string | null; log_id: number | null }
+type LhGate = { allow: boolean; reason: string; kind: string | null; mode: string | null; reuse_url: string | null; log_id: number | null; wait_ms?: number | null }
 const rpcPost = async (fn: string, args: Record<string, unknown>): Promise<unknown> => {
   const base = Deno.env.get('SUPABASE_URL')
   const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
@@ -193,20 +193,34 @@ const rpcPost = async (fn: string, args: Record<string, unknown>): Promise<unkno
   const t = await r.text()
   return t ? JSON.parse(t) : null
 }
+// 🔵 2026-11-10(우편함 「코드·운영 — LH 첨부 문지기 복원 …」 2) 몰림 막기 — 문지기가 「기다림」(allow false · wait_ms)을 주면 그만큼 쉬고 다시 묻는다.
+//   동시 받기 1 · 받기 사이 최소 간격 · 10분 상한은 DB 가 정한다(lh_file_policy · lh_file_gate). 이 함수는 기다림을 합쳐 LH_GATE_WAIT_MAX_MS 까지만 —
+//   넘으면 429 {status:'lh_file_gate', reason:'lh_file_busy', retry_after_ms} 로 돌려주고 부른 쪽이 나중에 다시 부른다(양을 버리지 않는다).
+const LH_GATE_WAIT_MAX_MS = 45_000
 const lhFileGate = async (u: URL, purpose: 'fetch' | 'probe'): Promise<LhGate> => {
-  try {
-    const g = await rpcPost('lh_file_gate', { p_url: u.toString(), p_purpose: purpose }) as LhGate
-    if (g && typeof g.allow === 'boolean') return g
-    return { allow: false, reason: '문지기 응답을 읽지 못함 — 받지 않음', kind: null, mode: null, reuse_url: null, log_id: null }
-  } catch (e) {
-    return { allow: false, reason: `문지기를 부르지 못함 — 받지 않음(${String(e instanceof Error ? e.message : e).slice(0, 80)})`, kind: null, mode: null, reuse_url: null, log_id: null }
+  let waited = 0
+  for (;;) {
+    let g: LhGate
+    try {
+      g = await rpcPost('lh_file_gate', { p_url: u.toString(), p_purpose: purpose }) as LhGate
+      if (!g || typeof g.allow !== 'boolean') return { allow: false, reason: '문지기 응답을 읽지 못함 — 받지 않음', kind: null, mode: null, reuse_url: null, log_id: null }
+    } catch (e) {
+      return { allow: false, reason: `문지기를 부르지 못함 — 받지 않음(${String(e instanceof Error ? e.message : e).slice(0, 80)})`, kind: null, mode: null, reuse_url: null, log_id: null }
+    }
+    const w = typeof g.wait_ms === 'number' && g.wait_ms > 0 ? Math.min(g.wait_ms, 15_000) : 0
+    if (g.allow || !w) return g
+    if (waited + w > LH_GATE_WAIT_MAX_MS) return { ...g, wait_ms: w }
+    await new Promise(r => setTimeout(r, w))
+    waited += w
   }
 }
 const lhGateDone = async (logId: number, outcome: string) => {
   try { await rpcPost('lh_file_gate_done', { p_log_id: logId, p_outcome: outcome }) } catch { /* 기록 실패는 응답을 바꾸지 않는다 */ }
 }
+// 기다림이 길어 돌려보낼 때는 429(lh_file_busy · retry_after_ms) — 막음(403 lh_file_gate)과 가른다.
+const lhGateStatus = (g: LhGate) => (g.wait_ms ? 429 : 403)
 const LH_GATE_BODY = (u: URL, g: LhGate) => ({
-  ok: false, status: 'lh_file_gate', reason: 'lh_file_gate', gate_mode: g.mode, gate_kind: g.kind, reuse_url: g.reuse_url,
+  ok: false, status: 'lh_file_gate', reason: g.wait_ms ? 'lh_file_busy' : 'lh_file_gate', retry_after_ms: g.wait_ms ?? null, gate_mode: g.mode, gate_kind: g.kind, reuse_url: g.reuse_url,
   error: `LH 첨부 경로 쓰임 가름(${g.mode ?? '?'}) — ${g.reason} · ${u.hostname}${u.pathname} 는 apply.lh.or.kr/robots.txt 가 막는 경로다(2026-11-05 다운님 결정)`,
 })
 // 허락한 lhFile.do 받기의 기록 행 — 요청마다 하나(응답 직전 결과를 적는다).
@@ -1026,7 +1040,7 @@ const hostProbe = async (target: string | null) => {
   }
   if (ROBOTS_DISALLOWED(u)) {
     const g = await lhFileGate(u, 'probe')
-    if (!g.allow) return { status: 403, body: LH_GATE_BODY(u, g) }
+    if (!g.allow) return { status: lhGateStatus(g), body: LH_GATE_BODY(u, g) }
   }
   const region = Deno.env.get('SB_REGION') ?? '(없음)'
   const t0 = Date.now()
@@ -1328,7 +1342,7 @@ const handleRequest = async (req: Request): Promise<Response> => {
   if (firstReject) return json({ ok: false, error: firstReject }, 403)
   if (ROBOTS_DISALLOWED(current)) {
     const g = await lhFileGate(current, 'fetch')
-    if (!g.allow) return json(LH_GATE_BODY(current, g), 403)
+    if (!g.allow) return json(LH_GATE_BODY(current, g), lhGateStatus(g))
     if (g.log_id != null) lhGateOf.set(req, g.log_id)
   }
 
@@ -1363,7 +1377,7 @@ const handleRequest = async (req: Request): Promise<Response> => {
         const g = await lhFileGate(next, 'fetch')
         if (!g.allow) {
           clearTimeout(timer)
-          return json({ ...LH_GATE_BODY(next, g), redirect_hops: hops }, 403)
+          return json({ ...LH_GATE_BODY(next, g), redirect_hops: hops }, lhGateStatus(g))
         }
         if (g.log_id != null) lhGateOf.set(req, g.log_id)
       }
@@ -1639,17 +1653,26 @@ const handleRequest = async (req: Request): Promise<Response> => {
 }
 
 // 🔵 2026-11-05 — lhFile.do 를 허락받아 받은 요청은 응답 직전 결과를 기록한다(lh_file_gate_done · 실패 셈 = 「재시도 한 번까지」).
+// 🔵 2026-11-10(우편함 「코드·운영 — LH 첨부 문지기 복원 …」 3) 차단 감지 재료 — 결과 이름을 가른다:
+//   원천(LH)이 4xx·5xx 를 돌려줬으면 upstream_<상태>(종전에는 본문 status 칸에만 있고 결과는 'ok' 로 남았다) ·
+//   받기 자체가 예외로 끝났으면(연결 거부·시간 초과 등 — 응답에 reason 없음) conn_error · 그 밖은 종전대로 reason(html_response · truncated …) 또는 ok.
+//   lh_file_gate_done 이 upstream_403 · upstream_429 · conn_error · html_response 연속을 차단으로 본다.
+const lhOutcome = (res: Response, j: Record<string, unknown> | null): string => {
+  if (j && typeof j.status === 'number' && j.status >= 400) return `upstream_${j.status}`
+  if (j && j.ok === false) {
+    if (typeof j.reason === 'string' && j.reason) return j.reason
+    if (typeof j.error === 'string') return `conn_error: ${j.error}`
+  }
+  if (j && j.uploaded === false && typeof j.reason === 'string') return j.reason
+  return res.ok ? 'ok' : `http_${res.status}`
+}
 Deno.serve(async (req: Request) => {
   const res = await handleRequest(req)
   const logId = lhGateOf.get(req)
   if (logId != null) {
-    let outcome = res.ok ? 'ok' : `http_${res.status}`
-    try {
-      const j = await res.clone().json() as Record<string, unknown>
-      if (j && j.ok === false) outcome = String(j.reason ?? j.error ?? outcome)
-      else if (j && j.uploaded === false && typeof j.reason === 'string') outcome = j.reason
-    } catch { /* 본문이 json 이 아니면 상태로만 */ }
-    await lhGateDone(logId, outcome.slice(0, 60))
+    let j: Record<string, unknown> | null = null
+    try { j = await res.clone().json() as Record<string, unknown> } catch { /* 본문이 json 이 아니면 상태로만 */ }
+    await lhGateDone(logId, lhOutcome(res, j).slice(0, 60))
   }
   return res
 })

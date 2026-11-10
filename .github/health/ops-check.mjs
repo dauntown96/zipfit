@@ -1059,9 +1059,33 @@ try {
   const rs = c.reasons.slice(0, 4).map(r => `${String(r.r).replace(/^\w+ — /, '')} ${r.n}`).join(' · ')
   add('lh_file_mode', 'LH 첨부 경로(lhFile.do) 쓰임 가름 · 24시간 받기 시도(정보)', 'info',
     `모드 ${c.mode} — 허락 ${c.allowed}(받음 ${c.ok}) · 막음 ${c.denied}${rs ? '(' + rs + ')' : ''} · 발송 대기 몫 ${c.held}`,
-    '정보 — 판정하지 않는다 · 모드 essential = 열린 공고 첨부만 파일당 한 번(+재시도 한 번) · #차수 몫은 발송(공지 첨부는 막고 본문으로) · paused = 전부 막음(LH 원문 몫 · #차수 몫 발송 대기 — 「발송 대기 몫」이 그 수) · normal = 종전 · 셈 = lh_file_fetch_log 24시간')
+    '정보 — 판정하지 않는다 · 모드 essential = 열린 공고 첨부만 파일당 한 번(+재시도 한 번) · #차수 몫은 발송(공지 첨부는 막고 본문으로) · paused = 전부 막음(LH 원문 몫 · #차수 몫 발송 대기 — 「발송 대기 몫」이 그 수) · normal = 종전(2026-11-10 복원 · 몰림 막기 · 차단 감지 — ㉞ lh_file_block) · 셈 = lh_file_fetch_log 24시간')
 } catch (e) {
   add('lh_file_mode', 'LH 첨부 경로(lhFile.do) 쓰임 가름 · 24시간 받기 시도(정보)', 'info', String(e).slice(0, 200), '설정 · 받기 기록 · 대기열 표를 읽는다(못 읽어도 정보)')
+}
+
+// ㉞ LH 첨부 차단 감지(2026-11-10 · 우편함 「코드·운영 — LH 첨부 문지기 복원(멈춤 전 꼴 + 몰림 막기 + 차단 감지) …」 3) —
+//    lh_file_gate_done 이 결과가 차단 꼴(upstream_403 · upstream_429 · conn_error · html_response)인 허락 받기가 연속 lh_file_block_streak 번이면
+//    그 자리에서 lh_file_mode = 'paused' 로 바꾸고 lh_file_block_at · lh_file_block_reason 을 남긴다. 그 표지가 서 있는 동안 ❌(안 멈춤 · gate.mjs HARD 밖 →
+//    health-ops-soft 이슈 — ⚠️ 는 이슈를 열지 않아서) · 다시 켜기는 사람(lh_file_mode = 'normal' · lh_file_block_at = null — 데이터 쓰기).
+//    값에 24시간 받기 수 · 차단 꼴 결과 수 · 받기 사이 간격(중앙 · 최소 — 몰림 막기 실측)을 함께 싣는다. 못 읽으면 ⚠️ 점검 불능.
+try {
+  const [x] = await sqlRead(`with l as (select * from public.lh_file_fetch_log where at > now() - interval '24 hours' and allowed),
+     o as (select extract(epoch from at - lag(at) over (order by at)) * 1000 gap from l),
+     c as (select lh_file_mode m, lh_file_block_at b, lh_file_block_reason r from public.analysis_dispatch_config where id = 1)
+  select json_build_object('mode', (select m from c), 'block_at', (select b from c), 'block_reason', (select r from c),
+      'fetched', (select count(*) from l), 'blocky', (select count(*) from l where outcome ~ '^(upstream_(403|429)|conn_error|html_response)'),
+      'gap_p50', (select round(percentile_cont(0.5) within group (order by gap)) from o where gap is not null),
+      'gap_min', (select round(min(gap)) from o where gap is not null),
+      'pol', public.lh_file_policy()) j`)
+  const c = x.j
+  const gaps = c.fetched > 1 ? ` · 받기 사이 중앙 ${c.gap_p50}ms · 최소 ${c.gap_min}ms` : ''
+  const rule = '차단 감지로 스스로 멈춘 표지(lh_file_block_at) 없음 — 서 있으면 ❌(안 멈춤 · 이슈) · 다시 켜기는 사람(lh_file_mode normal · lh_file_block_at null) · 몰림 막기 = 동시 1 · 받기 사이 최소 gap_ms · 10분 상한 cap_10min(lh_file_policy)'
+  if (c.block_at) add('lh_file_block', 'LH 첨부(lhFile.do) 차단 감지 — 스스로 멈춤', 'fail', `${c.block_at} 멈춤 · 모드 ${c.mode} · ${c.block_reason || ''}`.slice(0, 300), rule)
+  else add('lh_file_block', 'LH 첨부(lhFile.do) 차단 감지 — 스스로 멈춤', 'pass',
+    `모드 ${c.mode} · 24시간 받기 ${c.fetched} · 차단 꼴 결과 ${c.blocky}${gaps} · 간격 ${c.pol?.gap_ms}ms · 10분 상한 ${c.pol?.cap_10min} · 연속 ${c.pol?.block_streak}`, rule)
+} catch (e) {
+  addBlind('lh_file_block', 'LH 첨부(lhFile.do) 차단 감지 — 점검 불능', 'warn', String(e).slice(0, 200), '설정 · 받기 기록 표를 읽는다(못 읽으면 ⚠️)')
 }
 
 // ㉓ 화면 빈칸 점검 셋 — 한 쿼리(2026-11-04 · 우편함 「옛 주소 걷기·화면 빈칸 점검」 3~5 · 전부 안 멈춤 — gate.mjs HARD 밖).
