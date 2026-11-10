@@ -51,6 +51,26 @@ export const STATES = [
   }],
 ]
 
+// 🔵 2026-11-10(우편함 「코드·운영 — 시각 회귀 장치 … + axe 대비 「미완」 셈」 2) — axe 가 대비를 판정하지 못한 요소(incomplete 의 color-contrast ·
+//    배경 그림·겹침·반투명 등)도 센다. 그중 글자색·배경색을 읽어 4.5:1(큰 글자 3:1) 밑으로 계산된 것이 실제 미달이다(2026-11-10 span.zf-rent-basis #777 ·
+//    초록 글자 #1D9E75 — 둘 다 violations 가 아니라 incomplete 에 있었다).
+//    판정 단위는 노드 수가 아니라 「갈래」 = 요소 꼴(태그.첫 클래스) · 글자색 — 노드 수는 그날 카드 수에 따라 흔들린다. 기준선에 없는 갈래가 생기면 실패(compare).
+//    고치는 것은 설계 ④ 색 뜻 표 뒤 표시층 — 그때 갈래가 줄면 기준선을 다시 쓴다.
+export function contrastKinds (incomplete) {
+  const v = (incomplete || []).find(x => x.id === 'color-contrast')
+  const kinds = {}
+  for (const n of (v && v.nodes) || []) {
+    const d = (n.any || []).find(c => c.id === 'color-contrast')?.data || {}
+    const html = String(n.html || '')
+    const tag = (html.match(/^<([a-z0-9-]+)/i) || [])[1] || '?'
+    const cls = (html.match(/class="([^" ]+)/) || [])[1]
+    const k = `${tag}${cls ? '.' + cls : ''}|${(d.fgColor || '?').toLowerCase()}`
+    const e = kinds[k] || (kinds[k] = { nodes: 0, ratio: d.contrastRatio ?? null, bg: d.bgColor || null, why: d.messageKey || null })
+    e.nodes++
+  }
+  return kinds
+}
+
 // browser 하나로 여섯 상태를 잰다 → { state: { rules: { id: { impact, nodes, sample } }, err? } }
 export async function measure (browser, url, { AxeBuilder }) {
   const out = {}
@@ -68,7 +88,7 @@ export async function measure (browser, url, { AxeBuilder }) {
       for (const v of res.violations) {
         rules[v.id] = { impact: v.impact, nodes: v.nodes.length, sample: (v.nodes[0]?.target || []).join(' ').slice(0, 90) }
       }
-      out[name] = { rules }
+      out[name] = { rules, contrast_incomplete: contrastKinds(res.incomplete) }
     } catch (e) {
       out[name] = { err: String(e).slice(0, 200) }
     } finally {
@@ -95,11 +115,26 @@ export function compare (got, baseline) {
       else if (v.nodes > b.nodes + Math.max(3, Math.ceil(b.nodes * 0.2))) inc.push(`${st} ${id} ${b.nodes}→${v.nodes}`)
     }
   }
+  // 대비 「미완」 갈래 — 기준선(states[st].contrast_incomplete)에 없는 갈래 = 실패 · 기준선에 그 칸 자체가 없으면 경고(아직 안 잼)
+  const newKinds = [], noBase = []
+  let ciTotal = 0
+  for (const [st, r] of Object.entries(got)) {
+    if (r.err || !r.contrast_incomplete) continue
+    const bk = (baseline.states || {})[st]?.contrast_incomplete
+    for (const [k, v] of Object.entries(r.contrast_incomplete)) {
+      ciTotal += v.nodes
+      if (!bk) { noBase.push(st); continue }
+      if (!bk[k]) newKinds.push(`${st} ${k}(${v.nodes}${v.ratio ? ' · ' + v.ratio + ':1' : ''})`)
+    }
+  }
   const rulesNow = new Set(Object.values(got).flatMap(r => Object.keys(r.rules || {})))
   // 🔵 2026-10-12(우편함 「표시층 — 런칭 전 남은 화면 일」 2) — critical 은 규칙·상태까지 줄에 적는다(런칭 조건 ① 잣대 · 결과물 파일을 열지 않고 로그에서 확인)
   const crit = Object.entries(got).flatMap(([st, r]) => Object.entries(r.rules || {}).filter(([, v]) => v.impact === 'critical').map(([id, v]) => `${id} ${v.nodes}(${st})`))
-  const head = `위반 규칙 ${rulesNow.size}종 · 요소 ${total} · critical ${crit.length ? crit.join(', ') : '0'}`
+  const kindsNow = new Set(Object.values(got).flatMap(r => Object.keys(r.contrast_incomplete || {})))
+  const head = `위반 규칙 ${rulesNow.size}종 · 요소 ${total} · critical ${crit.length ? crit.join(', ') : '0'} · 대비 미완 갈래 ${kindsNow.size}(요소 ${ciTotal})`
   if (crit.length) return { status: 'fail', value: `${head} · critical 은 실패`, increased: inc }
+  if (newKinds.length) return { status: 'fail', value: `${head} · 대비 미완 새 갈래 ${newKinds.length}: ${newKinds.slice(0, 4).join(' / ')}`, increased: inc.concat(newKinds) }
+  if (noBase.length) inc.push(`대비 미완 기준선 없음(${[...new Set(noBase)].join(', ')})`)
   if (errs.length) return { status: 'warn', value: `${head} · 못 잰 상태 ${errs.length}: ${errs.join(' / ')}`, increased: inc }
   if (inc.length) return { status: 'warn', value: `${head} · 기준선보다 늚 ${inc.length}: ${inc.slice(0, 4).join(' / ')}`, increased: inc }
   return { status: 'pass', value: `${head} · 기준선 이내`, increased: [] }

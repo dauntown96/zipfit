@@ -1,0 +1,127 @@
+# 시각 회귀 — 표본 카드 다섯 × 390/1280 × 밝음/어두움 × 접힘/펼침(40장)을 고정 대역 응답으로 그려 기준 그림과 견준다
+# (2026-11-10 · 우편함 「코드·운영 — 시각 회귀 장치 …」 · 스크립트·규칙은 .github/health/visual.mjs 머리).
+# 🔴 운영을 부르지 않는다(Supabase 요청 전부 고정본 · 지도·썸네일 막음) · DB 기록·이슈 0 · PR 체크로만 보인다.
+# 언제: 화면 파일(index.html · sw.js · fonts/)이나 이 장치를 고친 PR · 수동.
+#   매일 실행은 두지 않는다 — 고정본이 고정이라 같은 커밋은 같은 그림이다(바뀌는 것은 PR 로만 들어온다).
+# 기준 갱신(의도한 모양 변경): 그 PR 가지에서 이 워크플로를 수동으로 update=true 로 돌린다 →
+#   러너가 기준 그림 40장 · baseline.json(누가 · 언제 · 실행 주소 · 커밋)을 새로 쓰고 그 가지에 커밋한다. main 에서는 갱신하지 않는다(PR 로만).
+name: Visual
+
+on:
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'sw.js'
+      - 'fonts/**'
+      - '.github/health/visual.mjs'
+      - '.github/health/visual/**'
+      - '.github/workflows/visual.yml'
+  workflow_dispatch:
+    inputs:
+      update:
+        description: '기준 갱신 — true 면 이 가지의 기준 그림을 새로 쓰고 커밋한다(main 불가 · 의도한 모양 변경일 때만)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: visual-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # 견주기 — PR 과 update 아닌 수동 실행. 읽기 권한만.
+  visual:
+    if: github.event_name == 'pull_request' || !inputs.update
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+      - name: Playwright · 그림 비교 준비
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/pw" && cd "$RUNNER_TEMP/pw"
+          npm init -y >/dev/null
+          # 판을 고정한다 — 렌더러 판이 바뀌면 그림이 바뀐다(그때는 기준 갱신). health-screen 과 같은 Playwright 판.
+          npm install --no-audit --no-fund playwright@1.55.0 pngjs@7.0.0 pixelmatch@5.3.0 >/dev/null
+          npx playwright install --with-deps chromium >/dev/null
+          ln -sfn "$RUNNER_TEMP/pw/node_modules" "$GITHUB_WORKSPACE/.github/health/node_modules"
+      - name: 그리기 · 견주기
+        id: run
+        run: |
+          set +e
+          node .github/health/visual.mjs
+          code=$?
+          [ -f visual-summary.md ] && cat visual-summary.md >> "$GITHUB_STEP_SUMMARY"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: 결과 올리기
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: visual-out
+          path: |
+            visual-out/
+            visual-result.json
+            visual-summary.md
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: 판정
+        run: |
+          code='${{ steps.run.outputs.code }}'
+          [ "$code" = "0" ] || { echo "::error::시각 회귀 실패(code=$code) — 요약·아티팩트 visual-out 의 차이 그림을 본다"; exit 1; }
+
+  # 기준 갱신 — 수동 update=true · main 밖 가지에서만. 그 가지에 커밋한다(쓰기 권한은 이 잡만).
+  # 🔴 GITHUB_TOKEN 으로 민 커밋은 PR 체크를 다시 돌리지 않는다 — 갱신 뒤 PR 의 「Visual」 실행을 다시 돌리거나(Re-run) 다음 push 로 잰다.
+  update:
+    if: github.event_name == 'workflow_dispatch' && inputs.update && github.ref != 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    env:
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+      - name: Playwright · 그림 비교 준비
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/pw" && cd "$RUNNER_TEMP/pw"
+          npm init -y >/dev/null
+          # 판을 고정한다 — 렌더러 판이 바뀌면 그림이 바뀐다(그때는 기준 갱신). health-screen 과 같은 Playwright 판.
+          npm install --no-audit --no-fund playwright@1.55.0 pngjs@7.0.0 pixelmatch@5.3.0 >/dev/null
+          npx playwright install --with-deps chromium >/dev/null
+          ln -sfn "$RUNNER_TEMP/pw/node_modules" "$GITHUB_WORKSPACE/.github/health/node_modules"
+      - name: 기준 그림 쓰기
+        run: node .github/health/visual.mjs --update
+      - name: 기준 올리기(아티팩트)
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: visual-baseline
+          path: |
+            .github/health/visual/baseline/
+            .github/health/visual/baseline.json
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: 기준 갱신 커밋
+        env:
+          ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          rm -f .github/health/node_modules
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/health/visual/baseline .github/health/visual/baseline.json
+          if git diff --cached --quiet; then echo "기준 그림 바뀐 것 없음"; exit 0; fi
+          git commit -m "시각 회귀 기준 갱신 — ${ACTOR} 요청 · $(date -u +%Y-%m-%dT%H:%MZ) · ${RUN_URL}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

@@ -3,3 +3,8 @@ node_modules/
 package-lock.json
 package.json
 __pycache__/
+# 2026-11-10 시각 회귀 — 러너·로컬 도구 링크 · 결과물(커밋하지 않는다)
+.github/health/node_modules
+visual-out/
+visual-result.json
+visual-summary.md
