@@ -462,6 +462,11 @@ body.theme-dark .hu-ug-name,body.theme-dark .hu-ug-target,body.theme-dark .hu-ug
 /* 🔵 2026-10-07(Z-2 ③ 1 · AI기본법 투명성 고지 · 다운님 승인 4) — 첫 화면(히어로 배지 자리 — 정적 글자는 「경기북부 2차 공고 6.30~7.2」였고 updateBannerFromDB 가 공고 하나로 덮어썼다. 배지를 걷어 그 함수는 할 일이 없다)과 푸터에 같은 문장. 줄바꿈 허용(배지는 한 줄 말줄임이라 문장이 잘렸다). */
 .zf-ai-note{margin:0.75rem 0 0;font-size:12px;line-height:1.6;color:#5F5F57;word-break:keep-all}
 .zf-footer .zf-ai-note{margin:0 0 6px;color:#888}
+/* 🔵 2026-11-10 비제휴 한 줄 — 상세 「원문 보기」 아래 · 바닥 첫 줄. 대비 4.5:1 이상(밝음 #5F5F57/#F8F8F8 · 어두움 #9AA0AA · d3 var(--ink-3)) — 바닥은 #888(3.5:1) 대신 진하게. */
+.zf-nonaffil{margin:8px 0 0;font-size:12px;line-height:1.55;color:#5F5F57;word-break:keep-all}
+.zf-footer .zf-nonaffil-foot{color:#5F5F57}
+body.theme-dark .zf-nonaffil,body.theme-dark .zf-footer .zf-nonaffil-foot{color:#9aa0aa}
+html[data-ui="d3"] .zf-nonaffil,html[data-ui="d3"] .zf-footer .zf-nonaffil-foot{color:var(--ink-3)}
 body.theme-dark .zf-ai-note{color:#9aa0aa}
 /* 의견 창구(시행일 뒤에만 그려진다 — zfV2On) — 카드 반응 한 줄 · 의견 보내기 창 · 바닥 링크 */
 .zf-fb-react{margin-top:12px;padding-top:12px;border-top:1px solid var(--line-2,#e8e8e0);font-size:var(--t-s,13px);color:var(--ink-2,#3d424a)}
@@ -1746,6 +1751,7 @@ html[data-ui="d3"] .pg-btn{min-width:var(--hit);height:var(--hit);font-size:var(
   </div> <!-- /main5 -->
 
   <footer class="zf-footer">
+    <p class="zf-ai-note zf-nonaffil-foot">꼭집은 공공기관이 운영하지 않는 서비스예요. 정보는 각 기관 공고 원문을 정리한 것이며, 신청은 원문에서 하세요.</p>
     <p class="zf-ai-note">꼭집의 공고 정보는 AI가 공고문 원문을 읽고 정리했어요. 신청 전에는 공고 원문을 꼭 확인해 주세요.</p>
     <p class="zf-ai-note zf-src">출처: LH · 마이홈 · SH 공고 원문 → 꼭집 정리</p>
     <a href="./terms.html">이용약관</a><span style="font-size:12px;color:#888"> · </span><a href="./privacy.html">개인정보 처리방침</a>
@@ -1757,6 +1763,10 @@ html[data-ui="d3"] .pg-btn{min-width:var(--hit);height:var(--hit);font-size:var(
 
 
 <script>
+// 🔵 2026-11-10(우편함 「표시층 — 비제휴 문구」 · 다운님 승인 2026-11-10 · LH 답 「오인·혼동 주의」) — 비제휴 한 줄(승인 문구 그대로).
+//    자리 둘: 화면 바닥(.zf-footer 첫 줄 — 정적) · 공고 상세 「AI 정리 · 원문 보기 →」 줄 바로 아래(공고 탭 · 맞춤 결과 상세 넷). title 아님 — 글자로 보인다.
+const ZF_NONAFFIL = '꼭집은 공공기관이 운영하지 않는 서비스예요. 정보는 각 기관 공고 원문을 정리한 것이며, 신청은 원문에서 하세요.';
+function zfNonAffilHtml(){ return `<p class="zf-nonaffil">${escapeHtml(ZF_NONAFFIL)}</p>`; }
 // ===== 공고 탭: 서버사이드 필터링 구조 =====
 // 필터 선택 시 RPC를 파라미터와 함께 재호출 → 클라이언트 필터링 제거
 
@@ -6008,8 +6018,9 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
             ${shareBtn}
             ${saveBtn}
           </div>
+          ${zfNonAffilHtml()}
         </div>`
-      : `<div id="${cardId}" data-ann-id="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px" onclick="event.stopPropagation()"><div style="display:flex;gap:8px;flex-wrap:wrap">${zfSafeUrl(n['공고URL'])?`<a class="detail-link" href="${zfSafeHref(n['공고URL'])}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`:''} ${shareBtn} ${saveBtn}</div></div>`;
+      : `<div id="${cardId}" data-ann-id="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px" onclick="event.stopPropagation()"><div style="display:flex;gap:8px;flex-wrap:wrap">${zfSafeUrl(n['공고URL'])?`<a class="detail-link" href="${zfSafeHref(n['공고URL'])}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`:''} ${shareBtn} ${saveBtn}</div>${zfNonAffilHtml()}</div>`;
 
     html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n['지역']||'').replace(/"/g,'&quot;')}" data-sido="${(n['sido_nm']||'').replace(/"/g,'&quot;')}" data-sigungu="${(n['sigungu_nm']||'').replace(/"/g,'&quot;')}" data-title="${(n['공고명']||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" data-housing-type="${(n['공급유형']||'').replace(/"/g,'&quot;')}" data-precise-address="${(n['precise_address']||'').replace(/"/g,'&quot;')}" data-relaxed="${n['is_relaxed_recruitment']===true?'1':''}" data-relaxation-detail="${(n['relaxation_detail']||'').replace(/"/g,'&quot;')}" data-contract-verify="${n['contract_before_verification']===true?'1':''}" data-rent-exempt-until="${(n['rent_exemption_until']||'').replace(/"/g,'&quot;')}" data-rent-exempt-note="${(n['rent_exemption_note']||'').replace(/"/g,'&quot;')}" data-revised="${isAmended?'1':''}" data-revision-note-full="${revisionNoteEsc}" data-special-notes="${n['special_notes']?JSON.stringify(n['special_notes']).replace(/"/g,'&quot;'):''}" data-apply-start="${(n['apply_start']||'').replace(/"/g,'&quot;')}" data-apply-end="${(n['apply_end']||'').replace(/"/g,'&quot;')}" data-announcement-date="${(n['announcement_date']||'').replace(/"/g,'&quot;')}" data-round-date="${zfNoticeDate(n).replace(/"/g,'&quot;')}" data-complex-count="${zfComplexCount(n)}" data-doc-submit-announce="${(n['doc_submit_announce_date']||'').replace(/"/g,'&quot;')}" data-doc-submit-start="${(n['doc_submit_start']||'').replace(/"/g,'&quot;')}" data-doc-submit-end="${(n['doc_submit_end']||'').replace(/"/g,'&quot;')}" data-winner-announce="${zfWinnerTrusted(n).replace(/"/g,'&quot;')}" data-contract-start="${(n['contract_start']||'').replace(/"/g,'&quot;')}" data-contract-end="${(n['contract_end']||'').replace(/"/g,'&quot;')}" data-attachment-urls="${n['attachment_urls']?JSON.stringify(n['attachment_urls']).replace(/"/g,'&quot;'):''}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this,'notice')" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
       <div class="htop">
@@ -12166,8 +12177,9 @@ function renderMatchResults(rows){
             ${mShareBtn}
             ${mSaveBtn}
           </div>
+          ${zfNonAffilHtml()}
         </div>`
-      : `<div id="${cardId}" data-ann-id="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px" onclick="event.stopPropagation()"><div style="display:flex;gap:8px;flex-wrap:wrap">${zfSafeUrl(n.url)?`<a class="detail-link" href="${zfSafeHref(n.url)}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`:''} ${mShareBtn} ${mSaveBtn}</div></div>`;
+      : `<div id="${cardId}" data-ann-id="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px" onclick="event.stopPropagation()"><div style="display:flex;gap:8px;flex-wrap:wrap">${zfSafeUrl(n.url)?`<a class="detail-link" href="${zfSafeHref(n.url)}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`:''} ${mShareBtn} ${mSaveBtn}</div>${zfNonAffilHtml()}</div>`;
 
     html += `<div class="hcard" role="button" tabindex="0" aria-expanded="false" data-card-id="${cardId}" data-region="${(n.region||'').replace(/"/g,'&quot;')}" data-sido="${(n.sido_nm||'').replace(/"/g,'&quot;')}" data-sigungu="${(n.sigungu_nm||'').replace(/"/g,'&quot;')}" data-title="${(n.title||'').replace(/"/g,'&quot;')}" data-announcement-id="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" data-housing-type="${(n.housing_type||'').replace(/"/g,'&quot;')}" data-precise-address="${(n.precise_address||'').replace(/"/g,'&quot;')}" data-relaxed="${n.is_relaxed_recruitment===true?'1':''}" data-relaxation-detail="${(n.relaxation_detail||'').replace(/"/g,'&quot;')}" data-contract-verify="${n.contract_before_verification===true?'1':''}" data-rent-exempt-until="${(n.rent_exemption_until||'').replace(/"/g,'&quot;')}" data-rent-exempt-note="${(n.rent_exemption_note||'').replace(/"/g,'&quot;')}" data-revised="${isAmended?'1':''}" data-revision-note-full="${revisionNoteEscM}" data-special-notes="${n.special_notes?JSON.stringify(n.special_notes).replace(/"/g,'&quot;'):''}" data-apply-start="${(n.apply_start||'').replace(/"/g,'&quot;')}" data-apply-end="${(n.apply_end||'').replace(/"/g,'&quot;')}" data-announcement-date="${(n.announcement_date||'').replace(/"/g,'&quot;')}" data-round-date="${zfNoticeDate(n).replace(/"/g,'&quot;')}" data-complex-count="${zfComplexCount(n)}" data-doc-submit-announce="${(n.doc_submit_announce_date||'').replace(/"/g,'&quot;')}" data-doc-submit-start="${(n.doc_submit_start||'').replace(/"/g,'&quot;')}" data-doc-submit-end="${(n.doc_submit_end||'').replace(/"/g,'&quot;')}" data-winner-announce="${zfWinnerTrusted(n).replace(/"/g,'&quot;')}" data-contract-start="${(n.contract_start||'').replace(/"/g,'&quot;')}" data-contract-end="${(n.contract_end||'').replace(/"/g,'&quot;')}" data-attachment-urls="${n.attachment_urls?JSON.stringify(n.attachment_urls).replace(/"/g,'&quot;'):''}" style="${isClosed?'opacity:0.5':''};cursor:pointer" onclick="toggleDetail('${cardId}',this,'match')" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}">
       <div class="htop">
