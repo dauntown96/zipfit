@@ -16,14 +16,20 @@ select json_build_object('groups', (select count(*) from ok),
   'ids', (select coalesce(json_agg(distinct e.announcement_id), '[]'::json) from public.eligibility_criteria e join g using (announcement_id) where e.supply_form is null)) j`
 
 // 「전세」는 그 세대 행이 걸린 공고의 제목·유형에서 본다(든든전세·전세임대 — 월세가 원래 없다 · 2026-10-22 실측 열린 묶음 월세 NULL 688행 전부 이 꼴).
+// 🔵 2026-11-10(우편함 「코드·운영 — 11-09 정돈 셋 …」 0장 1 · claude.ai 판정) — 원문이 월세를 「월 임대료 약 N만원」(확정 금액 아님 · 개별 안내)으로만
+//    준 행은 칸을 비운 것이 원문 충실이다(analysis 「약」 규칙). 그 행(extra_note 에 「월 임대료 약」 꼴)은 경고 셈(n) 밖 approx 로 따로 세어 ℹ️ 로 보인다.
+const RENT_APPROX = `h.extra_note ~ '월\\s*임대료\\s*약'`
+const RENT_GAP = `h.monthly_rent is null and h.deposit is not null and coalesce(g.title, '') || ' ' || coalesce(g.housing_type, '') !~ '전세'`
 export const RENT_NULL_SQL = `${OPEN_GROUP}
 select json_build_object('rows', (select count(*) from public.housing_units h join g using (announcement_id)),
   'jeonse', (select count(*) from public.housing_units h join g using (announcement_id)
               where h.monthly_rent is null and coalesce(g.title, '') || ' ' || coalesce(g.housing_type, '') ~ '전세'),
-  'n', (select count(*) from public.housing_units h join g using (announcement_id)
-         where h.monthly_rent is null and h.deposit is not null and coalesce(g.title, '') || ' ' || coalesce(g.housing_type, '') !~ '전세'),
+  'n', (select count(*) from public.housing_units h join g using (announcement_id) where ${RENT_GAP} and not coalesce(${RENT_APPROX}, false)),
   'ids', (select coalesce(json_agg(distinct h.announcement_id), '[]'::json) from public.housing_units h join g using (announcement_id)
-           where h.monthly_rent is null and h.deposit is not null and coalesce(g.title, '') || ' ' || coalesce(g.housing_type, '') !~ '전세')) j`
+           where ${RENT_GAP} and not coalesce(${RENT_APPROX}, false)),
+  'approx', (select count(*) from public.housing_units h join g using (announcement_id) where ${RENT_GAP} and ${RENT_APPROX}),
+  'approx_ids', (select coalesce(json_agg(distinct h.announcement_id), '[]'::json) from public.housing_units h join g using (announcement_id)
+           where ${RENT_GAP} and ${RENT_APPROX})) j`
 
 export function judgeEligFormNull(j) {
   const rule = '0 — 열린 묶음(열린 행의 제목 키와 같은 키의 행) 자격 행 중 supply_form NULL · 넘으면 ⚠️ 경고만(자격 표 머리가 비거나 지어질 수 있음 — 원문 공급 형태 확인 · 채우기는 운영 데이터 쓰기 몫)'
@@ -32,9 +38,11 @@ export function judgeEligFormNull(j) {
 }
 
 export function judgeRentNull(j) {
-  const rule = '0 — 열린 묶음 세대 행 중 monthly_rent NULL ∧ deposit 있음 ∧ 그 공고 제목·유형에 「전세」 없음 · 넘으면 ⚠️ 경고만(월세 칸 빠짐 — 화면에 「확인 필요」로 보임)'
-  if (j.n === 0) return { status: 'pass', value: `0(세대 행 ${j.rows} · 전세 월세 NULL ${j.jeonse})`, rule }
-  return { status: 'warn', value: `${j.n}행: ${j.ids.slice(0, 5).join(', ')} — 월세 칸 빠짐 · 화면에 「확인 필요」로 보임`, rule }
+  const rule = '0 — 열린 묶음 세대 행 중 monthly_rent NULL ∧ deposit 있음 ∧ 그 공고 제목·유형에 「전세」 없음 · 넘으면 ⚠️ 경고만(월세 칸 빠짐 — 화면에 「확인 필요」로 보임) · 원문이 「월 임대료 약」(확정 금액 아님)으로만 준 행은 셈 밖 ℹ️'
+  const ax = j.approx || 0
+  const axv = ax ? ` · 「월 임대료 약」 ${ax}행(${(j.approx_ids || []).slice(0, 5).join(', ')} — 원문 확정 금액 아님 · 비운 것이 맞음)` : ''
+  if (j.n === 0) return { status: ax ? 'info' : 'pass', value: `0(세대 행 ${j.rows} · 전세 월세 NULL ${j.jeonse}${axv})`, rule }
+  return { status: 'warn', value: `${j.n}행: ${j.ids.slice(0, 5).join(', ')} — 월세 칸 빠짐 · 화면에 「확인 필요」로 보임${axv}`, rule }
 }
 
 // ㉖ 회차 거르기 빠짐 감시(2026-10-29 · 우편함 「코드·운영 — 런칭 뒤 묶음」 2ⓐ · 백로그 「회차 거르기 규칙을 한 벌로」 ③ · 조사 10-27 ⑦).
