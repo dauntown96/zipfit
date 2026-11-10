@@ -68,7 +68,7 @@ export async function stubListRpc(page, { dir, maxAgeMin = 30 } = {}) {
     info.upstream++
     const res = await route.fetch({ timeout: 30000 })
     const body = await res.body()
-    if (res.status() !== 200) return { status: res.status(), body, cached: false, headers: res.headers() }
+    if (res.status() !== 200 && res.status() !== 206) return { status: res.status(), body, cached: false, headers: res.headers() }
     writeFileSync(file + '.part', body)
     renameSync(file + '.part', file)
     Object.assign(k, { fetched: true, ageMin: 0, bytes: body.length })
@@ -81,8 +81,11 @@ export async function stubListRpc(page, { dir, maxAgeMin = 30 } = {}) {
   await page.route(/\/rest\/v1\/usage_events(\?|$)/, r => r.fulfill({ status: 201, body: '' }))
   await page.route(`**${RPC}*`, async route => {
     const req = route.request()
-    const key = req.method() === 'POST' ? argKey(req.postData()) : null
+    let key = req.method() === 'POST' ? argKey(req.postData()) : null
     if (key == null) return route.continue()
+    // 🔵 2026-11-10 — 화면이 상한(1000행)에서 잘린 목록을 ?offset= 으로 이어 받는다(index.html zfListRpc). 쪽마다 따로 캐시한다(키에 offset 을 붙인다).
+    const off = new URL(req.url()).searchParams.get('offset')
+    if (off) key += ` offset=${off}`
     let p = inflight.get(key)
     const mine = !p
     if (mine) { p = load(key, route); inflight.set(key, p) }

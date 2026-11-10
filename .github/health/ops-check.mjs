@@ -212,11 +212,21 @@ const EXPECTED_JOBS = [
 //    (2026-10-06 · 우편함 「코드 — 1-C …」 2) — 관리 API 가 죽어 DB 점검이 「점검 실행」(runner) 하나로 끝나도 화면 쪽 결과는 남는다.
 try {
   // ③ 비로그인 목록·요약 함수
-  const list = await anonRpc('get_announcements_deduped', {})
-  const listOk = list.status === 200 && Array.isArray(list.data) && list.data.length > 0
+  // 🔵 2026-11-10(우편함 「코드·운영 — 목록 RPC … 운영 REST 1000행 상한」 · #941) — 전체 행 수를 함께 받는다(count=exact). 응답이 REST 상한
+  //    (PostgREST max_rows)에서 잘리면 206 이고 행 수 < 전체다 — 판정은 아래 anon_list_cap(⚠️ · 안 멈춤)이 한다. anon_list 는 206 도 응답으로 친다.
+  const list = await anonRpc('get_announcements_deduped', {}, 30000, { count: true })
+  const listOk = (list.status === 200 || list.status === 206) && Array.isArray(list.data) && list.data.length > 0
   add('anon_list', '비로그인 get_announcements_deduped', listOk && list.ms <= 10000 ? 'pass' : 'fail',
     `${list.status} · ${Array.isArray(list.data) ? list.data.length : 0}행 · ${list.ms}ms${list.snippet ? ' · ' + list.snippet : ''}`,
     '200 · 행 > 0 · 왕복 ≤ 10초(서버 한도 3초는 200 여부로 잰다 — 넘으면 500. 왕복은 러너↔싱가포르 1.9MB라 넉넉히)')
+  // ③-1 REST 상한 — 한 응답 행 수 < 전체 행 수면 화면은 이어 받기(index.html zfListRpc · ?offset=)로 목록 호출을 한 번 더 한다(함수가 한 번 더 돈다).
+  //    화면은 맞게 나오므로 ❌ 가 아니라 ⚠️(안 멈춤) — 상한을 올리면(다운님 · Supabase 설정 API 「Max rows」) 다시 한 번 호출로 돌아간다.
+  if (listOk) {
+    const cut = list.total != null && list.data.length < list.total
+    add('anon_list_cap', '목록 응답이 REST 상한에서 잘리나(화면이 이어 받는 중인가)', list.total == null || cut ? 'warn' : 'pass',
+      list.total == null ? `전체 행 수 머리(content-range) 없음 · ${list.data.length}행` : `${list.data.length}행 / 전체 ${list.total}행${cut ? ' — 잘림(화면은 ?offset= 으로 이어 받는다 · 목록 호출 2회)' : ''}`,
+      '응답 행 수 = 전체 행 수(상한 안) — 잘리면 화면이 목록 함수를 한 번 더 부른다')
+  }
   // ③-2 화면이 실제로 보내는 인자 모양 — 칩을 고른 목록(loadNoticeData · matchHouses)은 p_region · p_type 을 붙여 부른다(index.html zfRpcArgs).
   //    🔵 2026-11-04(우편함 「코드·운영 — swap 처방 …」 4 · 처방 6 — 목록 호출 4 → 2) — 종전 셋(명시 null · 지역 · 유형)을 「인자 있는 길」 하나로 합친다.
   //    · 명시 null 모양은 뺀다 — 화면은 2026-10-01 뒤 null 인자를 빼고 보낸다(index.html zfRpcArgs) · 인라인이 막히는 회귀는 마이그레이션 check
