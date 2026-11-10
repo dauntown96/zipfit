@@ -188,7 +188,8 @@ select:focus,input:focus{border-color:#5DCAA5}
 .policy-title{font-size:13px;font-weight:600;color:#333;margin-bottom:8px;cursor:pointer}
 .policy-item{border:1px solid #e8e8e0;border-radius:10px;padding:10px 12px;margin-bottom:8px}
 .policy-item:last-child{margin-bottom:0}
-.policy-category{font-size:12px;font-weight:600;color:#1D9E75;margin-bottom:4px}
+.policy-category{font-size:12px;font-weight:600;color:#0F6E56;margin-bottom:4px}   /* 🔵 2026-11-10(12월 재편 ④ ①) — #1D9E75 글자(약 3.4:1) → 4.5:1 이상 */
+body.theme-dark .policy-category{color:#7fd8b5}
 .policy-content{font-size:12px;color:#555;line-height:1.5;white-space:pre-wrap}
 /* 🔵 B62 ⑦ — 정책 안내: 고정 → 검색 → 칩 → 제목 목록(누르면 펼침) */
 .pol-pinned{border-color:#F0D9A8;background:#FFFBF1}
@@ -440,7 +441,8 @@ body.theme-dark .hu-x-chip{background:#1f2229;border-color:#2c2f38;color:#5DCAA5
 .hu-ug-area{color:#888;flex:0 0 auto}
 .hu-ug-price{color:#333;flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
 .hu-sqm{color:#6a6a6a;font-size:var(--t-xs,11px);white-space:nowrap}
-.zf-rent-basis{color:#777}
+.zf-rent-basis{color:var(--ink-3,#5F5F57)}   /* 🔵 2026-11-10(12월 재편 ④ ①) — #777(4.48:1) 은퇴 · 보조 글자 토큰 */
+body.theme-dark .zf-rent-basis{color:var(--ink-3,#9aa0aa)}
 .hu-ug-sub{font-size:11px;color:#888;margin-top:2px}
 body.theme-dark .hu-ug,body.theme-dark .hu-ug>summary{background:#1f2229;border-color:#2c2f38}
 body.theme-dark .hu-ug-name,body.theme-dark .hu-ug-target,body.theme-dark .hu-ug-price{color:#e8e8e8}
@@ -5068,7 +5070,7 @@ function updateSaveBtn(id){
   const isSaved = isSavedId(id);
   document.querySelectorAll(`[data-save-id="${CSS.escape(String(id))}"]`).forEach(btn=>{
     btn.textContent = isSaved ? '🔖 저장됨' : '🔖 저장';
-    btn.style.color = isSaved ? '#1D9E75' : '#888';
+    btn.style.color = isSaved ? '#0F6E56' : '#5F5F57';   // 🔵 2026-11-10(12월 재편 ④ ①) — 글자 대비 4.5:1 이상(테두리 색은 그대로)
     btn.style.borderColor = isSaved ? '#1D9E75' : '#ccc';
   });
 }
@@ -6005,8 +6007,8 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
     const nRegion = zfCoverPlaceText(n['region_names'], zfComplexCount(n), n['sido_nm'], n['sigungu_nm'], n['지역'], zfUnitPlacesFor(n['announcement_id']));
     const nSaved = isSavedId(n['announcement_id']||String(idx));
     // 🔴 G8(2026-10-18) — 공유·저장 값은 onclick 문자열에 이어 붙이지 않고 data-*(zfAttr)에 담아 누를 때 dataset 으로 읽는다.
-    const shareBtn = `<button class="detail-link" style="border:1px solid #1D9E75;color:#1D9E75;background:#fff;cursor:pointer;margin-top:10px" ${zfShareAttrs(n['공고명'], nRegion, n['공급유형'], n['공고URL'])} onclick="event.stopPropagation();zfShareFromBtn(this)">🔗 이 공고 공유하기</button>`;
-    const saveBtn = `<button data-save-id="${zfAttr(n['announcement_id']||idx)}" class="detail-link" style="border:1px solid ${nSaved?'#1D9E75':'#ccc'};color:${nSaved?'#1D9E75':'#888'};background:#fff;cursor:pointer;margin-top:10px" onclick="event.stopPropagation();toggleSaveNotice(this.dataset.saveId)">${nSaved?'🔖 저장됨':'🔖 저장'}</button>`;
+    const shareBtn = `<button class="detail-link" style="border:1px solid #1D9E75;color:#0F6E56;background:#fff;cursor:pointer;margin-top:10px" ${zfShareAttrs(n['공고명'], nRegion, n['공급유형'], n['공고URL'])} onclick="event.stopPropagation();zfShareFromBtn(this)">🔗 이 공고 공유하기</button>`;
+    const saveBtn = `<button data-save-id="${zfAttr(n['announcement_id']||idx)}" class="detail-link" style="border:1px solid ${nSaved?'#1D9E75':'#ccc'};color:${nSaved?'#0F6E56':'#5F5F57'};background:#fff;cursor:pointer;margin-top:10px" onclick="event.stopPropagation();toggleSaveNotice(this.dataset.saveId)">${nSaved?'🔖 저장됨':'🔖 저장'}</button>`;
     const detailHTML = detailRows.length
       ? `<div id="${cardId}" data-ann-id="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px;transition:all 0.2s" onclick="event.stopPropagation()">
           <div class="detail-grid">
@@ -12165,8 +12167,8 @@ function renderMatchResults(rows){
 
     const mRegion = zfCoverPlaceText(n.region_names, zfComplexCount(n), n.sido_nm, n.sigungu_nm, n.region, zfUnitPlacesFor(n.announcement_id));
     const mSaved = isSavedId(n.announcement_id||'m'+idx);
-    const mShareBtn = `<button class="detail-link" style="border:1px solid #1D9E75;color:#1D9E75;background:#fff;cursor:pointer" ${zfShareAttrs(n.title, mRegion, n.housing_type, n.url)} onclick="event.stopPropagation();zfShareFromBtn(this)">🔗 이 공고 공유하기</button>`;
-    const mSaveBtn = `<button data-save-id="${zfAttr(n.announcement_id||'m'+idx)}" class="detail-link" style="border:1px solid ${mSaved?'#1D9E75':'#ccc'};color:${mSaved?'#1D9E75':'#888'};background:#fff;cursor:pointer" onclick="event.stopPropagation();toggleSaveNotice(this.dataset.saveId)">${mSaved?'🔖 저장됨':'🔖 저장'}</button>`;
+    const mShareBtn = `<button class="detail-link" style="border:1px solid #1D9E75;color:#0F6E56;background:#fff;cursor:pointer" ${zfShareAttrs(n.title, mRegion, n.housing_type, n.url)} onclick="event.stopPropagation();zfShareFromBtn(this)">🔗 이 공고 공유하기</button>`;
+    const mSaveBtn = `<button data-save-id="${zfAttr(n.announcement_id||'m'+idx)}" class="detail-link" style="border:1px solid ${mSaved?'#1D9E75':'#ccc'};color:${mSaved?'#0F6E56':'#5F5F57'};background:#fff;cursor:pointer" onclick="event.stopPropagation();toggleSaveNotice(this.dataset.saveId)">${mSaved?'🔖 저장됨':'🔖 저장'}</button>`;
     const detailHTML = detailRows.length
       ? `<div id="${cardId}" data-ann-id="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px" onclick="event.stopPropagation()">
           <div class="detail-grid">

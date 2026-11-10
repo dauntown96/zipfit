@@ -107,12 +107,6 @@
      "bg": null,
      "why": "pseudoContent"
     },
-    "span.zf-rent-basis|#777777": {
-     "nodes": 16,
-     "ratio": null,
-     "bg": null,
-     "why": "pseudoContent"
-    },
     "b|#1f5e4a": {
      "nodes": 16,
      "ratio": null,
@@ -205,6 +199,12 @@
     },
     "span.zf-route-place|#8a5a12": {
      "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf-rent-basis|#5a616b": {
+     "nodes": 16,
      "ratio": null,
      "bg": null,
      "why": "pseudoContent"
@@ -310,12 +310,6 @@
      "bg": null,
      "why": "pseudoContent"
     },
-    "span.zf-rent-basis|#777777": {
-     "nodes": 16,
-     "ratio": null,
-     "bg": null,
-     "why": "pseudoContent"
-    },
     "b|#1f5e4a": {
      "nodes": 16,
      "ratio": null,
@@ -389,18 +383,6 @@
      "why": "pseudoContent"
     },
     "span.zf-ai-lbl|#0c447c": {
-     "nodes": 1,
-     "ratio": null,
-     "bg": null,
-     "why": "pseudoContent"
-    },
-    "button.detail-link|#1d9e75": {
-     "nodes": 1,
-     "ratio": null,
-     "bg": null,
-     "why": "pseudoContent"
-    },
-    "button.detail-link|#5a616b": {
      "nodes": 1,
      "ratio": null,
      "bg": null,
@@ -555,6 +537,30 @@
      "ratio": null,
      "bg": null,
      "why": "pseudoContent"
+    },
+    "span.zf-rent-basis|#5a616b": {
+     "nodes": 16,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "button.detail-link|#0f6e56": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "button.detail-link|#5f5f57": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "p.zf-nonaffil|#5a616b": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
     }
    }
   },
@@ -635,12 +641,6 @@
     },
     "span.chip|#b3261e": {
      "nodes": 7,
-     "ratio": null,
-     "bg": null,
-     "why": "pseudoContent"
-    },
-    "span.zf-rent-basis|#777777": {
-     "nodes": 16,
      "ratio": null,
      "bg": null,
      "why": "pseudoContent"
@@ -728,6 +728,12 @@
      "ratio": 0,
      "bg": null,
      "why": "bgOverlap"
+    },
+    "span.zf-rent-basis|#5a616b": {
+     "nodes": 16,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
     }
    }
   },
@@ -802,12 +808,6 @@
     },
     "span.chip|#ff8a80": {
      "nodes": 7,
-     "ratio": null,
-     "bg": null,
-     "why": "pseudoContent"
-    },
-    "span.zf-rent-basis|#777777": {
-     "nodes": 16,
      "ratio": null,
      "bg": null,
      "why": "pseudoContent"
@@ -907,6 +907,12 @@
      "ratio": null,
      "bg": null,
      "why": "pseudoContent"
+    },
+    "span.zf-rent-basis|#9ea4ad": {
+     "nodes": 16,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
     }
    }
   },
@@ -975,12 +981,6 @@
     },
     "div.zf-rent-line|#15171b": {
      "nodes": 3,
-     "ratio": null,
-     "bg": null,
-     "why": "pseudoContent"
-    },
-    "span.zf-rent-basis|#777777": {
-     "nodes": 4,
      "ratio": null,
      "bg": null,
      "why": "pseudoContent"
@@ -1068,11 +1068,17 @@
      "ratio": null,
      "bg": null,
      "why": "pseudoContent"
+    },
+    "span.zf-rent-basis|#5a616b": {
+     "nodes": 4,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
     }
    }
   }
  },
  "_note_match_390": "2026-10-13 우편함 「코드 — 열린 카드 오표시·오답·놓침」 0장 — 매칭 결과 상태 더함(F10 고친 이 가지 로컬 측정 여섯 상태 위반 0 · 나머지 다섯 상태는 종전 배포 v201 기준선 그대로)",
  "_contrast_at": "2026-11-10T07:05:57.371Z",
- "_note_contrast": "2026-11-10 우편함 「코드·운영 — 시각 회귀 장치 … + axe 대비 「미완」 셈」 2 — 배포본 측정 그대로의 대비 미완 갈래(요소 꼴|글자색)를 「알려진 것」으로 올림 · 위반 규칙(rules) 칸은 그대로 · 새 갈래가 생기면 실패 · 고치는 것은 설계 ④ 색 뜻 표 뒤 표시층"
+ "_note_contrast": "2026-11-10 우편함 「코드·운영 — 시각 회귀 장치 … + axe 대비 「미완」 셈」 2 — 배포본 측정 그대로의 대비 미완 갈래(요소 꼴|글자색)를 「알려진 것」으로 올림 · 위반 규칙(rules) 칸은 그대로 · 새 갈래가 생기면 실패 · 고치는 것은 설계 ④ 색 뜻 표 뒤 표시층 · 2026-11-10 우편함 「표시층 — 12월 재편 ④ 색 뜻 토큰」 ① — 대비 고침 셋의 글자색 갈래만 갈음(rent-basis #777→--ink-3 · 공유 단추 #1d9e75→#0f6e56 · 저장 단추 →#5f5f57) + #957 비제휴 줄(p.zf-nonaffil) · 그 밖 칸은 그대로"
 }
