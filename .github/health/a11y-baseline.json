@@ -10,23 +10,1069 @@
  ],
  "states": {
   "home-390": {
-   "rules": {}
+   "rules": {},
+   "contrast_incomplete": {
+    "span.zf3-ai-ic|#5a616b": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "nonBmp"
+    },
+    "span.zf3-nm|#e3f6ff": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    }
+   }
   },
   "notices-390": {
-   "rules": {}
+   "rules": {},
+   "contrast_incomplete": {
+    "span.zf3-ai-ic|#5a616b": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "nonBmp"
+    },
+    "span.zf3-nm|#e3f6ff": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "input|#15171b": {
+     "nodes": 1,
+     "ratio": 0,
+     "bg": null,
+     "why": "bgImage"
+    },
+    "button.zf3-stat|#b9bcc4": {
+     "nodes": 4,
+     "ratio": 0,
+     "bg": null,
+     "why": "bgGradient"
+    },
+    "b|#ff7a66": {
+     "nodes": 1,
+     "ratio": 0,
+     "bg": null,
+     "why": "shortTextContent"
+    },
+    "b|#ffb21a": {
+     "nodes": 3,
+     "ratio": 0,
+     "bg": null,
+     "why": "bgGradient"
+    },
+    "span.cv|#5a616b": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "nonBmp"
+    },
+    "span.zf3-badge|#ffffff": {
+     "nodes": 20,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf-type|#15171b": {
+     "nodes": 20,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf3-dpill|#15171b": {
+     "nodes": 19,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf-cover|#5a616b": {
+     "nodes": 20,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.chip|#3d424a": {
+     "nodes": 24,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.chip|#b3261e": {
+     "nodes": 7,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf-rent-basis|#777777": {
+     "nodes": 16,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "b|#1f5e4a": {
+     "nodes": 16,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.k|#5a616b": {
+     "nodes": 80,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.v|#15171b": {
+     "nodes": 79,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "small|#5a616b": {
+     "nodes": 3,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "b|#ffffff": {
+     "nodes": 20,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "p.hname|#15171b": {
+     "nodes": 4,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.chip|#ffffff": {
+     "nodes": 2,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf-dual-tag|#15171b": {
+     "nodes": 7,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "b.yr|#3d424a": {
+     "nodes": 14,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf-route-text|#8a5a12": {
+     "nodes": 5,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "button|#15171b": {
+     "nodes": 5,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.v|#5a616b": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "button.zf-cut-line|#3d424a": {
+     "nodes": 2,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf3-dpill|#ffffff": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span|#15171b": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf-route-place|#8a5a12": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    }
+   }
   },
   "detail-390": {
-   "rules": {}
+   "rules": {},
+   "contrast_incomplete": {
+    "span.zf3-ai-ic|#5a616b": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "nonBmp"
+    },
+    "span.zf3-nm|#e3f6ff": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "input|#15171b": {
+     "nodes": 1,
+     "ratio": 0,
+     "bg": null,
+     "why": "bgImage"
+    },
+    "button.zf3-stat|#b9bcc4": {
+     "nodes": 4,
+     "ratio": 0,
+     "bg": null,
+     "why": "bgGradient"
+    },
+    "b|#ff7a66": {
+     "nodes": 1,
+     "ratio": 0,
+     "bg": null,
+     "why": "shortTextContent"
+    },
+    "b|#ffb21a": {
+     "nodes": 3,
+     "ratio": 0,
+     "bg": null,
+     "why": "bgGradient"
+    },
+    "span.cv|#5a616b": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "nonBmp"
+    },
+    "span.zf3-badge|#ffffff": {
+     "nodes": 20,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf-type|#15171b": {
+     "nodes": 20,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf3-dpill|#15171b": {
+     "nodes": 19,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "p.hname|#15171b": {
+     "nodes": 5,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf-cover|#5a616b": {
+     "nodes": 20,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.chip|#3d424a": {
+     "nodes": 24,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.chip|#b3261e": {
+     "nodes": 7,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "div|#15171b": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "div.zf-rent-line|#15171b": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf-rent-basis|#777777": {
+     "nodes": 16,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "b|#1f5e4a": {
+     "nodes": 16,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.k|#5a616b": {
+     "nodes": 80,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.v|#15171b": {
+     "nodes": 79,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "small|#5a616b": {
+     "nodes": 3,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "b|#ffffff": {
+     "nodes": 20,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span|#b9bcc4": {
+     "nodes": 6,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span|#ffb21a": {
+     "nodes": 5,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf-units-src|#ffb21a": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf-units-src|#b9bcc4": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "p|#3d424a": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span|#5a616b": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "a.detail-link|#0c447c": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf-ai-lbl|#0c447c": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "button.detail-link|#1d9e75": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "button.detail-link|#5a616b": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "button.zf3-close|#3d424a": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "div.zf3-maplbl|#ffffff": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "div|#000000": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "button.poi-tab|#ffffff": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "button.poi-tab|#666666": {
+     "nodes": 6,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "div.poi-loading|#3d424a": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "summary.policy-title|#333333": {
+     "nodes": 3,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf-sch-src|#5a616b": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "summary.elig-title|#333333": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "div.hu-title|#333333": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf-site-pick-label|#666666": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "button.zf-site-chip|#ffffff": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "button.zf-site-chip|#3d5a99": {
+     "nodes": 4,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.hu-group-name|#333333": {
+     "nodes": 4,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.hu-group-count|#888888": {
+     "nodes": 4,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.chip|#ffffff": {
+     "nodes": 2,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf-dual-tag|#15171b": {
+     "nodes": 7,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "b.yr|#3d424a": {
+     "nodes": 14,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf-route-text|#8a5a12": {
+     "nodes": 5,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "button|#15171b": {
+     "nodes": 5,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.v|#5a616b": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "button.zf-cut-line|#3d424a": {
+     "nodes": 2,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf3-dpill|#ffffff": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span|#15171b": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf-route-place|#8a5a12": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    }
+   }
   },
   "notices-1280": {
-   "rules": {}
+   "rules": {},
+   "contrast_incomplete": {
+    "span.zf3-ai-ic|#5a616b": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "nonBmp"
+    },
+    "span.zf3-nm|#e3f6ff": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "input|#15171b": {
+     "nodes": 1,
+     "ratio": 0,
+     "bg": null,
+     "why": "bgImage"
+    },
+    "button.zf3-stat|#b9bcc4": {
+     "nodes": 4,
+     "ratio": 0,
+     "bg": null,
+     "why": "bgGradient"
+    },
+    "b|#ff7a66": {
+     "nodes": 1,
+     "ratio": 0,
+     "bg": null,
+     "why": "shortTextContent"
+    },
+    "b|#ffb21a": {
+     "nodes": 3,
+     "ratio": 0,
+     "bg": null,
+     "why": "bgGradient"
+    },
+    "span.cv|#5a616b": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "nonBmp"
+    },
+    "span.zf3-badge|#ffffff": {
+     "nodes": 20,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf-type|#15171b": {
+     "nodes": 20,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf3-dpill|#15171b": {
+     "nodes": 19,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf-cover|#5a616b": {
+     "nodes": 20,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.chip|#3d424a": {
+     "nodes": 24,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.chip|#b3261e": {
+     "nodes": 7,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf-rent-basis|#777777": {
+     "nodes": 16,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "b|#1f5e4a": {
+     "nodes": 16,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.k|#5a616b": {
+     "nodes": 80,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.v|#15171b": {
+     "nodes": 79,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "small|#5a616b": {
+     "nodes": 3,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "b|#ffffff": {
+     "nodes": 20,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.chip|#ffffff": {
+     "nodes": 2,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf-dual-tag|#15171b": {
+     "nodes": 7,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "b.yr|#3d424a": {
+     "nodes": 14,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf-route-place|#8a5a12": {
+     "nodes": 5,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "button|#15171b": {
+     "nodes": 3,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.v|#5a616b": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf3-dpill|#ffffff": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span|#15171b": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "text.lbl|#15171b": {
+     "nodes": 12,
+     "ratio": 0,
+     "bg": null,
+     "why": "bgOverlap"
+    }
+   }
   },
   "notices-390-dark": {
-   "rules": {}
+   "rules": {},
+   "contrast_incomplete": {
+    "span.zf3-ai-ic|#9ea4ad": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "nonBmp"
+    },
+    "span.zf3-nm|#e3f6ff": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "button.zf3-stat|#b9bcc4": {
+     "nodes": 4,
+     "ratio": 0,
+     "bg": null,
+     "why": "bgGradient"
+    },
+    "b|#ff7a66": {
+     "nodes": 1,
+     "ratio": 0,
+     "bg": null,
+     "why": "shortTextContent"
+    },
+    "b|#ffb21a": {
+     "nodes": 3,
+     "ratio": 0,
+     "bg": null,
+     "why": "bgGradient"
+    },
+    "span.cv|#9ea4ad": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "nonBmp"
+    },
+    "span.zf3-badge|#111216": {
+     "nodes": 20,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf-type|#ecedef": {
+     "nodes": 20,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf3-dpill|#ecedef": {
+     "nodes": 19,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf-cover|#9ea4ad": {
+     "nodes": 20,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.chip|#c5c9d0": {
+     "nodes": 24,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.chip|#ff8a80": {
+     "nodes": 7,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf-rent-basis|#777777": {
+     "nodes": 16,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "b|#7fd8b5": {
+     "nodes": 16,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.k|#9ea4ad": {
+     "nodes": 80,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.v|#ecedef": {
+     "nodes": 79,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "small|#9ea4ad": {
+     "nodes": 3,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "b|#16171b": {
+     "nodes": 20,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "p.hname|#ecedef": {
+     "nodes": 4,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.chip|#16171b": {
+     "nodes": 2,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf-dual-tag|#ecedef": {
+     "nodes": 7,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "b.yr|#c5c9d0": {
+     "nodes": 14,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf-route-text|#8a5a12": {
+     "nodes": 5,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "button|#ecedef": {
+     "nodes": 5,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.v|#9ea4ad": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "button.zf-cut-line|#c5c9d0": {
+     "nodes": 2,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf3-dpill|#16171b": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span|#ecedef": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf-route-place|#8a5a12": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    }
+   }
   },
   "match-390": {
-   "rules": {}
+   "rules": {},
+   "contrast_incomplete": {
+    "span.zf3-ai-ic|#5a616b": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "nonBmp"
+    },
+    "span.zf3-nm|#e3f6ff": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf3-badge|#ffffff": {
+     "nodes": 5,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf-type|#15171b": {
+     "nodes": 5,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf3-dpill|#ffffff": {
+     "nodes": 5,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "p.hname|#15171b": {
+     "nodes": 3,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf-cover|#5a616b": {
+     "nodes": 5,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span|#15171b": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.chip|#15171b": {
+     "nodes": 3,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.chip|#3d424a": {
+     "nodes": 5,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "div.zf-rent-line|#15171b": {
+     "nodes": 3,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf-rent-basis|#777777": {
+     "nodes": 4,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "b|#1f5e4a": {
+     "nodes": 4,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.k|#5a616b": {
+     "nodes": 20,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.v|#15171b": {
+     "nodes": 19,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "b|#ffffff": {
+     "nodes": 5,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf-route-text|#8a5a12": {
+     "nodes": 5,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.chip|#b3261e": {
+     "nodes": 3,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "small|#5a616b": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "button|#ffffff": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "button|#3d424a": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "b.yr|#3d424a": {
+     "nodes": 2,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.v|#5a616b": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "div|#15171b": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf-route-place|#8a5a12": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "button|#15171b": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    }
+   }
   }
  },
- "_note_match_390": "2026-10-13 우편함 「코드 — 열린 카드 오표시·오답·놓침」 0장 — 매칭 결과 상태 더함(F10 고친 이 가지 로컬 측정 여섯 상태 위반 0 · 나머지 다섯 상태는 종전 배포 v201 기준선 그대로)"
+ "_note_match_390": "2026-10-13 우편함 「코드 — 열린 카드 오표시·오답·놓침」 0장 — 매칭 결과 상태 더함(F10 고친 이 가지 로컬 측정 여섯 상태 위반 0 · 나머지 다섯 상태는 종전 배포 v201 기준선 그대로)",
+ "_contrast_at": "2026-11-10T07:05:57.371Z",
+ "_note_contrast": "2026-11-10 우편함 「코드·운영 — 시각 회귀 장치 … + axe 대비 「미완」 셈」 2 — 배포본 측정 그대로의 대비 미완 갈래(요소 꼴|글자색)를 「알려진 것」으로 올림 · 위반 규칙(rules) 칸은 그대로 · 새 갈래가 생기면 실패 · 고치는 것은 설계 ④ 색 뜻 표 뒤 표시층"
 }
