@@ -8237,6 +8237,7 @@ const ELIG_KEY_LABELS = {
   '자산기준_가구원수및출산자녀별': '자산기준(가구원수·출산자녀별)',
   '자동차가액_출산자녀별': '자동차가액(출산자녀별)',
   '자동차가액_출산자녀가산': '자동차가액(출산자녀 가산)',
+  '출산가산_문장': '출산 가산(문장)',   // 🔵 2026-11-10(우편함 「… 데이터 키와 짝」 2) — 일반 규칙이면 「출산가산(문장)」
   '2세미만자녀_우선배정': '2세 미만 자녀 우선배정',
   '우선배정_2세미만자녀': '우선배정(2세 미만 자녀)',
   '자산완화_출산2인이상': '자산 완화(출산 2인 이상)',
@@ -11009,6 +11010,9 @@ const HU_NOTE_INLINE_MAX = 28;
 function zfNoteSegHidden(seg, ctx){
   if(/^[^:]{1,20}:\s*-$/.test(seg) || /^[^:\d]{1,20}\s-$/.test(seg)) return true;   // 빈 값 「예비입주자: -」·「공가호수 -」
   if(!ctx) return false;
+  // 🔵 2026-11-10(우편함 「표시층 — 예비자 비고 숨김을 데이터 키와 짝」 1) — 배지로 보인 값의 원문 글자(extracted_facts 모집예비자수·대기예비자수 text)와
+  //    조각이 글자째 같으면 숨긴다 — 낱말 목록에 기대지 않는다. 입주자·당첨자 수를 함께 말하는 글자(「공급호수: 입주자 9호·예비자 9호」)는 아래 복합 규칙으로.
+  if(zfNoteSegIsBadgeText(seg, ctx)) return true;
   const num = x => Number(String(x).replace(/,/g, ''));
   let m = seg.match(/^(?:대기\s*중인|기존)\s*예비자수?\s*:?\s*([\d,]+)\s*명?$/);
   if(m) return ctx.wait != null && num(m[1]) === Number(ctx.wait);
@@ -11024,12 +11028,27 @@ function zfNoteSegHidden(seg, ctx){
 // 행(들)에서 ctx 를 만든다 — 대기 예비자 값은 zfWaitReserveHtml 이 배지 하나로 보이는 때(값 하나)만.
 // 🔵 2026-11-09(예비자 두 말 ⓐ) — 복합 조각 「공급호수: 입주자 N호·예비자 M호」·「모집호수 당첨자 N·예비자 M」은
 //    M 이 「이번에 뽑는 예비자」로 보인 값과 같을 때만 예비자 몫을 뗀다(남은 「공급호수: 입주자 N호」는 모집 수와 같으면 숨는다). 꼴이 다르면 그대로.
+function zfNoteSegIsBadgeText(seg, ctx){
+  if(!ctx || /(?<!예비)(?:입주자|당첨자)/.test(seg)) return false;   // 「예비입주자 34」·「예비당첨자 6」은 예비자 몫만 말한다
+  return !!((ctx.pickTexts && ctx.pickTexts.has(seg)) || (ctx.waitTexts && ctx.waitTexts.has(seg)));
+}
 function zfNoteSegTrim(seg, ctx){
   if(zfNoteSegHidden(seg, ctx)) return null;
   if(!ctx || ctx.pick == null) return seg;
+  let rest = null;
   const m = seg.match(/^(.*?(?:입주자|당첨자)\s*[\d,]+\s*호?)\s*·\s*예비자\s*([\d,]+)\s*(?:명|호)?$/);
-  if(!m || Number(m[2].replace(/,/g, '')) !== Number(ctx.pick)) return seg;
-  const rest = m[1].trim();
+  if(m && Number(m[2].replace(/,/g, '')) === Number(ctx.pick)) rest = m[1].trim();
+  // 🔵 2026-11-10(데이터 키와 짝 1) — 뗄 몫을 「모집예비자수」 text 글자로 찾는다(「모집호수 당첨자 12·예비당첨자 6」의 「예비당첨자 6」).
+  //    남는 몫이 「… 입주자·당첨자 N」 꼴일 때만 뗀다 — 꼴이 다르면 그대로(종전과 같음).
+  if(rest == null && ctx.pickTexts && ctx.pickTexts.size){
+    const pieces = seg.split('·').map(x => x.trim());
+    const at = pieces.findIndex(x => ctx.pickTexts.has(x));
+    if(at === pieces.length - 1 && at > 0){
+      const r = pieces.slice(0, at).join('·');
+      if(/(?:입주자|당첨자)\s*[\d,]+\s*호?$/.test(r)) rest = r;
+    }
+  }
+  if(rest == null) return seg;
   return zfNoteSegHidden(rest.replace(/(입주자|당첨자)\s*/, ''), ctx) ? null : rest;
 }
 function zfNoteCtxOf(units, recruitShown, pickShown){
@@ -11037,7 +11056,10 @@ function zfNoteCtxOf(units, recruitShown, pickShown){
   (units || []).forEach(u => { const a = u && u.extracted_facts && u.extracted_facts['대기예비자수']; if(Array.isArray(a)) a.forEach(it => { if(it && it.value != null) vals.push(String(it.value)); }); });
   const wv = [...new Set(vals)];
   const u0 = (units || [])[0];
-  return { wait: wv.length === 1 ? Number(wv[0]) : null, recruit: new Set((recruitShown || []).filter(x => x != null && x !== '').map(Number)), moveIn: (u0 && u0.zfCardMoveIn) || null, pick: pickShown != null ? Number(pickShown) : null };
+  const wait = wv.length === 1 ? Number(wv[0]) : null, pick = pickShown != null ? Number(pickShown) : null;
+  // 🔵 2026-11-10(데이터 키와 짝 1) — 배지에 보인 값과 같은 항목의 원문 글자만(값이 다른 항목의 글자는 숨기지 않는다).
+  const textsOf = (key, v) => { const t = new Set(); if(v == null) return t; (units || []).forEach(u => { const a = u && u.extracted_facts && u.extracted_facts[key]; if(Array.isArray(a)) a.forEach(it => { if(it && it.text && it.value != null && Number(it.value) === v) t.add(String(it.text).trim()); }); }); return t; };
+  return { wait, recruit: new Set((recruitShown || []).filter(x => x != null && x !== '').map(Number)), moveIn: (u0 && u0.zfCardMoveIn) || null, pick, pickTexts: textsOf('모집예비자수', pick), waitTexts: textsOf('대기예비자수', wait) };
 }
 function renderExtraNoteHtml(note, ctx){
   if(!note) return '';
