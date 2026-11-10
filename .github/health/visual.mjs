@@ -39,8 +39,8 @@ const WIDTHS = [390, 1280]
 const THEMES = ['light', 'dark']
 // 차이 임계 — 픽셀 하나의 색 차(pixelmatch threshold 0.1 · 안티에일리어싱 무시)를 넘는 픽셀이
 //    max(DIFF_MIN_PX, 면적 × DIFF_RATIO) 를 넘으면 실패. 크기가 다르면 실패. 같은 러너·같은 고정본이면 0 이 기대값이다.
-const DIFF_MIN_PX = 100
-const DIFF_RATIO = 0.001
+const DIFF_MIN_PX = 25
+const DIFF_RATIO = 0.0002
 
 const SUPA = /^https:\/\/khdpjjyspmlqtzperoqg\.supabase\.co\//
 const BLOCK = /dapi\.kakao\.com|kakaocdn\.net|daumcdn\.net|drive\.google\.com|googleusercontent\.com|api\.github\.com|googletagmanager|google-analytics/
@@ -132,9 +132,11 @@ async function main () {
         await page.evaluate(s => { const c = document.querySelector(s); toggleDetail(c.getAttribute('data-card-id'), c, 'visual') }, sel)
         await page.waitForLoadState('networkidle').catch(() => {})
         await page.waitForTimeout(2500)
-        // 넓은 화면(1280)은 상세가 카드 밖 옆 패널로 열린다 — 그때는 상세 요소를 찍는다(카드 안이면 카드째).
-        const openSel = await page.evaluate(s => { const c = document.querySelector(s); const d = document.getElementById(c.getAttribute('data-card-id'))
-          return d && !c.contains(d) && d.offsetParent !== null ? '#' + CSS.escape(d.id) : s }, sel)
+        // 넓은 화면(1280)은 상세가 카드 안 [data-ann-id] 이지만 position:fixed 옆 패널로 열린다(health-screen detail_1280 과 같은 자리) —
+        //    카드째 찍으면 카드 경계로 잘려 상세가 안 담긴다. 그때는 그 패널을 찍는다(390 은 카드째).
+        const openSel = await page.evaluate(s => { const c = document.querySelector(s); const d = c && c.querySelector('[data-ann-id]')
+          if (d && getComputedStyle(d).position === 'fixed') { d.setAttribute('data-vshot', '1'); return s + ' [data-vshot="1"]' }
+          return s }, sel)
         shots.push({ name: base + '-open', buf: await stableShot(page, openSel) })
         await page.evaluate(s => { const c = document.querySelector(s); toggleDetail(c.getAttribute('data-card-id'), c, 'visual') }, sel)
         await page.waitForTimeout(600)
@@ -219,6 +221,10 @@ async function stableShot (page, sel) {
       if ((p === 'fixed' || p === 'sticky') && !(t && (t.contains(e) || e.contains(t)))) { e.dataset.vhide = e.style.visibility || '-'; e.style.visibility = 'hidden' }
     }
   }, sel)
+  // 「불러오는 중」 자리가 끝날 때까지 기다린다(최대 20초) — 지도를 막아 두면 「지도를 불러오는 중…」이 잠시 뒤 「지도를 불러올 수 없어요」로 바뀐다.
+  //    그 사이에 찍힌 그림이 연달아 같아 보여 기준과 엇갈렸다(2026-11-10 로컬 재현 · …21017 390 어둡게 펼침 18,554 픽셀).
+  await page.waitForFunction(sel => { const t = document.querySelector(sel); return !t || !/불러오는 중|불러오고 있|로딩/.test(t.innerText) }, sel, { timeout: 20000 }).catch(() => {})
+  await page.waitForTimeout(300)
   let prev = null
   for (let i = 0; i < 4; i++) {
     const buf = await page.locator(sel).screenshot({ animations: 'disabled', caret: 'hide' })
