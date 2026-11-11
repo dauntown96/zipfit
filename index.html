@@ -188,8 +188,8 @@ select:focus,input:focus{border-color:#5DCAA5}
 .policy-title{font-size:13px;font-weight:600;color:#333;margin-bottom:8px;cursor:pointer}
 .policy-item{border:1px solid #e8e8e0;border-radius:10px;padding:10px 12px;margin-bottom:8px}
 .policy-item:last-child{margin-bottom:0}
-.policy-category{font-size:12px;font-weight:600;color:#0F6E56;margin-bottom:4px}   /* 🔵 2026-11-10(12월 재편 ④ ①) — #1D9E75 글자(약 3.4:1) → 4.5:1 이상 */
-body.theme-dark .policy-category{color:#7fd8b5}
+.policy-category{font-size:12px;font-weight:600;color:var(--ink-2,#3D424A);margin-bottom:4px}   /* 🔵 2026-11-10(12월 재편 ④ ①) — #1D9E75 글자(약 3.4:1) → 4.5:1 이상 */
+body.theme-dark .policy-category{color:var(--ink-2,#C5C9D0)}
 .policy-content{font-size:12px;color:#555;line-height:1.5;white-space:pre-wrap}
 /* 🔵 B62 ⑦ — 정책 안내: 고정 → 검색 → 칩 → 제목 목록(누르면 펼침) */
 .pol-pinned{border-color:#F0D9A8;background:#FFFBF1}
@@ -245,6 +245,8 @@ html[data-ui="d3"] .zf-org-sup span{background:var(--surface-2);color:var(--ink)
 .zf-route-more::after{content:'▾'}
 .zf-route-line.open .zf-route-more::after{content:'▴'}
 .zf-route-line.zf-fits .zf-route-more{display:none}
+/* 🔵 2026-11-11(12월 재편 ④ ② 병합 · #965 ⑦ 2) — 어두움에서 밝은 칩(#FBF0DC · #8A5A12)으로 그려지던 경로 칩: 보조 바탕 --surface-2 · 글자 --ink-2(경고 뜻 아님) */
+body.theme-dark .zf-route-line{background:var(--surface-2,#23262C);color:var(--ink-2,#C5C9D0)}
 /* 🔵 B62 ⑥ — 대기 예비자(원문 값) */
 .hu-wait-badge{padding:2px 9px;font-size:11px;cursor:help;display:inline-block;margin-left:6px;background:#F6F6F2;color:#6B6B63;border-color:#E8E8E0;font-weight:600}
 .zf-rentlow-head{margin:0 0 6px}
@@ -544,12 +546,12 @@ body.theme-dark .zf-totop{background:#262932;border-color:#3a3e48;color:#5DCAA5;
 html[data-ui="d3"] body{
   --bg:#F2F0EB; --paper:#FFFFFF; --surface:#F7F6F2; --surface-2:#EEECE6;
   --ink:#15171B; --ink-2:#3D424A; --ink-3:#5A616B;
-  --line:#C6C9CF; --line-2:#E2E3E6; --rail:#CDD1D7; --focus:#1F5FBF;
+  --line:#C6C9CF; --line-2:#E2E3E6; --rail:#CDD1D7; --focus:#15171B;
   --board:#17181C; --board-2:#24262C; --board-ink:#F2F1EC; --board-ink-2:#B9BCC4;
   --led:#FFB21A; --led-red:#FF7A66; --led-green:#7CF0A8; --led-cyan:#8FDCFF; --led-white:#F2F1EC;
   --led-dot:rgba(255,178,26,.09); --led-gap:rgba(8,9,11,.55); --led-glow:rgba(255,178,26,.45);
   --warn:#B3261E; --warn-bg:#FCEDEB;
-  --ln-kuk:#1F5FBF; --ln-young:#B5462B; --ln-hang:#1E7B4F; --ln-mae:#7B4BB0; --ln-jeon:#A35C00; --ln-gong:#0F7C8A; --ln-gi:#5B616B; --ln-ink:#FFFFFF;
+  --ln-kuk:#1F5FBF; --ln-young:#9B3C78; --ln-hang:#1E7B4F; --ln-mae:#7B4BB0; --ln-jeon:#A35C00; --ln-gong:#0F7C8A; --ln-gi:#5B616B; --ln-ink:#FFFFFF;
   --map-sea:#E9EEF3; --map-land:#FFFFFF; --map-line:#B7BEC8; --map-dot:#1F5FBF; --map-hot:#B3261E;
   --f-ui:"Kkokzip Sans","IBM Plex Sans KR",-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
   --f-led:"Kkokzip LED","Nanum Gothic Coding",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
@@ -562,14 +564,14 @@ html[data-ui="d3"] body{
 html[data-ui="d3"] body.theme-dark{
   --bg:#0E0F12; --paper:#16171B; --surface:#1C1E23; --surface-2:#23262C;
   --ink:#ECEDEF; --ink-2:#C5C9D0; --ink-3:#9EA4AD;
-  --line:#3B3F47; --line-2:#2A2D33; --rail:#3B3F47; --focus:#7FA8F0;
+  --line:#3B3F47; --line-2:#2A2D33; --rail:#3B3F47; --focus:#F2F1EC;
   --board:#0A0B0D; --board-2:#1A1C21;
   --warn:#FF8A80; --warn-bg:#3A1A18;
-  --ln-kuk:#7FA8F0; --ln-young:#F09A80; --ln-hang:#6FCB9C; --ln-mae:#B99AE6; --ln-jeon:#E8A453; --ln-gong:#5CC3D0; --ln-gi:#A9AFB8; --ln-ink:#111216;
+  --ln-kuk:#7FA8F0; --ln-young:#E39AC6; --ln-hang:#6FCB9C; --ln-mae:#B99AE6; --ln-jeon:#E8A453; --ln-gong:#5CC3D0; --ln-gi:#A9AFB8; --ln-ink:#111216;
   --map-sea:#12161C; --map-land:#1E2127; --map-line:#3E444E; --map-dot:#7FA8F0; --map-hot:#FF8A80;
 }
 html[data-ui="d3"] .wrap{padding-top:0}
-html[data-ui="d3"] :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+html[data-ui="d3"] :focus-visible{outline:2px solid var(--focus);outline-offset:2px;box-shadow:0 0 0 2px var(--paper)}   /* 시안 ② — 두 겹(바깥 잉크 · 안 바탕) */
 /* 2026-10-13(우편함 「코드 — 열린 카드 오표시·오답·놓침」 5 · F10) — 매칭 결과 접근성: 「전체」 등 선택된 칩 글자 대비(흰 글자 3.38 → 6.3 · 아래 .chip.sel) ·
    건수 줄 회색 글자(#888 3.54 → --ink-3) · 아래 고정 탭의 초점 테두리는 막대 가장자리에 잘리지 않게 안쪽으로 · 어둡게에서 「대상이 달라 뺀 공고」 상자 바탕 */
 html[data-ui="d3"] .count-info{color:var(--ink-3)}
@@ -719,6 +721,9 @@ html[data-ui="d3"] :is(#notice-list,#match-result) .hcard.zf3-closed::before{bac
 .zf3-dpill.hot{background:var(--warn);border-color:var(--warn);color:var(--paper)}
 .zf3-dpill.closed{border-color:var(--line);color:var(--ink-3);background:transparent}
 .zf3-dpill.unknown{border-style:dashed;color:var(--ink-2);background:transparent}
+/* 🔵 시안(12월 재편 ④ ②) — 상태는 색보다 글자·모양: 접수 중 = 채운 점 · 예정·마감·미상 = 빈 점(색 뜻을 늘리지 않음) */
+.zf3-dpill.open::before{content:"● "}
+.zf3-dpill:is(.before,.closed,.unknown)::before{content:"○ "}
 .zf3-hmparts{margin:-2px 0 6px;text-align:right;font-size:11px;color:var(--ink-2)}
 .zf3-card .htag{display:none}
 .zf3-card .htop{margin-bottom:2px}
@@ -8359,7 +8364,7 @@ function toggleDetail(id, card, from){
   if(!open) zfLog('notice_open', from?{from:from}:null, cardEl && cardEl.dataset ? cardEl.dataset.announcementId : '');
   if(!open && cardEl && cardEl.dataset) zfFbAttachReaction(detailEl, cardEl.dataset.announcementId || '');   // 시행일 뒤에만 그린다
   if(cardEl){
-    cardEl.style.borderColor = open ? '' : '#1D9E75';
+    cardEl.style.borderColor = open ? '' : 'var(--ink, #15171B)';   // 시안 ② — 펼침 테두리 초록 뺌(잉크)
     cardEl.setAttribute('aria-expanded', open ? 'false' : 'true');
     // 🔵 D-3 b — 노선 카드(d3)는 카드가 아니라 「상세 ›」 단추가 펼침 상태를 갖는다(카드는 role 없는 묶음 — aria-allowed-attr)
     if(cardEl.classList.contains('zf3-card')){
