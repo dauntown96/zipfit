@@ -137,6 +137,13 @@ async function saveOne(aid: string, r: OneResult, runAt: string, ms: number) {
     files_listed: rows.length, duration_ms: ms, error: null,
   }, { onConflict: 'announcement_id' })
   if (error) throw new Error(`수집 이력 저장: ${error.message}`)
+  // 🔵 2026-11-11(우편함 「코드·운영 — 단지 키 2차 …」 2) — 받은 단지 코드(sbd_lgo_no)를 단지 키에 잇는다(공고 하나에 코드 하나 ∧ 도로명 키 하나일 때만 —
+  //    규칙은 DB 함수 complex_link_announcements 한 곳). 🔴 실패해도 수집 결과는 그대로다(던지지 않는다 · 콘솔 로그만).
+  try {
+    const { data, error: linkErr } = await supabase.rpc('complex_link_announcements', { p_ids: [aid] })
+    if (linkErr) console.warn(`[images] 단지 잇기 실패 ${aid}: ${linkErr.message}`)
+    else if (data && ((data as Record<string, number>).code || (data as Record<string, number>).link)) console.log(`[images] 단지 잇기 ${aid} ${JSON.stringify(data)}`)
+  } catch (e) { console.warn(`[images] 단지 잇기 예외 ${aid}: ${e instanceof Error ? e.message : e}`) }
 }
 
 async function saveFail(aid: string, msg: string, ms: number) {
