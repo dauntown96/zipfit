@@ -245,6 +245,8 @@ html[data-ui="d3"] .zf-org-sup span{background:var(--surface-2);color:var(--ink)
 .zf-route-more::after{content:'▾'}
 .zf-route-line.open .zf-route-more::after{content:'▴'}
 .zf-route-line.zf-fits .zf-route-more{display:none}
+/* 🔵 2026-11-11(12월 재편 ④ ② 병합 · #965 ⑦ 2) — 어두움에서 밝은 칩(#FBF0DC · #8A5A12)으로 그려지던 경로 칩: 보조 바탕 --surface-2 · 글자 --ink-2(경고 뜻 아님) */
+body.theme-dark .zf-route-line{background:var(--surface-2,#23262C);color:var(--ink-2,#C5C9D0)}
 /* 🔵 B62 ⑥ — 대기 예비자(원문 값) */
 .hu-wait-badge{padding:2px 9px;font-size:11px;cursor:help;display:inline-block;margin-left:6px;background:#F6F6F2;color:#6B6B63;border-color:#E8E8E0;font-weight:600}
 .zf-rentlow-head{margin:0 0 6px}
