@@ -159,6 +159,7 @@ select:focus,input:focus{border-color:var(--focus)}
 /* 🔵 2026-11-11(색 토큰 2차) — 정보 배지·대상 태그 = 중립 칩(새 「정보」 색을 만들지 않음 · 뜻은 이모지·글자) · 안내 칩 셋 = 중립 */
 .chip.sel.zf-chip-info{background:var(--surface-2);border-color:var(--line);color:var(--ink-2)}
 .zf-doc-note,.zf-check-note,.zf-varies{color:var(--ink-2);background:var(--surface-2)}
+.zf-wave-slot.zf-wave-warn{color:var(--warn);background:var(--warn-bg)}   /* ⚠️ 이번 차수 대상 주택이 공고문 목록과 다름(확정) = 신청 대상이 바뀜 → 경고 · 🏘 게시 전 안내는 중립 */
 .chip-all{font-weight:600}
 /* 🔵 표시층 B ① — 카드 칩 행: 칩 단위로 줄을 바꾼다(칩 하나는 한 줄). 카드 폭보다 긴 칩만 말줄임 — 전문은 툴팁(zfTitleClippedChips) */
 .chip-row{display:flex;flex-wrap:wrap;align-items:center}
@@ -243,7 +244,7 @@ body.theme-dark mark.zf-hl{background:#7A5F00;color:#fff}
 /* 🔵 B62 ①② — 날짜 줄 아래 한 줄. 🔵 표시층 B ② 접힌 상태는 두 줄까지(첫 날짜가 보이게) · 펼침 표시 ▾는 말줄임 밖 별도 칸 · 누르면 펼친다 */
 .zf-org-sup{margin:4px 0 2px}
 .zf-org-sup span{display:inline-block;font-size:12px;font-weight:700;color:#3B4A6B;background:#E8EDF7;border-radius:999px;padding:2px 10px}
-.zf-wave-slot{font-size:12px;color:var(--warn);background:var(--warn-bg);border-radius:8px;padding:4px 10px;margin:4px 0 6px}
+.zf-wave-slot{font-size:12px;color:var(--ink-2);background:var(--surface-2);border-radius:8px;padding:4px 10px;margin:4px 0 6px}
 html[data-ui="d3"] .zf-org-sup span{background:var(--surface-2);color:var(--ink)}
 .zf-route-line{font-size:12px;color:#8A5A12;background:#FBF0DC;border-radius:8px;padding:4px 10px;margin:-4px 0 8px;cursor:pointer;display:flex;align-items:flex-start;gap:6px}
 .zf-route-text{flex:1;min-width:0;line-height:1.5;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;word-break:keep-all;overflow-wrap:anywhere}
@@ -3876,6 +3877,7 @@ function zfFillWaveSlots(){
     if(!hit) return;
     // 🔵 2026-10-28(우편함 「S1 표현 고침 여덟」 2) — 「지역·범위가 달라요」는 지역이 같은 공고(전북 …20737 — 호수만 줄었음)에도 붙었다.
     //    화면은 공지 목록의 시·구를 모른다 → 정책 행 원문 낱말 「공고문의 전체 목록과 다릅니다」 그대로만.
+    el.classList.add('zf-wave-warn');
     el.textContent = hit.n ? `⚠️ 이번 차수 대상 주택은 공지 목록 ${hit.n}호예요 — 공고문 전체 목록과 달라요` : '⚠️ 이번 차수 대상 주택은 따로 공지됐어요 — 공고문 전체 목록과 달라요';
     el.hidden = false;
   });
