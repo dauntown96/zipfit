@@ -119,7 +119,7 @@ select:focus,input:focus{border-color:var(--focus)}
 .warn .rtitle{color:#633806}.warn .rdesc{color:#854F0B}
 .err .rtitle{color:#501313}.err .rdesc{color:var(--warn)}
 .hcard{background:#fff;border:1px solid #e8e8e0;border-radius:14px;padding:1rem 1.25rem;margin-bottom:0.75rem;transition:border-color 0.15s}
-.hcard.top1{border:2px solid #1D9E75}
+.hcard.top1{border:2px solid var(--ink)}
 .htop{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;gap:8px}
 .hname{font-size:14px;font-weight:600;color:#111;margin-top:4px;flex:1;min-width:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .htag{font-size:11px;padding:3px 10px;border-radius:10px;font-weight:500;white-space:nowrap;flex-shrink:0}
@@ -133,7 +133,7 @@ select:focus,input:focus{border-color:var(--focus)}
 .mcard{background:#f8f8f4;border-radius:8px;padding:7px 8px;text-align:center}
 .mlabel{font-size:10px;color:#999;margin-bottom:2px}
 .mval{font-size:13px;font-weight:600;color:#111}
-.best{font-size:11px;background:#1D9E75;color:#fff;padding:3px 10px;border-radius:10px;margin-right:6px}
+.best{font-size:11px;background:var(--surface-2);color:var(--ink-2);padding:3px 10px;border-radius:10px;margin-right:6px}
 .rank{font-size:11px;color:#aaa}
 .checklist{list-style:none}
 .checklist li{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid #f0f0e8;font-size:13px;line-height:1.55}
@@ -150,12 +150,15 @@ select:focus,input:focus{border-color:var(--focus)}
 /* 다중선택 칩 */
 .chip-group{display:flex;flex-wrap:wrap;gap:6px}
 .chip{padding:7px 14px;border-radius:20px;border:1px solid #ddd;background:#fff;font-size:13px;color:#444;cursor:pointer;transition:all 0.12s;user-select:none}
-.chip:hover{border-color:#5DCAA5}
+.chip:hover{border-color:var(--ink)}
 .chip.sel{background:var(--ink);border-color:var(--ink);color:var(--paper);font-weight:500}
 /* 🔵 2026-11-11(날값 토큰 1차) — 경고 칩·경고 상자·대상 맞음 줄: 인라인 날값 → 클래스 + 토큰 */
 .chip.sel.zf-chip-warn{background:var(--warn);border-color:var(--warn);color:var(--paper)}
 .zf-warn-box{color:var(--warn);background:var(--warn-bg);border:1px solid var(--warn-line)}
 .zf-target-ok{color:var(--ink);background:var(--surface-2)}
+/* 🔵 2026-11-11(색 토큰 2차) — 정보 배지·대상 태그 = 중립 칩(새 「정보」 색을 만들지 않음 · 뜻은 이모지·글자) · 안내 칩 셋 = 중립 */
+.chip.sel.zf-chip-info{background:var(--surface-2);border-color:var(--line);color:var(--ink-2)}
+.zf-doc-note,.zf-check-note,.zf-varies{color:var(--ink-2);background:var(--surface-2)}
 .chip-all{font-weight:600}
 /* 🔵 표시층 B ① — 카드 칩 행: 칩 단위로 줄을 바꾼다(칩 하나는 한 줄). 카드 폭보다 긴 칩만 말줄임 — 전문은 툴팁(zfTitleClippedChips) */
 .chip-row{display:flex;flex-wrap:wrap;align-items:center}
@@ -173,7 +176,7 @@ select:focus,input:focus{border-color:var(--focus)}
 .alert-signup-box{background:#E1F5EE;border:1px solid #9FE1CB;border-radius:14px;padding:16px 18px;margin-top:1rem}
 .alert-signup-box input[type=email]{padding:9px 12px;font-size:13px;border:1px solid var(--line);border-radius:8px}
 .more-btn:hover{background:#f0f0e8}
-.detail-toggle-btn{width:100%;padding:8px;margin-top:8px;border-radius:8px;border:1px solid #e0e0d8;background:#fafaf6;color:#1D9E75;font-size:12px;font-weight:500;cursor:pointer}
+.detail-toggle-btn{width:100%;padding:8px;margin-top:8px;border-radius:8px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);font-size:12px;font-weight:500;cursor:pointer}
 .detail-toggle-btn:hover{background:#E1F5EE}
 .detail-box{margin-top:8px;padding-top:8px;border-top:1px dashed #e0e0d8}
 .detail-inner{display:flex;flex-direction:column;gap:8px}
@@ -240,7 +243,7 @@ body.theme-dark mark.zf-hl{background:#7A5F00;color:#fff}
 /* 🔵 B62 ①② — 날짜 줄 아래 한 줄. 🔵 표시층 B ② 접힌 상태는 두 줄까지(첫 날짜가 보이게) · 펼침 표시 ▾는 말줄임 밖 별도 칸 · 누르면 펼친다 */
 .zf-org-sup{margin:4px 0 2px}
 .zf-org-sup span{display:inline-block;font-size:12px;font-weight:700;color:#3B4A6B;background:#E8EDF7;border-radius:999px;padding:2px 10px}
-.zf-wave-slot{font-size:12px;color:#8A5A12;background:#FBF0DC;border-radius:8px;padding:4px 10px;margin:4px 0 6px}
+.zf-wave-slot{font-size:12px;color:var(--warn);background:var(--warn-bg);border-radius:8px;padding:4px 10px;margin:4px 0 6px}
 html[data-ui="d3"] .zf-org-sup span{background:var(--surface-2);color:var(--ink)}
 .zf-route-line{font-size:12px;color:#8A5A12;background:#FBF0DC;border-radius:8px;padding:4px 10px;margin:-4px 0 8px;cursor:pointer;display:flex;align-items:flex-start;gap:6px}
 .zf-route-text{flex:1;min-width:0;line-height:1.5;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;word-break:keep-all;overflow-wrap:anywhere}
@@ -353,7 +356,7 @@ body.theme-dark .extras-missing-note{color:#d8c48a;background:#2a2721;border-col
 .hu-note-block + .hu-note-block{margin-top:6px;padding-top:6px;border-top:1px dotted #ddd}
 .hu-note-long{flex:1 1 100%;font-size:11px;color:#555;line-height:1.55}
 .hu-note-badge{padding:2px 8px;font-size:11px;cursor:default;display:inline-block;margin:2px 4px 2px 0}
-.hu-recruit-badge{padding:2px 9px;font-size:11px;cursor:default;display:inline-block;margin-left:6px;background:#1D9E75;color:#fff;border-color:#1D9E75;font-weight:600}
+.hu-recruit-badge{padding:2px 9px;font-size:11px;cursor:default;display:inline-block;margin-left:6px;background:var(--surface-2);color:var(--ink-2);border-color:var(--line);font-weight:600}
 /* 회차 배지 — 대표(이번) 회차는 초록 테두리, 지난 회차는 주의색 채움으로 눈에 갈리게 한다.
    모집 배지(초록 채움)와 겹치지 않도록 이번 회차는 흰 바탕 + 초록 테두리로 둔다. */
 .hu-round-badge{padding:2px 9px;font-size:11px;cursor:default;display:inline-block;margin-left:6px;background:#fff;color:var(--ink-2);border-color:var(--line);font-weight:600}
@@ -376,7 +379,7 @@ body.theme-dark .extras-missing-note{color:#d8c48a;background:#2a2721;border-col
 .zf-rent-line b{font-weight:700;color:#1F5E4A}
 body.theme-dark .zf-rent-line{color:#9fb8b0}
 body.theme-dark .zf-rent-line b{color:#7fd8b5}
-.zf-exempt-chip{padding:2px 9px;font-size:11px;cursor:default;display:inline-block;margin-left:6px;background:#e7f5ef;color:#0F6E56;border-color:#bfe3d4;font-weight:600}
+.zf-exempt-chip{padding:2px 9px;font-size:11px;cursor:default;display:inline-block;margin-left:6px;background:var(--surface-2);color:var(--ink-2);border-color:var(--line);font-weight:600}
 .zf-pol-notes{margin:0 0 8px}
 .hu-list>.zf-weak-head{margin:0 0 8px}
 .zf-weak-chip{font-size:var(--t-xs,11px);padding:1px 6px;background:#EEF2FB;border-color:#CFD9F0;color:#2B4C8C}
@@ -529,14 +532,14 @@ a[href^="./privacy.html"]{font-weight:700}
    가로 자리는 .wrap(최대 720px) 오른쪽 안쪽에 맞춘다 — 넓은 화면에서 본문과 떨어져 뜨지 않게.
    아래 탭 바가 없어 바닥에서 띄우는 것은 안전 영역(홈 인디케이터)뿐이다. 겹칠 수 있는 고정 요소는 사진 보기
    오버레이(z-index 1000)뿐이라 그 아래(90)에 둔다 — 위쪽 탭 줄(sticky 100)과도 자리가 다르다. */
-.zf-totop{position:fixed;right:max(16px,calc((100vw - 720px) / 2 + 16px));bottom:calc(20px + env(safe-area-inset-bottom, 0px));z-index:90;width:44px;height:44px;border-radius:50%;border:1px solid #d8d8d0;background:#fff;color:#0F6E56;font-size:20px;line-height:1;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.15);display:flex;align-items:center;justify-content:center;opacity:0;visibility:hidden;transform:translateY(8px);transition:opacity .2s,transform .2s,visibility .2s}
+.zf-totop{position:fixed;right:max(16px,calc((100vw - 720px) / 2 + 16px));bottom:calc(20px + env(safe-area-inset-bottom, 0px));z-index:90;width:44px;height:44px;border-radius:50%;border:1px solid #d8d8d0;background:#fff;color:var(--ink-2);font-size:20px;line-height:1;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.15);display:flex;align-items:center;justify-content:center;opacity:0;visibility:hidden;transform:translateY(8px);transition:opacity .2s,transform .2s,visibility .2s}
 .zf-totop.show{opacity:1;visibility:visible;transform:none}
 /* 🔵 2026-10-20 실사용 5회차 D2 — 맨 위로 단추가 카드 펼침 단추 「›」를 덮지 않게: 단 밖 여백이 있으면 단 밖으로(840~) ·
    좁은 화면에서 「›」와 겹치는 동안은 숨는다(zf-dodge — 아래 스크립트가 스크롤마다 잰다). */
 .zf-totop.show.zf-dodge{opacity:0;visibility:hidden;pointer-events:none}
 @media (min-width:840px){.zf-totop{right:calc((100vw - 720px) / 2 - 52px)}}
 .zf-totop:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
-body.theme-dark .zf-totop{background:#262932;border-color:#3a3e48;color:#5DCAA5;box-shadow:0 2px 10px rgba(0,0,0,0.5)}
+body.theme-dark .zf-totop{background:#262932;border-color:#3a3e48;color:var(--ink-2);box-shadow:0 2px 10px rgba(0,0,0,0.5)}
 
 /* ===== 🔵 2026-10-12 표시층 D-3 · 단계 a — 「지금 판」 토큰 · 부품(ui=d3 일 때만) =====
    토큰 정본은 꼭집 Design System 아티팩트(D-2 4차 「확정 토큰 지금 판」 표) — 이름을 같게 둔다.
@@ -1566,7 +1569,7 @@ html[data-ui="d3"] .pg-btn{min-width:var(--hit);height:var(--hit);font-size:var(
         <div class="dday-sub" id="dday-sub"></div>
       </div>
       <!-- 🔴 2026-10-07(표시층 긴급 3) — 아래 목록은 유형별 고정 예시다. 원문 제출서류를 화면이 아직 읽지 않는다. -->
-      <p class="zf-doc-note" style="font-size:12px;color:#8A5A12;background:#FBF0DC;border-radius:8px;padding:8px 10px;margin:0 0 10px">공고마다 제출서류가 다릅니다 — 공고 원문에서 확인하세요</p>
+      <p class="zf-doc-note" style="font-size:12px;border-radius:8px;padding:8px 10px;margin:0 0 10px">공고마다 제출서류가 다릅니다 — 공고 원문에서 확인하세요</p>
       <p class="slabel">📋 일반적으로 필요한 서류(예시)</p>
       <ul class="checklist" id="checklist-common"></ul>
       <p class="slabel" id="checklist-cond-title" style="margin-top:1.25rem">📎 자격별 추가 서류</p>
@@ -1903,12 +1906,12 @@ function classifyNoticeType(typeText, nameText){
 function classifyDemographics(typeText, nameText){
   const t = (typeText||'') + ' ' + (nameText||'');
   const tags = [];
-  if(t.includes('신혼')||t.includes('신생아')) tags.push({label:'신혼·신생아', color:'#1D9E75'});
+  if(t.includes('신혼')||t.includes('신생아')) tags.push({label:'신혼·신생아', color:null});
   if(t.includes('청년')) tags.push({label:'청년', color:'#378ADD'});
   if(t.includes('대학생')) tags.push({label:'대학생', color:'#7F77DD'});
   if(t.includes('고령자')||t.includes('노인')) tags.push({label:'고령자', color:'#EF9F27'});
   if(t.includes('한부모')) tags.push({label:'한부모가족', color:'#D85A30'});
-  if(t.includes('장애인')) tags.push({label:'장애인', color:'#5DCAA5'});
+  if(t.includes('장애인')) tags.push({label:'장애인', color:null});
   return tags;
 }
 
@@ -1928,15 +1931,15 @@ function zfRelaxKind(title, detail){
 function buildConvBadges(mymy, supplyForm, appMethod, recruitMult, isRelaxed, selectionMethod, title, relaxDetail){
   const badges = [];
   if(mymy === true || mymy === 'true'){
-    badges.push('<span class="chip sel" style="cursor:default;padding:3px 8px;font-size:10px;background:#0F6E56;border-color:#0F6E56">📱 MyMy가능</span>');
+    badges.push('<span class="chip sel zf-chip-info" style="cursor:default;padding:3px 8px;font-size:10px">📱 MyMy가능</span>');
   }
   if(isRelaxed === true || isRelaxed === 'true'){
-    badges.push(`<span class="chip sel" data-zf-relax="1" style="cursor:default;padding:3px 8px;font-size:10px;background:#1D9E75;border-color:#1D9E75">🔓 ${zfRelaxKind(title, relaxDetail).label}</span>`);
+    badges.push(`<span class="chip sel zf-chip-info" data-zf-relax="1" style="cursor:default;padding:3px 8px;font-size:10px">🔓 ${zfRelaxKind(title, relaxDetail).label}</span>`);
   }
   if(supplyForm && supplyForm !== '일반'){
     const sfMap = {'전세형':'🏠 전세형','기숙사형':'🏢 기숙사형','공동거주형':'👥 공동거주형','건설형':'🏗 건설형','분양전환형':'🔑 분양전환형'};
     const label = sfMap[supplyForm] || supplyForm;
-    badges.push(`<span class="chip sel" style="cursor:default;padding:3px 8px;font-size:10px;background:#5DCAA5;border-color:#5DCAA5">${label}</span>`);
+    badges.push(`<span class="chip sel zf-chip-info" style="cursor:default;padding:3px 8px;font-size:10px">${label}</span>`);
   }
   if(appMethod && appMethod !== 'online'){
     const amMap = {'email':'📧 이메일신청','online_offline':'🏢 현장접수가능','local_gov':'🏛 지자체신청'};
@@ -2604,13 +2607,13 @@ function applyDateLine(row, annDate, applyStart, applyEnd, url){
   //    schedule_varies 가 true 일 때만 붙는다 — false·null·컬럼 없음은 종전 그대로 아무 것도 안 붙는다.
   // 🔵 B62 — class `zf-varies` 는 경로 칸 한 줄(①·②)이 이 배지를 대신할 때 찾는 표지다(zfFillRouteSlots).
   const variesTag = row && row['schedule_varies'] === true
-    ? ' <span class="zf-varies" style="display:inline-block;margin-left:4px;padding:1px 6px;border-radius:9px;background:#FBF0DC;color:#8A5A12;font-size:11px;font-weight:600">단지마다 일정이 달라요 — 원문 확인</span>'
+    ? ' <span class="zf-varies" style="display:inline-block;margin-left:4px;padding:1px 6px;border-radius:9px;font-size:11px;font-weight:600">단지마다 일정이 달라요 — 원문 확인</span>'
     : '';
   // 🔴 B62 ③ — 날짜 자리에 「확인 필요」와 공사 공고 링크만 둔다. 수집 날짜(믿을 수 없는 값)를 적지 않는다.
   if(row && row['apply_period_check'] === true){
     const head = annLabel ? `모집공고: ${annLabel} · ` : '';
     const link = zfSafeUrl(url)
-      ? ` · <a href="${zfSafeHref(url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:#0F6E56;font-weight:600;text-decoration:underline">공사 공고에서 확인 ↗</a>`
+      ? ` · <a href="${zfSafeHref(url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--ink-2);font-weight:600;text-decoration:underline">공사 공고에서 확인 ↗</a>`
       : ' · 공사 공고에서 확인하세요';
     return `${head}접수기간: <b style="color:#6B6B63">확인 필요</b>${link}`;
   }
@@ -2625,7 +2628,7 @@ function applyDateLine(row, annDate, applyStart, applyEnd, url){
   if(unknown && !applyStart && !applyEnd){
     const head = annLabel ? `모집공고: ${annLabel} · ` : '';
     const link = zfSafeUrl(url)
-      ? ` <a href="${zfSafeHref(url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:#0F6E56;font-weight:600;text-decoration:underline">📄 원문에서 확인</a>`
+      ? ` <a href="${zfSafeHref(url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--ink-2);font-weight:600;text-decoration:underline">📄 원문에서 확인</a>`
       : ' 원문에서 확인하세요';
     return `${head}<b style="color:#6B6B63">${APPLY_UNKNOWN_LABEL}</b> —${link}${variesTag}`;
   }
@@ -3997,7 +4000,7 @@ function cancelRowDateLine(row, annDate, url){
   const annLabel = zfAnnDateLabel(row, annDate);
   const head = annLabel ? `모집공고: ${annLabel}` : '';
   const link = zfSafeUrl(url)
-    ? `<a href="${zfSafeHref(url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:#0F6E56;font-weight:600;text-decoration:underline">📄 취소공고 원문 보기</a>`
+    ? `<a href="${zfSafeHref(url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--ink-2);font-weight:600;text-decoration:underline">📄 취소공고 원문 보기</a>`
     : '';
   return [head, link].filter(Boolean).join(' · ');
 }
@@ -5370,7 +5373,7 @@ function zfSummaryLine(s, dualTag){
 // 🔵 2026-09-29 코드 회차 2 잔여 — 문구만 갈아 끼울 수 있게 text 를 받는다(없으면 종전 문구). 상자·링크는 그대로.
 function zfNotAnalyzedHtml(url, text){
   const link = zfSafeUrl(url)
-    ? ` <a href="${zfSafeHref(url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:#0F6E56;font-weight:600;text-decoration:underline"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`
+    ? ` <a href="${zfSafeHref(url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--ink-2);font-weight:600;text-decoration:underline"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`
     : '';
   return `<div style="font-size:12px;color:#6B6B63;background:#F6F6F2;border:1px solid #E8E8E0;border-radius:8px;padding:6px 10px;margin-bottom:6px">${text || '아직 공고 원문을 정리하지 못했어요 · 보증금·면적은 원문에서 확인해 주세요'}${link}</div>`;
 }
@@ -5447,7 +5450,7 @@ function zfAnaPending(s, key){
 // 🔵 2026-10-16 — 아직 정리 전이라 「AI 정리」라고 말하지 않는다(링크는 「원문 보기」만 · 카드 안 다른 원문 링크의 「AI 정리 · 」도 .zf-ana-pending 에서 접는다).
 function zfAnaPendingHtml(url, org){
   const link = zfSafeUrl(url)
-    ? ` <a href="${zfSafeHref(url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:#0F6E56;font-weight:600;text-decoration:underline">원문 보기 →</a>`
+    ? ` <a href="${zfSafeHref(url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--ink-2);font-weight:600;text-decoration:underline">원문 보기 →</a>`
     : '';
   return `<div class="zf-ana-box"><span class="zf-ana-pill">분석 중</span>${org ? `<span class="zf-ana-org">${escapeHtml(org)}</span>` : ''}<span class="zf-ana-t">공고 원문을 정리하고 있어요 · 일정·자격은 원문에서 확인해 주세요</span>${link}</div>`;
 }
@@ -5911,7 +5914,7 @@ function zfWarnBadges(o){
     b.push('<span class="chip sel zf-chip-warn" title="자격 검증 전에 먼저 계약을 체결합니다. 계약 후 부적격으로 판명되면 계약이 직권 해제될 수 있어요." data-zf-tip tabindex="0" role="button" aria-expanded="false" style="cursor:pointer;padding:4px 10px;font-size:11px">⚠️ 선계약 후검증</span>');
   }
   if(o.rentExemptUntil){
-    b.push(`<span class="chip sel" title="${at('~' + o.rentExemptUntil + '까지 월임대료 면제' + (o.rentExemptNote ? ' / ' + o.rentExemptNote : ''))}" data-zf-tip tabindex="0" role="button" aria-expanded="false" style="cursor:pointer;padding:4px 10px;font-size:11px;background:#1D9E75;border-color:#1D9E75">🎁 임대료 면제</span>`);
+    b.push(`<span class="chip sel zf-chip-info" title="${at('~' + o.rentExemptUntil + '까지 월임대료 면제' + (o.rentExemptNote ? ' / ' + o.rentExemptNote : ''))}" data-zf-tip tabindex="0" role="button" aria-expanded="false" style="cursor:pointer;padding:4px 10px;font-size:11px">🎁 임대료 면제</span>`);
   }
   if(o.specialNotes && typeof o.specialNotes === 'object'){
     Object.entries(o.specialNotes).forEach(([k, v]) => {
@@ -6055,7 +6058,7 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
         ${closingSoon?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
         ${applyUnknownChip(n)}
         ${zfRentLowSlotHtml(n, n['공고명'])}
-        ${demoTags.map(t=>`<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:${t.color};border-color:${t.color}">${t.label}</span>`).join('')}
+        ${demoTags.map(t=>`<span class="chip sel${t.color ? '' : ' zf-chip-info'}" style="cursor:default;padding:4px 10px;font-size:11px${t.color ? `;background:${t.color};border-color:${t.color}` : ''}">${t.label}</span>`).join('')}
         ${convBadges}
         ${zfWarnBadges({contractVerify:n['contract_before_verification']===true, selectionMethod:n['selection_method'], rentExemptUntil:n['rent_exemption_until'], rentExemptNote:n['rent_exemption_note'], specialNotes:n['special_notes']})}
       `}</div>
@@ -6834,7 +6837,7 @@ function renderInsight(rows, wrap, statsRows){
               </div>
               <div style="text-align:right">
                 ${noticeCnt>0
-                  ? `<p style="font-size:14px;font-weight:700;color:#1D9E75;margin:0">${noticeCnt}건</p>
+                  ? `<p style="font-size:14px;font-weight:700;color:var(--ink);margin:0">${noticeCnt}건</p>
                      <p style="font-size:10px;color:#888;margin:2px 0 0">접수중 공고</p>
                      ${upcomingCnt>0?`<p style="font-size:10px;color:#EF9F27;margin:2px 0 0">접수 예정 ${upcomingCnt}건</p>`:''}`
                   : upcomingCnt>0
@@ -6899,7 +6902,7 @@ function renderInsight(rows, wrap, statsRows){
           <p style="font-size:12px;color:#888;margin-top:6px">🟢 접수중</p>
         </div>
         <div style="background:#f0faf5;border-radius:12px;padding:16px;text-align:center;box-shadow:0 1px 4px rgba(29,158,117,0.08)">
-          <p style="font-size:28px;font-weight:700;color:#1D9E75;margin:0">${kpiNew.toLocaleString()}</p>
+          <p style="font-size:28px;font-weight:700;color:var(--ink);margin:0">${kpiNew.toLocaleString()}</p>
           <p style="font-size:12px;color:#888;margin-top:6px">🆕 새 공고 · 3일</p>
         </div>
         <div style="background:#fff7f0;border-radius:12px;padding:16px;text-align:center;box-shadow:0 1px 4px rgba(239,159,39,0.08)">
@@ -7699,7 +7702,7 @@ function zfCheckNoteHtml(labels, typeNote){
   const lines = [];
   if(labels && labels.length) lines.push(`이 공고는 ${escapeHtml(labels.join('·'))} 대상 모집이에요 — 신청할 수 있는지 공고문에서 확인해 주세요`);
   if(typeNote) lines.push(`자격 진단에 이 유형(${escapeHtml(typeNote)}) 기준이 없어요 — 신청할 수 있는지 공고문에서 확인해 주세요`);
-  return lines.map(l => `<p class="zf-check-note" style="font-size:12px;color:#8A5A12;background:#FBF0DC;border-radius:8px;padding:6px 10px;margin:0 0 8px">📄 ${l}</p>`).join('');
+  return lines.map(l => `<p class="zf-check-note" style="font-size:12px;border-radius:8px;padding:6px 10px;margin:0 0 8px">📄 ${l}</p>`).join('');
 }
 function zfDiagFacts(){
   const by = parseInt(document.getElementById('birthYear')?.value) || 0;
@@ -8125,7 +8128,7 @@ function zfTargetNoteHtml(v){
     const tail = a.why === 'birth'
       ? `${prof ? '저장한' : '입력하신'} ${what}이 이 공고 기본 ${what} 기준(${lim})을 넘어요 · 이 공고는 2023년 3월 28일 이후 출산 자녀가 있으면 ${what} 기준이 올라가는데 그 금액은 공고문에서 확인해야 해요`
       : `${prof ? '저장한' : '입력하신'} ${what}이 이 공고 ${what} 기준(${lim})을 넘어요`;
-    return `<p class="zf-check-note" style="font-size:12px;color:#8A5A12;background:#FBF0DC;border-radius:8px;padding:6px 10px;margin:0 0 8px">📄 ${nm ? `${nm} ` : ''}대상 조건은 맞지만 ${escapeHtml(tail)} — 신청할 수 있는지 공고문에서 확인해 주세요</p>`;
+    return `<p class="zf-check-note" style="font-size:12px;border-radius:8px;padding:6px 10px;margin:0 0 8px">📄 ${nm ? `${nm} ` : ''}대상 조건은 맞지만 ${escapeHtml(tail)} — 신청할 수 있는지 공고문에서 확인해 주세요</p>`;
   }
   if(v.state === 'check' && v.income){
     // 🔵 2026-10-16(N12) — 대상 조건은 맞는데 소득을 볼 수 없거나 넘는 카드. 금액은 만원 단위 반올림(「약」)이다.
@@ -8135,12 +8138,12 @@ function zfTargetNoteHtml(v){
         ? (prof ? `저장한 소득이 이 공고 기본 소득 기준(${lim} · 맞벌이·출산 가산 전)보다 많아요` : `입력하신 소득이 이 공고 소득 기준(${lim})을 넘어요`)
       : v.income.why === 'unknown' ? (prof ? '저장한 조건에 소득이 없어 소득 기준은 보지 못했어요' : '소득을 입력하지 않아 소득 기준은 보지 못했어요')
       : '이 공고 소득 기준을 화면에서 계산하지 못했어요';
-    return `<p class="zf-check-note" style="font-size:12px;color:#8A5A12;background:#FBF0DC;border-radius:8px;padding:6px 10px;margin:0 0 8px">📄 ${nm ? `${nm} ` : ''}대상 조건은 맞지만 ${tail} — 신청할 수 있는지 공고문에서 확인해 주세요</p>`;
+    return `<p class="zf-check-note" style="font-size:12px;border-radius:8px;padding:6px 10px;margin:0 0 8px">📄 ${nm ? `${nm} ` : ''}대상 조건은 맞지만 ${tail} — 신청할 수 있는지 공고문에서 확인해 주세요</p>`;
   }
   if(v.state === 'check'){
     const why = (v.checks || []).length ? ` (${escapeHtml(v.checks.join(' · '))})` : '';
-    if((v.targets || []).length) return `<p class="zf-check-note" style="font-size:12px;color:#8A5A12;background:#FBF0DC;border-radius:8px;padding:6px 10px;margin:0 0 8px">📄 이 공고의 모집 대상은 ${v.targets.map(t => `「${escapeHtml(t)}」`).join(' · ')}이에요${why} — 신청할 수 있는지 공고문에서 확인해 주세요</p>`;
-    return `<p class="zf-check-note" style="font-size:12px;color:#8A5A12;background:#FBF0DC;border-radius:8px;padding:6px 10px;margin:0 0 8px">📄 ${nm ? `이 공고는 ${nm} 대상 모집이에요` : '대상 조건이 있는 공고예요'}${why} — 신청할 수 있는지 공고문에서 확인해 주세요</p>`;
+    if((v.targets || []).length) return `<p class="zf-check-note" style="font-size:12px;border-radius:8px;padding:6px 10px;margin:0 0 8px">📄 이 공고의 모집 대상은 ${v.targets.map(t => `「${escapeHtml(t)}」`).join(' · ')}이에요${why} — 신청할 수 있는지 공고문에서 확인해 주세요</p>`;
+    return `<p class="zf-check-note" style="font-size:12px;border-radius:8px;padding:6px 10px;margin:0 0 8px">📄 ${nm ? `이 공고는 ${nm} 대상 모집이에요` : '대상 조건이 있는 공고예요'}${why} — 신청할 수 있는지 공고문에서 확인해 주세요</p>`;
   }
   return '';
 }
@@ -12209,7 +12212,7 @@ function renderMatchResults(rows){
         ${closingSoon?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
         ${applyUnknownChip(n)}
         ${zfRentLowSlotHtml(n, n.title)}
-        ${demoTags.map(t=>`<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:${t.color};border-color:${t.color}">${t.label}</span>`).join('')}
+        ${demoTags.map(t=>`<span class="chip sel${t.color ? '' : ' zf-chip-info'}" style="cursor:default;padding:4px 10px;font-size:11px${t.color ? `;background:${t.color};border-color:${t.color}` : ''}">${t.label}</span>`).join('')}
         ${convBadgesM}
         ${zfWarnBadges({contractVerify:n.contract_before_verification===true, selectionMethod:n.selection_method, rentExemptUntil:n.rent_exemption_until, rentExemptNote:n.rent_exemption_note, specialNotes:n.special_notes})}
       </div>
@@ -15275,7 +15278,7 @@ function zf3Recolor(html){
     ['box-shadow:0 1px 6px rgba(0,0,0,0.07)', 'box-shadow:none'],
     ['background:#f8f9ff', 'background:var(--surface)'], ['background:#f5f5f5', 'background:var(--surface)'],
     ['color:#333', 'color:var(--ink)'], ['color:#888', 'color:var(--ink-3)'], ['color:#bbb', 'color:var(--ink-3)'], ['color:#ccc', 'color:var(--ink-3)'], ['color:#aaa', 'color:var(--ink-3)'],
-    ['color:#5a7af7', 'color:var(--ln-kuk)'], ['color:#1D9E75', 'color:var(--ln-hang)'], ['color:#EF9F27', 'color:var(--ln-jeon)']
+    ['color:#5a7af7', 'color:var(--ln-kuk)'], ['color:#EF9F27', 'color:var(--ln-jeon)']
   ];
   return map.reduce((h, [a, b]) => h.split(a).join(b), String(html || ''));
 }
