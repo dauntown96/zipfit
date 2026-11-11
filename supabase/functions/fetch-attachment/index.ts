@@ -197,12 +197,13 @@ const rpcPost = async (fn: string, args: Record<string, unknown>): Promise<unkno
 //   동시 받기 1 · 받기 사이 최소 간격 · 10분 상한은 DB 가 정한다(lh_file_policy · lh_file_gate). 이 함수는 기다림을 합쳐 LH_GATE_WAIT_MAX_MS 까지만 —
 //   넘으면 429 {status:'lh_file_gate', reason:'lh_file_busy', retry_after_ms} 로 돌려주고 부른 쪽이 나중에 다시 부른다(양을 버리지 않는다).
 const LH_GATE_WAIT_MAX_MS = 45_000
-const lhFileGate = async (u: URL, purpose: 'fetch' | 'probe'): Promise<LhGate> => {
+// 🔵 2026-11-11(우편함 「코드·운영 — 0장 다섯」 3) — 요청의 announcement_id 를 문지기에 넘긴다(공지 첨부를 kind notice_attachment + 그 공고로 기록 · 허락 판단은 DB 그대로).
+const lhFileGate = async (u: URL, purpose: 'fetch' | 'probe', announcementId: string | null = null): Promise<LhGate> => {
   let waited = 0
   for (;;) {
     let g: LhGate
     try {
-      g = await rpcPost('lh_file_gate', { p_url: u.toString(), p_purpose: purpose }) as LhGate
+      g = await rpcPost('lh_file_gate', { p_url: u.toString(), p_purpose: purpose, p_announcement_id: announcementId }) as LhGate
       if (!g || typeof g.allow !== 'boolean') return { allow: false, reason: '문지기 응답을 읽지 못함 — 받지 않음', kind: null, mode: null, reuse_url: null, log_id: null }
     } catch (e) {
       return { allow: false, reason: `문지기를 부르지 못함 — 받지 않음(${String(e instanceof Error ? e.message : e).slice(0, 80)})`, kind: null, mode: null, reuse_url: null, log_id: null }
@@ -1341,7 +1342,7 @@ const handleRequest = async (req: Request): Promise<Response> => {
   const firstReject = rejectReason(current)
   if (firstReject) return json({ ok: false, error: firstReject }, 403)
   if (ROBOTS_DISALLOWED(current)) {
-    const g = await lhFileGate(current, 'fetch')
+    const g = await lhFileGate(current, 'fetch', announcementId)
     if (!g.allow) return json(LH_GATE_BODY(current, g), lhGateStatus(g))
     if (g.log_id != null) lhGateOf.set(req, g.log_id)
   }
@@ -1374,7 +1375,7 @@ const handleRequest = async (req: Request): Promise<Response> => {
         }, 403)
       }
       if (ROBOTS_DISALLOWED(next) && !lhGateOf.has(req)) {
-        const g = await lhFileGate(next, 'fetch')
+        const g = await lhFileGate(next, 'fetch', announcementId)
         if (!g.allow) {
           clearTimeout(timer)
           return json({ ...LH_GATE_BODY(next, g), redirect_hops: hops }, lhGateStatus(g))

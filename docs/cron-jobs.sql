@@ -91,7 +91,7 @@ select cron.schedule('zipfit-collect-announcements-night', '0 18 * * *', $cmd$
   );
 $cmd$);
 
--- jobid 14 · zipfit-purge-usage-events · '0 15 * * *' = KST 00:00 · active=true · command md5 885844314dcd933b97af668b2f5210c1
+-- jobid 14 · zipfit-purge-usage-events · '0 15 * * *' = KST 00:00 · active=true · command md5 e294438a5e2e4adcc938dc849f666e66 · 2026-11-10 의견 1년 삭제 한 문장(마이그레이션 2026-11-10_02)
 select cron.schedule('zipfit-purge-usage-events', '0 15 * * *', $cmd$
   -- 처리방침 「서비스 이용 기록은 수집일로부터 1년간 보관한 뒤 파기합니다」를 지키는 장치.
   -- 🔴 삭제 기준에는 유예를 두지 않는다 — 유예를 두면 약속한 1년을 넘겨 보관하게 된다.
@@ -102,6 +102,8 @@ select cron.schedule('zipfit-purge-usage-events', '0 15 * * *', $cmd$
   UPDATE public.usage_events
      SET props = (props - 'q') || '{"q_expired":true}'::jsonb
    WHERE event = 'search' AND props ? 'q' AND occurred_at < now() - interval '90 days';
+  -- 2026-10-26 — 의견은 받은 날부터 1년(처리방침 1 · 7). 유예 없음(위와 같은 이유).
+  DELETE FROM public.user_feedback WHERE received_at < now() - interval '1 year';
   $cmd$);
 
 -- jobid 16 · zipfit-purge-sh-run-log · '10 15 * * *' = KST 00:10 · active=true · command md5 728b7a58b36d1b12860efd4113c6ee65

@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION public.lh_file_gate(p_url text, p_purpose text DEFAULT 'fetch'::text)
+CREATE OR REPLACE FUNCTION public.lh_file_gate(p_url text, p_purpose text DEFAULT 'fetch'::text, p_announcement_id text DEFAULT NULL::text)
  RETURNS jsonb
  LANGUAGE plpgsql
  SET search_path TO 'public', 'pg_temp'
@@ -36,6 +36,15 @@ begin
     if v_aid is not null then v_kind := 'attachment';
     elsif exists (select 1 from public.announcement_complex_images where file_sn::text = v_fid) then v_kind := 'complex_image';
     elsif exists (select 1 from public.announcement_promo_files where file_sn::text = v_fid) then v_kind := 'promo_file';
+    -- 🔵 2026-11-11(우편함 「코드·운영 — 0장 다섯」 3) — 공지 첨부(LH 공지사항 게시글 첨부 · 차수 대상주택 목록 등)는 announcements.attachment_urls 에 없어
+    --    종전에는 kind other · announcement_id 빈 칸으로 남았다(행 678). 부른 쪽(EF fetch-attachment)이 announcement_id 를 넘기고 그 공고가 있으면
+    --    공고 첨부·단지 이미지·홍보물 어느 것도 아닌 파일을 공지 첨부로 적고 그 공고에 잇는다. 허락 판단은 그대로(essential 은 공고 첨부만 허락).
+    elsif p_announcement_id is not null and exists (select 1 from public.announcements where announcement_id = p_announcement_id) then
+      v_kind := 'notice_attachment'; v_aid := p_announcement_id;
+    end if;
+    -- 단지 이미지·홍보물도 부른 쪽이 공고를 알려 주면 그 공고에 잇는다(기록만 · 판단 그대로).
+    if v_aid is null and p_announcement_id is not null and exists (select 1 from public.announcements where announcement_id = p_announcement_id) then
+      v_aid := p_announcement_id;
     end if;
     select x.file_url into v_reuse from public.announcement_extras x
      where x.source_url ~ ('[?&]fileid=' || v_fid || '($|&)') and x.file_url is not null order by x.created_at limit 1;
