@@ -1012,6 +1012,16 @@ async function collect() {
       .upsert(detailRows.slice(i, i+50), { onConflict: 'source,announcement_id', ignoreDuplicates: false })
     if (error) errors.push(`LH detail_upsert[${i}]: ${error.message}`)
   }
+  // 🔵 2026-11-11(우편함 「코드·운영 — 단지 키 2차 …」 2) — 상세 행(precise_address)을 단지 키에 잇는다. 규칙은 DB 함수 complex_link_announcements 한 곳.
+  //    🔴 실패해도 수집은 그대로다(errors 에 넣지 않는다 — 단지 잇기는 수집 성패가 아니다 · 콘솔 로그만).
+  if (detailRows.length) {
+    try {
+      const ids = [...new Set(detailRows.map(r => String(r.announcement_id)))]
+      const { data, error } = await supabase.rpc('complex_link_announcements', { p_ids: ids })
+      if (error) console.warn(`[LH] 단지 잇기 실패: ${error.message}`)
+      else console.log(`[LH] 단지 잇기 ${JSON.stringify(data)}`)
+    } catch (e) { console.warn(`[LH] 단지 잇기 예외: ${e instanceof Error ? e.message : e}`) }
+  }
   // 전용 컬럼이 없으므로 errors에 남긴다(스키마 변경은 범위 밖). late_retry와 같은 방식이며,
   // 마감이 실제로 발동했는지를 collection_run_log만 보고 판정할 유일한 근거다.
   if (detailSkipped > 0) {

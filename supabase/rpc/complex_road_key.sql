@@ -32,7 +32,10 @@ AS $function$
                end as sido, x.k
           from a cross join lateral (values (split_part(a.s, ' ', 1), 1), (btrim(coalesce(p_sido, '')), 2)) x(t, k)),
   sd as (select (select n.sido from n where n.sido is not null order by n.k limit 1) as sido),
-  rd as (select regexp_match((select s from a), '([가-힣A-Za-z0-9]+(?:로|길))\s?((?:[0-9]+번?(?:길|로))?)\s([0-9]+(?:-[0-9]+)?)(?:[^0-9-]|$)') as m)
+  -- 🔵 2026-11-11(단지 키 2차 1) — 띄어 쓴 꼴(종전 규칙 · 그대로 먼저)이 안 맞을 때만 붙여 쓴 꼴(「주공길24」·「올림픽로79길36」)을 본다.
+  --    붙여 쓴 꼴은 번호 뒤에 한글이 오면 받지 않는다(「을지로3가」 같은 동 이름을 번호로 읽지 않게). 종전 키는 한 행도 바뀌지 않는다(hu·공고·홍보물 주소 11,890 대조).
+  rd as (select coalesce(regexp_match((select s from a), '([가-힣A-Za-z0-9]+(?:로|길))\s?((?:[0-9]+번?(?:길|로))?)\s([0-9]+(?:-[0-9]+)?)(?:[^0-9-]|$)'),
+                        regexp_match((select s from a), '([가-힣A-Za-z0-9]+(?:로|길))((?:[0-9]+번?(?:길|로))?)([0-9]+(?:-[0-9]+)?)(?:[^0-9가-힣-]|$)')) as m)
   select case when rd.m is null or sd.sido is null then null
               else sd.sido || ' ' || rd.m[1] || rd.m[2] || ' ' || rd.m[3] end
     from sd, rd
