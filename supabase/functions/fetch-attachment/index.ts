@@ -31,6 +31,7 @@ const requireEnv = (key: string): string => {
 }
 
 import { allowedPaths, seoulOnlyHosts, probeHosts, extraCaOf } from '../_shared/board-hosts.ts'
+import { looksLikeHtml, isContentTypeHtml } from './sniff.ts'
 import { findEocd, parseCentralDirectory, refusalOf, dataOffsetFromLocalHeader, baseName, EOCD_TAIL_BYTES, type ZipEntry } from './zip.ts'
 
 // 기존 수집 EF와 같은 기준 — verify_jwt=false + x-cron-secret 게이트.
@@ -237,17 +238,9 @@ const typeReject = (u: URL, contentType: string | null): string | null => {
   return `이미지 경로인데 응답 형식이 그림·PDF가 아니다: ${t || '(없음)'}`
 }
 
-// 🔵 2026-11-03(우편함 「코드·운영 — fetch-attachment 잘림·HTML 거름 …」 1) — 원문 대신 온 HTML 쪽 가리기.
-//   LH 가 내린 파일의 fileid 는 200 · text/html · 2,541B 안내 쪽을 준다(…20749·…20750 평면도) — 그대로 올리면 Drive 에 「원문」 이름의 HTML 이 생긴다.
-//   🔴 업로드(mode=upload)에서만 쓴다 — fetch 모드는 게시판 상세(HTML)를 읽는 데도 쓰인다(부산·제주 view).
-//   판정은 본문 머리(공백·BOM 뒤 앞 64자)가 `<!doctype html` · `<html` 꼴일 때만 — content-type 만으로 막지 않는다
-//   (옛 서버가 hwp·pdf 를 text/html 로 내보내는 꼴이 있어도 막히지 않게 · 그때는 응답에 content_type_html 표지만).
-const looksLikeHtml = (bytes: Uint8Array): boolean => {
-  const head = new TextDecoder('utf-8', { fatal: false }).decode(bytes.subarray(0, 512))
-    .replace(/^[\ufeff\s]+/, '').slice(0, 64).toLowerCase()
-  return head.startsWith('<!doctype html') || head.startsWith('<html')
-}
-
+// 🔵 2026-11-03 원문 대신 온 HTML 쪽 가리기 → 2026-11-11(우편함 「코드·운영 — 0장 여섯 …」 1) 판정은 sniff.ts 로 옮겨 넓혔다(`<script`·`<head` 머리 ·
+//   text/html + `<` 머리 · BOM + `<`) — 단위 시험 sniff.test.mts. 🔴 업로드(mode=upload)와 LH 첨부 경로(lhFile.do — 늘 파일이어야 한다)에서만 쓴다 —
+//   fetch 모드는 게시판 상세(HTML)를 읽는 데도 쓰인다(부산·제주 view).
 // 🔵 2026-11-03(우편함 「코드·운영 — GH 2-0 관찰 장치 · nexacro XML 거름 …」 1) — 원문 대신 온 nexacro XML 오류 가리기.
 //   GH(apply-cdn.gh.or.kr) 는 받기 실패를 200 · application/octet-stream · 277B `<?xml …><Root xmlns="http://www.nexacroplatform.com/…">`
 //   `<Parameter id="ErrorMsg">err.파일.다운로드.실패</Parameter>` 로 준다(GH_823 공고문 PDF — 원본 쪽 고장 · GH 상세도 「277 Byte」 표시).
@@ -1476,7 +1469,7 @@ const handleRequest = async (req: Request): Promise<Response> => {
     // 🔵 2026-11-03 — 받은 바이트가 Content-Length 와 다르면(받기가 중간에 끊김 · 11-03 채움 실측 49,152·270,336·565,272B) 잘린 것이다.
     const lengthMatch = declaredLen === null || !Number.isFinite(declaredLen) ? null : declaredLen === bytes.length
     payload.length_match = lengthMatch
-    const ctHtml = /^\s*text\/html\b/i.test(res.headers.get('content-type') ?? '')
+    const ctHtml = isContentTypeHtml(res.headers.get('content-type'))
     if (ctHtml) payload.content_type_html = true
     const nexErr = looksLikeNexacroError(bytes)
     if (nexErr) payload.nexacro_error = true
@@ -1486,7 +1479,7 @@ const handleRequest = async (req: Request): Promise<Response> => {
         detail: `받은 ${bytes.length}B ≠ Content-Length ${declaredLen}B — 받기가 중간에 끊겼다(올리지 않음 · 다시 부를 것)`,
         elapsed_ms: Date.now() - started }, 502)
     }
-    if (wantUpload && looksLikeHtml(bytes)) {
+    if ((wantUpload || ROBOTS_DISALLOWED(current)) && looksLikeHtml(bytes, ctHtml)) {
       return json({ ...payload, ok: false, uploaded: false, body_included: false, reason: 'html_response',
         detail: `원문 대신 HTML 쪽(${bytes.length}B · ${res.headers.get('content-type') ?? '형식 없음'})을 받았다 — 원본이 내려갔거나 오류 쪽이다(올리지 않음)`,
         elapsed_ms: Date.now() - started }, 422)
