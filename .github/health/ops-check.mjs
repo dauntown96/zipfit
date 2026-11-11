@@ -1092,10 +1092,21 @@ try {
 //    묶음 = content_raw(앞뒤 공백 뺀 것) md5 가 같은 정책 행 · 일정·⚠️·모집일정 밖 · 서로 다른 공고 둘 이상.
 //    의심 꼴 = 그 묶음 행이 전부 2026-09-18 이전에 만들어졌고 원문 파일(source_file)이 둘 이상 다름 — 다른 원문에서 글자째 같은 요약(옛 배치 요약 의심).
 //    역전파 회차가 공고마다 자기 원문으로 고치면 줄어든다(2026-11-10 46묶음 · 176행). 표준 공고문 문장의 정상 겹침(전체 묶음)은 값에 함께 보인다.
+//    🔵 2026-11-11(우편함 「코드·운영 — 0장 여섯 …」 2) — 원문 대조를 마친 행은 뺀다: source_page 가 찼거나 · 같은 묶음(get_announcement_group_ids — 분석 행이
+//       MYHOME 블록 ID 에 있는 경우)의 분석 행 pending_fields 에 「정책 「<분류>」 … 원문 문장으로」 기록이 있는 (공고, 분류). 역전파가 원문으로 고친 표준 문장이
+//       공고끼리 다시 같아져 의심 묶음으로 되잡히던 것(역전파 7회차)을 막는다. 2026-11-11 전 40묶음·125행 → 뒤 37묶음·107행(뺀 행 89).
 try {
-  const [x] = await sqlRead(`with p as (
+  const [x] = await sqlRead(`with done as materialized (
+      select distinct g.gid, m[1] cat from public.announcement_analysis a
+        cross join lateral unnest(a.pending_fields) pf
+        cross join lateral regexp_matches(pf, '정책 「([^」]+)」[^「]{0,20}원문 문장으로', 'g') m
+        cross join lateral public.get_announcement_group_ids(a.announcement_id) g(gid)
+       where array_to_string(a.pending_fields, ' ') ~ '원문 문장으로'),
+    p as (
       select p.announcement_id, p.source_file, p.created_at, md5(btrim(p.content_raw)) h from public.announcement_policies p
-       where coalesce(btrim(p.content_raw), '') <> '' and p.category !~ '^(⚠️|일정|모집일정)'),
+       where coalesce(btrim(p.content_raw), '') <> '' and p.category !~ '^(⚠️|일정|모집일정)'
+         and to_jsonb(p) ->> 'source_page' is null
+         and not exists (select 1 from done d where d.gid = p.announcement_id and d.cat = p.category)),
     g as (select h, count(*) n, count(distinct source_file) nf, bool_and(created_at < '2026-09-18') old
             from p group by h having count(distinct announcement_id) > 1)
   select json_build_object('groups', count(*) filter (where old and nf > 1), 'rows', coalesce(sum(n) filter (where old and nf > 1), 0),
@@ -1103,7 +1114,7 @@ try {
   const c = x.j
   add('policy_md5_dup_old', '공고끼리 같은 요약 정책 행 — 09-18 이전 · 원문 파일 다름(정보)', 'info',
     `의심 묶음 ${c.groups} · ${c.rows}행(전체 겹침 묶음 ${c.all_groups} · ${c.all_rows}행 — 대부분 표준 문장)`,
-    '정보 — 판정하지 않는다 · content_raw md5 같은 정책 행 · 일정·⚠️·모집일정 밖 · 공고 둘 이상 · 의심 = 전부 2026-09-18 이전 ∧ source_file 둘 이상 · 역전파가 고치면 줄어든다(2026-11-10 46)')
+    '정보 — 판정하지 않는다 · content_raw md5 같은 정책 행 · 일정·⚠️·모집일정 밖 · 원문 대조 마친 행(source_page · pending 「원문 문장으로」) 밖 · 공고 둘 이상 · 의심 = 전부 2026-09-18 이전 ∧ source_file 둘 이상 · 역전파가 고치면 줄어든다(2026-11-10 46 · 11-11 37)')
 } catch (e) {
   add('policy_md5_dup_old', '공고끼리 같은 요약 정책 행 — 09-18 이전 · 원문 파일 다름(정보)', 'info', String(e).slice(0, 200), '정책 표를 읽는다(실패면 ℹ️)')
 }

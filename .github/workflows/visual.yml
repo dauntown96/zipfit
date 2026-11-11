@@ -7,7 +7,8 @@
 #   러너가 기준 그림 40장 · baseline.json(누가 · 언제 · 실행 주소 · 커밋)을 새로 쓰고 그 가지에 커밋한다. main 에서는 갱신하지 않는다(PR 로만).
 # 첫 기준(baseline.json 이 아직 없을 때만): PR 실행이 기준을 만들어 그 가지에 커밋하고 견주기는 건너뛴다(통과 · 요약에 「첫 기준」).
 #   새 워크플로는 main 에 들어가기 전에는 수동 실행(workflow_dispatch)이 안 되기 때문이다(2026-11-10 이 장치를 들인 PR 이 그 경우).
-# 🔴 GITHUB_TOKEN 으로 민 커밋은 체크를 다시 돌리지 않는다 — 갱신 뒤에는 PR 의 「Visual」 실행을 다시 돌리거나(Re-run) 다음 push 로 잰다.
+# 🔴 GITHUB_TOKEN 으로 민 커밋은 체크를 다시 돌리지 않는다 — 🔵 2026-11-11 부터 같은 실행이 기준 커밋 뒤 견주기를 한 번 더 돌려
+#    새 head 커밋 상태 「Visual (갱신 뒤 견주기)」로 남긴다(사람 손 없이 PR 에 결과가 보인다).
 name: Visual
 
 on:
@@ -40,6 +41,7 @@ jobs:
     # 기준을 쓸 때(첫 기준 · update=true) 그 가지에 커밋한다 — 같은 저장소 가지만(포크 PR 의 토큰은 읽기만이라 커밋 단계에서 실패한다).
     permissions:
       contents: write
+      statuses: write   # 갱신 뒤 견주기 결과를 새 head 커밋 상태로 남긴다(아래 「갱신 뒤 견주기」)
     env:
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       BRANCH: ${{ github.head_ref || github.ref_name }}
@@ -102,6 +104,26 @@ jobs:
           what=$([ "$MODE" = first ] && echo '첫 기준' || echo '기준 갱신')
           git commit -m "시각 회귀 ${what} — ${ACTOR} · $(date -u +%Y-%m-%dT%H:%MZ) · ${RUN_URL}"
           git push origin "HEAD:${BRANCH}"
+      # 🔵 2026-11-11(우편함 「코드·운영 — 0장 여섯 …」 4 · #966 회신 ⑦ 2) — 기준 커밋 뒤 같은 실행에서 견주기를 한 번 더 돌린다.
+      #    러너(GITHUB_TOKEN)가 민 커밋은 PR 실행을 다시 돌리지 않거나(action_required) 사람 손을 기다렸다 — 그래서 새 head 에 초록이 없었다.
+      #    방금 쓴 기준으로 견준 결과를 새 head 커밋 상태(context 「Visual (갱신 뒤 견주기)」)로 남긴다 — 사람 손 없이 PR 에 결과가 보인다.
+      - name: 갱신 뒤 견주기(같은 실행)
+        if: steps.run.outputs.mode != 'compare' && steps.run.outputs.code == '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          ln -sfn "$RUNNER_TEMP/pw/node_modules" "$GITHUB_WORKSPACE/.github/health/node_modules"
+          node .github/health/visual.mjs
+          code=$?
+          rm -f .github/health/node_modules
+          sha=$(git rev-parse HEAD)
+          state=$([ "$code" = "0" ] && echo success || echo failure)
+          desc=$([ "$code" = "0" ] && echo '갱신한 기준과 같음(40장)' || echo "갱신 뒤 견주기 실패(code=$code)")
+          [ -f visual-summary.md ] && { printf '\n## 갱신 뒤 견주기\n\n'; cat visual-summary.md; } >> "$GITHUB_STEP_SUMMARY"
+          gh api -X POST "repos/${GITHUB_REPOSITORY}/statuses/${sha}" -f state="$state" -f context='Visual (갱신 뒤 견주기)' \
+            -f description="$desc" -f target_url="$RUN_URL" >/dev/null || echo "::warning::커밋 상태를 남기지 못함"
+          [ "$code" = "0" ] || { echo "::error::갱신 뒤 견주기 실패(code=$code)"; exit 1; }
       - name: 판정
         run: |
           code='${{ steps.run.outputs.code }}'

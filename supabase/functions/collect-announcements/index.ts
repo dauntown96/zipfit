@@ -32,6 +32,18 @@ const authcheckResponse = () => new Response(JSON.stringify({ mode: 'authcheck',
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
+// 🔵 2026-11-11(우편함 「코드·운영 — 단지 키 2차 …」 2) — 쓴 공고를 단지 키에 잇는다. 규칙은 DB 함수 complex_link_announcements 한 곳
+//    (MYHOME precise_address 도로명 키 · LH 단일 단지 코드). 🔴 실패해도 수집은 그대로다(errors 에 넣지 않는다 — 콘솔 로그만 · 700건 약 0.1초).
+async function linkComplexes(ids: string[], tag: string) {
+  const uniq = [...new Set(ids.filter(Boolean))]
+  if (!uniq.length) return
+  try {
+    const { data, error } = await supabase.rpc('complex_link_announcements', { p_ids: uniq })
+    if (error) console.warn(`[${tag}] 단지 잇기 실패: ${error.message}`)
+    else console.log(`[${tag}] 단지 잇기 ${JSON.stringify(data)}`)
+  } catch (e) { console.warn(`[${tag}] 단지 잇기 예외: ${e instanceof Error ? e.message : e}`) }
+}
+
 const san = (v: unknown): string | null => {
   if (v == null) return null
   const s = String(v).trim()
@@ -1012,6 +1024,8 @@ async function collect() {
       .upsert(detailRows.slice(i, i+50), { onConflict: 'source,announcement_id', ignoreDuplicates: false })
     if (error) errors.push(`LH detail_upsert[${i}]: ${error.message}`)
   }
+  // 🔵 2026-11-11 단지 키 2차 — LH 상세 행의 단일 단지 코드(커트라인·단지 그림)를 잇는다(linkComplexes · 실패해도 수집 그대로).
+  await linkComplexes(detailRows.map(r => String(r.announcement_id)), 'LH')
   // 전용 컬럼이 없으므로 errors에 남긴다(스키마 변경은 범위 밖). late_retry와 같은 방식이며,
   // 마감이 실제로 발동했는지를 collection_run_log만 보고 판정할 유일한 근거다.
   if (detailSkipped > 0) {
@@ -1070,6 +1084,8 @@ async function collect() {
       else mhUpserted += data?.length ?? 0
     }
     console.log(`[MYHOME] upsert ${mhUpserted}건`)
+    // 🔵 2026-11-11 단지 키 2차 — MYHOME 행의 precise_address 도로명 키로 단지를 잇는다(linkComplexes · 실패해도 수집 그대로).
+    await linkComplexes(mhRows.map(r => r.announcement_id), 'MYHOME')
   } catch(e) {
     errors.push(`MYHOME: ${e}`)
   }
@@ -1130,6 +1146,7 @@ async function collect() {
             if (error) errors.push(`late_retry MYHOME upsert[${i}]: ${error.message}`)
             else mhUpserted += data?.length ?? 0
           }
+          await linkComplexes(rows.map(r => r.announcement_id), 'MYHOME 재시도')
           lateRetryMhOk = againMh.items.length
           mhFetched += againMh.items.length
           notes.push(`MYHOME 복구(${lateRetryMhOk}건)`)
