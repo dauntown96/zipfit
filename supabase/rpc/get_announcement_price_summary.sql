@@ -167,6 +167,7 @@ AS $function$
   -- 🔵 2026-11-02(우편함 「표시층 — ㎡당 월세 중앙값 …」 A) — rent_per_sqm_med = 위 가격 범위와 같은 pick 행의 monthly_rent / area_sqm 중앙값(원 · 반올림).
   --    주 조건 월세만(rent_priority1 은 섞지 않는다) · 월세 0(전세형)·면적 없음은 뺀다 · 영구임대는 「나군」 표기 행만(가군은 몇 값에 모여 위치가 뜻이 없다).
   --    rent_basis = 'primary'(주 조건) · 'na'(영구임대 나군) · 셀 행이 없으면 둘 다 null.
+  --    🔵 2026-11-11 — 「나」군 · 「나 군」 꼴도 나군으로 읽는다(「나」와 「군」 사이 공백·낫표·따옴표 2자까지 — 화면 zfGroupTag 의 NA 와 같은 식).
   perm as (
     select t.aid,
            coalesce(mp.std_type, a.housing_type) = '영구임대' as is_perm
@@ -199,11 +200,11 @@ AS $function$
          round(percentile_cont(0.5) within group (order by h.monthly_rent::numeric / h.area_sqm)
                filter (where h.area_sqm > 0 and h.monthly_rent > 0
                          and (not coalesce(pm.is_perm, false)
-                              or concat_ws(' ', h.unit_group, h.supply_target, h.unit_type) ~ '나군')))::bigint as rent_per_sqm_med,
+                              or concat_ws(' ', h.unit_group, h.supply_target, h.unit_type) ~ '나[\s「」『』''"]{0,2}군')))::bigint as rent_per_sqm_med,
          case
            when count(*) filter (where h.area_sqm > 0 and h.monthly_rent > 0
                                    and (not coalesce(pm.is_perm, false)
-                                        or concat_ws(' ', h.unit_group, h.supply_target, h.unit_type) ~ '나군')) = 0 then null
+                                        or concat_ws(' ', h.unit_group, h.supply_target, h.unit_type) ~ '나[\s「」『』''"]{0,2}군')) = 0 then null
            when coalesce(pm.is_perm, false) then 'na'
            else 'primary'
          end as rent_basis
