@@ -164,9 +164,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-11-11 | **코드·운영 — ㎡당 나군 식 외 넷 [완료]** — 가격 요약 나군 정규식 넓힘(「나」군 · 나 군 — 14공고 null→값 · 다른 변화 0) · `contrast.yml`(index.html PR 대비 ⚠️) · 뷰 `linked_separate_notices` + 불변식 v3.29 V26(꺼 둠) · githack = 로드 순서 · `list_folder` + `drive-dup-candidates.py` · PR 이 회차 |
 | 2026-11-11 | **표시층 — #974 병합(날값 색 토큰 1차) [완료]** — 15종 → 역할 토큰(신설 `--brand`·`--brand-ink`·`--warn-line` · 선택 `--ink`+모양 · 글 링크 `--ink-2`+밑줄 · 경고 칩·상자 클래스) · 어두움 `.detail-link`·쪽 번호 바탕 · 날값 233→217종 · Visual 기준 22장(판정 넷 자리 0) · a11y 5꼴 · v298 · PR #974 |
 | 2026-11-11 | **분석 묶음 — 역전파 8회차 [완료]** — ① 블록 상태 행 73 → 원문 LH ID 29행(상태 함수 전후 같음 · 영암 링크 블록 2 남김) · ② `policy_md5_dup_old` 6묶음 13행 원문화(새 정의 마감 32·95) · ③ 그림 판정 반영(미연결 35 → 25 · 쓰기 0) · 불변식 0 · PR 이 회차 |
-| 2026-11-11 | **코드·운영 — 0장 여섯 [완료]** — fetch-attachment HTML 거름 `sniff.ts`(`<script` 머리 등 · lhFile.do 받기도 · 시험 14) · `policy_md5_dup_old` 원문 대조 행 밖(40→37) · `scripts/contrast-compare.mjs`(#974 새 미달 0) · Visual 갱신 뒤 재견주기 · health-screen ℹ️ title·44px · Drive HTML 9 휴지통 · PR 이 회차 |
 
 ---
 

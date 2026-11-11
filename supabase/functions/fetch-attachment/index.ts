@@ -1203,6 +1203,36 @@ const handleRequest = async (req: Request): Promise<Response> => {
     }
   }
 
+  // 🔵 2026-11-11(우편함 「코드·운영 — ㎡당 나군 식(6공고) · … Drive 사본 sha 고르기」 5) — 폴더 안 파일 목록 + Drive 가 계산한 sha256·md5(읽기만).
+  //    Drive 커넥터의 목록은 체크섬을 주지 않아 「같은 바이트 사본」을 못 가린다 — scripts/drive-dup-candidates.py 가 이 모드를 net.http_post 로 부른다.
+  //    folder_id 필수 · 휴지통 밖 · 하위 폴더는 항목으로만(내려가지 않는다) · 쓰기 0.
+  if (mode === 'list_folder') {
+    if (!folderIdParam) return json({ ok: false, error: 'mode=list_folder에는 folder_id가 필요하다' }, 400)
+    const startedAt = Date.now()
+    let secrets: DriveSecrets | null = null
+    try {
+      secrets = await getDriveSecrets()
+      const token = await getAccessToken(secrets)
+      const files: Array<Record<string, unknown>> = []
+      let pageToken: string | undefined
+      for (let i = 0; i < 20; i++) {
+        const params = new URLSearchParams({
+          q: `'${q(folderIdParam)}' in parents and trashed=false`,
+          fields: 'nextPageToken,files(id,name,size,mimeType,md5Checksum,sha256Checksum,createdTime)',
+          pageSize: '1000',
+        })
+        if (pageToken) params.set('pageToken', pageToken)
+        const body = await driveFetch('https://www.googleapis.com/drive/v3/files?' + params, { method: 'GET' }, token, secrets)
+        files.push(...((body.files as Array<Record<string, unknown>> | undefined) ?? []))
+        pageToken = body.nextPageToken as string | undefined
+        if (!pageToken) break
+      }
+      return json({ ok: true, mode: 'list_folder', folder_id: folderIdParam, count: files.length, truncated: !!pageToken, files, elapsed_ms: Date.now() - startedAt })
+    } catch (e) {
+      return json({ ok: false, mode: 'list_folder', error: redact(String(e instanceof Error ? e.message : e), secrets), elapsed_ms: Date.now() - startedAt }, 502)
+    }
+  }
+
   // 🔵 2026-11-09 — Drive 안 zip 풀기(위 「Drive 안 zip 풀기」 주석). file_id = zip · folder_id = 올릴 폴더(entry 가 있을 때) · entry = 항목 번호(없으면 목록만).
   if (mode === 'unzip_drive') {
     const startedAt = Date.now()
