@@ -1,0 +1,97 @@
+# 글자 대비 비교 — PR 가지 ↔ 기준 가지(main)에서 「가지에서 새로 생긴 대비 미달」만 센다
+# (2026-11-11 · 우편함 「코드·운영 — ㎡당 나군 식(6공고) · 대비 비교 PR 점검 …」 2 · #978 회신 ⑦ 1 · 스크립트 scripts/contrast-compare.mjs).
+# 🔴 실패시키지 않는다 — 새 미달 > 0 이면 ⚠️(경고 표지 · 요약 · 커밋 상태 「대비 비교」 설명)만 남기고 체크는 초록이다.
+#    판정은 사람이(표시층 회신) — 새 미달이 의도한 것(어두움 바탕 위 연한 글자를 일부러 둔 것 등)일 수 있다.
+# 언제: index.html 을 고친 PR(+ 이 장치를 고친 PR) · 수동.
+# 무엇을 부르나: 목록 RPC 는 scripts/render-list-stub.mjs 캐시(한 실행 안에서 인자마다 한 번만 운영 anon) · 그 밖 공개 RPC 는 운영 anon 그대로(읽기만) ·
+#   이용 기록 송신은 스크립트가 받아 끝낸다 · DB 기록·이슈 0.
+name: Contrast
+
+on:
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'scripts/contrast-compare.mjs'
+      - '.github/workflows/contrast.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contrast-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contrast:
+    name: 대비 비교
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      statuses: write   # 결과를 PR head 커밋 상태 「대비 비교」로 남긴다(늘 success · 설명에 ⚠️)
+    env:
+      BASE_REF: ${{ github.base_ref || 'main' }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+      - name: Playwright 준비
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/pw" && cd "$RUNNER_TEMP/pw"
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund playwright@1.55.0 >/dev/null
+          npx playwright install --with-deps chromium >/dev/null
+      - name: 견주기(기준 ↔ 가지)
+        id: run
+        env:
+          PLAYWRIGHT_PATH: ${{ runner.temp }}/pw/node_modules/playwright
+          ZIPFIT_RENDER_CACHE_DIR: ${{ runner.temp }}/list-cache
+        run: |
+          set +e
+          git fetch -q origin "$BASE_REF"
+          node scripts/contrast-compare.mjs --base "origin/$BASE_REF" --head "$HEAD_SHA" --json contrast-result.json > contrast-out.txt 2>&1
+          code=$?
+          cat contrast-out.txt
+          n=$(node -e 'try{const r=require("./contrast-result.json");console.log(r.new.length)}catch{console.log("")}')
+          errs=$(node -e 'try{const r=require("./contrast-result.json");console.log(Object.values(r.states).filter(v=>typeof v.base==="string"||typeof v.head==="string").length)}catch{console.log("")}')
+          {
+            echo "## 글자 대비 비교 — origin/$BASE_REF ↔ ${HEAD_SHA:0:7}"
+            echo
+            if [ -z "$n" ]; then echo "⚠️ 견주지 못함(종료 코드 $code) — 아래 출력";
+            elif [ "$n" -gt 0 ]; then echo "⚠️ **가지에서 새로 생긴 대비 미달 $n 갈래** — 의도한 것인지 표시층 회신에서 판정(실패 아님)";
+            else echo "✅ 새 대비 미달 0"; fi
+            [ -n "$errs" ] && [ "$errs" -gt 0 ] && echo && echo "⚠️ 그리지 못한 상태 $errs(그 상태는 견주지 않았다)"
+            echo; echo '```'; cat contrast-out.txt; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ -z "$n" ]; then echo "::warning title=대비 비교::견주지 못함(종료 코드 $code)"; desc="⚠️ 견주지 못함"
+          elif [ "$n" -gt 0 ]; then echo "::warning title=대비 비교::가지에서 새로 생긴 대비 미달 $n 갈래(실패 아님 · 요약 참고)"; desc="⚠️ 새 대비 미달 $n"
+          else desc="새 대비 미달 0"; fi
+          [ -n "$errs" ] && [ "$errs" -gt 0 ] && desc="$desc · ⚠️ 못 그린 상태 $errs"
+          echo "desc=$desc" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: 커밋 상태 「대비 비교」
+        if: always() && steps.run.outputs.desc != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DESC: ${{ steps.run.outputs.desc }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh api -X POST "repos/${{ github.repository }}/statuses/$HEAD_SHA" \
+            -f state=success -f context="대비 비교" -f description="$DESC" -f target_url="$RUN_URL" >/dev/null \
+            || echo "::warning::커밋 상태를 남기지 못함(포크 PR 이면 토큰이 읽기만)"
+      - name: 결과 올리기
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: contrast-out
+          path: |
+            contrast-result.json
+            contrast-out.txt
+          if-no-files-found: ignore
+          retention-days: 14
