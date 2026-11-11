@@ -1131,6 +1131,51 @@ try {
     add('ime_ko', '한글 조합 입력 — 공고 검색 칸에 「부산」 · 치는 대로 결과', ok ? 'pass' : (value.startsWith('못 잼') ? 'warn' : 'fail'), value,
       '단어 조합(확정 전)에서 머리·시트 결과 수 = 「부산」 기준 수 ≠ 빈 칸 수 · 음절 확정 칸 글자 「부산」(겹침 0) · 재다 죽으면 경고')
   }
+  // ⑫ 감시 둘(2026-11-11 · 우편함 「코드·운영 — 0장 여섯 …」 5 · 설계 「📐 12월 재편」 11절) — ℹ️ 숫자만(판정하지 않는다 · 이슈 없음 · 결과 표로 추이를 본다).
+  //    ① title 속성 — 원본 index.html 의 `title="` 수 + JS `.title =` 수(줄어드는 쪽이 목표 · 설계 「title 기대지 않기」) · 배포본 390 공고 탭 DOM 의 [title] 수.
+  //    ② 누르는 자리 44px 미만 — axe target-size(24px · AA)는 44px 를 보지 않아 직접 센다. 390 공고 탭 · 첫 보이는 카드 펼친 상태.
+  //       대상 = 보이는 a · button · summary · input · select · [role=button] · [onclick] 중 너비나 높이가 44 미만(글 줄 안 링크도 센다 — 숫자를 보고 판정은 표시층).
+  try {
+    const src = readFileSync(new URL('../../index.html', import.meta.url), 'utf8')
+    const srcTitleAttr = (src.match(/\stitle="/g) || []).length
+    const srcTitleJs = (src.match(/\.title\s*=(?!=)/g) || []).length
+    const tctx = await browser.newContext({ viewport: VIEWPORT, serviceWorkers: 'block', locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+    await tctx.route(/\/rest\/v1\/usage_events(\?|$)/, r => r.fulfill({ status: 201, body: '' }))
+    const tp = await tctx.newPage()
+    await tp.goto(SITE + '?watch=' + Date.now(), { waitUntil: 'networkidle', timeout: 90000 })
+    await tp.waitForFunction(() => typeof noticeData !== 'undefined' && noticeData.length > 0, null, { timeout: 60000 })
+    await tp.evaluate(() => goMain(2)); await tp.waitForTimeout(3500)
+    const small = () => {
+      const sel = 'a, button, summary, input, select, [role="button"], [onclick]'
+      let n = 0, all = 0; const kinds = {}
+      for (const el of document.querySelectorAll(sel)) {
+        const r = el.getBoundingClientRect(); if (r.width < 1 || r.height < 1) continue
+        let hid = false; for (let e = el; e; e = e.parentElement) { const s = getComputedStyle(e); if (s.display === 'none' || s.visibility === 'hidden') { hid = true; break } } if (hid) continue
+        all++
+        if (r.width < 44 || r.height < 44) { n++; const k = el.tagName.toLowerCase() + ((el.getAttribute('class') || '').split(/\s+/).filter(Boolean)[0] ? '.' + el.getAttribute('class').split(/\s+/).filter(Boolean)[0] : ''); kinds[k] = (kinds[k] || 0) + 1 }
+      }
+      return { n, all, top: Object.entries(kinds).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, v]) => `${k} ${v}`), titles: document.querySelectorAll('[title]').length }
+    }
+    const listS = await tp.evaluate(small)
+    await tp.evaluate(() => {
+      const c = [...document.querySelectorAll('.hcard')].find(e => e.offsetParent !== null); if (!c) return
+      const id = c.getAttribute('data-card-id') || (c.querySelector('[id^="ncard-"]') || {}).id || c.id
+      if (typeof toggleDetail === 'function' && typeof cardElFor === 'function' && id) toggleDetail(id, cardElFor(id), 'test'); else c.click()
+    })
+    await tp.waitForTimeout(5000)
+    const detS = await tp.evaluate(small)
+    await tctx.close()
+    extra.watch_title_target = { srcTitleAttr, srcTitleJs, list: listS, detail: detS }
+    add('watch_title', 'title 속성 수(원본 · 390 공고 탭 DOM) — 추이(정보)', 'info',
+      `원본 title="" ${srcTitleAttr} · JS .title= ${srcTitleJs} · 공고 탭 DOM [title] ${listS.titles} · 카드 펼침 ${detS.titles}`,
+      '정보 — 판정하지 않는다 · 줄어드는 쪽이 목표(설계 11절 「title 기대지 않기」) · 결과 표로 추이를 본다')
+    add('watch_target44', '누르는 자리 44px 미만 수(390 공고 탭 · 카드 펼침) — 정보', 'info',
+      `공고 탭 ${listS.n}/${listS.all}(${listS.top.join(' · ')}) · 카드 펼침 ${detS.n}/${detS.all}(${detS.top.join(' · ')})`,
+      '정보 — 판정하지 않는다 · axe target-size(24px) 밖이라 직접 셈 · 보이는 a·button·summary·input·select·[role=button]·[onclick] 중 너비나 높이 < 44')
+  } catch (e) {
+    add('watch_title', 'title 속성 수(원본 · 390 공고 탭 DOM) — 추이(정보)', 'info', '못 잼: ' + String(e).slice(0, 160), '정보')
+    add('watch_target44', '누르는 자리 44px 미만 수(390 공고 탭 · 카드 펼침) — 정보', 'info', '못 잼: ' + String(e).slice(0, 160), '정보')
+  }
   // ⑧ 접근성(axe-core · 2026-10-12 · 우편함 「코드 — Claude Code 장비 정비」 1) — 여섯 상태(2026-10-13 매칭 결과 더함)를 따로 열어 재고 기준선(a11y-baseline.json)과 견준다.
   //    🔴 critical ≥ 1 은 실패(fail — 이슈가 열린다 · 2026-10-13 claude.ai 판정으로 승격 · 기준선은 같은 날 배포 v201 다섯 상태 0 으로 다시 씀).
   //    기준선보다 늘어난 serious 이하는 여전히 경고다. 패키지가 없거나 재다 죽어도 warn 이다 — 나머지 점검을 실패로 만들지 않는다.

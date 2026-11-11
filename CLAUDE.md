@@ -164,9 +164,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-11-11 | **코드·운영 — 0장 여섯 [완료]** — fetch-attachment HTML 거름 `sniff.ts`(`<script` 머리 등 · lhFile.do 받기도 · 시험 14) · `policy_md5_dup_old` 원문 대조 행 밖(40→37) · `scripts/contrast-compare.mjs`(#974 새 미달 0) · Visual 갱신 뒤 재견주기 · health-screen ℹ️ title·44px · Drive HTML 9 휴지통 · PR 이 회차 |
 | 2026-11-11 | **분석 묶음 — 역전파 7회차 [완료]** — ① 「최대거주기간」 요약 12 → 원문(남은 0) · ② 11-05 전 단지 그림 92 중 57 이음(새 33 + 옛 행 출처 20 · 남은 35 사유 확정) · ③ `policy_md5_dup_old` 10묶음 60행 원문화(45·151 → 40·125) · 불변식 0 · PR 이 회차 |
 | 2026-11-11 | **자동 — run 418 · 수원우만3 영구임대 예비입주자 `…21050` [완료]** — 정책 35(⚠️ 3 — 주택형 표기 · 입주 시기 · 43.90 나군 잔금 100원 차) · 자격 6 · 세대 6(가군·나군 · 모집 예비자 370+130) · 일정 3 · 경로 1 · 갤러리 3 · key_rank·source_page 첫 적용 · 불변식 v3.28 0 · 분자 +1 · PR 이 회차 |
-| 2026-11-11 | **코드·운영 — 단지 키 2차 [완료]** — `complex_road_key` 붙여 쓴 번호(종전 키 변화 0 · 새 키 18) · `complex_link_announcements` + EF 수집 뒤 호출(MYHOME · LH · 단지 그림) · 소급 2차(새 단지 6 · LH 코드 2차 규칙 1 → lh_code 40) · 불변식 0 · PR #973 · 이 회차 |
 
 ---
 
