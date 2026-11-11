@@ -382,16 +382,16 @@
      "bg": null,
      "why": "pseudoContent"
     },
-    "a.detail-link|#0c447c": {
+    "a.detail-link|#3d424a": {
      "nodes": 1,
-     "ratio": null,
-     "bg": null,
+     "ratio": 9.35,
+     "bg": "#f7f6f2",
      "why": "pseudoContent"
     },
-    "span.zf-ai-lbl|#0c447c": {
+    "span.zf-ai-lbl|#3d424a": {
      "nodes": 1,
-     "ratio": null,
-     "bg": null,
+     "ratio": 9.35,
+     "bg": "#f7f6f2",
      "why": "pseudoContent"
     },
     "button.zf3-close|#3d424a": {
@@ -550,16 +550,16 @@
      "bg": null,
      "why": "pseudoContent"
     },
-    "button.detail-link|#0f6e56": {
+    "button.detail-link|#3d424a": {
      "nodes": 1,
-     "ratio": null,
-     "bg": null,
+     "ratio": 10.11,
+     "bg": "#ffffff",
      "why": "pseudoContent"
     },
-    "button.detail-link|#5f5f57": {
+    "button.detail-link|#5a616b": {
      "nodes": 1,
-     "ratio": null,
-     "bg": null,
+     "ratio": 6.26,
+     "bg": "#ffffff",
      "why": "pseudoContent"
     },
     "p.zf-nonaffil|#5a616b": {
@@ -1124,5 +1124,6 @@
  "_contrast_at": "2026-11-10T07:05:57.371Z",
  "_note_contrast": "2026-11-10 우편함 「코드·운영 — 시각 회귀 장치 … + axe 대비 「미완」 셈」 2 — 배포본 측정 그대로의 대비 미완 갈래(요소 꼴|글자색)를 「알려진 것」으로 올림 · 위반 규칙(rules) 칸은 그대로 · 새 갈래가 생기면 실패 · 고치는 것은 설계 ④ 색 뜻 표 뒤 표시층 · 2026-11-10 우편함 「표시층 — 12월 재편 ④ 색 뜻 토큰」 ① — 대비 고침 셋의 글자색 갈래만 갈음(rent-basis #777→--ink-3 · 공유 단추 #1d9e75→#0f6e56 · 저장 단추 →#5f5f57) + #957 비제휴 줄(p.zf-nonaffil) · 그 밖 칸은 그대로",
  "_note_2026-11-11": "대비 미완 새 꼴 6 더함(우편함 「코드·운영 — 0장 다섯」 2) — axe 가 pseudoContent 로 대비를 못 낸 꼴 · ratio·bg 는 배포본에서 계산된 색으로 직접 잰 값(4.5:1 이상)",
- "_note_2026-11-11b": "우편함 「표시층 — PR #963 병합 …」 — notices-390-dark 만 갈음: 경로 칩(zf-route-text·place·ex) 어두움 글자색 #8a5a12 → #c5c9d0(바탕 --surface-2 #23262c · 9.13) · 상태 알약 ::before ○ 로 미완에 새로 잡힌 span.zf3-dpill|#c5c9d0(미상·예정 --ink-2 · 바탕 --paper) · 그 밖 칸 그대로"
+ "_note_2026-11-11b": "우편함 「표시층 — PR #963 병합 …」 — notices-390-dark 만 갈음: 경로 칩(zf-route-text·place·ex) 어두움 글자색 #8a5a12 → #c5c9d0(바탕 --surface-2 #23262c · 9.13) · 상태 알약 ::before ○ 로 미완에 새로 잡힌 span.zf3-dpill|#c5c9d0(미상·예정 --ink-2 · 바탕 --paper) · 그 밖 칸 그대로",
+ "_note_2026-11-11c": "우편함 「표시층 — 날값 색 토큰 바꾸기 1차 …」 — detail-390만 갈음: .detail-link(원문 보기 a · zf-ai-lbl · 공유 단추) 글자 → --ink-2 #3d424a · 저장 단추 안 누름 → --ink-3 #5a616b · 그 밖 칸 그대로"
 }
