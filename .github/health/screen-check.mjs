@@ -561,12 +561,17 @@ try {
     const kEl = document.querySelector('#insightContent .zf3-kpi .zf3-kc b')
     const kpi = kEl ? Number(kEl.textContent.replace(/[^\d]/g, '')) : NaN
     goMain(2)
-    return { M, T, since, A, B, K, kpi, tab: tab.trim(), ins: ins.trim() }
+    // 🔵 2026-11-12 — 화면이 받은 목록의 가장 늦은 created_at(DB 누적을 그 시점까지로 세어 수집 시차 거짓 실패를 없앤다)
+    const maxCreated = noticeData.reduce((m, r) => (r.created_at && r.created_at > m ? r.created_at : m), '')
+    return { M, T, since, A, B, K, kpi, tab: tab.trim(), ins: ins.trim(), maxCreated }
   }, process.env.SIMULATE === 'open_count')
   {
     let ok = false, value
     if (!oc.err) {
-      const [db] = await sqlRead(`select count(*)::int as t, to_char(min(announcement_date), 'YYYY"년 "FMMM"월부터"') as since from get_announcements_deduped()`)
+      // 🔵 2026-11-12(우편함 「코드·운영 — 단지 키 3차 + …」 5 · #994 ⑦) — 화면이 목록을 받은 뒤 수집이 새 공고를 넣으면 DB 누적이 하나 커져 거짓 실패였다.
+      //    DB 누적은 화면이 받은 목록의 가장 늦은 created_at 이하인 행만 센다(그 뒤 들어온 공고는 화면이 아직 모르는 것). 값을 못 받으면 종전대로 전량.
+      const cut = /^\d{4}-\d{2}-\d{2}T/.test(oc.maxCreated || '') ? `where created_at <= '${oc.maxCreated.replace(/'/g, '')}'::timestamptz` : ''
+      const [db] = await sqlRead(`select count(*)::int as t, to_char(min(announcement_date), 'YYYY"년 "FMMM"월부터"') as since from get_announcements_deduped() ${cut}`)
       const want = `지금 열린 공고 ${oc.M.toLocaleString('ko-KR')}건`
       const fmt = n => n.toLocaleString('ko-KR')
       const wantTab = `열린 공고 ${fmt(oc.M)}건 | 접수 중 ${fmt(oc.A)} · 예정 ${fmt(oc.B)}${oc.K ? ` · 미상 ${fmt(oc.K)}` : ''}`
