@@ -1,4 +1,3 @@
--- 안 C 시험 커밋(2026-11-12) — [skip ci] 로 pull_request 실행 0 인 head 를 만든다
 -- pg_cron 잡 사본 — 정본은 DB `cron.job` (뽑은 시각 2026-10-21 15:30 KST · pg_cron 1.6.4 · 23잡 · 2026-11-02 대조 23잡 일치 뒤 24째 zipfit-purge-cron-run-details(jobid 71) · 2026-11-02 25째 zipfit-purge-collection-run-log 더함 → 25잡 · 2026-11-09 재추출 29잡 일치(26째 purge-lh-file-fetch-log 84 · 빠졌던 gh-observe 75 · collect-lh-cutoff 78 · collect-lh-notices 82 더함))
 -- 2026-10-21 신설 (우편함 「코드·운영 — 문서·SQL만(B): docs/cron-jobs.sql … + docs/ops-audit.sql …」 · 근거 조사 「런칭 전 점검 ① Supabase」 회신 ② · claude.ai 판정 1).
 -- 왜: 백업(zipfit-backup backup.yml)은 public·zipfit_ops 만 덤프한다 — cron 스키마는 담기지 않아, DB를 복원해도 자동화(수집 · 분석 발송 · 점검 · 백업 깨우기)가
