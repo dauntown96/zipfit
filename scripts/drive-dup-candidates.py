@@ -20,6 +20,7 @@
 #   python3 scripts/drive-dup-candidates.py --out /tmp/cand.tsv                # 전 폴더
 #   python3 scripts/drive-dup-candidates.py --only 2015122300020393 --out -    # 공고 하나(같은 공고 폴더 전부)
 #   python3 scripts/drive-dup-candidates.py --limit 30                         # 앞 30 폴더만(시험)
+#   python3 scripts/drive-dup-candidates.py --gallery /tmp/gal.tsv              # 갤러리 행 ↔ 폴더 파일 이름 대조(2026-11-12)
 import argparse
 import datetime as dt
 import json
@@ -74,6 +75,7 @@ def main():
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--batch", type=int, default=10)
     ap.add_argument("--out", help="후보 TSV 경로(- = 표준 출력)")
+    ap.add_argument("--gallery", help="갤러리 대조 TSV 경로(- = 표준 출력) — announcement_extras 행의 Drive 파일이 그 공고 폴더에 있나 · 이름(2026-11-12)")
     a = ap.parse_args()
 
     where = "drive_folder_id is not null" + (f" and announcement_id = {lit(a.only)}" if a.only else "")
@@ -134,6 +136,42 @@ def main():
     print(f"폴더 목록 받음 {len(listing)} · 못 받음 {len(failed)} · 파일 {n_files} · 참조 있음 {n_ref} · 후보(참조 0 ∧ 같은 sha 의 참조 파일 있음) {len(cands)}")
     for f, st, err in failed[:20]:
         print(f"  못 받음 {f} · {st} · {str(err)[:120]}")
+    if a.gallery:
+        # 🔵 2026-11-12(우편함 「코드·운영 — 🔴 LH 목록 마감 … + 0장」 6 · 역전파 7회차 ⑦ 3) — 갤러리 행 ↔ Drive 파일 이름 대조(읽기만).
+        #    갤러리 표에는 source_file 칸이 없어 「file_url 의 Drive id 가 어느 공고 폴더 목록에 있나 · 이름」으로 본다.
+        #    있음(그 공고 폴더) · 다른 공고 폴더(같은 묶음의 원문 ID 폴더 등 — 이름과 폴더 공고를 적는다) · 어느 폴더에도 없음(옮겨짐·지워짐·하위 폴더).
+        #    🔴 행마다 묶음 함수를 부르면 관리 API 30초 프록시에 걸린다(2026-11-12 502) — 폴더 목록 전체에서 id 로 찾는다.
+        rows = sql("select e.id, e.announcement_id aid, e.extra_type t, e.file_url u from announcement_extras e "
+                   "where e.file_url like '%drive.google.com%'" + (f" and e.announcement_id = {lit(a.only)}" if a.only else ""))
+        where_id = {}
+        for f, files in listing.items():
+            for x in files:
+                where_id.setdefault(x.get("id"), (f, x.get("name", "")))
+        own = {}
+        for r in folders:
+            own.setdefault(r["aid"], set()).add(r["f"])
+        cnt = {"있음": 0, "다른 공고 폴더": 0, "어느 폴더에도 없음": 0}
+        lines = []
+        for r in rows:
+            ids_ = DRIVE_ID_RE.findall(r["u"] or "")
+            fid = ids_[0] if ids_ else ""
+            hit = where_id.get(fid)
+            if hit is None:
+                state, nm, fa = "어느 폴더에도 없음", "", ""
+            elif hit[0] in own.get(r["aid"], set()):
+                state, nm, fa = "있음", hit[1], r["aid"]
+            else:
+                state, nm, fa = "다른 공고 폴더", hit[1], aid_of.get(hit[0], "")
+            cnt[state] += 1
+            if state != "있음" or a.gallery != "-":
+                lines.append((r["aid"], str(r["id"]), r["t"] or "", fid, state, fa, nm))
+        print(f"갤러리 행 {len(rows)} · " + " · ".join(f"{k} {v}" for k, v in cnt.items()))
+        gout = sys.stdout if a.gallery == "-" else open(a.gallery, "w", encoding="utf-8")
+        gout.write("announcement_id\textras_id\textra_type\tfile_id\tstate\tfolder_announcement_id\tdrive_name\n")
+        for c in sorted(lines):
+            gout.write("\t".join(str(v).replace("\t", " ") for v in c) + "\n")
+        if gout is not sys.stdout:
+            gout.close()
     if a.out:
         out = sys.stdout if a.out == "-" else open(a.out, "w", encoding="utf-8")
         out.write("announcement_id\tfolder_id\tfile_id\tname\tbytes\tsame_sha_referenced_file_id\n")

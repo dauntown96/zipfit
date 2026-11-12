@@ -469,6 +469,18 @@ const scdlMerged = (scdls: SplScdlItem[]): SplScdlItem | null => {
   return out as SplScdlItem
 }
 
+// 🔴 2026-11-12(우편함 「코드·운영 — 🔴 LH 목록 마감(CLSG_DT) < 상세 청약 마감 감시·보호」 1) — 상세가 말하는 청약 마감(원소 중 가장 늦은 날).
+//   SBSC_ACP_CLSG_DT 가 없으면 전세임대 칸(UST_ACP_CLSG_DTTM 의 날짜 부분). 원소가 없으면 null(트리거가 이전 값을 지킨다).
+//   목록 CLSG_DT 가 이보다 앞서면 보호 트리거(protect_detail_columns)가 이 값을 apply_end 로 세운다 — …21026 인천논현2 꼴(목록 11-18 · 상세 11-20).
+const latestApplyEnd = (scdls: SplScdlItem[]): string | null => {
+  let best: string | null = null
+  for (const x of scdls) {
+    const d = parseDate(x.SBSC_ACP_CLSG_DT) ?? parseDate(san(x.UST_ACP_CLSG_DTTM)?.slice(0, 10))
+    if (d && (best === null || d > best)) best = d
+  }
+  return best
+}
+
 // 여러 벌일 때만 쓴다 — 가장 이른 접수 시작.
 const earliestApplyStart = (scdls: SplScdlItem[]): string | null => {
   let best: string | null = null
@@ -522,6 +534,9 @@ function mapLHRow(item: NoticeItem, sbds: SbdItem[], scdls: SplScdlItem[], ahflI
     first_announcement_date: parseDate(item.PAN_DT),
     apply_start:       varies === true ? earliestApplyStart(scdls) : acpStartOf(scdl),
     apply_end:         parseDate(item.CLSG_DT),
+    // 🔴 2026-11-12 — 목록 원값(감시용 · 매 런) · 상세 청약 마감(상세 받은 런만 · 없으면 null → 트리거가 지킨다). 카드 마감은 트리거가 정한다.
+    apply_end_list:    parseDate(item.CLSG_DT),
+    apply_end_detail:  latestApplyEnd(scdls),
     status:            san(item.PAN_SS),
     url:               san(item.DTL_URL),
     is_revised:        String(item.PAN_SS ?? '').includes('정정') || (title ?? '').startsWith('[정정공고]'),
