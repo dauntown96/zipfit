@@ -819,7 +819,7 @@ html[data-ui="d3"] .zf3-vline .policy-item.now::after{background:var(--ln,var(--
 html[data-ui="d3"] .zf3-vline .policy-item.now .policy-category::after{content:" · 진행 중";color:var(--ink);font-weight:700}
 /* 🔵 2026-10-15 상세 세로 노선(일정 표) — 범위 단추 · 범위 글자 · 출처 꼬리표 */
 .zf-sch .zf-sch-src{font-size:11px;font-weight:600;color:var(--ink-3,#777);margin-left:6px}
-.zf-sch .zf-sch-scope{display:inline-block;font-size:11px;font-weight:600;color:var(--ink-2,#555);background:var(--surface-2,#f1f1ee);border-radius:6px;padding:0 6px;margin-left:4px}
+:is(.zf-sch,.zf-sch-ann) .zf-sch-scope{display:inline-block;font-size:11px;font-weight:600;color:var(--ink-2,#555);background:var(--surface-2,#f1f1ee);border-radius:6px;padding:0 6px;margin-left:4px}
 .zf-sch .zf-sch-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px}
 .zf-sch .zf-sch-tabs button{font:inherit;font-size:12px;font-weight:600;padding:5px 10px;min-height:32px;border-radius:999px;border:1px solid var(--line,#ddd);background:var(--paper,#fff);color:var(--ink-2,#555);cursor:pointer}
 .zf-sch .zf-sch-tabs button[aria-selected="true"]{background:var(--ink,#222);border-color:var(--ink,#222);color:var(--paper,#fff)}
@@ -8838,6 +8838,19 @@ function zfScheduleSourceLabel(cardEl){
   const n = aid ? pool.find(x => String(x['announcement_id'] || '') === aid) : null;
   return ({ LH: 'LH 공급일정', MYHOME: '마이홈 공급일정', SH: 'SH 공급일정' })[n && n['source']] || '';
 }
+// 🔵 2026-11-12(우편함 「표시층 — 상세 「공급일정」 첫 정거장 공고일 …」 1) — 상세 「🗓️ 공급일정」 첫 정거장 = 공고일.
+//    일정 표에 「공고」 단계 행이 없으면(열린 분석 카드 70 중 62) 카드 노선 「공고」 역과 **같은 값**(zfNoticeDate → announcement_date ·
+//    정정 규칙도 카드 노선 그대로)으로 맨 앞에 한 역을 둔다. 원문 「원문 ▾」 대신 출처 표지 「목록 공고일」(카드 노선과 같은 값이라는 뜻).
+//    🔴 일정 표에 공고 행이 있으면 그 행 그대로(두 번 그리지 않는다). 행 id 가 없어 화면 점검 「상세 세로 노선」(data-sch-id)은 세지 않는다.
+function zfScheduleAnnItem(cardEl){
+  const aid = cardEl && cardEl.dataset ? String(cardEl.dataset.announcementId || '') : '';
+  const pool = [].concat(typeof noticeData !== 'undefined' && Array.isArray(noticeData) ? noticeData : [], typeof zf3Rows !== 'undefined' && Array.isArray(zf3Rows) ? zf3Rows : []);
+  const n = aid ? pool.find(x => String(x['announcement_id'] || '') === aid) : null;
+  const raw = n ? (zfNoticeDate(n) || n['announcement_date'] || '') : '';
+  const d = (/^\d{4}-\d{2}-\d{2}/.exec(String(raw)) || [''])[0];
+  if(!d || /^9999/.test(d)) return '';
+  return `<div class="policy-item zf-sch-ann" data-zf-d="${zfAttr(d)}" data-zf-e="${zfAttr(d)}"><div class="policy-category">📢 입주자 모집공고일 <span class="zf-sch-scope">목록 공고일</span></div><div class="policy-content">${escapeHtml(zfSchDay(d) || d)}</div></div>`;
+}
 function renderSupplySchedule(cardEl, id){
   const applyStart = cardEl.dataset.applyStart || '';
   const applyEnd = cardEl.dataset.applyEnd || '';
@@ -8875,7 +8888,7 @@ function renderSupplySchedule(cardEl, id){
 
   const wrap = document.createElement('details');
   wrap.className = 'policy-wrap';
-  wrap.innerHTML = `<summary class="policy-title">🗓️ 공급일정</summary>` +
+  wrap.innerHTML = `<summary class="policy-title">🗓️ 공급일정</summary>` + zfScheduleAnnItem(cardEl) +   // 🔵 2026-11-12 — 첫 정거장 = 공고일(zfScheduleAnnItem)
     items.map(([label,value]) => `<div class="policy-item" data-zf-d="${zfAttr((/\d{4}-\d{2}-\d{2}/.exec(value) || [''])[0])}" data-zf-e="${zfAttr((String(value).match(/\d{4}-\d{2}-\d{2}/g) || ['']).pop())}"><div class="policy-category">${label}</div><div class="policy-content">${escapeHtml(value)}</div></div>`).join('');
   const slot = document.getElementById('schedule-slot-'+id);
   if(slot) slot.appendChild(wrap);
@@ -9013,13 +9026,15 @@ function loadScheduleLine(annId, cardEl, id){
     const aS = cardEl.dataset.applyStart || '', aE = cardEl.dataset.applyEnd || '';
     const extraApply = !cur.some(r => r.stage === '접수') && (aS || aE)
       ? `<div class="policy-item" data-zf-d="${zfAttr(aS || aE)}" data-zf-e="${zfAttr(aE || aS)}"><div class="policy-category">📅 접수기간</div><div class="policy-content">${escapeHtml(`${aS || '-'} ~ ${aE || '-'}`)}</div></div>` : '';
+    // 🔵 2026-11-12 — 일정 표에 「공고」 단계 행이 없으면 첫 정거장 = 카드 노선과 같은 공고일(zfScheduleAnnItem · 노선마다 맨 앞)
+    const annItem = cur.some(r => r.stage === '공고') ? '' : zfScheduleAnnItem(cardEl);
     const withApply = list => {
       list = zfSchMergeApply(list, apCur);
-      if(!extraApply) return list.map(r => zfScheduleItemHTML(r.r, r.s)).join('');
+      if(!extraApply) return annItem + list.map(r => zfScheduleItemHTML(r.r, r.s)).join('');
       const k = list.findIndex(x => ZF_STAGE_AFTER_APPLY.includes(x.r.stage));
       const parts = list.map(x => zfScheduleItemHTML(x.r, x.s));
       parts.splice(k < 0 ? parts.length : k, 0, extraApply);
-      return parts.join('');
+      return annItem + parts.join('');
     };
     const stagesOf = {};
     cur.forEach(r => { if(r.scope_text){ (stagesOf[r.scope_text] = stagesOf[r.scope_text] || new Set()).add(r.stage); } });
@@ -10751,6 +10766,23 @@ function zfFillUnitChips(id){
     if(!g || used.has(key)){ el.innerHTML = ''; return; }
     used.add(key);
     el.innerHTML = `<button type="button" class="chip hu-x-chip" title="이 ${zfAttr(g.kind)}의 사진·평면도 ${g.items.length}건" onclick="event.preventDefault();event.stopPropagation();openExtrasViewer('${g.gid}',0)">📷 ${g.items.length}</button>`;
+  });
+  // 🔵 2026-11-12(우편함 「표시층 — 상세 「공급일정」 첫 정거장 공고일 + 묶인 세대 행 평면도」 2) — 묶음 머리(unit_group)에 제 키 그림이 없어도
+  //    묶음 안 주택형(unit_type) 키에 그림이 있으면 머리에도 칩을 단다(접힌 묶음을 열어야 보이던 평면도 — …21062 「55」 ↔ 「…::55A」).
+  //    장 수 = 안 행 키들의 그림 합(같은 행은 한 번) · 안 행 칩은 그대로(같은 그림이 두 자리에 — 갤러리에서 빼는 규칙은 그대로).
+  root.querySelectorAll('details.hu-ug').forEach(det => {
+    const head = det.querySelector(':scope > summary .hu-x-slot');
+    if(!head || head.firstChild) return;   // 머리 키에 제 그림이 있으면 종전 그대로
+    const items = [], gids = [];
+    [...new Set([...det.querySelectorAll(':scope > .hu-ug-list .hu-x-slot')].map(s => s.getAttribute('data-xkey')))].forEach(k => {
+      const g = map.get(k); if(!g) return;
+      gids.push(g.gid); g.items.forEach(it => { if(items.indexOf(it) === -1) items.push(it); });
+    });
+    if(!items.length) return;
+    let gid = gids.length === 1 ? gids[0] : (det.dataset.zfHuxGid || '');
+    if(!gid){ gid = 'eg' + (extrasGroupSeq++); det.dataset.zfHuxGid = gid; }
+    extrasGroupsRegistry[gid] = items;
+    head.innerHTML = `<button type="button" class="chip hu-x-chip" title="이 묶음 주택형의 사진·평면도 ${items.length}건" onclick="event.preventDefault();event.stopPropagation();openExtrasViewer('${gid}',0)">📷 ${items.length}</button>`;
   });
   if(typeof zf3On === 'function' && zf3On()) zf3HuPhotoBar(id);
 }
