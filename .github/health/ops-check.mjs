@@ -1095,6 +1095,10 @@ try {
 //    🔵 2026-11-11(우편함 「코드·운영 — 0장 여섯 …」 2) — 원문 대조를 마친 행은 뺀다: source_page 가 찼거나 · 같은 묶음(get_announcement_group_ids — 분석 행이
 //       MYHOME 블록 ID 에 있는 경우)의 분석 행 pending_fields 에 「정책 「<분류>」 … 원문 문장으로」 기록이 있는 (공고, 분류). 역전파가 원문으로 고친 표준 문장이
 //       공고끼리 다시 같아져 의심 묶음으로 되잡히던 것(역전파 7회차)을 막는다. 2026-11-11 전 40묶음·125행 → 뒤 37묶음·107행(뺀 행 89).
+//    🔵 2026-11-12(우편함 「코드·운영 — 🔴 LH 목록 마감 … + 0장」 4 · 역전파 10회차 ⑤ 판정) — 표준 공고문 정상 겹침을 뺀다: 묶음 행마다 source_file 이 「공고」가 든
+//       공고문이고 그 파일 수 = 공고 수(공고마다 자기 공고문)면 지역본부 표준문 문장이 글자째 같은 것이다(10회차 10묶음 · 8회차 9묶음 모두 이 꼴 — 거짓 양성).
+//       대조 마친 묶음 장부는 새 표를 두지 않고 위 pending 줄(「정책 「분류」 … 원문 문장으로」)을 그대로 쓴다 — 역전파 회차가 이미 그 줄을 남긴다.
+//       2026-11-12 22묶음·71행 → 6묶음·24행(뺀 16묶음 · 남은 것 = QnA 파일 3 · 할증률 표 2 · 신혼 2차 1).
 try {
   const [x] = await sqlRead(`with done as materialized (
       select distinct g.gid, m[1] cat from public.announcement_analysis a
@@ -1107,16 +1111,57 @@ try {
        where coalesce(btrim(p.content_raw), '') <> '' and p.category !~ '^(⚠️|일정|모집일정)'
          and to_jsonb(p) ->> 'source_page' is null
          and not exists (select 1 from done d where d.gid = p.announcement_id and d.cat = p.category)),
-    g as (select h, count(*) n, count(distinct source_file) nf, bool_and(created_at < '2026-09-18') old
+    g as (select h, count(*) n, count(distinct source_file) nf, bool_and(created_at < '2026-09-18') old,
+            bool_and(coalesce(source_file, '') ~ '공고') all_notice,
+            count(distinct source_file) = count(distinct announcement_id) own_file
             from p group by h having count(distinct announcement_id) > 1)
-  select json_build_object('groups', count(*) filter (where old and nf > 1), 'rows', coalesce(sum(n) filter (where old and nf > 1), 0),
+  select json_build_object('groups', count(*) filter (where old and nf > 1 and not (all_notice and own_file)),
+      'rows', coalesce(sum(n) filter (where old and nf > 1 and not (all_notice and own_file)), 0),
+      'std_groups', count(*) filter (where old and nf > 1 and all_notice and own_file),
       'all_groups', count(*), 'all_rows', coalesce(sum(n), 0)) j from g`)
   const c = x.j
   add('policy_md5_dup_old', '공고끼리 같은 요약 정책 행 — 09-18 이전 · 원문 파일 다름(정보)', 'info',
-    `의심 묶음 ${c.groups} · ${c.rows}행(전체 겹침 묶음 ${c.all_groups} · ${c.all_rows}행 — 대부분 표준 문장)`,
+    `의심 묶음 ${c.groups} · ${c.rows}행(표준 공고문 정상 겹침으로 뺀 ${c.std_groups}묶음 · 전체 겹침 묶음 ${c.all_groups} · ${c.all_rows}행)`,
     '정보 — 판정하지 않는다 · content_raw md5 같은 정책 행 · 일정·⚠️·모집일정 밖 · 원문 대조 마친 행(source_page · pending 「원문 문장으로」) 밖 · 공고 둘 이상 · 의심 = 전부 2026-09-18 이전 ∧ source_file 둘 이상 · 역전파가 고치면 줄어든다(2026-11-10 46 · 11-11 37)')
 } catch (e) {
   add('policy_md5_dup_old', '공고끼리 같은 요약 정책 행 — 09-18 이전 · 원문 파일 다름(정보)', 'info', String(e).slice(0, 200), '정책 표를 읽는다(실패면 ℹ️)')
+}
+
+// ㊲ LH 목록 마감(CLSG_DT) < 상세 청약 마감(2026-11-12 · 우편함 「코드·운영 — 🔴 LH 목록 마감(CLSG_DT) < 상세 청약 마감 감시·보호」 1 · …21026 꼴)
+//    — 열린 LH 행(apply_end ≥ 오늘 KST) 중 apply_end_detail(상세 받은 런의 청약 마감) > apply_end_list(목록 원값) = ⚠️(안 멈춤 · gate.mjs HARD 밖).
+//    보호 트리거(protect_detail_columns)가 이미 상세 값을 카드 마감으로 세운다 — 이 항목은 LH 가 목록·상세를 다르게 준 공고가 있다는 신호다(값 칸에 공고 · 두 값 · 지금 카드 마감).
+//    칸이 아직 없으면(마이그레이션 2026-11-12_02 적용 전) ℹ️.
+try {
+  const rows = await sqlRead(`select announcement_id id, apply_end_list l, apply_end_detail d, apply_end e, apply_end_confirmed c
+      from public.announcements where source = 'LH' and apply_end >= (now() at time zone 'Asia/Seoul')::date
+       and apply_end_list is not null and apply_end_detail is not null and apply_end_detail > apply_end_list
+     order by announcement_id desc limit 20`)
+  add('lh_list_end_early', 'LH 목록 마감 < 상세 청약 마감 — 열린 LH 행', rows.length ? 'warn' : 'pass',
+    rows.length ? rows.map(r => `…${String(r.id).slice(-5)} 목록 ${String(r.l).slice(5)} · 상세 ${String(r.d).slice(5)} → 카드 ${String(r.e).slice(5)}${r.c ? '(확정)' : ''}`).join(' / ') : '0',
+    '0 — 넘으면 ⚠️(안 멈춤) · 보호 트리거가 상세 값을 카드 마감으로 세운다 · apply_end_list = 목록 CLSG_DT · apply_end_detail = 상세 SBSC_ACP_CLSG_DT 중 가장 늦은 날')
+} catch (e) {
+  add('lh_list_end_early', 'LH 목록 마감 < 상세 청약 마감 — 열린 LH 행', 'info', String(e).slice(0, 200), '칸이 없으면(적용 전) ℹ️')
+}
+
+// ㊳ 사용자 글 칸 속 영문 식별자(2026-11-12 · 우편함 「코드·운영 — 🔴 LH 목록 마감 … + 0장」 5 · 백로그 「다른 회차 세대 비고에 DB 칸 이름」) — ℹ️ 셈만(판정하지 않는다).
+//    칸 = housing_units.extra_note · announcement_policies.content_raw · eligibility_criteria.manual_check_note · age_exception_note(화면이 그대로 보여 주는 글).
+//    셈 = 낱말 [a-z]+_[a-z_0-9]+(DB 칸 이름 꼴 — area_sqm · revision_note 등) 이 든 행 · 단독 낱말 null 이 든 행. 첫 값 2026-11-12 세대 비고 27(null 11 · 모두 식별자 행과 겹침) · 정책 1 · 자격 0.
+//    분석 묶음이 0으로 만든 뒤 ⚠️로 올릴지는 claude.ai 판정(그때 이 항목의 상태만 바꾼다).
+try {
+  const [x] = await sqlRead(`with t(src, txt) as (
+      select 'unit', extra_note from public.housing_units where extra_note is not null
+      union all select 'policy', content_raw from public.announcement_policies where content_raw is not null
+      union all select 'elig', manual_check_note from public.eligibility_criteria where manual_check_note is not null
+      union all select 'elig', age_exception_note from public.eligibility_criteria where age_exception_note is not null)
+    select json_object_agg(src, json_build_object('ident', ni, 'nul', nn)) j from (
+      select src, count(*) filter (where txt ~ '\\m[a-z]+_[a-z_0-9]+\\M') ni,
+                  count(*) filter (where txt ~* '(^|[^a-z_])null($|[^a-z_])') nn from t group by src) y`)
+  const c = x.j || {}, f = k => `${(c[k] || {}).ident ?? 0}${(c[k] || {}).nul ? '(null ' + c[k].nul + ')' : ''}`
+  add('user_text_ident', '사용자 글 칸 속 영문 식별자(DB 칸 이름 꼴 · 단독 null) — 정보', 'info',
+    `세대 비고 ${f('unit')} · 정책 ${f('policy')} · 자격 메모 ${f('elig')}`,
+    '정보 — 판정하지 않는다 · 낱말 [a-z]+_[a-z_0-9]+ 이 든 행 수(괄호 = 단독 null 든 행) · 첫 값 2026-11-12 27(11) · 1 · 0 · 분석 묶음이 0으로 만든 뒤 ⚠️ 승격은 claude.ai 판정')
+} catch (e) {
+  add('user_text_ident', '사용자 글 칸 속 영문 식별자(DB 칸 이름 꼴 · 단독 null) — 정보', 'info', String(e).slice(0, 200), '세대·정책·자격 표를 읽는다(실패면 ℹ️)')
 }
 
 // ㊱ 서식 출처 정책 행 · 「모집일정」 정책 행 ∧ 일정 행 0(2026-11-12 · 우편함 「코드·운영 — …21026 마감 원인·고침 + 커트라인 공급 이력 …」 3·4
