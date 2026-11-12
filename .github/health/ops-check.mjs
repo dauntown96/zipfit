@@ -1146,7 +1146,7 @@ try {
 // ㊳ 사용자 글 칸 속 영문 식별자(2026-11-12 · 우편함 「코드·운영 — 🔴 LH 목록 마감 … + 0장」 5 · 백로그 「다른 회차 세대 비고에 DB 칸 이름」) — ℹ️ 셈만(판정하지 않는다).
 //    칸 = housing_units.extra_note · announcement_policies.content_raw · eligibility_criteria.manual_check_note · age_exception_note(화면이 그대로 보여 주는 글).
 //    셈 = 낱말 [a-z]+_[a-z_0-9]+(DB 칸 이름 꼴 — area_sqm · revision_note 등) 이 든 행 · 단독 낱말 null 이 든 행. 첫 값 2026-11-12 세대 비고 27(null 11 · 모두 식별자 행과 겹침) · 정책 1 · 자격 0.
-//    분석 묶음이 0으로 만든 뒤 ⚠️로 올릴지는 claude.ai 판정(그때 이 항목의 상태만 바꾼다).
+//    2026-11-12 역전파 11회차가 0으로 만든 뒤 ⚠️로 올렸다(claude.ai 판정 · 우편함 「코드·운영 — 단지 키 3차 + …」 3).
 try {
   const [x] = await sqlRead(`with t(src, txt) as (
       select 'unit', extra_note from public.housing_units where extra_note is not null
@@ -1157,11 +1157,35 @@ try {
       select src, count(*) filter (where txt ~ '\\m[a-z]+_[a-z_0-9]+\\M') ni,
                   count(*) filter (where txt ~* '(^|[^a-z_])null($|[^a-z_])') nn from t group by src) y`)
   const c = x.j || {}, f = k => `${(c[k] || {}).ident ?? 0}${(c[k] || {}).nul ? '(null ' + c[k].nul + ')' : ''}`
-  add('user_text_ident', '사용자 글 칸 속 영문 식별자(DB 칸 이름 꼴 · 단독 null) — 정보', 'info',
+  const bad = Object.values(c).some(v => (v.ident || 0) + (v.nul || 0) > 0)
+  // 🔵 2026-11-12(우편함 「코드·운영 — 단지 키 3차 + …」 3 · claude.ai 판정) — 역전파 11회차가 0으로 만든 뒤 ⚠️ 승격(안 멈춤 · gate.mjs HARD 밖).
+  add('user_text_ident', '사용자 글 칸 속 영문 식별자(DB 칸 이름 꼴 · 단독 null)', bad ? 'warn' : 'pass',
     `세대 비고 ${f('unit')} · 정책 ${f('policy')} · 자격 메모 ${f('elig')}`,
-    '정보 — 판정하지 않는다 · 낱말 [a-z]+_[a-z_0-9]+ 이 든 행 수(괄호 = 단독 null 든 행) · 첫 값 2026-11-12 27(11) · 1 · 0 · 분석 묶음이 0으로 만든 뒤 ⚠️ 승격은 claude.ai 판정')
+    '0 — 넘으면 ⚠️(안 멈춤) · 낱말 [a-z]+_[a-z_0-9]+ 이 든 행 수(괄호 = 단독 null 든 행) · 첫 값 2026-11-12 27(11) · 1 · 0 → 같은 날 역전파 11회차 뒤 0')
 } catch (e) {
-  add('user_text_ident', '사용자 글 칸 속 영문 식별자(DB 칸 이름 꼴 · 단독 null) — 정보', 'info', String(e).slice(0, 200), '세대·정책·자격 표를 읽는다(실패면 ℹ️)')
+  add('user_text_ident', '사용자 글 칸 속 영문 식별자(DB 칸 이름 꼴 · 단독 null)', 'warn', String(e).slice(0, 200), '세대·정책·자격 표를 읽는다(못 읽으면 ⚠️ 점검 불능)')
+}
+
+// ㊴ 임대조건 한 줄 산술(2026-11-12 · 우편함 「코드·운영 — 단지 키 3차 + …」 4 · run 425 ⑦) — ℹ️ 셈만(판정하지 않는다 · gate.mjs HARD 밖).
+//    세대 비고(extra_note)의 「계약금 N원 · 잔금 M원」과 세대 행 deposit 을 견준다:
+//    ⓐ 합 어긋남 = N + M ≠ deposit · ⓑ 5% 어긋남 = 같은 공고의 다른 줄이 계약금 = 계 × 5% 꼴인데 이 줄은 |N − deposit × 5%| ≥ 1,000원(LH 는 천 원 미만을 맞춰 적는다 — 그 차이는 정상).
+//    원문 표 자체의 오기(…21029 「3,973,80」 꼴)도 잡힌다 — 고칠지는 원문을 보고 분석 묶음이 정한다. 첫 값 2026-11-12 1,566행 중 ⓐ 13(9공고 · …21029 · …21050 포함) · ⓑ 0.
+try {
+  const [x] = await sqlRead(`with r as (select announcement_id a, deposit d,
+        replace((regexp_match(extra_note, '계약금\\s*([\\d,]+)\\s*원'))[1], ',', '')::bigint k,
+        replace((regexp_match(extra_note, '잔금\\s*([\\d,]+)\\s*원'))[1], ',', '')::bigint j
+      from public.housing_units where extra_note ~ '계약금\\s*[\\d,]+\\s*원' and extra_note ~ '잔금\\s*[\\d,]+\\s*원' and deposit is not null),
+    f as (select *, k + j <> d sum_bad, abs(k - d * 0.05) >= 1000 pct_bad from r),
+    g as (select a, bool_or(not pct_bad) any5 from f group by a)
+    select json_build_object('rows', (select count(*) from f), 'sum_bad', (select count(*) from f where sum_bad),
+      'pct_bad', (select count(*) from f join g using (a) where g.any5 and pct_bad and not sum_bad),
+      'ann', (select coalesce(json_agg(distinct a), '[]'::json) from f join g using (a) where sum_bad or (g.any5 and pct_bad))) j`)
+  const c = x.j
+  add('rent_terms_arith', '임대조건 한 줄 산술 — 계약금 + 잔금 = 임대보증금 · 계약금 5%(정보)', 'info',
+    `${c.rows}행 중 합 어긋남 ${c.sum_bad} · 5% 어긋남 ${c.pct_bad}${c.ann.length ? ' — ' + c.ann.slice(0, 8).map(i => '…' + String(i).slice(-5)).join(' · ') : ''}`,
+    '정보 — 판정하지 않는다 · 세대 비고 「계약금 N원 · 잔금 M원」 ↔ deposit · 5% 는 같은 공고에 5% 꼴 줄이 있을 때만 · 천 원 미만 차이 무시 · 첫 값 2026-11-12 1,566 · 13 · 0')
+} catch (e) {
+  add('rent_terms_arith', '임대조건 한 줄 산술 — 계약금 + 잔금 = 임대보증금 · 계약금 5%(정보)', 'info', String(e).slice(0, 200), '세대 표를 읽는다(실패면 ℹ️)')
 }
 
 // ㊱ 서식 출처 정책 행 · 「모집일정」 정책 행 ∧ 일정 행 0(2026-11-12 · 우편함 「코드·운영 — …21026 마감 원인·고침 + 커트라인 공급 이력 …」 3·4
