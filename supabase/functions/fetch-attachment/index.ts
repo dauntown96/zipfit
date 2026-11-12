@@ -262,6 +262,21 @@ const toBase64 = (bytes: Uint8Array): string => {
   return btoa(binary)
 }
 
+// 🔵 2026-11-12(우편함 「코드·운영 — 단지 키 3차 + …」 7 · 역전파 11회차 ⑦) — PDF 쪽수(받은 바이트만 · 쓰기 0). 다음 분석이 1쪽 = 사진·평면도 ·
+//   여러 쪽 = pamphlet 로 가를 재료. 방법: ① 「/Type /Pages … /Count N」 중 가장 큰 N(루트 쪽 나무) ② 없으면 「/Type /Page」(Pages 아님) 개수.
+//   객체 스트림(압축된 /ObjStm)에만 쪽 나무가 있으면 둘 다 못 세어 null 이다(method 'unknown') — 지어내지 않는다.
+const pdfPageCount = (bytes: Uint8Array): { pages: number | null; method: string } => {
+  if (!(bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46)) return { pages: null, method: 'not_pdf' }
+  const txt = new TextDecoder('latin1').decode(bytes)
+  let best = 0
+  for (const m of txt.matchAll(/\/Type\s*\/Pages\b[^>]*?\/Count\s+(\d+)|\/Count\s+(\d+)[^>]*?\/Type\s*\/Pages\b/g)) {
+    const n = Number(m[1] ?? m[2]); if (n > best) best = n
+  }
+  if (best > 0) return { pages: best, method: 'pages_count' }
+  const leaf = (txt.match(/\/Type\s*\/Page(?![s\w])/g) || []).length
+  return leaf > 0 ? { pages: leaf, method: 'page_objects' } : { pages: null, method: 'unknown' }
+}
+
 const sha256Hex = async (bytes: Uint8Array): Promise<string> => {
   const digest = await crypto.subtle.digest('SHA-256', bytes)
   return Array.from(new Uint8Array(digest))
@@ -1495,6 +1510,8 @@ const handleRequest = async (req: Request): Promise<Response> => {
         .map((b) => b.toString(16).padStart(2, '0'))
         .join(''),
     }
+    // 🔵 2026-11-12 — PDF 쪽수(pdfPageCount 주석) · PDF 가 아니면 칸을 싣지 않는다.
+    { const pc = pdfPageCount(bytes); if (pc.method !== 'not_pdf') { payload.pdf_pages = pc.pages; payload.pdf_pages_method = pc.method } }
 
     // 🔵 2026-11-03 — 받은 바이트가 Content-Length 와 다르면(받기가 중간에 끊김 · 11-03 채움 실측 49,152·270,336·565,272B) 잘린 것이다.
     const lengthMatch = declaredLen === null || !Number.isFinite(declaredLen) ? null : declaredLen === bytes.length
