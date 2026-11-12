@@ -44,6 +44,28 @@
 | Supabase(DB · EF · Vault) | 전부 | `SUPABASE_SERVICE_ROLE_KEY` · Vault `cron_secret_v2` · `zipfit_routine_fire_url` · `zipfit_routine_fire_token` · `github_actions_dispatch_token` |
 | GitHub Actions(점검 · 백업 · 배포) | `.github/workflows/` | Actions Secret `SUPABASE_ACCESS_TOKEN` 등 |
 
+### 키·신청·만료 — 활용신청이 언제 끝나나
+
+2026-11-12 신설(우편함 「코드·운영 — 0장 일곱 …」 7 · 다운님 질문). 값은 다운님 포털 화면(2026-11-12 · 백로그 「다음 코드·운영 0장 여섯」 근거·비고 · 2026-10-11 만료 표) 그대로 — 모두 **개발 계정**. 키는 **이름만**.
+🔴 **기계가 읽는 사본은 [`api-expiry.json`](api-expiry.json)** — 이 표를 고치면 그 파일도 같은 PR에서 고친다. health-ops ⚠️ `api_expiry`가 남은 날 60일(KST) 안을 낸다(안 멈춤 · ⚠️는 점검 기록 `ops_health_record`와 관리자 상태판에 남고 이슈는 열지 않는다 — 이슈는 ❌만). 만료 표시 없는 것은 「표시 없음」 — 경보 밖, 아래 「정기 조사」 체크리스트 3에서 다시 본다.
+🔴 data.go.kr 키 이름 셋(`LH_API_KEY` · `MOLIT_RENT_API_KEY` · `ODCLOUD_API_KEY`)은 **같은 값**이다(아래 후보 표 머리) — 만료는 키가 아니라 그 계정의 API 신청마다 따로다. 연장 신청은 포털 「마이페이지 → 활용신청 현황」. 비밀값(토큰) 만료는 따로 — `zipfit_ops.secret_expiry_list()`(health-ops `secret_expiry` · 30일).
+
+| 포털·기관 | API | 키(이름) | 신청일 | 만료일 | 계정 |
+|---|---|---|---|---|---|
+| `khug.or.kr` | HUG 든든전세 모집공고 | `HUG_API_KEY`(컨테이너 환경변수) | 2026-11-12 | **2027-11-12** ← 가장 먼저 | 개발 |
+| data.go.kr | LH 분양임대공고문 · 공고별 상세정보 · 공고별 공급정보 · 청약센터 공지사항 목록 · 임대주택단지 조회 | data.go.kr 키(이름 셋 · 같은 값) | 2026-06-19 | 2028-06-19 | 개발 |
+| data.go.kr | 마이홈 공공주택 모집공고 | 같음 | — | 2028-06-21 | 개발 |
+| data.go.kr | 마이홈 예비입주자 대기현황 · 마이홈 공공임대주택 단지정보 | 같음 | — | 2028-06-23 | 개발 |
+| data.go.kr | 아파트 전월세 실거래가 | 같음 | — | 2028-09-28 | 개발 |
+| data.go.kr | LH 건설임대 당첨 합격점수 | 같음 | — | 2028-11-04 | 개발 |
+| data.go.kr | 공동주택 기본정보 · 공동주택 단지 목록 · 단독다가구·오피스텔·연립다세대 전월세 · LH 공공임대주택 단지정보 · LH 청약센터 공지사항별 상세정보 · 건축HUB 건축물대장 | 같음 | — | 2028-11-12 | 개발 |
+| data.go.kr | 마이홈 기존임대주택 목록 5종(파일데이터) | 같음 | 2026-06-25 | 표시 없음 | 개발 |
+| data.go.kr | 청약홈 분양정보 · 경쟁률·특별공급 · 신청·당첨자(이미 승인) | 같음 | 2026-06-23 | 표시 없음 | 개발 |
+| `juso.go.kr` | 도로명주소 검색 | `JUSO_SEARCH_KEY` | 2026-11-12(발급) | 표시 없음 | 개발 |
+| `juso.go.kr` | 좌표제공 검색(승인 중) | `JUSO_COORD_KEY`(가칭 — 이름은 다운님 확정 뒤) | — | 표시 없음 | 개발 |
+
+「—」 = 포털 화면 옮김에 신청일이 없었다(어림으로 채우지 않는다). HUG 주의: 모집공고 때만 데이터가 나오고 마감되면 API에서 자동 삭제(HUG 표기).
+
 ## 후보 — 쓸 시점이 정해진 것
 
 조사 회신 ②(2026-10-21) 후보 표에서 옮겼다. 「재확인」 칸은 포털·실호출로 다시 본 것만 날짜와 함께 적는다. 한도는 포털 「개발계정」 일 트래픽.
@@ -57,7 +79,7 @@
 | 1. LH 청약센터 공지사항 목록 조회 — [15058222](https://www.data.go.kr/data/15058222/openapi.do) · `B552555/lhNoticeInfo1/getNoticeInfo1` | JSON — 유형 · 제목 · 담당본부 · 게시일 · 상세 URL · `BBS_SN` · 기간(`SCH_ST_DT`~`SCH_ED_DT`) · 10,000 · 서비스키 · 자동승인 | 이용허락범위 제한 없음 | 🔵 **지금 씀 — 대상주택 공지 감지**(2026-11-05 · 원천 16 · EF `collect-lh-notices`) · 후순위 접수 여부 · 공급대상주택 게시(원천 13) · LH 상태(`PAN_SS`)를 믿을지의 판단 재료 | S0(판단 재료) · 수집은 S1 | 없음(이미 됨) | 포털 가이드 20210810 · 컨테이너 `MOLIT_RENT_API_KEY`로 **HTTP 200**(10-14~21 창 `ALL_CNT` 28) |
 | 2. LH 청약센터 공지사항별 상세정보 조회 — [15058449](https://www.data.go.kr/data/15058449/openapi.do) · `lhNoticeDtlInfo1/getNoticeDtlInfo1` | 상세 내용 · 첨부 목록 · 10,000 · 자동승인 · 대안: 목록의 상세 URL(HTML GET 200) | 이용허락범위 제한 없음 | 같음 — 공지 본문 · 첨부(공급대상주택 목록) | S1 | 없음(2026-11-12 신청 끝) | 포털 가이드 20210810 · 2026-10-21 403(신청 안 됨) → **2026-11-12 HTTP 200**: 인자 `BBS_SN` + `CCR_CNNT_SYS_DS_CD`(목록 행의 값 그대로 — 공지는 `02` · `03`을 주면 빈 응답) · 칸 `dsBbsInfo`(제목 · 본문 `BBS_DTL_CTS` · 게시일 · 담당) · `dsBbsAhflInfo`(`AHFL_URL` · `CMN_AHFL_NM`) · 🔴 첨부 주소는 `apply.lh.or.kr/lhapply/lhFile.do`(robots `Disallow` · 원천 6 문지기) — 이 API는 첨부 **목록**만 주고 받는 길은 그대로 막혀 있다(이 회차 첨부 받기 0) |
 | 3. LH 분양임대공고별 공급정보 조회 — [15056765](https://www.data.go.kr/data/15056765/openapi.do) · `lhLeaseNoticeSplInfo1/getLeaseNoticeSplInfo1` | 주택형 · 필지 · 상가호 목록 · 10,000 · 인자 `PAN_ID` · `SPL_INF_TP_CD` · `CCR_CNNT_SYS_DS_CD` · `UPP_AIS_TP_CD` · `AIS_TP_CD`(공고 목록 행의 값 그대로) | 이용허락범위 제한 없음 | 세대 행 자동화 · 매입 공급대상주택 목록이 나오는지 미확인 | S1 | 없음 | 포털 가이드 20260202 · **2026-11-12 HTTP 200**(울산다운2 A-6 `…21060`): `dsList01` 칸 = 단지명 · 주택형 · 전용 · 공급면적 · 세대수 · 금회공급 세대수 · 임대보증금 · 월임대료(이 공고는 금액 「공고문 참조」) — 매입 공고는 안 봄 |
-| 4. 한국부동산원 청약홈 분양정보 15098547 · 경쟁률 15098905 | 40,000 · 운영 심의승인 · `api.odcloud.kr` | 이용허락범위 제한 없음 | L1 「분양 보류」 | S4 | 활용신청(심의) | 2026-11-04 다시 봄(claude.ai 조사 · 우편함 「옛 주소 걷기·화면 빈칸 점검」 덧): 40,000 · 개발 자동 / 운영 심의 · 이용허락범위 제한 없음 · 포털 수정 2024-03-19 · 컨테이너에서 `api.odcloud.kr`·`www.applyhome.co.kr` CONNECT 403(허용 목록 축) |
+| 4. 한국부동산원 청약홈 분양정보 15098547 · 경쟁률 15098905 | 40,000 · 운영 심의승인 · `api.odcloud.kr` | 이용허락범위 제한 없음 | L1 「분양 보류」 | S4 | 없음 — 개발 계정 이미 승인(2026-06-23 신청 · 분양정보 · 경쟁률·특별공급 · 신청·당첨자 셋 · 다운님 포털 화면 2026-11-12) · 운영 계정 심의는 쓸 때 | 2026-11-04 다시 봄(claude.ai 조사 · 우편함 「옛 주소 걷기·화면 빈칸 점검」 덧): 40,000 · 개발 자동 / 운영 심의 · 이용허락범위 제한 없음 · 포털 수정 2024-03-19 · 컨테이너에서 `api.odcloud.kr`·`www.applyhome.co.kr` CONNECT 403(허용 목록 축) |
 | 5. 마이홈 예비입주자 대기현황 [15108378](https://www.data.go.kr/data/15108378/openapi.do) · `1613000/HWSPR03/moveWaitStsList`(또는 `data.myhome.go.kr/moveWaitStsList`) | 1,000 · 자동승인 · 인자 `brtcCode` · `signguCode`(+ `suplyTy` · `houseTy`) | 이용허락범위 제한 없음 | 매칭 「대기 순번」 | S4 | 없음(신청 끝) | **2026-11-12 HTTP 200**(`apis.data.go.kr` 경로 · 서울 종로 `totalCount` 14) · 칸: 기관 · 단지명 · 도로명 주소 `rnAdres` · 단지 번호 `hsmpSn` · 주택·공급 유형 · 형 · 추첨 단위 `drwtUnit` · 대기 수 `waitCo` · 해지 수 `trmnatCo` — 개인 값 없음 |
 | 6a. 마이홈 공공임대 단지정보 [15110581](https://www.data.go.kr/data/15110581/openapi.do) · `1613000/HWSPR04/rentalHouseGwList`(또는 `data.myhome.go.kr/rentalHouseGwList`) | 단지 행(형별) · 1,000 · 인자 `brtcCode` · `signguCode` · 🔴 **시도 코드는 새 코드**(전남 담양 `46` → `resultCode` 03 · `12` → 200) | 이용허락범위 제한 없음 | 지도 핀 정확도 · 단지 정보 · 지번 → 도로명(`pnu` 19자리 = 법정동 10 + 산 1 + 번 4 + 지 4 · `rnAdres`) | S1 | 없음(신청 끝) | **2026-11-12 HTTP 200**(서울 종로 387행 · 과천 39 · 구리 131) · 칸: `hsmpSn` · 기관 · 시도·시군구 · 단지명 · `rnAdres` · `pnu` · 준공 `competDe` · 세대 `hshldCo` · 공급유형 · 형 · 전용·공용 · 주택유형 · 난방 · 건물 형태 · 승강기 · 주차 · 기본 보증금·월임대료·전환 한도 · 🔵 지번만 공고 4건의 대지 `pnu` 일치 0(새 단지라 아직 없음 — 아래 「지번 → 도로명 표본」) |
 | 6b. LH 공공임대주택 단지정보 [15058476](https://www.data.go.kr/data/15058476/openapi.do) · `data.myhome.go.kr/rentalHouseList` | 1,000 · 인자 `brtcCode` · `signguCode` · 상세에 `apis.data.go.kr` 경로 없음 | 이용허락범위 제한 없음 | 6a와 같은 일(LH 단지만) | S1 | 허용 목록 `data.myhome.go.kr` | 2026-11-12 신청 끝 · 컨테이너 **CONNECT 403**(허용 목록 축 — 호출 0 · 키 반영 여부 미확인) |

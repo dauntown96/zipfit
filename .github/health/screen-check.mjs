@@ -1161,6 +1161,15 @@ try {
       }
       return { n, all, top: Object.entries(kinds).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, v]) => `${k} ${v}`), titles: document.querySelectorAll('[title]').length }
     }
+    // ⑫-④ [style*=] 규칙마다 걸리는 요소 수(2026-11-12 · 우편함 「코드·운영 — 0장 일곱 …」 4 · 토큰 3차 ⑦) — 같은 두 상태(공고 탭 · 첫 카드 펼침).
+    //    배포본 스타일시트에서 선택자에 [style*= 가 든 규칙을 골라 querySelectorAll 수를 센다(보임·숨김 가리지 않음 — 그 규칙이 칠 수 있는 요소 수).
+    const styleHits = () => {
+      const out = []
+      for (const sh of document.styleSheets) { let rules; try { rules = sh.cssRules } catch { continue }
+        for (const r of rules) if (r.selectorText && r.selectorText.includes('[style*=')) { let n = 0; try { n = document.querySelectorAll(r.selectorText).length } catch { n = -1 } out.push([r.selectorText, n]) } }
+      return out
+    }
+    const listH = await tp.evaluate(styleHits)
     const listS = await tp.evaluate(small)
     await tp.evaluate(() => {
       const c = [...document.querySelectorAll('.hcard')].find(e => e.offsetParent !== null); if (!c) return
@@ -1169,7 +1178,18 @@ try {
     })
     await tp.waitForTimeout(5000)
     const detS = await tp.evaluate(small)
+    const detH = await tp.evaluate(styleHits)
     await tctx.close()
+    {
+      const short = t => t.replace(/html\[data-ui="d3"\]\s*/g, '').replace(/\s+/g, ' ').slice(0, 60)
+      const rows = listH.map(([sel, n], i) => ({ sel, list: n, detail: (detH[i] || [])[1] ?? null }))
+      const zero = rows.filter(r => r.list === 0 && r.detail === 0)
+      extra.watch_style_attr = { rows }
+      add('watch_style_attr', '[style*=] 규칙마다 걸리는 요소 수(390 공고 탭 · 카드 펼침) — 정보', 'info',
+        `규칙 ${rows.length} · 둘 다 0 ${zero.length}${zero.length ? '(' + zero.map(r => short(r.sel)).join(' · ') + ')' : ''} · `
+          + rows.filter(r => !(r.list === 0 && r.detail === 0)).map(r => `${short(r.sel)} ${r.list}/${r.detail}`).join(' · '),
+        '정보 — 판정하지 않는다 · 배포본 스타일시트에서 선택자에 [style*= 가 든 규칙 · 공고 탭/첫 카드 펼침 querySelectorAll 수 · 둘 다 0 = 걷어도 되는 후보(다른 화면에서 쓰일 수 있음 — 판정은 표시층)')
+    }
     extra.watch_title_target = { srcTitleAttr, srcTitleJs, list: listS, detail: detS }
     add('watch_title', 'title 속성 수(원본 · 390 공고 탭 DOM) — 추이(정보)', 'info',
       `원본 title="" ${srcTitleAttr} · JS .title= ${srcTitleJs} · 공고 탭 DOM [title] ${listS.titles} · 카드 펼침 ${detS.titles}`,
