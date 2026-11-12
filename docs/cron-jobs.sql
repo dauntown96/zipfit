@@ -218,6 +218,10 @@ select cron.schedule('zipfit-purge-collection-run-log', '27 15 * * *', $cmd$dele
 --   2026-11-09 신설(supabase/migrations/2026-11-09_01_purge_lh_file_fetch_log.sql) — LH 첨부 문지기 기록 90일 보관(읽는 곳 · 문지기 재허락 뜻은 그 파일 머리 주석).
 select cron.schedule('zipfit-purge-lh-file-fetch-log', '37 15 * * *', $cmd$delete from public.lh_file_fetch_log where at < now() - interval '90 days'$cmd$);
 
+-- jobid 89 · zipfit-complex-link-pending · '41 * * * *' = KST 매시 41분 · active=true · command md5 0ffc740c96d15b4e9354d9b813e758bb
+--   2026-11-12 신설(supabase/migrations/2026-11-12_04_complex_link_pending_cron.sql) — 새 분석 공고 세대 행 단지 잇기 안전망(zipfit_ops.complex_link_pending).
+select cron.schedule('zipfit-complex-link-pending', '41 * * * *', $cmd$select zipfit_ops.complex_link_pending()$cmd$);
+
 -- jobid 75 · zipfit-gh-observe · '31 0,3,6,9 * * *' = KST 09:31·12:31·15:31·18:31 · active=true · command md5 32c19763f9e323ab6ddcb57e723e1aae
 --   2026-11-03 신설(supabase/migrations/2026-11-03_04_gh_observe.sql) — GH 공고 목록 관찰만(announcements 쓰기 0) · 2026-11-09 사본 재추출로 더함.
 select cron.schedule('zipfit-gh-observe', '31 0,3,6,9 * * *', $cmd$
@@ -259,5 +263,5 @@ $cmd$);
 --   빠진 잡(파일에 있는데 DB 에 없음)은 missing 행으로, 더 있는 잡(DB 에만 있음)은 extra 행으로 나온다.
 -- select coalesce(j.jobname, f.n) jobname, j.schedule, j.active, md5(j.command) cmd_md5,
 --        case when j.jobid is null then 'missing' when f.n is null then 'extra' else 'ok' end state
---   from cron.job j full join unnest(array['zipfit-collect-announcements', 'zipfit-collect-sh-announcements', 'zipfit-collect-rental-stats', 'zipfit-collect-announcements-warmup', 'zipfit-collect-announcements-night', 'zipfit-purge-usage-events', 'zipfit-purge-sh-run-log', 'zipfit-sh-close-missing', 'zipfit-collect-lh-promo', 'zipfit-refresh-post-links', 'zipfit-analysis-dispatch', 'zipfit-collect-lh-images', 'zipfit-health-ops-dispatch', 'zipfit-health-screen-dispatch', 'zipfit-check-source-pages', 'zipfit-uptime-ping', 'zipfit-backup-dispatch', 'zipfit-heartbeat-dispatch', 'zipfit-backup-poll', 'zipfit-purge-stale-sessions', 'zipfit-check-source-pages-new-sh', 'zipfit-net-purge-secrets', 'zipfit-list-rpc-probe', 'zipfit-purge-cron-run-details', 'zipfit-purge-collection-run-log', 'zipfit-purge-lh-file-fetch-log', 'zipfit-gh-observe', 'zipfit-collect-lh-cutoff', 'zipfit-collect-lh-notices']) f(n) on f.n = j.jobname
+--   from cron.job j full join unnest(array['zipfit-collect-announcements', 'zipfit-collect-sh-announcements', 'zipfit-collect-rental-stats', 'zipfit-collect-announcements-warmup', 'zipfit-collect-announcements-night', 'zipfit-purge-usage-events', 'zipfit-purge-sh-run-log', 'zipfit-sh-close-missing', 'zipfit-collect-lh-promo', 'zipfit-refresh-post-links', 'zipfit-analysis-dispatch', 'zipfit-collect-lh-images', 'zipfit-health-ops-dispatch', 'zipfit-health-screen-dispatch', 'zipfit-check-source-pages', 'zipfit-uptime-ping', 'zipfit-backup-dispatch', 'zipfit-heartbeat-dispatch', 'zipfit-backup-poll', 'zipfit-purge-stale-sessions', 'zipfit-check-source-pages-new-sh', 'zipfit-net-purge-secrets', 'zipfit-list-rpc-probe', 'zipfit-purge-cron-run-details', 'zipfit-purge-collection-run-log', 'zipfit-purge-lh-file-fetch-log', 'zipfit-gh-observe', 'zipfit-collect-lh-cutoff', 'zipfit-collect-lh-notices', 'zipfit-complex-link-pending']) f(n) on f.n = j.jobname
 --  order by 1;
