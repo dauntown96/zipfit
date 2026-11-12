@@ -218,7 +218,7 @@ select cron.schedule('zipfit-purge-collection-run-log', '27 15 * * *', $cmd$dele
 --   2026-11-09 신설(supabase/migrations/2026-11-09_01_purge_lh_file_fetch_log.sql) — LH 첨부 문지기 기록 90일 보관(읽는 곳 · 문지기 재허락 뜻은 그 파일 머리 주석).
 select cron.schedule('zipfit-purge-lh-file-fetch-log', '37 15 * * *', $cmd$delete from public.lh_file_fetch_log where at < now() - interval '90 days'$cmd$);
 
--- jobid ? · zipfit-complex-link-pending · '41 * * * *' = KST 매시 41분 · active=true · command md5 0ffc740c96d15b4e9354d9b813e758bb
+-- jobid 89 · zipfit-complex-link-pending · '41 * * * *' = KST 매시 41분 · active=true · command md5 0ffc740c96d15b4e9354d9b813e758bb
 --   2026-11-12 신설(supabase/migrations/2026-11-12_04_complex_link_pending_cron.sql) — 새 분석 공고 세대 행 단지 잇기 안전망(zipfit_ops.complex_link_pending).
 select cron.schedule('zipfit-complex-link-pending', '41 * * * *', $cmd$select zipfit_ops.complex_link_pending()$cmd$);
 
