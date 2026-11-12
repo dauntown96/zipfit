@@ -16,7 +16,7 @@ import { waveNoticeSql, judgeWaveNotice } from './wave-notice.mjs'
 import { LH_LEASE_MATCH_SQL, judgeLhLeaseMatch } from './lh-lease-match.mjs'
 import { chainMatchSql, judgeChainMatch } from './chain-match.mjs'
 import { judgeCronNames } from './cron-names.mjs'
-import { RENT_ARITH_SQL, rentArith, rentArithValue } from './rent-arith.mjs'
+import { RENT_ARITH_SQL, rentArith, rentArithValue, rentWarnMissingSql } from './rent-arith.mjs'
 import { judgeApiExpiry } from './api-expiry.mjs'
 import { screenRunSql, judgeScreenRun } from './screen-run.mjs'
 import { ELIG_FORM_NULL_SQL, RENT_NULL_SQL, ROUND_MIX_SQL, judgeEligFormNull, judgeRentNull, judgeRoundMix } from './open-gaps.mjs'
@@ -1217,8 +1217,14 @@ try {
 try {
   const [x] = await sqlRead(RENT_ARITH_SQL)
   const c = rentArith(x.j)
-  add('rent_terms_arith', '임대조건 한 줄 산술 — 계약금 + 잔금 = 임대보증금 · 계약금 5% · 전환 칸 · 결손 칸 후보(정보)', 'info', rentArithValue(c),
-    '정보 — 판정하지 않는다 · rent-arith.mjs · 두 벌 비고는 deposit·deposit_priority1 둘 다 · 5% 는 같은 공고에 5% 꼴 줄이 있을 때만 · 천 원 미만 차이 무시 · 전환 = 계 ± 한도 = 결과 보증금(한도·결과 둘 다 있는 구간만) · 결손 칸 후보 = 합 어긋남∧전환 맞음 → 계약금·잔금 칸 / 합 맞음∧전환 어긋남 → 전환 결과 칸')
+  // 🔵 2026-11-12(우편함 「코드·운영 — 서울 실행 EF 공용 길 …」 5 · claude.ai 판정) — 어긋남 공고(합·5%·전환) 중 ⚠️ 「임대조건 표기」 계열 정책 행이
+  //    없는 공고 > 0 이면 ⚠️(안 멈춤 · gate.mjs HARD 밖). 원문 결손이면 분석이 ⚠️ 정책 행을 달고, 옮김 실수면 고친다 — 둘 다 아니면 사람이 볼 자리.
+  const badIds = [...new Set([...c.ann, ...c.conv_ids])]
+  const [y] = badIds.length ? await sqlRead(rentWarnMissingSql(badIds)) : [{ j: [] }]
+  const noWarn = y.j
+  add('rent_terms_arith', '임대조건 한 줄 산술 — 계약금 + 잔금 = 임대보증금 · 계약금 5% · 전환 칸 · 결손 칸 후보 · ⚠️ 없는 어긋남 공고', noWarn.length ? 'warn' : 'info',
+    `⚠️ 정책 행 없는 어긋남 공고 ${noWarn.length}/${badIds.length}${noWarn.length ? '(' + noWarn.slice(0, 6).map(i => '…' + String(i).slice(-5)).join(' · ') + ')' : ''} · ` + rentArithValue(c),
+    '⚠️ 정책 행 없는 어긋남 공고 0 — 넘으면 ⚠️(안 멈춤) · 나머지 셈은 정보 · rent-arith.mjs · 두 벌 비고는 deposit·deposit_priority1 둘 다 · 5% 는 같은 공고에 5% 꼴 줄이 있을 때만 · 천 원 미만 차이 무시 · 전환 = 계 ± 한도 = 결과 보증금(한도·결과 둘 다 있는 구간만) · 결손 칸 후보 = 합 어긋남∧전환 맞음 → 계약금·잔금 칸 / 합 맞음∧전환 어긋남 → 전환 결과 칸')
 } catch (e) {
   add('rent_terms_arith', '임대조건 한 줄 산술 — 계약금 + 잔금 = 임대보증금 · 계약금 5% · 전환 칸 · 결손 칸 후보(정보)', 'info', String(e).slice(0, 200), '세대 표를 읽는다(실패면 ℹ️)')
 }
@@ -1346,13 +1352,13 @@ try {
 }
 
 // ㊷ API 활용신청 만료(2026-11-12 · 우편함 「코드·운영 — 0장 일곱 …」 7 · 다운님 질문) — docs/api-expiry.json(정본 표 docs/data-sources.md 「키·신청·만료」)을 읽는다.
-//    남은 날 ≤ 60(KST) = ⚠️(안 멈춤 · gate.mjs HARD 밖 · 열린 이슈로 다운님에게 닿는다) · 만료 표시 없는 것은 「표시 없음」으로 세기만 · 판정 api-expiry.mjs.
+//    남은 날 ≤ 60(KST) = ⚠️ · ≤ 30 또는 지남 = ❌(안 멈춤 · gate.mjs HARD 밖 → health-ops-soft 이슈 — 2026-11-12 두 단계) · 만료 표시 없는 것은 「표시 없음」으로 세기만 · 판정 api-expiry.mjs.
 try {
   const doc = JSON.parse(readFileSync(new URL('../../docs/api-expiry.json', import.meta.url), 'utf8'))
   const j = judgeApiExpiry(doc)
-  add('api_expiry', 'API 활용신청 만료(60일 안 ⚠️)', j.status, j.value, '남은 날 > 60(KST) — 60일 안·지남 ⚠️(안 멈춤) · 「표시 없음」은 경보 밖(분기 정기 조사) · 재료 docs/api-expiry.json')
+  add('api_expiry', 'API 활용신청 만료(60일 안 ⚠️ · 30일 안 ❌)', j.status, j.value, '남은 날 > 60(KST) — 60일 안 ⚠️ · 30일 안·지남 ❌(안 멈춤 · health-ops-soft 이슈) · 「표시 없음」은 경보 밖(분기 정기 조사) · 재료 docs/api-expiry.json')
 } catch (e) {
-  add('api_expiry', 'API 활용신청 만료(60일 안 ⚠️)', 'warn', String(e).slice(0, 200), 'docs/api-expiry.json 을 읽는다(못 읽으면 ⚠️)')
+  add('api_expiry', 'API 활용신청 만료(60일 안 ⚠️ · 30일 안 ❌)', 'warn', String(e).slice(0, 200), 'docs/api-expiry.json 을 읽는다(못 읽으면 ⚠️)')
 }
 
 // ⑳ 공고 원문 문자열 오염(2026-10-18 · 우편함 「코드·운영 — G8 확정 고침 …」 5 · 정보) — 화면 저장형 XSS 두 자리(제목 → innerHTML ·
