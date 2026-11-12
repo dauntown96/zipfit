@@ -83,7 +83,9 @@
 | `www.korea.kr` | 동향 — 정책브리핑 원문 링크 | 예정 | 허용 목록 · 미상 | 2026-10-14 | 막힘(CONNECT 403) |
 | `www.lh.or.kr` | 동향 — LH 보도자료 | 예정 | 허용 목록 · 미상 | 2026-10-14 | 막힘(CONNECT 403) |
 | `open.law.go.kr` | 백로그 「법령 원문 수집」(S1) | 예정 | 🔴 둘 다 — 허용 목록 + 서버 IP 등록·클라우드 IP 안티봇 | 2026-10-14 | 막힘(CONNECT 403) |
-| `business.juso.go.kr` | 도로명주소 API(세대 행 법정동) | 예정 | 허용 목록 · 미상 | 2026-10-14 | 막힘(CONNECT 403) |
+| `business.juso.go.kr` | 도로명주소 API(세대 행 법정동 · 지번 → 도로명 — 건축물대장에 없는 새 단지 · `data-sources.md` 후보 9 · 「도로명주소 검색」 · 「좌표제공 검색」 2026-11-12 신청) | 예정 | 허용 목록 · 미상 | 2026-11-12 | 막힘(CONNECT 403) |
+| `data.myhome.go.kr` | LH 공공임대주택 단지정보 15058476(`rentalHouseList` — 이 호스트에만 있음 · `data-sources.md` 후보 6b) · 마이홈 15110581 · 15108378은 `apis.data.go.kr` 경로로 대신 됨 | 예정 | 허용 목록 · 미상 | 2026-11-12 | 막힘(CONNECT 403) |
+| `www.khug.or.kr` | HUG 든든전세 — robots · 이용약관 · 오픈API 문서(15143827 LINK · 키 `HUG_API_KEY`) · 공고 원문 PDF(`/hug/homepage_file_upload/…`) · API 호출 호스트가 따로면 그 줄을 더한다 | 예정 | 허용 목록 · 미상 | 2026-11-12 | 막힘(CONNECT 403 · `khug.or.kr` · `openapi.khug.or.kr`도 403) |
 | `www.applyhome.co.kr` | 청약홈 · 분양 확장(L1 「분양 보류」) | 예정 | 허용 목록 · 미상 | 2026-11-04 | 막힘(CONNECT 403) |
 | `api.odcloud.kr` | data.go.kr 파일데이터 변환 API — 컨테이너에서 시험할 때(청약홈 후보 4 · HUG 든든전세 후보 10 · 수집 EF는 Supabase에서 돌아 해당 없음) | 예정 | 허용 목록 · 미상 | 2026-11-04 | 막힘(CONNECT 403) |
 | `infuser.odcloud.kr` | data.go.kr 파일데이터 내려받기(후보 10 HUG 든든전세 파일) | 예정 | 허용 목록 · 미상 | 2026-11-04 | 막힘(CONNECT 403) |
