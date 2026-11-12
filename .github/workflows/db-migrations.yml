@@ -12,6 +12,8 @@ on:
   #    (경로 필터가 있으면 DB 파일을 안 건드린 PR 에는 check 가 아예 생기지 않아 필수 체크가 영영 기다린다 — PR #278 실측).
   #    DB 파일(아래 check 잡 「DB 파일을 건드렸나」 단계의 grep 다섯 경로)을 안 건드린 PR 은 첫 단계가 「해당 없음」으로 끝내 DB 를 부르지 않는다.
   pull_request:
+    # 🔵 2026-11-12(우편함 「코드·운영 — 0장 일곱 …」 1) — edited 를 더했다: PR 제목·본문을 고치면 check 가 다시 돌아 「CI 건너뛰기 표시」 단계가 새 글을 본다.
+    types: [opened, synchronize, reopened, edited]
   push:
     branches: [main]
     paths:
@@ -35,6 +37,14 @@ jobs:
         with:
           fetch-depth: 0
       # 🔵 2026-10-30(우편함 「코드·운영 — #762 DB 묶음 병합」 덧 · #785) — PR 이 새로 더한 .md 줄의 {{ · {% (Pages Jekyll Liquid 빌드 실패 꼴). DB 를 부르지 않는다.
+      # 🔵 2026-11-12(우편함 「코드·운영 — 0장 일곱 …」 1 · #1006 사고) — PR 제목·본문·커밋 메시지의 CI 건너뛰기 표시(squash 메시지에 실려 main push 워크플로를 끈다). DB 를 부르지 않는다.
+      #    글은 환경변수로만 넘긴다(표현식을 run 안에 바로 쓰지 않는다 — 제목·본문은 PR 을 연 사람이 정한다).
+      - name: CI 건너뛰기 표시
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: bash scripts/skip-ci-check.sh
       - name: Pages Liquid 글자
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}

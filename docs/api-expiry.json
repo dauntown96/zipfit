@@ -1,0 +1,17 @@
+{
+  "_": "API 활용신청 만료 — 기계가 읽는 사본(정본 표는 docs/data-sources.md 「키·신청·만료」). 키는 이름만 · 값 0. expires=null 은 「표시 없음」(경보 대상 밖 · 분기 정기 조사에서 다시 봄). health-ops ⚠️ api_expiry 가 남은 날 ≤ 60(KST)을 낸다. 출처: 다운님 포털 화면(2026-11-12 · 백로그 「다음 코드·운영 0장 여섯」 근거·비고) · 2026-10-11 만료 표(백로그 「자동화가 기대는 비밀값의 만료」).",
+  "warn_days": 60,
+  "entries": [
+    { "portal": "khug.or.kr", "api": "HUG 든든전세 모집공고", "key": "HUG_API_KEY", "applied": "2026-11-12", "expires": "2027-11-12", "account": "개발" },
+    { "portal": "data.go.kr", "api": "LH 분양임대공고문 · 공고별 상세정보 · 공고별 공급정보 · 청약센터 공지사항 목록 · 임대주택단지 조회", "key": "LH_API_KEY · MOLIT_RENT_API_KEY · ODCLOUD_API_KEY(같은 값)", "applied": "2026-06-19", "expires": "2028-06-19", "account": "개발" },
+    { "portal": "data.go.kr", "api": "마이홈 공공주택 모집공고", "key": "LH_API_KEY · MOLIT_RENT_API_KEY · ODCLOUD_API_KEY(같은 값)", "applied": null, "expires": "2028-06-21", "account": "개발" },
+    { "portal": "data.go.kr", "api": "마이홈 예비입주자 대기현황 · 마이홈 공공임대주택 단지정보", "key": "LH_API_KEY · MOLIT_RENT_API_KEY · ODCLOUD_API_KEY(같은 값)", "applied": null, "expires": "2028-06-23", "account": "개발" },
+    { "portal": "data.go.kr", "api": "아파트 전월세 실거래가", "key": "LH_API_KEY · MOLIT_RENT_API_KEY · ODCLOUD_API_KEY(같은 값)", "applied": null, "expires": "2028-09-28", "account": "개발" },
+    { "portal": "data.go.kr", "api": "LH 건설임대 당첨 합격점수", "key": "LH_API_KEY · MOLIT_RENT_API_KEY · ODCLOUD_API_KEY(같은 값)", "applied": null, "expires": "2028-11-04", "account": "개발" },
+    { "portal": "data.go.kr", "api": "공동주택 기본정보 · 공동주택 단지 목록 · 단독다가구·오피스텔·연립다세대 전월세 · LH 공공임대주택 단지정보 · LH 청약센터 공지사항별 상세정보 · 건축HUB 건축물대장", "key": "LH_API_KEY · MOLIT_RENT_API_KEY · ODCLOUD_API_KEY(같은 값)", "applied": null, "expires": "2028-11-12", "account": "개발" },
+    { "portal": "data.go.kr", "api": "마이홈 기존임대주택 목록 5종(파일데이터)", "key": "LH_API_KEY · MOLIT_RENT_API_KEY · ODCLOUD_API_KEY(같은 값)", "applied": "2026-06-25", "expires": null, "account": "개발" },
+    { "portal": "data.go.kr", "api": "청약홈 분양정보 · 경쟁률·특별공급 · 신청·당첨자(이미 승인)", "key": "LH_API_KEY · MOLIT_RENT_API_KEY · ODCLOUD_API_KEY(같은 값)", "applied": "2026-06-23", "expires": null, "account": "개발" },
+    { "portal": "juso.go.kr", "api": "도로명주소 검색", "key": "JUSO_SEARCH_KEY", "applied": "2026-11-12", "expires": null, "account": "개발" },
+    { "portal": "juso.go.kr", "api": "좌표제공 검색(승인 중)", "key": "JUSO_COORD_KEY(가칭 — 이름은 다운님 확정 뒤)", "applied": null, "expires": null, "account": "개발" }
+  ]
+}

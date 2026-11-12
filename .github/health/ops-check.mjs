@@ -16,6 +16,8 @@ import { waveNoticeSql, judgeWaveNotice } from './wave-notice.mjs'
 import { LH_LEASE_MATCH_SQL, judgeLhLeaseMatch } from './lh-lease-match.mjs'
 import { chainMatchSql, judgeChainMatch } from './chain-match.mjs'
 import { judgeCronNames } from './cron-names.mjs'
+import { RENT_ARITH_SQL, rentArith, rentArithValue } from './rent-arith.mjs'
+import { judgeApiExpiry } from './api-expiry.mjs'
 import { screenRunSql, judgeScreenRun } from './screen-run.mjs'
 import { ELIG_FORM_NULL_SQL, RENT_NULL_SQL, ROUND_MIX_SQL, judgeEligFormNull, judgeRentNull, judgeRoundMix } from './open-gaps.mjs'
 import { readdirSync, readFileSync } from 'node:fs'
@@ -1186,43 +1188,39 @@ try {
   add('unit_note_ours', '세대 비고 속 우리 문장 꼴(⚠️ · 확인·추정·임의·별도 존재·반영·유지) — 정보', 'info', String(e).slice(0, 200), '세대 표를 읽는다(실패면 ℹ️)')
 }
 
-// ㊴ 임대조건 한 줄 산술(2026-11-12 · 우편함 「코드·운영 — 단지 키 3차 + …」 4 · run 425 ⑦) — ℹ️ 셈만(판정하지 않는다 · gate.mjs HARD 밖).
-//    세대 비고(extra_note)의 「계약금 N원 · 잔금 M원」과 세대 행 deposit 을 견준다:
-//    ⓐ 합 어긋남 = N + M ≠ deposit · ⓑ 5% 어긋남 = 같은 공고의 다른 줄이 계약금 = 계 × 5% 꼴인데 이 줄은 |N − deposit × 5%| ≥ 1,000원(LH 는 천 원 미만을 맞춰 적는다 — 그 차이는 정상).
-//    🔵 2026-11-12(우편함 「코드·운영 — Visual 갱신 뒤 승인 멈춤 안 C 시험 + …」 4 · run 426 검증 🧭) — 같은 줄 전환 칸도 견준다:
-//       증액 구간(「증액」·「(+)」 뒤 「;」·「/」·감액 낱말 앞까지)의 금액 둘 가운데 계 + a = b 인 짝이 있으면 증액 맞음 · 감액 구간(「감액」·「(-)」 뒤)은 계 − a = b.
-//       구간에 금액이 둘 미만이면 판정 안 함(월임대료만 적힌 꼴 등). 합 어긋남 행마다 갈래: 계·전환 맞음(계약금·잔금 쪽 결손) / 계약금·잔금 맞음(N + M + a = b · 계 쪽 결손) / 전환 칸 없음 / 둘 다 안 맞음.
-//    원문 표 자체의 오기(…21029 「3,973,80」 꼴)도 잡힌다 — 고칠지는 원문을 보고 분석 묶음이 정한다.
-//    첫 값 2026-11-12 1,568행 중 ⓐ 13(계·전환 맞음 3 · 계약금·잔금 맞음 0 · 전환 칸 없음 10 · 둘 다 0) · ⓑ 0 · 전환 칸 판정 1,180 중 어긋남 86(21공고 — 한 비고에 주택형이 여럿 섞인 꼴 포함).
+// ㊶ 단지 잇기 안전망 하루 변경 수(2026-11-12 · 우편함 「코드·운영 — 0장 일곱 …」 5 · #1006 ⑦ 1) — ℹ️ 셈만(판정하지 않는다 · HARD 밖).
+//    zipfit_ops.complex_link_runs(zipfit-complex-link-pending 한 번 = 한 행)를 KST 날짜로 묶어 최근 3일: 실행 수 · 변경 수(link + new_complex + code + name + code_pick + unit) · 그중 세대 행(unit).
+//    표가 없으면(적용 전) 실패 → ℹ️ 그 문구. 변경 0 이 여러 날 이어지면 안전망 호출을 줄여도 된다는 근거(#1006 ⑦ 1).
 try {
-  const [x] = await sqlRead(`with r as (select announcement_id a, deposit d,
-        replace((regexp_match(extra_note, '계약금\\s*([\\d,]+)\\s*원'))[1], ',', '')::bigint k,
-        replace((regexp_match(extra_note, '잔금\\s*([\\d,]+)\\s*원'))[1], ',', '')::bigint j,
-        substring(extra_note from '(?:증액|\\(\\+\\))([^;/]*?)(?:감액|\\(-\\)|\\(−\\)|/|;|$)') inc_s,
-        substring(extra_note from '(?:감액|\\(-\\)|\\(−\\))([^;/]*)') dec_s
-      from public.housing_units where extra_note ~ '계약금\\s*[\\d,]+\\s*원' and extra_note ~ '잔금\\s*[\\d,]+\\s*원' and deposit is not null),
-    c as (select r.*,
-        (select array_agg(replace(m[1], ',', '')::bigint) from regexp_matches(coalesce(inc_s, ''), '([\\d,]{4,})\\s*원', 'g') m) ni,
-        (select array_agg(replace(m[1], ',', '')::bigint) from regexp_matches(coalesce(dec_s, ''), '([\\d,]{4,})\\s*원', 'g') m) nd from r),
-    f as (select *, k + j <> d sum_bad, abs(k - d * 0.05) >= 1000 pct_bad,
-        case when coalesce(cardinality(ni), 0) < 2 then null else exists (select 1 from unnest(ni) x, unnest(ni) y where d + x = y) end inc_ok,
-        case when coalesce(cardinality(nd), 0) < 2 then null else exists (select 1 from unnest(nd) x, unnest(nd) y where d - x = y) end dec_ok,
-        exists (select 1 from unnest(coalesce(ni, '{}')) x, unnest(coalesce(ni, '{}')) y where k + j + x = y) kj_conv from c),
-    h as (select *, case when inc_ok is null and dec_ok is null then null else coalesce(inc_ok, true) and coalesce(dec_ok, true) end conv_ok from f),
-    g as (select a, bool_or(not pct_bad) any5 from h group by a)
-    select json_build_object('rows', (select count(*) from h), 'sum_bad', (select count(*) from h where sum_bad),
-      'pct_bad', (select count(*) from h join g using (a) where g.any5 and pct_bad and not sum_bad),
-      'sb_conv_ok', (select count(*) from h where sum_bad and conv_ok), 'sb_kj_ok', (select count(*) from h where sum_bad and conv_ok is false and kj_conv),
-      'sb_no_conv', (select count(*) from h where sum_bad and conv_ok is null), 'sb_neither', (select count(*) from h where sum_bad and conv_ok is false and not kj_conv),
-      'conv_n', (select count(*) from h where conv_ok is not null), 'conv_bad', (select count(*) from h where conv_ok is false),
-      'conv_bad_ann', (select count(distinct a) from h where conv_ok is false),
-      'ann', (select coalesce(json_agg(distinct a), '[]'::json) from h join g using (a) where sum_bad or (g.any5 and pct_bad))) j`)
-  const c = x.j
-  add('rent_terms_arith', '임대조건 한 줄 산술 — 계약금 + 잔금 = 임대보증금 · 계약금 5% · 전환 칸(정보)', 'info',
-    `${c.rows}행 중 합 어긋남 ${c.sum_bad}(계·전환 맞음 ${c.sb_conv_ok} · 계약금·잔금 맞음 ${c.sb_kj_ok} · 전환 칸 없음 ${c.sb_no_conv} · 둘 다 ${c.sb_neither}) · 5% 어긋남 ${c.pct_bad} · 전환 칸 ${c.conv_n} 중 어긋남 ${c.conv_bad}(${c.conv_bad_ann}공고)${c.ann.length ? ' — ' + c.ann.slice(0, 8).map(i => '…' + String(i).slice(-5)).join(' · ') : ''}`,
-    '정보 — 판정하지 않는다 · 세대 비고 「계약금 N원 · 잔금 M원」 ↔ deposit · 5% 는 같은 공고에 5% 꼴 줄이 있을 때만 · 천 원 미만 차이 무시 · 전환 = 증액·감액 구간 금액 짝(계 ± a = b) · 첫 값 2026-11-12 1,568 · 13(3·0·10·0) · 0 · 86')
+  const [x] = await sqlRead(`select coalesce(json_agg(t order by t.d desc), '[]'::json) j from (
+      select (at at time zone 'Asia/Seoul')::date d, count(*) runs,
+        sum(coalesce((result->>'link')::int, 0) + coalesce((result->>'new_complex')::int, 0) + coalesce((result->>'code')::int, 0)
+          + coalesce((result->>'name')::int, 0) + coalesce((result->>'code_pick')::int, 0) + coalesce((result->>'unit')::int, 0)) chg,
+        sum(coalesce((result->>'unit')::int, 0)) unit
+      from zipfit_ops.complex_link_runs where at >= now() - interval '3 days' group by 1) t`)
+  const d = x.j
+  add('complex_link_daily', '단지 잇기 안전망 하루 변경 수(정보)', 'info',
+    d.length ? d.map(r => `${String(r.d).slice(5)} 실행 ${r.runs} · 변경 ${r.chg}(세대 ${r.unit})`).join(' / ') : '기록 없음(표가 비었다)',
+    '정보 — 판정하지 않는다 · zipfit_ops.complex_link_runs KST 날짜별 최근 3일 · 변경 = link + new_complex + code + name + code_pick + unit')
 } catch (e) {
-  add('rent_terms_arith', '임대조건 한 줄 산술 — 계약금 + 잔금 = 임대보증금 · 계약금 5% · 전환 칸(정보)', 'info', String(e).slice(0, 200), '세대 표를 읽는다(실패면 ℹ️)')
+  add('complex_link_daily', '단지 잇기 안전망 하루 변경 수(정보)', 'info', String(e).slice(0, 200), 'zipfit_ops.complex_link_runs 를 읽는다(실패면 ℹ️ · 적용 전이면 표 없음)')
+}
+
+// ㊴ 임대조건 한 줄 산술(2026-11-12 · 우편함 「코드·운영 — 단지 키 3차 + …」 4 · run 425 ⑦) — ℹ️ 셈만(판정하지 않는다 · gate.mjs HARD 밖).
+//    세대 비고(extra_note)의 「계약금 N원 · 잔금 M원」 · 전환 칸(증액·감액 한도 → 결과 보증금)을 세대 행 deposit 과 견준다.
+//    🔵 2026-11-12(우편함 「코드·운영 — 0장 일곱 …」 2·3 · 역전파 14회차 ② 점검 식 한계 꼴 넷) — SQL 정규식 판을 rent-arith.mjs(JS)로 옮겼다:
+//       두 벌 비고(가군·나군)는 deposit · deposit_priority1 둘 다와 맞대고 · 한도 「-」·「0」·「0원」·「원」 없는 한도 · 「(+)L원 →」 꼴을 읽고 ·
+//       한도 칸 없이 결과만 적힌 꼴은 판정하지 않고 · 증액 구간은 감액 낱말 앞에서 끊는다. 같은 자리 결손 칸 후보(계약금·잔금 칸 / 전환 결과 칸).
+//    원문 표 자체의 오기도 잡힌다 — 고칠지는 원문을 보고 분석 묶음이 정한다. 월임대료 칸은 견주지 않는다(…19802 증액 줄 월 칸 결손은 안 잡힘).
+//    첫 값(고친 판) 2026-11-12 1,581행 중 합 어긋남 11 · 5% 0 · 전환 칸 1,166 중 어긋남 23(7공고 — 역전파 14회차 원문 결손 공고 안) ·
+//    고치기 전 같은 데이터 SQL 판 85행(20공고).
+try {
+  const [x] = await sqlRead(RENT_ARITH_SQL)
+  const c = rentArith(x.j)
+  add('rent_terms_arith', '임대조건 한 줄 산술 — 계약금 + 잔금 = 임대보증금 · 계약금 5% · 전환 칸 · 결손 칸 후보(정보)', 'info', rentArithValue(c),
+    '정보 — 판정하지 않는다 · rent-arith.mjs · 두 벌 비고는 deposit·deposit_priority1 둘 다 · 5% 는 같은 공고에 5% 꼴 줄이 있을 때만 · 천 원 미만 차이 무시 · 전환 = 계 ± 한도 = 결과 보증금(한도·결과 둘 다 있는 구간만) · 결손 칸 후보 = 합 어긋남∧전환 맞음 → 계약금·잔금 칸 / 합 맞음∧전환 어긋남 → 전환 결과 칸')
+} catch (e) {
+  add('rent_terms_arith', '임대조건 한 줄 산술 — 계약금 + 잔금 = 임대보증금 · 계약금 5% · 전환 칸 · 결손 칸 후보(정보)', 'info', String(e).slice(0, 200), '세대 표를 읽는다(실패면 ℹ️)')
 }
 
 // ㊱ 서식 출처 정책 행 · 「모집일정」 정책 행 ∧ 일정 행 0(2026-11-12 · 우편함 「코드·운영 — …21026 마감 원인·고침 + 커트라인 공급 이력 …」 3·4
@@ -1345,6 +1343,16 @@ try {
     '남은 날 > 30(KST) — 30일 안 ⚠️ · 지나면 ❌(안 멈춤) · Vault 설명칸 꼴 없음 ⚠️ · 정의 zipfit_ops.secret_expiry_list()')
 } catch (e) {
   add('secret_expiry', '비밀값 만료(30일 안 ⚠️)', 'warn', String(e).slice(0, 200), 'zipfit_ops.secret_expiry_list() 를 읽는다(못 읽으면 ⚠️)')
+}
+
+// ㊷ API 활용신청 만료(2026-11-12 · 우편함 「코드·운영 — 0장 일곱 …」 7 · 다운님 질문) — docs/api-expiry.json(정본 표 docs/data-sources.md 「키·신청·만료」)을 읽는다.
+//    남은 날 ≤ 60(KST) = ⚠️(안 멈춤 · gate.mjs HARD 밖 · 열린 이슈로 다운님에게 닿는다) · 만료 표시 없는 것은 「표시 없음」으로 세기만 · 판정 api-expiry.mjs.
+try {
+  const doc = JSON.parse(readFileSync(new URL('../../docs/api-expiry.json', import.meta.url), 'utf8'))
+  const j = judgeApiExpiry(doc)
+  add('api_expiry', 'API 활용신청 만료(60일 안 ⚠️)', j.status, j.value, '남은 날 > 60(KST) — 60일 안·지남 ⚠️(안 멈춤) · 「표시 없음」은 경보 밖(분기 정기 조사) · 재료 docs/api-expiry.json')
+} catch (e) {
+  add('api_expiry', 'API 활용신청 만료(60일 안 ⚠️)', 'warn', String(e).slice(0, 200), 'docs/api-expiry.json 을 읽는다(못 읽으면 ⚠️)')
 }
 
 // ⑳ 공고 원문 문자열 오염(2026-10-18 · 우편함 「코드·운영 — G8 확정 고침 …」 5 · 정보) — 화면 저장형 XSS 두 자리(제목 → innerHTML ·
