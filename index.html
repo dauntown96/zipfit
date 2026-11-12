@@ -4319,9 +4319,10 @@ function applyNoticeFiltersAndRender(keepPage){
     //    고르는 일은 추천 탭이 한다. 🔵 함수는 남는다 — 추천 탭(sortMatchRows)이 계속 쓴다.
     // 🔴 정렬만 zfSortDate 를 본다(2026-09-21) — 정정공고는 정정된 날 자리에 온다.
     //    NEW 배지와 카드 표지는 종전대로 zfNoticeDate 를 본다(물음이 다르다).
+    // 🔵 2026-11-12(우편함 「표시층 — #980 병합 + 최신 공고순 동률」 2 · 다운님 실사용) — 같은 날 안에서는 늦게 수집된 공고가 위(first_seen_at 내림 → apply_start 내림).
     if(sortVal==='date-desc')     return nullLast(a,b,n=>zfSortDate(n),true)
-      || nullLast(a,b,n=>n['apply_start'],true)
-      || nullLast(a,b,n=>n['first_seen_at'],true);
+      || nullLast(a,b,n=>n['first_seen_at'],true)
+      || nullLast(a,b,n=>n['apply_start'],true);
     // 🔴 이미 지난 마감일은 뒤로 보낸다 — 「마감 임박순」인데 맨 위가 지난 공고면 이름이 거짓말이다.
     //    앞: 마감일 ≥ 오늘 오름차순 / 뒤: 지난 마감일(역시 오름차순) / 맨 뒤: 마감일 없음.
     if(sortVal==='end-asc'){
@@ -8290,9 +8291,10 @@ function sortMatchRows(rows, sortVal){
     const anaDiff = (a._zfAnalyzed === true ? 0 : 1) - (b._zfAnalyzed === true ? 0 : 1);
     if(anaDiff !== 0) return anaDiff;
     // 🔴 공고 탭과 **같은 zfSortDate** 를 본다(2026-09-21) — 정렬 전용 축이다.
+    // 🔵 2026-11-12 — 같은 날 동률 축은 공고 탭과 같다(first_seen_at 내림 → apply_start 내림).
     if(sortVal==='date-desc')     return nullLast(a,b,n=>zfSortDate(n),true)
-      || nullLast(a,b,n=>n.apply_start,true)
-      || nullLast(a,b,n=>n.first_seen_at,true);
+      || nullLast(a,b,n=>n.first_seen_at,true)
+      || nullLast(a,b,n=>n.apply_start,true);
     if(sortVal==='end-asc')       return nullLast(a,b,n=>zfDeadline(n),false);   // 🔵 2026-10-07(표시층 긴급 5) — 묶인 카드는 가장 이른 열린 공고문 마감 · 2026-10-16 창 안 차수 카드는 이번 차수 끝(zfDeadline)
     if(sortVal==='start-asc')     return nullLast(a,b,n=>n.apply_start,false);
     // 🔵 공고 탭과 **같은 zfNumOrNull** 을 부른다 — 사본을 두지 않는다.
@@ -9314,6 +9316,7 @@ function zfRoundEndOf(roundMap){ return r => { const a = roundMap && r && roundM
 const extrasGroupsRegistry = {};
 let extrasGroupSeq = 0;
 
+// 🔴 같은 공고 안 같은 sha는 한 행만 둔다(2026-11-11 판정 · 분석 묶음 11회차가 소급) — 화면은 받은 행을 그대로 그린다(여기서 거르지 않는다).
 function loadAnnouncementExtras(annId, detailEl, id, useGroup){
   if(!annId) return;
   const ownerAnn = zfCardAnn(id);
