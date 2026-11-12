@@ -749,11 +749,11 @@ html[data-ui="d3"] .zf3-card .haddr{font-size:12px;color:var(--ink-3);margin-bot
 .zf3-dl-tags{margin:0 0 6px;font-size:12px}
 html[data-ui="d3"] .zf3-card .chip-row{margin:4px 0 8px!important;gap:6px!important}
 html[data-ui="d3"] .zf3-card .chip-row .chip{font-size:var(--t-xs)!important;padding:3px 9px!important;border-radius:999px!important;background:var(--surface)!important;border:1px solid var(--line)!important;color:var(--ink-2)!important;font-weight:600}
-html[data-ui="d3"] .zf3-card .chip-row .chip[style*="#D85A30"]{background:var(--ink)!important;border-color:var(--ink)!important;color:var(--paper)!important}
-html[data-ui="d3"] .zf3-card .chip-row .chip[style*="#EF9F27"],html[data-ui="d3"] .zf3-card .chip-row .chip[style*="#A32D2D"],html[data-ui="d3"] .zf3-card .chip-row .chip.zf-chip-warn,html[data-ui="d3"] .zf3-card .chip-row .chip[style*="#7B5EA7"]{background:var(--warn-bg)!important;border-color:var(--warn)!important;color:var(--warn)!important}
+html[data-ui="d3"] .zf3-card .chip-row .chip.zf-chip-new{background:var(--ink)!important;border-color:var(--ink)!important;color:var(--paper)!important}
+html[data-ui="d3"] .zf3-card .chip-row .chip.zf-chip-warn{background:var(--warn-bg)!important;border-color:var(--warn)!important;color:var(--warn)!important}
 html[data-ui="d3"] .zf3-card [data-sum-for]>div{background:var(--surface)!important;border-color:var(--line-2)!important;color:var(--ink)!important;font-variant-numeric:tabular-nums}
 html[data-ui="d3"] .zf3-card [data-sum-for] a{color:var(--ink)!important;text-decoration:underline;text-underline-offset:2px}
-html[data-ui="d3"] .zf3-card [data-sum-for]>div[style*="#fff3d6"]{background:var(--warn-bg)!important;border-color:var(--warn)!important;color:var(--warn)!important}
+html[data-ui="d3"] .zf3-card [data-sum-for]>div.zf-sum-stale{background:var(--warn-bg)!important;border-color:var(--warn)!important;color:var(--warn)!important}
 html[data-ui="d3"] .zf3-card>div[id^="ncard-"]{margin:0 -14px 0 -18px!important;padding:12px 14px 14px 18px!important;background:var(--surface)!important;border-top:1px solid var(--line-2)!important;border-radius:0!important}
 /* 가로 노선 — 역 간격은 같게, 「오늘」 깃발만 경과에 비례 */
 .zf3-route{margin:2px 0 8px}
@@ -1964,7 +1964,7 @@ function buildConvBadges(mymy, supplyForm, appMethod, recruitMult, isRelaxed, se
   if(selectionMethod === '선착순방문'){
     badges.push('<span class="chip sel zf-chip-warn" style="cursor:default;padding:3px 8px;font-size:10px">🏃 선착순 방문접수</span>');
   } else if(selectionMethod === '선계약후검증'){
-    badges.push('<span class="chip sel" style="cursor:default;padding:3px 8px;font-size:10px;background:#EF9F27;border-color:#EF9F27">⚠️ 선계약후검증</span>');
+    badges.push('<span class="chip sel zf-chip-warn" style="cursor:default;padding:3px 8px;font-size:10px;background:#EF9F27;border-color:#EF9F27">⚠️ 선계약후검증</span>');
   } else if(selectionMethod === '우선순위추첨'){
     badges.push('<span class="chip sel" style="cursor:default;padding:3px 8px;font-size:10px;background:#7F77DD;border-color:#7F77DD">🎲 우선순위+추첨</span>');
   }
@@ -5599,7 +5599,7 @@ function zfFillSummarySlots(){
       : 'font-size:12.5px;font-weight:600;color:#1F5E4A;background:#F2F9F6;border:1px solid #DCEDE6;border-radius:8px;padding:6px 10px;margin-bottom:6px';
     // 🔵 B62 ④ — 미분석 MYHOME 카드가 같은 게시물의 LH 카드에 함께 정리돼 있으면 그리로 보낸다.
     el.innerHTML = line
-      ? `<div style="${box}">${line}${s ? zfRoundTagHtml(s) : ''}</div>${zfRentLineHtml(id, s)}`
+      ? `<div${stale ? ' class="zf-sum-stale"' : ''} style="${box}">${line}${s ? zfRoundTagHtml(s) : ''}</div>${zfRentLineHtml(id, s)}`
       : (zfPostLinkOrganized(el.getAttribute('data-sum-key')) === true
           ? zfPostLinkHtml(el.getAttribute('data-sum-key'))
           : zfPostLinkHtml(el.getAttribute('data-sum-key')) + (() => {
@@ -5923,7 +5923,7 @@ function zfWarnBadges(o){
   if(o.specialNotes && typeof o.specialNotes === 'object'){
     Object.entries(o.specialNotes).forEach(([k, v]) => {
       const val = (v === null || v === undefined) ? '' : (typeof v === 'string' ? v : JSON.stringify(v));
-      b.push(`<span class="chip sel" title="${at(val)}" data-zf-tip tabindex="0" role="button" aria-expanded="false" style="cursor:pointer;padding:4px 10px;font-size:11px;background:#EF9F27;border-color:#EF9F27">⚠️ ${at(k)}</span>`);
+      b.push(`<span class="chip sel zf-chip-warn" title="${at(val)}" data-zf-tip tabindex="0" role="button" aria-expanded="false" style="cursor:pointer;padding:4px 10px;font-size:11px;background:#EF9F27;border-color:#EF9F27">⚠️ ${at(k)}</span>`);
     });
   }
   return b.join('');
@@ -6057,9 +6057,9 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
       <div class="chip-row" style="margin:8px 0;gap:5px">${isCancelRow ? cancelRowChip() : `
         ${hasCancel?cancelNoticeBadge(n['공고명']||'', n['apply_end']):''}
         ${n['building_name']?`<span class="chip" style="cursor:default;padding:4px 10px;font-size:11px">🏢 ${zfBuildingLabel(n['building_name'], zfComplexCount(n))}</span>`:''}
-        ${isAmended?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#7B5EA7;border-color:#7B5EA7">🔄 정정</span>':''}
-        ${isNew?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
-        ${closingSoon?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
+        ${isAmended?'<span class="chip sel zf-chip-warn" style="cursor:default;padding:4px 10px;font-size:11px;background:#7B5EA7;border-color:#7B5EA7">🔄 정정</span>':''}
+        ${isNew?'<span class="chip sel zf-chip-new" style="cursor:default;padding:4px 10px;font-size:11px;background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
+        ${closingSoon?'<span class="chip sel zf-chip-warn" style="cursor:default;padding:4px 10px;font-size:11px;background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
         ${applyUnknownChip(n)}
         ${zfRentLowSlotHtml(n, n['공고명'])}
         ${demoTags.map(t=>`<span class="chip sel${t.color ? '' : ' zf-chip-info'}" style="cursor:default;padding:4px 10px;font-size:11px${t.color ? `;background:${t.color};border-color:${t.color}` : ''}">${t.label}</span>`).join('')}
@@ -6496,8 +6496,8 @@ function renderPersonalizedRecommendations(){
       <p class="haddr">${zfCoverPlace(n['region_names'], zfComplexCount(n), n['sido_nm'], n['sigungu_nm'], n['지역'], n['announcement_id'])} · ${zfTypeHtml(n['source'], n['공급유형'], n['공고명']||n['name'])}</p>${zfOrgSupplyHtml(n['공고명']||n['name'])}
       <div class="chip-row" style="margin:6px 0;gap:5px">
         ${hasCancel?cancelNoticeBadge(n['공고명']||'', n['apply_end']):''}
-        ${isNewNotice(n)?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
-        ${closingSoon?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
+        ${isNewNotice(n)?'<span class="chip sel zf-chip-new" style="cursor:default;padding:4px 10px;font-size:11px;background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
+        ${closingSoon?'<span class="chip sel zf-chip-warn" style="cursor:default;padding:4px 10px;font-size:11px;background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
         ${applyUnknownChip(n)}
         ${zfRentLowSlotHtml(n, n['공고명']||n['name'])}
       </div>
@@ -12213,9 +12213,9 @@ function renderMatchResults(rows){
       <div class="chip-row" style="margin:8px 0;gap:5px">
         ${hasCancel?cancelNoticeBadge(n.title||'', n.apply_end):''}
         ${n.building_name?`<span class="chip" style="cursor:default;padding:4px 10px;font-size:11px">🏢 ${zfBuildingLabel(n.building_name, zfComplexCount(n))}</span>`:''}
-        ${isAmended?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#7B5EA7;border-color:#7B5EA7">🔄 정정</span>':''}
-        ${isNew?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
-        ${closingSoon?'<span class="chip sel" style="cursor:default;padding:4px 10px;font-size:11px;background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
+        ${isAmended?'<span class="chip sel zf-chip-warn" style="cursor:default;padding:4px 10px;font-size:11px;background:#7B5EA7;border-color:#7B5EA7">🔄 정정</span>':''}
+        ${isNew?'<span class="chip sel zf-chip-new" style="cursor:default;padding:4px 10px;font-size:11px;background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
+        ${closingSoon?'<span class="chip sel zf-chip-warn" style="cursor:default;padding:4px 10px;font-size:11px;background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
         ${applyUnknownChip(n)}
         ${zfRentLowSlotHtml(n, n.title)}
         ${demoTags.map(t=>`<span class="chip sel${t.color ? '' : ' zf-chip-info'}" style="cursor:default;padding:4px 10px;font-size:11px${t.color ? `;background:${t.color};border-color:${t.color}` : ''}">${t.label}</span>`).join('')}
