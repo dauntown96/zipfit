@@ -23,9 +23,13 @@ hit() { # $1 = 자리 이름 · stdin = 글
 }
 printf '%s\n' "${PR_TITLE:-}" | hit "PR 제목" || bad=1
 printf '%s\n' "${PR_BODY:-}" | hit "PR 본문(줄)" || bad=1
-for c in $(git rev-list --no-merges "$base".."$head"); do
+# PR 커밋 범위 — pull_request 실행의 HEAD 는 병합 시험 커밋(부모 1 = 지금 base 끝 · 부모 2 = PR head)이라 「부모 2 에서 부모 1 을 뺀 것」.
+#   BASE_SHA(이벤트의 base.sha)는 오래된 PR 에서 낡아 그사이 main 에 들어온 커밋까지 세었다(2026-11-12 Dependabot #436 거짓 실패 — #1006 옛 커밋).
+#   병합 커밋이 아니면(로컬 시험) 종전대로 base..head.
+if git rev-parse -q --verify "$head^2" >/dev/null; then range=("$head^2" "^$head^1"); else range=("$base..$head"); fi
+for c in $(git rev-list --no-merges "${range[@]}"); do
   git log -1 --format=%B "$c" | hit "커밋 ${c:0:7}(줄)" || bad=1
 done
-if [ "$bad" = 0 ]; then echo "CI 건너뛰기 표시 0 — 통과(제목 · 본문 · 커밋 $(git rev-list --no-merges --count "$base".."$head")개)"; exit 0; fi
+if [ "$bad" = 0 ]; then echo "CI 건너뛰기 표시 0 — 통과(제목 · 본문 · 커밋 $(git rev-list --no-merges --count "${range[@]}")개)"; exit 0; fi
 echo "CI 건너뛰기 표시가 있다 — 지우고 다시(커밋 메시지는 새 커밋으로 덮이지 않으니 squash 메시지에서 빼고 병합하거나 가지를 다시 뜬다)"
 exit 1
