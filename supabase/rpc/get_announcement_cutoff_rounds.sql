@@ -18,7 +18,8 @@ AS $function$
   --   두 길 공통: 카드 유형(housing_type)이 spl_tp_nm 을 품음 ∧ 이 공고의 회차 날짜(first_announcement_date, 없으면 announcement_date)보다 앞선 rcr_pan_dt.
   --   카드 단지마다 두 길의 후보 중 가장 최근 한 회차(rcr_pan_dt → pan_id → sbd_lgo_no 큰 쪽) — 두 길이 같은 회차면 via 'name'.
   --   history = 같은 단지 번호(sbd_lgo_no) · 같은 주택형(ltst_nm 글자 그대로) · 같은 신청유형의 고른 회차까지(포함) 회차별 신청 수
-  --             [{d: rcr_pan_dt, n: rqpr_cnt}] 오래된 것부터 — 같은 날 행이 여럿(pan_id 다름)이면 pan_id 큰 한 행(합하지 않는다 · 정정 겹셈 방지).
+  --             [{d: rcr_pan_dt, n: rqpr_cnt, s: spl_rmno}] 오래된 것부터 — 같은 날 행이 여럿(pan_id 다름)이면 pan_id 큰 한 행(합하지 않는다 · 정정 겹셈 방지).
+  --             s(그 회차 공급 수)는 2026-11-12(우편함 「코드·운영 — …21026 마감 원인·고침 + 커트라인 공급 이력」 1) — n 과 같은 행의 칸이다.
   --   주택형 맞춤·대표 고르기는 화면(zfCutoff*)이 unit_types 로 한다.
   -- 배열 상한 2000 — get_announcement_price_summary 와 같은 꼴(SQL 함수라 cast 로 넘을 때만 실패시킨다).
   with recursive guard as (
@@ -114,11 +115,11 @@ AS $function$
   pick as (select * from m where m.rk = 1),
   hist as (
     select p.aid, p.bkey, p.ltst_nm, p.rqs_tp_nm,
-           jsonb_agg(jsonb_build_object('d', h.rcr_pan_dt, 'n', h.rqpr_cnt) order by h.rcr_pan_dt) as history
+           jsonb_agg(jsonb_build_object('d', h.rcr_pan_dt, 'n', h.rqpr_cnt, 's', h.spl_rmno) order by h.rcr_pan_dt) as history
     from (select distinct aid, bkey, sbd_lgo_no, ltst_nm, rqs_tp_nm, rcr_pan_dt from pick) p
     join (
       -- 한 번 훑어 단지·주택형·신청유형·날짜마다 pan_id 큰 한 행(표에 sbd_lgo_no 색인이 없어 행마다 찾으면 표를 행 수만큼 훑는다)
-      select distinct on (s.sbd_lgo_no, s.ltst_nm, s.rqs_tp_nm, s.rcr_pan_dt) s.sbd_lgo_no, s.ltst_nm, s.rqs_tp_nm, s.rcr_pan_dt, s.rqpr_cnt
+      select distinct on (s.sbd_lgo_no, s.ltst_nm, s.rqs_tp_nm, s.rcr_pan_dt) s.sbd_lgo_no, s.ltst_nm, s.rqs_tp_nm, s.rcr_pan_dt, s.rqpr_cnt, s.spl_rmno
       from public.lh_cutoff_scores s
       where s.sbd_lgo_no in (select pk.sbd_lgo_no from pick pk)
       order by s.sbd_lgo_no, s.ltst_nm, s.rqs_tp_nm, s.rcr_pan_dt, s.pan_id desc

@@ -1176,6 +1176,18 @@ try {
     add('watch_title', 'title 속성 수(원본 · 390 공고 탭 DOM) — 추이(정보)', 'info', '못 잼: ' + String(e).slice(0, 160), '정보')
     add('watch_target44', '누르는 자리 44px 미만 수(390 공고 탭 · 카드 펼침) — 정보', 'info', '못 잼: ' + String(e).slice(0, 160), '정보')
   }
+  // ⑫-③ 유형 색이 유형 띠·점 밖에 쓰이는 자리(2026-11-12 · 우편함 「코드·운영 — …21026 마감 원인·고침 + 커트라인 공급 이력 …」 5 · #980 ⑦ 1)
+  //    — ℹ️ 숫자만(판정하지 않는다 · 이슈 없음). 원본 index.html 을 읽기만 한다 · 규칙은 ln-watch.mjs 머리 주석.
+  try {
+    const { lnWatch } = await import('./ln-watch.mjs')
+    const w = lnWatch(readFileSync(new URL('../../index.html', import.meta.url), 'utf8'))
+    extra.watch_ln = w
+    add('watch_ln_color', '유형 색(--ln-*)이 유형 띠·점 밖에 쓰이는 규칙 수 — 정보', 'info',
+      `밖 ${w.out}(${w.outSel.slice(0, 4).join(' · ')}) · 띠·점 ${w.band} · 날값 ${w.raw} · zf3Recolor 짝 ${w.recolorPairs} · style*= 칩 규칙 ${w.chipRules}`,
+      '정보 — 판정하지 않는다 · 밖 = var(--ln-<이름>)을 곧바로 쓰는 CSS 규칙(var(--ln,…) 대체값 제외) · 날값 = 토큰 정의 밖 #값 · 줄어드는 쪽이 목표(#980 ⑦ 1)')
+  } catch (e) {
+    add('watch_ln_color', '유형 색(--ln-*)이 유형 띠·점 밖에 쓰이는 규칙 수 — 정보', 'info', '못 잼: ' + String(e).slice(0, 160), '정보')
+  }
   // ⑧ 접근성(axe-core · 2026-10-12 · 우편함 「코드 — Claude Code 장비 정비」 1) — 여섯 상태(2026-10-13 매칭 결과 더함)를 따로 열어 재고 기준선(a11y-baseline.json)과 견준다.
   //    🔴 critical ≥ 1 은 실패(fail — 이슈가 열린다 · 2026-10-13 claude.ai 판정으로 승격 · 기준선은 같은 날 배포 v201 다섯 상태 0 으로 다시 씀).
   //    기준선보다 늘어난 serious 이하는 여전히 경고다. 패키지가 없거나 재다 죽어도 warn 이다 — 나머지 점검을 실패로 만들지 않는다.

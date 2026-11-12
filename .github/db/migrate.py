@@ -406,8 +406,25 @@ def build_check_sql(pending, inv_base):
         for i, q in enumerate(anon_all):
             parts.append(anon_probe_sql(q, i, 'before'))
         parts.append('reset statement_timeout;\nreset role;\n')
+    # 🔵 2026-11-12(우편함 「코드·운영 — …21026 마감 원인·고침 + 커트라인 공급 이력 …」 2 · #982 꼴) — apply 는 파일마다 한 트랜잭션으로
+    #    「그 파일 적용 직전 위반 수」를 기준으로 불변식 가드를 건다. check 가 파일을 다 넣은 뒤 한 번만 세면, 끝에서는 맞아도 중간 파일에서
+    #    위반이 늘어 apply 가 멈추는 꼴(#981 두 파일 순서 → #982 · #984 로 순서 바꿈)을 못 잡았다. 파일이 둘 이상이면 파일마다
+    #    적용 직후 위반 수를 zipfit.inv_steps 에 남기고, cmd_check 가 apply 와 같은 순서(이름 순)·같은 기준(직전 값)으로 견준다.
+    multi = len(pending) > 1
     for f in pending:
         parts.append(f'-- ▼ {f["name"]}\n{f["sql"].rstrip()}\n')
+        if multi:
+            parts.append(f"""DO {dq(f'''
+declare n bigint; c jsonb := coalesce(nullif(current_setting('zipfit.inv_steps', true), ''), '[]')::jsonb;
+begin
+  execute {dq('select count(*) from (' + inv + ') x', 'zz_inv')} into n;
+  perform set_config('zipfit.inv_steps', (c || jsonb_build_array(jsonb_build_object('file', {lit(f['name'])}, 'n', n)))::text, true);
+exception when others then
+  -- apply 라면 이 파일의 가드가 이 오류로 롤백된다(#982 = 42P01). check 는 끝까지 돌려 결과를 모은다.
+  perform set_config('zipfit.inv_steps', (c || jsonb_build_array(jsonb_build_object('file', {lit(f['name'])}, 'err', SQLSTATE || ' ' || SQLERRM)))::text, true);
+end
+''', 'zz_st')};
+""")
     parts.append(f"""
 DO {dq(f'''
 declare n bigint; smp jsonb; fns jsonb;
@@ -430,7 +447,8 @@ end
             parts.append(anon_probe_sql(q, i, 'after'))
         parts.append('reset statement_timeout;\nreset role;\n')
     parts.append(f"""DO $zz_end$ begin raise exception '{CHECK_TAG} %', (current_setting('zipfit.check')::jsonb
-  || jsonb_build_object('anon_before', coalesce(nullif(current_setting('zipfit.anon_before', true), ''), '{{}}')::jsonb,
+  || jsonb_build_object('inv_steps', coalesce(nullif(current_setting('zipfit.inv_steps', true), ''), '[]')::jsonb,
+                        'anon_before', coalesce(nullif(current_setting('zipfit.anon_before', true), ''), '{{}}')::jsonb,
                         'anon_after', coalesce(nullif(current_setting('zipfit.anon_after', true), ''), '{{}}')::jsonb))::text; end $zz_end$;
 """)
     return '\n'.join(parts), names, anon_all
@@ -548,6 +566,22 @@ def cmd_check():
             lines.append(f'- ❌ 불변식 {INV_NAME} 위반 {inv_b} → {inv_n}: `{json.dumps(res["invariants_sample"], ensure_ascii=False)[:400]}`')
         else:
             lines.append(f'- ✅ 불변식 {INV_NAME} 위반 {inv_b} → {inv_n}')
+        steps = res.get('inv_steps') or []
+        if steps:
+            prev, bad = inv_b, []
+            for stp in steps:
+                if 'err' in stp:
+                    bad.append(f'`{stp["file"]}` 불변식이 돌지 못함({redact_db_error(stp["err"])[:160]})')
+                    continue
+                if stp['n'] > prev:
+                    bad.append(f'`{stp["file"]}` {prev} → {stp["n"]}')
+                prev = stp['n']
+            seq = ' → '.join([str(inv_b)] + [str(x.get('n', '오류')) for x in steps])
+            if bad:
+                ok = False
+                lines.append(f'- ❌ 파일마다(apply 순서) 불변식 {INV_NAME}: {seq} — 늘어난 파일 {", ".join(bad)} · apply 는 그 파일에서 멈춘다(파일 순서·이름을 고친다)')
+            else:
+                lines.append(f'- ✅ 파일마다(apply 순서) 불변식 {INV_NAME}: {seq}')
         res['anon'] = []
         for i, q in enumerate(anon_all):
             b = (res.get('anon_before') or {}).get(str(i)) or {}
