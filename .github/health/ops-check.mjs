@@ -204,6 +204,7 @@ const EXPECTED_JOBS = [
   'zipfit-collect-lh-cutoff',      // 2026-11-04 LH 건설임대 당첨 합격점수 주 1회(마이그레이션 2026-11-04_04 · ㉔ lh_cutoff)
   'zipfit-collect-lh-notices',     // 2026-11-05 LH 대상주택 공지 감지 하루 4회(마이그레이션 2026-11-05_04 · ㉘ wave_notice_missing 값)
   'zipfit-purge-lh-file-fetch-log', // 2026-11-09 LH 첨부 문지기 기록 90일 보관(마이그레이션 2026-11-09_01)
+  'zipfit-complex-link-pending', // 2026-11-12 새 분석 공고 단지 잇기 안전망(마이그레이션 2026-11-12_04)
   'zipfit-gh-observe',             // 2026-11-03 GH 공고 목록 관찰(마이그레이션 2026-11-03_04) — 2026-11-09 사본 재추출 때 빠진 것을 더함
   'zipfit-purge-stale-sessions',   // 로그인 세션 30일 정리(jobid 57) — 2026-11-09 사본 재추출 때 빠진 것을 더함
 ]
@@ -1166,26 +1167,62 @@ try {
   add('user_text_ident', '사용자 글 칸 속 영문 식별자(DB 칸 이름 꼴 · 단독 null)', 'warn', String(e).slice(0, 200), '세대·정책·자격 표를 읽는다(못 읽으면 ⚠️ 점검 불능)')
 }
 
+// ㊵ 세대 비고 속 우리 문장(2026-11-12 · 우편함 「코드·운영 — Visual 갱신 뒤 승인 멈춤 안 C 시험 + …」 3 · 역전파 12회차 ⑦) — ℹ️ 셈만(판정하지 않는다 · HARD 밖).
+//    housing_units.extra_note 에 「⚠️」 또는 낱말 「확인 · 추정 · 임의 · 별도 존재 · 반영 · 유지」가 든 행 — 원문 문장이 아니라 분석이 덧붙인 꼴일 수 있는 줄(역전파가 원문으로 고치면 줄어든다).
+//    열린 카드(목록 RPC 열린 대표 → 같은 제목 키 공고 전부) / 전체 따로. 첫 값 2026-11-12 전체 874행 · 51공고(그중 ⚠️ 815) · 열린 카드 1행 · 1공고.
+try {
+  const [x] = await sqlRead(`with op as materialized (select x.announcement_id rep, public.announcement_dedup_key(a.title) k from public.get_announcements_deduped() x
+        join public.announcements a on a.announcement_id = x.announcement_id where x.apply_end >= (now() at time zone 'Asia/Seoul')::date),
+      g as materialized (select distinct a.announcement_id aid from op join public.announcements a on public.announcement_dedup_key(a.title) = op.k),
+      t as (select h.announcement_id, h.extra_note ~ '⚠️|확인|추정|임의|별도 존재|반영|유지' hit, h.extra_note ~ '⚠️' warn, (g.aid is not null) op
+              from public.housing_units h left join g on g.aid = h.announcement_id where h.extra_note is not null)
+    select json_build_object('all', count(*) filter (where hit), 'all_ann', count(distinct announcement_id) filter (where hit), 'warn', count(*) filter (where warn),
+      'open', count(*) filter (where hit and op), 'open_ann', count(distinct announcement_id) filter (where hit and op)) j from t`)
+  const c = x.j
+  add('unit_note_ours', '세대 비고 속 우리 문장 꼴(⚠️ · 확인·추정·임의·별도 존재·반영·유지) — 정보', 'info',
+    `열린 카드 ${c.open}행 · ${c.open_ann}공고 / 전체 ${c.all}행 · ${c.all_ann}공고(⚠️ ${c.warn})`,
+    '정보 — 판정하지 않는다 · extra_note 낱말 셈 · 열린 카드 = 목록 RPC 열린 대표의 같은 제목 키 공고 · 첫 값 2026-11-12 1 · 1 / 874 · 51')
+} catch (e) {
+  add('unit_note_ours', '세대 비고 속 우리 문장 꼴(⚠️ · 확인·추정·임의·별도 존재·반영·유지) — 정보', 'info', String(e).slice(0, 200), '세대 표를 읽는다(실패면 ℹ️)')
+}
+
 // ㊴ 임대조건 한 줄 산술(2026-11-12 · 우편함 「코드·운영 — 단지 키 3차 + …」 4 · run 425 ⑦) — ℹ️ 셈만(판정하지 않는다 · gate.mjs HARD 밖).
 //    세대 비고(extra_note)의 「계약금 N원 · 잔금 M원」과 세대 행 deposit 을 견준다:
 //    ⓐ 합 어긋남 = N + M ≠ deposit · ⓑ 5% 어긋남 = 같은 공고의 다른 줄이 계약금 = 계 × 5% 꼴인데 이 줄은 |N − deposit × 5%| ≥ 1,000원(LH 는 천 원 미만을 맞춰 적는다 — 그 차이는 정상).
-//    원문 표 자체의 오기(…21029 「3,973,80」 꼴)도 잡힌다 — 고칠지는 원문을 보고 분석 묶음이 정한다. 첫 값 2026-11-12 1,566행 중 ⓐ 13(9공고 · …21029 · …21050 포함) · ⓑ 0.
+//    🔵 2026-11-12(우편함 「코드·운영 — Visual 갱신 뒤 승인 멈춤 안 C 시험 + …」 4 · run 426 검증 🧭) — 같은 줄 전환 칸도 견준다:
+//       증액 구간(「증액」·「(+)」 뒤 「;」·「/」·감액 낱말 앞까지)의 금액 둘 가운데 계 + a = b 인 짝이 있으면 증액 맞음 · 감액 구간(「감액」·「(-)」 뒤)은 계 − a = b.
+//       구간에 금액이 둘 미만이면 판정 안 함(월임대료만 적힌 꼴 등). 합 어긋남 행마다 갈래: 계·전환 맞음(계약금·잔금 쪽 결손) / 계약금·잔금 맞음(N + M + a = b · 계 쪽 결손) / 전환 칸 없음 / 둘 다 안 맞음.
+//    원문 표 자체의 오기(…21029 「3,973,80」 꼴)도 잡힌다 — 고칠지는 원문을 보고 분석 묶음이 정한다.
+//    첫 값 2026-11-12 1,568행 중 ⓐ 13(계·전환 맞음 3 · 계약금·잔금 맞음 0 · 전환 칸 없음 10 · 둘 다 0) · ⓑ 0 · 전환 칸 판정 1,180 중 어긋남 86(21공고 — 한 비고에 주택형이 여럿 섞인 꼴 포함).
 try {
   const [x] = await sqlRead(`with r as (select announcement_id a, deposit d,
         replace((regexp_match(extra_note, '계약금\\s*([\\d,]+)\\s*원'))[1], ',', '')::bigint k,
-        replace((regexp_match(extra_note, '잔금\\s*([\\d,]+)\\s*원'))[1], ',', '')::bigint j
+        replace((regexp_match(extra_note, '잔금\\s*([\\d,]+)\\s*원'))[1], ',', '')::bigint j,
+        substring(extra_note from '(?:증액|\\(\\+\\))([^;/]*?)(?:감액|\\(-\\)|\\(−\\)|/|;|$)') inc_s,
+        substring(extra_note from '(?:감액|\\(-\\)|\\(−\\))([^;/]*)') dec_s
       from public.housing_units where extra_note ~ '계약금\\s*[\\d,]+\\s*원' and extra_note ~ '잔금\\s*[\\d,]+\\s*원' and deposit is not null),
-    f as (select *, k + j <> d sum_bad, abs(k - d * 0.05) >= 1000 pct_bad from r),
-    g as (select a, bool_or(not pct_bad) any5 from f group by a)
-    select json_build_object('rows', (select count(*) from f), 'sum_bad', (select count(*) from f where sum_bad),
-      'pct_bad', (select count(*) from f join g using (a) where g.any5 and pct_bad and not sum_bad),
-      'ann', (select coalesce(json_agg(distinct a), '[]'::json) from f join g using (a) where sum_bad or (g.any5 and pct_bad))) j`)
+    c as (select r.*,
+        (select array_agg(replace(m[1], ',', '')::bigint) from regexp_matches(coalesce(inc_s, ''), '([\\d,]{4,})\\s*원', 'g') m) ni,
+        (select array_agg(replace(m[1], ',', '')::bigint) from regexp_matches(coalesce(dec_s, ''), '([\\d,]{4,})\\s*원', 'g') m) nd from r),
+    f as (select *, k + j <> d sum_bad, abs(k - d * 0.05) >= 1000 pct_bad,
+        case when coalesce(cardinality(ni), 0) < 2 then null else exists (select 1 from unnest(ni) x, unnest(ni) y where d + x = y) end inc_ok,
+        case when coalesce(cardinality(nd), 0) < 2 then null else exists (select 1 from unnest(nd) x, unnest(nd) y where d - x = y) end dec_ok,
+        exists (select 1 from unnest(coalesce(ni, '{}')) x, unnest(coalesce(ni, '{}')) y where k + j + x = y) kj_conv from c),
+    h as (select *, case when inc_ok is null and dec_ok is null then null else coalesce(inc_ok, true) and coalesce(dec_ok, true) end conv_ok from f),
+    g as (select a, bool_or(not pct_bad) any5 from h group by a)
+    select json_build_object('rows', (select count(*) from h), 'sum_bad', (select count(*) from h where sum_bad),
+      'pct_bad', (select count(*) from h join g using (a) where g.any5 and pct_bad and not sum_bad),
+      'sb_conv_ok', (select count(*) from h where sum_bad and conv_ok), 'sb_kj_ok', (select count(*) from h where sum_bad and conv_ok is false and kj_conv),
+      'sb_no_conv', (select count(*) from h where sum_bad and conv_ok is null), 'sb_neither', (select count(*) from h where sum_bad and conv_ok is false and not kj_conv),
+      'conv_n', (select count(*) from h where conv_ok is not null), 'conv_bad', (select count(*) from h where conv_ok is false),
+      'conv_bad_ann', (select count(distinct a) from h where conv_ok is false),
+      'ann', (select coalesce(json_agg(distinct a), '[]'::json) from h join g using (a) where sum_bad or (g.any5 and pct_bad))) j`)
   const c = x.j
-  add('rent_terms_arith', '임대조건 한 줄 산술 — 계약금 + 잔금 = 임대보증금 · 계약금 5%(정보)', 'info',
-    `${c.rows}행 중 합 어긋남 ${c.sum_bad} · 5% 어긋남 ${c.pct_bad}${c.ann.length ? ' — ' + c.ann.slice(0, 8).map(i => '…' + String(i).slice(-5)).join(' · ') : ''}`,
-    '정보 — 판정하지 않는다 · 세대 비고 「계약금 N원 · 잔금 M원」 ↔ deposit · 5% 는 같은 공고에 5% 꼴 줄이 있을 때만 · 천 원 미만 차이 무시 · 첫 값 2026-11-12 1,566 · 13 · 0')
+  add('rent_terms_arith', '임대조건 한 줄 산술 — 계약금 + 잔금 = 임대보증금 · 계약금 5% · 전환 칸(정보)', 'info',
+    `${c.rows}행 중 합 어긋남 ${c.sum_bad}(계·전환 맞음 ${c.sb_conv_ok} · 계약금·잔금 맞음 ${c.sb_kj_ok} · 전환 칸 없음 ${c.sb_no_conv} · 둘 다 ${c.sb_neither}) · 5% 어긋남 ${c.pct_bad} · 전환 칸 ${c.conv_n} 중 어긋남 ${c.conv_bad}(${c.conv_bad_ann}공고)${c.ann.length ? ' — ' + c.ann.slice(0, 8).map(i => '…' + String(i).slice(-5)).join(' · ') : ''}`,
+    '정보 — 판정하지 않는다 · 세대 비고 「계약금 N원 · 잔금 M원」 ↔ deposit · 5% 는 같은 공고에 5% 꼴 줄이 있을 때만 · 천 원 미만 차이 무시 · 전환 = 증액·감액 구간 금액 짝(계 ± a = b) · 첫 값 2026-11-12 1,568 · 13(3·0·10·0) · 0 · 86')
 } catch (e) {
-  add('rent_terms_arith', '임대조건 한 줄 산술 — 계약금 + 잔금 = 임대보증금 · 계약금 5%(정보)', 'info', String(e).slice(0, 200), '세대 표를 읽는다(실패면 ℹ️)')
+  add('rent_terms_arith', '임대조건 한 줄 산술 — 계약금 + 잔금 = 임대보증금 · 계약금 5% · 전환 칸(정보)', 'info', String(e).slice(0, 200), '세대 표를 읽는다(실패면 ℹ️)')
 }
 
 // ㊱ 서식 출처 정책 행 · 「모집일정」 정책 행 ∧ 일정 행 0(2026-11-12 · 우편함 「코드·운영 — …21026 마감 원인·고침 + 커트라인 공급 이력 …」 3·4

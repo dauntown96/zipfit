@@ -9,16 +9,24 @@ name: PR — ⑩ 단원
 on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
+  # 🔵 2026-11-12(우편함 「코드·운영 — Visual 갱신 뒤 승인 멈춤 안 C 시험 …」 1) — 봇(GITHUB_TOKEN)이 민 커밋에서 PR 실행이 승인 대기로 멈춰서
+  #    visual.yml 이 기준 커밋 뒤 그 가지로 이것을 dispatch 한다(본문·기준 sha 는 PR 번호로 읽는다).
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: '그 가지의 PR 번호'
+        required: true
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   unit10:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     concurrency:
-      group: pr-unit10-${{ github.event.pull_request.number }}
+      group: pr-unit10-${{ github.event.pull_request.number || inputs.pr_number }}
       cancel-in-progress: true
     steps:
       - uses: actions/checkout@v7
@@ -28,7 +36,15 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_BODY: ${{ github.event.pull_request.body }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          GH_TOKEN: ${{ github.token }}
         run: |
+          if [ -z "$BASE_SHA" ] && [ -n "$PR_NUMBER" ]; then   # dispatch — PR 에서 읽는다
+            pr=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}")
+            BASE_SHA=$(printf '%s' "$pr" | python3 -c 'import json,sys; print(json.load(sys.stdin)["base"]["sha"])')
+            PR_BODY=$(printf '%s' "$pr" | python3 -c 'import json,sys; print(json.load(sys.stdin)["body"] or "")')
+            git fetch -q origin "$BASE_SHA" 2>/dev/null || true
+          fi
           files=$(git diff --name-only "$BASE_SHA"...HEAD | grep -E '^(index\.html$|supabase/functions/|supabase/migrations/|\.github/db/|\.github/health/)' || true)
           if [ -z "$files" ]; then
             echo "구현 파일 변경 없음 — 해당 없음" | tee -a "$GITHUB_STEP_SUMMARY"; exit 0

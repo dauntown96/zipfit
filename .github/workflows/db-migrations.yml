@@ -17,27 +17,55 @@ on:
     paths:
       - 'supabase/migrations/**'
   workflow_dispatch:
+    # 🔵 2026-11-12(우편함 「코드·운영 — Visual 갱신 뒤 승인 멈춤 안 C 시험 …」 1) — mode=check: 그 가지(ref)에서 check 잡만 돈다(apply 0).
+    #    봇(GITHUB_TOKEN)이 민 커밋(Visual 기준 갱신)에는 PR 실행이 승인 대기로 멈춰 필수 체크 check 가 새 head 에 없었다(#994 3cfdf6e).
+    #    visual.yml 이 기준 커밋 뒤 이 워크플로를 그 가지로 dispatch 한다 — dispatch 는 GITHUB_TOKEN 으로도 돈다.
+    inputs:
+      mode:
+        description: 'check = 가지에서 PR 체크만(apply 0) · 비우면 종전(main apply 재실행)'
+        required: false
+        default: ''
+      pr_number:
+        description: 'mode=check 일 때 — 그 가지의 PR 번호(기준 sha 를 PR 에서 읽는다)'
+        required: false
+        default: ''
 
 permissions:
   contents: read
   issues: write
+  pull-requests: read
 
 jobs:
   check:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'check')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     concurrency:
-      group: db-check-${{ github.head_ref }}
+      group: db-check-${{ github.head_ref || github.ref_name }}
       cancel-in-progress: true
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      # 기준 sha — PR 실행은 이벤트 값 · dispatch(mode=check)는 PR 번호로 읽는다(그 PR head = 이 가지 head 여야 한다 · 아니면 실패).
+      - name: 기준 sha
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EV_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+        run: |
+          if [ -n "$EV_BASE" ]; then echo "BASE_SHA=$EV_BASE" >> "$GITHUB_ENV"; exit 0; fi
+          [ -n "$PR_NUMBER" ] || { echo "::error::mode=check 에는 pr_number 가 필요하다"; exit 1; }
+          pr=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}")
+          base=$(printf '%s' "$pr" | python3 -c 'import json,sys; print(json.load(sys.stdin)["base"]["sha"])')
+          head=$(printf '%s' "$pr" | python3 -c 'import json,sys; print(json.load(sys.stdin)["head"]["sha"])')
+          [ "$head" = "$(git rev-parse HEAD)" ] || { echo "::error::PR #${PR_NUMBER} head $head ≠ 이 가지 head $(git rev-parse HEAD)"; exit 1; }
+          git fetch -q origin "$base" 2>/dev/null || true
+          echo "BASE_SHA=$base" >> "$GITHUB_ENV"
+          echo "dispatch check — PR #${PR_NUMBER} 기준 ${base:0:7} · head ${head:0:7}" | tee -a "$GITHUB_STEP_SUMMARY"
       # 🔵 2026-10-30(우편함 「코드·운영 — #762 DB 묶음 병합」 덧 · #785) — PR 이 새로 더한 .md 줄의 {{ · {% (Pages Jekyll Liquid 빌드 실패 꼴). DB 를 부르지 않는다.
       - name: Pages Liquid 글자
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        # BASE_SHA = 「기준 sha」 단계(GITHUB_ENV)
         run: bash scripts/pages-liquid-check.sh
       # 🔵 2026-10-13(우편함 「코드 — 카드 머리 세대수」 0장 2) — CLAUDE.md 「최근 작업 이력」 꼴(그 절 머리 아래 표 한 벌 · 3행 · 행당 600B · 최신부터).
       #    검사는 .claude/hooks/rule-check.py 의 history_problems() 한 벌(커밋 훅과 같은 함수 · 표준 라이브러리만 · DB 를 부르지 않는다).
@@ -65,8 +93,7 @@ jobs:
       # 🔵 2026-10-29(우편함 「코드·운영 — 런칭 전날」 2) — index.html · sw.js 를 바꾼 PR 은 head CACHE_NAME = base + 1(원칙 9). 두 파일을 안 건드리면 건너뜀.
       #    DB 를 부르지 않는다 · scripts/ 파일이라 아래 「DB 파일을 건드렸나」의 다섯 경로에 들지 않는다.
       - name: CACHE 판(+1)
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        # BASE_SHA = 「기준 sha」 단계(GITHUB_ENV)
         run: bash scripts/cache-bump-check.sh
       # 🔵 2026-11-04(우편함 「코드·운영 — #732 지방공사 받기 …」 6 ② · 백로그 「네트워크 허용 문서가 낡았고 … 「{{」를 막는 PR 검사가 없다」) —
       #    고지 문서(privacy.html · terms.html · notices.json)에 자리 표시 「{{」가 남은 채 main 으로 가면 실패. DB 를 부르지 않는다(grep 한 줄).
@@ -78,8 +105,7 @@ jobs:
           exit 1
       - name: DB 파일을 건드렸나
         id: scope
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        # BASE_SHA = 「기준 sha」 단계(GITHUB_ENV)
         run: |
           # DB 파일 = 종전 pull_request.paths 다섯 경로
           changed=$(git diff --name-only "$BASE_SHA"...HEAD)
@@ -107,7 +133,7 @@ jobs:
         if: steps.scope.outputs.relevant == 'true'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}   # 불변식 파일만 바꾼 PR 을 가리려고(migrate.py changed_invariants)
+          # BASE_SHA 는 「기준 sha」 단계가 GITHUB_ENV 에 둔다 — 불변식 파일만 바꾼 PR 을 가리려고(migrate.py changed_invariants)
         run: python3 .github/db/migrate.py check
       - name: 결과 올리기
         if: always() && steps.scope.outputs.relevant == 'true'
@@ -118,7 +144,7 @@ jobs:
           retention-days: 30
 
   apply:
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && inputs.mode != 'check'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     concurrency:

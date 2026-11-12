@@ -42,6 +42,8 @@ jobs:
     permissions:
       contents: write
       statuses: write   # 갱신 뒤 견주기 결과를 새 head 커밋 상태로 남긴다(아래 「갱신 뒤 견주기」)
+      actions: write    # 기준 커밋 뒤 db-migrations · pr-unit10 을 그 가지로 dispatch(아래 「필수 체크 다시 돌리기」)
+      pull-requests: read
     env:
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       BRANCH: ${{ github.head_ref || github.ref_name }}
@@ -124,6 +126,21 @@ jobs:
           gh api -X POST "repos/${GITHUB_REPOSITORY}/statuses/${sha}" -f state="$state" -f context='Visual (갱신 뒤 견주기)' \
             -f description="$desc" -f target_url="$RUN_URL" >/dev/null || echo "::warning::커밋 상태를 남기지 못함"
           [ "$code" = "0" ] || { echo "::error::갱신 뒤 견주기 실패(code=$code)"; exit 1; }
+      # 🔵 2026-11-12(우편함 「코드·운영 — Visual 갱신 뒤 승인 멈춤 안 C 시험 …」 1) — 안 C: 봇(GITHUB_TOKEN)이 민 기준 커밋에서는 PR 실행이
+      #    승인 대기로 멈춰(작업 0 · 결론 failure — #994 3cfdf6e 실측) 필수 체크 check 가 새 head 에 없었다. dispatch 는 GITHUB_TOKEN 으로도 도니
+      #    db-migrations(mode=check) · pr-unit10 을 그 가지·PR 번호로 부른다 — 그 실행의 check 가 새 head 커밋에 붙는다.
+      - name: 필수 체크 다시 돌리기(기준 커밋 뒤)
+        if: steps.run.outputs.mode != 'compare' && steps.run.outputs.code == '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          head=$(git rev-parse HEAD)
+          pr=$(gh api "repos/${GITHUB_REPOSITORY}/pulls?head=${GITHUB_REPOSITORY_OWNER}:${BRANCH}&state=open" -q '.[0].number')
+          if [ -z "$pr" ]; then echo "::warning::이 가지(${BRANCH})의 열린 PR 이 없어 dispatch 하지 않음"; exit 0; fi
+          gh workflow run db-migrations.yml --ref "$BRANCH" -f mode=check -f pr_number="$pr" && echo "db-migrations check dispatch — PR #$pr · ${head:0:7}" | tee -a "$GITHUB_STEP_SUMMARY"
+          gh workflow run pr-unit10.yml --ref "$BRANCH" -f pr_number="$pr" && echo "pr-unit10 dispatch — PR #$pr" | tee -a "$GITHUB_STEP_SUMMARY"
+          exit 0
       - name: 판정
         run: |
           code='${{ steps.run.outputs.code }}'
