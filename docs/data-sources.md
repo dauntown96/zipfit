@@ -15,6 +15,19 @@
 
 「받는 길」: API · HTML(긁기) · 바이트(첨부 받기) · 파일(빌드) · SDK(브라우저) · 손 입력. 「주기」는 pg_cron 잡 이름 — 시각은 `cron.job` 조회로 본다(UTC 등록).
 
+### 출구 지역 — 서울에서 불러야 받는 호스트
+
+2026-11-12 신설(우편함 「코드·운영 — 서울 실행 EF 공용 길 …」 6). 🔴 **허용 목록이 열렸다고 받는 것은 아니다** — 아래 호스트는 해외 IP(컨테이너 출구 · 싱가포르 DB `net.http_get` · 싱가포르 EF)를 서버가 끊는다(TLS reset · 시간 초과 · 403). 그래서 서울 지역(`ap-northeast-2`) EF 실행으로만 부른다 — 다른 지역에서 불리면 함수가 `x-region`으로 자신에게 한 번 넘긴다(호출하는 쪽은 그대로 부른다). 이것은 우회가 아니라 우리 함수의 실행 위치 선택이다(UA·경유는 그대로).
+
+| 호스트 | 받는 것 | 서울 실행 길 | 해외 출구 실측 |
+|---|---|---|---|
+| `www.bmc.busan.kr` | 부산도시공사 게시판 · 첨부 | EF `fetch-attachment` `SEOUL_ONLY`(`_shared/board-hosts.ts`) | 싱가포르 DB Apache 403(2026-10-12) |
+| `business.juso.go.kr` | 도로명주소 검색 API(후보 9 · 키 `JUSO_SEARCH_KEY`) | EF `seoul-api` `api=juso_search`(키는 EF 비밀값에서만 · 호스트·경로·인자 고정) | 컨테이너 TLS reset 10회+ · 싱가포르 DB robots는 200(2026-11-12) |
+| `data.myhome.go.kr` | LH 공공임대주택 단지정보 15058476 `rentalHouseList`(후보 6b · data.go.kr 키) | EF `seoul-api` `api=myhome_rental_list` | 컨테이너 TLS reset 6/6 · 싱가포르 DB 시간 초과(2026-11-12) |
+| `www.myhome.go.kr` | (사이트 — 받지 않음: 약관상 승인 전 받는 길 없음 · 원천 3) | — | 해외 IP 막음(조사 2026-11-05) |
+
+`seoul-api`는 표에 적은 API만 부른다(그 밖 0 · 호출자가 URL·키를 주지 않는다) · 인증 `x-cron-secret` · 실행 인스턴스마다 API별 분당 60회 · 쓰기 0. 새 API를 더하려면 그 함수의 `APIS` 표와 이 표를 같은 PR에서 고친다.
+
 | # | 원천 | 받는 길 | 코드 위치 · 주기 | 키(이름) | 이용허락(포털 표시) | 활용가이드 날짜 | 마지막 확인 |
 |---|---|---|---|---|---|---|---|
 | 1 | LH 분양임대공고문 조회 — data.go.kr [15058530](https://www.data.go.kr/data/15058530/openapi.do) · `B552555/lhLeaseNoticeInfo1` | API | EF `collect-announcements` `fetchNoticeList` · 잡 `zipfit-collect-announcements`(+ `-warmup` · `-night`) | `LH_API_KEY`(EF 비밀값) | 이용허락범위 제한 없음 · 🔴 첨부 받기는 원천 6(robots `Disallow` · 문지기 — 2026-11-05) | 20260708(`OpenAPI활용가이드_…_분양임대공고조회_20260708.docx`) | 2026-10-21 |
@@ -47,7 +60,7 @@
 ### 키·신청·만료 — 활용신청이 언제 끝나나
 
 2026-11-12 신설(우편함 「코드·운영 — 0장 일곱 …」 7 · 다운님 질문). 값은 다운님 포털 화면(2026-11-12 · 백로그 「다음 코드·운영 0장 여섯」 근거·비고 · 2026-10-11 만료 표) 그대로 — 모두 **개발 계정**. 키는 **이름만**.
-🔴 **기계가 읽는 사본은 [`api-expiry.json`](api-expiry.json)** — 이 표를 고치면 그 파일도 같은 PR에서 고친다. health-ops ⚠️ `api_expiry`가 남은 날 60일(KST) 안을 낸다(안 멈춤 · ⚠️는 점검 기록 `ops_health_record`와 관리자 상태판에 남고 이슈는 열지 않는다 — 이슈는 ❌만). 만료 표시 없는 것은 「표시 없음」 — 경보 밖, 아래 「정기 조사」 체크리스트 3에서 다시 본다.
+🔴 **기계가 읽는 사본은 [`api-expiry.json`](api-expiry.json)** — 이 표를 고치면 그 파일도 같은 PR에서 고친다. health-ops `api_expiry`가 남은 날 60일(KST) 안 ⚠️ · 30일 안이나 지남 ❌(안 멈춤 · `health-ops-soft` 이슈가 열려 다운님에게 닿는다 — 2026-11-12 두 단계)를 낸다. 만료 표시 없는 것은 「표시 없음」 — 경보 밖, 아래 「정기 조사」 체크리스트 3에서 다시 본다.
 🔴 data.go.kr 키 이름 셋(`LH_API_KEY` · `MOLIT_RENT_API_KEY` · `ODCLOUD_API_KEY`)은 **같은 값**이다(아래 후보 표 머리) — 만료는 키가 아니라 그 계정의 API 신청마다 따로다. 연장 신청은 포털 「마이페이지 → 활용신청 현황」. 비밀값(토큰) 만료는 따로 — `zipfit_ops.secret_expiry_list()`(health-ops `secret_expiry` · 30일).
 
 | 포털·기관 | API | 키(이름) | 신청일 | 만료일 | 계정 |

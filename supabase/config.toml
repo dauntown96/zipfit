@@ -48,6 +48,10 @@ verify_jwt = false
 [functions.public-status]
 verify_jwt = false
 
+# 2026-11-12 신설 — 서울 실행 공공 API 공용 길(juso · data.myhome — 해외 IP 를 끊는 키 싣는 API). 다른 수집 함수와 같이 x-cron-secret 으로 막는다(JWT 없음).
+[functions.seoul-api]
+verify_jwt = false
+
 [functions.save-user-profile]
 verify_jwt = true
 

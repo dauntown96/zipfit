@@ -34,6 +34,7 @@ on:
           - fetch-attachment
           - public-status
           - save-user-profile
+          - seoul-api
           - submit-feedback
           - test-login
 
@@ -46,7 +47,7 @@ concurrency:
 
 env:
   PROJECT_REF: khdpjjyspmlqtzperoqg
-  ALLOWED: check-source-pages collect-announcements collect-gh-announcements collect-lh-cutoff collect-lh-images collect-lh-notices collect-lh-promo collect-rental-stats collect-sh-announcements delete-account fetch-attachment public-status save-user-profile submit-feedback test-login
+  ALLOWED: check-source-pages collect-announcements collect-gh-announcements collect-lh-cutoff collect-lh-images collect-lh-notices collect-lh-promo collect-rental-stats collect-sh-announcements delete-account fetch-attachment public-status save-user-profile seoul-api submit-feedback test-login
 
 jobs:
   deploy:

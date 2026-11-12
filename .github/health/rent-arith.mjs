@@ -89,8 +89,16 @@ export function rentArith(rows) {
     cand_conv: ids(r => !r.sumBad && r.convOk === false),        // 계·계약금 맞음 → 전환 결과 칸
     cand_conv_rows: per.filter(r => !r.sumBad && r.convOk === false).length,
     ann: ids(r => r.sumBad || (any5.get(r.a) && r.pctBad)),
+    conv_ids: ids(r => r.convOk === false),
   }
 }
+
+// 어긋남 공고(합·5%·전환) 중 ⚠️ 「임대조건 표기」 계열 정책 행이 없는 공고(2026-11-12 · 우편함 「코드·운영 — 서울 실행 EF 공용 길 …」 5 · claude.ai 판정).
+//   ⚠️ 계열 = category 에 「⚠」 ∧ (category 또는 content_raw 앞 200자에 임대조건 · 임대보증금 · 최대전환 · 전환 · 계약금 · 잔금).
+//   같은 공고 id 의 정책 행만 본다(묶음 펼침 없음 — 분석이 그 공고에 ⚠️ 를 단다). 결과 = ⚠️ 없는 공고 id 배열.
+export const rentWarnMissingSql = ids => `select coalesce(json_agg(x order by x), '[]'::json) j from unnest(array[${ids.map(i => `'${String(i).replace(/'/g, "''")}'`).join(',') || "''"}]::text[]) x
+  where x <> '' and not exists (select 1 from public.announcement_policies p where p.announcement_id = x and p.category ~ '⚠'
+    and (p.category ~ '임대조건|임대보증금|최대전환|전환|계약금|잔금' or left(p.content_raw, 200) ~ '임대조건|임대보증금|최대전환|계약금|잔금'))`
 
 export const RENT_ARITH_SQL = `select coalesce(json_agg(json_build_array(announcement_id, deposit, deposit_priority1, extra_note)), '[]'::json) j
   from public.housing_units where extra_note ~ '계약금\\s*[\\d,]+\\s*원' and extra_note ~ '잔금\\s*[\\d,]+\\s*원' and deposit is not null`
