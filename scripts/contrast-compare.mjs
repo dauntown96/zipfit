@@ -89,6 +89,24 @@ function serve(dir) {
   return new Promise(r => srv.listen(0, '127.0.0.1', () => r(srv)))
 }
 
+// 🔵 2026-11-12(우편함 「코드·운영 — …21026 마감 원인·고침 + 커트라인 공급 이력 …」 6 · #985 ②) — 그리기 끝 기다림.
+//    prep 의 고정 대기(3.5·5초)만으로는 펼친 카드의 곁 데이터(커트라인·가격 요약·노선 등 RPC)가 늦게 오는 날 기준 쪽이 덜 그려진 채 재여
+//    가지 쪽에만 보이는 요소가 거짓 「새 미달」로 잡혔다. 재기 전에 ① 네트워크 한가(최대 15초) ② 보이는 요소 수·글자 길이가
+//    SETTLE_STABLE 번 연달아(SETTLE_STEP_MS 간격) 같을 때까지(최대 SETTLE_MAX_MS) 기다린다. 못 맞추면 그대로 잰다(값에 표지 _unsettled).
+const SETTLE_STEP_MS = 700, SETTLE_STABLE = 3, SETTLE_MAX_MS = 20000
+async function settle(page) {
+  try { await page.waitForLoadState('networkidle', { timeout: 15000 }) } catch {}
+  const sig = () => page.evaluate(() => { const b = document.body; return b.getElementsByTagName('*').length + ':' + (b.innerText || '').length })
+  let last = await sig(), same = 0
+  const t0 = Date.now()
+  while (Date.now() - t0 < SETTLE_MAX_MS) {
+    await page.waitForTimeout(SETTLE_STEP_MS)
+    const now = await sig()
+    if (now === last) { if (++same >= SETTLE_STABLE) return true } else { same = 0; last = now }
+  }
+  return false
+}
+
 async function measureRef(browser, ref) {
   const dir = mkdtempSync(join(tmpdir(), 'zf-contrast-'))
   execFileSync('git', ['-C', ROOT, 'worktree', 'add', '--detach', dir, ref], { stdio: 'ignore' })
@@ -106,7 +124,9 @@ async function measureRef(browser, ref) {
         await page.waitForFunction(() => typeof noticeData !== 'undefined' && noticeData.length > 0, null, { timeout: 60000 })
         if (dark) await page.evaluate(() => typeof setTheme === 'function' && setTheme('dark', true))
         await prep(page)
+        const settled = await settle(page)
         res[key] = await page.evaluate(MEASURE)
+        if (!settled) res[key]._unsettled = true
       } catch (e) { res[key] = { _err: String(e).slice(0, 160) } } finally { await ctx.close() }
     }
   } finally {
@@ -124,11 +144,13 @@ await browser.close()
 const report = { base: BASE, head: HEAD, states: {}, new: [] }
 for (const st of Object.keys(head)) {
   const b = base[st] || {}, h = head[st] || {}
-  report.states[st] = { base: b._err ? b._err : Object.keys(b).length, head: h._err ? h._err : Object.keys(h).length }
+  const nk = o => Object.keys(o).filter(k => k !== '_unsettled').length
+  report.states[st] = { base: b._err ? b._err : nk(b), head: h._err ? h._err : nk(h) }
   if (h._err || b._err) continue
-  for (const [k, v] of Object.entries(h)) if (!b[k]) report.new.push({ state: st, kind: k, ...v })
+  for (const [k, v] of Object.entries(h)) if (k !== '_unsettled' && !b[k]) report.new.push({ state: st, kind: k, ...v })
+  if (b._unsettled || h._unsettled) report.states[st].unsettled = [b._unsettled && 'base', h._unsettled && 'head'].filter(Boolean)
 }
 if (OUT) writeFileSync(OUT, JSON.stringify(report, null, 1) + '\n')
-for (const [st, v] of Object.entries(report.states)) console.log(`${st}: 미달 갈래 기준 ${v.base} · 가지 ${v.head}`)
+for (const [st, v] of Object.entries(report.states)) console.log(`${st}: 미달 갈래 기준 ${v.base} · 가지 ${v.head}${v.unsettled ? ` · ⚠️ 그리기 안 멎음(${v.unsettled.join('·')})` : ''}`)
 for (const n of report.new.slice(0, 40)) console.log(`  새 ${n.state} ${n.kind} 대비 ${n.ratio}(<${n.need}) ×${n.n} 「${n.sample}」`)
 console.log(`새 미달 ${report.new.length}`)

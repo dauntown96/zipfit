@@ -1119,6 +1119,36 @@ try {
   add('policy_md5_dup_old', '공고끼리 같은 요약 정책 행 — 09-18 이전 · 원문 파일 다름(정보)', 'info', String(e).slice(0, 200), '정책 표를 읽는다(실패면 ℹ️)')
 }
 
+// ㊱ 서식 출처 정책 행 · 「모집일정」 정책 행 ∧ 일정 행 0(2026-11-12 · 우편함 「코드·운영 — …21026 마감 원인·고침 + 커트라인 공급 이력 …」 3·4
+//    · 역전파 9회차 ⑦ 1·2) — 한 쿼리 · ℹ️ 셈만(판정하지 않는다 · gate.mjs HARD 밖).
+//    ⓐ policy_form_source — source_file ~ '신청서|서약|위임장|동의서' 정책 행(신청서·서약서 서식 칸을 원문 요약으로 읽은 꼴 — 역전파 9회차 ③ 광명 4행).
+//       「신청서류.pdf」처럼 공고문과 함께 실린 파일도 걸린다 — 값은 행·공고 수(정상 포함) · 첫 값 2026-11-12 10행 · 6공고.
+//    ⓑ schedule_rows_missing — 분석 완료(상태 「완료…」 · 블록 ID 묶음은 get_announcement_group_ids 로 편다) 공고 중 category 에 「모집일정」 정책 행이
+//       있는데 announcement_schedule 행이 0 인 공고(카드 일정 표가 정책 글로만 남는 꼴) · 첫 값 2026-11-12 75(…20675·…20679·…20723 은 같은 날 역전파 10회차가 채워 밖).
+try {
+  const [x] = await sqlRead(`with done as materialized (
+      select distinct g.gid from public.announcement_analysis a
+        cross join lateral public.get_announcement_group_ids(a.announcement_id) g(gid) where a.status like '완료%'),
+    sm as (select distinct p.announcement_id from public.announcement_policies p join done d on d.gid = p.announcement_id
+            where p.category ~ '모집일정'
+              and not exists (select 1 from public.announcement_schedule s where s.announcement_id = p.announcement_id))
+    select json_build_object(
+      'form_rows', (select count(*) from public.announcement_policies where source_file ~ '신청서|서약|위임장|동의서'),
+      'form_ann', (select count(distinct announcement_id) from public.announcement_policies where source_file ~ '신청서|서약|위임장|동의서'),
+      'sched_missing', (select count(*) from sm),
+      'sched_top', (select coalesce(json_agg(announcement_id order by announcement_id desc), '[]'::json) from (select announcement_id from sm order by 1 desc limit 5) t)) j`)
+  const c = x.j
+  add('policy_form_source', '서식 출처 정책 행(신청서·서약·위임장·동의서 — 정보)', 'info',
+    `${c.form_rows}행 · ${c.form_ann}공고`,
+    '정보 — 판정하지 않는다 · source_file ~ 신청서|서약|위임장|동의서 · 「신청서류」 같은 정상 출처도 센다(첫 값 2026-11-12 10행 · 6공고)')
+  add('schedule_rows_missing', '「모집일정」 정책 행은 있는데 일정 행 0 — 분석 완료 공고(정보)', 'info',
+    `${c.sched_missing}공고${c.sched_missing ? ' — 최근 ' + c.sched_top.map(i => '…' + String(i).slice(-5)).join(' · ') : ''}`,
+    '정보 — 판정하지 않는다 · 완료 공고(묶음 펼침) · category ~ 모집일정 ∧ announcement_schedule 0 (첫 값 2026-11-12 75)')
+} catch (e) {
+  add('policy_form_source', '서식 출처 정책 행(신청서·서약·위임장·동의서 — 정보)', 'info', String(e).slice(0, 200), '정책 표를 읽는다(실패면 ℹ️)')
+  add('schedule_rows_missing', '「모집일정」 정책 행은 있는데 일정 행 0 — 분석 완료 공고(정보)', 'info', String(e).slice(0, 200), '정책·일정 표를 읽는다(실패면 ℹ️)')
+}
+
 // ㉓ 화면 빈칸 점검 셋 — 한 쿼리(2026-11-04 · 우편함 「옛 주소 걷기·화면 빈칸 점검」 3~5 · 전부 안 멈춤 — gate.mjs HARD 밖).
 //    카드 = 목록 RPC 대표 · 같은 카드의 행 = 제목 키(announcement_dedup_key — 화면 zfDedupKey 와 한 벌)가 같은 공고 전부(화면 곁 데이터 붙이기와 같다).
 //    ⓐ deadline_hm_missing — 마감이 오늘·내일(KST)인 카드 중 그날 끝나는 경로 표 행 · 일정 표 「접수」 행이 **하나도 없는** 것 = ⚠️(화면이 「오늘 16:00까지」를 못 낸다 · …20923 꼴).
