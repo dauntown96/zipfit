@@ -1176,6 +1176,56 @@ try {
     add('watch_title', 'title 속성 수(원본 · 390 공고 탭 DOM) — 추이(정보)', 'info', '못 잼: ' + String(e).slice(0, 160), '정보')
     add('watch_target44', '누르는 자리 44px 미만 수(390 공고 탭 · 카드 펼침) — 정보', 'info', '못 잼: ' + String(e).slice(0, 160), '정보')
   }
+  // ⑫-④ 느린 망 로드 순서 — 둘째·셋째 <script> 사이 8초 멈춤(2026-11-12 · 우편함 「코드·운영 — 🔴 LH 목록 마감 … + 0장」 3 · #990 ⑦)
+  //    재현 꼴 그대로: 이 실행의 저장소 index.html 을 러너 안 로컬 서버가 「zf3Real 을 정의하는 <script> 바로 앞」까지 보내고 8초 쉰 뒤 나머지를 보낸다.
+  //    목록 등 공개 RPC 는 운영 anon 응답 그대로(읽기) · 이용 기록 송신은 받아 끝낸다 · 서비스 워커 막음. PR(브랜치 index.html) · 배포 뒤(main) 둘 다 돈다.
+  //    통과 = 페이지 오류(pageerror) 0 ∧ 「공고 데이터를 불러오지 못했어요」 0 ∧ 공고 카드 > 0. 멈춤 동안 목록 응답이 왔는지(재현 조건)를 값에 적는다.
+  //    🔴 실패 = health-screen 이슈(안 멈춤 · gate.mjs 밖). #990 이전 판(main 2c1556d 전)은 이 조건에서 카드 0 · ReferenceError 였다(#990 회신 재현).
+  try {
+    const http = await import('node:http')
+    const root = new URL('../../', import.meta.url).pathname
+    const html = readFileSync(root + 'index.html', 'utf8')
+    const zi = html.indexOf('const zf3Real')
+    const cut = zi < 0 ? -1 : html.lastIndexOf('<script>', zi)
+    if (cut < 0) throw new Error('zf3Real 을 정의하는 <script> 를 찾지 못함')
+    let htmlDone = 0
+    const srv = http.createServer((req, res) => {
+      let p = decodeURIComponent(req.url.split('?')[0]); if (p === '/') p = '/index.html'
+      if (p === '/index.html') {
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
+        res.write(html.slice(0, cut))
+        setTimeout(() => { res.end(html.slice(cut)); htmlDone = Date.now() }, 8000)
+        return
+      }
+      const f = root + p.replace(/^\/+/, '')
+      let body = null; try { body = readFileSync(f) } catch {}
+      if (!body || p.includes('..')) { res.writeHead(404); return res.end() }
+      res.writeHead(200, { 'content-type': { '.js': 'text/javascript', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.css': 'text/css' }[p.slice(p.lastIndexOf('.'))] || 'application/octet-stream' })
+      res.end(body)
+    })
+    await new Promise(r => srv.listen(0, '127.0.0.1', r))
+    const sctx = await browser.newContext({ viewport: VIEWPORT, serviceWorkers: 'block', locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+    await sctx.route(/\/rest\/v1\/usage_events(\?|$)/, r => r.fulfill({ status: 201, body: '' }))
+    const sp = await sctx.newPage()
+    const perrs = []; sp.on('pageerror', e => perrs.push(String(e.message || e).slice(0, 120)))
+    let listAt = 0
+    sp.on('response', r => { if (/\/rpc\/get_announcements_deduped/.test(r.url()) && !listAt) listAt = Date.now() })
+    const t0 = Date.now()
+    await sp.goto(`http://127.0.0.1:${srv.address().port}/?stall=${t0}`, { waitUntil: 'load', timeout: 90000 })
+    await sp.waitForFunction(() => (typeof noticeData !== 'undefined' && noticeData.length > 0 && document.querySelectorAll('.hcard').length > 0)
+      || /공고 데이터를 불러오지 못했어요/.test(document.body.innerText), null, { timeout: 60000 }).catch(() => {})
+    await sp.waitForTimeout(1500)
+    const st = await sp.evaluate(() => ({ cards: document.querySelectorAll('.hcard').length, fail: /공고 데이터를 불러오지 못했어요/.test(document.body.innerText) }))
+    await sctx.close(); srv.close()
+    const during = listAt && htmlDone ? listAt < htmlDone : null
+    const ok = perrs.length === 0 && !st.fail && st.cards > 0
+    extra.stall8 = { cut, cards: st.cards, fail: st.fail, pageerrors: perrs, list_before_html_end: during }
+    add('stall8_load', '느린 망 — 둘째·셋째 <script> 사이 8초 멈춤에도 목록이 그려지나', ok ? 'pass' : 'fail',
+      `카드 ${st.cards} · 오류 상자 ${st.fail ? '있음' : '0'} · 페이지 오류 ${perrs.length}${perrs.length ? '(' + perrs[0] + ')' : ''} · 멈춤 중 목록 응답 ${during === null ? '모름' : during ? '옴' : '안 옴(재현 조건 아님)'}`,
+      '로컬 서버가 zf3Real <script> 앞에서 8초 쉼 · 페이지 오류 0 ∧ 오류 상자 0 ∧ 카드 > 0(#990 고침이 지키는 것)')
+  } catch (e) {
+    add('stall8_load', '느린 망 — 둘째·셋째 <script> 사이 8초 멈춤에도 목록이 그려지나', 'warn', '못 잼: ' + String(e).slice(0, 160), '재다 죽으면 경고')
+  }
   // ⑫-③ 유형 색이 유형 띠·점 밖에 쓰이는 자리(2026-11-12 · 우편함 「코드·운영 — …21026 마감 원인·고침 + 커트라인 공급 이력 …」 5 · #980 ⑦ 1)
   //    — ℹ️ 숫자만(판정하지 않는다 · 이슈 없음). 원본 index.html 을 읽기만 한다 · 규칙은 ln-watch.mjs 머리 주석.
   try {

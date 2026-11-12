@@ -73,6 +73,20 @@ BEGIN
     NEW.apply_end := NEW.apply_end_confirmed;
   END IF;
 
+  -- 🔴 2026-11-12(우편함 「코드·운영 — 🔴 LH 목록 마감(CLSG_DT) < 상세 청약 마감 감시·보호」 1) — LH 목록 마감이 상세 청약 마감보다 앞서면 상세가 선다.
+  --   왜: …21024·…21026 인천논현2 국임 — 11-11 LH 목록 CLSG_DT 가 첫 순위 창 끝(11-18)으로 바뀌고 상세 dsSplScdl SBSC_ACP_CLSG_DT 는 11-20 그대로였다.
+  --   수집이 매 런 목록 값을 apply_end 에 써서 열린 카드가 「마감 11-18」이 됐다(#993 · 그때는 확정 칸으로 막음).
+  --   apply_end_detail = 수집이 상세를 받은 런의 청약 마감(scdl 원소 중 가장 늦은 날 · 상세 없는 런은 NULL → 여기서 OLD 를 지킨다).
+  --   상세 없는 기본 upsert 가 목록 값을 다시 실어도 지킨 상세 값이 다시 세운다(되돌림 없음). 확정 칸이 있으면 그것이 먼저다(위).
+  --   LH 행만 · 목록 값이 상세보다 늦거나 같으면 그대로(한 게시물 두 공고문 B53 꼴 = 목록이 늦은 쪽 — 건드리지 않는다).
+  --   apply_end_list(목록 원값 · 매 런 실림)는 감시용이다 — health-ops lh_list_end_early 가 둘을 견준다.
+  NEW.apply_end_detail := coalesce(NEW.apply_end_detail, OLD.apply_end_detail);
+  IF NEW.apply_end_confirmed IS NULL AND NEW.source = 'LH'
+     AND NEW.apply_end_detail IS NOT NULL AND NEW.apply_end IS NOT NULL
+     AND NEW.apply_end < NEW.apply_end_detail THEN
+    NEW.apply_end := NEW.apply_end_detail;
+  END IF;
+
   -- 🔵 2026-09-29 코드 회차 3 — 확정 마감일이 이미 지났고 이미 「접수마감」인 행은 수집 upsert 가
   --   원천 status(「공고중」 등)로 되돌리지 못하게 한다. 이것이 없으면 매 런 upsert 가 되돌리고
   --   같은 런 끝의 markExpired 가 다시 「접수마감」으로 바꿨다(칠곡 MYHOME 5행 · expired_marked 매 런 5).
