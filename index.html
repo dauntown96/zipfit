@@ -712,9 +712,7 @@ html[data-ui="d3"] .zf3-card .zf-dateline{color:var(--ink-3)!important}
 html[data-ui="d3"] .zf-footer{border-top-color:var(--line-2)}
 /* 🔵 2026-10-13(우편함 「표시층 — 실사용 1회차 반영」 1 · D1) — 글자 토큰 최소는 t-xs 12px다. 옛 화면 조각(카드 상세 · 표지 칩 · 인사이트 재고 절)에
    9~11.5px로 적힌 글자를 d3 에서 12px로 올린다 — 고령 사용자에게 9~10px는 읽기 어렵다(1회차 P4). 글자가 아닌 기호(◆ 구분 · ✕ · ▾ · 원 안 아이콘)는 그대로. */
-html[data-ui="d3"] [style*="font-size:20px"]{font-size:var(--t-2xl)!important}   /* D6 — 재고 절 큰 숫자 20px → t-2xl */
-html[data-ui="d3"] [style*="border-radius:8px"]{border-radius:var(--r-2)!important}   /* D3 — 손으로 적힌 8px 둥글기 → r-2 */
-html[data-ui="d3"] :is([style*="font-size:8px"],[style*="font-size:9px"],[style*="font-size:10px"],[style*="font-size:10.5px"],[style*="font-size:11px"],[style*="font-size:11.5px"]){font-size:var(--t-xs)!important}
+/* 🔵 2026-11-16(토큰 4차) — 종전 값 맞춤 [style*=] 세 줄(20px → t-2xl · 둥글기 8px → r-2 · 8~11.5px → t-xs)은 그리는 쪽 인라인 값을 토큰으로 바꿔 걷었다(docs/design-tokens.md 2-4절). */
 /* D2 — 누름 칸은 hit 44px 이상(카카오로 시작하기 40 · 상세 공유하기·저장 35 · 1회차 실측) */
 html[data-ui="d3"] :is(.btn,.detail-link){min-height:var(--hit);box-sizing:border-box}
 html[data-ui="d3"] .detail-link{display:flex!important;align-items:center;justify-content:center}
@@ -963,7 +961,10 @@ html[data-ui="d3"] .zf3-card .chip-row .chip.zf3-minechip{background:var(--surfa
 .zf3-hux button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 .zf3-phonly .hu-group:not([data-zf3-ph]){display:none}
 .zf3-phonly .hu-more-btn{display:none}
-html[data-ui="d3"] .poi-loading{color:var(--ink-2)}   /* 종전 #999 — 대비 2.85:1(axe · 1200 상세 패널) */
+html[data-ui="d3"] .poi-loading{color:var(--ink-2)}
+/* 🔵 2026-11-16(이슈 1023) — 지도 아래 주변 시설 줄: 종전 .poi-item 날값 글자·바탕(d3 토큰 밖 — 어두움에서 밝은 줄 · 이름 span 이 axe 대비 미완 새 글자색) → 토큰 */
+html[data-ui="d3"] .poi-item{color:var(--ink);background:var(--surface);border-radius:var(--r-1)}
+html[data-ui="d3"] .poi-dist{color:var(--ink-3)}   /* 종전 #999 — 대비 2.85:1(axe · 1200 상세 패널) */
 html[data-ui="d3"] [id^="map-"] > .poi-loading{color:#4a4f57}   /* 지도 자리 바탕은 두 모드 모두 밝은 #f0f0e8 이라 고정색 */
 @keyframes zf3grow{from{transform:scaleY(0)}}
 @keyframes zf3grow-x{from{transform:scaleX(0)}}
@@ -978,11 +979,11 @@ html[data-ui="d3"] .btn-primary:hover{background:var(--ink-2)}
 html[data-ui="d3"] .btn-sec{background:var(--paper);color:var(--ink);border:1px solid var(--line)}
 html[data-ui="d3"] .btn-sec:hover{background:var(--surface)}
 html[data-ui="d3"] .btn-sm{min-height:var(--hit);display:inline-flex;align-items:center;justify-content:center;font-size:var(--t-s);font-weight:600}
-/* 손으로 적힌 회색 글자(종전 화면 인라인 #555~#bbb) → 토큰 — 어둡게 모드에서 2:1 까지 떨어지던 자리(둘러보기 ①) */
-html[data-ui="d3"] [style*="color:#555"],html[data-ui="d3"] [style*="color:#666"]{color:var(--ink-2)!important}
-html[data-ui="d3"] [style*="color:#888"],html[data-ui="d3"] [style*="color:#999"],html[data-ui="d3"] [style*="color:#aaa"],html[data-ui="d3"] [style*="color:#bbb"]{color:var(--ink-3)!important}
-/* 아직 못 가는 단계(추천 「② 주택 매칭」 — opacity .4 로 흐리던 것) → 흐림 대신 옅은 글자 · 단계 e 에서 노선 스텝으로 바뀐다 */
-html[data-ui="d3"] .step[style*="opacity"]{opacity:1!important;color:var(--ink-3)}
+/* 손으로 적힌 회색 글자(종전 화면 인라인 #555~#bbb)는 그리는 쪽에서 --ink-2/--ink-3 으로 바꿨다(토큰 4차 · 값 맞춤 [style*=] 두 줄 걷음).
+   「모집 N배수」 칩만 글자색이 아니라 테두리 border-color:#888 이 그 줄에 걸려 글자가 --ink-3 이던 것 — 같은 자리 · 같은 무게의 클래스로 그대로 둔다. */
+html[data-ui="d3"] .zf-chip-mult{color:var(--ink-3)!important}
+/* 추천 「② 주택 매칭」 단계 — 종전 인라인 opacity(.4 → 풀면 1)가 [style*="opacity"] 줄에 늘 걸려 흐림 대신 옅은 글자였다(풀린 뒤에도) · 같은 자리 · 같은 무게로 그대로 */
+html[data-ui="d3"] .step[data-zf-dim]{color:var(--ink-3)}   /* goStep 이 className 을 다시 쓰므로 클래스가 아니라 속성 */
 /* 나의 노선도(d3 · 둘러보기 ④) */
 .zf3-my{background:var(--paper);border:1px solid var(--line-2);border-radius:var(--r-3);padding:16px;margin:0 0 14px}
 .zf3-my-h{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin:0 0 10px}
@@ -1248,7 +1249,7 @@ html[data-ui="d3"] .pg-btn{min-width:var(--hit);height:var(--hit);font-size:var(
     <button class="maintab active" id="m1" role="tab" aria-selected="true" onclick="goMain(1)">추천</button>
     <button class="maintab" id="m2" role="tab" aria-selected="false" onclick="goMain(2)">공고</button>
     <button class="maintab" id="m3" role="tab" aria-selected="false" onclick="goMain(3)">인사이트</button>
-    <button class="maintab" id="m4" role="tab" aria-selected="false" onclick="goMain(4)">관리<span id="savedBadge" style="display:none;background:#D85A30;color:#fff;border-radius:10px;font-size:10px;padding:1px 5px;margin-left:3px;vertical-align:middle"></span></button>
+    <button class="maintab" id="m4" role="tab" aria-selected="false" onclick="goMain(4)">관리<span id="savedBadge" style="display:none;background:#D85A30;color:#fff;border-radius:10px;font-size:var(--t-xs);padding:1px 5px;margin-left:3px;vertical-align:middle"></span></button>
     <button class="maintab" id="m5" role="tab" aria-selected="false" onclick="goMain(5)">설정</button>
   </div>
   <!-- 🔵 D-3 a — 맞춤 LED 전광판(공지 포함 · 띠는 하나). ui=d3 일 때만. -->
@@ -1260,7 +1261,7 @@ html[data-ui="d3"] .pg-btn{min-width:var(--hit);height:var(--hit);font-size:var(
   <!-- 맞춤 공고 추천 (로그인 사용자 전용) -->
   <div id="personalizedPanel" class="panel" style="margin-bottom:1rem;display:none">
     <p class="panel-title" style="margin-bottom:0.5rem">🎯 맞춤 추천 공고</p>
-    <p style="font-size:12px;color:#999;margin-bottom:1rem" id="personalizedDesc"></p>
+    <p style="font-size:12px;color:var(--ink-3);margin-bottom:1rem" id="personalizedDesc"></p>
     <div id="personalizedList"></div>
   </div>
   <div id="personalizedPrompt" class="rbox warn" style="margin-bottom:1rem;display:none">
@@ -1270,7 +1271,7 @@ html[data-ui="d3"] .pg-btn{min-width:var(--hit);height:var(--hit);font-size:var(
 
   <div class="subtabs">
     <div class="step active" id="s1" onclick="goStep(1)">① 자격 진단</div>
-    <div class="step" id="s2" onclick="goStep(2)" style="opacity:0.4;pointer-events:none;" title="자격 진단을 먼저 완료해주세요">② 주택 매칭</div>
+    <div class="step" id="s2" data-zf-dim onclick="goStep(2)" style="pointer-events:none;" title="자격 진단을 먼저 완료해주세요">② 주택 매칭</div>
   </div>
 
   <!-- STEP 1 -->
@@ -1455,7 +1456,7 @@ html[data-ui="d3"] .pg-btn{min-width:var(--hit);height:var(--hit);font-size:var(
 
     <button class="btn btn-primary" onclick="matchHouses()">맞춤 주택 찾기 →</button>
     <div style="display:flex;align-items:center;justify-content:flex-end;margin-top:10px">
-      <select id="matchSortSel" aria-label="매칭 결과 정렬" onchange="applyMatchSortAndRender()" style="font-size:13px;padding:5px 8px;border:1px solid #e0e0e0;border-radius:8px;background:#fff;color:#333;cursor:pointer">
+      <select id="matchSortSel" aria-label="매칭 결과 정렬" onchange="applyMatchSortAndRender()" style="font-size:13px;padding:5px 8px;border:1px solid #e0e0e0;border-radius:var(--r-2);background:#fff;color:#333;cursor:pointer">
         <option value="date-desc">최신 공고순</option>
         <option value="end-asc">마감 임박순</option>
         <option value="start-asc">접수 시작순</option>
@@ -1486,9 +1487,9 @@ html[data-ui="d3"] .pg-btn{min-width:var(--hit);height:var(--hit);font-size:var(
          그 줄은 걷혀 있다 — 그리는 쪽은 칸 value 를 쓰지 않는다(applyNoticeSubFilters 의 q 인자). -->
     <div style="display:flex;gap:8px;margin-bottom:0.75rem">
       <span class="zf-clr-wrap"><input type="text" id="noticeSearchInput" placeholder="공고명, 지역 등으로 검색" aria-label="공고 검색" oninput="applyNoticeFiltersAndRender();zfLogSearchSoon(this.value)" onkeydown="zfClearKey(event,this)"
-        style="flex:1;min-width:0;padding:9px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px"><button type="button" class="zf-clr" aria-label="검색어 지우기" onmousedown="event.preventDefault()" onclick="zfClearSearch(this,event)">×</button></span>
+        style="flex:1;min-width:0;padding:9px 12px;border:1px solid #e0e0e0;border-radius:var(--r-2);font-size:14px"><button type="button" class="zf-clr" aria-label="검색어 지우기" onmousedown="event.preventDefault()" onclick="zfClearSearch(this,event)">×</button></span>
       <select id="noticeSearchScopeSel" aria-label="검색 범위" onchange="applyNoticeFiltersAndRender()"
-        style="font-size:13px;padding:5px 8px;border:1px solid #e0e0e0;border-radius:8px;background:#fff;color:#333;cursor:pointer">
+        style="font-size:13px;padding:5px 8px;border:1px solid #e0e0e0;border-radius:var(--r-2);background:#fff;color:#333;cursor:pointer">
         <option value="title">제목만</option>
         <option value="title-region" selected>제목+지역</option>
         <option value="all">전체</option>
@@ -1521,21 +1522,21 @@ html[data-ui="d3"] .pg-btn{min-width:var(--hit);height:var(--hit);font-size:var(
       <div style="display:flex;align-items:center;justify-content:space-between;margin-top:0.5rem">
         <div style="display:flex;align-items:center;gap:8px">
           <input type="checkbox" id="hideClosedChk" checked style="width:16px;height:16px;cursor:pointer">
-          <label for="hideClosedChk" style="font-size:13px;color:#555;cursor:pointer;margin:0">신청할 수 없는 공고 숨기기</label>
+          <label for="hideClosedChk" style="font-size:13px;color:var(--ink-2);cursor:pointer;margin:0">신청할 수 없는 공고 숨기기</label>
         </div>
-        <button onclick="resetNoticeFilters()" style="font-size:12px;padding:5px 12px;border:1px solid #ddd;border-radius:8px;background:#fff;color:#666;cursor:pointer">필터 초기화</button>
+        <button onclick="resetNoticeFilters()" style="font-size:12px;padding:5px 12px;border:1px solid #ddd;border-radius:var(--r-2);background:#fff;color:var(--ink-2);cursor:pointer">필터 초기화</button>
       </div>
     </div>
 
     <div style="display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-bottom:8px">
       <select id="noticePageSizeSel" aria-label="한 쪽에 보여줄 공고 수" onchange="noticeSetPageSize(this.value)"
-        style="font-size:13px;padding:5px 8px;border:1px solid #e0e0e0;border-radius:8px;background:#fff;color:#333;cursor:pointer">
+        style="font-size:13px;padding:5px 8px;border:1px solid #e0e0e0;border-radius:var(--r-2);background:#fff;color:#333;cursor:pointer">
         <option value="10">10개씩</option>
         <option value="20" selected>20개씩</option>
         <option value="30">30개씩</option>
         <option value="50">50개씩</option>
       </select>
-      <select id="noticeSortSel" autocomplete="off" style="font-size:13px;padding:5px 8px;border:1px solid #e0e0e0;border-radius:8px;background:#fff;color:#333;cursor:pointer" onchange="applyNoticeFiltersAndRender()">
+      <select id="noticeSortSel" autocomplete="off" style="font-size:13px;padding:5px 8px;border:1px solid #e0e0e0;border-radius:var(--r-2);background:#fff;color:#333;cursor:pointer" onchange="applyNoticeFiltersAndRender()">
         <option value="date-desc">최신 공고순</option>
         <option value="end-asc">마감 임박순</option>
         <option value="start-asc">접수 시작순</option>
@@ -1554,7 +1555,7 @@ html[data-ui="d3"] .pg-btn{min-width:var(--hit);height:var(--hit);font-size:var(
   <div id="main3" class="main-section hidden">
     <div id="insightContent">
       <div class="rbox" style="text-align:center;padding:2rem 1rem">
-        <p style="color:#888;font-size:14px">📊 통계 데이터를 불러오는 중...</p>
+        <p style="color:var(--ink-3);font-size:14px">📊 통계 데이터를 불러오는 중...</p>
       </div>
     </div>
   </div> <!-- /main3 -->
@@ -1576,7 +1577,7 @@ html[data-ui="d3"] .pg-btn{min-width:var(--hit);height:var(--hit);font-size:var(
         <div class="dday-sub" id="dday-sub"></div>
       </div>
       <!-- 🔴 2026-10-07(표시층 긴급 3) — 아래 목록은 유형별 고정 예시다. 원문 제출서류를 화면이 아직 읽지 않는다. -->
-      <p class="zf-doc-note" style="font-size:12px;border-radius:8px;padding:8px 10px;margin:0 0 10px">공고마다 제출서류가 다릅니다 — 공고 원문에서 확인하세요</p>
+      <p class="zf-doc-note" style="font-size:12px;border-radius:var(--r-2);padding:8px 10px;margin:0 0 10px">공고마다 제출서류가 다릅니다 — 공고 원문에서 확인하세요</p>
       <p class="slabel">📋 일반적으로 필요한 서류(예시)</p>
       <ul class="checklist" id="checklist-common"></ul>
       <p class="slabel" id="checklist-cond-title" style="margin-top:1.25rem">📎 자격별 추가 서류</p>
@@ -1601,13 +1602,13 @@ html[data-ui="d3"] .pg-btn{min-width:var(--hit);height:var(--hit);font-size:var(
     <div id="loginGate" class="panel">
       <p class="panel-title">로그인</p>
       <p class="sub" style="margin-bottom:0.5rem">로그인하면 저장하신 조건과 알림 설정을 불러올 수 있어요.</p>
-      <p style="font-size:12px;color:#888;margin:0 0 1rem;line-height:1.5">🔒 창이나 탭을 닫으면 자동으로 로그아웃돼요. 새로고침은 그대로 유지됩니다.</p>
+      <p style="font-size:12px;color:var(--ink-3);margin:0 0 1rem;line-height:1.5">🔒 창이나 탭을 닫으면 자동으로 로그아웃돼요. 새로고침은 그대로 유지됩니다.</p>
 
       <!-- 로그인 경로 — 카카오 -->
       <button class="btn" id="zfKakaoBtn" onclick="zfSignInKakao()"
               style="background:#FEE500;color:#191600;border:none;margin-bottom:0.75rem">카카오로 시작하기</button>
 
-      <p id="zfAuthMsg" style="font-size:12px;margin-top:8px;color:#888"></p>
+      <p id="zfAuthMsg" style="font-size:12px;margin-top:8px;color:var(--ink-3)"></p>
     </div>
 
     <!-- 카카오 로그인 직후: 알림 받을 이메일 수집 (필수 경로 — 카카오는 이메일을 주지 않음) -->
@@ -1620,14 +1621,14 @@ html[data-ui="d3"] .pg-btn{min-width:var(--hit);height:var(--hit);font-size:var(
       </div>
       <button class="btn btn-primary" onclick="zfSaveAlertEmail()">저장하고 계속 →</button>
       <button class="btn btn-sec" onclick="zfSkipAlertEmail()">건너뛰기</button>
-      <p id="zfAlertEmailMsg" style="font-size:12px;margin-top:8px;color:#888"></p>
+      <p id="zfAlertEmailMsg" style="font-size:12px;margin-top:8px;color:var(--ink-3)"></p>
     </div>
 
     <!-- 로그인 후: 환경설정 본체 -->
     <div id="settingsBody" class="hidden">
       <div class="panel" style="margin-bottom:1rem">
         <p class="panel-title" style="margin-bottom:4px">⚙️ 환경설정</p>
-        <p style="font-size:12px;color:#999" id="currentUserEmail"></p>
+        <p style="font-size:12px;color:var(--ink-3)" id="currentUserEmail"></p>
       </div>
 
       <!-- 조건 설정 -->
@@ -1668,7 +1669,7 @@ html[data-ui="d3"] .pg-btn{min-width:var(--hit);height:var(--hit);font-size:var(
             <label class="label" for="set_assets">총 자산 (만원)</label>
             <input type="number" id="set_assets" min="0" placeholder="예: 15000">
             <!-- 🔵 2026-09-25 B26 — 자격진단 #assets 아래와 같은 문장(B24). 판정·저장 코드는 바꾸지 않는다. -->
-            <p style="font-size:11px;color:#999;margin:0.35rem 0 0">부동산·자동차·금융자산 등을 모두 더하고 부채를 뺀 금액이에요.</p>
+            <p style="font-size:var(--t-xs);color:var(--ink-3);margin:0.35rem 0 0">부동산·자동차·금융자산 등을 모두 더하고 부채를 뺀 금액이에요.</p>
           </div>
           <div class="field">
             <label class="label" for="set_maxDeposit">최대 보증금 (만원)</label>
@@ -1691,7 +1692,7 @@ html[data-ui="d3"] .pg-btn{min-width:var(--hit);height:var(--hit);font-size:var(
           <div class="chip-group" id="settingsTypeChips"></div>
         </div>
         <button class="btn btn-primary" style="margin-top:1rem" onclick="saveSettings()">조건 저장하기</button>
-        <p id="settingsSaveMsg" style="font-size:12px;margin-top:8px;color:#888"></p>
+        <p id="settingsSaveMsg" style="font-size:12px;margin-top:8px;color:var(--ink-3)"></p>
       </div>
 
       <div class="panel" style="margin-bottom:1rem">
@@ -1704,7 +1705,7 @@ html[data-ui="d3"] .pg-btn{min-width:var(--hit);height:var(--hit);font-size:var(
           <input type="email" id="zfSettingsAlertEmail" placeholder="example@email.com">
           <button class="btn btn-sec" style="margin-top:8px"
                   onclick="zfSaveAlertEmail('zfSettingsAlertEmail','zfSettingsAlertEmailMsg')">알림 이메일 저장</button>
-          <p id="zfSettingsAlertEmailMsg" style="font-size:12px;margin:6px 0 0;color:#888"></p>
+          <p id="zfSettingsAlertEmailMsg" style="font-size:12px;margin:6px 0 0;color:var(--ink-3)"></p>
         </div>
 
         <div class="setting-row">
@@ -1749,15 +1750,15 @@ html[data-ui="d3"] .pg-btn{min-width:var(--hit);height:var(--hit);font-size:var(
       <div class="panel">
         <p class="slabel" style="margin:0 0 0.75rem">🚪 계정</p>
         <button class="btn btn-sec" onclick="logoutUser()">로그아웃하고 다른 계정으로 전환</button>
-        <p style="font-size:12px;color:#888;margin:6px 0 0;line-height:1.5">지금 계정에서 로그아웃한 뒤 다른 계정으로 로그인합니다. 저장한 공고와 설정은 계정마다 따로 보관돼요.</p>
+        <p style="font-size:12px;color:var(--ink-3);margin:6px 0 0;line-height:1.5">지금 계정에서 로그아웃한 뒤 다른 계정으로 로그인합니다. 저장한 공고와 설정은 계정마다 따로 보관돼요.</p>
 
         <!-- 🔴 탈퇴는 로그아웃과 다른 일이라 선으로 끊고 색을 달리한다(2026-09-18). 이 패널 전체가
              #settingsBody 안이라 로그인 상태에서만 보인다 — 별도 분기를 두지 않는다. -->
         <div id="zfDeleteZone" style="margin-top:1.25rem;padding-top:1rem;border-top:1px solid #e8e8e0">
           <button id="zfDeleteBtn" class="btn btn-sec" style="border-color:#C0392B;color:#C0392B" onclick="zfDeleteAccountAsk()">회원 탈퇴</button>
-          <p style="font-size:12px;color:#888;margin:6px 0 0;line-height:1.5">계정과 이 계정에 저장된 정보를 삭제합니다.</p>
+          <p style="font-size:12px;color:var(--ink-3);margin:6px 0 0;line-height:1.5">계정과 이 계정에 저장된 정보를 삭제합니다.</p>
 
-          <div id="zfDeleteConfirm" class="hidden" style="margin-top:10px;padding:12px;border:1px solid #C0392B;border-radius:8px;background:#FDF3F2">
+          <div id="zfDeleteConfirm" class="hidden" style="margin-top:10px;padding:12px;border:1px solid #C0392B;border-radius:var(--r-2);background:#FDF3F2">
             <p style="font-size:13px;color:#7B241C;margin:0 0 10px;line-height:1.6">탈퇴하면 저장한 조건·찜한 공고·알림 설정과 이 계정에 연결된 이용 기록이 삭제됩니다. 되돌릴 수 없습니다.</p>
             <button id="zfDeleteGo" class="btn" style="background:#C0392B;color:#fff;border-color:#C0392B" onclick="zfDeleteAccountRun()">탈퇴합니다</button>
             <button class="btn btn-sec" style="margin-left:6px" onclick="zfDeleteAccountCancel()">취소</button>
@@ -1777,7 +1778,7 @@ html[data-ui="d3"] .pg-btn{min-width:var(--hit);height:var(--hit);font-size:var(
     <p class="zf-ai-note zf-nonaffil-foot">꼭집은 공공기관이 운영하지 않는 서비스예요. 정보는 각 기관 공고 원문을 정리한 것이며, 신청은 원문에서 하세요.</p>
     <p class="zf-ai-note">꼭집의 공고 정보는 AI가 공고문 원문을 읽고 정리했어요. 신청 전에는 공고 원문을 꼭 확인해 주세요.</p>
     <p class="zf-ai-note zf-src">출처: LH · 마이홈 · SH 공고 원문 → 꼭집 정리</p>
-    <a href="./terms.html">이용약관</a><span style="font-size:12px;color:#888"> · </span><a href="./privacy.html">개인정보 처리방침</a>
+    <a href="./terms.html">이용약관</a><span style="font-size:12px;color:var(--ink-3)"> · </span><a href="./privacy.html">개인정보 처리방침</a>
   </footer>
 
 </div> <!-- /wrap -->
@@ -1946,30 +1947,30 @@ function zfRelaxKind(title, detail){
 function buildConvBadges(mymy, supplyForm, appMethod, recruitMult, isRelaxed, selectionMethod, title, relaxDetail){
   const badges = [];
   if(mymy === true || mymy === 'true'){
-    badges.push('<span class="chip sel zf-chip-info" style="cursor:default;padding:3px 8px;font-size:10px">📱 MyMy가능</span>');
+    badges.push('<span class="chip sel zf-chip-info" style="cursor:default;padding:3px 8px;font-size:var(--t-xs)">📱 MyMy가능</span>');
   }
   if(isRelaxed === true || isRelaxed === 'true'){
-    badges.push(`<span class="chip sel zf-chip-info" data-zf-relax="1" style="cursor:default;padding:3px 8px;font-size:10px">🔓 ${zfRelaxKind(title, relaxDetail).label}</span>`);
+    badges.push(`<span class="chip sel zf-chip-info" data-zf-relax="1" style="cursor:default;padding:3px 8px;font-size:var(--t-xs)">🔓 ${zfRelaxKind(title, relaxDetail).label}</span>`);
   }
   if(supplyForm && supplyForm !== '일반'){
     const sfMap = {'전세형':'🏠 전세형','기숙사형':'🏢 기숙사형','공동거주형':'👥 공동거주형','건설형':'🏗 건설형','분양전환형':'🔑 분양전환형'};
     const label = sfMap[supplyForm] || supplyForm;
-    badges.push(`<span class="chip sel zf-chip-info" style="cursor:default;padding:3px 8px;font-size:10px">${label}</span>`);
+    badges.push(`<span class="chip sel zf-chip-info" style="cursor:default;padding:3px 8px;font-size:var(--t-xs)">${label}</span>`);
   }
   if(appMethod && appMethod !== 'online'){
     const amMap = {'email':'📧 이메일신청','online_offline':'🏢 현장접수가능','local_gov':'🏛 지자체신청'};
     const label = amMap[appMethod] || appMethod;
-    badges.push(`<span class="chip sel" style="cursor:default;padding:3px 8px;font-size:10px;background:#7F77DD;border-color:#7F77DD">${label}</span>`);
+    badges.push(`<span class="chip sel" style="cursor:default;padding:3px 8px;font-size:var(--t-xs);background:#7F77DD;border-color:#7F77DD">${label}</span>`);
   }
   if(selectionMethod === '선착순방문'){
-    badges.push('<span class="chip sel zf-chip-warn" style="cursor:default;padding:3px 8px;font-size:10px">🏃 선착순 방문접수</span>');
+    badges.push('<span class="chip sel zf-chip-warn" style="cursor:default;padding:3px 8px;font-size:var(--t-xs)">🏃 선착순 방문접수</span>');
   } else if(selectionMethod === '선계약후검증'){
-    badges.push('<span class="chip sel zf-chip-warn" style="cursor:default;padding:3px 8px;font-size:10px;background:#EF9F27;border-color:#EF9F27">⚠️ 선계약후검증</span>');
+    badges.push('<span class="chip sel zf-chip-warn" style="cursor:default;padding:3px 8px;font-size:var(--t-xs);background:#EF9F27;border-color:#EF9F27">⚠️ 선계약후검증</span>');
   } else if(selectionMethod === '우선순위추첨'){
-    badges.push('<span class="chip sel" style="cursor:default;padding:3px 8px;font-size:10px;background:#7F77DD;border-color:#7F77DD">🎲 우선순위+추첨</span>');
+    badges.push('<span class="chip sel" style="cursor:default;padding:3px 8px;font-size:var(--t-xs);background:#7F77DD;border-color:#7F77DD">🎲 우선순위+추첨</span>');
   }
   if(recruitMult){
-    badges.push(`<span class="chip sel" style="cursor:default;padding:3px 8px;font-size:10px;background:#888;border-color:#888">모집${recruitMult}배수</span>`);
+    badges.push(`<span class="chip sel zf-chip-mult" style="cursor:default;padding:3px 8px;font-size:var(--t-xs);background:#888;border-color:#888">모집${recruitMult}배수</span>`);
   }
   return badges.join('');
 }
@@ -2606,9 +2607,9 @@ function applyUnknownChip(row){
   if(applyWindowState(row) !== 'unknown') return '';
   // 🔴 B62 ③ — 모르는 것이 아니라 「수집값이 공사 공고와 어긋날 수 있다」는 것이라 낱말을 가른다. 색·형식은 그대로다.
   if(row['apply_period_check'] === true){
-    return `<span class="chip" title="이 공급기관은 공고 목록의 접수기간이 공사 공고와 다른 적이 있어요. 공사 공고에서 확인하세요." data-zf-tip tabindex="0" role="button" aria-expanded="false" style="cursor:pointer;padding:4px 10px;font-size:11px;background:#F6F6F2;border-color:#E8E8E0;color:#6B6B63">📅 ${APPLY_CHECK_LABEL}</span>`;
+    return `<span class="chip" title="이 공급기관은 공고 목록의 접수기간이 공사 공고와 다른 적이 있어요. 공사 공고에서 확인하세요." data-zf-tip tabindex="0" role="button" aria-expanded="false" style="cursor:pointer;padding:4px 10px;font-size:var(--t-xs);background:#F6F6F2;border-color:#E8E8E0;color:#6B6B63">📅 ${APPLY_CHECK_LABEL}</span>`;
   }
-  return `<span class="chip" data-zf-unk="1" title="이 공고는 접수기간이 공개 목록에 없어요. 원문에서 확인하세요." data-zf-tip tabindex="0" role="button" aria-expanded="false" style="cursor:pointer;padding:4px 10px;font-size:11px;background:#F6F6F2;border-color:#E8E8E0;color:#6B6B63">📅 ${APPLY_UNKNOWN_LABEL}</span>`;
+  return `<span class="chip" data-zf-unk="1" title="이 공고는 접수기간이 공개 목록에 없어요. 원문에서 확인하세요." data-zf-tip tabindex="0" role="button" aria-expanded="false" style="cursor:pointer;padding:4px 10px;font-size:var(--t-xs);background:#F6F6F2;border-color:#E8E8E0;color:#6B6B63">📅 ${APPLY_UNKNOWN_LABEL}</span>`;
 }
 // 날짜 줄. unknown이면 하이픈 대신 '미상'과 원문 링크를 놓는다 —
 // `접수마감: -`는 「마감일이 없다」로도 「비어 있다」로도 읽혀 아무 말도 안 한다.
@@ -2622,7 +2623,7 @@ function applyDateLine(row, annDate, applyStart, applyEnd, url){
   //    schedule_varies 가 true 일 때만 붙는다 — false·null·컬럼 없음은 종전 그대로 아무 것도 안 붙는다.
   // 🔵 B62 — class `zf-varies` 는 경로 칸 한 줄(①·②)이 이 배지를 대신할 때 찾는 표지다(zfFillRouteSlots).
   const variesTag = row && row['schedule_varies'] === true
-    ? ' <span class="zf-varies" style="display:inline-block;margin-left:4px;padding:1px 6px;border-radius:9px;font-size:11px;font-weight:600">단지마다 일정이 달라요 — 원문 확인</span>'
+    ? ' <span class="zf-varies" style="display:inline-block;margin-left:4px;padding:1px 6px;border-radius:9px;font-size:var(--t-xs);font-weight:600">단지마다 일정이 달라요 — 원문 확인</span>'
     : '';
   // 🔴 B62 ③ — 날짜 자리에 「확인 필요」와 공사 공고 링크만 둔다. 수집 날짜(믿을 수 없는 값)를 적지 않는다.
   if(row && row['apply_period_check'] === true){
@@ -2983,7 +2984,7 @@ function zfNoticeStateBadge(state, end, hmPassed, win2){
     //    종전 접수 예정 #EEF2FA/#3D5A99 는 국민 유형 파랑과 겹쳤다 · 마감 #F6F6F2/#6B6B63 은 날값(어두움에서 밝은 칩).
     : t === '접수 예정' ? 'background:transparent;color:var(--ink-2);box-shadow:inset 0 0 0 1px var(--ink-3)'
     : 'background:transparent;color:var(--ink-3)';
-  return `<span class="zf-nt-state"${hmPassed ? ' data-zf-hm="1"' : ''}${win2 ? ' data-zf-win2="1"' : ''} style="display:inline-block;white-space:nowrap;margin-left:4px;padding:1px 6px;border-radius:9px;font-size:11px;font-weight:600;${c}">${t}</span>`;
+  return `<span class="zf-nt-state"${hmPassed ? ' data-zf-hm="1"' : ''}${win2 ? ' data-zf-win2="1"' : ''} style="display:inline-block;white-space:nowrap;margin-left:4px;padding:1px 6px;border-radius:9px;font-size:var(--t-xs);font-weight:600;${c}">${t}</span>`;
 }
 // 자리는 카드 행의 접수 재료를 함께 싣는다 — 공고 탭·추천·매칭 카드의 행 모양이 달라도 채울 때 같은 판정을 한다.
 function zfNoticesSlotHtml(row){
@@ -3002,7 +3003,7 @@ function zfFillNoticeSlots(){
     if(!list) return;
     const same = list.every(x => x.start === list[0].start && x.end === list[0].end && x.state === list[0].state);
     // 🟡 2026-11-12(토큰 3차 시안 ③) — 상자째 토큰(--surface · --line-2 · --ink-2) — 종전 날값 #FAFAF6/#444 상자는 어두움에서 밝게 남았다(2-2절 「남긴 것」).
-    const box = 'font-size:12px;color:var(--ink-2);background:var(--surface);border:1px solid var(--line-2);border-radius:8px;padding:6px 10px;margin:0 0 8px;line-height:1.7';
+    const box = 'font-size:12px;color:var(--ink-2);background:var(--surface);border:1px solid var(--line-2);border-radius:var(--r-2);padding:6px 10px;margin:0 0 8px;line-height:1.7';
     const name = x => `<span title="${zfAttr(x.title)}" style="font-weight:600;color:var(--ink)">${escapeHtml(x.name || x.title)}</span>`;
     // 🔵 2026-10-01 — class zf-nt-line·zf-nt-span·zf-nt-state 는 화면 점검(health-screen 「공고문 자리 ↔ DB」)이 읽는 표지다. 모양은 그대로다.
     el.innerHTML = same
@@ -3322,7 +3323,7 @@ function zfTitleClippedChips(){
 }
 // ⑤ 칩 — 비교 기준을 툴팁에 밝힌다. 🔴 권유·예측 문구를 붙이지 않는다.
 function zfRentLowChip(r){
-  return `<span class="chip" title="${zfAttr(`같은 시·군 국민임대 ${r.area_complexes}곳 중 ㎡당 월임대료 기준`)}" data-zf-tip tabindex="0" role="button" aria-expanded="false" style="cursor:pointer;padding:4px 10px;font-size:11px;background:#EEF6F2;border-color:#CFE6DA;color:#1F5E4A">💰 ${escapeHtml(r.area_label)} 국민임대 중 ㎡당 월세 낮은 편</span>`;
+  return `<span class="chip" title="${zfAttr(`같은 시·군 국민임대 ${r.area_complexes}곳 중 ㎡당 월임대료 기준`)}" data-zf-tip tabindex="0" role="button" aria-expanded="false" style="cursor:pointer;padding:4px 10px;font-size:var(--t-xs);background:#EEF6F2;border-color:#CFE6DA;color:#1F5E4A">💰 ${escapeHtml(r.area_label)} 국민임대 중 ㎡당 월세 낮은 편</span>`;
 }
 // 단일 단지 카드에만 자리를 둔다 — 여러 단지 카드는 상세의 해당 단지 머리에 단다(renderHousingGroupRows).
 function zfRentLowSlotHtml(row, title){
@@ -3348,7 +3349,7 @@ function zfPostLinkHtml(key){
   const text = zfPostLinkOrganized(key)
     ? `이 공고는 「${escapeHtml(title)}」 공고에 함께 정리돼 있어요 →`
     : `이 공고는 「${escapeHtml(title)}」 공고와 같은 게시물에 올라왔어요 →`;
-  return `<div style="font-size:12px;color:#1F5E4A;background:#F2F9F6;border:1px solid #DCEDE6;border-radius:8px;padding:6px 10px;margin-bottom:6px">`
+  return `<div style="font-size:12px;color:#1F5E4A;background:#F2F9F6;border:1px solid #DCEDE6;border-radius:var(--r-2);padding:6px 10px;margin-bottom:6px">`
     + `<a href="#" role="button" data-open-key="${zfAttr(lk.lhKey)}" onclick="event.preventDefault();event.stopPropagation();zfOpenNoticeByKey(this.dataset.openKey)" style="color:var(--ink-2);font-weight:600;text-decoration:underline">`
     + `${text}</a></div>`;
 }
@@ -4016,7 +4017,7 @@ function zfCheckDedupMirror(rows){
 //    칩은 이 한 개뿐이다(상태·접수기간·NEW·마감임박을 달지 않는다 — 신청할 공고가 아니다).
 function cancelRowChip(){
   return '<span class="chip sel zf-chip-warn" title="취소 공고예요. 무엇이 취소됐는지는 원문에서 확인하세요." '
-    + 'data-zf-tip tabindex="0" role="button" aria-expanded="false" style="cursor:pointer;padding:4px 10px;font-size:11px">🚫 취소공고</span>';
+    + 'data-zf-tip tabindex="0" role="button" aria-expanded="false" style="cursor:pointer;padding:4px 10px;font-size:var(--t-xs)">🚫 취소공고</span>';
 }
 function cancelRowDateLine(row, annDate, url){
   const annLabel = zfAnnDateLabel(row, annDate);
@@ -4028,7 +4029,7 @@ function cancelRowDateLine(row, annDate, url){
 }
 // 「취소공고 있음」 배지 — 취소공고 원문 URL 을 알면 링크로, 모르면 종전 칩 그대로.
 function cancelNoticeBadge(title, applyEnd){
-  const st  = 'cursor:pointer;padding:4px 10px;font-size:11px';
+  const st  = 'cursor:pointer;padding:4px 10px;font-size:var(--t-xs)';
   const tip = '같은 이름의 [취소공고]가 따로 게시됐어요. 공고 원문을 반드시 확인하세요.';
   const info = zfCancelInfoFor(title, applyEnd);
   if(info && zfSafeUrl(info.url)){
@@ -4047,7 +4048,7 @@ function zfPlacesLineInner(regionNames, units){
   const u = Array.isArray(units) ? units.filter(Boolean) : [];
   const places = zfPlaceNames(u.length ? zfMergeUnitPlaces(regionNames, u) : regionNames);
   if(places.length < 2) return '';
-  return `<p style="font-size:12px;color:#666;margin:8px 0 0;line-height:1.6">📍 <span style="color:#999">이 공고의 주택이 있는 지역</span> ${places.map(x => escapeHtml(zfShortPlace(x))).join(' · ')}</p>`;
+  return `<p style="font-size:12px;color:var(--ink-2);margin:8px 0 0;line-height:1.6">📍 <span style="color:var(--ink-3)">이 공고의 주택이 있는 지역</span> ${places.map(x => escapeHtml(zfShortPlace(x))).join(' · ')}</p>`;
 }
 const zfPlacesArgs = new Map();
 function zfPlacesLine(regionNames, aid){
@@ -4904,7 +4905,7 @@ function zfFbSubmit(ov){
 function zfFbFooter(){
   if(!zfV2On() || document.getElementById('zfFbFoot')) return;
   const ft = document.querySelector('.zf-footer'); if(!ft) return;
-  const sep = document.createElement('span'); sep.style.cssText = 'font-size:12px;color:#888'; sep.textContent = ' · ';
+  const sep = document.createElement('span'); sep.style.cssText = 'font-size:12px;color:var(--ink-3)'; sep.textContent = ' · ';
   const b = document.createElement('button'); b.type = 'button'; b.id = 'zfFbFoot'; b.className = 'zf-fb-foot'; b.textContent = '의견 보내기';
   b.addEventListener('click', () => zfFbOpen('', null));
   ft.appendChild(sep); ft.appendChild(b);
@@ -5153,13 +5154,13 @@ function renderSavedNotices(){
     el.innerHTML = `<div class="rbox" style="text-align:center;padding:2rem 1rem">
       <p style="font-size:2rem;margin-bottom:8px">🔖</p>
       <p style="font-weight:600;color:#333;margin-bottom:6px">아직 저장한 공고가 없어요</p>
-      <p style="font-size:13px;color:#888">공고 카드에서 🔖 저장 버튼을 눌러보세요</p>
+      <p style="font-size:13px;color:var(--ink-3)">공고 카드에서 🔖 저장 버튼을 눌러보세요</p>
     </div>`;
     if(typeof zf3On === 'function' && zf3On()) el.innerHTML = zf3EmptyHTML('아직 저장한 공고가 없어요', '공고 상세의 🔖 저장을 누르면 여기 모이고, 다음 일정이 「나의 노선도」에 이어져요.', { label: '공고 보러 가기 →', on: 'goMain(2)' });   // 🔵 빈 상태 한 꼴
     if(typeof zf3MyRoute === 'function') zf3MyRoute();
     return;
   }
-  let html = `<p style="font-size:13px;color:#888;margin-bottom:12px">총 ${saved.length}건 저장됨</p>`;
+  let html = `<p style="font-size:13px;color:var(--ink-3);margin-bottom:12px">총 ${saved.length}건 저장됨</p>`;
   saved.forEach(s=>{
     const dateStr = s.savedAt ? new Date(s.savedAt).toLocaleDateString('ko-KR') : '';
     html += `<div class="hcard">
@@ -5170,7 +5171,7 @@ function renderSavedNotices(){
       <p class="haddr">${escapeHtml(s.cover||s.region||'')} · ${zfTypeHtml(s.source, s.type, s.title)}</p>${zfOrgSupplyHtml(s.title)}
       ${(s.cancelled || zfCancelInfoFor(s.title||'', s.apply_end))
         ? `<div style="margin-top:6px">${cancelNoticeBadge(s.title||'', s.apply_end)}</div>` : ''}
-      ${dateStr?`<p style="font-size:11px;color:#bbb;margin-top:4px">저장일: ${dateStr}</p>`:''}
+      ${dateStr?`<p style="font-size:var(--t-xs);color:var(--ink-3);margin-top:4px">저장일: ${dateStr}</p>`:''}
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
         ${zfSafeUrl(s.url)?`<a class="detail-link" href="${zfSafeHref(s.url)}" target="_blank" data-ai-for="${zfAttr(s.id)}" data-ai-key="${zfAttr(zfDedupKey(s.title||''))}"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`:''}
       </div>
@@ -5399,7 +5400,7 @@ function zfNotAnalyzedHtml(url, text){
   const link = zfSafeUrl(url)
     ? ` <a href="${zfSafeHref(url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--ink-2);font-weight:600;text-decoration:underline"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`
     : '';
-  return `<div style="font-size:12px;color:#6B6B63;background:#F6F6F2;border:1px solid #E8E8E0;border-radius:8px;padding:6px 10px;margin-bottom:6px">${text || '아직 공고 원문을 정리하지 못했어요 · 보증금·면적은 원문에서 확인해 주세요'}${link}</div>`;
+  return `<div style="font-size:12px;color:#6B6B63;background:#F6F6F2;border:1px solid #E8E8E0;border-radius:var(--r-2);padding:6px 10px;margin-bottom:6px">${text || '아직 공고 원문을 정리하지 못했어요 · 보증금·면적은 원문에서 확인해 주세요'}${link}</div>`;
 }
 
 // 🔵 2026-09-29 코드 회차 2 잔여 — 요약·세대가 빈 카드가 「왜」 비었는지를 RPC 두 칸으로 가른다(다운님 확정 문구).
@@ -5595,8 +5596,8 @@ function zfFillSummarySlots(){
     // 🔵 이번 회차 값이 아니면 상자 색도 함께 바꾼다 — 칩만 달면 초록 상자가 「확인됨」처럼 읽힌다.
     const stale = !!(s && (s.round_state === 'past' || s.round_state === 'unknown'));
     const box = stale
-      ? 'font-size:12.5px;font-weight:600;color:#8a6a1c;background:#fff3d6;border:1px solid #e0b96a;border-radius:8px;padding:6px 10px;margin-bottom:6px'
-      : 'font-size:12.5px;font-weight:600;color:#1F5E4A;background:#F2F9F6;border:1px solid #DCEDE6;border-radius:8px;padding:6px 10px;margin-bottom:6px';
+      ? 'font-size:12.5px;font-weight:600;color:#8a6a1c;background:#fff3d6;border:1px solid #e0b96a;border-radius:var(--r-2);padding:6px 10px;margin-bottom:6px'
+      : 'font-size:12.5px;font-weight:600;color:#1F5E4A;background:#F2F9F6;border:1px solid #DCEDE6;border-radius:var(--r-2);padding:6px 10px;margin-bottom:6px';
     // 🔵 B62 ④ — 미분석 MYHOME 카드가 같은 게시물의 LH 카드에 함께 정리돼 있으면 그리로 보낸다.
     el.innerHTML = line
       ? `<div${stale ? ' class="zf-sum-stale"' : ''} style="${box}">${line}${s ? zfRoundTagHtml(s) : ''}</div>${zfRentLineHtml(id, s)}`
@@ -5660,7 +5661,7 @@ function zfCutoffLineHtml(rows){
   if(!r) return '';
   const same = rows.filter(x => x.complex_name === r.complex_name && x.rcr_pan_dt === r.rcr_pan_dt);
   const types = new Set(same.map(x => x.ltst_nm)).size;
-  return `<button type="button" class="zf-cut-line" onclick="zfOpenCutoffDetail(this,event)" style="display:block;width:100%;text-align:left;font:inherit;font-size:12px;color:var(--ink-2,#555);background:var(--surface,#f7f6f2);border:1px solid var(--line-2,#e2e3e6);border-radius:8px;padding:6px 10px;margin-bottom:6px;line-height:1.5;cursor:pointer">`
+  return `<button type="button" class="zf-cut-line" onclick="zfOpenCutoffDetail(this,event)" style="display:block;width:100%;text-align:left;font:inherit;font-size:12px;color:var(--ink-2,#555);background:var(--surface,#f7f6f2);border:1px solid var(--line-2,#e2e3e6);border-radius:var(--r-2);padding:6px 10px;margin-bottom:6px;line-height:1.5;cursor:pointer">`
     + `🕘 지난 회차(${escapeHtml(String(r.rcr_pan_dt || '').slice(0, 7))}) 주택형 ${types}개 · 신청 기록 보기 ›</button>`;
 }
 // 카드 한 줄을 누르면 — 카드가 접혀 있으면 펼치고(종전 펼침과 같은 길) 상세 「지난 회차」 접힘을 열어 그 자리로.
@@ -5751,7 +5752,7 @@ async function zfRenderCutoffDetail(annId, id){
   rows.forEach(r => { const k = r.complex_name || ''; if(!byCx.has(k)) byCx.set(k, []); byCx.get(k).push(r); });
   const th = 'text-align:left;font-weight:600;padding:4px 4px;border-bottom:1px solid var(--line-2,#e2e3e6);vertical-align:bottom;word-break:keep-all';
   const td = 'padding:4px 4px;border-bottom:1px solid var(--line-2,#e2e3e6);vertical-align:top;word-break:keep-all';
-  const note = 'font-size:11px;color:var(--ink-3,#888);margin-top:4px;line-height:1.5';
+  const note = 'font-size:var(--t-xs);color:var(--ink-3,#888);margin-top:4px;line-height:1.5';
   const num = v => (v == null || v === '') ? null : Number(v);
   let body = '';
   let anyWait = false;
@@ -5853,7 +5854,7 @@ async function zfRenderCutoffDetail(annId, id){
     });
     const clsHtml = clsLines.length
       ? `<details class="zf-cut-cls" style="margin-top:6px"><summary style="${note};cursor:pointer">계층별 신청 보기</summary>`
-        + `<ul style="font-size:11px;color:var(--ink-2,#555);margin:4px 0 0;padding-left:16px;line-height:1.5">${clsLines.join('')}</ul></details>` : '';
+        + `<ul style="font-size:var(--t-xs);color:var(--ink-2,#555);margin:4px 0 0;padding-left:16px;line-height:1.5">${clsLines.join('')}</ul></details>` : '';
     const head = waitOnlyAll
       ? `<th style="${th}">예비입주자 모집</th>`
       : `<th style="${th}">일반공급</th><th style="${th}">예비자</th>`;
@@ -5863,9 +5864,9 @@ async function zfRenderCutoffDetail(annId, id){
         + `<th style="${th}">주택형</th>${head}${dropCut ? '' : `<th style="${th}">커트라인</th>`}<th class="zf-cut-trc" style="${th}">지난 신청(회차별)</th></tr></thead><tbody>${trs}</tbody></table></div>` : '')
       + below + clsHtml;
   });
-  const waitNote = anyWait ? `<p class="zf-cut-wait-note" style="font-size:11px;color:var(--ink-2,#555);margin-top:6px;line-height:1.5">ⓘ ${escapeHtml(ZF_CUT_WAIT_NOTE)}</p>` : '';
+  const waitNote = anyWait ? `<p class="zf-cut-wait-note" style="font-size:var(--t-xs);color:var(--ink-2,#555);margin-top:6px;line-height:1.5">ⓘ ${escapeHtml(ZF_CUT_WAIT_NOTE)}</p>` : '';
   slot.innerHTML = `<details class="hu-past zf-cut-detail"><summary class="hu-past-title">🕘 지난 회차 — LH 공개 커트라인</summary>${body}${waitNote}`
-    + `<p style="font-size:11px;color:var(--ink-3,#888);margin-top:6px;line-height:1.5">출처 LH 공공데이터(건설임대 당첨 합격점수) · ${ZF_CUTOFF_NOTE}</p></details>`;
+    + `<p style="font-size:var(--t-xs);color:var(--ink-3,#888);margin-top:6px;line-height:1.5">출처 LH 공공데이터(건설임대 당첨 합격점수) · ${ZF_CUTOFF_NOTE}</p></details>`;
 }
 
 // 아직 모르는 id만 골라 한 번에 묻는다. 카드마다 부르면 목록 1회에 87번이 된다.
@@ -5915,15 +5916,15 @@ function zfWarnBadges(o){
   const b = [];
   const at = s => escapeHtml(String(s || ''));
   if(o.contractVerify && o.selectionMethod !== '선계약후검증'){
-    b.push('<span class="chip sel zf-chip-warn" title="자격 검증 전에 먼저 계약을 체결합니다. 계약 후 부적격으로 판명되면 계약이 직권 해제될 수 있어요." data-zf-tip tabindex="0" role="button" aria-expanded="false" style="cursor:pointer;padding:4px 10px;font-size:11px">⚠️ 선계약 후검증</span>');
+    b.push('<span class="chip sel zf-chip-warn" title="자격 검증 전에 먼저 계약을 체결합니다. 계약 후 부적격으로 판명되면 계약이 직권 해제될 수 있어요." data-zf-tip tabindex="0" role="button" aria-expanded="false" style="cursor:pointer;padding:4px 10px;font-size:var(--t-xs)">⚠️ 선계약 후검증</span>');
   }
   if(o.rentExemptUntil){
-    b.push(`<span class="chip sel zf-chip-info" title="${at('~' + o.rentExemptUntil + '까지 월임대료 면제' + (o.rentExemptNote ? ' / ' + o.rentExemptNote : ''))}" data-zf-tip tabindex="0" role="button" aria-expanded="false" style="cursor:pointer;padding:4px 10px;font-size:11px">🎁 임대료 면제</span>`);
+    b.push(`<span class="chip sel zf-chip-info" title="${at('~' + o.rentExemptUntil + '까지 월임대료 면제' + (o.rentExemptNote ? ' / ' + o.rentExemptNote : ''))}" data-zf-tip tabindex="0" role="button" aria-expanded="false" style="cursor:pointer;padding:4px 10px;font-size:var(--t-xs)">🎁 임대료 면제</span>`);
   }
   if(o.specialNotes && typeof o.specialNotes === 'object'){
     Object.entries(o.specialNotes).forEach(([k, v]) => {
       const val = (v === null || v === undefined) ? '' : (typeof v === 'string' ? v : JSON.stringify(v));
-      b.push(`<span class="chip sel zf-chip-warn" title="${at(val)}" data-zf-tip tabindex="0" role="button" aria-expanded="false" style="cursor:pointer;padding:4px 10px;font-size:11px;background:#EF9F27;border-color:#EF9F27">⚠️ ${at(k)}</span>`);
+      b.push(`<span class="chip sel zf-chip-warn" title="${at(val)}" data-zf-tip tabindex="0" role="button" aria-expanded="false" style="cursor:pointer;padding:4px 10px;font-size:var(--t-xs);background:#EF9F27;border-color:#EF9F27">⚠️ ${at(k)}</span>`);
     });
   }
   return b.join('');
@@ -6030,7 +6031,7 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
     const detailHTML = detailRows.length
       ? `<div id="${cardId}" data-ann-id="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px;transition:all 0.2s" onclick="event.stopPropagation()">
           <div class="detail-grid">
-            ${detailRows.map(([k,v])=>`<div${ZF_DCELL_DATE.test(k)?' class="zf-dcell-date"':''} style="font-size:12px"><span style="color:#999">${k}</span><br><span style="color:#333;font-weight:500">${v}</span></div>`).join('')}
+            ${detailRows.map(([k,v])=>`<div${ZF_DCELL_DATE.test(k)?' class="zf-dcell-date"':''} style="font-size:12px"><span style="color:var(--ink-3)">${k}</span><br><span style="color:#333;font-weight:500">${v}</span></div>`).join('')}
           </div>
           ${zfPlacesLine(n['region_names'], n['announcement_id'])}
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
@@ -6056,19 +6057,19 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
       <p class="haddr">${zfCoverPlace(n['region_names'], zfComplexCount(n), n['sido_nm'], n['sigungu_nm'], n['지역'], n['announcement_id'])} · ${zfTypeHtml(n['source'], n['공급유형'], n['공고명']||n['name'])}</p>${zfOrgSupplyHtml(n['공고명']||n['name'])}${isCancelRow ? '' : zfWaveSlotHtml(n['announcement_id'])}
       <div class="chip-row" style="margin:8px 0;gap:5px">${isCancelRow ? cancelRowChip() : `
         ${hasCancel?cancelNoticeBadge(n['공고명']||'', n['apply_end']):''}
-        ${n['building_name']?`<span class="chip" style="cursor:default;padding:4px 10px;font-size:11px">🏢 ${zfBuildingLabel(n['building_name'], zfComplexCount(n))}</span>`:''}
-        ${isAmended?'<span class="chip sel zf-chip-warn" style="cursor:default;padding:4px 10px;font-size:11px;background:#7B5EA7;border-color:#7B5EA7">🔄 정정</span>':''}
-        ${isNew?'<span class="chip sel zf-chip-new" style="cursor:default;padding:4px 10px;font-size:11px;background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
-        ${closingSoon?'<span class="chip sel zf-chip-warn" style="cursor:default;padding:4px 10px;font-size:11px;background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
+        ${n['building_name']?`<span class="chip" style="cursor:default;padding:4px 10px;font-size:var(--t-xs)">🏢 ${zfBuildingLabel(n['building_name'], zfComplexCount(n))}</span>`:''}
+        ${isAmended?'<span class="chip sel zf-chip-warn" style="cursor:default;padding:4px 10px;font-size:var(--t-xs);background:#7B5EA7;border-color:#7B5EA7">🔄 정정</span>':''}
+        ${isNew?'<span class="chip sel zf-chip-new" style="cursor:default;padding:4px 10px;font-size:var(--t-xs);background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
+        ${closingSoon?'<span class="chip sel zf-chip-warn" style="cursor:default;padding:4px 10px;font-size:var(--t-xs);background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
         ${applyUnknownChip(n)}
         ${zfRentLowSlotHtml(n, n['공고명'])}
-        ${demoTags.map(t=>`<span class="chip sel${t.color ? '' : ' zf-chip-info'}" style="cursor:default;padding:4px 10px;font-size:11px${t.color ? `;background:${t.color};border-color:${t.color}` : ''}">${t.label}</span>`).join('')}
+        ${demoTags.map(t=>`<span class="chip sel${t.color ? '' : ' zf-chip-info'}" style="cursor:default;padding:4px 10px;font-size:var(--t-xs)${t.color ? `;background:${t.color};border-color:${t.color}` : ''}">${t.label}</span>`).join('')}
         ${convBadges}
         ${zfWarnBadges({contractVerify:n['contract_before_verification']===true, selectionMethod:n['selection_method'], rentExemptUntil:n['rent_exemption_until'], rentExemptNote:n['rent_exemption_note'], specialNotes:n['special_notes']})}
       `}</div>
-      ${(pairKey && !isCancelRow)?`<div class="zf-warn-box" style="font-size:11px;border-radius:8px;padding:5px 10px;margin-bottom:6px">⚠️ 동일 회차 짝공고와 <b>중복 신청 시 자동 탈락</b>될 수 있어요. 공고문을 반드시 확인하세요.</div>`:''}
+      ${(pairKey && !isCancelRow)?`<div class="zf-warn-box" style="font-size:var(--t-xs);border-radius:var(--r-2);padding:5px 10px;margin-bottom:6px">⚠️ 동일 회차 짝공고와 <b>중복 신청 시 자동 탈락</b>될 수 있어요. 공고문을 반드시 확인하세요.</div>`:''}
       ${isCancelRow?'':`<div data-sum-for="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" data-sum-url="${(n['공고URL']||'').replace(/"/g,'&quot;')}" data-sum-key="${zfAttr(zfDedupKey(n['공고명']))}" data-sum-org="${zfAttr(n['공급기관'] || n['source'] || '')}"></div>`}
-      <p class="zf-dateline" style="font-size:12px;color:#888;margin-bottom:8px">${dateLine}</p>
+      <p class="zf-dateline" style="font-size:12px;color:var(--ink-3);margin-bottom:8px">${dateLine}</p>
       ${isCancelRow?'':zfRouteSlotHtml(n, n['공고명'])}
       ${isCancelRow?'':zfNoticesSlotHtml(n)}
       ${detailHTML}
@@ -6496,20 +6497,20 @@ function renderPersonalizedRecommendations(){
       <p class="haddr">${zfCoverPlace(n['region_names'], zfComplexCount(n), n['sido_nm'], n['sigungu_nm'], n['지역'], n['announcement_id'])} · ${zfTypeHtml(n['source'], n['공급유형'], n['공고명']||n['name'])}</p>${zfOrgSupplyHtml(n['공고명']||n['name'])}
       <div class="chip-row" style="margin:6px 0;gap:5px">
         ${hasCancel?cancelNoticeBadge(n['공고명']||'', n['apply_end']):''}
-        ${isNewNotice(n)?'<span class="chip sel zf-chip-new" style="cursor:default;padding:4px 10px;font-size:11px;background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
-        ${closingSoon?'<span class="chip sel zf-chip-warn" style="cursor:default;padding:4px 10px;font-size:11px;background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
+        ${isNewNotice(n)?'<span class="chip sel zf-chip-new" style="cursor:default;padding:4px 10px;font-size:var(--t-xs);background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
+        ${closingSoon?'<span class="chip sel zf-chip-warn" style="cursor:default;padding:4px 10px;font-size:var(--t-xs);background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
         ${applyUnknownChip(n)}
         ${zfRentLowSlotHtml(n, n['공고명']||n['name'])}
       </div>
       <div data-sum-for="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" data-sum-url="${(n['공고URL']||n['url']||'').replace(/"/g,'&quot;')}" data-sum-key="${zfAttr(zfDedupKey(n['공고명']||n['name']))}" data-sum-org="${zfAttr(n['공급기관'] || n['source'] || '')}"></div>
-      <p class="zf-rec-date" style="font-size:12px;color:#888;margin-bottom:8px">${dateLine}</p>
+      <p class="zf-rec-date" style="font-size:12px;color:var(--ink-3);margin-bottom:8px">${dateLine}</p>
       ${n._zfTarget ? zfTargetNoteHtml(n._zfTarget) : zfCheckNoteHtml(zfSupplyCheckLabels(n['공고명']||n['name'], zfProfileFacts()), '')}
       ${zfRouteSlotHtml(n, n['공고명']||n['name'])}
       ${zfNoticesSlotHtml(n)}
       ${zfSafeUrl(n['공고URL']||n['url'])?`<a class="detail-link" href="${zfSafeHref(n['공고URL']||n['url'])}" target="_blank" rel="noopener" style="display:block" data-aid="${zfAttr((n['announcement_id']||'').toString().replace(/'/g,''))}" onclick="zfLog('recommend_click',{rank:${idx+1}},this.dataset.aid)"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`:''}
     </div>`;
   });
-  if(filtered.length>5) html+=`<p style="font-size:12px;color:#888;text-align:center;margin-top:8px">외 ${filtered.length-5}건 더 — 공고 탭에서 전체 확인</p>`;
+  if(filtered.length>5) html+=`<p style="font-size:12px;color:var(--ink-3);text-align:center;margin-top:8px">외 ${filtered.length-5}건 더 — 공고 탭에서 전체 확인</p>`;
   html += zfTargetExcludedHtml(recOut);
   document.getElementById('personalizedList').innerHTML=html;
   // 🔴 공고 탭·매칭 탭과 같은 두 줄이다(2026-09-17). 새 문구·새 함수를 만들지 않고
@@ -6656,7 +6657,7 @@ async function loadInsightData(){
   const wrap = document.getElementById('insightContent');
   if(!wrap) return;
   if(insightLoaded) return;
-  wrap.innerHTML = '<div class="rbox" style="text-align:center;padding:2rem 1rem"><p style="color:#888;font-size:14px">📊 통계 데이터를 불러오는 중...</p></div>';
+  wrap.innerHTML = '<div class="rbox" style="text-align:center;padding:2rem 1rem"><p style="color:var(--ink-3);font-size:14px">📊 통계 데이터를 불러오는 중...</p></div>';
   try{
     // 🔵 2026-10-08(숫자가 말하는 「지금」) — 같은 게시물 공고문(zfLoadPostNotices)이 온 뒤에 센다. 공고 탭·매칭 탭이 그렇게 하므로
     //    여기만 먼저 세면 「지금 열린 공고」 수가 탭마다 갈린다(isHiddenAsClosed 가 붙은 공고문 상태를 본다). 실패해도 약속은 풀린다.
@@ -6766,9 +6767,9 @@ function renderInsight(rows, wrap, statsRows){
   const regionMaxCnt = Math.max(1, wideN, ...regionAll.map(e=>e[1].cnt));
   const regionRowHTML = ([region,v])=>`
           <div>
-            <div style="display:flex;justify-content:space-between;font-size:12px;color:#555;margin-bottom:4px">
+            <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink-2);margin-bottom:4px">
               <span style="font-weight:600">${region}</span>
-              <span style="color:#888">${v.cnt}건</span>
+              <span style="color:var(--ink-3)">${v.cnt}건</span>
             </div>
             <div style="display:flex;flex-direction:column;gap:3px">
               <div style="background:#eee;border-radius:4px;height:8px;overflow:hidden">
@@ -6796,7 +6797,7 @@ function renderInsight(rows, wrap, statsRows){
   const statsHTML = (()=>{
       if(!statsRows){
         return `<div style="background:#f5f5f5;border-radius:14px;padding:20px;margin-bottom:16px;text-align:center">
-          <p style="font-size:13px;color:#aaa">재고 데이터를 불러올 수 없습니다</p>
+          <p style="font-size:13px;color:var(--ink-3)">재고 데이터를 불러올 수 없습니다</p>
         </div>`;
       }
 
@@ -6837,21 +6838,21 @@ function renderInsight(rows, wrap, statsRows){
             <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:#f8f9ff;border-radius:10px">
               <div>
                 <p style="font-size:13px;font-weight:700;color:#333;margin:0 0 4px">${label}</p>
-                <p style="font-size:20px;font-weight:700;color:#5a7af7;margin:0">${(stock/10000).toFixed(1)}<span style="font-size:11px;font-weight:400;color:#888">만 세대 보유</span></p>
+                <p style="font-size:var(--t-2xl);font-weight:700;color:#5a7af7;margin:0">${(stock/10000).toFixed(1)}<span style="font-size:var(--t-xs);font-weight:400;color:var(--ink-3)">만 세대 보유</span></p>
               </div>
               <div style="text-align:right">
                 ${noticeCnt>0
                   ? `<p style="font-size:14px;font-weight:700;color:var(--ink);margin:0">${noticeCnt}건</p>
-                     <p style="font-size:10px;color:#888;margin:2px 0 0">접수중 공고</p>
-                     ${upcomingCnt>0?`<p style="font-size:10px;color:var(--ink-2);margin:2px 0 0">접수 예정 ${upcomingCnt}건</p>`:''}`
+                     <p style="font-size:var(--t-xs);color:var(--ink-3);margin:2px 0 0">접수중 공고</p>
+                     ${upcomingCnt>0?`<p style="font-size:var(--t-xs);color:var(--ink-2);margin:2px 0 0">접수 예정 ${upcomingCnt}건</p>`:''}`
                   : upcomingCnt>0
                     ? `<p style="font-size:14px;font-weight:700;color:var(--ink);margin:0">${upcomingCnt}건</p>
-                       <p style="font-size:10px;color:#888;margin:2px 0 0">접수 예정 (접수 시작 전)</p>`
-                    : `<p style="font-size:12px;color:#bbb;margin:0">접수중·접수예정 모두 없음</p>`}
+                       <p style="font-size:var(--t-xs);color:var(--ink-3);margin:2px 0 0">접수 예정 (접수 시작 전)</p>`
+                    : `<p style="font-size:12px;color:var(--ink-3);margin:0">접수중·접수예정 모두 없음</p>`}
               </div>
             </div>`).join('')}
         </div>
-        <p style="font-size:11px;color:#bbb;margin:10px 0 0;text-align:right">출처: 공공데이터포털 (2026.05 기준)</p>
+        <p style="font-size:var(--t-xs);color:var(--ink-3);margin:10px 0 0;text-align:right">출처: 공공데이터포털 (2026.05 기준)</p>
       </div>`;
 
       // === 섹션 B: 유형별 실거주 임대 조건 (RPC 집계값 직접 사용) ===
@@ -6870,21 +6871,21 @@ function renderInsight(rows, wrap, statsRows){
               <p style="font-size:12px;font-weight:700;color:#333;margin:0 0 8px">${label}</p>
               <div style="display:flex;flex-direction:column;gap:5px">
                 <div>
-                  <p style="font-size:10px;color:#5a7af7;margin:0 0 2px">보증금</p>
-                  <p style="font-size:13px;font-weight:700;color:#333;margin:0">${deposit!=null ? (deposit/10000).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,',')+'만원' : '<span style="font-size:11px;color:#ccc">정보없음</span>'}</p>
+                  <p style="font-size:var(--t-xs);color:#5a7af7;margin:0 0 2px">보증금</p>
+                  <p style="font-size:13px;font-weight:700;color:#333;margin:0">${deposit!=null ? (deposit/10000).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,',')+'만원' : '<span style="font-size:var(--t-xs);color:#ccc">정보없음</span>'}</p>
                 </div>
                 <div>
-                  <p style="font-size:10px;color:#EF9F27;margin:0 0 2px">월임대료</p>
-                  <p style="font-size:13px;font-weight:700;color:#333;margin:0">${rent!=null ? '월 '+(rent/10000).toFixed(0)+'만원' : '<span style="font-size:11px;color:#ccc">정보없음</span>'}</p>
+                  <p style="font-size:var(--t-xs);color:#EF9F27;margin:0 0 2px">월임대료</p>
+                  <p style="font-size:13px;font-weight:700;color:#333;margin:0">${rent!=null ? '월 '+(rent/10000).toFixed(0)+'만원' : '<span style="font-size:var(--t-xs);color:#ccc">정보없음</span>'}</p>
                 </div>
               </div>
             </div>`).join('')}
         </div>
-        <p style="font-size:11px;color:#bbb;margin:10px 0 0;text-align:right">출처: 공공데이터포털 (2026.05 기준)</p>
+        <p style="font-size:var(--t-xs);color:var(--ink-3);margin:10px 0 0;text-align:right">출처: 공공데이터포털 (2026.05 기준)</p>
       </div>`;
 
       return `<div style="margin:8px 0 4px">
-        <p style="font-size:13px;font-weight:700;color:#888;margin:0 0 12px;padding-left:2px">📊 전국 공공임대 재고 현황 (출처: 공공데이터포털)</p>
+        <p style="font-size:13px;font-weight:700;color:var(--ink-3);margin:0 0 12px;padding-left:2px">📊 전국 공공임대 재고 현황 (출처: 공공데이터포털)</p>
       </div>${secA}${secB}`;
   })();
   // 🔵 D-3 둘러보기 ③ — d3 는 같은 수로 다른 판(LED 숫자판 · 14일 마감 막대 · 지역 막대 · 30일 추이)을 그리고, 재고 절은 색만 토큰으로(어둡게 모드)
@@ -6895,7 +6896,7 @@ function renderInsight(rows, wrap, statsRows){
   wrap.innerHTML = `
     <div style="${S}">
       <p style="${T}">📊 공고 통계 인사이트</p>
-      <p style="font-size:13px;color:#888;margin:0">지금 열린 공고 <strong style="color:#5a7af7">${regionRows.length.toLocaleString()}건</strong> · ${zfCumulativeText(rows)} · 수시로 자동 업데이트</p>
+      <p style="font-size:13px;color:var(--ink-3);margin:0">지금 열린 공고 <strong style="color:#5a7af7">${regionRows.length.toLocaleString()}건</strong> · ${zfCumulativeText(rows)} · 수시로 자동 업데이트</p>
     </div>
 
     <div style="${S}">
@@ -6903,15 +6904,15 @@ function renderInsight(rows, wrap, statsRows){
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
         <div style="background:#f0f3ff;border-radius:12px;padding:16px;text-align:center;box-shadow:0 1px 4px rgba(90,122,247,0.08)">
           <p style="font-size:28px;font-weight:700;color:#5a7af7;margin:0">${kpiActive.toLocaleString()}</p>
-          <p style="font-size:12px;color:#888;margin-top:6px">🟢 접수중</p>
+          <p style="font-size:12px;color:var(--ink-3);margin-top:6px">🟢 접수중</p>
         </div>
         <div style="background:#f0faf5;border-radius:12px;padding:16px;text-align:center;box-shadow:0 1px 4px rgba(29,158,117,0.08)">
           <p style="font-size:28px;font-weight:700;color:var(--ink);margin:0">${kpiNew.toLocaleString()}</p>
-          <p style="font-size:12px;color:#888;margin-top:6px">🆕 새 공고 · 3일</p>
+          <p style="font-size:12px;color:var(--ink-3);margin-top:6px">🆕 새 공고 · 3일</p>
         </div>
         <div style="background:#fff7f0;border-radius:12px;padding:16px;text-align:center;box-shadow:0 1px 4px rgba(239,159,39,0.08)">
           <p style="font-size:28px;font-weight:700;color:#EF9F27;margin:0">${kpiClosing.toLocaleString()}</p>
-          <p style="font-size:12px;color:#888;margin-top:6px">⏰ 마감임박</p>
+          <p style="font-size:12px;color:var(--ink-3);margin-top:6px">⏰ 마감임박</p>
         </div>
       </div>
     </div>
@@ -6930,9 +6931,9 @@ function renderInsight(rows, wrap, statsRows){
           //    「오늘 3」으로 읽혔다(D-3 검증 철회 · 회신 ⑦ ⑴). 낭독기·자동 점검이 같은 오독을 하지 않게 한다.
           const spoken = `${+date.slice(5,7)}월 ${+date.slice(8,10)}일${isToday?'(오늘)':isTomorrow?'(내일)':''} 마감 ${cnt}건`;
           return `<div role="img" aria-label="${spoken}" title="${spoken}" style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;min-width:34px">
-            <span style="font-size:10px;color:${cnt>0?'#666':'#767676'};margin-bottom:2px;font-weight:${cnt>0?'600':'400'}">${cnt}</span>
+            <span style="font-size:var(--t-xs);color:${cnt>0?'#666':'#767676'};margin-bottom:2px;font-weight:${cnt>0?'600':'400'}">${cnt}</span>
             <div style="background:${barColor};border-radius:3px 3px 0 0;width:22px;height:${barH}px;opacity:${cnt>0?1:0.2}"></div>
-            <span style="font-size:9px;color:${labelColor};margin-top:3px;font-weight:${isToday||isTomorrow?'700':'400'}">${label}</span>
+            <span style="font-size:var(--t-xs);color:${labelColor};margin-top:3px;font-weight:${isToday||isTomorrow?'700':'400'}">${label}</span>
           </div>`;
         }).join('')}
       </div>
@@ -6940,8 +6941,8 @@ function renderInsight(rows, wrap, statsRows){
 
     <div style="${S}">
       <p style="${T};margin-bottom:4px">📍 지역별 공고 현황 (${regionAll.length}개 지역)</p>
-      <p style="font-size:12px;color:#888;margin:0 0 14px;line-height:1.5">신청할 수 없는 공고는 빼고 <strong style="color:#5a7af7">${regionRows.length.toLocaleString()}건</strong>을 세었어요 · 목록에 없는 지역은 지금 신청할 수 있는 공고가 없는 곳이에요</p>
-      ${regionAll.length===0 && !wideN ? '<p style="font-size:13px;color:#aaa;text-align:center;padding:20px 0">지금 신청할 수 있는 공고가 없어요</p>' : `
+      <p style="font-size:12px;color:var(--ink-3);margin:0 0 14px;line-height:1.5">신청할 수 없는 공고는 빼고 <strong style="color:#5a7af7">${regionRows.length.toLocaleString()}건</strong>을 세었어요 · 목록에 없는 지역은 지금 신청할 수 있는 공고가 없는 곳이에요</p>
+      ${regionAll.length===0 && !wideN ? '<p style="font-size:13px;color:var(--ink-3);text-align:center;padding:20px 0">지금 신청할 수 있는 공고가 없어요</p>' : `
       <div style="display:flex;flex-direction:column;gap:10px">
         ${wideN ? regionRowHTML(['전국 단위', {cnt: wideN}]) : ''}
         ${regionTop.map(regionRowHTML).join('')}
@@ -6958,15 +6959,15 @@ function renderInsight(rows, wrap, statsRows){
 
     <div style="${S}">
       <p style="${T};margin-bottom:4px">📈 최근 30일 공고 추이</p>
-      <p style="font-size:12px;color:#888;margin:0 0 12px">공고일 기준 · 마감 포함</p>
+      <p style="font-size:12px;color:var(--ink-3);margin:0 0 12px">공고일 기준 · 마감 포함</p>
       ${trendEntries.length===0
-        ? '<p style="font-size:13px;color:#aaa;text-align:center;padding:20px 0">최근 30일 데이터가 없어요</p>'
+        ? '<p style="font-size:13px;color:var(--ink-3);text-align:center;padding:20px 0">최근 30일 데이터가 없어요</p>'
         : `<div style="display:flex;align-items:flex-end;gap:4px;overflow-x:auto;padding-bottom:4px;min-height:84px">
             ${trendEntries.map(([date,cnt])=>`
               <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;min-width:24px" title="${date}: ${cnt}건">
-                <span style="font-size:9px;color:#888;margin-bottom:2px">${cnt}</span>
+                <span style="font-size:var(--t-xs);color:var(--ink-3);margin-bottom:2px">${cnt}</span>
                 <div style="background:#5a7af7;border-radius:3px 3px 0 0;width:18px;height:${Math.round(cnt/trendMax*60)+4}px"></div>
-                <span style="font-size:8px;color:#bbb;margin-top:2px;writing-mode:vertical-rl;text-orientation:mixed">${date.slice(5)}</span>
+                <span style="font-size:var(--t-xs);color:var(--ink-3);margin-top:2px;writing-mode:vertical-rl;text-orientation:mixed">${date.slice(5)}</span>
               </div>`).join('')}
           </div>`
       }
@@ -7375,7 +7376,7 @@ async function diagnose(){
     const BASE_YEAR = { '도시근로자': urban.year, '기준중위소득': median.year };
     const BASE_NAME = { '도시근로자': '도시근로자 월평균소득', '기준중위소득': '기준 중위소득' };
     const baseNote = usedBases.length
-      ? `<br><span style="color:#888">소득 기준: ${usedBases.map(b => `${BASE_NAME[b]}(${BASE_YEAR[b]}년)`).join(' · ')}</span>`
+      ? `<br><span style="color:var(--ink-3)">소득 기준: ${usedBases.map(b => `${BASE_NAME[b]}(${BASE_YEAR[b]}년)`).join(' · ')}</span>`
       : '';
     incomeMsg = (incomeOk1
       ? `소득 ${fmt(income)} — 소득 기준을 충족하는 유형이 있어요 (${basis} · ${zfTopNote(zfTopTypes(c => limitsFor(c, birthTierApplied, dualApplied).incLim || 0, incMax), fmt(incMax))})`
@@ -7501,7 +7502,7 @@ async function diagnose(){
 
   // Step2 활성화
   const s2 = document.getElementById('s2');
-  if(s2){ s2.style.opacity='1'; s2.style.pointerEvents='auto'; s2.removeAttribute('title'); }
+  if(s2){ s2.style.pointerEvents='auto'; s2.removeAttribute('title'); }
 
   // eligibleTypes 기반 주택 유형 칩 자동 선택
   selectedTypes.clear();
@@ -7535,7 +7536,7 @@ async function diagnose(){
       if(a.carLim  !=null && b.carLim  !=null && a.carLim  >b.carLim  ) parts.push(`자동차 ${fmt(b.carLim)} → ${fmt(a.carLim)}`);
       return `· ${escapeHtml(c.housing_type)}${sf}${parts.length ? ' — '+parts.join(' · ') : ''}`;
     }).join('<br>');
-    commonMsgs+=`<div class="rbox warn" style="margin-top:6px"><p class="rtitle">🍼 출산자녀 수에 따라 기준이 완화될 수 있어요</p><p class="rdesc">${bonusLabels}<br><span style="font-size:11px;color:#999">위 판정은 완화 전 기준이에요. 2023년 3월 28일 이후 출산(입양·임신 포함)한 자녀가 있는지를 「모름」으로 두셔서 완화를 적용하지 않았어요. 해당되면 위에서 「예」를 선택하고 다시 진단해주세요.</span></p></div>`;
+    commonMsgs+=`<div class="rbox warn" style="margin-top:6px"><p class="rtitle">🍼 출산자녀 수에 따라 기준이 완화될 수 있어요</p><p class="rdesc">${bonusLabels}<br><span style="font-size:var(--t-xs);color:var(--ink-3)">위 판정은 완화 전 기준이에요. 2023년 3월 28일 이후 출산(입양·임신 포함)한 자녀가 있는지를 「모름」으로 두셔서 완화를 적용하지 않았어요. 해당되면 위에서 「예」를 선택하고 다시 진단해주세요.</span></p></div>`;
   }
 
   // 🔴 맞벌이로 갈리는 유형만 띄운다. 갈리지 않으면 아무것도 띄우지 않는다.
@@ -7548,7 +7549,7 @@ async function diagnose(){
         ? ` — 소득 ${fmt(b.incLim)} → ${fmt(a.incLim)}` : '';
       return `· ${escapeHtml(c.housing_type)}${sf}${gap}`;
     }).join('<br>');
-    commonMsgs+=`<div class="rbox warn" style="margin-top:6px"><p class="rtitle">👫 본인과 배우자 모두 소득이 있으면 기준이 완화돼요</p><p class="rdesc">${dualLabels}<br><span style="font-size:11px;color:#999">위 판정은 단독소득 기준이에요. 맞벌이 여부를 「모름」으로 두셔서 완화를 적용하지 않았어요. 해당되면 위에서 「예」를 선택하고 다시 진단해주세요.</span></p></div>`;
+    commonMsgs+=`<div class="rbox warn" style="margin-top:6px"><p class="rtitle">👫 본인과 배우자 모두 소득이 있으면 기준이 완화돼요</p><p class="rdesc">${dualLabels}<br><span style="font-size:var(--t-xs);color:var(--ink-3)">위 판정은 단독소득 기준이에요. 맞벌이 여부를 「모름」으로 두셔서 완화를 적용하지 않았어요. 해당되면 위에서 「예」를 선택하고 다시 진단해주세요.</span></p></div>`;
   }
 
   // 🔴 나이 구간 밖이지만 사라지지 않는 유형 — 사유는 DB가 들고 있다.
@@ -7603,7 +7604,7 @@ async function diagnose(){
     const why = birthYear
       ? '생일이 지났는지에 따라 만 나이가 갈려요. 공고문의 기준일로 확인해주세요.'
       : '출생연도를 입력하면 신청 가능 여부를 판정해드려요.';
-    ageCheckBox=`<div class="rbox warn" style="margin-top:6px"><p class="rtitle">🎂 나이 확인 필요</p><p class="rdesc">${checkLabels}<br><span style="font-size:11px;color:#999">${why}</span></p></div>`;
+    ageCheckBox=`<div class="rbox warn" style="margin-top:6px"><p class="rtitle">🎂 나이 확인 필요</p><p class="rdesc">${checkLabels}<br><span style="font-size:var(--t-xs);color:var(--ink-3)">${why}</span></p></div>`;
   }
 
   let html='';
@@ -7637,7 +7638,7 @@ async function diagnose(){
     // 한도가 없는 행이 섞이면 「자동차 요건을 충족했다」가 그 행에 대해 거짓이 된다.
     const carJudged = carValue>0 && eligibleEntries.every(c => limitsFor(c,birthTierApplied,dualApplied).carLim!=null);
     const okAxes = carJudged ? '소득·자산·자동차·나이' : '소득·자산·나이';
-    html=`<div class="rbox ok"><p class="rtitle">✅ 신청 가능한 주택 유형</p><p class="rdesc">${entryLabels}<br><span style="font-size:11px;color:#999">${okAxes} 기준을 충족한 유형이에요. 공급형태(전세형 등)별로 기준이 다를 수 있어요.</span></p></div>`;
+    html=`<div class="rbox ok"><p class="rtitle">✅ 신청 가능한 주택 유형</p><p class="rdesc">${entryLabels}<br><span style="font-size:var(--t-xs);color:var(--ink-3)">${okAxes} 기준을 충족한 유형이에요. 공급형태(전세형 등)별로 기준이 다를 수 있어요.</span></p></div>`;
     html+=commonMsgs;
 
     // 🔴 제3의 표시 — 통과도 탈락도 아니다.
@@ -7706,7 +7707,7 @@ function zfCheckNoteHtml(labels, typeNote){
   const lines = [];
   if(labels && labels.length) lines.push(`이 공고는 ${escapeHtml(labels.join('·'))} 대상 모집이에요 — 신청할 수 있는지 공고문에서 확인해 주세요`);
   if(typeNote) lines.push(`자격 진단에 이 유형(${escapeHtml(typeNote)}) 기준이 없어요 — 신청할 수 있는지 공고문에서 확인해 주세요`);
-  return lines.map(l => `<p class="zf-check-note" style="font-size:12px;border-radius:8px;padding:6px 10px;margin:0 0 8px">📄 ${l}</p>`).join('');
+  return lines.map(l => `<p class="zf-check-note" style="font-size:12px;border-radius:var(--r-2);padding:6px 10px;margin:0 0 8px">📄 ${l}</p>`).join('');
 }
 function zfDiagFacts(){
   const by = parseInt(document.getElementById('birthYear')?.value) || 0;
@@ -8124,7 +8125,7 @@ function zfTargetNoteHtml(v){
   const nm = escapeHtml((v.names || []).join('·'));
   // 🔵 2026-10-15(우편함 「코드 — 공급대상 안내 이름 빈칸 …」 1) — 대상 이름이 없는 갈래(`{조건:{혼인:"혼인 중"}}` — Ⅱ 5순위 「그 밖의 혼인가구」)만으로
   //    판정되면 이름 자리를 뺀다(우리 말로 이름을 짓지 않는다). 종전에는 「👥 대상 모집 — …」처럼 빈 이름이 그대로 그려졌다.
-  if(v.state === 'ok') return `<p class="zf-target-ok" style="font-size:12px;border-radius:8px;padding:6px 10px;margin:0 0 8px">👥 ${nm ? `${nm} 대상 모집 — ` : ''}입력하신 정보로는 대상 조건에 맞아요</p>`;
+  if(v.state === 'ok') return `<p class="zf-target-ok" style="font-size:12px;border-radius:var(--r-2);padding:6px 10px;margin:0 0 8px">👥 ${nm ? `${nm} 대상 모집 — ` : ''}입력하신 정보로는 대상 조건에 맞아요</p>`;
   if(v.state === 'check' && v.asset){
     // 🔵 2026-11-09(우편함 「표시층 — 카드 ✓ 관문 자산 축」) — 대상·소득은 맞는데 자산·자동차가 이 공고 기준을 넘거나(출산 가산 금액을 몰라) 못 잰 카드.
     const a = v.asset, prof = a.src === 'profile', what = a.kind === 'car' ? '자동차가액' : '자산';
@@ -8132,7 +8133,7 @@ function zfTargetNoteHtml(v){
     const tail = a.why === 'birth'
       ? `${prof ? '저장한' : '입력하신'} ${what}이 이 공고 기본 ${what} 기준(${lim})을 넘어요 · 이 공고는 2023년 3월 28일 이후 출산 자녀가 있으면 ${what} 기준이 올라가는데 그 금액은 공고문에서 확인해야 해요`
       : `${prof ? '저장한' : '입력하신'} ${what}이 이 공고 ${what} 기준(${lim})을 넘어요`;
-    return `<p class="zf-check-note" style="font-size:12px;border-radius:8px;padding:6px 10px;margin:0 0 8px">📄 ${nm ? `${nm} ` : ''}대상 조건은 맞지만 ${escapeHtml(tail)} — 신청할 수 있는지 공고문에서 확인해 주세요</p>`;
+    return `<p class="zf-check-note" style="font-size:12px;border-radius:var(--r-2);padding:6px 10px;margin:0 0 8px">📄 ${nm ? `${nm} ` : ''}대상 조건은 맞지만 ${escapeHtml(tail)} — 신청할 수 있는지 공고문에서 확인해 주세요</p>`;
   }
   if(v.state === 'check' && v.income){
     // 🔵 2026-10-16(N12) — 대상 조건은 맞는데 소득을 볼 수 없거나 넘는 카드. 금액은 만원 단위 반올림(「약」)이다.
@@ -8142,12 +8143,12 @@ function zfTargetNoteHtml(v){
         ? (prof ? `저장한 소득이 이 공고 기본 소득 기준(${lim} · 맞벌이·출산 가산 전)보다 많아요` : `입력하신 소득이 이 공고 소득 기준(${lim})을 넘어요`)
       : v.income.why === 'unknown' ? (prof ? '저장한 조건에 소득이 없어 소득 기준은 보지 못했어요' : '소득을 입력하지 않아 소득 기준은 보지 못했어요')
       : '이 공고 소득 기준을 화면에서 계산하지 못했어요';
-    return `<p class="zf-check-note" style="font-size:12px;border-radius:8px;padding:6px 10px;margin:0 0 8px">📄 ${nm ? `${nm} ` : ''}대상 조건은 맞지만 ${tail} — 신청할 수 있는지 공고문에서 확인해 주세요</p>`;
+    return `<p class="zf-check-note" style="font-size:12px;border-radius:var(--r-2);padding:6px 10px;margin:0 0 8px">📄 ${nm ? `${nm} ` : ''}대상 조건은 맞지만 ${tail} — 신청할 수 있는지 공고문에서 확인해 주세요</p>`;
   }
   if(v.state === 'check'){
     const why = (v.checks || []).length ? ` (${escapeHtml(v.checks.join(' · '))})` : '';
-    if((v.targets || []).length) return `<p class="zf-check-note" style="font-size:12px;border-radius:8px;padding:6px 10px;margin:0 0 8px">📄 이 공고의 모집 대상은 ${v.targets.map(t => `「${escapeHtml(t)}」`).join(' · ')}이에요${why} — 신청할 수 있는지 공고문에서 확인해 주세요</p>`;
-    return `<p class="zf-check-note" style="font-size:12px;border-radius:8px;padding:6px 10px;margin:0 0 8px">📄 ${nm ? `이 공고는 ${nm} 대상 모집이에요` : '대상 조건이 있는 공고예요'}${why} — 신청할 수 있는지 공고문에서 확인해 주세요</p>`;
+    if((v.targets || []).length) return `<p class="zf-check-note" style="font-size:12px;border-radius:var(--r-2);padding:6px 10px;margin:0 0 8px">📄 이 공고의 모집 대상은 ${v.targets.map(t => `「${escapeHtml(t)}」`).join(' · ')}이에요${why} — 신청할 수 있는지 공고문에서 확인해 주세요</p>`;
+    return `<p class="zf-check-note" style="font-size:12px;border-radius:var(--r-2);padding:6px 10px;margin:0 0 8px">📄 ${nm ? `이 공고는 ${nm} 대상 모집이에요` : '대상 조건이 있는 공고예요'}${why} — 신청할 수 있는지 공고문에서 확인해 주세요</p>`;
   }
   return '';
 }
@@ -8158,11 +8159,11 @@ function zfTargetExcludedHtml(list){
     const nm = escapeHtml((x.v.names || []).join('·'));
     const q = (x.v.quotes || [])[0];
     // 🔵 원문은 두 줄로 접는다 — 7건이면 390px에서 상자가 화면 세 장이었다(다운님 승인 때 함께 고칠 것 ②). 「더 보기」로 편다.
-    const qh = q ? `<br><span class="zf-tq" style="color:#999;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden">원문: ${escapeHtml(q)}</span><button type="button" class="zf-tq-more" style="border:0;background:none;color:var(--ink-2);font-size:12px;padding:2px 0;cursor:pointer" onclick="event.stopPropagation();const p=this.previousElementSibling;p.style.webkitLineClamp='unset';p.style.display='block';this.remove()">더 보기</button>` : '';
-    return `<li style="margin:0 0 8px"><span style="font-weight:600">${t}</span>${nm ? `<br><span style="color:#666">${nm} 대상 모집</span>` : ''}${qh}</li>`;
+    const qh = q ? `<br><span class="zf-tq" style="color:var(--ink-3);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden">원문: ${escapeHtml(q)}</span><button type="button" class="zf-tq-more" style="border:0;background:none;color:var(--ink-2);font-size:12px;padding:2px 0;cursor:pointer" onclick="event.stopPropagation();const p=this.previousElementSibling;p.style.webkitLineClamp='unset';p.style.display='block';this.remove()">더 보기</button>` : '';
+    return `<li style="margin:0 0 8px"><span style="font-weight:600">${t}</span>${nm ? `<br><span style="color:var(--ink-2)">${nm} 대상 모집</span>` : ''}${qh}</li>`;
   }).join('');
   return `<details class="zf-target-out" style="margin-top:10px;background:#f6f6f2;border-radius:10px;padding:8px 12px;font-size:12px">
-    <summary style="cursor:pointer;font-weight:600;color:#555">👥 공급 대상이 달라 뺀 공고 ${list.length}</summary>
+    <summary style="cursor:pointer;font-weight:600;color:var(--ink-2)">👥 공급 대상이 달라 뺀 공고 ${list.length}</summary>
     <ul style="margin:8px 0 0;padding-left:16px">${items}</ul>
   </details>`;
 }
@@ -8656,7 +8657,7 @@ function renderSpecialNotes(cardEl, id){
     items.push(`<div class="policy-item"><div class="policy-category">🔓 ${rk.label}</div><div class="policy-content">${rk.text}${relaxationDetail?'<br>'+escapeHtml(relaxationDetail):''}</div></div>`);
   }
   if(contractVerify){
-    items.push(`<div class="zf-warn-box" style="font-size:12px;border-radius:8px;padding:8px 10px;margin-bottom:8px">⚠️ 이 공고는 자격 검증 전에 먼저 계약을 체결합니다. 계약 후 부적격으로 판명되면 계약이 직권 해제될 수 있으니 신청 전 자격을 반드시 스스로 확인하세요.</div>`);
+    items.push(`<div class="zf-warn-box" style="font-size:12px;border-radius:var(--r-2);padding:8px 10px;margin-bottom:8px">⚠️ 이 공고는 자격 검증 전에 먼저 계약을 체결합니다. 계약 후 부적격으로 판명되면 계약이 직권 해제될 수 있으니 신청 전 자격을 반드시 스스로 확인하세요.</div>`);
   }
   if(rentExemptUntil){
     items.push(`<div class="policy-item"><div class="policy-category">🎁 월임대료 한시 면제</div><div class="policy-content">~${escapeHtml(rentExemptUntil)}까지 면제${rentExemptNote?'<br>'+escapeHtml(rentExemptNote):''}</div></div>`);
@@ -11704,7 +11705,7 @@ function renderHousingUnitRow(u){
   const depositP1 = huMoneyText(u.deposit_priority1, u.rent_priority1);
   const rentP1 = huRentText(u.rent_priority1, u.deposit_priority1);
   const depositRent = hasPriority1
-    ? `<div class="hu-item hu-item-wide"><span class="hu-label">임대조건</span><span class="hu-value">보증금 ${deposit}·월 ${rent} 또는 보증금 ${depositP1}·월 ${rentP1}<br><span style="font-size:11px;color:#888">어느 조건이 적용되는지는 비고·공고문에서 확인하세요</span></span></div>`
+    ? `<div class="hu-item hu-item-wide"><span class="hu-label">임대조건</span><span class="hu-value">보증금 ${deposit}·월 ${rent} 또는 보증금 ${depositP1}·월 ${rentP1}<br><span style="font-size:var(--t-xs);color:var(--ink-3)">어느 조건이 적용되는지는 비고·공고문에서 확인하세요</span></span></div>`
     : `<div class="hu-item"><span class="hu-label">보증금</span><span class="hu-value">${deposit}</span></div>
       <div class="hu-item"><span class="hu-label">월임대료</span><span class="hu-value">${rent}${huSqmText(u)}</span></div>`;
   const conv = u.conversion_date ? `<div class="hu-item"><span class="hu-label">분양전환</span><span class="hu-value">${escapeHtml(u.conversion_date)}</span></div>` : '';
@@ -12224,7 +12225,7 @@ function renderMatchResults(rows){
     const detailHTML = detailRows.length
       ? `<div id="${cardId}" data-ann-id="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 14px 14px" onclick="event.stopPropagation()">
           <div class="detail-grid">
-            ${detailRows.map(([k,v])=>`<div${ZF_DCELL_DATE.test(k)?' class="zf-dcell-date"':''} style="font-size:12px"><span style="color:#999">${k}</span><br><span style="color:#333;font-weight:500">${v}</span></div>`).join('')}
+            ${detailRows.map(([k,v])=>`<div${ZF_DCELL_DATE.test(k)?' class="zf-dcell-date"':''} style="font-size:12px"><span style="color:var(--ink-3)">${k}</span><br><span style="color:#333;font-weight:500">${v}</span></div>`).join('')}
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
             ${zfSafeUrl(n.url)?`<a class="detail-link" href="${zfSafeHref(n.url)}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`:''}
@@ -12244,19 +12245,19 @@ function renderMatchResults(rows){
       <p class="haddr">${zfCoverPlace(n.region_names, zfComplexCount(n), n.sido_nm, n.sigungu_nm, n.region, n.announcement_id)} · ${zfTypeHtml(n.source, n.housing_type, n.title)}</p>${zfOrgSupplyHtml(n.title)}
       <div class="chip-row" style="margin:8px 0;gap:5px">
         ${hasCancel?cancelNoticeBadge(n.title||'', n.apply_end):''}
-        ${n.building_name?`<span class="chip" style="cursor:default;padding:4px 10px;font-size:11px">🏢 ${zfBuildingLabel(n.building_name, zfComplexCount(n))}</span>`:''}
-        ${isAmended?'<span class="chip sel zf-chip-warn" style="cursor:default;padding:4px 10px;font-size:11px;background:#7B5EA7;border-color:#7B5EA7">🔄 정정</span>':''}
-        ${isNew?'<span class="chip sel zf-chip-new" style="cursor:default;padding:4px 10px;font-size:11px;background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
-        ${closingSoon?'<span class="chip sel zf-chip-warn" style="cursor:default;padding:4px 10px;font-size:11px;background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
+        ${n.building_name?`<span class="chip" style="cursor:default;padding:4px 10px;font-size:var(--t-xs)">🏢 ${zfBuildingLabel(n.building_name, zfComplexCount(n))}</span>`:''}
+        ${isAmended?'<span class="chip sel zf-chip-warn" style="cursor:default;padding:4px 10px;font-size:var(--t-xs);background:#7B5EA7;border-color:#7B5EA7">🔄 정정</span>':''}
+        ${isNew?'<span class="chip sel zf-chip-new" style="cursor:default;padding:4px 10px;font-size:var(--t-xs);background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
+        ${closingSoon?'<span class="chip sel zf-chip-warn" style="cursor:default;padding:4px 10px;font-size:var(--t-xs);background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
         ${applyUnknownChip(n)}
         ${zfRentLowSlotHtml(n, n.title)}
-        ${demoTags.map(t=>`<span class="chip sel${t.color ? '' : ' zf-chip-info'}" style="cursor:default;padding:4px 10px;font-size:11px${t.color ? `;background:${t.color};border-color:${t.color}` : ''}">${t.label}</span>`).join('')}
+        ${demoTags.map(t=>`<span class="chip sel${t.color ? '' : ' zf-chip-info'}" style="cursor:default;padding:4px 10px;font-size:var(--t-xs)${t.color ? `;background:${t.color};border-color:${t.color}` : ''}">${t.label}</span>`).join('')}
         ${convBadgesM}
         ${zfWarnBadges({contractVerify:n.contract_before_verification===true, selectionMethod:n.selection_method, rentExemptUntil:n.rent_exemption_until, rentExemptNote:n.rent_exemption_note, specialNotes:n.special_notes})}
       </div>
-      ${pairKeyM?`<div class="zf-warn-box" style="font-size:11px;border-radius:8px;padding:5px 10px;margin-bottom:6px">⚠️ 동일 회차 짝공고와 <b>중복 신청 시 자동 탈락</b>될 수 있어요. 공고문을 반드시 확인하세요.</div>`:''}
+      ${pairKeyM?`<div class="zf-warn-box" style="font-size:var(--t-xs);border-radius:var(--r-2);padding:5px 10px;margin-bottom:6px">⚠️ 동일 회차 짝공고와 <b>중복 신청 시 자동 탈락</b>될 수 있어요. 공고문을 반드시 확인하세요.</div>`:''}
       <div data-sum-for="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" data-sum-url="${(n.url||'').replace(/"/g,'&quot;')}" data-sum-key="${zfAttr(zfDedupKey(n.title))}" data-sum-org="${zfAttr(n.supply_org || n.source || '')}"></div>
-      <p class="zf-dateline" style="font-size:12px;color:#888;margin-bottom:8px">${dateLine}</p>
+      <p class="zf-dateline" style="font-size:12px;color:var(--ink-3);margin-bottom:8px">${dateLine}</p>
       ${n._zfTarget ? zfTargetNoteHtml(n._zfTarget) + zfCheckNoteHtml([], n._zfTypeCheck) : zfCheckNoteHtml(n._zfSupplyCheck, n._zfTypeCheck)}
       ${zfRouteSlotHtml(n, n.title)}
       ${zfNoticesSlotHtml(n)}
@@ -12271,7 +12272,7 @@ function renderMatchResults(rows){
 
   html += `<div class="alert-signup-box" id="alertSignupBox">
     <p style="font-size:14px;font-weight:600;color:#111;margin-bottom:6px">💾 이 검색 조건을 저장할까요?</p>
-    <p style="font-size:12px;color:#888;margin-bottom:12px">저장해두면 다음에 다시 입력하지 않아도 바로 검색할 수 있어요.</p>
+    <p style="font-size:12px;color:var(--ink-3);margin-bottom:12px">저장해두면 다음에 다시 입력하지 않아도 바로 검색할 수 있어요.</p>
     ${currentUser
       ? `<p style="font-size:12px;color:var(--ink);margin-bottom:10px">✅ ${escapeHtml(currentUser.alert_email||currentUser.email||'로그인한 계정')}으로 저장됩니다</p>`
       : `<p style="font-size:12px;color:var(--warn);margin-bottom:10px">설정 탭에서 로그인하면 조건을 저장할 수 있어요.</p>`}
@@ -12412,8 +12413,8 @@ function buildChecklist(){
   if(!saved.length){
     selectorEl.innerHTML = `<div class="rbox" style="text-align:center;padding:1.5rem 1rem;margin-bottom:16px">
       <p style="font-size:1.8rem;margin-bottom:8px">🔖</p>
-      <p style="font-size:13px;color:#555;font-weight:600;margin-bottom:4px">저장한 공고가 없습니다</p>
-      <p style="font-size:12px;color:#888;margin-bottom:12px">공고 탭에서 공고를 저장해주세요.</p>
+      <p style="font-size:13px;color:var(--ink-2);font-weight:600;margin-bottom:4px">저장한 공고가 없습니다</p>
+      <p style="font-size:12px;color:var(--ink-3);margin-bottom:12px">공고 탭에서 공고를 저장해주세요.</p>
       <button class="btn btn-sec btn-sm" onclick="goMain(2)">공고 탭으로 이동 →</button>
     </div>`;
     if(typeof zf3On === 'function' && zf3On()) selectorEl.innerHTML = zf3EmptyHTML('아직 저장한 공고가 없어요', '공고 상세의 🔖 저장을 누르면 서류와 일정이 여기 모여요.', { label: '공고 보러 가기 →', on: 'goMain(2)' });   // 🔵 빈 상태 한 꼴
@@ -12439,7 +12440,7 @@ function buildChecklist(){
   }).join('');
 
   selectorEl.innerHTML = `<div style="margin-bottom:16px">
-    <label style="font-size:12px;color:#888;display:block;margin-bottom:6px">공고 선택</label>
+    <label style="font-size:12px;color:var(--ink-3);display:block;margin-bottom:6px">공고 선택</label>
     <select id="noticeSelect" style="width:100%;padding:10px 12px;border:1.5px solid #e0e0d8;border-radius:10px;font-size:13px;color:#333;background:#fff;cursor:pointer" onchange="buildChecklist()">${options}</select>
   </div>`;
 
@@ -12539,7 +12540,7 @@ function buildChecklist(){
     : apSite ? '신청처는 위 접수 장소예요' : '신청처는 위 신청 방법 줄에 있어요';
   document.getElementById('checklist-apply-btn').innerHTML = `
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:1.25rem">
-      ${showSite ? `<button class="btn btn-sec" onclick="window.open('https://apply.lh.or.kr','_blank')">LH청약플러스 바로가기 →</button>` : `<p class="zf-chk-site" style="font-size:12px;color:#666;margin:0;align-self:center">${siteAlt}</p>`}
+      ${showSite ? `<button class="btn btn-sec" onclick="window.open('https://apply.lh.or.kr','_blank')">LH청약플러스 바로가기 →</button>` : `<p class="zf-chk-site" style="font-size:12px;color:var(--ink-2);margin:0;align-self:center">${siteAlt}</p>`}
       ${zfSafeUrl(sel.url)?`<a class="detail-link" href="${zfSafeHref(sel.url)}" target="_blank" data-ai-for="${zfAttr(sel.id)}" data-ai-key="${zfAttr(zfDedupKey(sel.title||''))}"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`:''}
     </div>`;
   zfAiLabelSync();   // 🔵 2026-10-16 — 분석 없는 공고는 「원문 보기」만
@@ -13104,7 +13105,7 @@ async function zfOpsLoad(){
     let board = null, issues;   // issues: undefined = 받는 중 · null = 못 읽음
     const paint = () => {
       zone.innerHTML = board === null
-        ? `<p class="slabel" style="margin:0 0 0.5rem">🛠 운영</p><p style="font-size:13px;color:#888">상태판을 받는 중…</p>`
+        ? `<p class="slabel" style="margin:0 0 0.5rem">🛠 운영</p><p style="font-size:13px;color:var(--ink-3)">상태판을 받는 중…</p>`
         : board.ok && board.data ? zfOpsHtml(board.data, issues)
         : `<p class="slabel" style="margin:0 0 0.5rem">🛠 운영</p><p style="font-size:13px;color:${ZF_OPS_COLOR.red}">상태판을 읽지 못했어요${board.data && board.data.message ? ' — ' + zfOpsEsc(board.data.message) : ''}</p>`;
     };
@@ -13122,31 +13123,31 @@ function zfOpsRatesHtml(rates){
   const r = rates || {}, rt = Array.isArray(r.routine) ? r.routine : [], ob = Array.isArray(r.open_by_source) ? r.open_by_source : [];
   const short = x => Number(x.numerator) < Number(x.denominator);
   const row = (k, x, extra) => `<div style="display:flex;justify-content:space-between;gap:6px"><span>${zfOpsEsc(k)}</span><b style="font-variant-numeric:tabular-nums;color:${short(x) ? ZF_OPS_COLOR.yellow : 'inherit'}">${x.numerator ?? '—'}/${x.denominator ?? '—'}</b></div>${extra || ''}`;
-  const col = (title, rows) => `<div style="flex:1 1 140px;min-width:0;padding:6px 8px;border:1px solid #eee;border-radius:8px"><div style="font-size:12px;color:#888;margin-bottom:2px">${title}</div>${rows || '<div style="color:#888">—</div>'}</div>`;
+  const col = (title, rows) => `<div style="flex:1 1 140px;min-width:0;padding:6px 8px;border:1px solid #eee;border-radius:var(--r-2)"><div style="font-size:12px;color:var(--ink-3);margin-bottom:2px">${title}</div>${rows || '<div style="color:var(--ink-3)">—</div>'}</div>`;
   const left = rt.map(x => row(x.phase, x, x.not_done ? `<div style="font-size:12px;color:${ZF_OPS_COLOR.yellow};word-break:break-all">미완 ${zfOpsEsc(x.not_done)}</div>` : '')).join('');
-  const right = ob.map(x => row(x.source_group, x, Number(x.with_attachments) < Number(x.denominator) ? `<div style="font-size:12px;color:#888">첨부 있음 ${x.with_attachments ?? '—'}</div>` : '')).join('');
+  const right = ob.map(x => row(x.source_group, x, Number(x.with_attachments) < Number(x.denominator) ? `<div style="font-size:12px;color:var(--ink-3)">첨부 있음 ${x.with_attachments ?? '—'}</div>` : '')).join('');
   const color = rt.concat(ob).some(short) ? 'yellow' : 'ok';
   return { color, html: `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">${col('루틴 분모(정본)', left)}${col('열린 카드 · 출처별', right)}</div>` };
 }
 // 최근 분석 회차 다섯 — 회차마다 한 줄(이유 · 상태 · 끝난 시각 · 걸린 분 · 끝낸 대기열 행) + 끝 메모 앞 80자.
 function zfOpsRunsHtml(runs){
   const rs = Array.isArray(runs) ? runs : [];
-  if(!rs.length) return '<div style="color:#888">회차 없음</div>';
+  if(!rs.length) return '<div style="color:var(--ink-3)">회차 없음</div>';
   return rs.map(x => `<div style="padding:3px 0">run ${zfOpsEsc(x.id)} · ${zfOpsEsc(ZF_OPS_RUN_REASON[x.reason] || x.reason)} · ${zfOpsEsc(ZF_OPS_RUN_STATE[x.state] || x.state)}`
     + (x.finished_at ? ` ${zfOpsTime(x.finished_at)}${x.minutes != null ? ` · ${x.minutes}분` + (x.minutes_from === 'sent' ? ` <span style="font-size:12px;color:${ZF_OPS_COLOR.yellow};border:1px solid currentColor;border-radius:4px;padding:0 4px;white-space:nowrap" title="잡은 시각이 없어 발송 시각부터 셌어요 — 대기 시간이 섞였어요">발송부터</span>` : '') : ''}` : ` · ${x.claimed_at ? '시작' : '발송'} ${zfOpsTime(x.claimed_at || x.created_at)}`)
     + ` · 끝낸 공고 ${x.done ?? 0}`
-    + (x.note ? `<br><span style="color:#888;font-size:12px;word-break:break-all">${zfOpsEsc(x.note)}</span>` : '') + `</div>`).join('');
+    + (x.note ? `<br><span style="color:var(--ink-3);font-size:12px;word-break:break-all">${zfOpsEsc(x.note)}</span>` : '') + `</div>`).join('');
 }
 // 인스턴스 메모리(ops_status_board().instance — 2026-10-17 health-ops 기록) · 단위 MiB(대시보드와 같게).
 //    색은 화면에 문턱을 두지 않고 같은 시각 운영 점검의 instance_mem 경고를 따른다(문턱 정본 .github/health/instance.mjs).
 function zfOpsInstanceHtml(it, warned){
-  if(!it || it.mem_total == null) return { color: 'yellow', html: '기록 없음 <span style="color:#888">(운영 점검이 아직 남기지 않았어요)</span>' };
+  if(!it || it.mem_total == null) return { color: 'yellow', html: '기록 없음 <span style="color:var(--ink-3)">(운영 점검이 아직 남기지 않았어요)</span>' };
   const mib = v => v == null ? '—' : Math.round(Number(v) / 1048576);
   const parts = [`가용 ${mib(it.mem_available)}/${mib(it.mem_total)} MiB`];
   if(it.swap_used != null) parts.push(`swap ${mib(it.swap_used)}${it.swap_total ? `/${mib(it.swap_total)} MiB(${Math.round(Number(it.swap_used) / Number(it.swap_total) * 100)}%)` : ' MiB'}`);
   if(it.committed_as != null && Number(it.commit_limit) > 0) parts.push(`commit ${(Number(it.committed_as) / Number(it.commit_limit)).toFixed(2)}배`);
   if(it.swapin_24h_pages != null || it.swapout_24h_pages != null) parts.push(`24시간 swap 들어옴 ${it.swapin_24h_pages ?? '—'} · 나감 ${it.swapout_24h_pages ?? '—'}쪽`);
-  return { color: warned ? 'yellow' : 'ok', html: zfOpsEsc(parts.join(' · ')) + ` <span style="color:#888">(기록 ${zfOpsTime(it.scraped_at)}${warned ? ' · 점검 ⚠️' : ''})</span>` };
+  return { color: warned ? 'yellow' : 'ok', html: zfOpsEsc(parts.join(' · ')) + ` <span style="color:var(--ink-3)">(기록 ${zfOpsTime(it.scraped_at)}${warned ? ' · 점검 ⚠️' : ''})</span>` };
 }
 // 비밀값 만료(ops_status_board().secrets = zipfit_ops.secret_expiry_list() 한 정의) — 이름만(값은 반환에 없다).
 //    날짜 있는 것을 남은 날 오름차순으로: 지난 것 빨강 · 30일 이하 주황(health-ops secret_expiry 와 같은 30) · missing(설명칸 꼴 없음) 주황.
@@ -13157,7 +13158,7 @@ function zfOpsSecretsHtml(secrets){
   const dated = rs.filter(r => r.state === 'date').sort((a, c) => Number(a.days_left) - Number(c.days_left));
   const missing = rs.filter(r => r.state === 'missing');
   const cOf = r => r.state === 'missing' ? 'orange' : Number(r.days_left) < 0 ? 'red' : Number(r.days_left) <= ZF_OPS_SECRET_SOON_DAYS ? 'orange' : null;
-  const src = r => `<span style="color:#888;font-size:12px">${r.source === 'vault' ? 'Vault' : 'Vault 밖'}</span>`;
+  const src = r => `<span style="color:var(--ink-3);font-size:12px">${r.source === 'vault' ? 'Vault' : 'Vault 밖'}</span>`;
   const row = r => { const c = cOf(r);
     const when = r.state === 'missing' ? '설명칸 expires= 없음' : `${zfOpsEsc(r.expires)} · ${Number(r.days_left) < 0 ? `${-Number(r.days_left)}일 지남` : `D-${Number(r.days_left)}`}`;
     return `<div style="display:flex;justify-content:space-between;gap:8px;padding:2px 0"><span style="min-width:0;word-break:break-all">${zfOpsEsc(r.name)} ${src(r)}</span>`
@@ -13168,8 +13169,8 @@ function zfOpsSecretsHtml(secrets){
   const nNone = rs.filter(r => r.state === 'none').length, nUnknown = rs.filter(r => r.state === 'unknown').length;
   const color = dated.some(r => Number(r.days_left) < 0) ? 'red' : urgent.length ? 'orange' : 'ok';
   return { color, html: `<div style="margin-top:4px">${shown.map(row).join('')}`
-    + (rest.length ? `<details><summary style="cursor:pointer;color:#888;font-size:12px">날짜 있는 나머지 ${rest.length}</summary>${rest.map(row).join('')}</details>` : '')
-    + `<div style="color:#888;font-size:12px">만료 없음 ${nNone} · 모름 ${nUnknown}</div></div>` };
+    + (rest.length ? `<details><summary style="cursor:pointer;color:var(--ink-3);font-size:12px">날짜 있는 나머지 ${rest.length}</summary>${rest.map(row).join('')}</details>` : '')
+    + `<div style="color:var(--ink-3);font-size:12px">만료 없음 ${nNone} · 모름 ${nUnknown}</div></div>` };
 }
 function zfOpsHtml(b, issues){
   const line = (color, label, text) => `<div style="padding:6px 0;border-top:1px solid #eee;font-size:13px;line-height:1.55">`
@@ -13199,13 +13200,13 @@ function zfOpsHtml(b, issues){
   const logs = ((b.health || {}).dispatch_log || []).map(l => `${zfOpsEsc(l.target)} ${zfOpsTime(l.at)}${l.status_code && l.status_code >= 300 ? '(' + l.status_code + ')' : ''}`).join(' · ');
   out.push(line(hColor, '운영 점검', `마지막 ${zfOpsTime(h.run_at)} · 실패 ${h.n_fail ?? '—'}${(h.failed || []).length ? '(' + zfOpsEsc(h.failed.join(', ')) + ')' : ''}`
     + ` · 경고 ${h.n_warn ?? '—'}${(h.warned || []).length ? '(' + zfOpsEsc(h.warned.join(', ')) + ')' : ''}`
-    + (hasHard ? ' · 멈춤 이슈 열림' : '') + (logs ? `<br><span style="color:#888">점검 발송: ${logs}</span>` : '')));
+    + (hasHard ? ' · 멈춤 이슈 열림' : '') + (logs ? `<br><span style="color:var(--ink-3)">점검 발송: ${logs}</span>` : '')));
   // ⓒ-2 목록 RPC 사용자 실패 24시간(health-ops list_user_fail — 2026-10-17) · 사람 브라우저 1 이상이면 주황(눈에 띄게)
   const luf = (b.health || {}).list_user_fail;
   if(luf){
     const human = Number((/사람 브라우저 (\d+)/.exec(luf.value || '') || [])[1] || 0);
     const txt = luf.warned ? zfOpsEsc(String(luf.value || '경고').replace(/^목록 RPC 사용자 실패[^—]*—\s*/, '')) : '24시간 0';
-    out.push(line(luf.warned ? (human > 0 ? 'orange' : 'yellow') : 'ok', '목록 사용자 실패', (human > 0 ? `<b>${txt}</b>` : txt) + ` <span style="color:#888">(점검 ${zfOpsTime(luf.run_at)})</span>`));
+    out.push(line(luf.warned ? (human > 0 ? 'orange' : 'yellow') : 'ok', '목록 사용자 실패', (human > 0 ? `<b>${txt}</b>` : txt) + ` <span style="color:var(--ink-3)">(점검 ${zfOpsTime(luf.run_at)})</span>`));
   }
   // ⓒ-2b 새 공급기관(2026-11-03 · 우편함 「표시층 — 다음 판 시안」 D 2 · 백로그 「첨부를 못 받는 공고…」 ②) — 정의 = health-ops attach0_unanalyzed(#762)와 같은 셈
   //    (열린 대표 ∧ 접수 시작 14일 안 ∧ 같은 묶음 첨부 0 ∧ 완료 계열 분석 0 — 처음 본 기관의 공고는 첨부를 못 받아 여기 걸린다).
@@ -13216,7 +13217,7 @@ function zfOpsHtml(b, issues){
     const m0 = a0 && /—\s*(\d+):\s*(.*)$/.exec(String(a0.value || ''));
     const orgs0 = m0 ? [...new Set([...m0[2].matchAll(/\(([^·()]+?)\s*·/g)].map(x => x[1].trim()))] : [];
     const txt0 = m0 ? `${m0[1]}${orgs0.length ? ' — ' + zfOpsEsc(orgs0.join(', ')) : ''}` : warned0 ? '있음 — 운영 점검 경고 attach0_unanalyzed' : '0';
-    out.push(line(m0 || warned0 ? 'yellow' : 'ok', '새 공급기관', `${txt0} <span style="color:#888">(첨부 0 · 미분석 열린 대표 · 점검 ${zfOpsTime(h.run_at)})</span>`));
+    out.push(line(m0 || warned0 ? 'yellow' : 'ok', '새 공급기관', `${txt0} <span style="color:var(--ink-3)">(첨부 0 · 미분석 열린 대표 · 점검 ${zfOpsTime(h.run_at)})</span>`));
   }
   // ⓒ-3 인스턴스 메모리 · ⓒ-4 비밀값 만료(2026-10-17 상태판 새 칸 — PR #603 instance · secrets)
   if('instance' in b){ const im = zfOpsInstanceHtml(b.instance, (h.warned || []).includes('instance_mem')); out.push(line(im.color, '인스턴스 메모리', im.html)); }
@@ -13227,15 +13228,15 @@ function zfOpsHtml(b, issues){
   // 🔵 2026-11-09(우편함 「표시층 — 상태판 이용 기록 맞대기」) — 바로 아래 작은 글씨로 이용 기록(usage_events)만으로 센 「지금부터 7일」 세션(users.sessions_7d)을 맞댄다.
   //    두 셈은 창이 다르다(이용 기록 = 지금부터 7일 · 엣지 로그 = KST 어제까지 7일) — 이름과 창을 같이 적는다 · users 칸이 없는 응답이면 줄 없음.
   const us7 = (b.users && b.users.sessions_7d != null)
-    ? `<span style="font-size:12px;color:#888">이용 기록 7일 ${Number(b.users.sessions_7d) || 0} <span>(이용 기록만으로 센 세션 · 지금부터 7일 · 운영 표지·운영자 뺌)</span></span>` : '';
+    ? `<span style="font-size:12px;color:var(--ink-3)">이용 기록 7일 ${Number(b.users.sessions_7d) || 0} <span>(이용 기록만으로 센 세션 · 지금부터 7일 · 운영 표지·운영자 뺌)</span></span>` : '';
   if(!b.usage_7d && us7) out.push(line('ok', '이용 기록 7일', us7));
   if(b.usage_7d){
     const u = b.usage_7d, days = Number(u.days) || 0, heavy = Number(u.other_heavy) || 0;
     const ux = days
       ? `사람 ${Number(u.other) || 0}(봇 ${Number(u.bot) || 0} · 운영 ${Number(u.ops) || 0} 뺌) · ${days}일 셈${days < 7 ? '(7일 중)' : ''}`
-        + ` <span style="color:#888">(${zfOpsEsc(u.from)}~${zfOpsEsc(u.to)} KST · 헤드리스 ${Number(u.headless) || 0} · 스크립트 ${Number(u.script) || 0})</span>`
-        + (heavy > 0 ? `<br><span style="font-size:12px;color:#888">열기 많은 세션 ${heavy}</span>` : '')
-      : '기록 없음 <span style="color:#888">(usage_ua_daily 7일 행 0)</span>';
+        + ` <span style="color:var(--ink-3)">(${zfOpsEsc(u.from)}~${zfOpsEsc(u.to)} KST · 헤드리스 ${Number(u.headless) || 0} · 스크립트 ${Number(u.script) || 0})</span>`
+        + (heavy > 0 ? `<br><span style="font-size:12px;color:var(--ink-3)">열기 많은 세션 ${heavy}</span>` : '')
+      : '기록 없음 <span style="color:var(--ink-3)">(usage_ua_daily 7일 행 0)</span>';
     out.push(line('ok', '이용자 7일(엣지 로그)', ux + (us7 ? '<br>' + us7 : '')));
   }
   // ⓓ 수집 마지막 시각
@@ -13248,9 +13249,9 @@ function zfOpsHtml(b, issues){
     issues === undefined ? '받는 중…' : issues === null ? 'GitHub 를 읽지 못했어요' : (issues.length ? issues.map(i => `<a href="${zfSafeHref(i.url)}" target="_blank" rel="noopener">#${i.n}</a> ${zfOpsEsc(i.t)}(${zfOpsEsc(i.labels.join(', '))})`).join('<br>') : '없음')));
   // 숨긴 묶음(열린 것 · 풀기) + 숨기기 입력
   const hides = b.hides || [];
-  const hideRows = hides.length ? hides.map(x => `<div style="font-size:13px;padding:4px 0">${zfOpsEsc(x.group_key)} <span style="color:#888">— ${zfOpsEsc(x.reason)} · ${zfOpsTime(x.hidden_at)} · ${zfOpsEsc(x.announcement_id || '')}</span>`
-    + ` <button class="btn btn-sec" style="width:auto;padding:2px 8px;font-size:12px" onclick="zfOpsRelease(${Number(x.id)})">풀기</button></div>`).join('') : '<div style="font-size:13px;color:#888">숨긴 묶음 없음</div>';
-  return `<p class="slabel" style="margin:0 0 0.5rem">🛠 운영 <span style="font-size:12px;color:#888;font-weight:400">${zfOpsTime(b.now)}</span>`
+  const hideRows = hides.length ? hides.map(x => `<div style="font-size:13px;padding:4px 0">${zfOpsEsc(x.group_key)} <span style="color:var(--ink-3)">— ${zfOpsEsc(x.reason)} · ${zfOpsTime(x.hidden_at)} · ${zfOpsEsc(x.announcement_id || '')}</span>`
+    + ` <button class="btn btn-sec" style="width:auto;padding:2px 8px;font-size:12px" onclick="zfOpsRelease(${Number(x.id)})">풀기</button></div>`).join('') : '<div style="font-size:13px;color:var(--ink-3)">숨긴 묶음 없음</div>';
+  return `<p class="slabel" style="margin:0 0 0.5rem">🛠 운영 <span style="font-size:12px;color:var(--ink-3);font-weight:400">${zfOpsTime(b.now)}</span>`
     + ` <button class="btn btn-sec" style="width:auto;padding:2px 8px;font-size:12px;margin-left:6px" onclick="zfOpsLoad()">새로 고침</button></p>`
     + out.join('')
     + `<div style="border-top:1px solid #eee;padding-top:8px;margin-top:4px"><p style="font-size:13px;font-weight:600;margin:0 0 4px">목록에서 숨긴 묶음</p>${hideRows}`
@@ -13258,7 +13259,7 @@ function zfOpsHtml(b, issues){
     + `<input id="zfOpsHideId" placeholder="공고 ID" style="flex:1 1 140px;min-width:0" aria-label="숨길 공고 ID">`
     + `<input id="zfOpsHideReason" placeholder="숨기는 사유(필수)" style="flex:2 1 200px;min-width:0" aria-label="숨기는 사유">`
     + `<button class="btn btn-sec" onclick="zfOpsHide()">묶음 숨기기</button></div>`
-    + `<p id="zfOpsHideMsg" style="font-size:12px;color:#888;margin:6px 0 0">같은 제목 묶음(LH·마이홈 행 · 나중에 들어오는 같은 제목)이 목록·분석 대기열에서 함께 빠져요.</p></div>`;
+    + `<p id="zfOpsHideMsg" style="font-size:12px;color:var(--ink-3);margin:6px 0 0">같은 제목 묶음(LH·마이홈 행 · 나중에 들어오는 같은 제목)이 목록·분석 대기열에서 함께 빠져요.</p></div>`;
 }
 async function zfOpsHide(){
   const id = (document.getElementById('zfOpsHideId') || {}).value || '', reason = (document.getElementById('zfOpsHideReason') || {}).value || '';
