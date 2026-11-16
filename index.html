@@ -2163,7 +2163,11 @@ function zfRouteWinsAll(row){
   }
   wins.sort((p, q) => p.x - q.x);
   const merged = [];
-  wins.forEach(c => { const m = merged[merged.length - 1]; if(m && c.x <= m.y + 864e5){ if(c.y > m.y){ m.y = c.y; m.de = c.de; } m.ph = m.ph.concat(c.ph); m.rt = m.rt.concat(c.rt); m.ids = m.ids.concat(c.ids); } else merged.push(Object.assign({}, c)); });
+  // 🔴 2026-11-16(우편함 「코드·운영 — 🔴 순위별 접수 창 …」) — 하루 차로 붙은 행은 같은 대상 순위(phase_text 원문)일 때만 한 창이다.
+  //    순위가 다르면 따로 센다 — 연천전곡1 …20996 「1,2순위」 11-16 · 「3순위」 11-17 이 한 창으로 묶여, LH 가 첫 창 끝에 단 「접수마감」이
+  //    다음 날 3순위 창까지 닫았다(인천 남동구 …20987·…21031 같은 꼴). 겹치는 행 · 순위 글자가 빈 행 · 같은 순위가 이어지는 행(인터넷→현장)은 종전대로 한 창.
+  const zfSameWave = (m, c) => c.x <= m.y || !c.ph.length || !m.ph.length || c.ph.some(p => m.ph.includes(p));
+  wins.forEach(c => { const m = merged[merged.length - 1]; if(m && c.x <= m.y + 864e5 && zfSameWave(m, c)){ if(c.y > m.y){ m.y = c.y; m.de = c.de; } m.ph = m.ph.concat(c.ph); m.rt = m.rt.concat(c.rt); m.ids = m.ids.concat(c.ids); } else merged.push(Object.assign({}, c)); });
   return merged.length < 2 ? null : { merged, today, s0, e0, routes: new Set(wins.flatMap(w => w.rt)).size };
 }
 // 기본 창 — 오늘이 어느 창 안이면 그 창 · 창 사이면 다음 창 · 모두 끝났으면 마지막 창 · 모두 전이면 첫 창(다운님 설계 「기본 노출 = 오늘 날짜에 해당하는 창」).
@@ -2245,11 +2249,21 @@ function zfFillWinSlots(){
 // 🔵 2026-10-19(우편함 「표시층 — 덧 셋」 ①) — 다음 창의 대상 순위(경로 행 phase_text 원문)와, 경로가 갈리는 카드면 그 창의 경로(route)도 함께 돌려준다.
 //    글자는 원문 그대로이고 띄어쓰기·가운뎃점만 좁힌다(「1순위 (일반) ⋅ 2순위」 → 「1순위(일반)·2순위」). 경로가 하나뿐인 카드는 경로 글자를 내지 않는다.
 const zfPhaseShort = t => String(t || '').replace(/\s*\(\s*/g, '(').replace(/\s*\)/g, ')').replace(/\s*[⋅·]\s*/g, '·').trim();
+// 🔴 2026-11-16(우편함 「코드·운영 — 🔴 순위별 접수 창 …」) — 첫 창 **안**인데 LH 가 「…마감」을 달았고 다음 창이 남았으면 그 마감은 첫 창의 끝이다
+//    (LH 상태 전환은 첫 창 끝 직후 — zfLhSaysClosed 주석) — 「원문 날짜 > 목록 상태」로 닫지 않고 창 사이처럼 다음 창을 기다린다(「접수 예정」 + 다음 창 순위).
+//    둘째 이후 창 안은 종전대로 날짜(zfInLaterWin) · 창 하나 · 경로 행 전은 종전대로 LH 를 믿는다.
 function zfRouteGap(row){
   const W = zfRouteWins(row);
-  if(!W || W.merged.some(m => m.x <= W.today && W.today <= m.y)) return null;
-  const nxt = W.merged.find(m => m.x > W.today);
-  if(!nxt) return { state: 'closed' };
+  if(!W) return null;
+  const inI = W.merged.findIndex(m => m.x <= W.today && W.today <= m.y);
+  let nxt;
+  if(inI >= 0){
+    if(!(inI === 0 && W.merged.length > 1 && String((row && row.source) || '') === 'LH' && statusSaysClosed(row))) return null;
+    nxt = W.merged[1];
+  } else {
+    nxt = W.merged.find(m => m.x > W.today);
+    if(!nxt) return { state: 'closed' };
+  }
   const phase = [...new Set(nxt.ph.map(zfPhaseShort).filter(Boolean))].join('·');
   const route = W.routes > 1 ? [...new Set(nxt.rt)].join('·') : '';
   return { state: 'before', next: nxt.d, nextEnd: nxt.de, phase, route };

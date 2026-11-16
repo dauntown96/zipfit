@@ -19,7 +19,7 @@ import { judgeCronNames } from './cron-names.mjs'
 import { RENT_ARITH_SQL, rentArith, rentArithValue, rentWarnMissingSql } from './rent-arith.mjs'
 import { judgeApiExpiry } from './api-expiry.mjs'
 import { screenRunSql, judgeScreenRun } from './screen-run.mjs'
-import { ELIG_FORM_NULL_SQL, RENT_NULL_SQL, ROUND_MIX_SQL, judgeEligFormNull, judgeRentNull, judgeRoundMix } from './open-gaps.mjs'
+import { ELIG_FORM_NULL_SQL, RENT_NULL_SQL, ROUND_MIX_SQL, LH_CLOSED_WIN_SQL, judgeEligFormNull, judgeRentNull, judgeRoundMix, judgeLhClosedWin } from './open-gaps.mjs'
 import { readdirSync, readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 
@@ -1524,6 +1524,7 @@ for (const [id, name, sql, judge] of [
   ['elig_form_null', '열린 카드 자격 행 공급 형태(supply_form) 빔', ELIG_FORM_NULL_SQL, judgeEligFormNull],
   ['rent_null_not_jeonse', '열린 카드 전세 아닌 세대 행 월세(monthly_rent) 빔', RENT_NULL_SQL, judgeRentNull],
   ['round_mix', '열린 카드 묶음에 다른 회차 경로·서류 행(정보 — 화면 회차 거르기가 받쳐야 함)', ROUND_MIX_SQL, judgeRoundMix],   // 2026-10-29 ㉖
+  ['lh_closed_win_left', 'LH 「…마감」인데 원문 접수 창이 남은 열린 카드(일정 표만 · 경로 행 0)', LH_CLOSED_WIN_SQL, judgeLhClosedWin],   // 2026-11-16 ㉛
 ]) {
   try {
     const [x] = await sqlRead(sql)
