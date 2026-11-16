@@ -1240,7 +1240,7 @@ html.zf12 .zf12-off{display:none!important}
 html.zf12 .zf12-card .zf3-ctop{flex-wrap:wrap;row-gap:6px}
 html.zf12 .zf12-badges{display:contents}
 html.zf12 .zf12-badges .chip{display:inline-flex;align-items:center;min-height:24px;padding:2px 8px!important;border-radius:var(--r-1);font-size:var(--t-xs)!important;font-weight:700;background:var(--warn-bg)!important;border:1px solid var(--warn)!important;color:var(--warn)!important;cursor:default}
-html.zf12 .zf12-cov{font-size:var(--t-xs);color:var(--ink-2)}
+html.zf12 .zf12-cov{font-size:var(--t-xs);color:var(--ink-3)}
 html.zf12 .zf12-badges .chip[role=button]{position:relative}
 html.zf12 .zf12-badges .chip[role=button]::after{content:"";position:absolute;left:0;right:0;top:-10px;bottom:-10px}   /* 누르는 자리 44px(보이는 높이 24 + 위아래 10) */
 html.zf12 .zf3-dpill.zf12-soon{background:var(--warn-bg)!important;border-color:var(--warn)!important;color:var(--warn)!important}
@@ -1257,10 +1257,10 @@ html.zf12 .zf12-cond{font-weight:500;color:var(--ink-2)}
 /* 겉 ⑤ 언제 — 노선 한 줄(● 지남 · ◉ 다음 · ○ 앞으로) */
 html.zf12 .zf12-when{display:flex;align-items:center;gap:6px;margin:8px 0 12px;font-size:var(--t-xs);color:var(--ink-2);white-space:nowrap;overflow:hidden}
 html.zf12 .zf12-w{display:inline-flex;align-items:baseline;gap:3px;font-family:var(--f-ui)}
-html.zf12 .zf12-w .k{color:var(--ink-3)}
+html.zf12 .zf12-w .zf12-k{color:var(--ink-3)}
 html.zf12 .zf12-w.past{color:var(--ink-3)}
 html.zf12 .zf12-w.next{color:var(--ink);font-weight:700}
-html.zf12 .zf12-w.next .k{color:var(--ink)}
+html.zf12 .zf12-w.next .zf12-k{color:var(--ink)}
 html.zf12 .zf12-m{font-size:10px;line-height:1}
 html.zf12 .zf12-sep{color:var(--ink-3)}
 /* 안 2층 머리 — 겉에서 내린 것 · 꼭 볼 것 · 정정 · ㎡당 */
@@ -15644,7 +15644,7 @@ function zf12WhenHTML(n){
   return items.map(([k, d, u], i) => {
     const cls = !d ? 'unk' : d < today ? 'past' : i === nextI ? 'next' : 'fut';
     const mark = cls === 'past' ? '●' : cls === 'next' ? '◉' : '○';
-    return `<span class="zf12-w ${cls}"><span class="zf12-m" aria-hidden="true">${mark}</span><span class="k">${k}</span> ${d ? escapeHtml(zf3Md(d)) : escapeHtml(u || '원문 확인')}</span>`;
+    return `<span class="zf12-w ${cls}"><span class="zf12-m" aria-hidden="true">${mark}</span><span class="zf12-k">${k}</span> ${d ? escapeHtml(zf3Md(d)) : escapeHtml(u || '원문 확인')}</span>`;
   }).join('<span class="zf12-sep" aria-hidden="true">›</span>');
 }
 const ZF12_FRONT_KEEP = el => el.matches('.zf3-ctop,.htop,.haddr,.zf12-who,[data-sum-for],.zf12-when,.zf12-l2-host,[id^="ncard-"],[id^="mcard-"],.zf3-close') || el.hidden || getComputedStyle(el).display === 'none';
