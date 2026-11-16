@@ -23,7 +23,7 @@
 |---|---|---|---|
 | `www.bmc.busan.kr` | 부산도시공사 게시판 · 첨부 | EF `fetch-attachment` `SEOUL_ONLY`(`_shared/board-hosts.ts`) | 싱가포르 DB Apache 403(2026-10-12) |
 | `business.juso.go.kr` | 도로명주소 검색 API · 좌표제공 검색 API(후보 9 · 키 `JUSO_SEARCH_KEY` · `JUSO_COORD_KEY`) | EF `seoul-api` `api=juso_search` · `api=juso_coord`(2026-11-16 · 인자는 `juso_search` 결과의 `admCd` · `rnMgtSn` · `udrtYn` · `buldMnnm` · `buldSlno` · 답 `entX`·`entY` = GRS80 UTM-K) — 키는 EF 비밀값에서만 · 호스트·경로·인자 고정 · 2026-11-16 두 키 EF 비밀값 등록(다운님) 뒤 29주소·좌표 18 실호출 200 · ⚠️ juso는 몰아 부르면 `E0007`(짧은 시간 다량 요청) — 순차·간격 | 컨테이너 TLS reset 10회+ · 싱가포르 DB robots는 200(2026-11-12) |
-| `data.myhome.go.kr` | LH 공공임대주택 단지정보 15058476 `rentalHouseList`(후보 6b · data.go.kr 키) | EF `seoul-api` `api=myhome_rental_list` | 컨테이너 TLS reset 6/6 · 싱가포르 DB 시간 초과(2026-11-12) |
+| `data.myhome.go.kr` | LH 공공임대주택 단지정보 15058476 `rentalHouseList`(후보 6b · data.go.kr 키) · 마이홈 단지정보 15110581 `rentalHouseGwList`(6a의 이 호스트 경로 — 6b code 30 가르기 · 2026-11-16) | EF `seoul-api` `api=myhome_rental_list` · `api=myhome_rental_gw` | 컨테이너 TLS reset 6/6 · 싱가포르 DB 시간 초과(2026-11-12) |
 | `www.myhome.go.kr` | (사이트 — 받지 않음: 약관상 승인 전 받는 길 없음 · 원천 3) · 🔴 2026-11-16 LH 주거복지계획처 답(다운님 민원): 마이홈 첨부 대량 자동 수집은 robots.txt로 제한 · 공고 정보는 OpenAPI 15108420(원천 3) 권장 · API는 첨부 경로를 주지 않음 · 공공데이터법 준수 · LH 공식 서비스와 혼동 주의 → **마이홈 사이트·첨부는 받지 않음(확정)** | — | 해외 IP 막음(조사 2026-11-05) |
 
 `seoul-api`는 표에 적은 API만 부른다(그 밖 0 · 호출자가 URL·키를 주지 않는다) · 인증 `x-cron-secret` · 실행 인스턴스마다 API별 분당 60회 · 쓰기 0. 새 API를 더하려면 그 함수의 `APIS` 표와 이 표를 같은 PR에서 고친다.
