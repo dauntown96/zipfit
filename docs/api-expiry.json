@@ -13,6 +13,6 @@
     { "portal": "data.go.kr", "api": "마이홈 기존임대주택 목록 5종(파일데이터)", "key": "LH_API_KEY · MOLIT_RENT_API_KEY · ODCLOUD_API_KEY(같은 값)", "applied": "2026-06-25", "expires": null, "account": "개발" },
     { "portal": "data.go.kr", "api": "청약홈 분양정보 · 경쟁률·특별공급 · 신청·당첨자(이미 승인)", "key": "LH_API_KEY · MOLIT_RENT_API_KEY · ODCLOUD_API_KEY(같은 값)", "applied": "2026-06-23", "expires": null, "account": "개발" },
     { "portal": "juso.go.kr", "api": "도로명주소 검색", "key": "JUSO_SEARCH_KEY", "applied": "2026-11-12", "expires": null, "account": "개발" },
-    { "portal": "juso.go.kr", "api": "좌표제공 검색(승인 중)", "key": "JUSO_COORD_KEY(가칭 — 이름은 다운님 확정 뒤)", "applied": null, "expires": null, "account": "개발" }
+    { "portal": "juso.go.kr", "api": "좌표제공 검색", "key": "JUSO_COORD_KEY", "applied": null, "expires": null, "account": "개발" }
   ]
 }

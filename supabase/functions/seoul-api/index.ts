@@ -47,6 +47,12 @@ export const APIS: Record<string, Api> = {
     host: 'business.juso.go.kr', path: '/addrlink/addrLinkApi.do', keyParam: 'confmKey', keyEnv: 'JUSO_SEARCH_KEY',
     params: ['keyword', 'currentPage', 'countPerPage', 'hstryYn', 'firstSort', 'addInfoYn'], fixed: { resultType: 'json' },
   },
+  // 행정안전부 좌표제공 검색(juso · 승인키 JUSO_COORD_KEY · 2026-11-16 추가). 인자는 juso_search 결과 칸 그대로
+  // (admCd 행정구역코드 · rnMgtSn 도로명코드 · udrtYn 지하 · buldMnnm/buldSlno 건물 본번·부번) → entX·entY(GRS80 UTM-K).
+  juso_coord: {
+    host: 'business.juso.go.kr', path: '/addrlink/addrCoordApi.do', keyParam: 'confmKey', keyEnv: 'JUSO_COORD_KEY',
+    params: ['admCd', 'rnMgtSn', 'udrtYn', 'buldMnnm', 'buldSlno'], fixed: { resultType: 'json' },
+  },
   // LH 공공임대주택 단지정보 15058476(data.myhome.go.kr 전용 · data.go.kr 키 — LH_API_KEY 와 같은 값)
   myhome_rental_list: {
     host: 'data.myhome.go.kr', path: '/rentalHouseList', keyParam: 'serviceKey', keyEnv: 'LH_API_KEY',
