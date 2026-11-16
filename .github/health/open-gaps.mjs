@@ -9,11 +9,19 @@ with ok as materialized (select distinct a.title_dedup_key k from public.announc
         where a.apply_end >= (now() at time zone 'Asia/Seoul')::date and a.hidden_from_listing is not true and a.title not like '%조기%마감%'),
      g as materialized (select a.announcement_id, a.title, a.housing_type from public.announcements a join ok on ok.k = a.title_dedup_key)`
 
+// 🔵 2026-11-16(우편함 「코드·운영 — 단지 도로명·좌표 표 …」 0장 ① · claude.ai 판정) — 원문에 공급 형태 구분이 아예 없는 공고는 supply_form 을 비운 것이
+//    원문 충실이다. 그 공고는 경고 셈(n) 밖 exempt 로 따로 세어 ℹ️ 로 보인다 · 공고마다 근거(원문 쪽·문장)를 함께 적는다 · 더할 때는 판정을 받은 뒤.
+export const ELIG_FORM_EXEMPT = [
+  { id: '2015122300021004', why: '파주시 중소기업체 기관공급(행복주택) — 공고문 p.3 「우선공급은 없습니다」 · 원문에 공급 형태 구분 없음(claude.ai 판정 2026-11-16)' },
+]
+const EXEMPT_IDS = `array[${ELIG_FORM_EXEMPT.map(x => `'${x.id}'`).join(', ')}]::text[]`
 export const ELIG_FORM_NULL_SQL = `${OPEN_GROUP}
 select json_build_object('groups', (select count(*) from ok),
   'rows', (select count(*) from public.eligibility_criteria e join g using (announcement_id)),
-  'n', (select count(*) from public.eligibility_criteria e join g using (announcement_id) where e.supply_form is null),
-  'ids', (select coalesce(json_agg(distinct e.announcement_id), '[]'::json) from public.eligibility_criteria e join g using (announcement_id) where e.supply_form is null)) j`
+  'n', (select count(*) from public.eligibility_criteria e join g using (announcement_id) where e.supply_form is null and e.announcement_id <> all(${EXEMPT_IDS})),
+  'ids', (select coalesce(json_agg(distinct e.announcement_id), '[]'::json) from public.eligibility_criteria e join g using (announcement_id) where e.supply_form is null and e.announcement_id <> all(${EXEMPT_IDS})),
+  'exempt', (select count(*) from public.eligibility_criteria e join g using (announcement_id) where e.supply_form is null and e.announcement_id = any(${EXEMPT_IDS})),
+  'exempt_ids', (select coalesce(json_agg(distinct e.announcement_id), '[]'::json) from public.eligibility_criteria e join g using (announcement_id) where e.supply_form is null and e.announcement_id = any(${EXEMPT_IDS}))) j`
 
 // 「전세」는 그 세대 행이 걸린 공고의 제목·유형에서 본다(든든전세·전세임대 — 월세가 원래 없다 · 2026-10-22 실측 열린 묶음 월세 NULL 688행 전부 이 꼴).
 // 🔵 2026-11-10(우편함 「코드·운영 — 11-09 정돈 셋 …」 0장 1 · claude.ai 판정) — 원문이 월세를 「월 임대료 약 N만원」(확정 금액 아님 · 개별 안내)으로만
@@ -32,9 +40,11 @@ select json_build_object('rows', (select count(*) from public.housing_units h jo
            where ${RENT_GAP} and ${RENT_APPROX})) j`
 
 export function judgeEligFormNull(j) {
-  const rule = '0 — 열린 묶음(열린 행의 제목 키와 같은 키의 행) 자격 행 중 supply_form NULL · 넘으면 ⚠️ 경고만(자격 표 머리가 비거나 지어질 수 있음 — 원문 공급 형태 확인 · 채우기는 운영 데이터 쓰기 몫)'
-  if (j.n === 0) return { status: 'pass', value: `0(열린 묶음 ${j.groups} · 자격 행 ${j.rows})`, rule }
-  return { status: 'warn', value: `${j.n}행: ${j.ids.slice(0, 5).join(', ')} — 자격 표 머리가 비거나 지어질 수 있음 · 원문 공급 형태 확인`, rule }
+  const rule = '0 — 열린 묶음(열린 행의 제목 키와 같은 키의 행) 자격 행 중 supply_form NULL · 넘으면 ⚠️ 경고만(자격 표 머리가 비거나 지어질 수 있음 — 원문 공급 형태 확인 · 채우기는 운영 데이터 쓰기 몫) · 원문에 공급 형태 구분이 없다고 판정된 공고(open-gaps.mjs ELIG_FORM_EXEMPT)는 셈 밖 ℹ️'
+  const ex = j.exempt || 0
+  const exv = ex ? ` · 예외 ${ex}행(${(j.exempt_ids || []).slice(0, 5).join(', ')} — 원문에 공급 형태 구분 없음)` : ''
+  if (j.n === 0) return { status: ex ? 'info' : 'pass', value: `0(열린 묶음 ${j.groups} · 자격 행 ${j.rows}${exv})`, rule }
+  return { status: 'warn', value: `${j.n}행: ${j.ids.slice(0, 5).join(', ')} — 자격 표 머리가 비거나 지어질 수 있음 · 원문 공급 형태 확인${exv}`, rule }
 }
 
 export function judgeRentNull(j) {
