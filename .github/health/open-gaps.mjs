@@ -80,3 +80,32 @@ export function judgeRoundMix(j) {
   if (!ids.length) return { status: 'info', value: `0(열린 카드 ${j.cards} · 다른 회차 ID 있는 카드 ${j.other_cards})`, rule }
   return { status: 'info', value: `${ids.length}: 경로 ${j.route.length}(${j.route.slice(0, 5).join(', ')}) · 서류 ${j.doc.length}(${j.doc.slice(0, 5).join(', ')}) — 화면 회차 거르기가 받쳐야 하는 카드`, rule }
 }
+
+// ㉛ LH 「…마감」인데 원문 접수 창이 남은 열린 카드(2026-11-16 · 우편함 「코드·운영 — 🔴 순위별 접수 창 …」 3 · 연천전곡1 …20996).
+//    LH 목록 상태(PAN_SS)는 첫 창 끝 직후 「접수마감」으로 바뀐다 — 다음 순위 창이 남은 카드는 화면이 경로 표 창(zfRouteWinsAll · zfRouteGap)으로
+//    「접수 예정 · 다음 창」을 세운다. 그 장치는 **경로 표(announcement_apply_routes)** 만 본다 — 일정 표(announcement_schedule 접수 행)에만 남은 창이 있고
+//    경로 행이 없는 카드는 화면이 LH 「…마감」으로 닫는다(기준 ① 틀린 「마감」). 그 꼴이 ⚠️ · 경로 표로 받치는 카드 수는 ℹ️ 값 칸.
+//    대상 = LH 행 ∧ status 「…마감」 ∧ apply_end ≥ 오늘 KST ∧ 숨김 아님 · 남은 창 = 같은 제목 키 묶음의 경로·일정(접수) 행 중 시작 > 오늘 KST.
+//    🔴 ⚠️ 경고만 · gate.mjs HARD 밖(안 멈춤 — 고침은 데이터(경로 행)나 화면 회차) · SQL 실패는 ⚠️ 점검 불능.
+export const LH_CLOSED_WIN_SQL = `
+with t as (select (now() at time zone 'Asia/Seoul')::date d),
+lh as materialized (select a.announcement_id, a.title_dedup_key k from public.announcements a, t
+        where a.source = 'LH' and a.status ~ '마감$' and a.apply_end >= t.d and a.hidden_from_listing is not true),
+g as materialized (select lh.announcement_id, x.announcement_id aid from lh join public.announcements x on x.title_dedup_key = lh.k),
+z as (select lh.announcement_id,
+        exists (select 1 from g join public.announcement_apply_routes r on r.announcement_id = g.aid, t where g.announcement_id = lh.announcement_id and r.start_date > t.d) route_ahead,
+        exists (select 1 from g join public.announcement_schedule s on s.announcement_id = g.aid, t where g.announcement_id = lh.announcement_id and s.stage = '접수' and s.start_date > t.d) sched_ahead,
+        exists (select 1 from g join public.announcement_apply_routes r on r.announcement_id = g.aid where g.announcement_id = lh.announcement_id) has_route
+      from lh)
+select json_build_object('lh_closed', (select count(*) from lh),
+  'covered', (select count(*) from z where route_ahead),
+  'covered_ids', (select coalesce(json_agg(announcement_id order by announcement_id), '[]'::json) from z where route_ahead),
+  'n', (select count(*) from z where sched_ahead and not has_route),
+  'ids', (select coalesce(json_agg(announcement_id order by announcement_id), '[]'::json) from z where sched_ahead and not has_route)) j`
+
+export function judgeLhClosedWin(j) {
+  const rule = '0 — LH 행 status 「…마감」 ∧ 열린 기간인데 같은 제목 키 묶음 일정 표에 시작 > 오늘(KST) 접수 행이 남았고 경로 표 행이 0인 카드(화면이 그 창을 못 봐 LH 마감으로 닫음) · 넘으면 ⚠️ 경고만 · 경로 표로 화면이 받치는 카드 수는 값 칸(ℹ️)'
+  const cov = j.covered ? ` · 경로 표로 받침 ${j.covered}(${j.covered_ids.slice(0, 5).join(', ')})` : ''
+  if (j.n === 0) return { status: j.covered ? 'info' : 'pass', value: `0(LH 마감 열린 행 ${j.lh_closed}${cov})`, rule }
+  return { status: 'warn', value: `${j.n}: ${j.ids.slice(0, 5).join(', ')} — 일정 표에만 남은 접수 창(경로 행 0) · 화면이 「마감」으로 닫음${cov}`, rule }
+}
