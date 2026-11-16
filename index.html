@@ -1236,6 +1236,7 @@ html[data-ui="d3"] .pg-btn{min-width:var(--hit);height:var(--hit);font-size:var(
 @media (prefers-reduced-motion:reduce){html[data-ui="d3"] .zf3-done,html[data-ui="d3"] .zf3-today,html[data-ui="d3"] .zf3-sk,html[data-ui="d3"] .zf3-go span{animation:none!important;transition:none!important}}
 /* 🧪 12월 재편 A·B 새 시안(병합 0 · 설계 「📐 12월 재편」 9·13·14·15절 · Design System v3 토큰만) */
 html.zf12 .zf12-off{display:none!important}
+html.zf12 .hcard.zf-ana-pending :is(.zf12-when,.zf12-badges){display:none!important}   /* 분석 전 카드 — 「분석 중」만(수집값 날짜·상태·경고 칩 0 — 종전 .zf-ana-pending 규칙과 같은 거름) */
 /* 겉 ① 유형 · (지역) · 상태 알약 · 경고 배지(빨강 하나 — 경고만) */
 html.zf12 .zf12-card .zf3-ctop{flex-wrap:wrap;row-gap:6px}
 html.zf12 .zf12-badges{display:contents}
