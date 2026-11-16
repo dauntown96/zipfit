@@ -58,6 +58,12 @@ export const APIS: Record<string, Api> = {
     host: 'data.myhome.go.kr', path: '/rentalHouseList', keyParam: 'serviceKey', keyEnv: 'LH_API_KEY',
     params: ['brtcCode', 'signguCode', 'numOfRows', 'pageNo'], fixed: {},
   },
+  // 마이홈 공공임대 단지정보 15110581 의 data.myhome.go.kr 경로(2026-11-16 · 15058476 code 30 가르기 — 같은 키 · 같은 호스트에서
+  // 이 경로도 code 30 이면 호스트 축, 200 이면 15058476 신청 축). 같은 데이터는 apis.data.go.kr/1613000/HWSPR04/rentalHouseGwList 로도 받는다.
+  myhome_rental_gw: {
+    host: 'data.myhome.go.kr', path: '/rentalHouseGwList', keyParam: 'serviceKey', keyEnv: 'LH_API_KEY',
+    params: ['brtcCode', 'signguCode', 'numOfRows', 'pageNo'], fixed: {},
+  },
 }
 
 const json = (body: unknown, status = 200, extra: Record<string, string> = {}) =>
