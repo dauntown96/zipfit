@@ -1339,6 +1339,43 @@ html.zf12 .zf12-eh summary{cursor:pointer;list-style:none;font-weight:700;color:
 html.zf12 .zf12-eh summary::-webkit-details-marker{display:none}
 html.zf12 .zf12-eh summary::after{content:" ▾";color:var(--ink-3);font-weight:400}
 html.zf12 .zf12-eh[open] summary::after{content:" ▴"}
+/* ⚠️ 시안 전용(미리보기 가지 · 병합하지 않음 · 우편함 「조사 — 디자인 2차 독립 조사 → 독립 시안」) — ?mood=cc3|cc4 일 때만.
+   근거(2026-11-17 측정): 네이버·다방·교보 첫 화면 — 본문 14~16px(12px 3~19% · 11px 이하 2~5%) · 위 410px = 로고 → 검색(+AI 입구) → 바로가기 줄 · 키프레임 0~1 */
+html[data-mood^="cc"]{--r-1:8px;--r-2:8px;--r-3:16px}
+html[data-mood^="cc"] #zf3Board{display:none}
+html[data-mood^="cc"] .zf3-search{margin:6px 0 8px}
+html[data-mood^="cc"] .zf3-search input{min-height:48px;border-radius:16px;font-size:15px}
+html[data-mood^="cc"] .zfcc-types{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 0 10px;padding:2px 0}
+html[data-mood^="cc"] .zfcc-types button{all:unset;box-sizing:border-box;flex:none;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-width:64px;min-height:64px;padding:8px 6px;border-radius:16px;background:var(--surface);border:1px solid var(--line);color:var(--ink);font:600 13px/1.2 var(--f-ui);cursor:pointer;transition:transform .1s var(--ease),background .15s var(--ease)}
+html[data-mood^="cc"] .zfcc-types button i{font-style:normal;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;color:#fff;font:700 13px/1 var(--f-ui)}
+html[data-mood^="cc"] .zfcc-types button.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+html[data-mood^="cc"] .zfcc-types button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+html[data-mood^="cc"] .zf3-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;overflow:visible;mask-image:none;margin:8px 0 6px}
+@media (min-width:720px){html[data-mood^="cc"] .zf3-stats{grid-template-columns:repeat(4,minmax(0,1fr))}}
+html[data-mood^="cc"] .zf3-stat{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;min-height:64px;padding:10px 14px;border-radius:16px;background:var(--surface);background-image:none;border:1px solid var(--line);color:var(--ink-2);font-size:13px;white-space:normal}
+html[data-mood^="cc"] .zf3-stat b{font:700 22px/1 var(--f-ui);color:var(--ink);text-shadow:none}
+html[data-mood^="cc"] .zf3-stat.hot b{color:var(--warn);text-shadow:none}
+html[data-mood^="cc"] .zf3-stat.on{box-shadow:inset 0 0 0 2px var(--ink)}
+html[data-mood^="cc"] #notice-list .hcard.zf3-card{border-radius:16px;padding:14px 16px 0 18px}
+html[data-mood^="cc"] #notice-list .zf3-in{animation:none}
+html[data-mood^="cc"] #notice-list .hname{font-size:16px;line-height:1.4}
+html[data-mood^="cc"] #notice-list .haddr{font-size:14px}
+html[data-mood^="cc"] #notice-list [data-sum-for] > div{font-size:14px}
+html[data-mood^="cc"] #notice-list .zf12-when{font-size:13px}
+html[data-mood^="cc"] #notice-list .zf3-dpill{font-size:12px}
+html[data-mood^="cc"] :is(.hcard,.zf3-go,.zf3-stat,.zfcc-types button,button.chip):active{transform:scale(.98)}
+html[data-mood^="cc"] :is(.hcard,.zf3-go,.zf3-stat){transition:transform .1s var(--ease),border-color .15s var(--ease),box-shadow .15s var(--ease)}
+/* cc4 — 카드 겉 가격·언제 줄을 세 칸 표로(값은 카드에 이미 있는 글자 그대로 옮김) */
+html[data-mood="cc4"] #notice-list .zf12-card > [data-sum-for]{display:none}
+html[data-mood="cc4"] #notice-list .zf12-card > .zf12-when:has(> .zfcc-spec) > :not(.zfcc-spec){display:none}
+html[data-mood="cc4"] #notice-list .zf12-card > .zf12-when:has(> .zfcc-spec){display:block;padding:0;margin:10px 0 14px;border:0;background:none}
+html[data-mood="cc4"] .zfcc-spec{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid var(--line);border-radius:8px;overflow:hidden}
+html[data-mood="cc4"] .zfcc-spec > span{display:block;padding:8px 10px;min-width:0}
+html[data-mood="cc4"] .zfcc-spec > span + span{border-left:1px solid var(--line)}
+html[data-mood="cc4"] .zfcc-spec .k{display:block;font:400 12px/1.3 var(--f-ui);color:var(--ink-3);margin:0 0 3px}
+html[data-mood="cc4"] .zfcc-spec .v{display:block;font:600 14px/1.35 var(--f-ui);color:var(--ink);word-break:keep-all;white-space:normal}
+html[data-mood="cc4"] .zfcc-spec .s{display:block;font:400 12px/1.3 var(--f-ui);color:var(--ink-2)}
+@media (min-width:1200px){html[data-mood="cc4"] #notice-list .zf12-card > .zf12-when:has(> .zfcc-spec){grid-column:2;grid-row:1 / span 3;align-self:center;margin:0}}
 html.zf12 .zf12-eh-full{display:block;margin-top:6px;font-weight:400;color:var(--ink-2);font-size:var(--t-xs);line-height:1.6}
 </style>
 </head>
@@ -16053,6 +16090,58 @@ function zf12EligTidy(root){
     h.innerHTML = `<details class="zf12-eh"><summary>${escapeHtml(short)}</summary><span class="zf12-eh-full">${escapeHtml(full)}</span></details>`;
   });
 }
+</script>
+<!-- ⚠️ 시안 전용(미리보기 가지 · 병합하지 않음) — ?mood=cc3|cc4 일 때만. 새 사실 0 · 값은 화면에 이미 있는 글자를 옮길 뿐. -->
+<script>
+(function(){
+  const m = (new URLSearchParams(location.search).get('mood') || '').toLowerCase();
+  if(m !== 'cc3' && m !== 'cc4') return;
+  document.documentElement.setAttribute('data-mood', m);
+  // 유형 바로가기 줄 — 거름 시트의 유형 칩(#noticeTypeChips)을 그대로 눌러 준다(거름 규칙 새로 0).
+  const TYPE_LN = [['국민', '--ln-kuk'], ['행복', '--ln-hang'], ['영구', '--ln-young'], ['공공', '--ln-gong'], ['매입', '--ln-mae'], ['전세', '--ln-jeon']];
+  const lnOf = t => (TYPE_LN.find(([k]) => t.includes(k)) || [0, '--ln-gi'])[1];
+  function typesRow(){
+    const search = document.querySelector('#main2 .zf3-search');
+    const src = document.getElementById('noticeTypeChips');
+    if(!search || !src) return;
+    const chips = [...src.querySelectorAll('.chip')].filter(c => c.textContent.trim());
+    if(!chips.length) return;
+    let row = document.querySelector('.zfcc-types');
+    if(!row){ row = document.createElement('div'); row.className = 'zfcc-types'; row.setAttribute('role', 'group'); row.setAttribute('aria-label', '공급 유형으로 거르기'); search.after(row); }
+    const sig = chips.map(c => c.textContent.trim() + (c.classList.contains('sel') ? '*' : '')).join('|');
+    if(row.dataset.sig === sig) return;
+    row.dataset.sig = sig;
+    row.innerHTML = chips.map((c, i) => { const t = c.textContent.trim(); return `<button type="button" data-i="${i}" class="${c.classList.contains('sel') ? 'on' : ''}" aria-pressed="${c.classList.contains('sel')}"><i aria-hidden="true" style="background:var(${t === '전체' ? '--ink-2' : lnOf(t)})">${escapeHtml(t.charAt(0))}</i>${escapeHtml(t)}</button>`; }).join('');
+    row.onclick = ev => { const b = ev.target.closest('button[data-i]'); if(!b) return; const c = chips[+b.dataset.i]; if(c) c.click(); setTimeout(typesRow, 50); };
+  }
+  // cc4 — 카드 겉 세 칸(임대 조건 · 접수 ~ 마감 · 발표). 글자는 카드의 가격 줄·언제 줄에서 그대로 옮긴다.
+  function specCards(){
+    if(m !== 'cc4') return;
+    document.querySelectorAll('#notice-list .zf12-card').forEach(card => {
+      const sum = card.querySelector(':scope > [data-sum-for]'), when = card.querySelector(':scope > .zf12-when');
+      if(!when) return;
+      const priceTxt = sum ? sum.textContent.replace(/\s+/g, ' ').trim() : '';
+      const w = [...when.querySelectorAll('.zf12-w')].map(x => ({ k: (x.querySelector('.zf12-k') || {}).textContent || '', v: x.textContent.replace((x.querySelector('.zf12-m') || {}).textContent || '', '').replace((x.querySelector('.zf12-k') || {}).textContent || '', '').trim() }));
+      const dd = (when.querySelector('.zf12-dd') || {}).textContent || '';
+      const get = k => (w.find(x => x.k === k) || {}).v || '';
+      const sig = [priceTxt, get('접수'), get('마감'), get('발표'), dd].join('|');
+      // 표는 「언제」 줄 안에 넣는다 — 카드 정리(ZF12_FRONT_KEEP)가 모르는 겉 요소를 상세 2층으로 옮기기 때문.
+      let spec = when.querySelector(':scope > .zfcc-spec');
+      if(spec && spec.dataset.sig === sig) return;
+      if(!spec){ spec = document.createElement('span'); spec.className = 'zfcc-spec'; when.appendChild(spec); }
+      spec.dataset.sig = sig;
+      const [price, cond] = priceTxt.split(' · 조건별');
+      const cell = (dt, v, small) => `<span><span class="k">${dt}</span><span class="v">${escapeHtml(v || '원문 확인')}</span>${small ? `<span class="s">${escapeHtml(small)}</span>` : ''}</span>`;
+      spec.innerHTML = cell('임대 조건', price ? price.replace(/ · 월/, '\n월').split('\n')[0] : '', price && price.includes(' · 월') ? '월' + price.split(' · 월')[1] + (cond !== undefined ? ' · 조건별 다름' : '') : '')
+        + cell('접수 ~ 마감', get('접수') && get('마감') ? `${get('접수').replace(/\(.\)$/, '')} ~ ${get('마감')}` : (get('접수') || get('마감')), dd)
+        + cell('발표', get('발표'));
+    });
+  }
+  const run = () => { try{ typesRow(); specCards(); }catch(e){ console.warn('mood', e); } };
+  const obs = new MutationObserver(() => { clearTimeout(obs.t); obs.t = setTimeout(run, 120); });
+  const start = () => { run(); const list = document.getElementById('main2'); if(list) obs.observe(list, { childList: true, subtree: true }); };
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+})();
 </script>
 </body>
 </html>
