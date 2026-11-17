@@ -849,6 +849,18 @@
      "ratio": null,
      "bg": null,
      "why": "pseudoContent"
+    },
+    "summary.hu-title|#333333": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": null
+    },
+    "summary.extras-title|#333333": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": null
     }
    }
   },
@@ -1693,5 +1705,6 @@
  "_note": "2026-11-12 — claude.ai 판정(#989 세 갈래 실제 대비 5.53·15.29·10.78)으로 --write-baseline 뒤 옛 기준선 갈래를 합쳤다(그날 첫 카드에 따라 갈래가 흔들려, 새로 잰 것만 두면 옛 갈래가 다시 「회귀」로 걸린다). · 2026-11-16 다시 씀(표시층 「12월 재편 A·B 새 시안」 0장 · claude.ai 승인): 위반 규칙·새 대비 미완 갈래는 그날 배포본(v304) 측정 · 그날 카드에 안 나타난 종전 대비 미완 갈래(62)는 상태별로 남김(다시 나타날 때 「아는 요소에 새 글자색」 거짓 실패를 막으려고)",
  "_note_2026_11_17": "우편함 「표시층 — 12월 재편 A·B 2차 시안」 0장 · #1054 — 갈래 7 더함(모두 pseudoContent · 페이지에서 잰 대비 10.11~14.23 ≥ 4.5): span|#3d424a(.zf3-bn 경로 가지 이름 --ink-2 · 영암 카드) ×3 상태 · 어두움 div.zf-rent-line|#ecedef · div|#ecedef(요약 가격 줄) · span|#c5c9d0(.zf3-bn 어두움) · match small|#3d424a(.zf3-wsw 「끝남」)",
  "_note_2026_11_17b": "우편함 「표시층 — 12월 재편 A·B 반영」 3 — detail-390 갈래 2 더함(pseudoContent · 페이지 계산 대비): b|#15171b(2층 「꼭 볼 것」 머리 · 17.94) · div.zf-rent-line|#4f6b62(2층으로 옮긴 ㎡당 줄 · 5.37)",
- "_note_2026_11_17c": "우편함 「표시층 — 작은 판 3」 4 — 12월 재편 새 요소 꼴 24(상태별 50) 더함 · 모두 pseudoContent·nonBmp(axe 미완) · 페이지에서 글자색 ↔ 실제 배경으로 잰 대비 최소 6.26(span.zf12-k·zf12-w·zf12-m #5a616b) ~ 17.94 · 미달 0: span.zf12-w/m/k/dd(겉 언제 줄 정거장) · span.zf12-cond/res · p.zf12-area · h4(꼭 볼 것) · span.zf12-pv(꼭 볼 것 머리 첫 문장)"
+ "_note_2026_11_17c": "우편함 「표시층 — 작은 판 3」 4 — 12월 재편 새 요소 꼴 24(상태별 50) 더함 · 모두 pseudoContent·nonBmp(axe 미완) · 페이지에서 글자색 ↔ 실제 배경으로 잰 대비 최소 6.26(span.zf12-k·zf12-w·zf12-m #5a616b) ~ 17.94 · 미달 0: span.zf12-w/m/k/dd(겉 언제 줄 정거장) · span.zf12-cond/res · p.zf12-area · h4(꼭 볼 것) · span.zf12-pv(꼭 볼 것 머리 첫 문장)",
+ "_note_2026_11_17d": "우편함 「표시층 — 작은 판 3」 4 덧 — 병합 뒤 배포본 점검(run 44046840809)에서 처음 본 꼴 2 더함: detail-390 summary.hu-title|#333333 · summary.extras-title|#333333(세대·사진 절 제목 · 배포본 detail-390에서 잰 대비 11.68 · 배경 #f7f6f2) · 미달 0"
 }
