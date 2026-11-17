@@ -2247,6 +2247,18 @@ function zfRouteWins(row){
   if(w && startOfLocalDay(w).getTime() < W.today) return null;
   return W;
 }
+// 🔴 2026-11-17(우편함 「표시층 — 🔴 기준 위반: 여러 날짜 벌 카드 …」 2) — 순위 낱말을 낱낱 순위로 편다(「1,2,3순위」 → 1순위 · 2순위 · 3순위 · 「1순위(일반)·2순위」는 한 덩어리 그대로).
+//    같은 순위가 날짜가 다른 두 창에 다시 나오면 창을 가르는 것은 순위가 아니라 단지(장소)다 — 부산 …21070 「1,2,3순위」 11-30(기장교리) · 「1순위」 12-01(동부권) ·
+//    광주 …21056 효천 1순위 12-01 · 수완 1순위 12-02. 그런 카드는 「기본 창」·순위 단추를 쓰지 않는다(한 단지 창이 카드 전체의 접수·마감으로 서지 않게).
+function zfPhaseTokens(t){
+  const s = String(t || '').replace(/\s+/g, '');
+  const m = s.match(/^(\d+(?:[,.·]\d+)*)(순위.*)$/);
+  return m ? m[1].split(/[,.·]/).filter(Boolean).map(n => n + m[2]) : (s ? [s] : []);
+}
+function zfWinsBySite(merged){
+  const seen = new Map();
+  return merged.some((m, i) => [...new Set(m.ph.flatMap(zfPhaseTokens))].some(k => { if(seen.has(k) && seen.get(k) !== i) return true; seen.set(k, i); return false; }));
+}
 function zfRouteWinsAll(row){
   if(!row || !zfSide.routesReady || row['apply_period_check'] === true || zfEarlyClosed(row)) return null;
   const S = parseNoticeDate(row['신청시작일'] || row['apply_start'] || ''), E = parseNoticeDate(row['신청마감일'] || row['apply_end'] || '');
@@ -2268,13 +2280,13 @@ function zfRouteWinsAll(row){
   //    다음 날 3순위 창까지 닫았다(인천 남동구 …20987·…21031 같은 꼴). 겹치는 행 · 순위 글자가 빈 행 · 같은 순위가 이어지는 행(인터넷→현장)은 종전대로 한 창.
   const zfSameWave = (m, c) => c.x <= m.y || !c.ph.length || !m.ph.length || c.ph.some(p => m.ph.includes(p));
   wins.forEach(c => { const m = merged[merged.length - 1]; if(m && c.x <= m.y + 864e5 && zfSameWave(m, c)){ if(c.y > m.y){ m.y = c.y; m.de = c.de; } m.ph = m.ph.concat(c.ph); m.rt = m.rt.concat(c.rt); m.ids = m.ids.concat(c.ids); } else merged.push(Object.assign({}, c)); });
-  return merged.length < 2 ? null : { merged, today, s0, e0, routes: new Set(wins.flatMap(w => w.rt)).size };
+  return merged.length < 2 ? null : { merged, today, s0, e0, routes: new Set(wins.flatMap(w => w.rt)).size, bySite: zfWinsBySite(merged) };
 }
 // 기본 창 — 오늘이 어느 창 안이면 그 창 · 창 사이면 다음 창 · 모두 끝났으면 마지막 창 · 모두 전이면 첫 창(다운님 설계 「기본 노출 = 오늘 날짜에 해당하는 창」).
 //    창이 하나뿐이거나 경로 행 전이면 null(검은 상자 「접수기간」은 종전 그대로).
 function zfRouteDefaultWin(row){
   const W = zfRouteWinsAll(row);
-  if(!W) return null;
+  if(!W || W.bySite) return null;   // 🔴 2026-11-17 — 단지로 갈린 창은 기본 창이 없다(카드 전체 범위 · 단추 0 · 검은 상자 종전 「접수기간」)
   const M = W.merged, t = W.today;
   let i = M.findIndex(m => m.x <= t && t <= m.y);
   if(i < 0) i = M.findIndex(m => m.x > t);
@@ -3210,6 +3222,24 @@ function zfRouteVerdict(rows, today){
     widen(p, r.start_date, r.end_date, '');
   });
   if(phases.length >= 2){
+    // 🔴 2026-11-17(우편함 「표시층 — 🔴 기준 위반: 여러 날짜 벌 카드 …」 2) — 같은 순위가 날짜가 다른 행에 다시 나오면(단지마다 다른 날) 순위만으로 묶으면 단지 날짜가 섞인다 —
+    //    그때는 단지(site_text · 없으면 장소 place_text — 경로 행 원문 그대로)와 순위를 함께 적는다(새 낱말 0).
+    const tokSpan = new Map();
+    rs.forEach(r => zfPhaseTokens(r.phase_text).forEach(k => { const v = (r.start_date || '') + '|' + (r.end_date || ''); if(!tokSpan.has(k)) tokSpan.set(k, new Set()); tokSpan.get(k).add(v); }));
+    if([...tokSpan.values()].some(v => v.size > 1)){
+      const loc = r => String(r.site_text || r.place_text || '').trim();
+      const parts = [];
+      rs.forEach(r => {
+        if(!r.phase_text) return;
+        const key = loc(r) + '|' + r.phase_text;
+        let p = parts.find(x => x.key === key);
+        if(!p){ p = { key, name: [loc(r), r.phase_text].filter(Boolean).join(' ') }; parts.push(p); }
+        widen(p, r.start_date, r.end_date, '');
+      });
+      parts.sort((a, b) => String(a.s || '').localeCompare(String(b.s || '')));
+      const lead2 = parts.some(p => /순위/.test(p.name)) ? '순위별로 접수일이 달라요' : '접수일이 나뉘어 있어요';
+      return { kind: '①', text: lead2 + ' · ' + parts.map(p => `${p.name} ${zfSpanText(p.s, p.e)}`.trim()).join(' · ') };
+    }
     // 🔵 2026-10-21(우편함 「표시층 — S1 묶음 3」 ⑥ · 조사 「표본 정확도 2차」 ⑦ 2) — 차수 이름에 「순위」가 하나도 없으면(…19312 첫날 · 2일차 ~ 마감일 —
     //    순위가 아니라 접수 차수) 「순위별로」라 하지 않는다. 순위 차수는 그대로.
     const lead = phases.some(p => /순위/.test(p.name)) ? '순위별로 접수일이 달라요' : '접수일이 나뉘어 있어요';
@@ -15697,6 +15727,17 @@ function zf12WhenHTML(n){
   const W = zfRouteWinsAll(n);
   let s = st[1].d, e = st[2].d;
   if(W) e = W.merged[W.merged.length - 1].de;   // 창이 여럿이면 접수 = 기본 창(오늘의 창 · 사이면 다음 창) · 마감 = 마지막 창 끝(창별 날짜는 2층 꼬리)
+  // 🔴 2026-11-17(우편함 「표시층 — 🔴 기준 위반: 여러 날짜 벌 카드 …」 1) — 한 카드에 날짜 벌이 여럿(같은 게시물 공고문별 · 경로 표 창별)이면
+  //    접수 = 아직 끝나지 않은 벌 중 가장 이른 시작 · 마감 = 마지막 벌 끝(설계 14절 규칙 4와 같은 축). 종전에는 접수를 카드 행에서, 마감을 「열린 공고문 중 가장 이른 마감」에서
+  //    따로 가져와 접수 > 마감이 섰다(영암 …21044 「접수 12-01 › 마감 11-30」 — 영암용의1 11-30 · 영암·해남 12-01~12-02).
+  const bands = [];
+  if(W) W.merged.forEach(m => bands.push([m.d, m.de]));
+  (zfPostNoticeList(n) || []).filter(x => x.state !== 'closed' && x.start && x.end).forEach(x => bands.push([String(x.start).slice(0, 10), String(x.end).slice(0, 10)]));
+  if(bands.length >= 2 && !(zfWinSwitch(n) && zfWinPick.has(String(n['announcement_id'] || '')))){
+    const t0 = zf3Today(), live = bands.filter(b => b[1] >= t0), pool = live.length ? live : bands;
+    s = pool.map(b => b[0]).sort()[0];
+    e = bands.map(b => b[1]).sort().slice(-1)[0];
+  }
   const items = [['접수', s], ['마감', e], ['발표', st[3].d, st[3].u]];
   if(!items[0][1] && !items[1][1]) return '';
   const today = zf3Today();
@@ -15704,7 +15745,7 @@ function zf12WhenHTML(n){
   return items.map(([k, d, u], i) => {
     const cls = !d ? 'unk' : d < today ? 'past' : i === nextI ? 'next' : 'fut';
     const mark = cls === 'past' ? '●' : cls === 'next' ? '◉' : '○';
-    return `<span class="zf12-w ${cls}"${d ? ` data-zf12-d="${escapeHtml(d)}"` : ''}><span class="zf12-m" aria-hidden="true">${mark}</span><span class="zf12-k">${k}</span> ${d ? escapeHtml(cls === 'next' ? zf3Md(d) : zf3Md(d).replace(/\(.\)$/, '')) : escapeHtml(u || '원문 확인')}</span>`;   // ◉ 밖 정거장은 요일을 뺀다(2층 노선에 그대로)
+    return `<span class="zf12-w ${cls}" data-zf12-k="${k}"${d ? ` data-zf12-d="${escapeHtml(d)}"` : ''}><span class="zf12-m" aria-hidden="true">${mark}</span><span class="zf12-k">${k}</span> ${d ? escapeHtml(cls === 'next' ? zf3Md(d) : zf3Md(d).replace(/\(.\)$/, '')) : escapeHtml(u || '원문 확인')}</span>`;   // ◉ 밖 정거장은 요일을 뺀다(2층 노선에 그대로)
   }).join('<span class="zf12-sep" aria-hidden="true">›</span>');
 }
 const ZF12_FRONT_KEEP = el => el.matches('.zf3-ctop,.htop,.haddr,.zf12-who,[data-sum-for],.zf12-when,.zf12-l2-host,[id^="ncard-"],[id^="mcard-"],.zf3-close') || el.hidden || getComputedStyle(el).display === 'none';
@@ -15722,7 +15763,13 @@ function zf12Sweep(card){
   });
 }
 function zf12Front(card, n){
-  if(card.dataset.zf12 === '1'){ zf12Sweep(card); return; }
+  if(card.dataset.zf12 === '1'){
+    zf12Sweep(card);
+    // 같은 게시물 공고문 목록·경로 행은 처음 꾸민 뒤에 온다 — 다시 꾸밀 때 겉 언제 줄을 새로 그린다(날짜 벌이 그때 생긴다 · …21044)
+    const w = card.querySelector('.zf12-when'), html = zf12WhenHTML(n);
+    if(w && html && w.dataset.zf12Html !== html){ w.dataset.zf12Html = html; w.innerHTML = html; w.setAttribute('aria-label', '일정 — ' + w.textContent.replace(/[●◉○›]/g, ' ').replace(/\s+/g, ' ').trim()); zf12PillTidy(card); }
+    return;
+  }
   card.dataset.zf12 = '1';
   card.classList.add('zf12-card');
   const det = document.getElementById(card.getAttribute('data-card-id'));
@@ -15741,7 +15788,7 @@ function zf12Front(card, n){
   const when = zf12WhenHTML(n);
   const sum = card.querySelector('[data-sum-for]');
   if(when){
-    const w = document.createElement('p'); w.className = 'zf12-when'; w.innerHTML = when;
+    const w = document.createElement('p'); w.className = 'zf12-when'; w.innerHTML = when; w.dataset.zf12Html = when;
     w.setAttribute('aria-label', '일정 — ' + w.textContent.replace(/[●◉○›]/g, ' ').replace(/\s+/g, ' ').trim());
     (sum || addr || top).after(w);
   }
@@ -15764,8 +15811,11 @@ function zf12Front(card, n){
 function zf12PillTidy(card){
   const pill = card.querySelector('.zf3-ctop .zf3-dpill'), when = card.querySelector('.zf12-when');
   if(!pill) return;
-  const raw = pill.textContent.trim();
-  if(raw === pill.dataset.zf12Shown) return;   // 내가 쓴 글자(되돌이 없음)
+  let raw = pill.textContent.trim();
+  if(raw === pill.dataset.zf12Shown){   // 내가 쓴 글자 — 원래 글자로 남은 날 조각만 다시 붙인다(겉 줄을 새로 그린 뒤)
+    if(!when || when.querySelector('.zf12-dd') || !pill.dataset.zf12Raw) return;
+    raw = pill.dataset.zf12Raw;
+  }
   pill.dataset.zf12Raw = raw;
   const parts = raw.split(/\s·\s/);
   const cls = pill.classList;
@@ -15783,7 +15833,9 @@ function zf12PillTidy(card){
   const m = left.match(/D-(\d+)/), today = zf3Today();
   const nd = nx && nx.dataset.zf12D;
   const same = m ? nd && zf3Days(today, nd) === Number(m[1]) : /^오늘/.test(left) && nd === today;
-  const txt = same ? (m ? 'D-' + m[1] : left) : left;
+  // 🔴 2026-11-17 — 남은 날이 「D-n」 하나뿐이면 ◉ 날짜로 다시 센다(겉 줄의 접수일 기준 · 알약은 카드 행 시작일로 셌다 — …21044 D-14 ↔ ◉ 11-30)
+  const dn = nd ? zf3Days(today, nd) : null;
+  const txt = same ? (m ? 'D-' + m[1] : left) : (/^D-\d+$/.test(left) && dn != null && dn > 0 ? 'D-' + dn : left);
   let dd = when.querySelector('.zf12-dd');
   if(!dd){ dd = document.createElement('span'); dd.className = 'zf12-dd'; }
   dd.classList.toggle('hot', cls.contains('hot') || pill.classList.contains('zf12-soon'));

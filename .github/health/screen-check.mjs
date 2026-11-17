@@ -143,6 +143,8 @@ try {
   const overflow = []
   const greyOpen = []         // 회색(흐림 · zf3-closed)인데 숨기기 술어(isHiddenAsClosed)로는 열린 카드
   let greySeen = 0
+  const whenBad = []          // 겉 언제 줄(.zf12-when) 접수 > 마감
+  let whenSeen = 0
   for (let pg = 1; pg <= MAX_PAGES; pg++) {
     if (pg > 1) {
       const ok = await page.evaluate(pg => { const b = [...document.querySelectorAll('button')].find(b => b.offsetParent !== null && b.innerText.trim() === String(pg)); if (!b) return false; b.click(); return true }, pg)
@@ -209,7 +211,14 @@ try {
         const t = c.getAttribute('data-title') || (c.querySelector('.hname') || {}).textContent || ''
         return [c.getAttribute('data-announcement-id') || '?', ORG_RE.test(t), !!c.querySelector('.zf-org-sup')]
       })
-      return { cardRows, chips, dates, nts, overflow: sw > window.innerWidth + 1 ? sw : 0, greys: greys.length, greyBad, orgCards }
+      // 🔴 2026-11-17(우편함 「표시층 — 🔴 기준 위반: 여러 날짜 벌 카드 …」 3 · 원칙 33) — 겉 언제 줄의 접수일 ≤ 마감일(정거장 data-zf12-k · data-zf12-d)
+      const whens = [...document.querySelectorAll('#notice-list .zf12-when')].filter(vis)
+      const whenBad = whens.map(w => {
+        const d = k => (w.querySelector(`.zf12-w[data-zf12-k="${k}"]`) || {}).dataset?.zf12D || ''
+        const a = d('접수'), b = d('마감')
+        return a && b && a > b ? (w.closest('.hcard')?.getAttribute('data-announcement-id') || '?') + ` 접수 ${a} > 마감 ${b}` : null
+      }).filter(Boolean)
+      return { cardRows, chips, dates, nts, overflow: sw > window.innerWidth + 1 ? sw : 0, greys: greys.length, greyBad, orgCards, whens: whens.length, whenBad }
     })
     // 🔴 갈래는 자르기 전 전문으로 정한다(이슈 #360 · 2026-10-07) — 60자로 자른 뒤 판정하면 긴 ④ 링크 문구
     //    (「…[정정공고] … 공고에 함께 정리돼 있어요 →」 65자)의 「있어요」가 잘려 「알수없음」으로 떨어졌다. 60자는 결과 표에 보일 때만.
@@ -221,6 +230,8 @@ try {
     if (got.overflow) overflow.push(`쪽 ${pg}: scrollWidth ${got.overflow}`)
     greySeen += got.greys
     greyOpen.push(...got.greyBad)
+    whenSeen += got.whens
+    whenBad.push(...got.whenBad)
   }
   extra.cards_seen = cards.length
 
@@ -343,6 +354,7 @@ try {
   add('chips', '깨진 칩(높이 > 30px 또는 줄바꿈 조각 2개 이상)', brokenChips.length === 0 ? 'pass' : 'fail', brokenChips.length ? `${brokenChips.length}: ${brokenChips.slice(0, 3).join(' / ')}` : 0, '0(표시층 B 뒤 0)')
   add('route_date', '접힌 경로 줄 첫 날짜가 보이는가', hiddenDates.length === 0 ? 'pass' : 'fail', hiddenDates.length ? `${hiddenDates.length}: ${hiddenDates.slice(0, 3).join(' / ')}` : 0, '가려진 첫 날짜 0')
   add('overflow', '가로 넘침(390px)', overflow.length === 0 ? 'pass' : 'fail', overflow.length ? overflow.join(' / ') : 0, 'scrollWidth ≤ 390')
+  add('when_order', '겉 언제 줄 — 접수일 ≤ 마감일(열린 카드 전 쪽)', whenBad.length === 0 ? 'pass' : 'fail', `언제 줄 ${whenSeen} · 접수 > 마감 ${whenBad.length}${whenBad.length ? ': ' + whenBad.slice(0, 5).join(' / ') : ''}`, '0 — 날짜 벌이 여럿인 카드는 접수 = 아직 안 끝난 벌 중 가장 이른 시작 · 마감 = 마지막 벌 끝(2026-11-17 …21044)')
   add('grey_open', '회색(흐림) 카드 중 숨기기 술어로는 열린 카드 — 회색 = isHiddenAsClosed', greyOpen.length === 0 ? 'pass' : 'fail', `회색 ${greySeen} · 열린데 회색 ${greyOpen.length}${greyOpen.length ? ': ' + greyOpen.slice(0, 5).join(' / ') : ''}`, '0(목록에 보이는 카드 전 쪽 · 2026-10-19 순위별 접수 창 사이 3장)')
   // ④ 보이는 글자에 옛 서비스명 0(2026-10-06 · 우편함 「코드 — Z-1 …」 PR-A A4 · 이름 규칙 — 사용자에게 보이는 곳 = 「꼭집」).
   //    body.innerText(화면에 그려진 글자만 · 숨은 요소·주석·콘솔 제외) 안의 「ZipFit」(대소문자 그대로)을 센다 — 지금 열린 쪽 기준.
