@@ -295,6 +295,7 @@ body.theme-dark .elig-subrow span:first-child{color:#9aa0aa}
 .extras-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px}
 .extras-thumb{display:block;border-radius:8px;overflow:hidden;border:1px solid #e8e8e0;aspect-ratio:1/1;position:relative;background:#f8f8f8}
 .extras-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.extras-thumb img[data-rot="90"]{transform:rotate(90deg)}.extras-thumb img[data-rot="180"]{transform:rotate(180deg)}.extras-thumb img[data-rot="270"]{transform:rotate(270deg)}   /* 2026-11-17 3판 안 B — 칸이 정사각이라 돌려도 넘치지 않는다 */
 .extras-thumb-label{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.55);color:#fff;font-size:9px;padding:3px 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .extras-thumb{cursor:pointer;border:1px solid #e8e8e0}
 .extras-thumb-missing{background:#f2f2ee;border-style:dashed;border-color:#d3d3ca}
@@ -311,6 +312,8 @@ body.theme-dark .extras-missing-note{color:#d8c48a;background:#2a2721;border-col
 .extras-modal-body{flex:1;min-height:200px;position:relative;overflow:auto;background:#000}
 .extras-modal-content{width:100%;height:100%;display:flex;align-items:center;justify-content:center}
 .extras-modal-body img{max-width:100%;max-height:80vh;object-fit:contain}
+.extras-modal-body .zf-rot-wrap{position:relative;display:block;flex:0 0 auto;overflow:hidden}
+.extras-modal-body .zf-rot-wrap img{position:absolute;left:50%;top:50%;max-width:none;max-height:none;transform-origin:center}
 .extras-modal-body iframe{width:100%;height:80vh;border:0}
 .extras-modal-close{position:absolute;top:8px;right:8px;width:32px;height:32px;border-radius:50%;border:1px solid rgba(255,255,255,0.3);background:rgba(0,0,0,0.45);color:#fff;font-size:16px;cursor:pointer;z-index:2;box-shadow:0 1px 4px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center}
 .extras-modal-nav{position:absolute;top:50%;transform:translateY(-50%);width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,0.3);background:rgba(0,0,0,0.45);color:#fff;font-size:22px;cursor:pointer;z-index:2;box-shadow:0 1px 4px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center}
@@ -9661,7 +9664,7 @@ function loadAnnouncementExtras(annId, detailEl, id, useGroup){
           // fid를 못 뽑은 행은 애초에 띄울 URL이 없으므로 그 자리에서 바로 자리표시자로 만든다.
           return `<a class="extras-thumb${thumbSrc ? '' : ' extras-thumb-missing'}" data-fid="${zfAttr(fid||'')}" data-kind="${zfAttr(it.extra_type||'')}" href="${zfSafeHref(it.file_url) || '#'}" target="_blank" rel="noopener" onclick="event.preventDefault();openExtrasViewer('${gid}',${idx})">
             ${thumbSrc
-              ? `<img src="${zfAttr(thumbSrc)}" loading="lazy" alt="${zfAttr(caption)}" onerror="extrasThumbFailed(this)">`
+              ? `<img src="${zfAttr(thumbSrc)}" loading="lazy" alt="${zfAttr(caption)}"${zfExtraRot(it) ? ` data-rot="${zfExtraRot(it)}"` : ''} onerror="extrasThumbFailed(this)">`
               : `<span class="extras-thumb-missing-mark">불러올 수 없음</span>`}
             ${caption ? `<span class="extras-thumb-label">${escapeHtml(caption)}</span>` : ''}${it.extra_type === 'floorplan' && !it.unit_key && typeof zf3On === 'function' && zf3On() ? (zf3PlanMissing(it.building_address, keys) ? '<span class="zf3-xmiss">이번 모집 세대 목록에 없는 주택형</span>' : zf3PlanLooseTag(it)) : ''}
           </a>`;
@@ -9860,7 +9863,28 @@ function renderExtrasModal(){
     ? extrasUnavailableHtml()
     : usePreview
       ? extrasPreviewHtml(fid)
-      : `<img src="https://drive.google.com/uc?export=view&id=${fid}" alt="${escapeHtml(caption)}" data-fid="${escapeHtml(fid)}" onerror="extrasModalImgFailed(this)">`;
+      : `<img src="https://drive.google.com/uc?export=view&id=${fid}" alt="${escapeHtml(caption)}" data-fid="${escapeHtml(fid)}"${zfExtraRot(it) ? ` data-rot="${zfExtraRot(it)}" onload="zfRotFit(this)"` : ''} onerror="extrasModalImgFailed(this)">`;
+}
+// 🔵 2026-11-17(우편함 「표시층 — 3판」 2 · 다운님 결정 16:11 안 B) — 갤러리 행 회전 값(announcement_extras.rotate_deg · 시계 방향 0/90/180/270).
+//    원 파일이 옆으로 누운 묶음(같은 zip)을 화면에서만 돌린다 — 파일·주소는 그대로. 칸이 없거나 0 이면 종전 그대로.
+function zfExtraRot(it){ const d = Number(it && it.rotate_deg) || 0; return [90, 180, 270].includes(d) ? d : 0; }
+// 크게 보기 — 90·270 은 가로·세로가 바뀐다. 그림 원래 크기로 돌린 뒤 모습이 칸(가로 = 본문 폭 · 세로 = 80vh) 안에 들게 줄이고,
+//    돌린 모습 크기의 틀(span)로 감싸 자리를 잡는다(잘림·넘침 0). 180 은 크기 그대로 돌리기만.
+function zfRotFit(img){
+  const d = Number(img.getAttribute('data-rot')) || 0;
+  if(!d) return;
+  const box = img.closest('.extras-modal-body') || img.parentElement;
+  const nw = img.naturalWidth, nh = img.naturalHeight;
+  if(!nw || !nh || !box) return;
+  const side = d === 90 || d === 270;
+  const cw = Math.max(80, box.clientWidth), ch = Math.max(80, window.innerHeight * 0.8);
+  const vw = side ? nh : nw, vh = side ? nw : nh;   // 돌린 모습의 가로·세로(원래 크기)
+  const k = Math.min(1, cw / vw, ch / vh);
+  let wrap = img.parentElement;
+  if(!wrap || !wrap.classList.contains('zf-rot-wrap')){ wrap = document.createElement('span'); wrap.className = 'zf-rot-wrap'; img.replaceWith(wrap); wrap.appendChild(img); }
+  wrap.style.width = Math.round(vw * k) + 'px'; wrap.style.height = Math.round(vh * k) + 'px';
+  img.style.width = Math.round(nw * k) + 'px'; img.style.height = Math.round(nh * k) + 'px';
+  img.style.transform = `translate(-50%,-50%) rotate(${d}deg)`;
 }
 
 function extrasPreviewHtml(fid){
@@ -12097,6 +12121,13 @@ function closeMapAsMultiRegion(id, names){
     + '주소는 아래 「<span class="zf-ai-lbl">AI 정리 · </span>원문 보기」의 공고 원문에서 확인하세요.</span></p>');
 }
 
+let zfComplexGeoP = null;   // 단지 도로명·좌표 표(complex_geo) — matched_from(원문 주소 그대로) → { lat, lng } · 실패하면 빈 표(종전 지오코딩)
+function zfComplexGeo(){
+  if(!zfComplexGeoP) zfComplexGeoP = fetch(`${SUPABASE_URL}/rest/v1/complex_geo?select=matched_from,lat,lng&lat=not.is.null&lng=not.is.null`, { headers: zfAnonHeaders() })
+    .then(r => r.ok ? r.json() : []).then(rows => new Map((Array.isArray(rows) ? rows : []).map(r => [String(r.matched_from || '').trim(), r])))
+    .catch(() => new Map());
+  return zfComplexGeoP;
+}
 const zfMapSeq = {};   // 상자(카드 id)마다 지도 호출 차례 — initMapForHouse 가 마지막 호출만 그린다
 function initMapForHouse(h,id){
   // 🔴 전세임대는 **주소 유무와 무관하게** 닫는다 — 판정이 주소에 매여 있으면 시군구가 들어오는
@@ -12161,7 +12192,12 @@ function initMapForHouse(h,id){
     setMapApproxNote(mapEl, approx);
     buildPoiTabs(id, coords);
   };
-  loadKakao().then(()=>{
+  // 🔵 2026-11-17(우편함 「표시층 — 3판」 1) — 단지 도로명·좌표 표(complex_geo · 공식 공공 API 값)에 이 주소(matched_from = 세대·블록 주소 원문 그대로)의
+  //    좌표가 있으면 지오코딩 없이 그 좌표로 그린다(고창무장 「청보리로 1457」 — 카카오 ZERO_RESULT → 대략 원이던 자리). 없으면 종전대로.
+  //    화면 주소 글자는 원문 그대로(이 표는 핀 자리만) · 표는 첫 지도에서 한 번만 읽는다(좌표 있는 행만 · anon 공개 읽기).
+  Promise.all([loadKakao(), zfComplexGeo()]).then(([, geo])=>{
+    const cg = !h.approx && geo && geo.get(String(h.addr || '').trim());
+    if(cg && cg.lat != null && cg.lng != null){ renderMap([{ x: String(cg.lng), y: String(cg.lat), address_type: 'ROAD_ADDR' }], false); return; }
     const geocoder = new kakao.maps.services.Geocoder();
     // 쉼표로 이어붙은 복수 지번("지번1 , 지번2")은 지오코딩 API가 파싱하지 못해
     // 상위 행정구역 대표좌표로 튀는 문제가 있어, Lv1부터 첫 번째 지번만 남겨 사용
