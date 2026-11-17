@@ -25,7 +25,7 @@ concurrency:
 jobs:
   contrast:
     name: 대비 비교
-    runs-on: ubuntu-24.04   # 2026-11-17 — ubuntu-latest 가 26.04 로 바뀌어 고정한 Playwright 1.55 가 의존성을 못 깔았다(#1088) · Playwright 판을 올릴 때 함께 푼다
+    runs-on: ubuntu-latest   # 2026-11-17 — 24.04 고정(#1088)을 풀었다: Playwright 1.55 → 1.64.1(ubuntu26.04 의존성 표를 안다 · 우편함 「코드·운영 — 1장 …」 3)
     timeout-minutes: 20
     permissions:
       contents: read
@@ -45,7 +45,7 @@ jobs:
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/pw" && cd "$RUNNER_TEMP/pw"
           npm init -y >/dev/null
-          npm install --no-audit --no-fund playwright@1.55.0 >/dev/null
+          npm install --no-audit --no-fund playwright@1.64.1 >/dev/null
           npx playwright install --with-deps chromium >/dev/null
       - name: 견주기(기준 ↔ 가지)
         id: run
