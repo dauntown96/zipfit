@@ -1244,7 +1244,7 @@ html.zf12 .zf12-badges .chip{display:inline-flex;align-items:center;min-height:2
 html.zf12 .zf12-cov{font-size:var(--t-xs);color:var(--ink-3)}
 html.zf12 .zf12-badges .chip[role=button]{position:relative}
 html.zf12 .zf12-badges .chip[role=button]::after{content:"";position:absolute;left:0;right:0;top:-10px;bottom:-10px}   /* 누르는 자리 44px(보이는 높이 24 + 위아래 10) */
-html.zf12 .zf3-dpill.zf12-soon{background:var(--warn-bg)!important;border-color:var(--warn)!important;color:var(--warn)!important}
+html.zf12 .zf3-ctop .zf3-dpill:is(.hot,.zf12-soon){background:var(--ink);border-color:var(--ink);color:var(--paper)}   /* 2차 2 — 알약은 상태만 · 임박 경고는 일정 줄 남은 날 조각(.zf12-dd.hot)이 맡는다 */
 html.zf12 .zf12-cov::before{content:"· ";color:var(--ink-3)}
 /* 겉 ② 제목 최대 2줄 */
 html.zf12 .zf12-card .hname{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
@@ -1264,6 +1264,11 @@ html.zf12 .zf12-w.next{color:var(--ink);font-weight:700}
 html.zf12 .zf12-w.next .zf12-k{color:var(--ink)}
 html.zf12 .zf12-m{font-size:10px;line-height:1}
 html.zf12 .zf12-sep{color:var(--ink-3)}
+html.zf12 .zf12-dd{font-weight:700;color:var(--ink);font-family:var(--f-ui)}
+html.zf12 .zf12-dd.hot{color:var(--warn)}
+html.zf12 .zf12-nu{font-size:var(--t-xs);color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:0}
+html.zf12 .zf12-nu a{color:var(--ink-2);font-weight:600;text-decoration:underline}
+html.zf12 .zf12-nu .zf-ai-lbl{display:none}
 /* 안 2층 머리 — 겉에서 내린 것 · 꼭 볼 것 · 정정 · ㎡당 */
 html.zf12 .zf12-l2{display:flex;flex-direction:column;gap:10px;margin:4px 0 12px;padding:12px;border:1px solid var(--line-2);border-radius:var(--r-2);background:var(--surface)}
 html.zf12 .zf12-l2:empty{display:none}
@@ -15686,7 +15691,7 @@ function zf12WhenHTML(n){
   return items.map(([k, d, u], i) => {
     const cls = !d ? 'unk' : d < today ? 'past' : i === nextI ? 'next' : 'fut';
     const mark = cls === 'past' ? '●' : cls === 'next' ? '◉' : '○';
-    return `<span class="zf12-w ${cls}"><span class="zf12-m" aria-hidden="true">${mark}</span><span class="zf12-k">${k}</span> ${d ? escapeHtml(zf3Md(d)) : escapeHtml(u || '원문 확인')}</span>`;
+    return `<span class="zf12-w ${cls}"${d ? ` data-zf12-d="${escapeHtml(d)}"` : ''}><span class="zf12-m" aria-hidden="true">${mark}</span><span class="zf12-k">${k}</span> ${d ? escapeHtml(zf3Md(d)) : escapeHtml(u || '원문 확인')}</span>`;
   }).join('<span class="zf12-sep" aria-hidden="true">›</span>');
 }
 const ZF12_FRONT_KEEP = el => el.matches('.zf3-ctop,.htop,.haddr,.zf12-who,[data-sum-for],.zf12-when,.zf12-l2-host,[id^="ncard-"],[id^="mcard-"],.zf3-close') || el.hidden || getComputedStyle(el).display === 'none';
@@ -15721,6 +15726,9 @@ function zf12Front(card, n){
     w.setAttribute('aria-label', '일정 — ' + w.textContent.replace(/[●◉○›]/g, ' ').replace(/\s+/g, ' ').trim());
     (sum || addr || top).after(w);
   }
+  zf12PillTidy(card);
+  const pl = card.querySelector('.zf3-ctop .zf3-dpill');
+  if(pl) new MutationObserver(() => zf12PillTidy(card)).observe(pl, { childList: true, characterData: true, subtree: true });   // 창 단추 · 시각 알약(1분마다)이 다시 써도
   if(det){
     const l2 = document.createElement('div'); l2.className = 'zf12-l2';
     det.appendChild(l2);
@@ -15733,15 +15741,49 @@ function zf12Front(card, n){
     new MutationObserver(() => { if(det.style.display === 'block') zf12Must(card, n); }).observe(det, { attributes: true, attributeFilter: ['style'] });   // 펼침(누름 · 주소창 n= · toggleDetail) 어느 길이든
   }
 }
+// 🔵 2차 시안 2(claude.ai 의견 3 · Claude Code ⑦ 1) — 알약은 상태 글자만(「접수 중」·「접수 예정」 · 마감·확인 필요는 그대로) ·
+//    「D-n」·「오늘 마감」 같은 남은 날 조각은 일정 줄 ◉ 옆으로 · 매입 차수 알약의 창 꼬리(「· 1순위(일반)·2순위」)는 겉에서 뺀다(2층 창 단추에 그대로).
+//    ◉ 날짜와 남은 날이 가리키는 날이 다르면(창이 여럿 — 이번 차수 끝 ≠ 마지막 창 끝) 원래 알약 글자 그대로 붙인다(새 낱말 0).
+function zf12PillTidy(card){
+  const pill = card.querySelector('.zf3-ctop .zf3-dpill'), when = card.querySelector('.zf12-when');
+  if(!pill) return;
+  const raw = pill.textContent.trim();
+  if(raw === pill.dataset.zf12Shown) return;   // 내가 쓴 글자(되돌이 없음)
+  pill.dataset.zf12Raw = raw;
+  const parts = raw.split(/\s·\s/);
+  const cls = pill.classList;
+  const status = cls.contains('open') ? '접수 중' : cls.contains('before') ? '접수 예정' : parts[0];
+  let left = '';
+  if(cls.contains('open') || cls.contains('before') || /D-\d+|오늘/.test(raw)){
+    const dPart = parts.find(x => /D-\d+|오늘|시간 남음/.test(x)) || (parts[0] !== status ? parts[0] : '');
+    left = /^(접수 중|접수 예정)$/.test(dPart) ? '' : dPart;
+  }
+  pill.dataset.zf12Shown = status;
+  pill.textContent = status;
+  if(pill.title === '' && raw !== status) pill.setAttribute('aria-label', raw);
+  if(!when || !left) { when && when.querySelector('.zf12-dd')?.remove(); return; }
+  const nx = when.querySelector('.zf12-w.next') || when.querySelector('.zf12-w:not(.past)');
+  const m = left.match(/D-(\d+)/), today = zf3Today();
+  const nd = nx && nx.dataset.zf12D;
+  const same = m ? nd && zf3Days(today, nd) === Number(m[1]) : /^오늘/.test(left) && nd === today;
+  const txt = same ? (m ? 'D-' + m[1] : left) : left;
+  let dd = when.querySelector('.zf12-dd');
+  if(!dd){ dd = document.createElement('span'); dd.className = 'zf12-dd'; }
+  dd.classList.toggle('hot', cls.contains('hot') || pill.classList.contains('zf12-soon'));
+  dd.textContent = txt;
+  (nx || when.lastElementChild).after(dd);
+}
 function zf12FillWho(){
   document.querySelectorAll('.zf12-who[data-zf12-ann]').forEach(p => {
     const I = zf12Info.get(p.dataset.zf12Ann);
     if(!I) return;
     const card = p.closest('.hcard'); if(!card || card.dataset.zf12Who === '1') return;
     I.sched.length && zf12SchedBadge(card, I.sched);
-    if(!I.heads.length && !I.res) return;
+    // 🔵 2차 시안 1(claude.ai 의견 2 · 다운님 11-16) — 군·목 꼴(가군·나군 · 가목 …) 카드는 겉에 거주 조각만 · 군 이름은 안 자격 절(원문 괄호 뜻과 함께)
+    const heads = I.heads.some(h => /(^|\s)[가-하](군|목)$/.test(h)) ? [] : I.heads;
+    if(!heads.length && !I.res) return;
     card.dataset.zf12Who = '1';
-    p.innerHTML = `<span class="zf12-wi" aria-hidden="true">👥</span>${I.res ? `<span class="zf12-res">${escapeHtml(I.res)}</span> ` : ''}${escapeHtml(I.heads.join(' · '))}`;
+    p.innerHTML = `<span class="zf12-wi" aria-hidden="true">👥</span>${I.res ? `<span class="zf12-res">${escapeHtml(I.res)}</span>${heads.length ? ' ' : ''}` : ''}${escapeHtml(heads.join(' · '))}`;
     p.hidden = false;
     // 「누가」가 서면 지역은 ①로(겉 다섯 줄 상한 유지 — 설계 9절)
     const cov = card.querySelector('.haddr .zf-cover'), top = card.querySelector('.zf3-ctop');
@@ -15754,7 +15796,7 @@ function zf12SchedBadge(card, cats){
   // 「일정 확인 필요」 — 설계 14절 규칙 5(다운님 판정 2026-11-12 ①) · 근거 행 이름은 펼치면 2층 첫 줄에
   b.insertAdjacentHTML('beforeend', `<span class="chip sel zf-chip-warn zf12-sched">⚠️ 일정 확인 필요</span>`);
   const l2 = card.querySelector('.zf12-l2');
-  if(l2) l2.insertAdjacentHTML('afterbegin', `<p class="zf12-schedwhy">⚠️ 일정 확인 필요 — 원문 안에서 같은 단계 날짜가 갈려요: ${cats.map(c => escapeHtml(c.replace(/^⚠️\s*/, ''))).join(' · ')} (아래 ⚠️ 행)</p>`);
+  if(l2) l2.insertAdjacentHTML('afterbegin', `<p class="zf12-schedwhy">⚠️ 일정 확인 필요 — 원문에 같은 단계 날짜가 둘 적혀 있어요: ${cats.map(c => escapeHtml(c.replace(/^⚠️\s*/, ''))).join(' · ')} (아래 ⚠️ 행)</p>`);
 }
 // ④ 얼마 — 겉은 「보증금 · 월」 한 줄(조건별이면 「조건별 다름」) · 전용 · 합친 범위 설명 · ㎡당 비교는 2층으로
 function zf12Price(){
@@ -15803,6 +15845,18 @@ function zf12Must(card, n){
     why ? why.after(sec) : l2.prepend(sec);
   });
 }
+// 🔵 2차 시안 3(claude.ai 의견 4) — 세대 목록 없는 카드의 ④ 자리 두 줄 상자 → 한 줄(기존 문구 안에서 줄임 · 새 문장 0) · 원문 보기 고리는 그대로
+function zf12NoUnits(){
+  document.querySelectorAll('.zf12-card [data-sum-for] > div:not([data-zf12nu])').forEach(box => {
+    if(!/세대별 목록이 없어요/.test(box.textContent)) return;
+    box.dataset.zf12nu = '1';
+    const a = box.querySelector('a');
+    box.className = 'zf12-nu';
+    box.removeAttribute('style');
+    box.innerHTML = '원문에 세대별 목록이 없어요';
+    if(a){ box.append(' · '); box.appendChild(a); }
+  });
+}
 function zf12Decorate(){
   if(!zf12On()) return;
   document.documentElement.classList.add('zf12');
@@ -15811,7 +15865,7 @@ function zf12Decorate(){
     if(!list || !map) return;
     list.querySelectorAll('.zf3-card[data-card-id]').forEach(card => { const n = map.get(card.getAttribute('data-card-id')); if(n){ zf12Front(card, n); seen.push(n); } });
   });
-  zf12FillWho(); zf12Price();
+  zf12FillWho(); zf12Price(); zf12NoUnits();
   zf12Load(seen).then(ok => { if(ok) zf12FillWho(); });
 }
 // 세대 — 390 은 지금 꼴(주택형 → 계층 줄) 그대로 · 1200 이상(1280 상세 패널)은 주택형마다 계층을 줄 맞춘 표로(안 2).
