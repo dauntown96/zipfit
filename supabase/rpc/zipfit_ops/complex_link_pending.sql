@@ -13,6 +13,8 @@ AS $function$
 --   주소가 complex_geo.matched_from 과 같은(source pending 밖 · 도로명 있음) 세대 행의 공고.
 -- 🔵 2026-11-17(우편함 「코드·운영 — 3장 …」 0장 2) — 대상 ①의 도로명 키 시도가 세대 sido_nm 이 비면 공고 sido_nm(공고 행 source 순 첫 행)으로
 --   물러난다(잇기 함수 ⑤와 같은 꼴 — 종전에는 세대 sido 가 빈 행이 2일 뒤 다시 불리지 않았다).
+-- 🔵 2026-11-17(우편함 「코드·운영 — 4장 …」 본 1 4) — 부를 때마다 끝에 public.complex_lh_code_fill()(단지 ↔ LH 단지 번호 채움 · 대상 0이면 쓰기 0)을 부르고
+--   그 결과를 r 의 lh_fill 칸에 함께 남긴다(새 단지가 생겨도 같은 규칙으로 채워진다).
 declare ids text[]; r jsonb;
 begin
   ids := array(select distinct x from (
@@ -26,6 +28,7 @@ begin
     where x is not null order by 1 limit 2000);
   if cardinality(ids) = 0 then r := jsonb_build_object('ids', 0);
   else r := public.complex_link_announcements(ids); end if;
+  r := r || jsonb_build_object('lh_fill', public.complex_lh_code_fill());
   insert into zipfit_ops.complex_link_runs(result) values (r);
   delete from zipfit_ops.complex_link_runs where at < now() - interval '30 days';
   return r;

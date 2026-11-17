@@ -15,7 +15,9 @@ AS $function$
   --                 같은 단지 =
   --                 단지 키 = 공백·「-」를 빼고 「블럭」→「블록」 · 한쪽이 다른 쪽과 같거나 그 앞머리이고 바로 뒤가 숫자가 아님
   --                 (「화성동탄2A82블록」 ↔ 「화성동탄2A82블록(28단지)(행복)」 · 「A5」 ↔ 「A53」은 다름) ∧ 시군구는 둘 다 있을 때만 한쪽이 다른 쪽 앞머리.
-  --   두 길 공통: 카드 유형(housing_type)이 spl_tp_nm 을 품음 ∧ 이 공고의 회차 날짜(first_announcement_date, 없으면 announcement_date)보다 앞선 rcr_pan_dt.
+  --   via 'code'  = 🔵 2026-11-17(우편함 「코드·운영 — 4장 …」 본 1 3) 세 번째 길 — 세대 행 complex_id → complexes.lh_sbd_lgo_no = sbd_lgo_no.
+  --                 이름 길·사슬 길이 그 카드 단지(bkey)에 후보를 하나도 못 낸 때만 쓴다(있던 행은 그대로 · 빈 자리만 채움 — 증평송산 1·2·3 「증평송산1」 ↔ 「증평송산 1단지」).
+  --   세 길 공통: 카드 유형(housing_type)이 spl_tp_nm 을 품음 ∧ 이 공고의 회차 날짜(first_announcement_date, 없으면 announcement_date)보다 앞선 rcr_pan_dt.
   --   카드 단지마다 두 길의 후보 중 가장 최근 한 회차(rcr_pan_dt → pan_id → sbd_lgo_no 큰 쪽) — 두 길이 같은 회차면 via 'name'.
   --   history = 같은 단지 번호(sbd_lgo_no) · 같은 주택형(ltst_nm 글자 그대로) · 같은 신청유형의 고른 회차까지(포함) 회차별 신청 수
   --             [{d: rcr_pan_dt, n: rqpr_cnt, s: spl_rmno}] 오래된 것부터 — 같은 날 행이 여럿(pan_id 다름)이면 pan_id 큰 한 행(합하지 않는다 · 정정 겹셈 방지).
@@ -35,10 +37,11 @@ AS $function$
     where a.housing_type is not null and coalesce(a.first_announcement_date, a.announcement_date) is not null
   ),
   units as (
-    select an.aid, h.building_name, coalesce(h.sigungu_nm, '') as sgg, h.unit_type, h.seq
+    select an.aid, h.building_name, coalesce(h.sigungu_nm, '') as sgg, h.unit_type, h.seq, cc.lh_sbd_lgo_no as lh
     from ann an
     join public.announcements s on s.title_dedup_key = an.title_dedup_key and s.hidden_from_listing is not true
     join public.housing_units h on h.announcement_id = s.announcement_id
+    left join public.complexes cc on cc.id = h.complex_id
     where coalesce(h.building_name, '') <> ''
   ),
   cx as (
@@ -46,7 +49,8 @@ AS $function$
            regexp_replace(building_name, '\s', '', 'g') as bkey,
            replace(regexp_replace(building_name, '[\s-]', '', 'g'), '블럭', '블록') as ckey,
            max(regexp_replace(sgg, '\s', '', 'g')) as skey,
-           array_remove(array_agg(unit_type order by seq), null) as unit_types
+           array_remove(array_agg(unit_type order by seq), null) as unit_types,
+           array_remove(array_agg(distinct lh), null) as codes
     from units group by 1, 2, 3
   ),
   by_name as (
@@ -101,12 +105,24 @@ AS $function$
            or (cx.ckey like n.k || '%' and substr(cx.ckey, length(n.k) + 1, 1) !~ '[0-9]'))
       and (n.s = '' or cx.skey = '' or n.s like cx.skey || '%' or cx.skey like n.s || '%')
   ),
+  by_code as (
+    select an.aid, cx.bkey, cx.unit_types, c.*, 'code'::text as via
+    from ann an
+    join cx on cx.aid = an.aid and cardinality(cx.codes) > 0
+    join public.lh_cutoff_scores c on c.sbd_lgo_no = any(cx.codes)
+    where position(c.spl_tp_nm in an.housing_type) > 0
+      and c.rcr_pan_dt < an.adate
+      and not exists (select 1 from by_name x where x.aid = an.aid and x.bkey = cx.bkey)
+      and not exists (select 1 from by_chain x where x.aid = an.aid and x.bkey = cx.bkey)
+  ),
   cand as (
     select * from by_name
     union all
     select b.* from by_chain b
     where not exists (select 1 from by_name x where x.aid = b.aid and x.bkey = b.bkey and x.pan_id = b.pan_id and x.sbd_lgo_no = b.sbd_lgo_no
                         and x.ltst_nm = b.ltst_nm and x.rqs_tp_nm = b.rqs_tp_nm)
+    union all
+    select * from by_code
   ),
   m as (
     select cand.*, dense_rank() over (partition by cand.aid, cand.bkey order by cand.rcr_pan_dt desc, cand.pan_id desc, cand.sbd_lgo_no desc) as rk
