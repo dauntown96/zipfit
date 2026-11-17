@@ -5721,7 +5721,7 @@ function zfFillSummarySlots(){
   });
   zfRefreshCovers();   // 🔵 2026-09-30 — 세대 행 지역이 방금 왔을 수 있다(표지 대표·곳 수)
   zfCutoffKick();      // 🔵 2026-11-05 — 카드 「지난 회차」 줄(LH 합격점수)
-  if(typeof zf12Price === 'function') zf12Price();   // 🧪 12월 재편 A·B 시안(병합 0)
+  if(typeof zf12Price === 'function') { zf12Price(); zf12NoUnits(); }   // 🧪 12월 재편 A·B 시안(병합 0)
 }
 
 // 🔵 2026-11-05(우편함 「표시층 — 커트라인 시안 A」 · 다운님 승인 2026-11-05) — 카드 「🕘 지난 회차」 한 줄 + 상세 「지난 회차」 표.
@@ -15847,6 +15847,7 @@ function zf12Must(card, n){
 }
 // 🔵 2차 시안 3(claude.ai 의견 4) — 세대 목록 없는 카드의 ④ 자리 두 줄 상자 → 한 줄(기존 문구 안에서 줄임 · 새 문장 0) · 원문 보기 고리는 그대로
 function zf12NoUnits(){
+  if(!zf12On()) return;
   document.querySelectorAll('.zf12-card [data-sum-for] > div:not([data-zf12nu])').forEach(box => {
     if(!/세대별 목록이 없어요/.test(box.textContent)) return;
     box.dataset.zf12nu = '1';
