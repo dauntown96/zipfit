@@ -1156,6 +1156,7 @@ try {
         if (!ok) continue
         cards++
         await page.waitForFunction(() => !!document.querySelector('#notice-list .zf12-l2'), null, { timeout: 8000 }).catch(() => {})
+        await page.waitForFunction(() => { const l2 = document.querySelector('#notice-list .zf12-l2'); return !l2 || l2.querySelector('.zf12-must') || l2.dataset.zf12Must === 'none' }, null, { timeout: 4000 }).catch(() => {})   // 「꼭 볼 것」은 늦게 선다
         await page.waitForTimeout(600)
         const r = await page.evaluate(([sim]) => {
           const l2 = document.querySelector('#notice-list .zf12-l2')
@@ -1170,7 +1171,20 @@ try {
             const k = el.tagName + '.' + [...el.classList].sort().join('.') + '|' + t
             seen.set(k, (seen.get(k) || 0) + 1)
           }
-          return [...seen].filter(([, n]) => n > 1).map(([k, n]) => `${k.slice(0, 60)} ×${n}`)
+          const out = [...seen].filter(([, n]) => n > 1).map(([k, n]) => `${k.slice(0, 60)} ×${n}`)
+          // 🔴 2026-11-17(우편함 「표시층 — 작은 판 3」 3) — 「꼭 볼 것」: 접힌 머리가 「…」로 잘림 0 · 펼친 뒤 머리 글자(분류 뺀 나머지)가 본문 첫머리와 같음 0.
+          //    위 열쇠(태그·클래스·글자 같음)로는 머리(분류 + 첫 문장) ↔ 본문(원문 전체)이 글자가 달라 안 걸린다.
+          const txt = e => ((e && e.innerText) || '').replace(/\s+/g, ' ').trim()
+          for (const d of l2.querySelectorAll('.zf12-must details')) {
+            const sm = d.querySelector('summary'), cat = txt(sm.querySelector('b'))
+            const head = () => { const t = txt(sm); return (cat && t.startsWith(cat) ? t.slice(cat.length) : t).trim() }
+            if (!d.open && /…$/.test(head())) out.push(`꼭 볼 것 접힌 머리 잘림: ${head().slice(-30)}`)
+            d.open = true
+            const h = head().replace(/…$/, ''), raw = txt(d.querySelector('.zf12-raw'))
+            if (h.length >= 4 && raw.startsWith(h)) out.push(`꼭 볼 것 펼친 뒤 머리 = 본문 첫머리: ${h.slice(0, 30)}`)
+            d.open = false
+          }
+          return out
         }, [process.env.SIMULATE === 'l2_dup' && i === 0])
         if (r === null) continue
         l2s++
@@ -1181,7 +1195,7 @@ try {
     if (err) add('l2_dup', '펼친 2층 — 같은 글자 줄 두 번', 'warn', `못 잼(${err})`, '펼친 2층 같은 글자 줄 0')
     else add('l2_dup', '펼친 2층 — 같은 글자 줄 두 번', dups.length || !l2s ? 'fail' : 'pass',
       `카드 ${cards}장 펼침 · 2층 ${l2s} · 같은 줄 ${dups.length}${dups.length ? ': ' + dups.slice(0, 3).join(' / ') : ''}`,
-      '열린 카드 앞 12장 2층(.zf12-l2) 안 보이는 글자 줄(태그·클래스·글자가 같은 가장 안쪽 요소) 두 번 0 · 2층 하나 이상 잼')
+      '열린 카드 앞 12장 2층(.zf12-l2) 안 보이는 글자 줄(태그·클래스·글자가 같은 가장 안쪽 요소) 두 번 0 · 「꼭 볼 것」 접힌 머리 「…」 잘림 0 · 펼친 뒤 머리 = 본문 첫머리 0 · 2층 하나 이상 잼')
   }
   // ⑦-2 한글 조합 입력(2026-10-13 · 우편함 「코드 — 한글 중복 입력 …」 1 · 원칙 33) — 공고 검색 칸에 실제 조합 이벤트(CDP Input.imeSetComposition →
   //    insertText)로 「부산」을 친다. 두 꼴을 본다:
