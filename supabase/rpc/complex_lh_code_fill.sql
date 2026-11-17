@@ -8,6 +8,8 @@ AS $function$
 --   ① 같은 시도(짧은 이름 — complexes.sido_nm ↔ 커트라인 cnp_nm) ∧ 같은 시군구(공백 무시 — complexes.sigungu_nm ↔ sgg_nm)
 --   ② 이름 = 공백과 「단지」 글자를 걷은 뒤 같음(complexes.display_name ↔ sbd_lgo_nm — 「증평송산1」 = 「증평송산 1단지」 · 「단지」 앞 숫자까지 같아야 한다)
 --   ③ 1:1 — 그 코드에 맞는 단지가 하나 ∧ 그 단지에 맞는 코드가 하나 ∧ 코드에 이름·시군구·시도 꼴이 하나 ∧ 단지 lh_sbd_lgo_no 빈칸 ∧ 그 코드의 lh_code 별칭이 아직 없음.
+--   🔵 2026-11-17(우편함 「코드·운영 — 5장 …」 본 2) — 이름 비교 전 양쪽에서 꼬리 셋을 더 걷는다: 「(N개동)」 · 「휴먼시아」 · 「임대주택」
+--      (그 밖 「행복주택」 · 「국민임대」 · 블록 번호 · 「도전숙」 등은 걷지 않는다 · 「같은 시군구 ∧ 남은 후보 하나」만으로는 잇지 않는다 — 이름 조건 그대로).
 --   complex_aliases name 별칭은 쓰지 않는다(같은 시 동명 다른 단지 10쌍). 둘 이상이면 비운다(ambiguous 로 돌려준다 — 사람 판정).
 -- 채우는 꼴은 기존 67과 같다: complex_aliases lh_code 한 행(added_by collect · confirmed auto) + complexes.lh_sbd_lgo_no.
 -- 부르는 곳: zipfit_ops.complex_link_pending(매시 41분 · 새 단지가 생겨도 채움) · 소급(4장 운영 데이터 쓰기).
@@ -23,12 +25,12 @@ begin
           ('대전광역시','대전'),('대전','대전'),('울산광역시','울산'),('울산','울산'),('세종특별자치시','세종'),('세종시','세종'),('세종','세종'),('경기도','경기'),('경기','경기'),
           ('강원특별자치도','강원'),('강원도','강원'),('강원','강원'),('충청북도','충북'),('충북','충북'),('충청남도','충남'),('충남','충남'),('전북특별자치도','전북'),('전라북도','전북'),('전북','전북'),
           ('경상북도','경북'),('경북','경북'),('경상남도','경남'),('경남','경남'),('제주특별자치도','제주'),('제주도','제주'),('제주','제주')),
-  cut as (select distinct s.sbd_lgo_no no, replace(regexp_replace(s.sbd_lgo_nm, '\s', '', 'g'), '단지', '') nk,
+  cut as (select distinct s.sbd_lgo_no no, replace(replace(replace(regexp_replace(regexp_replace(s.sbd_lgo_nm, '\s', '', 'g'), '\([0-9]+개동\)', '', 'g'), '휴먼시아', ''), '임대주택', ''), '단지', '') nk,
                  regexp_replace(s.sgg_nm, '\s', '', 'g') sk, cm.s dk
             from public.lh_cutoff_scores s left join m cm on cm.t = s.cnp_nm
            where s.sbd_lgo_no ~ '^[CD][0-9]{5}$' and coalesce(s.sgg_nm, '') <> '' and coalesce(s.sbd_lgo_nm, '') <> ''),
   cutk as (select no, min(nk) nk, min(sk) sk, min(dk) dk, count(*)::int nkeys from cut group by no),
-  cx as (select c.id, c.lh_sbd_lgo_no lh, replace(regexp_replace(c.display_name, '\s', '', 'g'), '단지', '') nk,
+  cx as (select c.id, c.lh_sbd_lgo_no lh, replace(replace(replace(regexp_replace(regexp_replace(c.display_name, '\s', '', 'g'), '\([0-9]+개동\)', '', 'g'), '휴먼시아', ''), '임대주택', ''), '단지', '') nk,
                 regexp_replace(c.sigungu_nm, '\s', '', 'g') sk, cm.s dk
            from public.complexes c left join m cm on cm.t = c.sido_nm
           where c.kind = 'build' and coalesce(c.display_name, '') <> '' and coalesce(c.sigungu_nm, '') <> ''),
