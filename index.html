@@ -15713,7 +15713,8 @@ function zf12Sweep(card){
   // 겉에 다시 그려진 같은 꼴 줄(지난 회차 줄 등 — 그리는 쪽이 겉에서 옛것을 못 찾아 새로 만든다)은 2층의 옛것과 바꿔 끼운다(두 번 서지 않게)
   [...card.children].forEach(el => {
     if(ZF12_FRONT_KEEP(el)) return;
-    const twin = el.className ? [...l2.children].find(x => x !== el && x.tagName === el.tagName && x.className === el.className) : null;
+    const key = x => x.tagName + '|' + x.className + '|' + (x.getAttribute('data-cut-for') || '');   // 지난 회차 자리는 클래스 없이 data-cut-for 로 선다
+    const twin = (el.className || el.hasAttribute('data-cut-for')) ? [...l2.children].find(x => x !== el && key(x) === key(el)) : null;
     twin ? twin.replaceWith(el) : l2.appendChild(el);
   });
   card.querySelectorAll('.zf12-badges').forEach(b => {   // 늦게 붙은 경고 칩도 ①로
