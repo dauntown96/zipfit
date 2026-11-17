@@ -5,14 +5,14 @@
 <link rel="icon" href="data:,">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>꼭집 — 꼭 맞는 집만 꼭 집어서</title>
-<meta name="description" content="전국 공공임대주택 공고를 한곳에서 보고, 내 조건으로 자격진단까지. LH·마이홈·SH 공고를 모아 보여줍니다.">
+<meta name="description" content="전국 공공임대주택 공고를 한곳에서 보고, 내 조건으로 자격진단까지. LH·마이홈·SH·GH 공고를 모아 보여줍니다.">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="꼭집">
 <meta property="og:title" content="꼭집 — 꼭 맞는 집만 꼭 집어서">
-<meta property="og:description" content="전국 공공임대주택 공고를 한곳에서 보고, 내 조건으로 자격진단까지. LH·마이홈·SH 공고를 모아 보여줍니다.">
+<meta property="og:description" content="전국 공공임대주택 공고를 한곳에서 보고, 내 조건으로 자격진단까지. LH·마이홈·SH·GH 공고를 모아 보여줍니다.">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="꼭집 — 꼭 맞는 집만 꼭 집어서">
-<meta name="twitter:description" content="전국 공공임대주택 공고를 한곳에서 보고, 내 조건으로 자격진단까지. LH·마이홈·SH 공고를 모아 보여줍니다.">
+<meta name="twitter:description" content="전국 공공임대주택 공고를 한곳에서 보고, 내 조건으로 자격진단까지. LH·마이홈·SH·GH 공고를 모아 보여줍니다.">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#F2F0EB">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1862,7 +1862,7 @@ html.zf12 .zf12-eh-full{display:block;margin-top:6px;font-weight:400;color:var(-
   <footer class="zf-footer">
     <p class="zf-ai-note zf-nonaffil-foot">꼭집은 공공기관이 운영하지 않는 서비스예요. 정보는 각 기관 공고 원문을 정리한 것이며, 신청은 원문에서 하세요.</p>
     <p class="zf-ai-note">꼭집의 공고 정보는 AI가 공고문 원문을 읽고 정리했어요. 신청 전에는 공고 원문을 꼭 확인해 주세요.</p>
-    <p class="zf-ai-note zf-src">출처: LH · 마이홈 · SH 공고 원문 → 꼭집 정리</p>
+    <p class="zf-ai-note zf-src">출처: LH · 마이홈 · SH · GH 공고 원문 → 꼭집 정리</p>
     <a href="./terms.html">이용약관</a><span style="font-size:12px;color:var(--ink-3)"> · </span><a href="./privacy.html">개인정보 처리방침</a>
   </footer>
 
@@ -2248,7 +2248,11 @@ function zfRouteWinsAll(row){
   }
   wins.sort((p, q) => p.x - q.x);
   const merged = [];
-  wins.forEach(c => { const m = merged[merged.length - 1]; if(m && c.x <= m.y + 864e5){ if(c.y > m.y){ m.y = c.y; m.de = c.de; } m.ph = m.ph.concat(c.ph); m.rt = m.rt.concat(c.rt); m.ids = m.ids.concat(c.ids); } else merged.push(Object.assign({}, c)); });
+  // 🔴 2026-11-16(우편함 「코드·운영 — 🔴 순위별 접수 창 …」) — 하루 차로 붙은 행은 같은 대상 순위(phase_text 원문)일 때만 한 창이다.
+  //    순위가 다르면 따로 센다 — 연천전곡1 …20996 「1,2순위」 11-16 · 「3순위」 11-17 이 한 창으로 묶여, LH 가 첫 창 끝에 단 「접수마감」이
+  //    다음 날 3순위 창까지 닫았다(인천 남동구 …20987·…21031 같은 꼴). 겹치는 행 · 순위 글자가 빈 행 · 같은 순위가 이어지는 행(인터넷→현장)은 종전대로 한 창.
+  const zfSameWave = (m, c) => c.x <= m.y || !c.ph.length || !m.ph.length || c.ph.some(p => m.ph.includes(p));
+  wins.forEach(c => { const m = merged[merged.length - 1]; if(m && c.x <= m.y + 864e5 && zfSameWave(m, c)){ if(c.y > m.y){ m.y = c.y; m.de = c.de; } m.ph = m.ph.concat(c.ph); m.rt = m.rt.concat(c.rt); m.ids = m.ids.concat(c.ids); } else merged.push(Object.assign({}, c)); });
   return merged.length < 2 ? null : { merged, today, s0, e0, routes: new Set(wins.flatMap(w => w.rt)).size };
 }
 // 기본 창 — 오늘이 어느 창 안이면 그 창 · 창 사이면 다음 창 · 모두 끝났으면 마지막 창 · 모두 전이면 첫 창(다운님 설계 「기본 노출 = 오늘 날짜에 해당하는 창」).
@@ -2330,11 +2334,21 @@ function zfFillWinSlots(){
 // 🔵 2026-10-19(우편함 「표시층 — 덧 셋」 ①) — 다음 창의 대상 순위(경로 행 phase_text 원문)와, 경로가 갈리는 카드면 그 창의 경로(route)도 함께 돌려준다.
 //    글자는 원문 그대로이고 띄어쓰기·가운뎃점만 좁힌다(「1순위 (일반) ⋅ 2순위」 → 「1순위(일반)·2순위」). 경로가 하나뿐인 카드는 경로 글자를 내지 않는다.
 const zfPhaseShort = t => String(t || '').replace(/\s*\(\s*/g, '(').replace(/\s*\)/g, ')').replace(/\s*[⋅·]\s*/g, '·').trim();
+// 🔴 2026-11-16(우편함 「코드·운영 — 🔴 순위별 접수 창 …」) — 첫 창 **안**인데 LH 가 「…마감」을 달았고 다음 창이 남았으면 그 마감은 첫 창의 끝이다
+//    (LH 상태 전환은 첫 창 끝 직후 — zfLhSaysClosed 주석) — 「원문 날짜 > 목록 상태」로 닫지 않고 창 사이처럼 다음 창을 기다린다(「접수 예정」 + 다음 창 순위).
+//    둘째 이후 창 안은 종전대로 날짜(zfInLaterWin) · 창 하나 · 경로 행 전은 종전대로 LH 를 믿는다.
 function zfRouteGap(row){
   const W = zfRouteWins(row);
-  if(!W || W.merged.some(m => m.x <= W.today && W.today <= m.y)) return null;
-  const nxt = W.merged.find(m => m.x > W.today);
-  if(!nxt) return { state: 'closed' };
+  if(!W) return null;
+  const inI = W.merged.findIndex(m => m.x <= W.today && W.today <= m.y);
+  let nxt;
+  if(inI >= 0){
+    if(!(inI === 0 && W.merged.length > 1 && String((row && row.source) || '') === 'LH' && statusSaysClosed(row))) return null;
+    nxt = W.merged[1];
+  } else {
+    nxt = W.merged.find(m => m.x > W.today);
+    if(!nxt) return { state: 'closed' };
+  }
   const phase = [...new Set(nxt.ph.map(zfPhaseShort).filter(Boolean))].join('·');
   const route = W.routes > 1 ? [...new Set(nxt.rt)].join('·') : '';
   return { state: 'before', next: nxt.d, nextEnd: nxt.de, phase, route };
@@ -4428,19 +4442,25 @@ function applyNoticeFiltersAndRender(keepPage){
         const sa = isClosingSoon(zfWithSoonestEnd(a)) ? 0 : 1, sb = isClosingSoon(zfWithSoonestEnd(b)) ? 0 : 1;
         if(sa !== sb) return sa - sb;
       }
-      return nullLast(a,b,n=>zfDeadline(n),false);
+      // 🔵 2026-11-17(우편함 「표시층 — 작은 판」 1 · 다운님 실사용 11-16 3) — 지난 마감 묶음은 최근 마감부터(내림) — 「마감 포함」에서 1년 전 공고가 먼저 서지 않게.
+      return nullLast(a,b,n=>zfDeadline(n),ga === 1);
     }
     // 🔴 접수 시작순도 같은 3분기를 탄다(2026-09-16) — 종전에는 맨 위가 작년 시작일 공고였다
     //    (apply_start 가 있는 594건 중 518건이 이미 지난 날짜, 최솟값 2025-07-28).
     if(sortVal==='start-asc'){
       const ga = applyDateGroup(a,'신청시작일','apply_start'), gb = applyDateGroup(b,'신청시작일','apply_start');
       if(ga !== gb) return ga - gb;
-      return nullLast(a,b,n=>n['apply_start'],false);
+      return nullLast(a,b,n=>n['apply_start'],ga === 1);   // 🔵 2026-11-17 — 이미 시작한 묶음은 최근 시작부터(내림)
     }
     // 🔴 네 수치 정렬은 zfNumOrNull 한 벌을 쓴다 — 0 은 값이고 빈 값만 모름이다(2026-09-16).
     if(sortVal==='units-desc')    return nullLast(a,b,n=>zfNumOrNull(n['total_units']),true);
     // 🔵 2026-11-04(우편함 「표시층 — 실사용 7회차 고침」 1 · 기준 위반) — 보증금·월임대료는 카드 머리 가격 줄과 같은 재료(get_announcement_price_summary 최솟값)로 줄 세운다.
     //    종전 공고 칸 deposit_min·rent_min 은 열린 57 중 4만 차 있어 순서가 틀렸다(강릉 매입 58만이 영등포 4,650만 아래). 가격 없는 카드는 뒤(종전 그대로).
+    // 🔵 2026-11-17(우편함 「표시층 — 작은 판」 1) — 세 값 정렬은 열린 묶음 → 마감 묶음(isHiddenAsClosed · 「마감」 칩과 같은 술어) · 묶음 안은 값 순.
+    if(sortVal==='deposit-asc' || sortVal==='rent-asc' || sortVal==='area-desc'){
+      const ca = isHiddenAsClosed(a) ? 1 : 0, cb = isHiddenAsClosed(b) ? 1 : 0;
+      if(ca !== cb) return ca - cb;
+    }
     if(sortVal==='deposit-asc')   return nullLast(a,b,n=>zfSortPriceOf(n,'deposit_min'),false);
     if(sortVal==='rent-asc')      return nullLast(a,b,n=>zfSortPriceOf(n,'rent_min'),false);
     if(sortVal==='area-desc')     return nullLast(a,b,n=>zfSortPriceOf(n,'area_max'),true);   // 🔵 2026-11-05 — 카드 머리 「전용」 재료(가격 요약 area_max · 목록 RPC area_max 는 분석분이 빈다)
@@ -8918,12 +8938,12 @@ function revisionNoteItemHtml(note){
 
 // 카드 data-* 속성(접수기간/서류제출대상자발표일/서류접수기간/당첨자발표일/계약기간)을 읽어
 // 값이 있는 항목만 순서대로 "공급일정" 섹션으로 렌더링 (별도 fetch 없이 동기 렌더링, renderSpecialNotes와 동일 패턴)
-// 공급일정 칸 출처 — 카드 대표 행의 수집 출처(LH 상세 공급일정 · 마이홈 · SH). 모르면 빈 문자열(이름표를 짓지 않는다).
+// 공급일정 칸 출처 — 카드 대표 행의 수집 출처(LH 상세 공급일정 · 마이홈 · SH · GH 상세 공급일정 — 2026-11-17 GH 들이기). 모르면 빈 문자열(이름표를 짓지 않는다).
 function zfScheduleSourceLabel(cardEl){
   const aid = cardEl && cardEl.dataset ? String(cardEl.dataset.announcementId || '') : '';
   const pool = [].concat(typeof noticeData !== 'undefined' && Array.isArray(noticeData) ? noticeData : [], typeof zf3Rows !== 'undefined' && Array.isArray(zf3Rows) ? zf3Rows : []);
   const n = aid ? pool.find(x => String(x['announcement_id'] || '') === aid) : null;
-  return ({ LH: 'LH 공급일정', MYHOME: '마이홈 공급일정', SH: 'SH 공급일정' })[n && n['source']] || '';
+  return ({ LH: 'LH 공급일정', MYHOME: '마이홈 공급일정', SH: 'SH 공급일정', GH: 'GH 공급일정' })[n && n['source']] || '';
 }
 // 🔵 2026-11-12(우편함 「표시층 — 상세 「공급일정」 첫 정거장 공고일 …」 1) — 상세 「🗓️ 공급일정」 첫 정거장 = 공고일.
 //    일정 표에 「공고」 단계 행이 없으면(열린 분석 카드 70 중 62) 카드 노선 「공고」 역과 **같은 값**(zfNoticeDate → announcement_date ·
@@ -10406,9 +10426,12 @@ function zfSameDaySeries(annId){
   const key = zfSeriesKey(me['공고명']);
   if(key.replace(/\s/g, '').length < 8) return [];
   const myDk = zfDedupKey(me['공고명']);
+  const mySido = zfCanonSido(me['sido_nm'] || me['지역']);
   const seen = new Set([myDk]);
   return (noticeData || []).filter(n => {
     if(n['announcement_date'] !== me['announcement_date'] || (n['공급유형'] || '') !== (me['공급유형'] || '')) return false;
+    // 🔵 2026-11-17(우편함 「표시층 — 작은 판」 2 · 다운님 실사용 11-16 9) — 같은 시·도만(고성군 공고에 서울·전남 공고가 섞였다) · 좁혀 0건이면 줄 없음(호출부가 빈 배열을 그리지 않는다).
+    if(zfCanonSido(n['sido_nm'] || n['지역']) !== mySido) return false;
     if(typeof isHiddenAsClosed === 'function' && isHiddenAsClosed(n)) return false;
     if(zfSeriesKey(n['공고명']) !== key) return false;
     const dk = zfDedupKey(n['공고명']);
@@ -10837,6 +10860,21 @@ function zfUnitTypeKey(u, head){
   const h = head || (u && u.unit_type);
   return (u && h) ? zfBuildingKeyOf(u) + '::' + h : '';
 }
+// 🔵 2026-11-17(우편함 「표시층 — 작은 판」 4 · 다운님 실사용 11-16 5) — 묶음 머리 **표시**만: 앞머리가 그 행 단지명(공백 무시)과 같으면 걷는다
+//    (단지 블록 안에서 「부산명지 39」 → 「39」). 저장 값·그림 키(zfUnitTypeKey)는 g.group 그대로 · 걷고 남는 것이 없으면 그대로.
+function zfUgHeadLabel(group, bname){
+  const g = String(group || ''), b = String(bname || '').replace(/\s+/g, '');
+  if(!b) return g;
+  let i = 0, j = 0;
+  while(i < g.length && j < b.length){
+    if(/\s/.test(g[i])){ i++; continue; }
+    if(g[i] !== b[j]) return g;
+    i++; j++;
+  }
+  if(j < b.length) return g;
+  const rest = g.slice(i).trim();
+  return rest || g;
+}
 // 칩 자리 — 렌더 함수는 자리만 둔다. 채우는 것은 zfFillUnitChips 다(첨부가 늦게 와도 그 자리에 붙는다).
 function zfUnitChipSlot(key){
   return key ? `<span class="hu-x-slot" data-xkey="${zfAttr(key)}"></span>` : '';
@@ -10869,6 +10907,9 @@ function zfFillUnitChips(id){
     let gid = gids.length === 1 ? gids[0] : (det.dataset.zfHuxGid || '');
     if(!gid){ gid = 'eg' + (extrasGroupSeq++); det.dataset.zfHuxGid = gid; }
     extrasGroupsRegistry[gid] = items;
+    // 🔵 2026-11-17(우편함 「표시층 — 작은 판」 5 · 다운님 실사용 11-16 2) — 그림 있는 안 형이 하나뿐이면 머리에만(같은 그림이 두 자리에 서지 않게 —
+    //    …21062 「55」 머리 ↔ 「55A」 행) · 둘 이상이면 종전 그대로(형마다 행 칩 · 머리 합계).
+    if(gids.length === 1) det.querySelectorAll(':scope > .hu-ug-list .hu-x-slot').forEach(s => { s.innerHTML = ''; });
     head.innerHTML = `<button type="button" class="chip hu-x-chip" title="이 묶음 주택형의 사진·평면도 ${items.length}건" onclick="event.preventDefault();event.stopPropagation();openExtrasViewer('${gid}',0)">📷 ${items.length}</button>`;
   });
   if(typeof zf3On === 'function' && zf3On()) zf3HuPhotoBar(id);
@@ -10933,7 +10974,7 @@ function zfPruneCardCaches(){
 //    있을 때만 뺀다(huCompareNeedsName). 원문 값·중복제거 키·화면 글자는 그대로다.
 function huCompareKey(u, withName){
   // 🔵 2026-11-02 — 「(복층)」 표기 유무도 같게 본다(화성동탄 A4-1 …20958 10월 「41A/41B(복층) …」 ↔ 7월 「41A/41B …」 · 금액 같음 · 한 공고 안에 두 표기가 같이 오는 묶음 0 실측).
-  const ut = u.unit_type == null ? u.unit_type : String(u.unit_type).replace(/\(복층\)/g, '').replace(/\s*형$/, '');
+  const ut = u.unit_type == null ? u.unit_type : String(u.unit_type).replace(/\(복층\)/g, '').replace(/\s*형$/, '').replace(/\s*㎡$/, '');   // 🔵 2026-11-17(작은 판 3) — 끝 「㎡」도 같은 자리(「39㎡」 ↔ 「39」)
   return (withName === false ? [u.address, u.floor_info, ut, u.area_sqm]
                              : [u.building_name, u.address, u.floor_info, ut, u.area_sqm]).join('|');
 }
@@ -11722,7 +11763,7 @@ function renderHousingUnitGroup(g){
     </div>`;
   }).join('');
   return `<details class="hu-ug">
-    <summary><span class="hu-ug-name">${escapeHtml(g.group)}</span><span class="hu-ug-meta"${headPick ? ` title="${zfAttr('원문: ' + headPick.texts.join(' / '))}"` : ''}>${escapeHtml(headAreas + headCount)}</span>${headWait ? zfWaitReserveHtml(g.units) : ''}${zfUnitChipSlot(zfUnitTypeKey(g.units[0], g.group))}</summary>
+    <summary><span class="hu-ug-name">${escapeHtml(zfUgHeadLabel(g.group, g.units[0] && g.units[0].building_name))}</span><span class="hu-ug-meta"${headPick ? ` title="${zfAttr('원문: ' + headPick.texts.join(' / '))}"` : ''}>${escapeHtml(headAreas + headCount)}</span>${headWait ? zfWaitReserveHtml(g.units) : ''}${zfUnitChipSlot(zfUnitTypeKey(g.units[0], g.group))}</summary>
     <div class="hu-ug-list">${body}</div>
   </details>`;
 }
