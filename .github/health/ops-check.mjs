@@ -290,6 +290,13 @@ try {
       'images_last_run_age_min', (select extract(epoch from now() - max(d.start_time))/60 from cron.job_run_details d join cron.job j using (jobid) where j.jobname = 'zipfit-collect-lh-images'),
       'images_fail_24h', (select count(*) from announcement_complex_image_fetch where not ok and fetched_at > now() - interval '24 hours'),
       'sh_last_run_age_min', (select extract(epoch from now() - max(run_at))/60 from sh_collection_run_log),
+      -- 🔵 2026-11-17(우편함 「코드·운영 — 0장 …」 4 ① · 장치 넷 회신 ⑦ 1) — 열린 LH 공고의 마지막 상세 시도가 90분 넘은 수(장기 창 굶음 감시 · #1090 계기).
+      'lh_detail_stale', (select json_build_object('n', count(*) filter (where detail_fetch_last_attempt is null or detail_fetch_last_attempt < now() - interval '90 minutes'),
+                                                   'open', count(*),
+                                                   'oldest_min', round(extract(epoch from now() - min(detail_fetch_last_attempt))/60),
+                                                   'ids', (array_agg(announcement_id order by detail_fetch_last_attempt nulls first)
+                                                            filter (where detail_fetch_last_attempt is null or detail_fetch_last_attempt < now() - interval '90 minutes'))[1:5])
+                            from announcements where source = 'LH' and status in ('접수중','공고중','정정공고중') and not coalesce(hidden_from_listing, false)),
       -- 🔵 2026-11-03(우편함 「GH 수집 켜기 1단계」 ④) — GH(경기주택도시공사) 수집기: cron 이 붙기 전(1단계)이라 정보만 · 들인 공고 행은 0 이어야 한다.
       -- 🔵 2026-11-03(「GH 2-0 관찰 장치」 2) — 관찰 cron(zipfit-gh-observe) 뒤: 최근 행 · 그 행 목록 오류 수 · 열린 공고 수 · 새로/사라짐.
       'gh', (select json_build_object('last_run_age_min', (select extract(epoch from now() - max(run_at))/60 from gh_collection_run_log),
@@ -465,6 +472,16 @@ try {
   add('images_fresh', '단지 이미지 목록 수집 마지막 cron 실행 경과(분)', d.images_last_run_age_min != null && d.images_last_run_age_min <= promoLimit ? 'pass' : 'fail',
     d.images_last_run_age_min == null ? '실행 기록 없음' : Math.round(d.images_last_run_age_min), 'UTC 00:40~9시 ≤ 40분(30분 주기 17·47분) · 그 밖 ≤ 900분')
   add('images_fail', '24시간 안 실패한 단지 이미지 목록 수집(공고)', d.images_fail_24h < 3 ? 'pass' : 'fail', d.images_fail_24h, '< 3(2026-10-02 시험 38쪽 파싱 실패 0)')
+  // 🔵 2026-11-17(「0장」 4 ①) — 열린 LH 마지막 상세 시도 > 90분이면 ⚠️(안 멈춤 · 이슈 없음). 수집이 10분마다 도는 KST 10:30~19:00(UTC 01:30~10:00)에만 판정 —
+  //   그 밖(밤·이른 아침)은 수집이 쉬어 모두 90분을 넘으므로 정보로만 둔다.
+  {
+    const x = d.lh_detail_stale || {}
+    const um = new Date().getUTCHours() * 60 + new Date().getUTCMinutes()
+    const inHours = um >= 90 && um < 600
+    const val = `열린 LH ${x.open ?? '?'} 중 90분 넘음 ${x.n ?? '?'} · 가장 오래된 시도 ${x.oldest_min ?? '?'}분 전${x.n ? ' · ' + (x.ids || []).join(', ') : ''}`
+    add('lh_detail_stale', 'LH 상세 — 열린 공고 마지막 상세 시도 90분 넘음', !inHours ? 'info' : (x.n ? 'warn' : 'pass'), val,
+      '수집 시간대(KST 10:30~19:00)에 0 — 넘으면 ⚠️(장기 창 굶음 · #1090 「60분 넘음 맨 앞」이 막는다) · 그 밖 시간은 정보')
+  }
   add('sh_fresh', 'SH 수집 마지막 런 경과(분)', d.sh_last_run_age_min != null && d.sh_last_run_age_min <= 960 ? 'pass' : 'fail',
     d.sh_last_run_age_min == null ? '기록 없음' : Math.round(d.sh_last_run_age_min), '≤ 960분(하루 4회 09·12·15·18시 KST — 18시 → 다음날 09시 = 900분 · 밤 점검(23:55)이 밀려 00시 첫 런 직전에 돌 여유 60분)')
   // 2026-11-03 GH — 1단계(정보) → 2-0 관찰 장치(「GH 2-0 관찰 장치」 2): 최근 행 ≤ 960분 ∧ 그 행 목록 오류 0 이면 통과 · 아니면 ⚠️

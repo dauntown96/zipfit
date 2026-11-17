@@ -67,9 +67,14 @@ export const HOSTS: HostConf[] = [
   { host: 'i-sh.co.kr', paths: null },
   { host: 'housing.seoul.go.kr', paths: null },
   // 🔵 2026-10-28(#854 · 2026-11-04 표로 옮김) — GH 청약센터 공고문 받기(collect-gh-announcements 가 싣는 selectFileDown.do).
-  //   robots `Allow: /*`(2026-10-28) · 받기 경로 둘뿐(임대주택 · 매입임대) — 단지 이미지(/sb/sr/…/selectAtchImage.do)는 열지 않는다.
-  //   해외 IP 축은 미상(싱가포르 EF로 잰 적 없음) — 켜는 회차의 첫 확인(막히면 seoulOnly · 부산 꼴).
-  { host: 'apply-cdn.gh.or.kr', paths: ['/sr/sr7150/selectFileDown.do', '/sr/sr7155/selectFileDown.do'] },
+  //   robots `Allow: /*`(2026-10-28 · 2026-11-17 다시 — apply-cdn /robots.txt → apply.gh.or.kr 같은 파일) · 해외 IP 막힘 없음(2026-11-17 GH 들이기 meta 4/4).
+  //   🔵 2026-11-17(우편함 「코드·운영 — 0장 …」 5 · run 474 조건부) — 상세 페이지 「단지 관련 이미지 정보」 두 길을 더한다:
+  //   주택형 이미지 <img src="https://apply-cdn.gh.or.kr/sb/sr/<게시판>/selectAtchImage.do?bizCd=…&atchFileSn=…"> · 원본 받기
+  //   https://apply-cdn.gh.or.kr/sr/<게시판>/selectCtlgFileDown.do?bizCd=…&atchFileSn=…&ver=…&atchFileDtlSn=…(fn_chgSn 이 만든다).
+  //   GH_850 실측 7장(atchFileSn 1297511~1297593) · selectAtchImage 한 장 GET 200 JPEG 793×1121.
+  { host: 'apply-cdn.gh.or.kr', paths: ['/sr/sr7150/selectFileDown.do', '/sr/sr7155/selectFileDown.do',
+    '/sb/sr/sr7150/selectAtchImage.do', '/sb/sr/sr7155/selectAtchImage.do',
+    '/sr/sr7150/selectCtlgFileDown.do', '/sr/sr7155/selectCtlgFileDown.do'] },
   // ── 지방공사(MYHOME url 호스트 — 2026-10-13 전수 17 + 광주) ──
   // 부산도시공사 — 해외 IP 에 403(2026-10-12) · 게시판 상세·받기 둘만.
   { host: 'www.bmc.busan.kr', paths: ['/board/download.do', '/board/view.do'], seoulOnly: true, probe: true,
