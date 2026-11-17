@@ -16,11 +16,14 @@ AS $function$
 --    이름으로 단지를 합치지 않는다 — 같은 공고 안에서 코드를 고르는 데만 쓴다(다른 공고·다른 단지로 넘어가지 않음).
 -- ⑤ 세대 행: 이 공고 세대 행 중 complex_id 가 비고 도로명 키가 있는 행을 그 키의 단지에 잇는다(같은 kind 만 · 없으면 1차 규칙대로 단지 + road 별칭 —
 --    display_name = 그 세대 행 building_name). 분석이 세대 행을 쓴 뒤 이 함수를 다시 부르면 채워진다(스킬 v11.6 전까지 코드·운영 회차가 소급으로 부른다).
--- 동시 호출은 권고 잠금으로 한 줄로 세운다. 반환: {ids, link, new_complex, code, hold, name, code_pick, unit}
+-- 🔵 2026-11-17(우편함 「코드·운영 — 2장 …」 본 1 · #1030 둘째 키 승인) — ⑤의 둘째 키: 세대 행 주소의 도로명 키가 NULL(지번 꼴 · 시도 없음)이고
+--    그 주소(원문 그대로)가 complex_geo.matched_from 과 같으면 complex_road_key(complex_geo.road_address) 로 잇는다(source pending · 도로명 없는 행은 잇지 않음).
+--    새 단지를 만들면 road 별칭 출처 = complex_geo.road_address · 이은 단지가 아직 어느 complex_geo 행에도 없으면 그 행 complex_id 를 채운다(단지 하나에 한 행).
+-- 동시 호출은 권고 잠금으로 한 줄로 세운다. 반환: {ids, link, new_complex, code, hold, name, code_pick, unit, unit_geo, geo_cid}
 declare
   r record; v_kind text; v_rk text; v_cid bigint; v_ckind text; v_codes text[]; v_keys text[];
   n_link int := 0; n_new int := 0; n_code int := 0; n_hold int := 0; n int;
-  n_name int := 0; n_pick int := 0; n_unit int := 0; cr record; u record;
+  n_name int := 0; n_pick int := 0; n_unit int := 0; cr record; u record; n_ugeo int := 0; n_gcid int := 0;
 begin
   if p_ids is null or cardinality(p_ids) = 0 then return jsonb_build_object('ids', 0); end if;
   if cardinality(p_ids) > 2000 then p_ids := p_ids[1:2000]; end if;
@@ -104,9 +107,12 @@ begin
       end loop;
     end if;
     -- ⑤ 세대 행 complex_id(도로명 키 · 같은 kind)
-    for u in select h.id, public.complex_road_key(h.address, coalesce(h.sido_nm, r.sido_nm)) as k, nullif(btrim(h.building_name), '') as bn,
-                    coalesce(h.sido_nm, r.sido_nm) as sd, coalesce(h.sigungu_nm, r.sigungu_nm) as sg
-               from public.housing_units h where h.announcement_id = r.announcement_id and h.complex_id is null loop
+    for u in select q.id, coalesce(q.k1, public.complex_road_key(g.road_address, q.sd)) as k, q.k1 is null and g.id is not null as by_geo, g.id as gid,
+                    q.bn, q.sd, q.sg
+               from (select h.id, h.address, public.complex_road_key(h.address, coalesce(h.sido_nm, r.sido_nm)) as k1, nullif(btrim(h.building_name), '') as bn,
+                            coalesce(h.sido_nm, r.sido_nm) as sd, coalesce(h.sigungu_nm, r.sigungu_nm) as sg
+                       from public.housing_units h where h.announcement_id = r.announcement_id and h.complex_id is null) q
+               left join public.complex_geo g on q.k1 is null and g.matched_from = q.address and g.source <> 'pending' and g.road_address is not null loop
       continue when u.k is null;
       v_cid := null; v_ckind := null;
       select cc.id, cc.kind into v_cid, v_ckind from public.complex_aliases ca join public.complexes cc on cc.id = ca.complex_id
@@ -116,16 +122,24 @@ begin
       elsif v_cid is null then
         insert into public.complexes (kind, supplier, sido_nm, sigungu_nm, road_key, display_name) values (v_kind, r.supply_org, u.sd, u.sg, u.k, u.bn) returning id into v_cid;
         insert into public.complex_aliases (complex_id, alias_type, alias_value, source, evidence, added_by, confirmed)
-        values (v_cid, 'road', u.k, 'housing_units.address', 'complex_road_key(address, sido_nm) · 세대 행 · 공고 ' || r.announcement_id, 'collect', 'auto');
+        values (v_cid, 'road', u.k, case when u.by_geo then 'complex_geo.road_address' else 'housing_units.address' end,
+                case when u.by_geo then 'complex_road_key(complex_geo.road_address) · matched_from = 세대 주소 · complex_geo ' || u.gid || ' · 공고 ' || r.announcement_id
+                     else 'complex_road_key(address, sido_nm) · 세대 행 · 공고 ' || r.announcement_id end, 'collect', 'auto');
         n_new := n_new + 1;
       end if;
       update public.housing_units set complex_id = v_cid where id = u.id and complex_id is null;
       get diagnostics n = row_count; n_unit := n_unit + n;
+      if u.by_geo then
+        n_ugeo := n_ugeo + n;
+        update public.complex_geo set complex_id = v_cid
+         where id = u.gid and complex_id is null and not exists (select 1 from public.complex_geo g2 where g2.complex_id = v_cid);
+        get diagnostics n = row_count; n_gcid := n_gcid + n;
+      end if;
       insert into public.announcement_complexes (announcement_id, complex_id, source) values (r.announcement_id, v_cid, 'housing_units') on conflict do nothing;
       if u.bn is not null then update public.complexes set display_name = u.bn where id = v_cid and display_name is null; end if;
     end loop;
   end loop;
   return jsonb_build_object('ids', cardinality(p_ids), 'link', n_link, 'new_complex', n_new, 'code', n_code, 'hold', n_hold,
-                            'name', n_name, 'code_pick', n_pick, 'unit', n_unit);
+                            'name', n_name, 'code_pick', n_pick, 'unit', n_unit, 'unit_geo', n_ugeo, 'geo_cid', n_gcid);
 end
 $function$

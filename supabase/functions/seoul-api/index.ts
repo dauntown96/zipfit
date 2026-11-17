@@ -1,7 +1,7 @@
 // 서울 실행 공공 API 공용 길 Edge Function (2026-11-12 신설 · 우편함 「코드·운영 — 서울 실행 EF 공용 길 …」 1)
 //
 // 왜: 키를 싣는 공공 API 중 해외 IP를 TLS 단계에서 끊는 호스트가 있다 — `business.juso.go.kr`(도로명주소 검색) ·
-//   `data.myhome.go.kr`(마이홈 공공임대 단지정보 15058476). 컨테이너(해외 출구)는 CONNECT 200 뒤 `Connection reset by peer`,
+//   `data.myhome.go.kr`(마이홈 공공임대 단지정보 15058476 — 2026-11-17 걷음 · 아래 표 주석). 컨테이너(해외 출구)는 CONNECT 200 뒤 `Connection reset by peer`,
 //   DB(싱가포르 net.http_get)는 시간 초과였다(조사 「juso 검색으로 지번 33주소 …」 회신 · 2026-11-12).
 //   그래서 이 함수가 **서울 지역(ap-northeast-2)에서 실행될 때만** 바깥을 부른다 — `fetch-attachment` SEOUL_ONLY(x-region) 선례와 같은 결.
 //   다른 지역에서 불리면 같은 요청을 `x-region: ap-northeast-2`로 자신에게 한 번 넘긴다(x-zf-region-hop 으로 두 번 넘기지 않음).
@@ -53,17 +53,14 @@ export const APIS: Record<string, Api> = {
     host: 'business.juso.go.kr', path: '/addrlink/addrCoordApi.do', keyParam: 'confmKey', keyEnv: 'JUSO_COORD_KEY',
     params: ['admCd', 'rnMgtSn', 'udrtYn', 'buldMnnm', 'buldSlno'], fixed: { resultType: 'json' },
   },
-  // LH 공공임대주택 단지정보 15058476(data.myhome.go.kr 전용 · data.go.kr 키 — LH_API_KEY 와 같은 값)
-  myhome_rental_list: {
-    host: 'data.myhome.go.kr', path: '/rentalHouseList', keyParam: 'serviceKey', keyEnv: 'LH_API_KEY',
-    params: ['brtcCode', 'signguCode', 'numOfRows', 'pageNo'], fixed: {},
+  // 국토교통부 건축HUB 건축물대장 표제부(15134735 · data.go.kr 키 MOLIT_RENT_API_KEY · 2026-11-17 추가 — complex-geo-fill 의 여러 결과 고르기 ②).
+  // apis.data.go.kr 은 해외 IP 를 막지 않지만(컨테이너 200) 키를 EF 비밀값에서만 쓰려고 같은 길에 둔다. 인자는 juso 결과 admCd(10자리) 앞5 · 뒤5 · 산 · 본번·부번 4자리.
+  bldhub_title: {
+    host: 'apis.data.go.kr', path: '/1613000/BldRgstHubService/getBrTitleInfo', keyParam: 'serviceKey', keyEnv: 'MOLIT_RENT_API_KEY',
+    params: ['sigunguCd', 'bjdongCd', 'platGbCd', 'bun', 'ji', 'numOfRows', 'pageNo'], fixed: { _type: 'json' },
   },
-  // 마이홈 공공임대 단지정보 15110581 의 data.myhome.go.kr 경로(2026-11-16 · 15058476 code 30 가르기 — 같은 키 · 같은 호스트에서
-  // 이 경로도 code 30 이면 호스트 축, 200 이면 15058476 신청 축). 같은 데이터는 apis.data.go.kr/1613000/HWSPR04/rentalHouseGwList 로도 받는다.
-  myhome_rental_gw: {
-    host: 'data.myhome.go.kr', path: '/rentalHouseGwList', keyParam: 'serviceKey', keyEnv: 'LH_API_KEY',
-    params: ['brtcCode', 'signguCode', 'numOfRows', 'pageNo'], fixed: {},
-  },
+  // 🔵 2026-11-17(우편함 「코드·운영 — 2장 …」 0장 1) — 마이홈 두 동작(myhome_rental_list 15058476 · myhome_rental_gw 15110581 의 data.myhome.go.kr 경로)을 걷었다.
+  //   LH 답(2026-11-16): 마이홈은 OpenAPI 15108420 만 · 부르는 곳 0(저장소 · DB 함수 · cron 확인). 같은 데이터는 apis.data.go.kr 경로(6a)로 받는다.
 }
 
 const json = (body: unknown, status = 200, extra: Record<string, string> = {}) =>
