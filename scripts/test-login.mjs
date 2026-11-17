@@ -43,7 +43,11 @@ async function sql(query) {
 }
 
 // EF 를 DB 에서 부르고(pg_net) 응답이 오면 **읽으면서 지운다**. 돌려주는 것은 상태와 본문 JSON(호출자가 무엇을 꺼낼지 고른다).
-async function callTestLogin(mode, { waitMs = 30000 } = {}) {
+// 🔵 2026-11-17(우편함 「코드·운영 — 운영 장치 넷 …」 3) — 기다림 30초 → 75초. 11-17 08:5x 하루 1회 바퀴가 「30000ms 안에 응답 없음(요청 23698)」으로
+//   실패했다 — pg_net 대기열이 늦어 응답이 30초 뒤에 왔고, 링크가 든 응답 행은 zipfit-net-purge-secrets(5분마다)가 거둬 흔적도 없었다.
+//   요청은 한 번만 넣는다(다시 넣으면 링크가 두 번 생긴다) · 폴링 간격은 처음 1.5초에서 3초로 늘린다(관리 API 호출 수를 줄인다).
+//   바퀴 전체 한도(health-screen.yml `timeout`)를 링크·정리 두 번 기다림 + 화면 바퀴가 들어가게 함께 늘렸다. 정리 보장(withTestLogin)은 그대로다.
+async function callTestLogin(mode, { waitMs = 75000 } = {}) {
   if (!['link', 'cleanup'].includes(mode)) throw new Error('mode 는 link · cleanup')
   const [{ id }] = await sql(
     `select net.http_post(url := '${EF_URL}', body := '{"mode":"${mode}"}'::jsonb,` + SEP +
@@ -52,8 +56,10 @@ async function callTestLogin(mode, { waitMs = 30000 } = {}) {
     ` timeout_milliseconds := 20000) as id`)
   if (!Number.isInteger(id)) throw new Error('net.http_post 요청 번호를 받지 못했다')
   const until = Date.now() + waitMs
+  let pause = 1500
   while (Date.now() < until) {
-    await new Promise(r => setTimeout(r, 1500))
+    await new Promise(r => setTimeout(r, pause))
+    pause = Math.min(pause + 500, 3000)
     const rows = await sql(`with d as (delete from net._http_response where id = ${id} returning status_code, content, error_msg) select * from d`)
     if (rows.length) {
       const { status_code, content, error_msg } = rows[0]

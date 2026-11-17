@@ -862,16 +862,21 @@ async function collect() {
 
   const nullApplyStartIds = new Set<string>()
   const failCountMap = new Map<string, number>()
+  // 🔵 2026-11-17(우편함 「코드·운영 — 운영 장치 넷 …」 2 · 「조사·의견 — LH 응답 지연 …」 회신 ⓑ) — 마지막 상세 시도 시각(성공·실패 모두 찍힌다).
+  //   줄 세움의 셋째 기준 「오래된 시도 먼저 · 시도 없음이 맨 앞」 — 예산 40초에서 끊겨도 같은 앞쪽 공고만 매번 받고 뒤쪽은 굶는 것을 막는다.
+  const lastAttemptMap = new Map<string, number>()
   try {
     const activeIds = activeNotices.map(n => n.PAN_ID)
     const { data: existing } = await supabase.from('announcements')
-      .select('announcement_id, apply_start, detail_fetch_fail_count')
+      .select('announcement_id, apply_start, detail_fetch_fail_count, detail_fetch_last_attempt')
       .eq('source', 'LH')
       .in('announcement_id', activeIds)
     const knownIds = new Set((existing ?? []).map(r => r.announcement_id as string))
     for (const r of (existing ?? [])) {
       if (r.apply_start === null) nullApplyStartIds.add(r.announcement_id as string)
       failCountMap.set(r.announcement_id as string, (r.detail_fetch_fail_count as number) ?? 0)
+      const t = r.detail_fetch_last_attempt ? Date.parse(r.detail_fetch_last_attempt as string) : NaN
+      if (Number.isFinite(t)) lastAttemptMap.set(r.announcement_id as string, t)
     }
     for (const id of activeIds) {
       if (!knownIds.has(id)) nullApplyStartIds.add(id)
@@ -918,7 +923,9 @@ async function collect() {
       if (aBackfill !== bBackfill) return aBackfill - bBackfill
       const aNull = nullApplyStartIds.has(a.PAN_ID) ? 0 : 1
       const bNull = nullApplyStartIds.has(b.PAN_ID) ? 0 : 1
-      return aNull - bNull
+      if (aNull !== bNull) return aNull - bNull
+      // 셋째: 마지막 상세 시도가 오래된 것 먼저(시도 기록 없음 = 0 = 맨 앞) — 대상 수·예산·캡 90은 그대로다.
+      return (lastAttemptMap.get(a.PAN_ID) ?? 0) - (lastAttemptMap.get(b.PAN_ID) ?? 0)
     })
     .slice(0, 90)
   console.log(`[LH] 상세대상 ${needDetail.length}건 (활성 ${activeNotices.length} · 그중 장기 창 ${activeNotices.filter(n => longIds.has(n.PAN_ID)).length}, 정정보강 후보 ${revisionBackfillNotices.length})`)
