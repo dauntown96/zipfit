@@ -1236,6 +1236,39 @@ try {
   add('complex_link_daily', '단지 잇기 안전망 하루 변경 수(정보)', 'info', String(e).slice(0, 200), 'zipfit_ops.complex_link_runs 를 읽는다(실패면 ℹ️ · 적용 전이면 표 없음)')
 }
 
+// ㊷ 단지 좌표 사람 판정 대기(2026-11-17 · 우편함 「코드·운영 — 3장 …」 0장 3 · 2장 ⑦ 2) — ℹ️ 셈만(판정하지 않는다 · HARD 밖).
+//    complex_geo_attempts outcome multi = EF complex-geo-fill 이 juso 정확 결과 여럿을 원문 단지명·건축HUB 로 못 고른 주소(사람 판정 목록).
+//    판정이 끝나면 그 행을 picked 로 바꾸고 complex_geo 에 한 행(그래서 multi 로 남은 것 = 판정 안 끝난 것).
+try {
+  const [x] = await sqlRead(`select count(*)::int n, min(tried_at) oldest from public.complex_geo_attempts where outcome = 'multi'`)
+  add('complex_geo_review', '단지 좌표 사람 판정 대기(정보)', 'info',
+    x.n ? `${x.n}주소 · 가장 오래된 시도 ${String(x.oldest).slice(0, 10)}` : '0',
+    '정보 — 판정하지 않는다 · complex_geo_attempts outcome multi(사람 판정 목록 — claude.ai 원문 대조 뒤 complex_geo 에 한 행 · 그 행 picked)')
+} catch (e) {
+  add('complex_geo_review', '단지 좌표 사람 판정 대기(정보)', 'info', String(e).slice(0, 200), 'complex_geo_attempts 를 읽는다(실패면 ℹ️)')
+}
+
+// ㊸ 단지 시도 ≠ 세대 주소 시도(2026-11-17 · 우편함 「코드·운영 — 3장 …」 본 1 4) — ⚠️ 경고만(HARD 밖 · 이슈를 열지 않는다).
+//    경산 단지 셋(6808 · 8772 · 8773)이 「대구광역시」로 든 꼴: LH 공고 행 sido_nm 이 지역본부(대구경북) 시도이고 세대 행 sido_nm 이 비어,
+//    잇기 함수가 공고 시도를 단지 sido_nm 에 넣었다. 셈 = complexes 중 ① sido_nm(짧은 이름) ≠ 이은 세대 행 주소 첫 토큰의 시도(시도로 읽히는 토큰만)
+//    ∨ ② sido_nm(짧은 이름) ≠ road_key 첫 토큰. 짧은 이름은 complex_road_key 와 같다(「경북」=「경상북도」 · 「전남광주」=광주·전남·전남광주통합특별시).
+try {
+  const [x] = await sqlRead(`with m(t, s) as (values ('서울특별시','서울'),('서울시','서울'),('서울','서울'),('부산광역시','부산'),('부산','부산'),('대구광역시','대구'),('대구','대구'),
+        ('인천광역시','인천'),('인천','인천'),('광주광역시','전남광주'),('광주','전남광주'),('전라남도','전남광주'),('전남','전남광주'),('전남광주통합특별시','전남광주'),('전남광주','전남광주'),
+        ('대전광역시','대전'),('대전','대전'),('울산광역시','울산'),('울산','울산'),('세종특별자치시','세종'),('세종시','세종'),('세종','세종'),('경기도','경기'),('경기','경기'),
+        ('강원특별자치도','강원'),('강원도','강원'),('강원','강원'),('충청북도','충북'),('충북','충북'),('충청남도','충남'),('충남','충남'),('전북특별자치도','전북'),('전라북도','전북'),('전북','전북'),
+        ('경상북도','경북'),('경북','경북'),('경상남도','경남'),('경남','경남'),('제주특별자치도','제주'),('제주도','제주'),('제주','제주')),
+      b as (select distinct c.id from public.complexes c left join m cm on cm.t = c.sido_nm
+             where (c.road_key is not null and cm.s is distinct from split_part(c.road_key, ' ', 1))
+                or exists (select 1 from public.housing_units h join m hm on hm.t = split_part(btrim(h.address), ' ', 1)
+                            where h.complex_id = c.id and hm.s is distinct from cm.s))
+      select count(*)::int n, coalesce(string_agg(id::text, ' · ' order by id), '') ids from b`)
+  add('complex_sido_mismatch', '단지 시도 ≠ 세대 주소·도로명 키 시도', x.n ? 'warn' : 'pass', x.n ? `${x.n} — ${x.ids.slice(0, 200)}` : '0',
+    '0 — complexes.sido_nm(짧은 이름) = 이은 세대 행 주소 첫 토큰 시도 ∧ = road_key 첫 토큰 · ⚠️ 경고만(이슈 없음) · 2026-11-17 경산 셋 바로잡음')
+} catch (e) {
+  add('complex_sido_mismatch', '단지 시도 ≠ 세대 주소·도로명 키 시도', 'warn', String(e).slice(0, 200), 'complexes · housing_units 를 읽는다')
+}
+
 // ㊴ 임대조건 한 줄 산술(2026-11-12 · 우편함 「코드·운영 — 단지 키 3차 + …」 4 · run 425 ⑦) — ℹ️ 셈만(판정하지 않는다 · gate.mjs HARD 밖).
 //    세대 비고(extra_note)의 「계약금 N원 · 잔금 M원」 · 전환 칸(증액·감액 한도 → 결과 보증금)을 세대 행 deposit 과 견준다.
 //    🔵 2026-11-12(우편함 「코드·운영 — 0장 일곱 …」 2·3 · 역전파 14회차 ② 점검 식 한계 꼴 넷) — SQL 정규식 판을 rent-arith.mjs(JS)로 옮겼다:

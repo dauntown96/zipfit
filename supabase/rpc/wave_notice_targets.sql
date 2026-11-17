@@ -9,7 +9,10 @@ AS $function$
 --   lh_notice_ingest(맞은 공지 저장) · analysis_dispatch_tick #차수 갈래(켜기 칸 wave_notice_enabled). 🔴 한쪽만 고치지 않는다 — 여기를 고친다.
 -- 정의는 화면 그대로다(index.html zfRouteWinsAll · zfRouteDefaultWin · zfWaveIdsOf · zfLoadWaveNotes · zfRouteSchedOf):
 --   카드      = get_announcements_deduped() 대표 ∧ apply_end ≥ 오늘(KST) ∧ 매입 ∧ apply_period_check 아님 ∧ 조기 마감 아님(제목 머리 [조기마감] · revision_note)
---   창        = 같은 제목 키 경로 행 중 카드 기간과 겹치는 것 · 겹치거나 하루 차로 붙은 행은 한 창 · 날짜 빈 경로 행이 있으면 그 카드는 보지 않는다 · 창 둘 이상만
+--   창        = 같은 제목 키 경로 행 중 카드 기간과 겹치는 것 · 겹치는 행은 한 창 · 하루 차로 붙은 행은 같은 대상 순위(phase_text 원문)일 때만 한 창
+--               (순위 글자가 빈 행 · 창에 순위 글자가 아직 없으면 종전대로 한 창 — 화면 zfSameWave · #1052 · screen-check WAVE_G_SQL 과 같은 꼴)
+--               · 날짜 빈 경로 행이 있으면 그 카드는 보지 않는다 · 창 둘 이상만
+--   🔵 2026-11-17(우편함 「코드·운영 — 3장 …」 본 2) — 하루 차 묶기를 순위 조건으로 바꿨다(종전: 하루 차면 순위와 관계없이 한 창).
 --   기본 창 i = 오늘이 든 창 → 없으면 다음 창 → 다 끝났으면 마지막 창 · i ≥ 1(둘째 이후)만 한 행(창마다 그 창 대상주택게시 scope 마다 한 행 · 없으면 scope NULL 한 행)
 --   has_warn  = 창들의 경로 행 공고 id ∪ 카드 id 의 정책 행 중 분류가 「⚠️」로 시작 ∧ 「차수」 ∧ 「대상」
 --   multi_scope = 그 id 들의 대상주택게시 scope_text 가 둘 이상(순위별)
@@ -28,10 +31,19 @@ r as materialized (select c.announcement_id cid, x.announcement_id rid, x.start_
         join public.announcement_apply_routes x on x.announcement_id = a.announcement_id
        where a.title is not null),
 bad as (select distinct cid from r where x0 is null or y0 is null),
-w as (select r.*, case when x0 <= max(y0) over (partition by cid order by x0, y0 rows between unbounded preceding and 1 preceding) + 1 then 0 else 1 end brk
+w as (select r.*, row_number() over (partition by r.cid order by r.x0, r.y0, r.rid, r.ph) rn
         from r join c on c.announcement_id = r.cid
        where r.cid not in (select cid from bad) and not (r.y0 < c.s0 or r.x0 > c.e0)),
-g as (select w.*, sum(brk) over (partition by cid order by x0, y0 rows unbounded preceding) gi from w),
+g as (select w.*, v.gi from w join (
+        with recursive q(cid, rn, gi, wy, wph) as (
+          select w1.cid, w1.rn, 1, w1.y0, case when nullif(w1.ph, '') is null then '{}'::text[] else array[w1.ph] end from w w1 where w1.rn = 1
+          union all
+          select w2.cid, w2.rn, q.gi + case when t.sm then 0 else 1 end, case when t.sm then greatest(q.wy, w2.y0) else w2.y0 end,
+                 case when t.sm then q.wph || pp.p2 else pp.p2 end
+            from q join w w2 on w2.cid = q.cid and w2.rn = q.rn + 1
+            cross join lateral (select case when nullif(w2.ph, '') is null then '{}'::text[] else array[w2.ph] end p2) pp
+            cross join lateral (select w2.x0 <= q.wy + 1 and (w2.x0 <= q.wy or nullif(w2.ph, '') is null or cardinality(q.wph) = 0 or w2.ph = any(q.wph)) sm) t)
+        select q.cid, q.rn, q.gi from q) v on v.cid = w.cid and v.rn = w.rn),
 m as (select cid, gi, min(x0) x, max(y0) y, array_agg(distinct ph) filter (where ph is not null) phs, array_agg(distinct rid) ids
         from g group by cid, gi),
 mc as (select m.*, count(*) over (partition by cid) n, row_number() over (partition by cid order by x) - 1 i from m),

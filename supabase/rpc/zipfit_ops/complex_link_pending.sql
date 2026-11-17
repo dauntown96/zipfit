@@ -11,12 +11,15 @@ AS $function$
 --   30일 넘은 행은 같은 자리에서 지운다) — pg_cron 은 반환값을 「1 row」로만 남겨 하루 변경 수를 셀 수 없었다. health-ops ℹ️ complex_link_daily 가 읽는다.
 -- 🔵 2026-11-17(우편함 「코드·운영 — 2장 …」 본 1) — 대상 ①에 둘째 키 자리를 더한다: complex_id 가 비고 도로명 키는 NULL 이나
 --   주소가 complex_geo.matched_from 과 같은(source pending 밖 · 도로명 있음) 세대 행의 공고.
+-- 🔵 2026-11-17(우편함 「코드·운영 — 3장 …」 0장 2) — 대상 ①의 도로명 키 시도가 세대 sido_nm 이 비면 공고 sido_nm(공고 행 source 순 첫 행)으로
+--   물러난다(잇기 함수 ⑤와 같은 꼴 — 종전에는 세대 sido 가 빈 행이 2일 뒤 다시 불리지 않았다).
 declare ids text[]; r jsonb;
 begin
   ids := array(select distinct x from (
       select h.announcement_id x from public.housing_units h
+        left join lateral (select a.sido_nm from public.announcements a where a.announcement_id = h.announcement_id order by a.source limit 1) an on true
        where h.complex_id is null and h.address is not null
-         and (public.complex_road_key(h.address, h.sido_nm) is not null
+         and (public.complex_road_key(h.address, coalesce(h.sido_nm, an.sido_nm)) is not null
               or exists (select 1 from public.complex_geo g where g.matched_from = h.address and g.source <> 'pending' and g.road_address is not null))
       union
       select h.announcement_id from public.housing_units h where h.created_at > now() - interval '2 days') z
