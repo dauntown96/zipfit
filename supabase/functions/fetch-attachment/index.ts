@@ -177,7 +177,7 @@ const rejectReason = (u: URL): string | null => {
 // 🔴 LH 첨부 경로 쓰임 가름(2026-11-05 · 우편함 「코드·운영 — LH 첨부 경로(lhFile.do) 사용 중단 …」 「🔴 요청 고침」 2장 · 다운님 결정 「문의 답 전까지 중간 길」) —
 //   apply.lh.or.kr/robots.txt 가 Disallow: /lhapply/lhFile.do · /lhapply/apply/csvc/lhFile.do 를 건다. 그 두 경로는 받기 전에 DB 문지기 lh_file_gate(url, 목적)를
 //   부른다(모드 analysis_dispatch_config.lh_file_mode — essential: 열린 공고 첨부를 파일당 한 번 + 재시도 한 번 · paused: 전부 막음 · normal: 종전).
-//   허락하지 않으면 403 {status:'lh_file_gate'} · 🔴 문지기를 못 부르면 받지 않는다(닫힌 쪽). 허락한 받기의 결과(ok · 실패 사유)는 응답 직전 lh_file_gate_done 이 적는다(Deno.serve).
+//   허락하지 않으면 423 {status:'lh_file_gate', reason:'gate_refused', self_refusal:true}(2026-11-17 — 종전 403 · LH 403 과 가른다) · 🔴 문지기를 못 부르면 받지 않는다(닫힌 쪽). 허락한 받기의 결과(ok · 실패 사유)는 응답 직전 lh_file_gate_done 이 적는다(Deno.serve).
 //   첫 주소 · 리다이렉트 다음 주소 · host_probe 모두. 다른 LH 경로(/upload/Files/ 이미지 · 공고 페이지)와 다른 호스트는 그대로.
 const ROBOTS_DISALLOWED = (u: URL) => u.hostname === 'apply.lh.or.kr' && /^\/lhapply\/(apply\/csvc\/)?lhfile\.do$/i.test(u.pathname)
 type LhGate = { allow: boolean; reason: string; kind: string | null; mode: string | null; reuse_url: string | null; log_id: number | null; wait_ms?: number | null }
@@ -219,11 +219,15 @@ const lhFileGate = async (u: URL, purpose: 'fetch' | 'probe', announcementId: st
 const lhGateDone = async (logId: number, outcome: string) => {
   try { await rpcPost('lh_file_gate_done', { p_log_id: logId, p_outcome: outcome }) } catch { /* 기록 실패는 응답을 바꾸지 않는다 */ }
 }
-// 기다림이 길어 돌려보낼 때는 429(lh_file_busy · retry_after_ms) — 막음(403 lh_file_gate)과 가른다.
-const lhGateStatus = (g: LhGate) => (g.wait_ms ? 429 : 403)
+// 기다림이 길어 돌려보낼 때는 429(lh_file_busy · retry_after_ms) — 막음과 가른다.
+// 🔵 2026-11-17(우편함 「코드·운영 — 0장 …」 3 · run 478) — 문지기가 스스로 거절한 막음은 403 이 아니라 423 · reason 'gate_refused' ·
+//   self_refusal: true 다. 종전 403 은 회차 기록에 「문지기 403」으로 남아 LH 가 돌려준 403(upstream_403)과 섞여 읽혔다.
+//   LH 에 요청을 보내지 않은 응답이다(lhFile.do 호출 0) — 부른 쪽은 종전 403 과 같이 그 파일을 건너뛴다.
+const lhGateStatus = (g: LhGate) => (g.wait_ms ? 429 : 423)
 const LH_GATE_BODY = (u: URL, g: LhGate) => ({
-  ok: false, status: 'lh_file_gate', reason: g.wait_ms ? 'lh_file_busy' : 'lh_file_gate', retry_after_ms: g.wait_ms ?? null, gate_mode: g.mode, gate_kind: g.kind, reuse_url: g.reuse_url,
-  error: `LH 첨부 경로 쓰임 가름(${g.mode ?? '?'}) — ${g.reason} · ${u.hostname}${u.pathname} 는 apply.lh.or.kr/robots.txt 가 막는 경로다(2026-11-05 다운님 결정)`,
+  ok: false, status: 'lh_file_gate', reason: g.wait_ms ? 'lh_file_busy' : 'gate_refused', self_refusal: !g.wait_ms,
+  retry_after_ms: g.wait_ms ?? null, gate_mode: g.mode, gate_kind: g.kind, reuse_url: g.reuse_url,
+  error: `꼭집 문지기 자체 거절(LH 응답 아님 · lhFile.do 호출 0) — 쓰임 가름 ${g.mode ?? '?'} · ${g.reason} · ${u.hostname}${u.pathname} 는 apply.lh.or.kr/robots.txt 가 막는 경로다(2026-11-05 다운님 결정)`,
 })
 // 허락한 lhFile.do 받기의 기록 행 — 요청마다 하나(응답 직전 결과를 적는다).
 const lhGateOf = new WeakMap<Request, number>()
@@ -1463,8 +1467,23 @@ const handleRequest = async (req: Request): Promise<Response> => {
       }, started, ac, timer)
     }
 
+    // 🔵 2026-11-17(우편함 「코드·운영 — 0장 …」 4 ② · 장치 넷 회신 ⑦ 2) — 업로드(폴더 있음)에서 선언 크기가 상한을 넘으면
+    //   size_exceeded_declared 로 돌려보내지 않고 이미 연 응답을 그대로 큰 파일 갈래(resumable)로 넘긴다.
+    //   종전에는 부른 쪽이 large=resumable 로 같은 파일을 다시 받아(LH 두 번) 그 재시도가 시간 초과로 문지기 차단 셈에 들었다(11-17 1351 → 1352).
+    //   받기(fetch)·메타 모드와 폴더 없는 업로드는 종전 그대로(아래 ①).
+    if (wantUpload && folderIdParam !== null && declaredLen !== null && Number.isFinite(declaredLen) && declaredLen > MAX_SOURCE_BYTES) {
+      return await handleResumable(res, { ...base, auto_resumable: true }, declaredLen, {
+        announcementId: announcementId as string,
+        folderId: folderIdParam as string,
+        nameOverride,
+        onDupe,
+        current,
+        reuseOn,
+      }, started, ac, timer)
+    }
+
     // ① Content-length가 있고 상한을 넘으면 본문을 아예 받지 않는다.
-    // 🔴 업로드 경로에서도 똑같이 막는다. 가드는 mode와 무관하다.
+    // 🔴 업로드 경로에서도 똑같이 막는다(폴더 없는 업로드 — 위 큰 파일 갈래 밖). 가드는 mode와 무관하다.
     if (declaredLen !== null && Number.isFinite(declaredLen) && declaredLen > MAX_SOURCE_BYTES) {
       await res.body?.cancel()
       clearTimeout(timer)
