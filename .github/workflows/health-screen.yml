@@ -27,6 +27,8 @@ on:
     paths:
       - 'index.html'
       - 'sw.js'
+      # 2026-11-17(우편함 「코드·운영 — 2장 …」 0장 2) — 점검기만 고친 PR에도 화면 점검이 붙게(#1094 이 붙지 않았다).
+      - '.github/health/screen-check.mjs'
   workflow_dispatch:
     inputs:
       simulate:

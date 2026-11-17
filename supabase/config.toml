@@ -52,6 +52,10 @@ verify_jwt = false
 [functions.seoul-api]
 verify_jwt = false
 
+# 2026-11-17 신설 — 단지 도로명·좌표 자동 채움(juso 는 seoul-api 로만). x-cron-secret 으로 막는다(JWT 없음).
+[functions.complex-geo-fill]
+verify_jwt = false
+
 [functions.save-user-profile]
 verify_jwt = true
 

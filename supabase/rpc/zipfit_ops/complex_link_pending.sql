@@ -9,11 +9,15 @@ AS $function$
 --   (코드 고르기 · 이름 채움 재료) · 최대 2,000 · 대상 0 이면 잇기 함수를 부르지 않는다. 쓰기는 잇기 함수 규칙 그대로(원문 값만 · 이름으로 합치지 않음).
 -- 🔵 2026-11-12(우편함 「코드·운영 — 0장 일곱 …」 5 · #1006 ⑦ 1) — 부를 때마다 결과를 zipfit_ops.complex_link_runs 에 한 행 남긴다(대상 0 포함 ·
 --   30일 넘은 행은 같은 자리에서 지운다) — pg_cron 은 반환값을 「1 row」로만 남겨 하루 변경 수를 셀 수 없었다. health-ops ℹ️ complex_link_daily 가 읽는다.
+-- 🔵 2026-11-17(우편함 「코드·운영 — 2장 …」 본 1) — 대상 ①에 둘째 키 자리를 더한다: complex_id 가 비고 도로명 키는 NULL 이나
+--   주소가 complex_geo.matched_from 과 같은(source pending 밖 · 도로명 있음) 세대 행의 공고.
 declare ids text[]; r jsonb;
 begin
   ids := array(select distinct x from (
       select h.announcement_id x from public.housing_units h
-       where h.complex_id is null and h.address is not null and public.complex_road_key(h.address, h.sido_nm) is not null
+       where h.complex_id is null and h.address is not null
+         and (public.complex_road_key(h.address, h.sido_nm) is not null
+              or exists (select 1 from public.complex_geo g where g.matched_from = h.address and g.source <> 'pending' and g.road_address is not null))
       union
       select h.announcement_id from public.housing_units h where h.created_at > now() - interval '2 days') z
     where x is not null order by 1 limit 2000);
