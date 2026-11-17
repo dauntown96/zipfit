@@ -916,8 +916,16 @@ async function collect() {
   // 활성 공고의 상세조회가 보강분에 밀리지 않는다(실측 활성 80건 < 90).
   // 🔵 2026-10-11(3-B ①) — 장기 창 활성 공고는 정기 창 활성 다음 · 정정 보강 앞(층 0 · 1 · 2). 정기 창 공고의 자리는 줄지 않는다.
   const tierOf = (n: NoticeItem) => !activeIdSet.has(n.PAN_ID) ? 2 : longIds.has(n.PAN_ID) ? 1 : 0
+  // 🔵 2026-11-17(「운영 장치 넷」 2 고침 — PR #1082 뒤 두 시간 측정) — 셋째 기준만으로는 층 1(장기 창 상시·수시모집)이 늘 예산(40초)에 잘렸다
+  //   (열린 LH 96 중 11건이 11-16 14:40 뒤 상세 0 · 런마다 15건 미시도). 그래서 「마지막 시도가 STALE_MS 넘게 오래됨(또는 없음)」을 맨 앞 기준으로 세운다.
+  //   정기 창 공고는 10분마다 받으므로 60분을 넘지 않아 자리를 잃지 않는다 · 굶던 공고가 한 번 받으면 다시 층 순서로 돌아간다.
+  const STALE_MS = 60 * 60 * 1000
+  const staleOf = (n: NoticeItem) => (Date.now() - (lastAttemptMap.get(n.PAN_ID) ?? 0)) > STALE_MS ? 0 : 1
   const needDetail = [...activeNotices, ...revisionBackfillNotices]
     .sort((a, b) => {
+      const aStale = staleOf(a)
+      const bStale = staleOf(b)
+      if (aStale !== bStale) return aStale - bStale
       const aBackfill = tierOf(a)
       const bBackfill = tierOf(b)
       if (aBackfill !== bBackfill) return aBackfill - bBackfill
