@@ -19,6 +19,9 @@ AS $function$
 -- 🔵 2026-11-17(우편함 「코드·운영 — 2장 …」 본 1 · #1030 둘째 키 승인) — ⑤의 둘째 키: 세대 행 주소의 도로명 키가 NULL(지번 꼴 · 시도 없음)이고
 --    그 주소(원문 그대로)가 complex_geo.matched_from 과 같으면 complex_road_key(complex_geo.road_address) 로 잇는다(source pending · 도로명 없는 행은 잇지 않음).
 --    새 단지를 만들면 road 별칭 출처 = complex_geo.road_address · 이은 단지가 아직 어느 complex_geo 행에도 없으면 그 행 complex_id 를 채운다(단지 하나에 한 행).
+-- 🔵 2026-11-17(우편함 「코드·운영 — 4장 …」 본 2 · 3장 ② 승인) — 단지를 새로 만들 때 complexes.sido_nm = 주소 첫 토큰이 시도 이름이면 그 토큰(원문 그대로)
+--    → 아니면 세대 sido_nm → 아니면 공고 sido_nm(① precise_address 는 그 주소 첫 토큰 → 공고 sido_nm). 경산 셋이 LH 공고 행 시도(지역본부 「대구광역시」)로 든 꼴(3장).
+--    「광주시」는 경기 광주시와 겹쳐 시도로 읽지 않는다(complex_road_key 와 같다). 기존 단지는 건드리지 않는다.
 -- 동시 호출은 권고 잠금으로 한 줄로 세운다. 반환: {ids, link, new_complex, code, hold, name, code_pick, unit, unit_geo, geo_cid}
 declare
   r record; v_kind text; v_rk text; v_cid bigint; v_ckind text; v_codes text[]; v_keys text[];
@@ -43,7 +46,11 @@ begin
       if v_cid is not null and v_ckind <> v_kind then
         n_hold := n_hold + 1; v_cid := null;
       elsif v_cid is null then
-        insert into public.complexes (kind, supplier, sido_nm, sigungu_nm, road_key, display_name) values (v_kind, r.supply_org, r.sido_nm, r.sigungu_nm, v_rk, r.building_name) returning id into v_cid;
+        insert into public.complexes (kind, supplier, sido_nm, sigungu_nm, road_key, display_name)
+        values (v_kind, r.supply_org,
+                case when split_part(regexp_replace(btrim(coalesce(r.precise_address, '')), '\s+', ' ', 'g'), ' ', 1) ~ '^(서울특별시|서울시|서울|부산광역시|부산시|부산|대구광역시|대구시|대구|인천광역시|인천시|인천|광주광역시|광주|전라남도|전남|전남광주통합특별시|전남광주|대전광역시|대전시|대전|울산광역시|울산시|울산|세종특별자치시|세종시|세종|경기도|경기|강원특별자치도|강원도|강원|충청북도|충북|충청남도|충남|전북특별자치도|전라북도|전북|경상북도|경북|경상남도|경남|제주특별자치도|제주도|제주)$'
+                     then split_part(regexp_replace(btrim(r.precise_address), '\s+', ' ', 'g'), ' ', 1) else r.sido_nm end,
+                r.sigungu_nm, v_rk, r.building_name) returning id into v_cid;
         insert into public.complex_aliases (complex_id, alias_type, alias_value, source, evidence, added_by, confirmed)
         values (v_cid, 'road', v_rk, 'announcements.precise_address', 'complex_road_key(precise_address, sido_nm) · 공고 ' || r.announcement_id, 'collect', 'auto');
         n_new := n_new + 1;
@@ -108,9 +115,11 @@ begin
     end if;
     -- ⑤ 세대 행 complex_id(도로명 키 · 같은 kind)
     for u in select q.id, coalesce(q.k1, public.complex_road_key(g.road_address, q.sd)) as k, q.k1 is null and g.id is not null as by_geo, g.id as gid,
-                    q.bn, q.sd, q.sg
+                    q.bn, q.sd, q.sg, coalesce(q.tk, q.sd) as csd
                from (select h.id, h.address, public.complex_road_key(h.address, coalesce(h.sido_nm, r.sido_nm)) as k1, nullif(btrim(h.building_name), '') as bn,
-                            coalesce(h.sido_nm, r.sido_nm) as sd, coalesce(h.sigungu_nm, r.sigungu_nm) as sg
+                            coalesce(h.sido_nm, r.sido_nm) as sd, coalesce(h.sigungu_nm, r.sigungu_nm) as sg,
+                            case when split_part(regexp_replace(btrim(coalesce(h.address, '')), '\s+', ' ', 'g'), ' ', 1) ~ '^(서울특별시|서울시|서울|부산광역시|부산시|부산|대구광역시|대구시|대구|인천광역시|인천시|인천|광주광역시|광주|전라남도|전남|전남광주통합특별시|전남광주|대전광역시|대전시|대전|울산광역시|울산시|울산|세종특별자치시|세종시|세종|경기도|경기|강원특별자치도|강원도|강원|충청북도|충북|충청남도|충남|전북특별자치도|전라북도|전북|경상북도|경북|경상남도|경남|제주특별자치도|제주도|제주)$'
+                                 then split_part(regexp_replace(btrim(h.address), '\s+', ' ', 'g'), ' ', 1) end as tk
                        from public.housing_units h where h.announcement_id = r.announcement_id and h.complex_id is null) q
                left join public.complex_geo g on q.k1 is null and g.matched_from = q.address and g.source <> 'pending' and g.road_address is not null loop
       continue when u.k is null;
@@ -120,7 +129,7 @@ begin
       if v_cid is not null and v_ckind <> v_kind then
         n_hold := n_hold + 1; continue;
       elsif v_cid is null then
-        insert into public.complexes (kind, supplier, sido_nm, sigungu_nm, road_key, display_name) values (v_kind, r.supply_org, u.sd, u.sg, u.k, u.bn) returning id into v_cid;
+        insert into public.complexes (kind, supplier, sido_nm, sigungu_nm, road_key, display_name) values (v_kind, r.supply_org, u.csd, u.sg, u.k, u.bn) returning id into v_cid;
         insert into public.complex_aliases (complex_id, alias_type, alias_value, source, evidence, added_by, confirmed)
         values (v_cid, 'road', u.k, case when u.by_geo then 'complex_geo.road_address' else 'housing_units.address' end,
                 case when u.by_geo then 'complex_road_key(complex_geo.road_address) · matched_from = 세대 주소 · complex_geo ' || u.gid || ' · 공고 ' || r.announcement_id
