@@ -1294,6 +1294,7 @@ html.zf12 .zf12-must h4{margin:0 0 4px;font-size:var(--t-s);font-weight:700;colo
 html.zf12 .zf12-must ol{margin:0;padding:0;list-style:none;font-size:var(--t-s);color:var(--ink)}
 html.zf12 .zf12-must summary{cursor:pointer;padding:12px 0;min-height:var(--hit);box-sizing:border-box;line-height:1.5;color:var(--ink-2)}
 html.zf12 .zf12-must summary b{color:var(--ink);font-weight:700}
+html.zf12 .zf12-must details[open] > summary .zf12-pv{display:none}   /* 작은 판 3 — 펼치면 본문이 같은 첫 문장을 말한다 */
 html.zf12 .zf12-raw{white-space:pre-wrap;font-size:var(--t-xs);line-height:1.6;color:var(--ink-2);margin:0 0 8px}
 /* 안 — 층 순서(DOM 은 그대로 · 순서만): 머리 → 행동 줄 → 2층 → 특이사항 → 세대 → 지난 회차 → 자격 → 일정 → 어디 → 그림 → 원문 → 기본 정보 */
 html.zf12 .zf12-card.zf3-open > [id^="ncard-"]{display:flex!important;flex-direction:column}
@@ -15988,8 +15989,9 @@ function zf12Must(card, n){
     sec.innerHTML = `<h4>꼭 볼 것</h4><ol>${list.map(r => {
       let f = zf12FirstSentence(r.content_raw); const cat = String(r.category || '').trim();
       if(cat && f.startsWith(cat) && /^[\s:·■]/.test(f.slice(cat.length))) f = f.slice(cat.length).replace(/^[\s:·■]+/, '');   // 원문 첫머리가 분류 이름과 같으면 한 번만
-      const short = f.length > 90 ? f.slice(0, 88) + '…' : f;
-      return `<li><details><summary><b>${escapeHtml(r.category || '')}</b> ${escapeHtml(short)}</summary><p class="zf12-raw">${escapeHtml(r.content_raw)}</p></details></li>`;
+      // 🔵 2026-11-17(우편함 「표시층 — 작은 판 3」 2) — 접힌 머리 = 분류 + 첫 문장 전체(종전 88자에서 「…」로 문장 중간을 잘랐다 · 첫 문장 최대 166자) ·
+      //    펼치면 머리의 첫 문장(.zf12-pv)은 숨긴다 — 본문(원문 전체)이 같은 문장으로 시작해 두 번 보이던 자리(…21100 「모집 신청과 관련하여 매우 중요한 사항」).
+      return `<li><details><summary><b>${escapeHtml(r.category || '')}</b> <span class="zf12-pv">${escapeHtml(f)}</span></summary><p class="zf12-raw">${escapeHtml(r.content_raw)}</p></details></li>`;
     }).join('')}</ol>`;
     const why = l2.querySelector('.zf12-schedwhy');
     why ? why.after(sec) : l2.prepend(sec);
