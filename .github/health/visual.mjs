@@ -9,6 +9,7 @@
 //
 // 쓰는 법:
 //   node .github/health/visual.mjs --record     # 고정본을 운영에서 새로 뜬다(🔴 컨테이너·사람 손 · 운영 anon 읽기만) → 기준 갱신도 함께 해야 한다
+//   node .github/health/visual.mjs --record-missing   # 있는 고정본(시각 그대로)에 화면이 새로 낸 요청만 운영에서 받아 더한다(🔴 컨테이너 · anon 읽기만)
 //   node .github/health/visual.mjs --update     # 기준 그림을 새로 쓴다 — 워크플로 visual.yml 「기준 갱신」(누가·언제가 baseline.json 과 커밋에 남는다)
 //   node .github/health/visual.mjs              # 견준다 → visual-out/(차이 그림 · 결과 visual-result.json · 요약 visual-summary.md) · 실패면 종료 코드 1
 //   --site <주소>  잴 페이지(기본: 저장소 뿌리를 이 스크립트가 127.0.0.1 임시 서버로 띄운다)
@@ -47,7 +48,8 @@ const BLOCK = /dapi\.kakao\.com|kakaocdn\.net|daumcdn\.net|drive\.google\.com|go
 const LIST_RPC = '/rest/v1/rpc/get_announcements_deduped'
 
 const argv = process.argv.slice(2)
-const MODE = argv.includes('--record') ? 'record' : argv.includes('--update') ? 'update' : 'compare'
+const ADD_MISSING = argv.includes('--record-missing')
+const MODE = argv.includes('--record') || ADD_MISSING ? 'record' : argv.includes('--update') ? 'update' : 'compare'
 const si = argv.indexOf('--site')
 
 // 요청 열쇠 — 방법 · 주소(쿼리 포함) · 본문. 머리(키)는 넣지 않는다.
@@ -73,6 +75,9 @@ async function main () {
   let fixture = null
   if (MODE !== 'record') {
     if (!fs.existsSync(FIXTURE)) throw new Error('고정본 없음 — --record 로 먼저 뜬다')
+    fixture = JSON.parse(zlib.gunzipSync(fs.readFileSync(FIXTURE)).toString('utf8'))
+  } else if (ADD_MISSING && fs.existsSync(FIXTURE)) {
+    // 🔵 2026-11-17(우편함 「표시층 — 12월 재편 A·B 반영」 4) — 있는 고정본을 그대로 두고(시각 _at 그대로) 화면이 새로 내는 요청만 운영에서 받아 더한다.
     fixture = JSON.parse(zlib.gunzipSync(fs.readFileSync(FIXTURE)).toString('utf8'))
   } else {
     fixture = { _at: new Date().toISOString(), _samples: SAMPLES.map(s => s[0]), entries: {} }

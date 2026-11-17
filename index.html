@@ -1234,6 +1234,106 @@ html[data-ui="d3"] .pg-bar{gap:2px}
 .zf3-search select{flex:0 0 auto;min-height:var(--hit);box-sizing:border-box;padding:0 8px;border:1px solid var(--line);border-radius:var(--r-2);background:var(--paper);color:var(--ink-2);font-size:var(--t-s);font-family:var(--f-ui);cursor:pointer}
 html[data-ui="d3"] .pg-btn{min-width:var(--hit);height:var(--hit);font-size:var(--t-s)}
 @media (prefers-reduced-motion:reduce){html[data-ui="d3"] .zf3-done,html[data-ui="d3"] .zf3-today,html[data-ui="d3"] .zf3-sk,html[data-ui="d3"] .zf3-go span{animation:none!important;transition:none!important}}
+/* 🧪 12월 재편 A·B 새 시안(병합 0 · 설계 「📐 12월 재편」 9·13·14·15절 · Design System v3 토큰만) */
+html.zf12 .zf12-off{display:none!important}
+html.zf12 .hcard.zf-ana-pending :is(.zf12-when,.zf12-badges){display:none!important}   /* 분석 전 카드 — 「분석 중」만(수집값 날짜·상태·경고 칩 0 — 종전 .zf-ana-pending 규칙과 같은 거름) */
+/* 겉 ① 유형 · (지역) · 상태 알약 · 경고 배지(빨강 하나 — 경고만) */
+html.zf12 .zf12-card .zf3-ctop{flex-wrap:wrap;row-gap:6px}
+html.zf12 .zf12-badges{display:contents}
+html.zf12 .zf12-badges .chip{display:inline-flex;align-items:center;min-height:24px;padding:2px 8px!important;border-radius:var(--r-1);font-size:var(--t-xs)!important;font-weight:700;background:var(--warn-bg)!important;border:1px solid var(--warn)!important;color:var(--warn)!important;cursor:default}
+html.zf12 .zf12-cov{font-size:var(--t-xs);color:var(--ink-3)}
+html.zf12 .zf12-badges .chip[role=button]{position:relative}
+html.zf12 .zf12-badges .chip[role=button]::after{content:"";position:absolute;left:0;right:0;top:-10px;bottom:-10px}   /* 누르는 자리 44px(보이는 높이 24 + 위아래 10) */
+html.zf12 .zf3-ctop .zf3-dpill:is(.hot,.zf12-soon){background:var(--ink);border-color:var(--ink);color:var(--paper)}   /* 2차 2 — 알약은 상태만 · 임박 경고는 일정 줄 남은 날 조각(.zf12-dd.hot)이 맡는다 */
+html.zf12 .zf12-cov::before{content:"· ";color:var(--ink-3)}
+/* 겉 ② 제목 최대 2줄 */
+html.zf12 .zf12-card .hname{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+/* 겉 ③ 누가(원문 칸 글자) */
+html.zf12 .zf12-who{margin:2px 0 8px;font-size:var(--t-s);font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html.zf12 .zf12-who .zf12-res{font-weight:400;color:var(--ink-2)}
+html.zf12 .zf12-wi{margin-right:4px}
+/* 겉 ④ 얼마 — 한 줄 */
+html.zf12 .zf12-card [data-sum-for] > div[data-zf12]{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:0!important}
+html.zf12 .zf12-cond{font-weight:500;color:var(--ink-2)}
+/* 겉 ⑤ 언제 — 노선 한 줄(● 지남 · ◉ 다음 · ○ 앞으로) */
+html.zf12 .zf12-when{display:flex;flex-wrap:wrap;align-items:center;gap:2px 6px;margin:8px 0 12px;font-size:var(--t-xs);color:var(--ink-2)}   /* 좁으면 정거장 단위로 다음 줄(글자를 자르지 않는다) */
+html.zf12 .zf12-w{display:inline-flex;align-items:baseline;gap:3px;font-family:var(--f-ui);white-space:nowrap}
+html.zf12 .zf12-w .zf12-k{color:var(--ink-3)}
+html.zf12 .zf12-w.past{color:var(--ink-3)}
+html.zf12 .zf12-w.next{color:var(--ink);font-weight:700}
+html.zf12 .zf12-w.next .zf12-k{color:var(--ink)}
+html.zf12 .zf12-m{font-size:10px;line-height:1}
+html.zf12 .zf12-sep{color:var(--ink-3)}
+html.zf12 .zf12-dd{font-weight:700;color:var(--ink);font-family:var(--f-ui);white-space:nowrap}
+html.zf12 .zf12-dd.hot{color:var(--warn)}
+html.zf12 .zf12-nu{font-size:var(--t-xs);color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:0}
+html.zf12 .zf12-nu a{color:var(--ink-2);font-weight:600;text-decoration:underline}
+html.zf12 .zf12-nu .zf-ai-lbl{display:none}
+/* 안 2층 머리 — 겉에서 내린 것 · 꼭 볼 것 · 정정 · ㎡당 */
+html.zf12 .zf12-l2{display:flex;flex-direction:column;gap:10px;margin:4px 0 12px;padding:12px;border:1px solid var(--line-2);border-radius:var(--r-2);background:var(--surface)}
+html.zf12 .zf12-l2:empty{display:none}
+html.zf12 .zf12-l2 > *{margin:0!important;order:20}
+/* 2층 차례는 도착 순서가 아니라 고정(늦게 붙는 것이 있어도 같은 그림) · 창 단추·가지 머리가 없는 카드는 노선 그림을 접는다(겉 한 줄과 같은 말) — 늦게 붙는 단추도 :has 로 따라간다 */
+html.zf12 .zf12-l2 > .zf12-schedwhy{order:1}
+html.zf12 .zf12-l2 > .zf12-must{order:2}
+html.zf12 .zf12-l2 > .zf12-sqm{order:3}
+html.zf12 .zf12-l2 > .chip-row{order:4}
+html.zf12 .zf12-l2 > .zf3-route{order:5}
+html.zf12 .zf12-l2 > .zf3-wsw{order:6}
+html.zf12 .zf12-l2 > .zf-route-slot{order:7}
+html.zf12 .zf12-l2 > .zf-wave-slot{order:8}
+html.zf12 .zf12-card:not(:has(.zf3-wsw,.zf3-bhead)) .zf3-route{display:none!important}
+html.zf12 .zf12-area{font-size:var(--t-xs);color:var(--ink-2);margin:0 0 4px}
+html.zf12 .zf12-schedwhy{font-size:var(--t-s);font-weight:700;color:var(--warn);background:var(--warn-bg);border:1px solid var(--warn-line);border-radius:var(--r-1);padding:8px 10px}
+html.zf12 .zf12-must h4{margin:0 0 4px;font-size:var(--t-s);font-weight:700;color:var(--ink)}
+html.zf12 .zf12-must ol{margin:0;padding:0;list-style:none;font-size:var(--t-s);color:var(--ink)}
+html.zf12 .zf12-must summary{cursor:pointer;padding:12px 0;min-height:var(--hit);box-sizing:border-box;line-height:1.5;color:var(--ink-2)}
+html.zf12 .zf12-must summary b{color:var(--ink);font-weight:700}
+html.zf12 .zf12-raw{white-space:pre-wrap;font-size:var(--t-xs);line-height:1.6;color:var(--ink-2);margin:0 0 8px}
+/* 안 — 층 순서(DOM 은 그대로 · 순서만): 머리 → 행동 줄 → 2층 → 특이사항 → 세대 → 지난 회차 → 자격 → 일정 → 어디 → 그림 → 원문 → 기본 정보 */
+html.zf12 .zf12-card.zf3-open > [id^="ncard-"]{display:flex!important;flex-direction:column}
+html.zf12 .zf12-card > [id^="ncard-"] > div:has(> [id^="notes-slot-"]){display:contents}
+html.zf12 .zf12-card > [id^="ncard-"] > .zf3-dtop{order:0}
+html.zf12 .zf12-card > [id^="ncard-"] > div:has(> .detail-link){order:1;margin:0 0 10px!important}
+html.zf12 .zf12-card > [id^="ncard-"] > .zf12-l2{order:2}
+html.zf12 .zf12-card > [id^="ncard-"] [id^="notes-slot-"]{order:3}
+html.zf12 .zf12-card > [id^="ncard-"] [id^="hu-slot-"]{order:4}
+html.zf12 .zf12-card > [id^="ncard-"] [id^="blocks-slot-"]{order:5}
+html.zf12 .zf12-card > [id^="ncard-"] [id^="cutoff-slot-"]{order:6}
+html.zf12 .zf12-card > [id^="ncard-"] [id^="elig-slot-"]{order:7}
+html.zf12 .zf12-card > [id^="ncard-"] [id^="schedule-slot-"]{order:8}
+html.zf12 .zf12-card > [id^="ncard-"] > div:has(> .map-box){order:9}
+html.zf12 .zf12-card > [id^="ncard-"] [id^="extras-slot-"]{order:10}
+html.zf12 .zf12-card > [id^="ncard-"] [id^="attachments-slot-"]{order:11}
+html.zf12 .zf12-card > [id^="ncard-"] [id^="policy-slot-"]{order:12}
+html.zf12 .zf12-card > [id^="ncard-"] [id^="docs-slot-"]{order:13}
+html.zf12 .zf12-card > [id^="ncard-"] > .detail-grid{order:14;margin-top:10px}
+html.zf12 .zf12-card > [id^="ncard-"] > .zf-places{order:15}
+html.zf12 .zf12-card > [id^="ncard-"] > .zf-nonaffil{order:16}
+html.zf12 .zf12-card > [id^="ncard-"] > .zf3-close{order:17}
+html.zf12 .zf12-card .detail-grid .zf-dcell-date{display:none}   /* 공고일·접수기간 = 겉 ⑤와 같은 사실(한 사실 한 층) */
+/* 세대 — 1200 이상: 계층 줄을 표처럼(계층 · 보증금·월 · ㎡당 열 맞춤) */
+@media (min-width:1200px){
+  html.zf12 .zf12-hut .hu-ug-line{display:grid;grid-template-columns:minmax(7em,1fr) 2fr auto;gap:10px;align-items:baseline}
+  html.zf12 .zf12-hut > .hu-ug-row{border-bottom:1px solid var(--line-2);padding:6px 0}
+  html.zf12 .zf12-hut > .hu-ug-row:last-child{border-bottom:0}
+}
+/* 1280 목록형 C — 왼쪽 ①②③ · 오른쪽 ④ 얼마 · ⑤ 언제(상세는 오른쪽 패널 그대로) */
+@media (min-width:1200px){
+  html.zf12 #notice-list .zf12-card{display:grid;grid-template-columns:minmax(0,1fr) 350px;column-gap:20px;align-items:start}
+  html.zf12 #notice-list .zf12-card > .zf3-ctop{grid-column:1;grid-row:1}
+  html.zf12 #notice-list .zf12-card > .htop{grid-column:1;grid-row:2}
+  html.zf12 #notice-list .zf12-card > .haddr,html.zf12 #notice-list .zf12-card > .zf12-who{grid-column:1;grid-row:3}
+  html.zf12 #notice-list .zf12-card > [data-sum-for]{grid-column:2;grid-row:1 / span 2;align-self:end}
+  html.zf12 #notice-list .zf12-card > .zf12-when{grid-column:2;grid-row:3;margin:6px 0 10px}
+  html.zf12 #notice-list .zf12-card > [id^="ncard-"]{grid-column:1 / -1}
+}
+/* 자격 절 — 짧은 머리(누르면 원문 머리 전체) */
+html.zf12 .zf12-eh summary{cursor:pointer;list-style:none;font-weight:700;color:var(--ink);min-height:var(--hit);display:flex;align-items:center;flex-wrap:wrap}
+html.zf12 .zf12-eh summary::-webkit-details-marker{display:none}
+html.zf12 .zf12-eh summary::after{content:" ▾";color:var(--ink-3);font-weight:400}
+html.zf12 .zf12-eh[open] summary::after{content:" ▴"}
+html.zf12 .zf12-eh-full{display:block;margin-top:6px;font-weight:400;color:var(--ink-2);font-size:var(--t-xs);line-height:1.6}
 </style>
 </head>
 <body>
@@ -5631,6 +5731,7 @@ function zfFillSummarySlots(){
   });
   zfRefreshCovers();   // 🔵 2026-09-30 — 세대 행 지역이 방금 왔을 수 있다(표지 대표·곳 수)
   zfCutoffKick();      // 🔵 2026-11-05 — 카드 「지난 회차」 줄(LH 합격점수)
+  if(typeof zf12Price === 'function') { zf12Price(); zf12NoUnits(); }   // 🧪 12월 재편 A·B 시안(병합 0)
 }
 
 // 🔵 2026-11-05(우편함 「표시층 — 커트라인 시안 A」 · 다운님 승인 2026-11-05) — 카드 「🕘 지난 회차」 한 줄 + 상세 「지난 회차」 표.
@@ -14088,6 +14189,7 @@ function zf3DecorateCards(){
   const nl = document.getElementById('notice-list'), ml = document.getElementById('match-result');
   if(nl) zf3DecorateIn(nl, zf3CardRows);
   if(ml && zf3MatchRows.size) zf3DecorateIn(ml, zf3MatchRows, true);
+  if(typeof zf12Decorate === 'function') zf12Decorate();   // 🧪 12월 재편 A·B 시안(병합 0)
 }
 function zf3DecorateIn(list, rowsMap, isMatch){
   const prefs = zf3Prefs();
@@ -15531,6 +15633,288 @@ try{ zfFbFooter(); }catch(e){}   // 시행일 뒤 바닥 「의견 보내기」
 if('serviceWorker' in navigator){
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW 등록 실패:', e));
+  });
+}
+</script>
+<script>
+// 🧪 12월 재편 A·B 새 시안(우편함 「표시층 — 12월 재편 A·B 새 시안 …」 · 설계 「📐 12월 재편」 6~15절 · Design System v3) — 병합 0 · 세 단계 판정용.
+//    겉(1층) 다섯 줄: ① 유형·상태·경고 배지 ② 제목(최대 2줄) ③ 지역·단지 수 — 「누가」가 서면 ③ = 누가 · 지역은 ①로 ④ 얼마 ⑤ 언제(노선 겉 한 줄).
+//    겉에서 내린 것(칩 줄 · ㎡당 비교 · 경고 상자 · 순위별 꼬리 · 창 단추 · 공고문 여러 개 · 지난 회차 줄)은 상세 2층 머리(.zf12-l2)로 옮긴다 — 지우지 않는다.
+//    「누가」 = 세대 supply_target 계층 이름(괄호 꼬리 떼기 · 원문 순서 · 중복 없이) 앞에 자격 첫 문장의 「OO에 거주하는」 원문 조각 · 그 밖은 숨김(조사 회신 5의 ①③④).
+const ZF12_ELIG_CATS = ['신청자격', '신청 자격', '입주자격', '입주자 신청자격', '공급대상'];
+const ZF12_SCHED_RE = /일정|기간|날짜|일자|발표일|마감일|접수일/;   // 날짜를 다루는 ⚠️ 행만(「접수 방법」 같은 꼴은 아님)
+const zf12Info = new Map();     // 카드 대표 id → { ids, heads, res, sched }
+const zf12Pend = new Set();
+const zf12MustMemo = new Map(); // 카드 대표 id → Promise(꼭 볼 것 행)
+const zf12LoadP = new Map();    // 카드 대표 id → Promise(묶음 id·누가 재료) — 꼭 볼 것이 묶음 id 를 받은 뒤 묻게(펼침이 먼저 와도 같은 결과)
+function zf12On(){ return typeof zf3On === 'function' && zf3On(); }
+function zf12Heads(vals){
+  const out = [];
+  for(const v of vals){
+    const t = String(v || '').trim();
+    if(!t) continue;
+    if(/구간/.test(t)) return [];                       // 통합공공임대 — 값이 소득 구간(누가가 아님)
+    const h = t.replace(/\s*\([^()]*\)\s*$/, '').trim();  // 괄호 꼬리 떼기(원문 괄호는 안 세대 표에)
+    if(!h || /(^|\s)일반(공급)?$/.test(h)) continue;   // 「일반」·「통합공임 일반」 — 누가를 가르지 않는 말
+    if(!out.includes(h)) out.push(h);
+  }
+  return out;
+}
+function zf12FirstSentence(t){ return String(t || '').split(/\n|(?<=다\.)\s/)[0] || ''; }
+function zf12Res(t){ const m = zf12FirstSentence(t).match(/([^\s(]+(?:\([^)]*\))?)에\s*거주하는/); return m ? m[1] + '에 거주하는' : ''; }
+async function zf12Load(rows){
+  const need = rows.map(n => String(n['announcement_id'] || '')).filter(id => id && !zf12Info.has(id) && !zf12Pend.has(id));
+  if(!need.length) return false;
+  need.forEach(id => zf12Pend.add(id));
+  let done; const P = new Promise(r => { done = r; });
+  need.forEach(id => zf12LoadP.set(id, P));
+  try{
+    const grp = await Promise.all(need.map(id => fetch(`${SUPABASE_URL}/rest/v1/rpc/get_announcement_group_ids`, { method: 'POST', headers: zfAnonHeaders(), body: JSON.stringify({ p_announcement_id: id }) })
+      .then(r => r.ok ? r.json() : []).catch(() => [])
+      .then(a => [id, [id, ...(Array.isArray(a) ? a.map(x => String((x && x.announcement_id) || '')) : [])].filter((x, i, s) => x && s.indexOf(x) === i)])));
+    const all = [...new Set(grp.flatMap(g => g[1]))];
+    const cats = ZF12_ELIG_CATS.map(c => `"${c}"`).join(',');
+    const [hu, pol] = await Promise.all([
+      fetch(`${SUPABASE_URL}/rest/v1/housing_units?select=announcement_id,supply_target,seq&${idFilterFor(all)}&order=seq`, { headers: zfAnonHeaders() }).then(r => r.ok ? r.json() : []),
+      fetch(`${SUPABASE_URL}/rest/v1/announcement_policies?select=announcement_id,category,seq,content_raw&${idFilterFor(all)}&or=(category.in.(${encodeURIComponent(cats)}),category.like.${encodeURIComponent('⚠️*')})&order=seq`, { headers: zfAnonHeaders() }).then(r => r.ok ? r.json() : [])
+    ]);
+    grp.forEach(([id, ids]) => {
+      const set = new Set(ids), mine = r => set.has(String(r.announcement_id));
+      const heads = zf12Heads((Array.isArray(hu) ? hu : []).filter(mine).map(r => r.supply_target));
+      const P = (Array.isArray(pol) ? pol : []).filter(mine);
+      const ep = P.filter(r => ZF12_ELIG_CATS.includes(r.category));
+      const sched = P.filter(r => /^⚠️/.test(r.category || '') && ZF12_SCHED_RE.test(r.category || '')).map(r => r.category);
+      zf12Info.set(id, { ids, heads, res: ep.length ? zf12Res(ep[0].content_raw) : '', sched });
+    });
+    return true;
+  }catch(e){ console.warn('시안 「누가」 재료 실패', e); return false; }
+  finally{ need.forEach(id => zf12Pend.delete(id)); done(); }
+}
+// ⑤ 언제 — 노선 겉 한 줄(접수 · 마감 · 발표). 마감 = 마지막 접수 창의 끝(설계 14절 규칙 4) · 상태는 글자·모양(● 지남 · ◉ 다음 · ○ 앞으로).
+function zf12WhenHTML(n){
+  if(zfIsCancelRow(n['공고명']) || n['apply_period_check'] === true) return '';
+  const st = zf3Stations(n);
+  const W = zfRouteWinsAll(n);
+  let s = st[1].d, e = st[2].d;
+  if(W) e = W.merged[W.merged.length - 1].de;   // 창이 여럿이면 접수 = 기본 창(오늘의 창 · 사이면 다음 창) · 마감 = 마지막 창 끝(창별 날짜는 2층 꼬리)
+  const items = [['접수', s], ['마감', e], ['발표', st[3].d, st[3].u]];
+  if(!items[0][1] && !items[1][1]) return '';
+  const today = zf3Today();
+  const nextI = items.findIndex(x => x[1] && x[1] >= today);
+  return items.map(([k, d, u], i) => {
+    const cls = !d ? 'unk' : d < today ? 'past' : i === nextI ? 'next' : 'fut';
+    const mark = cls === 'past' ? '●' : cls === 'next' ? '◉' : '○';
+    return `<span class="zf12-w ${cls}"${d ? ` data-zf12-d="${escapeHtml(d)}"` : ''}><span class="zf12-m" aria-hidden="true">${mark}</span><span class="zf12-k">${k}</span> ${d ? escapeHtml(cls === 'next' ? zf3Md(d) : zf3Md(d).replace(/\(.\)$/, '')) : escapeHtml(u || '원문 확인')}</span>`;   // ◉ 밖 정거장은 요일을 뺀다(2층 노선에 그대로)
+  }).join('<span class="zf12-sep" aria-hidden="true">›</span>');
+}
+const ZF12_FRONT_KEEP = el => el.matches('.zf3-ctop,.htop,.haddr,.zf12-who,[data-sum-for],.zf12-when,.zf12-l2-host,[id^="ncard-"],[id^="mcard-"],.zf3-close') || el.hidden || getComputedStyle(el).display === 'none';
+function zf12Sweep(card){
+  const l2 = card.querySelector('.zf12-l2'); if(!l2) return;
+  // 겉에 다시 그려진 같은 꼴 줄(지난 회차 줄 등 — 그리는 쪽이 겉에서 옛것을 못 찾아 새로 만든다)은 2층의 옛것과 바꿔 끼운다(두 번 서지 않게)
+  [...card.children].forEach(el => {
+    if(ZF12_FRONT_KEEP(el)) return;
+    const key = x => x.tagName + '|' + x.className + '|' + (x.getAttribute('data-cut-for') || '');   // 지난 회차 자리는 클래스 없이 data-cut-for 로 선다
+    const twin = (el.className || el.hasAttribute('data-cut-for')) ? [...l2.children].find(x => x !== el && key(x) === key(el)) : null;
+    twin ? twin.replaceWith(el) : l2.appendChild(el);
+  });
+  card.querySelectorAll('.zf12-badges').forEach(b => {   // 늦게 붙은 경고 칩도 ①로
+    card.querySelectorAll('.zf12-l2 .chip-row .zf-chip-warn').forEach(x => b.appendChild(x));
+  });
+}
+function zf12Front(card, n){
+  if(card.dataset.zf12 === '1'){ zf12Sweep(card); return; }
+  card.dataset.zf12 = '1';
+  card.classList.add('zf12-card');
+  const det = document.getElementById(card.getAttribute('data-card-id'));
+  const top = card.querySelector('.zf3-ctop');
+  const bw = document.createElement('span'); bw.className = 'zf12-badges';
+  card.querySelectorAll('.chip-row .zf-chip-warn').forEach(x => {
+    // 「⏰ 마감임박」은 상태 알약(D-n)과 같은 사실 — 알약을 경고 모양으로 하고 배지는 접는다(한 사실 한 자리)
+    if(/마감임박/.test(x.textContent) && top && top.querySelector('.zf3-dpill')){ top.querySelector('.zf3-dpill').classList.add('zf12-soon'); x.classList.add('zf12-off'); return; }
+    bw.appendChild(x);
+  });
+  if(top) top.appendChild(bw);
+  const addr = card.querySelector('.haddr');
+  const who = document.createElement('p'); who.className = 'zf12-who'; who.hidden = true;
+  who.dataset.zf12Ann = String(n['announcement_id'] || '');
+  if(addr) addr.after(who);
+  const when = zf12WhenHTML(n);
+  const sum = card.querySelector('[data-sum-for]');
+  if(when){
+    const w = document.createElement('p'); w.className = 'zf12-when'; w.innerHTML = when;
+    w.setAttribute('aria-label', '일정 — ' + w.textContent.replace(/[●◉○›]/g, ' ').replace(/\s+/g, ' ').trim());
+    (sum || addr || top).after(w);
+  }
+  zf12PillTidy(card);
+  const pl = card.querySelector('.zf3-ctop .zf3-dpill');
+  if(pl) new MutationObserver(() => zf12PillTidy(card)).observe(pl, { childList: true, characterData: true, subtree: true });   // 창 단추 · 시각 알약(1분마다)이 다시 써도
+  if(det){
+    const l2 = document.createElement('div'); l2.className = 'zf12-l2';
+    det.appendChild(l2);
+    // 창 단추가 있는 카드만 노선 그림을 2층에 둔다(단추가 그 그림을 고른 창으로 다시 그린다) · 그 밖은 겉 한 줄과 같은 말이라 접는다
+    zf12Sweep(card);
+    new MutationObserver(() => zf12Sweep(card)).observe(card, { childList: true });
+    let eT = 0; new MutationObserver(() => { clearTimeout(eT); eT = setTimeout(() => { zf12EligTidy(det); zf12HuTable(det); }, 120); }).observe(det, { childList: true, subtree: true });
+    new MutationObserver(() => { if(det.style.display === 'block') zf12Must(card, n); }).observe(det, { attributes: true, attributeFilter: ['style'] });   // 펼침(누름 · 주소창 n= · toggleDetail) 어느 길이든
+  }
+}
+// 🔵 2차 시안 2(claude.ai 의견 3 · Claude Code ⑦ 1) — 알약은 상태 글자만(「접수 중」·「접수 예정」 · 마감·확인 필요는 그대로) ·
+//    「D-n」·「오늘 마감」 같은 남은 날 조각은 일정 줄 ◉ 옆으로 · 매입 차수 알약의 창 꼬리(「· 1순위(일반)·2순위」)는 겉에서 뺀다(2층 창 단추에 그대로).
+//    ◉ 날짜와 남은 날이 가리키는 날이 다르면(창이 여럿 — 이번 차수 끝 ≠ 마지막 창 끝) 원래 알약 글자 그대로 붙인다(새 낱말 0).
+function zf12PillTidy(card){
+  const pill = card.querySelector('.zf3-ctop .zf3-dpill'), when = card.querySelector('.zf12-when');
+  if(!pill) return;
+  const raw = pill.textContent.trim();
+  if(raw === pill.dataset.zf12Shown) return;   // 내가 쓴 글자(되돌이 없음)
+  pill.dataset.zf12Raw = raw;
+  const parts = raw.split(/\s·\s/);
+  const cls = pill.classList;
+  const status = cls.contains('open') ? '접수 중' : cls.contains('before') ? '접수 예정' : parts[0];
+  let left = '';
+  if(cls.contains('open') || cls.contains('before') || /D-\d+|오늘/.test(raw)){
+    const dPart = parts.find(x => /D-\d+|오늘|시간 남음/.test(x)) || (parts[0] !== status ? parts[0] : '');
+    left = /^(접수 중|접수 예정)$/.test(dPart) ? '' : dPart;
+  }
+  pill.dataset.zf12Shown = status;
+  pill.textContent = status;
+  if(pill.title === '' && raw !== status) pill.setAttribute('aria-label', raw);
+  if(!when || !left) { when && when.querySelector('.zf12-dd')?.remove(); return; }
+  const nx = when.querySelector('.zf12-w.next') || when.querySelector('.zf12-w:not(.past)');
+  const m = left.match(/D-(\d+)/), today = zf3Today();
+  const nd = nx && nx.dataset.zf12D;
+  const same = m ? nd && zf3Days(today, nd) === Number(m[1]) : /^오늘/.test(left) && nd === today;
+  const txt = same ? (m ? 'D-' + m[1] : left) : left;
+  let dd = when.querySelector('.zf12-dd');
+  if(!dd){ dd = document.createElement('span'); dd.className = 'zf12-dd'; }
+  dd.classList.toggle('hot', cls.contains('hot') || pill.classList.contains('zf12-soon'));
+  dd.textContent = txt;
+  (nx || when.lastElementChild).after(dd);
+}
+function zf12FillWho(){
+  document.querySelectorAll('.zf12-who[data-zf12-ann]').forEach(p => {
+    const I = zf12Info.get(p.dataset.zf12Ann);
+    if(!I) return;
+    const card = p.closest('.hcard'); if(!card || card.dataset.zf12Who === '1') return;
+    I.sched.length && zf12SchedBadge(card, I.sched);
+    // 🔵 2차 시안 1(claude.ai 의견 2 · 다운님 11-16) — 군·목 꼴(가군·나군 · 가목 …) 카드는 겉에 거주 조각만 · 군 이름은 안 자격 절(원문 괄호 뜻과 함께)
+    const heads = I.heads.some(h => /(^|\s)[가-하](군|목)$/.test(h)) ? [] : I.heads;
+    if(!heads.length && !I.res) return;
+    card.dataset.zf12Who = '1';
+    p.innerHTML = `<span class="zf12-wi" aria-hidden="true">👥</span>${I.res ? `<span class="zf12-res">${escapeHtml(I.res)}</span>${heads.length ? ' ' : ''}` : ''}${escapeHtml(heads.join(' · '))}`;
+    p.hidden = false;
+    // 「누가」가 서면 지역은 ①로(겉 다섯 줄 상한 유지 — 설계 9절)
+    const cov = card.querySelector('.haddr .zf-cover'), top = card.querySelector('.zf3-ctop');
+    if(cov && top){ cov.classList.add('zf12-cov'); top.insertBefore(cov, top.querySelector('.zf3-dpill')); card.querySelector('.haddr').classList.add('zf12-off'); }
+  });
+}
+function zf12SchedBadge(card, cats){
+  if(card.querySelector('.zf12-sched')) return;
+  const b = card.querySelector('.zf12-badges'); if(!b) return;
+  // 「일정 확인 필요」 — 설계 14절 규칙 5(다운님 판정 2026-11-12 ①) · 근거 행 이름은 펼치면 2층 첫 줄에
+  b.insertAdjacentHTML('beforeend', `<span class="chip sel zf-chip-warn zf12-sched">⚠️ 일정 확인 필요</span>`);
+  const l2 = card.querySelector('.zf12-l2');
+  if(l2) l2.insertAdjacentHTML('afterbegin', `<p class="zf12-schedwhy">⚠️ 일정 확인 필요 — 원문에 같은 단계 날짜가 둘 적혀 있어요: ${cats.map(c => escapeHtml(c.replace(/^⚠️\s*/, ''))).join(' · ')} (아래 ⚠️ 행)</p>`);
+}
+// ④ 얼마 — 겉은 「보증금 · 월」 한 줄(조건별이면 「조건별 다름」) · 전용 · 합친 범위 설명 · ㎡당 비교는 2층으로
+function zf12Price(){
+  if(!zf12On()) return;
+  document.querySelectorAll('.zf12-card [data-sum-for]').forEach(el => {
+    const id = el.getAttribute('data-sum-for'), s = zfPriceCache.get(id);
+    const box = el.firstElementChild;
+    if(!s || !box || box.dataset.zf12 === '1' || !/보증금|월 |월세/.test(box.textContent)) return;
+    const card = el.closest('.hcard'), l2 = card && card.querySelector('.zf12-l2');
+    const parts = [];
+    if(s.deposit_min != null) parts.push('보증금 ' + zfPriceRange(s.deposit_min, s.deposit_max, 10000, 0, '만', true));
+    if(s.rent_min != null) parts.push((Number(s.rent_min) === 0 && Number(s.rent_max) === 0) ? '월세 없음' : '월 ' + zfPriceRange(s.rent_min, s.rent_max, 10000, 1, '만', true));
+    const dual = box.querySelector('.zf-dual-tag'), round = box.querySelector('.zf-round-tag,.zf-sum-round');
+    box.dataset.zf12 = '1';
+    box.innerHTML = escapeHtml(parts.join(' · ')) + (dual ? ' <span class="zf12-cond">· 조건별 다름</span>' : '');
+    if(round) box.appendChild(round);
+    if(l2){
+      let sq = l2.querySelector('.zf12-sqm');
+      if(!sq){ sq = document.createElement('div'); sq.className = 'zf12-sqm'; l2.prepend(sq); }
+      const area = s.area_min != null ? '전용 ' + zfPriceRange(s.area_min, s.area_max, 1, 0, '㎡', false) : '';
+      sq.innerHTML = (area || dual ? `<p class="zf12-area">${escapeHtml(area)}${dual ? ` · ${escapeHtml(dual.textContent.replace(/[()]/g, ''))} — ${escapeHtml(dual.title || '')}` : ''}</p>` : '');
+      el.querySelectorAll('.zf-rent-line').forEach(x => sq.appendChild(x));
+    }
+  });
+}
+// 2층 「꼭 볼 것」 — 정책 행 key_rank(1~3) · 원문 문장 그대로 · 없으면 절 없음(설계 8절 승인)
+function zf12Must(card, n){
+  const id = String(n['announcement_id'] || ''), l2 = card.querySelector('.zf12-l2');
+  if(!l2 || l2.querySelector('.zf12-must') || l2.dataset.zf12Must === 'none') return;
+  if(!zf12MustMemo.has(id)){
+    zf12MustMemo.set(id, (zf12LoadP.get(id) || Promise.resolve()).then(() => (zf12Info.get(id) || {}).ids || [id]).then(ids => fetch(`${SUPABASE_URL}/rest/v1/announcement_policies?select=category,content_raw,key_rank,seq&${idFilterFor(ids)}&key_rank=not.is.null&order=key_rank,seq`, { headers: zfAnonHeaders() }).then(r => r.ok ? r.json() : []).catch(() => [])));
+  }
+  zf12MustMemo.get(id).then(rows => {
+    if(l2.querySelector('.zf12-must')) return;
+    const seen = new Set(), list = (Array.isArray(rows) ? rows : []).filter(r => { const k = String(r.content_raw || '').trim(); if(!k || seen.has(k)) return false; seen.add(k); return true; }).slice(0, 3);
+    if(!list.length){ l2.dataset.zf12Must = 'none'; return; }
+    const sec = document.createElement('section'); sec.className = 'zf12-must';
+    sec.innerHTML = `<h4>꼭 볼 것</h4><ol>${list.map(r => {
+      let f = zf12FirstSentence(r.content_raw); const cat = String(r.category || '').trim();
+      if(cat && f.startsWith(cat) && /^[\s:·■]/.test(f.slice(cat.length))) f = f.slice(cat.length).replace(/^[\s:·■]+/, '');   // 원문 첫머리가 분류 이름과 같으면 한 번만
+      const short = f.length > 90 ? f.slice(0, 88) + '…' : f;
+      return `<li><details><summary><b>${escapeHtml(r.category || '')}</b> ${escapeHtml(short)}</summary><p class="zf12-raw">${escapeHtml(r.content_raw)}</p></details></li>`;
+    }).join('')}</ol>`;
+    const why = l2.querySelector('.zf12-schedwhy');
+    why ? why.after(sec) : l2.prepend(sec);
+  });
+}
+// 🔵 2차 시안 3(claude.ai 의견 4) — 세대 목록 없는 카드의 ④ 자리 두 줄 상자 → 한 줄(기존 문구 안에서 줄임 · 새 문장 0) · 원문 보기 고리는 그대로
+function zf12NoUnits(){
+  if(!zf12On()) return;
+  document.querySelectorAll('.zf12-card [data-sum-for] > div:not([data-zf12nu])').forEach(box => {
+    if(!/세대별 목록이 없어요/.test(box.textContent)) return;
+    box.dataset.zf12nu = '1';
+    const a = box.querySelector('a');
+    box.className = 'zf12-nu';
+    box.removeAttribute('style');
+    box.innerHTML = '원문에 세대별 목록이 없어요';
+    if(a){ box.append(' · '); box.appendChild(a); }
+  });
+}
+function zf12Decorate(){
+  if(!zf12On()) return;
+  document.documentElement.classList.add('zf12');
+  const seen = [];
+  [[document.getElementById('notice-list'), typeof zf3CardRows !== 'undefined' ? zf3CardRows : null], [document.getElementById('match-result'), typeof zf3MatchRows !== 'undefined' ? zf3MatchRows : null]].forEach(([list, map]) => {
+    if(!list || !map) return;
+    list.querySelectorAll('.zf3-card[data-card-id]').forEach(card => { const n = map.get(card.getAttribute('data-card-id')); if(n){ zf12Front(card, n); seen.push(n); } });
+  });
+  zf12FillWho(); zf12Price(); zf12NoUnits();
+  zf12Load(seen).then(ok => { if(ok) zf12FillWho(); });
+}
+// 세대 — 390 은 지금 꼴(주택형 → 계층 줄) 그대로 · 1200 이상(1280 상세 패널)은 주택형마다 계층을 줄 맞춘 표로(안 2).
+//    한 주택형 안 계층 줄들의 비고가 모두 같으면 비고를 한 번만(마지막 줄 아래) — 행복 카드의 「같은 비고 되풀이」(설계 4절 재료).
+function zf12HuTable(root){
+  if(!zf12On() || !root) return;
+  root.querySelectorAll('[id^="hu-slot-"] .hu-ug-list:not([data-zf12])').forEach(list => {
+    list.dataset.zf12 = '1';
+    list.classList.add('zf12-hut');
+    const rows = [...list.querySelectorAll(':scope > .hu-ug-row')];
+    const notes = rows.map(r => r.querySelector('.hu-note-wrap'));
+    if(rows.length > 1 && notes.every(n => n) && notes.every(n => n.textContent.trim() === notes[0].textContent.trim())){
+      notes.slice(0, -1).forEach(n => n.classList.add('zf12-off'));
+    }
+  });
+}
+// 자격 절 — 목 제목은 짧게 · 같은 목 문장이 머리와 아래(「1순위 해당자」 등)에 두 번 나오지 않게(…21050 실측: 머리 174자 + 아래 같은 문장).
+//    짧은 머리 = 원문 머리의 낱말만: 「목」 앞 머리 + 「가목 · 다목 …」 + 끝 꼬리(「· 1순위」) · 문장 전체는 머리를 누르면 펼친다(원문 그대로).
+function zf12EligTidy(root){
+  if(!zf12On() || !root) return;
+  root.querySelectorAll('.elig-head:not([data-zf12])').forEach(h => {
+    h.dataset.zf12 = '1';
+    const full = h.textContent.trim();
+    if(full.length <= 40) return;
+    const toks = full.match(/(?:^|\s)([가-하]목)(?=\s)/g);
+    let short;
+    if(toks && toks.length){
+      const head = full.slice(0, full.search(/(?:^|\s)[가-하]목\s/)).trim();
+      const tail = (full.match(/·\s*([^·]{1,12})$/) || [])[1] || '';
+      short = [head, toks.map(t => t.trim()).join(' · '), tail && !/목/.test(tail) ? tail.trim() : ''].filter(Boolean).join(' · ').replace(/ · (?=[가-하]목)/, ' ');
+    } else short = full.slice(0, 38).trim() + '…';
+    h.innerHTML = `<details class="zf12-eh"><summary>${escapeHtml(short)}</summary><span class="zf12-eh-full">${escapeHtml(full)}</span></details>`;
   });
 }
 </script>
