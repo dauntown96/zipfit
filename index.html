@@ -16054,5 +16054,53 @@ function zf12EligTidy(root){
   });
 }
 </script>
+
+<!-- ⚠️ 시안 전용(미리보기 가지 · 병합하지 않음 · 우편함 「표시층 — 디자인 2차 무드 시안」) — ?mood=cc1 | cc2 일 때만 켜진다. 없으면 화면 변화 0. -->
+<style id="zf-mood-css">
+/* 공통 세 축 — 본문 14px(보조 12px) · 둥글기 한 갈래(작게 6 · 크게 10 · 알약 · 원) · 누름 반응 하나 */
+html[data-mood] { --r-1: 6px; --r-2: 10px; --r-3: 10px }
+html[data-mood] :is(.hcard, .zf3-go, .zf3-chip, .zf3-stat, button, summary, a.btn, .chip):active { transform: scale(.98) }
+html[data-mood] :is(.hcard, .zf3-go, .zf3-chip, .zf3-stat, button, summary, a.btn, .chip) { transition: transform .1s var(--ease), background-color .16s var(--ease), border-color .16s var(--ease) }
+html[data-mood] .hcard .hname { font-size: 16px; line-height: 1.4 }
+html[data-mood] .hcard .haddr { font-size: 13px }
+/* CC1 「노선 정보지」 — 흰 바탕 · 어두운 LED 칩 줄 → 밝은 「오늘 판」(같은 숫자 · 같은 단추) · 전광판 흐름은 맨 위 한 자리만 · 카드 = 흰 + 선 하나(그림자 0) · 유형 띠·노선 ◉›○ 그대로 */
+html[data-mood="cc1"] body { background: var(--paper) }
+html[data-mood="cc1"] .wrap { background: var(--paper) }
+html[data-mood="cc1"] .zf3-stats { mask-image: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; overflow: visible }
+html[data-mood="cc1"] .zf3-stat { background: var(--surface); background-image: none; color: var(--ink-2); border: 1px solid var(--line-2); flex-direction: column; justify-content: center; gap: 2px; padding: 6px 4px; min-height: 56px; text-align: center; font-size: 12px; line-height: 1.25; white-space: normal; word-break: keep-all }
+html[data-mood="cc1"] .zf3-stat b { font: 700 18px/1 var(--f-ui, inherit); color: var(--ink); text-shadow: none }
+html[data-mood="cc1"] .zf3-stat.hot b { color: var(--warn); text-shadow: none }
+html[data-mood="cc1"] .zf3-stat.on { box-shadow: inset 0 0 0 2px var(--ink) }
+html[data-mood="cc1"] .hcard.zf3-card { box-shadow: none; border: 1px solid var(--line-2) }
+html[data-mood="cc1"] #notice-list { gap: 10px }
+</style>
+<script id="zf-mood-js">
+// 시안 전용 — 주소 ?mood=cc1|cc2 를 html[data-mood] 로. 둥글기·글자 크기는 날값이 많아(원문 선언 210 중 토큰 27~30%) 시안에서는 그린 뒤 계산값을 한 갈래로 옮겨 보인다
+// (진짜 구현은 날값 선언을 토큰으로 바꾸는 일 — 이 덧입힘은 「바뀐 모습」만 보이기 위한 것).
+(function(){
+  const m = (new URLSearchParams(location.search).get('mood') || '').toLowerCase();
+  if(!/^cc[12]$/.test(m)) return;
+  document.documentElement.dataset.mood = m;
+  const SMALL_TEXT_KEEP = /chip|badge|pill|tag|zf3-stat|zf12-w|zf12-k|zf12-m|zf12-dd|led|zf3-stn|hu-x|zf-cut-calc|hu-label|policy-category|zf3-k\b/;
+  const norm = root => {
+    for(const e of root.querySelectorAll('*')){
+      if(e.dataset.zfMood === '1') continue;
+      const cs = getComputedStyle(e);
+      // 둥글기 — 0 · 원(50%) · 알약(≥999)은 그대로 · 나머지 날값은 ≤7px → 6px(작게) · 그 위 → 10px(크게)
+      const r = cs.borderTopLeftRadius;
+      if(r && r !== '0px' && !r.endsWith('%')){ const v = parseFloat(r); if(v > 0 && v < 999 && v !== 6 && v !== 10){ e.style.borderRadius = (v <= 7 ? 6 : 10) + 'px'; } }
+      // 글자 — 상세·카드 본문 자리의 12px(글 줄 20자 넘음)만 14px · 칩·배지·전광판·노선 낱말은 그대로(보조 12px)
+      if(cs.fontSize === '12px' && !SMALL_TEXT_KEEP.test(String(e.className || '')) && !e.closest('.zf3-stats,.zf3-mq,.zf3-line,.zf12-when')){
+        const own = [...e.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('').trim();
+        if(own.length >= 20) e.style.fontSize = '14px';
+      }
+      e.dataset.zfMood = '1';
+    }
+  };
+  let t = 0;
+  const run = () => { clearTimeout(t); t = setTimeout(() => norm(document.body), 120); };
+  document.addEventListener('DOMContentLoaded', () => { run(); new MutationObserver(run).observe(document.body, { childList: true, subtree: true }); });
+})();
+</script>
 </body>
 </html>
