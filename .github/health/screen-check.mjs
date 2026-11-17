@@ -26,6 +26,24 @@ const SCHED_DAY_SQL = (A, G) => `(select case when count(distinct coalesce(s.sta
                where s.stage = '결과발표' and coalesce(s.start_date, s.end_date) is not null
                  and s.announcement_id in (select g2.rid from g g2 where g2.aid = ${A} and g2.gid = ${G} union select ${A})
                  and s.scope_text in (select g3.ph from g g3 where g3.aid = ${A} and g3.gid = ${G}))`
+// 🔵 2026-11-17(우편함 「코드·운영 — 1장 …」 2) — 창 묶음(o · g)을 화면 zfRouteWinsAll 의 zfSameWave 규칙 그대로 잰다:
+//    겹치면 한 창 · 하루 차로 붙으면 순위 글자(phase_text)가 빈 행이거나 앞 창에 같은 순위 글자가 있을 때만 한 창 · 그 밖은 새 창.
+//    종전 g 는 「하루 차로 붙으면 한 창」(순위 무시)이라 2026-11-16 화면 고침(…20996 「1,2순위」 11-16 · 「3순위」 11-17 따로) 뒤 SQL 과 화면이 갈렸다.
+//    앞 창에 쌓인 순위와 견주는 상태가 있어 창 함수가 아니라 재귀다(ROUTE_GUARD_SQL wv 와 같은 식). gid = 창 번호(1부터 · x, y 순).
+const WAVE_G_SQL = (cols) => {
+  const c = cols ? cols + ', ' : ''
+  return `o as (select aid, x, y, ${c}ph, row_number() over (partition by aid order by x, y) rn from w),
+      g as (select o.aid, o.x, o.y, ${cols ? cols.split(',').map(t => 'o.' + t.trim()).join(', ') + ', ' : ''}o.ph, v.wid gid from o join (
+              with recursive r(aid, rn, wid, wy, wph) as (
+                select aid, rn, 1, y, case when nullif(ph, '') is null then '{}'::text[] else array[ph] end from o where rn = 1
+                union all
+                select o2.aid, o2.rn, r.wid + case when q.sm then 0 else 1 end, case when q.sm then greatest(r.wy, o2.y) else o2.y end,
+                       case when q.sm then r.wph || pp.p2 else pp.p2 end
+                  from r join o o2 on o2.aid = r.aid and o2.rn = r.rn + 1
+                  cross join lateral (select case when nullif(o2.ph, '') is null then '{}'::text[] else array[o2.ph] end p2) pp
+                  cross join lateral (select o2.x <= r.wy + 1 and (o2.x <= r.wy or nullif(o2.ph, '') is null or cardinality(r.wph) = 0 or o2.ph = any(r.wph)) sm) q)
+              select aid, rn, wid from r) v on v.aid = o.aid and v.rn = o.rn),`
+}
 const ROUTE_GUARD_SQL = `lg as (select aid, max(gid) gid, max(wd) wd from g group by aid),
       gd as (select lg.aid, coalesce(${SCHED_DAY_SQL('lg.aid', 'lg.gid')}, lg.wd) gd from lg),
       wo as (select aid, x, y, nullif(ph, '') ph, row_number() over (partition by aid order by x, y) rn from g),
@@ -693,8 +711,7 @@ try {
                from c join announcements a on announcement_dedup_key(a.title) = announcement_dedup_key(c.title)
                join announcement_apply_routes r on r.announcement_id = a.announcement_id),
       w as (select aid, x, y, wd, ph, rid from rt where aid not in (select aid from rt where x is null or y is null) and y >= s and x <= e),
-      o as (select aid, x, y, wd, ph, rid, max(y) over (partition by aid order by x, y rows between unbounded preceding and 1 preceding) py from w),
-      g as (select aid, x, y, wd, ph, rid, sum(case when py is null or x > py + 1 then 1 else 0 end) over (partition by aid order by x, y) gid from o),
+      ${WAVE_G_SQL('wd, rid')}
       ${ROUTE_GUARD_SQL}
       isl as (select aid, gid, min(x) x, max(y) y from g where aid in (select aid from gd where gd is null or gd >= (select d from today)) and aid not in (select aid from bys) group by aid, gid),
       agg as (select aid, count(*) n, bool_or(x <= t.d and t.d <= y) inwin, min(x) filter (where x > t.d) nxt from isl, today t group by aid)
@@ -743,8 +760,7 @@ try {
                from c join announcements a on announcement_dedup_key(a.title) = announcement_dedup_key(c.title)
                join announcement_apply_routes r on r.announcement_id = a.announcement_id),
       w as (select aid, x, y, wd, ph, rid from rt where aid not in (select aid from rt where x is null or y is null) and y >= s and x <= e),
-      o as (select aid, x, y, wd, ph, rid, max(y) over (partition by aid order by x, y rows between unbounded preceding and 1 preceding) py from w),
-      g as (select aid, x, y, wd, ph, rid, sum(case when py is null or x > py + 1 then 1 else 0 end) over (partition by aid order by x, y) gid from o),
+      ${WAVE_G_SQL('wd, rid')}
       ${ROUTE_GUARD_SQL}
       isl as (select aid, gid, min(x) x, max(y) y from g where aid in (select aid from gd where gd is null or gd >= (select d from today)) and aid not in (select aid from bys) group by aid, gid),
       agg as (select aid, count(*) n, bool_or(x <= t.d and t.d <= y) inwin, max(y) filter (where x <= t.d and t.d <= y) cur, max(y) lst, (select d from today) td from isl, today t group by aid)
@@ -796,8 +812,7 @@ try {
                from c join announcements a on announcement_dedup_key(a.title) = announcement_dedup_key(c.title)
                join announcement_apply_routes r on r.announcement_id = a.announcement_id),
       w as (select aid, x, y, ph, rid from rt where aid not in (select aid from rt where x is null or y is null) and y >= s and x <= e),
-      o as (select aid, x, y, ph, rid, max(y) over (partition by aid order by x, y rows between unbounded preceding and 1 preceding) py from w),
-      g as (select aid, x, y, ph, rid, sum(case when py is null or x > py + 1 then 1 else 0 end) over (partition by aid order by x, y) gid from o),
+      ${WAVE_G_SQL('rid')}
       isl as (select aid, gid, min(x) x, max(y) y from g group by aid, gid),
       pick as (select aid, count(*) n, coalesce(min(gid) filter (where x <= t.d and t.d <= y), min(gid) filter (where x > t.d), max(gid)) gid from isl, today t group by aid),
       res as (select p.aid, ${SCHED_DAY_SQL('p.aid', 'p.gid')} d from pick p where p.n >= 2)
@@ -841,8 +856,7 @@ try {
                from c join announcements a on announcement_dedup_key(a.title) = announcement_dedup_key(c.title)
                join announcement_apply_routes r on r.announcement_id = a.announcement_id),
       w as (select aid, x, y, ph from rt where aid not in (select aid from rt where x is null or y is null) and y >= s and x <= e),
-      o as (select aid, x, y, ph, max(y) over (partition by aid order by x, y rows between unbounded preceding and 1 preceding) py from w),
-      g as (select aid, x, y, ph, sum(case when py is null or x > py + 1 then 1 else 0 end) over (partition by aid order by x, y) gid from o),
+      ${WAVE_G_SQL('')}
       isl as (select aid, gid, min(x) x, max(y) y, array_agg(distinct ph) filter (where ph is not null and ph <> '') phs from g group by aid, gid),
       pick as (select aid, count(*) n, bool_and(phs is not null) allph,
                       coalesce(min(gid) filter (where x <= t.d and t.d <= y), min(gid) filter (where x > t.d), max(gid)) gid from isl, today t group by aid)
@@ -1122,6 +1136,51 @@ try {
     } else value = `못 잼(${err})`
     add('sched_line', '상세 세로 노선 — 공고문 일정 표의 이 카드 회차 행을 빠짐없이 · 다른 회차 없이', ok ? 'pass' : 'fail', value,
       'DB 로 따로 계산한 일정 행 id(같은 제목 키 · apply_end = 카드 apply_end) = 펼친 상세 노선 역의 id(범위 노선 모두) · 노선 기본 접힘 · 역 원문 글 = DB period_text · 깨진 글자 0')
+  }
+  // ⑦-1d 펼친 2층 같은 글자 줄(2026-11-17 · 우편함 「코드·운영 — 1장 …」 4 · 12월 반영 회신 ⑦ 1 — 「지난 회차」 줄이 겉에서 다시 그려져 2층에 두 번 선 꼴 재발 막기 · 원칙 33).
+  //    열린 카드 앞 12장을 실제로 펼쳐 2층(.zf12-l2) 안 보이는 요소 중 글자를 품은 가장 안쪽 요소를 「태그 · 클래스 · 글자」로 센다 — 같은 열쇠가 둘이면 실패.
+  //    글자가 같아도 다른 요소(겉 커트라인 단추 ↔ 상세 절 제목 「지난 회차 — LH 공개 커트라인」)는 2층 밖이거나 태그·클래스가 달라 걸리지 않는다.
+  //    SIMULATE=l2_dup 이면 첫 카드 2층의 줄 하나를 복제해 잰다(실패해야 맞다).
+  {
+    let err = null, cards = 0, l2s = 0
+    const dups = []
+    try {
+      await page.evaluate(() => { goMain(2); if (typeof zf3SetView === 'function') zf3SetView('list'); document.getElementById('noticeFilterPanel')?.classList.add('hidden') })
+      const ids = await page.evaluate(() => zfOpenNotices(noticeData).slice(0, 12).map(r => String(r.announcement_id)))
+      for (const [i, aid] of ids.entries()) {
+        const ok = await page.evaluate(aid => {
+          const rows = noticeData.filter(n => String(n.announcement_id) === aid); renderNoticeList(rows, rows.length, 0)
+          const c = document.querySelector(`#notice-list .hcard[data-announcement-id="${CSS.escape(aid)}"]`); if (c) c.click(); return !!c
+        }, aid)
+        if (!ok) continue
+        cards++
+        await page.waitForFunction(() => !!document.querySelector('#notice-list .zf12-l2'), null, { timeout: 8000 }).catch(() => {})
+        await page.waitForTimeout(600)
+        const r = await page.evaluate(([sim]) => {
+          const l2 = document.querySelector('#notice-list .zf12-l2')
+          if (!l2) return null
+          if (sim) { const x = [...l2.querySelectorAll('*')].find(e => e.offsetParent && (e.innerText || '').trim().length >= 4 && !e.children.length); if (x) x.after(x.cloneNode(true)) }
+          const seen = new Map()
+          for (const el of l2.querySelectorAll('*')) {
+            if (!el.offsetParent) continue
+            const t = (el.innerText || '').replace(/\s+/g, ' ').trim()
+            if (t.length < 4) continue
+            if ([...el.children].some(c => (c.innerText || '').replace(/\s+/g, ' ').trim() === t)) continue
+            const k = el.tagName + '.' + [...el.classList].sort().join('.') + '|' + t
+            seen.set(k, (seen.get(k) || 0) + 1)
+          }
+          return [...seen].filter(([, n]) => n > 1).map(([k, n]) => `${k.slice(0, 60)} ×${n}`)
+        }, [process.env.SIMULATE === 'l2_dup' && i === 0])
+        if (r === null) continue
+        l2s++
+        r.forEach(x => dups.push(`${aid}: ${x}`))
+      }
+      await page.evaluate(() => { try { applyNoticeFiltersAndRender() } catch (e) {} })
+    } catch (e) { err = String(e.message || e).slice(0, 120) }
+    if (err) add('l2_dup', '펼친 2층 — 같은 글자 줄 두 번', 'warn', `못 잼(${err})`, '펼친 2층 같은 글자 줄 0')
+    else add('l2_dup', '펼친 2층 — 같은 글자 줄 두 번', dups.length || !l2s ? 'fail' : 'pass',
+      `카드 ${cards}장 펼침 · 2층 ${l2s} · 같은 줄 ${dups.length}${dups.length ? ': ' + dups.slice(0, 3).join(' / ') : ''}`,
+      '열린 카드 앞 12장 2층(.zf12-l2) 안 보이는 글자 줄(태그·클래스·글자가 같은 가장 안쪽 요소) 두 번 0 · 2층 하나 이상 잼')
   }
   // ⑦-2 한글 조합 입력(2026-10-13 · 우편함 「코드 — 한글 중복 입력 …」 1 · 원칙 33) — 공고 검색 칸에 실제 조합 이벤트(CDP Input.imeSetComposition →
   //    insertText)로 「부산」을 친다. 두 꼴을 본다:
