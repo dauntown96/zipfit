@@ -27,7 +27,26 @@ const SCHED_DAY_SQL = (A, G) => `(select case when count(distinct coalesce(s.sta
                  and s.announcement_id in (select g2.rid from g g2 where g2.aid = ${A} and g2.gid = ${G} union select ${A})
                  and s.scope_text in (select g3.ph from g g3 where g3.aid = ${A} and g3.gid = ${G}))`
 const ROUTE_GUARD_SQL = `lg as (select aid, max(gid) gid, max(wd) wd from g group by aid),
-      gd as (select lg.aid, coalesce(${SCHED_DAY_SQL('lg.aid', 'lg.gid')}, lg.wd) gd from lg),`
+      gd as (select lg.aid, coalesce(${SCHED_DAY_SQL('lg.aid', 'lg.gid')}, lg.wd) gd from lg),
+      wo as (select aid, x, y, nullif(ph, '') ph, row_number() over (partition by aid order by x, y) rn from g),
+      wv as (with recursive r(aid, rn, ph, wid, wy, wph) as (
+               select aid, rn, ph, 1, y, case when ph is null then '{}'::text[] else array[ph] end from wo where rn = 1
+               union all
+               select o.aid, o.rn, o.ph, r.wid + case when sm then 0 else 1 end,
+                      case when sm then greatest(r.wy, o.y) else o.y end,
+                      case when sm then r.wph || case when o.ph is null then '{}'::text[] else array[o.ph] end else case when o.ph is null then '{}'::text[] else array[o.ph] end end
+                 from r join wo o on o.aid = r.aid and o.rn = r.rn + 1
+                 cross join lateral (select o.x <= r.wy + 1 and (o.x <= r.wy or o.ph is null or cardinality(r.wph) = 0 or o.ph = any(r.wph)) sm) q)
+             select aid, wid, ph from r),
+      tk as (select wv.aid, wv.wid, t.tk from wv
+               cross join lateral (select replace(coalesce(wv.ph, ''), ' ', '') p) q
+               cross join lateral unnest(case when q.p ~ '^[0-9]+([,.·][0-9]+)*순위'
+                 then (select array_agg(n || substring(q.p from '^[0-9,.·]+(순위.*)$')) from regexp_split_to_table(substring(q.p from '^([0-9,.·]+)순위'), '[,.·]') n where n <> '')
+                 else array[q.p] end) t(tk) where t.tk <> ''),
+      bys as (select distinct aid from tk group by aid, tk having count(distinct wid) > 1),`
+// 🔴 2026-11-17(우편함 「표시층 — 작은 판 2」 1) — bys = 단지별 창 카드(화면 zfPhaseTokens · zfWinsBySite 사본): 같은 순위 낱말이 서로 다른 창에 다시 나옴.
+//    창(wid)은 화면 zfRouteWinsAll 묶음 사본 — 겹치면 한 창 · 하루 차로 붙으면 순위 글자가 빈 행이거나 앞 창에 같은 순위 글자가 있을 때만 한 창(zfSameWave).
+//    route_gap · route_cur 는 이 카드를 창 판정에서 뺀다(화면 zfRouteWins 가 null).
 // 콘솔 오류 제외 — 카카오맵 SDK(지도만 빠진다).
 const CONSOLE_IGNORE = [/dapi\.kakao\.com/, /kakao/i,
   // 🔵 2026-11-03 — 브랜치 점검(입력 ref · 러너 안 127.0.0.1:8201)은 카카오 지도 키의 등록 도메인 밖이라 SDK 가 안 온다 → 화면이 남기는 그 실패 한 줄만 뺀다.
@@ -145,6 +164,7 @@ try {
   let greySeen = 0
   const whenBad = []          // 겉 언제 줄(.zf12-when) 접수 > 마감
   let whenSeen = 0
+  const ymdBad = []           // 날짜 꼴 「YYYYMM-DD」(연도와 월이 붙은 글자)
   for (let pg = 1; pg <= MAX_PAGES; pg++) {
     if (pg > 1) {
       const ok = await page.evaluate(pg => { const b = [...document.querySelectorAll('button')].find(b => b.offsetParent !== null && b.innerText.trim() === String(pg)); if (!b) return false; b.click(); return true }, pg)
@@ -218,7 +238,13 @@ try {
         const a = d('접수'), b = d('마감')
         return a && b && a > b ? (w.closest('.hcard')?.getAttribute('data-announcement-id') || '?') + ` 접수 ${a} > 마감 ${b}` : null
       }).filter(Boolean)
-      return { cardRows, chips, dates, nts, overflow: sw > window.innerWidth + 1 ? sw : 0, greys: greys.length, greyBad, orgCards, whens: whens.length, whenBad }
+      // 🔴 2026-11-17(우편함 「표시층 — 작은 판 2」 6) — 카드(펼침 자리 포함) 글자에 「202704-30」 꼴(연도·월이 붙은 날짜) 0
+      const ymdBad = [...document.querySelectorAll('#notice-list .hcard')].map(c => {
+        const t = c.textContent + ((c.nextElementSibling && !c.nextElementSibling.classList.contains('hcard')) ? c.nextElementSibling.textContent : '')
+        const m = t.match(/\d{6}-\d{2}/)
+        return m ? (c.getAttribute('data-announcement-id') || '?') + ' ' + m[0] : null
+      }).filter(Boolean)
+      return { cardRows, chips, dates, nts, overflow: sw > window.innerWidth + 1 ? sw : 0, greys: greys.length, greyBad, orgCards, whens: whens.length, whenBad, ymdBad }
     })
     // 🔴 갈래는 자르기 전 전문으로 정한다(이슈 #360 · 2026-10-07) — 60자로 자른 뒤 판정하면 긴 ④ 링크 문구
     //    (「…[정정공고] … 공고에 함께 정리돼 있어요 →」 65자)의 「있어요」가 잘려 「알수없음」으로 떨어졌다. 60자는 결과 표에 보일 때만.
@@ -232,6 +258,7 @@ try {
     greyOpen.push(...got.greyBad)
     whenSeen += got.whens
     whenBad.push(...got.whenBad)
+    ymdBad.push(...got.ymdBad)
   }
   extra.cards_seen = cards.length
 
@@ -355,6 +382,7 @@ try {
   add('route_date', '접힌 경로 줄 첫 날짜가 보이는가', hiddenDates.length === 0 ? 'pass' : 'fail', hiddenDates.length ? `${hiddenDates.length}: ${hiddenDates.slice(0, 3).join(' / ')}` : 0, '가려진 첫 날짜 0')
   add('overflow', '가로 넘침(390px)', overflow.length === 0 ? 'pass' : 'fail', overflow.length ? overflow.join(' / ') : 0, 'scrollWidth ≤ 390')
   add('when_order', '겉 언제 줄 — 접수일 ≤ 마감일(열린 카드 전 쪽)', whenBad.length === 0 ? 'pass' : 'fail', `언제 줄 ${whenSeen} · 접수 > 마감 ${whenBad.length}${whenBad.length ? ': ' + whenBad.slice(0, 5).join(' / ') : ''}`, '0 — 날짜 벌이 여럿인 카드는 접수 = 아직 안 끝난 벌 중 가장 이른 시작 · 마감 = 마지막 벌 끝(2026-11-17 …21044)')
+  add('date_form', '날짜 꼴 — 연도·월이 붙은 「YYYYMM-DD」 글자 0(카드 전 쪽)', ymdBad.length === 0 ? 'pass' : 'fail', `${ymdBad.length}${ymdBad.length ? ': ' + ymdBad.slice(0, 5).join(' / ') : ''}`, '0 — 다음 해 날짜는 「27-04-30」 꼴(2026-11-17 GH_850)')
   add('grey_open', '회색(흐림) 카드 중 숨기기 술어로는 열린 카드 — 회색 = isHiddenAsClosed', greyOpen.length === 0 ? 'pass' : 'fail', `회색 ${greySeen} · 열린데 회색 ${greyOpen.length}${greyOpen.length ? ': ' + greyOpen.slice(0, 5).join(' / ') : ''}`, '0(목록에 보이는 카드 전 쪽 · 2026-10-19 순위별 접수 창 사이 3장)')
   // ④ 보이는 글자에 옛 서비스명 0(2026-10-06 · 우편함 「코드 — Z-1 …」 PR-A A4 · 이름 규칙 — 사용자에게 보이는 곳 = 「꼭집」).
   //    body.innerText(화면에 그려진 글자만 · 숨은 요소·주석·콘솔 제외) 안의 「ZipFit」(대소문자 그대로)을 센다 — 지금 열린 쪽 기준.
@@ -659,7 +687,7 @@ try {
       o as (select aid, x, y, wd, ph, rid, max(y) over (partition by aid order by x, y rows between unbounded preceding and 1 preceding) py from w),
       g as (select aid, x, y, wd, ph, rid, sum(case when py is null or x > py + 1 then 1 else 0 end) over (partition by aid order by x, y) gid from o),
       ${ROUTE_GUARD_SQL}
-      isl as (select aid, gid, min(x) x, max(y) y from g where aid in (select aid from gd where gd is null or gd >= (select d from today)) group by aid, gid),
+      isl as (select aid, gid, min(x) x, max(y) y from g where aid in (select aid from gd where gd is null or gd >= (select d from today)) and aid not in (select aid from bys) group by aid, gid),
       agg as (select aid, count(*) n, bool_or(x <= t.d and t.d <= y) inwin, min(x) filter (where x > t.d) nxt from isl, today t group by aid)
       select coalesce(json_agg(json_build_object('aid', aid, 'next', nxt) order by aid), '[]'::json) j from agg where n >= 2 and not inwin`)
     const want = gq.j || []
@@ -709,7 +737,7 @@ try {
       o as (select aid, x, y, wd, ph, rid, max(y) over (partition by aid order by x, y rows between unbounded preceding and 1 preceding) py from w),
       g as (select aid, x, y, wd, ph, rid, sum(case when py is null or x > py + 1 then 1 else 0 end) over (partition by aid order by x, y) gid from o),
       ${ROUTE_GUARD_SQL}
-      isl as (select aid, gid, min(x) x, max(y) y from g where aid in (select aid from gd where gd is null or gd >= (select d from today)) group by aid, gid),
+      isl as (select aid, gid, min(x) x, max(y) y from g where aid in (select aid from gd where gd is null or gd >= (select d from today)) and aid not in (select aid from bys) group by aid, gid),
       agg as (select aid, count(*) n, bool_or(x <= t.d and t.d <= y) inwin, max(y) filter (where x <= t.d and t.d <= y) cur, max(y) lst, (select d from today) td from isl, today t group by aid)
       select coalesce(json_agg(json_build_object('aid', aid, 'kind', case when inwin then 'in' else 'gap' end, 'cur', cur, 'days', cur - td) order by aid), '[]'::json) j
         from agg where n >= 2 and (not inwin or cur < lst)`)

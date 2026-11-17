@@ -424,7 +424,7 @@ body.theme-dark .hu-past-title{color:#cfcfcf}
 .hu-x-slot{flex:0 0 auto;display:inline-flex}
 .hu-x-slot:empty{display:none}
 .hu-x-chip{padding:2px 8px;font-size:11px;line-height:1.4;white-space:nowrap;background:#fff;border-color:#cfd8d3;color:var(--ink-2);text-decoration:underline;font-weight:600}
-.hu-addr .hu-x-slot,.hu-ug>summary .hu-x-slot{margin-left:6px}
+.hu-addr .hu-x-slot,.hu-ug>summary .hu-x-slot,.hu-ug>.hu-ug-head .hu-x-slot{margin-left:6px}
 .hu-x-single{display:flex;justify-content:flex-end}
 .hu-x-single:has(.hu-x-slot:empty){display:none}
 .extras-linked-note{font-size:11px;color:var(--ink-2);margin:0 0 8px}
@@ -438,6 +438,7 @@ body.theme-dark .hu-x-chip{background:#1f2229;border-color:#2c2f38;color:var(--i
    머리줄은 접을 수 있고 기본은 펼침 — 이 목록은 이미 「세대별 정보」와 「건물」 두 겹 안에 있어
    세 번째 겹까지 접으면 금액을 보는 데 세 번을 눌러야 한다. */
 .hu-ug{border:1px solid #e8e8e0;border-radius:10px;overflow:hidden;background:#fff}
+.hu-ug>.hu-ug-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:4px 8px;background:#f8f8f8;padding:8px 10px;font-size:12px}
 .hu-ug>summary{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:4px 8px;background:#f8f8f8;padding:8px 10px;cursor:pointer;font-size:12px;list-style:none}
 .hu-ug>summary::-webkit-details-marker{display:none}
 .hu-ug>summary::before{content:'▸';color:#999;margin-right:4px;flex:0 0 auto}
@@ -460,7 +461,7 @@ body.theme-dark .hu-x-chip{background:#1f2229;border-color:#2c2f38;color:var(--i
 .zf-rent-basis{color:var(--ink-3,#5F5F57)}   /* 🔵 2026-11-10(12월 재편 ④ ①) — #777(4.48:1) 은퇴 · 보조 글자 토큰 */
 body.theme-dark .zf-rent-basis{color:var(--ink-3,#9aa0aa)}
 .hu-ug-sub{font-size:11px;color:#888;margin-top:2px}
-body.theme-dark .hu-ug,body.theme-dark .hu-ug>summary{background:#1f2229;border-color:#2c2f38}
+body.theme-dark .hu-ug,body.theme-dark .hu-ug>summary,body.theme-dark .hu-ug>.hu-ug-head{background:#1f2229;border-color:#2c2f38}
 body.theme-dark .hu-ug-name,body.theme-dark .hu-ug-target,body.theme-dark .hu-ug-price{color:#e8e8e8}
 .poi-section{margin-top:8px}
 .poi-tabs{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap}
@@ -765,7 +766,8 @@ html[data-ui="d3"] .zf3-card>div[id^="ncard-"]{margin:0 -14px 0 -18px!important;
 .zf3-stn.unk i{border-style:dashed;border-color:var(--ink-3)}
 .zf3-stn .k{font-size:var(--t-xs);color:var(--ink-3);line-height:1.3;margin-top:2px}
 .zf3-stn .v .yr{display:block;font-weight:700;color:var(--ink-2);font-family:var(--f-led)}   /* 2026-10-21 S1 묶음 3 ⑤ — 다음 해 날짜는 연도를 날짜 위 한 줄로(역 이름 줄은 이름만) */
-@media (min-width:720px){.zf3-stn .v .yr{display:inline}.zf3-stn .v .yr::after{content:'-'}}   /* 2026-11-02(다운님 「(나)」) — 넓은 화면은 「2027-01-26(화)」 한 줄(상세 공급일정 zfSchDay 와 같은 꼴) · 좁은 화면(390 역 폭 약 70px — 한 줄이면 날짜 중간에서 꺾임)은 위 두 줄 그대로 */
+.zf3-stn .v .yr .yd{display:none}
+@media (min-width:720px){.zf3-stn .v .yr{display:inline}.zf3-stn .v .yr .yd{display:inline}}   /* 🔵 2026-11-17(우편함 「표시층 — 작은 판 2」 6) — 연도는 두 자리 「27-04-30」(겉 줄 꼴) · 붙임표는 글자로(종전 ::after 라 글자가 「202704-30」이었다) · 좁은 화면은 연도 한 줄 위 그대로 */   /* 2026-11-02(다운님 「(나)」) — 넓은 화면은 「2027-01-26(화)」 한 줄(상세 공급일정 zfSchDay 와 같은 꼴) · 좁은 화면(390 역 폭 약 70px — 한 줄이면 날짜 중간에서 꺾임)은 위 두 줄 그대로 */
 html[data-ui="d3"] .hcard .zf3-dup{display:none!important}   /* 🔴 2026-10-19(덧 셋 ③) — 카드 안(접은 같은 말 칩)만. 종전 전역 규칙이 전광판 둘째 반쪽(.zf3-half.zf3-dup)까지 숨겨 -50% 가 첫 반쪽 가운데서 처음으로 되감겼다(#451 이후) */
 .zf3-stn .v{font-size:12px;font-weight:700;font-family:var(--f-led);color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.25;overflow-wrap:anywhere}
 .zf3-stn .v small{display:block;font-family:var(--f-ui);font-weight:400;font-size:var(--t-xs);color:var(--ink-3)}
@@ -775,7 +777,7 @@ html[data-ui="d3"] .hcard .zf3-dup{display:none!important}   /* 🔴 2026-10-19(
 .zf3-today b::after{content:"";position:absolute;left:50%;top:100%;width:2px;height:7px;margin-left:-1px;background:var(--ink)}
 .zf3-bhead{margin:0 0 2px;font-size:12px;font-weight:700;color:var(--ink-2)}
 .zf3-branch{border-left:2px solid var(--ln,var(--ink));padding-left:8px;margin:6px 0 0 2px}
-.zf3-bn{margin:0 0 -8px;font-size:12px;font-weight:700;color:var(--ink-2);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.zf3-bn{margin:0 0 6px;font-size:12px;font-weight:700;color:var(--ink-2);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 /* 아래 줄 — 「내 희망 조건」 · 「상세 ›」 */
 .zf3-go{all:unset;box-sizing:border-box;min-height:var(--hit);min-width:var(--hit);padding:0 12px;font-size:13px;font-weight:700;color:var(--ink);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:4px;border-radius:var(--r-1)}
 .zf3-go span{display:inline-block;transition:transform var(--m-fast) var(--ease)}
@@ -1210,7 +1212,7 @@ html[data-ui="d3"] body.theme-dark{color-scheme:dark}
    D1 잔여 — 공급일정 「공고문 일정」·「원문」·대상 표지 11px → t-xs(12). 모양(글자·색·테두리)은 그대로 · 칸만 넓힌다. */
 html[data-ui="d3"] :is(.policy-title,.elig-title,.hu-title,.extras-title,.docs-title){padding:12px 0;line-height:20px;margin-bottom:0}
 html[data-ui="d3"] .policy-item>summary,html[data-ui="d3"] .zf-sch-stop>summary{min-height:var(--hit);box-sizing:border-box}
-html[data-ui="d3"] .hu-ug>summary{min-height:var(--hit);box-sizing:border-box}
+html[data-ui="d3"] :is(.hu-ug>summary,.hu-ug>.hu-ug-head){min-height:var(--hit);box-sizing:border-box}
 /* 🔵 2026-10-16(우편함 「표시층 — 생활시설 칩 작게 …」 1 · 다운님 휴대폰 「너무 크다」) — 보이는 알약은 28(::before) · 누름 칸은 위아래 투명 8을 더한 44 그대로.
    생활시설 칩은 한 줄(넘치면 옆으로 넘김) · 정책 칩도 같은 이유로 커졌던 것이라 같은 꼴. */
 html[data-ui="d3"] :is(.pol-chip,.poi-tab){position:relative;z-index:0;min-height:var(--hit);box-sizing:border-box;display:inline-flex;align-items:center;flex:0 0 auto;padding:0 10px;margin:0;border:0!important;background:transparent!important;border-radius:0;font-size:var(--t-xs);line-height:1;white-space:nowrap;font-family:inherit}
@@ -2241,7 +2243,8 @@ function zfLhSpanIsUnion(row, pn){
 //    상태 판정(zfRouteWins → zfRouteGap · zfRouteCurEnd)은 종전 그대로 오늘이 카드 기간 안 · 당첨발표 전일 때만 본다.
 function zfRouteWins(row){
   const W = zfRouteWinsAll(row);
-  if(!W || W.today < W.s0 || W.today > W.e0) return null;
+  // 🔴 2026-11-17(우편함 「표시층 — 작은 판 2」 1) — 단지별 창(zfWinsBySite)은 「차수 사이 · 이번 차수 마감」을 한 단지 창으로 세지 않는다(카드 전체 범위 — 점검 route_gap·route_cur SQL 사본도 같은 규칙)
+  if(!W || W.bySite || W.today < W.s0 || W.today > W.e0) return null;
   // 🔵 2026-10-19(우편함 「표시층 — 노선 발표·계약 역 = 기본 창」 2) — 카드 발표 칸은 앞 창 발표일 수 있다 — 일정 표에 마지막 창 결과발표가 있으면 그 날로 끈다.
   const w = parseNoticeDate(zfRouteSchedOf(row, W, W.merged.length - 1).win || row['winner_announce_date'] || '');
   if(w && startOfLocalDay(w).getTime() < W.today) return null;
@@ -3233,12 +3236,15 @@ function zfRouteVerdict(rows, today){
         if(!r.phase_text) return;
         const key = loc(r) + '|' + r.phase_text;
         let p = parts.find(x => x.key === key);
-        if(!p){ p = { key, name: [loc(r), r.phase_text].filter(Boolean).join(' ') }; parts.push(p); }
+        if(!p){ p = { key, loc: loc(r), ph: r.phase_text, name: [loc(r), r.phase_text].filter(Boolean).join(' ') }; parts.push(p); }
         widen(p, r.start_date, r.end_date, '');
       });
       parts.sort((a, b) => String(a.s || '').localeCompare(String(b.s || '')));
       const lead2 = parts.some(p => /순위/.test(p.name)) ? '순위별로 접수일이 달라요' : '접수일이 나뉘어 있어요';
-      return { kind: '①', text: lead2 + ' · ' + parts.map(p => `${p.name} ${zfSpanText(p.s, p.e)}`.trim()).join(' · ') };
+      // 🔵 2026-11-17(우편함 「표시층 — 작은 판 2」 7) — 같은 단지 조각은 한데 모은다: 「단지 이름 · 1순위 12/1 · 2,3순위 12/2」(낱말 그대로 · 차례만 — 단지 차례 = 그 단지 첫 접수).
+      const locs = [];
+      parts.forEach(p => { let L = locs.find(x => x.loc === p.loc); if(!L){ L = { loc: p.loc, ps: [] }; locs.push(L); } L.ps.push(p); });
+      return { kind: '①', text: lead2 + ' · ' + locs.map(L => [L.loc, ...L.ps.map(p => `${p.ph} ${zfSpanText(p.s, p.e)}`.trim())].filter(Boolean).join(' · ')).join(' · ') };
     }
     // 🔵 2026-10-21(우편함 「표시층 — S1 묶음 3」 ⑥ · 조사 「표본 정확도 2차」 ⑦ 2) — 차수 이름에 「순위」가 하나도 없으면(…19312 첫날 · 2일차 ~ 마감일 —
     //    순위가 아니라 접수 차수) 「순위별로」라 하지 않는다. 순위 차수는 그대로.
@@ -5810,8 +5816,9 @@ function zfCutoffPick(rows){
 function zfCutoffLineHtml(rows){
   const r = zfCutoffPick(rows);
   if(!r) return '';
-  const same = rows.filter(x => x.complex_name === r.complex_name && x.rcr_pan_dt === r.rcr_pan_dt);
-  const types = new Set(same.map(x => x.ltst_nm)).size;
+  // 🔵 2026-11-17(우편함 「표시층 — 작은 판 2」 4) — 주택형 수 = 펼친 「지난 회차」 표의 줄 수 그대로(단지마다 일반공급·예비자 행이 있는 ltst_nm · 계층 행만 있는 형은 표에 없어 세지 않는다).
+  //    종전: 대표 단지·대표 회차만 세어 펼친 표와 달랐다(…21089 표 8줄 ↔ 겉 3).
+  const types = new Set(rows.filter(x => zfCutKind(x) !== 'cls').map(x => (x.complex_name || '') + '\u0001' + (x.ltst_nm || ''))).size;
   return `<button type="button" class="zf-cut-line" onclick="zfOpenCutoffDetail(this,event)" style="display:block;width:100%;text-align:left;font:inherit;font-size:12px;color:var(--ink-2,#555);background:var(--surface,#f7f6f2);border:1px solid var(--line-2,#e2e3e6);border-radius:var(--r-2);padding:6px 10px;margin-bottom:6px;line-height:1.5;cursor:pointer">`
     + `🕘 지난 회차(${escapeHtml(String(r.rcr_pan_dt || '').slice(0, 7))}) 주택형 ${types}개 · 신청 기록 보기 ›</button>`;
 }
@@ -10134,7 +10141,9 @@ function toggleBlockGroup(id, idx){
   // 세대정보에 실제 주소가 있으면 뒤이어 loadHousingUnits가 더 정밀한 좌표로 갱신한다.
   const blk = (blockInfo[id]||[])[idx];
   if(blk && blk.precise_address){
-    initMapForHouse({ addr: blk.precise_address, name: blk.precise_address }, id);
+    // 🔵 2026-11-17(우편함 「표시층 — 작은 판 2」 5) — 핀 이름은 단지 이름 · 주소는 이름이 없을 때만(nameIsAddr — 뒤늦게 와도 단지 이름을 덮지 않는다).
+    const blkSite = String(blk._zfSite || blk.site_label || '').trim();
+    initMapForHouse({ addr: blk.precise_address, name: blkSite || blk.precise_address, nameIsAddr: !blkSite }, id);
   }
   const subId = id+'-blk'+idx;
   const annIdForBlock = (blockAnnIds[id]||[])[idx] || '';
@@ -10517,7 +10526,7 @@ function zfPlaceWeakHead(id){
   list.querySelectorAll(':scope > .zf-weak-head').forEach(b => b.remove());
   list.insertAdjacentHTML('afterbegin', html);
   // 주거약자용 주택형 묶음 머리에 칩 — 묶음 이름에 이미 「주거약자」가 있으면 달지 않는다(같은 낱말 두 번)
-  list.querySelectorAll('details.hu-ug > summary').forEach(sm => {
+  list.querySelectorAll('.hu-ug > :is(summary,.hu-ug-head)').forEach(sm => {
     const nm = (sm.querySelector('.hu-ug-name') || {}).textContent || '';
     const rows = sm.parentElement.querySelectorAll('.hu-ug-target');
     if(/주거약자/.test(nm) || sm.querySelector('.zf-weak-chip')) return;
@@ -10940,8 +10949,8 @@ function zfFillUnitChips(id){
   // 🔵 2026-11-12(우편함 「표시층 — 상세 「공급일정」 첫 정거장 공고일 + 묶인 세대 행 평면도」 2) — 묶음 머리(unit_group)에 제 키 그림이 없어도
   //    묶음 안 주택형(unit_type) 키에 그림이 있으면 머리에도 칩을 단다(접힌 묶음을 열어야 보이던 평면도 — …21062 「55」 ↔ 「…::55A」).
   //    장 수 = 안 행 키들의 그림 합(같은 행은 한 번) · 안 행 칩은 그대로(같은 그림이 두 자리에 — 갤러리에서 빼는 규칙은 그대로).
-  root.querySelectorAll('details.hu-ug').forEach(det => {
-    const head = det.querySelector(':scope > summary .hu-x-slot');
+  root.querySelectorAll('.hu-ug').forEach(det => {
+    const head = det.querySelector(':scope > :is(summary,.hu-ug-head) .hu-x-slot');
     if(!head || head.firstChild) return;   // 머리 키에 제 그림이 있으면 종전 그대로
     const items = [], gids = [];
     [...new Set([...det.querySelectorAll(':scope > .hu-ug-list .hu-x-slot')].map(s => s.getAttribute('data-xkey')))].forEach(k => {
@@ -11807,6 +11816,12 @@ function renderHousingUnitGroup(g){
       ${note}
     </div>`;
   }).join('');
+  // 🔵 2026-11-17(우편함 「표시층 — 작은 판 2」 3) — 행이 하나뿐인 묶음은 접고 펴는 칸 없이 그 행을 바로 보인다(머리 줄은 그대로 · 칩 자리 키도 묶음 키 그대로).
+  const head = `<span class="hu-ug-name">${escapeHtml(zfUgHeadLabel(g.group, g.units[0] && g.units[0].building_name))}</span><span class="hu-ug-meta"${headPick ? ` title="${zfAttr('원문: ' + headPick.texts.join(' / '))}"` : ''}>${escapeHtml(headAreas + headCount)}</span>${headWait ? zfWaitReserveHtml(g.units) : ''}${zfUnitChipSlot(zfUnitTypeKey(g.units[0], g.group))}`;
+  if(lines.length === 1) return `<div class="hu-ug hu-ug-one">
+    <div class="hu-ug-head">${head}</div>
+    <div class="hu-ug-list">${body}</div>
+  </div>`;
   return `<details class="hu-ug">
     <summary><span class="hu-ug-name">${escapeHtml(zfUgHeadLabel(g.group, g.units[0] && g.units[0].building_name))}</span><span class="hu-ug-meta"${headPick ? ` title="${zfAttr('원문: ' + headPick.texts.join(' / '))}"` : ''}>${escapeHtml(headAreas + headCount)}</span>${headWait ? zfWaitReserveHtml(g.units) : ''}${zfUnitChipSlot(zfUnitTypeKey(g.units[0], g.group))}</summary>
     <div class="hu-ug-list">${body}</div>
@@ -12097,6 +12112,13 @@ function initMapForHouse(h,id){
     // 🔴 D-3 검증 c — 단지 이름표는 카카오가 「실제 주소」(도로명·지번 주소)로 찾았을 때만. 지명(REGION)으로 찾은 점은
     //    그 지역의 가운데라 단지 위치로 읽히면 안 된다(양주 …20727 — 동 이름까지만 있는 주소가 시청 자리로 떨어졌다).
     const zf3Exact = !approx && /_ADDR$/.test(String((result[0] || {}).address_type || ''));
+    // 🔵 2026-11-17(작은 판 2 5) — 이름이 주소뿐인 호출(nameIsAddr)은 이 상자가 이미 단지 이름을 달았으면 그 이름을 그대로 쓴다(늦게 온 지오코딩이 덮던 자리).
+    const lblName = () => {
+      const st = huMapState[id];
+      if(h && h.nameIsAddr && st && st.el === mapEl && st.lblReal) return st.lblName;
+      return zf3MapName(id, h);
+    };
+    const lblKeep = () => { const st = huMapState[id]; if(st && !(h && h.nameIsAddr && st.lblReal)){ st.lblName = zf3MapName(id, h); st.lblReal = !(h && h.nameIsAddr) && !!String((h && h.name) || '').trim(); } };
     // 지도는 처음 한 번만 생성하고, 이후 건물 클릭 시에는 기존 지도/마커를 그 위치로 옮겨서
     // 항상 마커가 1개만 유지되도록 함.
     // 🔴 단, 「그 지도가 지금 이 상자에 들어 있을 때」만 그렇다.
@@ -12111,7 +12133,7 @@ function initMapForHouse(h,id){
     if(state && state.map && state.marker && state.el === mapEl){
       state.map.setCenter(coords);
       state.marker.setPosition(coords);
-      if(state.label && typeof zf3MapLabel === 'function'){ try{ state.label.setMap(null); }catch(e){} state.label = zf3Exact ? zf3MapLabel(state.map, coords, zf3MapName(id, h), state.el) : null; }   // 🔴 대략 핀(시군구 가운데)에는 단지 이름표를 달지 않는다 — 단지 위치로 읽힌다(D-3 검증 c · 양주 …20727)
+      if(state.label && typeof zf3MapLabel === 'function'){ try{ state.label.setMap(null); }catch(e){} state.label = zf3Exact ? zf3MapLabel(state.map, coords, lblName(), state.el) : null; }   // 🔴 대략 핀(시군구 가운데)에는 단지 이름표를 달지 않는다 — 단지 위치로 읽힌다(D-3 검증 c · 양주 …20727)
     } else {
       // 🔴 카카오 지도는 컨테이너에 타일을 **덧붙인다** — 기존 자식을 지우지 않는다.
       //    그래서 「📍 지도를 불러오는 중...」 자리표시자가 타일 뒤에 그대로 남아,
@@ -12121,8 +12143,9 @@ function initMapForHouse(h,id){
       const map = new kakao.maps.Map(mapEl, {center:coords, level:5});
       const marker = new kakao.maps.Marker(Object.assign({position:coords, map}, (typeof zf3On === 'function' && zf3On() && typeof zf3MapName === 'function' && zf3MapName(id, zf3Exact ? h : null)) ? { title: zf3MapName(id, zf3Exact ? h : null) } : {}));   // 🔵 D-3 c 후속 — d3 만 표지 이름(카카오가 만드는 <area alt> 자리)
       huMapState[id] = { map, marker, el: mapEl };   // 🔵 어느 상자에 들어 있는지까지 기억한다
-      if(typeof zf3MapLabel === 'function' && zf3Exact) huMapState[id].label = zf3MapLabel(map, coords, zf3MapName(id, h), mapEl);   // 🔵 D-3 c — d3 만 · 대략 핀은 이름표 없음(검증 c)
+      if(typeof zf3MapLabel === 'function' && zf3Exact) huMapState[id].label = zf3MapLabel(map, coords, lblName(), mapEl);   // 🔵 D-3 c — d3 만 · 대략 핀은 이름표 없음(검증 c)
     }
+    if(zf3Exact) lblKeep();
     zfMapApproxShape(huMapState[id], coords, approx);
     setMapApproxNote(mapEl, approx);
     buildPoiTabs(id, coords);
@@ -14120,7 +14143,7 @@ function zf3LineHTML(stns, label){
     else { const j = last + 1 + j0, f = zf3Days(stns[last].d, today) / Math.max(1, zf3Days(stns[last].d, stns[j].d)); p = (last + f * (j - last)) / (n - 1); moving = true; }
   }
   const nextI = stns.findIndex(x => x.d && x.d > today);
-  const st = stns.map((x, i) => `<span class="zf3-stn${!x.d ? ' unk' : x.d <= today ? ' past' : i === nextI ? ' next' : ''}"><i></i><span class="k">${escapeHtml(x.k)}</span><span class="v">${x.d && x.d.slice(0, 4) !== today.slice(0, 4) ? `<b class="yr">${x.d.slice(0, 4)}</b>` : ''}${x.d ? zf3Md(x.d, true) : escapeHtml(x.u || '원문 확인')}${x.sub ? `<small>${escapeHtml(x.sub)}</small>` : ''}</span></span>`).join('');
+  const st = stns.map((x, i) => `<span class="zf3-stn${!x.d ? ' unk' : x.d <= today ? ' past' : i === nextI ? ' next' : ''}"><i></i><span class="k">${escapeHtml(x.k)}</span><span class="v">${x.d && x.d.slice(0, 4) !== today.slice(0, 4) ? `<b class="yr">${x.d.slice(2, 4)}<span class="yd">-</span></b>` : ''}${x.d ? zf3Md(x.d, true) : escapeHtml(x.u || '원문 확인')}${x.sub ? `<small>${escapeHtml(x.sub)}</small>` : ''}</span></span>`).join('');
   const aria = stns.map(x => `${x.k} ${x.d ? (x.d.slice(0, 4) !== today.slice(0, 4) ? x.d.slice(0, 4) + '년 ' : '') + zf3Md(x.d, true) : (x.u || '원문 확인')}${x.sub ? ' ' + x.sub : ''}`).join(', ');
   return `<div class="zf3-line" style="--n:${n};--p:${p.toFixed(3)}" role="img" aria-label="${zfAttr((label ? label + ' — ' : '') + aria)}"><span class="zf3-rail"></span><span class="zf3-done"></span>${st}${moving ? '<span class="zf3-today" aria-hidden="true"><b>오늘</b></span>' : ''}</div>`;
 }
