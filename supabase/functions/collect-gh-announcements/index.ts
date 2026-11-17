@@ -4,7 +4,8 @@
 //   SH 수집기(collect-sh-announcements)를 본뜬 기관별 수집기다(합치지 말 것 — 검증 ⑦ 채택: 수집기는 기관별 · 첨부 받기 설정은 호스트 표 하나).
 // 🔴 robots(2026-10-28 다시 잼): apply.gh.or.kr = `User-agent: * / Allow: /*` · apply-cdn.gh.or.kr = 같음.
 //   www.gh.or.kr 은 `Disallow: /`(사이트 전체) — 🔴 이 함수는 그 호스트에 한 번도 요청하지 않는다(BASE 하나뿐 · 검증 판정 ⑤-2 「자동 접근 0」).
-// 🔴 켜기는 런칭 뒤 — cron 등록 · 쓰기 켜기 · 화면 출처 표기 · 처리방침 열거 고지는 다운님 결정(켜는 순서 4단계 · 조사 회신 5절 ②).
+// 🔵 2026-11-17 켜기(우편함 「코드·운영 — GH 들이기 …」 · 다운님 승인 2026-11-16 권장 A 「마감일 있는 것만 지금」) — cron zipfit-collect-gh-announcements 로 쓰기.
+//   🔴 새로 들이는 것은 목록 마감일 칸이 날짜인 공고만이다(다운님 결정 ③ — 「-」 운영기관 상시 접수는 들이지 않음 · 관찰 ?mode=observe 는 그대로 「-」도 본다).
 //
 // 받는 자리(조사 회신 1절):
 //   임대주택 sr7150 · 매입임대 sr7155 — 임대상가 sr7170 · 서류제출 대상 sr7310 은 받지 않는다.
@@ -12,8 +13,10 @@
 //   상세 진입 화면의 NetFunnel(대기열 스크립트)은 브라우저 쪽이다 — 서버는 토큰 없이 200(조사 회신 · 2026-10-28 다시 확인).
 // ⚠️ 빠르게 이어 부르면 연결을 끊는다(2026-10-28 실측 — 1초 간격 상세 POST 에 reset by peer) → 요청 간격 2초 · 동시 요청 없음.
 //
-// 들이는 범위(조사 검증 「백필 = 열린 공고만」):
-//   열린 공고(상태가 마감이 아니고 마감일이 오늘 이후거나 「-」) ∪ 이미 들인 GH 공고(마감으로 바뀐 것을 반영) — 마감 지난 옛 공고는 새로 들이지 않는다.
+// 들이는 범위(조사 검증 「백필 = 열린 공고만」 · 2026-11-17 결정 ③):
+//   collect = 열린 공고 중 마감일 칸이 날짜인 것 ∪ 이미 들인 GH 공고(마감으로 바뀐 것을 반영) — 마감 지난 옛 공고 · 마감 「-」 공고는 새로 들이지 않는다.
+//   observe · probe = 열린 공고 전부(마감 「-」 포함 — 관찰 장치가 「-」 공고를 언제 내리나 잰다).
+//   닫힘: 목록 상태 「마감」 또는 마감일 < 오늘이면 접수마감 · 목록에서 사라진 들인 공고는 upsert 뒤 apply_end < 오늘이면 접수마감(closeGone).
 
 import { createClient } from 'jsr:@supabase/supabase-js@2.116.0'
 import { parseList, parseTotalPages, parseDetail, applyWindow, winnerDate, sigunguOf, type GhBoard, type GhListRow, type GhFile } from './parse.ts'
@@ -104,7 +107,7 @@ function mapRow(r: GhListRow, today: string) {
 type Mapped = ReturnType<typeof mapRow> & { attachment_urls?: Omit<GhFile, 'bytes'>[] }
 
 /** 목록을 읽어 들일 행을 고른다. known = 이미 들인 GH announcement_id(probe 는 빈 집합 — DB 를 읽지 않는다). */
-async function readLists(known: Set<string>, startedAt: number, errors: string[]) {
+async function readLists(known: Set<string>, startedAt: number, errors: string[], datedOnly = false) {
   const today = todayKst()
   const remain = () => RUN_FETCH_BUDGET_MS - (Date.now() - startedAt)
   const pages: Record<string, { total: number; read: number; failed: number }> = {}
@@ -127,7 +130,8 @@ async function readLists(known: Set<string>, startedAt: number, errors: string[]
       parsed += rows.length
       if (!rows.length) { errors.push(`${b} p=${p}: 행 0(꼴 바뀜?)`); break }
       const take = rows.filter(r => isOpen(r, today) || known.has(`GH_${r.pbancNo}`))
-      picked.push(...take)
+      // 🔴 collect 는 마감일이 날짜인 열린 공고만 새로 들인다(결정 ③) — 멈춤 판정(아래 break)은 거르기 전 take 로 한다(관찰과 같은 쪽 수를 읽는다).
+      picked.push(...(datedOnly ? take.filter(r => r.closeDate || known.has(`GH_${r.pbancNo}`)) : take))
       if (!take.length) break   // 이 쪽에 열린·들인 공고가 없으면 더 옛 쪽도 없다(게시일 내림차순 — 실측)
     }
   }
@@ -186,7 +190,7 @@ async function collect() {
     const { data: knownRows, error: kErr } = await supabase.from('announcements').select('announcement_id').eq('source', 'GH')
     if (kErr) throw new Error(`이미 들인 GH 공고 조회 실패: ${kErr.message}`)
     const known = new Set((knownRows ?? []).map(r => r.announcement_id as string))
-    const L = await readLists(known, startedAt, errors)
+    const L = await readLists(known, startedAt, errors, true)
     const rows: Mapped[] = L.rows.map(r => mapRow(r, L.today))
     const detail = await readDetails(L.rows, rows, startedAt, L.today)
 
@@ -204,17 +208,28 @@ async function collect() {
       if (error) gu.failed.push(`${id}: ${error.message}`)
       else gu.filled += data?.length ?? 0
     }
+    // 목록에서 사라진 들인 공고(조기 마감 · 내림) — 접수 끝(apply_end)이 오늘보다 앞이면 접수마감(SH sh-close-missing 과 같은 뜻 · 목록 오류 런은 건너뜀).
+    const closeGone = { closed: 0, failed: null as string | null }
+    if (!errors.length) {
+      const seen = rows.map(r => r.announcement_id)
+      let q = supabase.from('announcements').update({ status: '접수마감', updated_at: new Date().toISOString() })
+        .eq('source', 'GH').neq('status', '접수마감').lt('apply_end', L.today)
+      if (seen.length) q = q.not('announcement_id', 'in', `(${seen.join(',')})`)
+      const { data, error } = await q.select('id')
+      if (error) closeGone.failed = error.message
+      else closeGone.closed = data?.length ?? 0
+    }
     const result = {
       pages: L.pages, parsed: L.parsed, picked: rows.length, upserted,
       hidden: rows.filter(r => r.hidden_from_listing).length,
       visible: rows.filter(r => !r.hidden_from_listing).length,
       duration_ms: Date.now() - startedAt, errors,
     }
-    await logRun({ ...result, detail })
-    console.log(`[GH] ${JSON.stringify({ ...result, detail, gu })}`)
-    return { ...result, detail, gu }
+    await logRun({ mode: 'collect', ...result, detail: { ...detail, gu, closeGone } })
+    console.log(`[GH] ${JSON.stringify({ ...result, detail, gu, closeGone })}`)
+    return { ...result, detail, gu, closeGone }
   } catch (e) {
-    await logRun({ pages: null, parsed: null, picked: null, upserted: null, hidden: null, visible: null,
+    await logRun({ mode: 'collect', pages: null, parsed: null, picked: null, upserted: null, hidden: null, visible: null,
       duration_ms: Date.now() - startedAt, errors: [...errors, String(e)], detail: null })
     throw e
   }
