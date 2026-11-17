@@ -103,6 +103,29 @@ def redact_db_error(text):
     return text
 
 
+def _guard_message(txt):
+    try:
+        return json.loads(txt).get('message', '') or ''
+    except (ValueError, AttributeError):
+        return txt or ''
+
+
+def apply_guard_sample(txt):
+    """apply 가드 예외 메시지의 「ZIPFIT_APPLY_SAMPLE <json>」 → 표본 목록(없거나 못 읽으면 None)."""
+    m = re.search(r'ZIPFIT_APPLY_SAMPLE (\[.*\])', _guard_message(txt), re.S)
+    if not m:
+        return None
+    try:
+        return json.loads(m.group(1))
+    except ValueError:
+        return None
+
+
+def apply_guard_head(txt):
+    """적용 실패 원문에서 표본 꼬리를 뗀다(표본은 따로 한 줄로 싣는다)."""
+    return re.sub(r' ZIPFIT_APPLY_SAMPLE \[.*?\](?=\\n|\n|\"|$)', ' (표본은 아래 줄)', txt, flags=re.S)
+
+
 def read(sql):
     st, txt = query(sql, read_only=True)
     if st not in (200, 201):
@@ -696,10 +719,14 @@ def cmd_apply():
         fp0 = fingerprint()
         guard = f"""
 DO {dq(f'''
-declare n bigint;
+declare n bigint; smp jsonb;
 begin
   execute {dq('select count(*) from (' + inv + ') x', 'zz_inv')} into n;
-  if n > {inv_base} then raise exception 'ZIPFIT_APPLY_GUARD 불변식 {INV_NAME} 위반 % → %', {inv_base}, n; end if;
+  if n > {inv_base} then
+    -- 🔵 2026-11-17(우편함 「코드·운영 — 운영 장치 넷 …」 4 · #1078) — check 쪽과 같은 꼴로 어느 검사·어느 행인지(앞 3행)를 메시지에 싣는다.
+    execute {dq('select coalesce(jsonb_agg(to_jsonb(y)), ' + "'[]'::jsonb" + ') from (select * from (' + inv + ') x limit 3) y', 'zz_inv2')} into smp;
+    raise exception 'ZIPFIT_APPLY_GUARD 불변식 {INV_NAME} 위반 % → % ZIPFIT_APPLY_SAMPLE %', {inv_base}, n, smp::text;
+  end if;
 end
 ''', 'zz_g')};
 """
@@ -713,7 +740,11 @@ end
         st, txt = query(sql)
         if st not in (200, 201):
             ok = False
-            lines.append(f'- ❌ `{f["name"]}` 적용 실패(HTTP {st}) — 트랜잭션 전체가 롤백됐다: `{redact_db_error(txt)[:500]}`')
+            lines.append(f'- ❌ `{f["name"]}` 적용 실패(HTTP {st}) — 트랜잭션 전체가 롤백됐다: `{redact_db_error(apply_guard_head(txt))[:500]}`')
+            smp = apply_guard_sample(txt)
+            if smp is not None:
+                # check 쪽(「불변식 … 위반 a → b: `표본`」)과 같은 꼴 — 어느 검사·어느 행인지를 이슈 본문에서 바로 본다.
+                lines.append(f'- ❌ 불변식 {INV_NAME} 위반 표본(앞 3행): `{json.dumps(smp, ensure_ascii=False)[:400]}`')
             break
         fp1 = fingerprint()
         info = functions_info(sorted({s.split('(')[0] for s in list(f['functions']) + f['dropped']}))

@@ -1080,6 +1080,7 @@ try {
 
 // ㉞ LH 첨부 차단 감지(2026-11-10 · 우편함 「코드·운영 — LH 첨부 문지기 복원(멈춤 전 꼴 + 몰림 막기 + 차단 감지) …」 3) —
 //    lh_file_gate_done 이 결과가 차단 꼴(upstream_403 · upstream_429 · conn_error · html_response)인 허락 받기가 연속 lh_file_block_streak 번이면
+//    (2026-11-17 — conn_error·aborted 가 섞이면 서로 다른 파일 block_streak 개일 때만 · 마이그레이션 2026-11-17_02)
 //    그 자리에서 lh_file_mode = 'paused' 로 바꾸고 lh_file_block_at · lh_file_block_reason 을 남긴다. 그 표지가 서 있는 동안 ❌(안 멈춤 · gate.mjs HARD 밖 →
 //    health-ops-soft 이슈 — ⚠️ 는 이슈를 열지 않아서) · 다시 켜기는 사람(lh_file_mode = 'normal' · lh_file_block_at = null — 데이터 쓰기).
 //    값에 24시간 받기 수 · 차단 꼴 결과 수 · 받기 사이 간격(중앙 · 최소 — 몰림 막기 실측)을 함께 싣는다. 못 읽으면 ⚠️ 점검 불능.
