@@ -36,7 +36,7 @@ concurrency:
 
 jobs:
   visual:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # 2026-11-17 — ubuntu-latest 가 26.04 로 바뀌어 고정한 Playwright 1.55 가 의존성을 못 깔았다(#1088) · Playwright 판을 올릴 때 함께 푼다
     timeout-minutes: 20
     # 기준을 쓸 때(첫 기준 · update=true) 그 가지에 커밋한다 — 같은 저장소 가지만(포크 PR 의 토큰은 읽기만이라 커밋 단계에서 실패한다).
     permissions:

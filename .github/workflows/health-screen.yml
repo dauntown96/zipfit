@@ -61,7 +61,7 @@ concurrency:
 
 jobs:
   screen:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # 2026-11-17 — ubuntu-latest 가 26.04 로 바뀌어 고정한 Playwright 1.55 가 의존성을 못 깔았다(#1088) · Playwright 판을 올릴 때 함께 푼다
     env:
       # 브랜치 점검(site 입력)이면 기록·이슈·로그인 한 바퀴를 하지 않는다 — G1 화면 셈(ops_health_runs kind=screen ref=main)에 들어가지 않게.
       # PR 실행은 PR head 커밋을 ref 로 쓴다(입력이 없다).

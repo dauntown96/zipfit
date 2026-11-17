@@ -25,7 +25,7 @@ concurrency:
 jobs:
   contrast:
     name: 대비 비교
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # 2026-11-17 — ubuntu-latest 가 26.04 로 바뀌어 고정한 Playwright 1.55 가 의존성을 못 깔았다(#1088) · Playwright 판을 올릴 때 함께 푼다
     timeout-minutes: 20
     permissions:
       contents: read
