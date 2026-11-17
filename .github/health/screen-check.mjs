@@ -1,4 +1,5 @@
 // A. 화면 점검 — 배포본이 사실과 같은 말을 하는가. 읽기·알림만 한다.
+//   이 파일만 고친 PR 에도 PR 단계 화면 점검(screen)이 붙는다(health-screen.yml pull_request.paths · 2026-11-17).
 //   예외 하나(2026-10-18): 끝에 실행 요약을 public.ops_health_record(jsonb · kind=screen)로 DB 한 줄 남긴다(⑫ · 운영 점검과 같은 함수).
 // 출발점: claude.ai 가 쓰던 Playwright 두 벌(💡 「실사용 점검 회차 정례화」 · 2026-09-29) —
 //   ① 카드 문구 점검(공고 탭 전 쪽의 카드 요약 문구) ② 390px 화면 품질(깨진 칩 · 경로 한 줄 첫 날짜).

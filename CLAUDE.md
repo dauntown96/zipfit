@@ -165,8 +165,8 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 | 날짜 | 내용 |
 |---|---|
 | 2026-11-17 | **표시층 — 작은 판 3: 「꼭 볼 것」 첫 문장 중복·머리 잘림 · a11y 기준선** — 접힌 머리 = 분류 + 첫 문장 전체(88자 「…」 걷음) · 펼치면 머리 첫 문장 숨김(중복 162 → 0 · 잘림 50 → 0) · `l2_dup`에 그 꼴 더함 · 12월 새 요소 꼴 24 대비 최소 6.26 → 기준선 · `sw.js` v312 · PR 이 회차 |
+| 2026-11-17 | **코드·운영 — 2장(단지 잇기 둘째 키 + 자동 채움 · 마이홈 두 동작 걷기 · 화면 점검 paths)** — 세대 주소 도로명 키 NULL이면 `complex_geo.road_address`로 잇기(모의: 단지 붙은 행 7 → 18 · 세대 136 · 다른 시군구 0) · 새 EF `complex-geo-fill`(juso 순차 3초 · 대상 0이면 호출 0 · 여러 결과 = 단지명 → 건축HUB → 사람 판정 `complex_geo_attempts`) · cron 매시 34분 · `seoul-api` 마이홈 둘 걷고 `bldhub_title` · `screen-check.mjs` paths · PR 이 회차 |
 | 2026-11-17 | **표시층 — 3판: 지도가 complex_geo 좌표 먼저 · 평면도 묶음 회전 값(안 B)** — 좌표 있는 주소는 지오코딩 없이 그 좌표(고창무장 대략 원 → id 29 핀) · `announcement_extras.rotate_deg`(0/90/180/270) 칸 + 갤러리·크게 보기 회전 · 파주 산내2 같은 zip 8행 90 · 원본 그대로 · `sw.js` v311 · PR 이 회차 |
-| 2026-11-17 | **코드·운영 — 1장(오탈자 좌표 3 · 점검 SQL 창 묶음 · Playwright 판)** — `complex_geo` 30~32(원문 오탈자 셋 · 세대 주소 그대로) · 점검 SQL 창 묶음 = 화면 `zfSameWave`(세 날 화면 = SQL · 바뀐 판정 0) · 점검 셋 `ubuntu-latest` + Playwright 1.64.1 · Visual 기준 다시 씀 · health-screen `l2_dup` · GH_823 후보 0 확인 · PR 이 회차 |
 ## 🚫 코딩 원칙
 
 1. **단일 파일 유지** — `index.html` 하나. JS/CSS 분리 금지
