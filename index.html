@@ -4357,19 +4357,25 @@ function applyNoticeFiltersAndRender(keepPage){
         const sa = isClosingSoon(zfWithSoonestEnd(a)) ? 0 : 1, sb = isClosingSoon(zfWithSoonestEnd(b)) ? 0 : 1;
         if(sa !== sb) return sa - sb;
       }
-      return nullLast(a,b,n=>zfDeadline(n),false);
+      // 🔵 2026-11-17(우편함 「표시층 — 작은 판」 1 · 다운님 실사용 11-16 3) — 지난 마감 묶음은 최근 마감부터(내림) — 「마감 포함」에서 1년 전 공고가 먼저 서지 않게.
+      return nullLast(a,b,n=>zfDeadline(n),ga === 1);
     }
     // 🔴 접수 시작순도 같은 3분기를 탄다(2026-09-16) — 종전에는 맨 위가 작년 시작일 공고였다
     //    (apply_start 가 있는 594건 중 518건이 이미 지난 날짜, 최솟값 2025-07-28).
     if(sortVal==='start-asc'){
       const ga = applyDateGroup(a,'신청시작일','apply_start'), gb = applyDateGroup(b,'신청시작일','apply_start');
       if(ga !== gb) return ga - gb;
-      return nullLast(a,b,n=>n['apply_start'],false);
+      return nullLast(a,b,n=>n['apply_start'],ga === 1);   // 🔵 2026-11-17 — 이미 시작한 묶음은 최근 시작부터(내림)
     }
     // 🔴 네 수치 정렬은 zfNumOrNull 한 벌을 쓴다 — 0 은 값이고 빈 값만 모름이다(2026-09-16).
     if(sortVal==='units-desc')    return nullLast(a,b,n=>zfNumOrNull(n['total_units']),true);
     // 🔵 2026-11-04(우편함 「표시층 — 실사용 7회차 고침」 1 · 기준 위반) — 보증금·월임대료는 카드 머리 가격 줄과 같은 재료(get_announcement_price_summary 최솟값)로 줄 세운다.
     //    종전 공고 칸 deposit_min·rent_min 은 열린 57 중 4만 차 있어 순서가 틀렸다(강릉 매입 58만이 영등포 4,650만 아래). 가격 없는 카드는 뒤(종전 그대로).
+    // 🔵 2026-11-17(우편함 「표시층 — 작은 판」 1) — 세 값 정렬은 열린 묶음 → 마감 묶음(isHiddenAsClosed · 「마감」 칩과 같은 술어) · 묶음 안은 값 순.
+    if(sortVal==='deposit-asc' || sortVal==='rent-asc' || sortVal==='area-desc'){
+      const ca = isHiddenAsClosed(a) ? 1 : 0, cb = isHiddenAsClosed(b) ? 1 : 0;
+      if(ca !== cb) return ca - cb;
+    }
     if(sortVal==='deposit-asc')   return nullLast(a,b,n=>zfSortPriceOf(n,'deposit_min'),false);
     if(sortVal==='rent-asc')      return nullLast(a,b,n=>zfSortPriceOf(n,'rent_min'),false);
     if(sortVal==='area-desc')     return nullLast(a,b,n=>zfSortPriceOf(n,'area_max'),true);   // 🔵 2026-11-05 — 카드 머리 「전용」 재료(가격 요약 area_max · 목록 RPC area_max 는 분석분이 빈다)
@@ -10334,9 +10340,12 @@ function zfSameDaySeries(annId){
   const key = zfSeriesKey(me['공고명']);
   if(key.replace(/\s/g, '').length < 8) return [];
   const myDk = zfDedupKey(me['공고명']);
+  const mySido = zfCanonSido(me['sido_nm'] || me['지역']);
   const seen = new Set([myDk]);
   return (noticeData || []).filter(n => {
     if(n['announcement_date'] !== me['announcement_date'] || (n['공급유형'] || '') !== (me['공급유형'] || '')) return false;
+    // 🔵 2026-11-17(우편함 「표시층 — 작은 판」 2 · 다운님 실사용 11-16 9) — 같은 시·도만(고성군 공고에 서울·전남 공고가 섞였다) · 좁혀 0건이면 줄 없음(호출부가 빈 배열을 그리지 않는다).
+    if(zfCanonSido(n['sido_nm'] || n['지역']) !== mySido) return false;
     if(typeof isHiddenAsClosed === 'function' && isHiddenAsClosed(n)) return false;
     if(zfSeriesKey(n['공고명']) !== key) return false;
     const dk = zfDedupKey(n['공고명']);
@@ -10765,6 +10774,21 @@ function zfUnitTypeKey(u, head){
   const h = head || (u && u.unit_type);
   return (u && h) ? zfBuildingKeyOf(u) + '::' + h : '';
 }
+// 🔵 2026-11-17(우편함 「표시층 — 작은 판」 4 · 다운님 실사용 11-16 5) — 묶음 머리 **표시**만: 앞머리가 그 행 단지명(공백 무시)과 같으면 걷는다
+//    (단지 블록 안에서 「부산명지 39」 → 「39」). 저장 값·그림 키(zfUnitTypeKey)는 g.group 그대로 · 걷고 남는 것이 없으면 그대로.
+function zfUgHeadLabel(group, bname){
+  const g = String(group || ''), b = String(bname || '').replace(/\s+/g, '');
+  if(!b) return g;
+  let i = 0, j = 0;
+  while(i < g.length && j < b.length){
+    if(/\s/.test(g[i])){ i++; continue; }
+    if(g[i] !== b[j]) return g;
+    i++; j++;
+  }
+  if(j < b.length) return g;
+  const rest = g.slice(i).trim();
+  return rest || g;
+}
 // 칩 자리 — 렌더 함수는 자리만 둔다. 채우는 것은 zfFillUnitChips 다(첨부가 늦게 와도 그 자리에 붙는다).
 function zfUnitChipSlot(key){
   return key ? `<span class="hu-x-slot" data-xkey="${zfAttr(key)}"></span>` : '';
@@ -10797,6 +10821,9 @@ function zfFillUnitChips(id){
     let gid = gids.length === 1 ? gids[0] : (det.dataset.zfHuxGid || '');
     if(!gid){ gid = 'eg' + (extrasGroupSeq++); det.dataset.zfHuxGid = gid; }
     extrasGroupsRegistry[gid] = items;
+    // 🔵 2026-11-17(우편함 「표시층 — 작은 판」 5 · 다운님 실사용 11-16 2) — 그림 있는 안 형이 하나뿐이면 머리에만(같은 그림이 두 자리에 서지 않게 —
+    //    …21062 「55」 머리 ↔ 「55A」 행) · 둘 이상이면 종전 그대로(형마다 행 칩 · 머리 합계).
+    if(gids.length === 1) det.querySelectorAll(':scope > .hu-ug-list .hu-x-slot').forEach(s => { s.innerHTML = ''; });
     head.innerHTML = `<button type="button" class="chip hu-x-chip" title="이 묶음 주택형의 사진·평면도 ${items.length}건" onclick="event.preventDefault();event.stopPropagation();openExtrasViewer('${gid}',0)">📷 ${items.length}</button>`;
   });
   if(typeof zf3On === 'function' && zf3On()) zf3HuPhotoBar(id);
@@ -10861,7 +10888,7 @@ function zfPruneCardCaches(){
 //    있을 때만 뺀다(huCompareNeedsName). 원문 값·중복제거 키·화면 글자는 그대로다.
 function huCompareKey(u, withName){
   // 🔵 2026-11-02 — 「(복층)」 표기 유무도 같게 본다(화성동탄 A4-1 …20958 10월 「41A/41B(복층) …」 ↔ 7월 「41A/41B …」 · 금액 같음 · 한 공고 안에 두 표기가 같이 오는 묶음 0 실측).
-  const ut = u.unit_type == null ? u.unit_type : String(u.unit_type).replace(/\(복층\)/g, '').replace(/\s*형$/, '');
+  const ut = u.unit_type == null ? u.unit_type : String(u.unit_type).replace(/\(복층\)/g, '').replace(/\s*형$/, '').replace(/\s*㎡$/, '');   // 🔵 2026-11-17(작은 판 3) — 끝 「㎡」도 같은 자리(「39㎡」 ↔ 「39」)
   return (withName === false ? [u.address, u.floor_info, ut, u.area_sqm]
                              : [u.building_name, u.address, u.floor_info, ut, u.area_sqm]).join('|');
 }
@@ -11650,7 +11677,7 @@ function renderHousingUnitGroup(g){
     </div>`;
   }).join('');
   return `<details class="hu-ug">
-    <summary><span class="hu-ug-name">${escapeHtml(g.group)}</span><span class="hu-ug-meta"${headPick ? ` title="${zfAttr('원문: ' + headPick.texts.join(' / '))}"` : ''}>${escapeHtml(headAreas + headCount)}</span>${headWait ? zfWaitReserveHtml(g.units) : ''}${zfUnitChipSlot(zfUnitTypeKey(g.units[0], g.group))}</summary>
+    <summary><span class="hu-ug-name">${escapeHtml(zfUgHeadLabel(g.group, g.units[0] && g.units[0].building_name))}</span><span class="hu-ug-meta"${headPick ? ` title="${zfAttr('원문: ' + headPick.texts.join(' / '))}"` : ''}>${escapeHtml(headAreas + headCount)}</span>${headWait ? zfWaitReserveHtml(g.units) : ''}${zfUnitChipSlot(zfUnitTypeKey(g.units[0], g.group))}</summary>
     <div class="hu-ug-list">${body}</div>
   </details>`;
 }
