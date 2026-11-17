@@ -208,6 +208,7 @@ const EXPECTED_JOBS = [
   'zipfit-purge-lh-file-fetch-log', // 2026-11-09 LH 첨부 문지기 기록 90일 보관(마이그레이션 2026-11-09_01)
   'zipfit-complex-link-pending', // 2026-11-12 새 분석 공고 단지 잇기 안전망(마이그레이션 2026-11-12_04)
   'zipfit-gh-observe',             // 2026-11-03 GH 공고 목록 관찰(마이그레이션 2026-11-03_04) — 2026-11-09 사본 재추출 때 빠진 것을 더함
+  'zipfit-collect-gh-announcements', // 2026-11-17 GH 들이기 — 마감일 있는 열린 GH 공고 쓰기(마이그레이션 2026-11-17_01 · gh_collect)
   'zipfit-purge-stale-sessions',   // 로그인 세션 30일 정리(jobid 57) — 2026-11-09 사본 재추출 때 빠진 것을 더함
 ]
 
@@ -297,6 +298,10 @@ try {
                             from gh_collection_run_log order by id desc limit 1),
                  'runs_24h', (select count(*) from gh_collection_run_log where run_at > now() - interval '24 hours'),
                  'rows', (select count(*) from announcements where source = 'GH'),
+                 -- 🔵 2026-11-17(우편함 「코드·운영 — GH 들이기 …」 6) — 쓰기 런(zipfit-collect-gh-announcements) 최근 행 · 그 행 오류 수 · 들인 행 수.
+                 'collect', (select json_build_object('age_min', extract(epoch from now() - run_at)/60, 'errors', jsonb_array_length(errors),
+                                                      'upserted', upserted, 'picked', picked)
+                               from gh_collection_run_log where mode = 'collect' order by id desc limit 1),
                  'job', (select count(*) from cron.job where jobname ~ '(^|-)gh-'))),
       'ops_dispatch', (select json_build_object('age_min', extract(epoch from now() - l.at)/60, 'status', coalesce(l.status_code, r.status_code), 'pending', l.status_note is null and r.id is null,
                               'err', left(coalesce(l.error_msg, r.error_msg, case when r.status_code >= 300 then r.content end), 200))
@@ -470,7 +475,13 @@ try {
     const ok = g.last_run_age_min != null && g.last_run_age_min <= 960 && l.errors === 0
     add('gh_runs', 'GH(경기주택도시공사) 관찰 — 최근 런 · 목록 오류 · 들인 공고 행', ok ? 'pass' : 'warn',
       `최근 런 ${g.last_run_age_min == null ? '없음' : Math.round(g.last_run_age_min) + '분 전'}(${l.mode ?? '?'}) · 목록 오류 ${l.errors ?? '?'} · 열린 ${l.open ?? '?'} · 새로 ${l.appeared ?? '?'} · 사라짐 ${l.disappeared ?? '?'} · 24시간 런 ${g.runs_24h ?? '?'} · 공고 행 ${g.rows ?? '?'} · cron ${g.job ?? '?'}`,
-      '최근 런 ≤ 960분(하루 4회 09·12·15·18시 31분 KST) ∧ 목록 오류 0 — 아니면 ⚠️(카드 0 · 2-0 은 관찰만 · 공고 행 0)')
+      '최근 런 ≤ 960분(하루 4회 09·12·15·18시 31분 KST) ∧ 목록 오류 0 — 아니면 ⚠️(관찰 런 · 2026-11-17 뒤 쓰기는 아래 gh_collect)')
+    // 🔵 2026-11-17(「GH 들이기」 6) — 쓰기 런 감시(SH sh_fresh 꼴): 최근 쓰기 런 ≤ 960분 ∧ 그 런 오류 0(목록 「행 0(꼴 바뀜?)」 · upsert 실패 포함).
+    //   쓰기 런이 아직 없으면(병합 뒤 첫 런 전) ⚠️ · 멈춤 아님(gate HARD 밖 → health-ops-soft).
+    const c = g.collect
+    add('gh_collect', 'GH 수집(쓰기) 마지막 런 경과(분) · 오류', !c ? 'warn' : (c.age_min <= 960 && c.errors === 0 ? 'pass' : 'fail'),
+      !c ? '쓰기 런 기록 없음(첫 런 전)' : `${Math.round(c.age_min)}분 전 · 오류 ${c.errors} · 고른 ${c.picked ?? '?'} · 쓴 ${c.upserted ?? '?'} · 공고 행 ${g.rows ?? '?'}`,
+      '≤ 960분(하루 4회 09·12·15·18시 38분 KST — 18:38 → 다음날 09:38 = 900분 · 여유 60분) ∧ 오류 0')
   }
   // ⑧ 공고 분석 루틴 발송기(2026-10-01) — 스위치가 켜져 있을 때만 판정한다(꺼진 동안 대기는 정상).
   {
