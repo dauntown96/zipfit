@@ -10136,6 +10136,7 @@ function toggleBlockGroup(id, idx){
   bodyEl.style.display = isOpen ? 'none' : 'block';
   if(headEl) headEl.classList.toggle('hu-group-active', !isOpen);
   if(isOpen) return;
+  zfBlkActive[id] = id + '-blk' + idx;   // 🔵 작은 판 2 5 — 마지막으로 연 블록(늦게 온 다른 블록 세대 지도는 zfBlkMapOk 가 막는다)
   // 블록 자신의 precise_address를 1순위 지도 소스로 사용한다 — 세대정보(housing_units)의
   // address가 비어 있어도 블록을 열면 항상 그 블록 위치로 지도가 이동하게 하는 방어선.
   // 세대정보에 실제 주소가 있으면 뒤이어 loadHousingUnits가 더 정밀한 좌표로 갱신한다.
@@ -11280,7 +11281,7 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
       //    대표 행의 시군구 하나는 그 공고의 위치가 아니다(사하구 공고가 북구 중심에 찍혔다 · 우편함 「지도·일정·이전 회차 조사」 1).
       const multi = (fb && fb.level === 'sigungu') ? zfPlaceNames(zfCardRegionNames(mid)) : [];
       if(multi.length >= 2) closeMapAsMultiRegion(mid, multi);
-      else if(fb) initMapForHouse(fb, mid);
+      else if(fb && zfBlkMapOk(id)) initMapForHouse(fb, mid);
       else mapFail(mid, '위치 정보가 없어요', '세대정보도 폴백 주소도 없다(정밀주소·시군구 모두 비어 있음)');
       // 🔴 한 칸 카드 상세 경로에서만 안내를 넣는다 — 블록 본문에는 이미 .blk-empty가 있다(중복 방지).
       if(!huFetchFailed && !huIsBlock){
@@ -11353,7 +11354,7 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
     console.error('ZipFit 세대정보 로드 실패:', err);
     const fb = huRegionFallback[id];
     const mid = huMapTargetId[id] || id;
-    if(fb) initMapForHouse(fb, mid);
+    if(fb && zfBlkMapOk(id)) initMapForHouse(fb, mid);
     else mapFail(mid, '위치 정보를 불러오지 못했어요', '세대정보 조회 실패 + 폴백 주소 없음: ' + err);
   });
 }
@@ -11386,6 +11387,10 @@ function zfRentLowHeadHtml(id, g){
   }
   return '';
 }
+// 🔵 2026-11-17(우편함 「표시층 — 작은 판 2」 5 덧붙임) — 블록(단지) 세대 목록이 늦게 와서 부르는 지도는 그 블록이 지금 마지막으로 연 블록일 때만.
+//    앞서 연 블록의 세대 조회가 뒤늦게 끝나 지도를 그 블록으로 되돌리던 자리(…21089 · …21044 빠르게 번갈아 열기).
+const zfBlkActive = {};   // 카드 id → 마지막으로 연 블록 세대 목록 id(`${id}-blk${idx}`)
+function zfBlkMapOk(id){ const m = huMapTargetId[id]; return !m || m === id || !zfBlkActive[m] || zfBlkActive[m] === id; }
 function renderHousingGroupRows(id, visibleCount, mapOnly){
   const groups = huGroupsCache[id];
   const listEl = document.getElementById('hu-list-'+id);
@@ -11398,7 +11403,7 @@ function renderHousingGroupRows(id, visibleCount, mapOnly){
   if(mapOnly){
     const g0 = groups[0];
     const a0 = g0 && (g0.address || g0.building_name);
-    if(a0) initMapForHouse({ addr: a0, name: g0.building_name || '' }, mapId);
+    if(a0 && zfBlkMapOk(id)) initMapForHouse({ addr: a0, name: g0.building_name || '' }, mapId);
     else mapFail(mapId, '위치 정보가 없어요', '지난 회차 블록의 첫 건물에 주소·단지명이 없다');
     zfFillUnitChips(id);
     return;
@@ -11416,7 +11421,7 @@ function renderHousingGroupRows(id, visibleCount, mapOnly){
     const addr = g.address || g.building_name;
     if(addr){
       setActiveHousingGroup(id, 0);
-      initMapForHouse({ addr, name: g.building_name || '' }, mapId);
+      if(zfBlkMapOk(id)) initMapForHouse({ addr, name: g.building_name || '' }, mapId);
     } else {
       mapFail(mapId, '위치 정보가 없어요', '단일 건물에 주소·단지명이 없다');
     }
@@ -11456,7 +11461,7 @@ function renderHousingGroupRows(id, visibleCount, mapOnly){
     const addr = first.address || first.building_name;
     if(addr){
       setActiveHousingGroup(id, 0);
-      initMapForHouse({ addr, name: first.building_name || '' }, mapId);
+      if(zfBlkMapOk(id)) initMapForHouse({ addr, name: first.building_name || '' }, mapId);
     } else {
       mapFail(mapId, '위치 정보가 없어요', '첫 건물에 주소·단지명이 없다');
     }
@@ -12092,6 +12097,7 @@ function closeMapAsMultiRegion(id, names){
     + '주소는 아래 「<span class="zf-ai-lbl">AI 정리 · </span>원문 보기」의 공고 원문에서 확인하세요.</span></p>');
 }
 
+const zfMapSeq = {};   // 상자(카드 id)마다 지도 호출 차례 — initMapForHouse 가 마지막 호출만 그린다
 function initMapForHouse(h,id){
   // 🔴 전세임대는 **주소 유무와 무관하게** 닫는다 — 판정이 주소에 매여 있으면 시군구가 들어오는
   //    순간 지도와 주변시설이 뜨는데, 그 핀이 가리킬 단지가 애초에 없다(2026-09-16).
@@ -12103,7 +12109,12 @@ function initMapForHouse(h,id){
   //    ① 호출자가 넘긴 주소 자체가 시도+시군구뿐일 때(huRegionFallback)
   //    ② 전체주소·도로명 지오코딩이 다 실패해 tryLevel3로 떨어졌을 때
   const mapOwnerAnn = zfCardAnn(id);
+  // 🔵 2026-11-17(우편함 「표시층 — 작은 판 2」 5 · 덧붙임 — 단지 아코디언을 빠르게 번갈아 눌러도) — 같은 상자의 지도 호출은 마지막 것만 그린다.
+  //    앞 호출의 지오코딩이 늦게 돌아오면 버린다(핀 · 이름표가 마지막에 연 단지로 남는다 — 종전엔 늦게 온 응답이 덮었다).
+  const mapSeqN = (zfMapSeq[id] = (zfMapSeq[id] || 0) + 1);
+  const mapStale = () => mapSeqN !== zfMapSeq[id];
   const renderMap = (result, approx) => {
+    if(mapStale()) return;
     if(!zfStillOurs(id, mapOwnerAnn)){ zfMapWarn(id, '좌표가 돌아왔을 때 이 자리는 다른 공고였다'); return; }
     const mapEl = document.getElementById('map-'+id);
     if(!mapEl){ zfMapWarn(id, '좌표는 받았으나 지도 상자가 사라졌다(카드가 다시 그려짐)'); return; }
@@ -12163,7 +12174,7 @@ function initMapForHouse(h,id){
       //    종전 `if(!huMapState[id])` 는 이전 카드가 남긴 상태에도 참이 되어, 이 상자에는 지도가
       //    없는데 문구를 덮지 않고 **자리표시자를 그대로 남겼다**(실측: 지오코딩 전패 시 재현).
       if(!fallback){
-        mapFail(id, '주소 위치를 찾을 수 없어요', '지오코딩할 주소가 비어 있다');
+        mapStale() || mapFail(id, '주소 위치를 찾을 수 없어요', '지오코딩할 주소가 비어 있다');
         return;
       }
       geocoder.addressSearch(fallback, (r3, s3) => {
@@ -12171,7 +12182,7 @@ function initMapForHouse(h,id){
         if(s3 === kakao.maps.services.Status.OK && r3.length){
           renderMap(r3, 'notfound');   // Lv3 = 시군구 중심. 추정이다 — 주소는 있는데 지도 서비스가 못 찾았다.
         } else {
-          mapFail(id, '주소 위치를 찾을 수 없어요', 'Lv3(시군구) 지오코딩 실패: ' + fallback + ' → ' + s3);
+          mapStale() || mapFail(id, '주소 위치를 찾을 수 없어요', 'Lv3(시군구) 지오코딩 실패: ' + fallback + ' → ' + s3);
         }
       });
     };
@@ -12239,7 +12250,7 @@ function initMapForHouse(h,id){
   }).catch(err=>{
     // ⚠️ 여기는 SDK 로드 실패만이 아니라 **위 then 본문에서 던진 것**도 잡는다(주변시설 탭 포함).
     //    그래서 지도가 이미 그려진 뒤에 걸리면 멀쩡한 지도를 문구로 덮는다 — 회신에 적었다.
-    mapFail(id, '지도를 불러올 수 없어요', '지도 경로에서 예외: ' + err);
+    mapStale() || mapFail(id, '지도를 불러올 수 없어요', '지도 경로에서 예외: ' + err);
     console.error('ZipFit 지도 로드 실패:', err);
   });
 }
@@ -14353,11 +14364,23 @@ function zf3DecorateIn(list, rowsMap, isMatch){
       const nl = zfPostNoticeList(n);
       const varied = nl && nl.length > 1 && !nl.every(x => x.start === nl[0].start && x.end === nl[0].end && x.state === nl[0].state);
       const route = card.querySelector('.zf3-route');
-      if(varied && route){
+      // 🔵 2026-11-17(우편함 「표시층 — 작은 판 2」 덧붙임 7 · 다운님 결정 15:16 안 C) — 공고문 목록 상자·갈래 노선을 걷고 다단지 카드의 경로 한 줄 꼴로:
+      //    「📅 접수일이 나뉘어 있어요 · <공고문 이름> 날짜 · …」(같은 기간 이름은 「, 」로 · 새 낱말 0 · 이름은 상자 글자 그대로). 노선 그림(카드 전체)은 그대로 둔다.
+      //    자리 = 경로 한 줄 칸(.zf-route-slot — 같은 꼴 · 같은 자리). 숨긴 상자(zf3-off)는 점검 「공고문 자리 ↔ DB」의 재료로 남는다.
+      const rslot = card.querySelector('.zf-route-slot');
+      if(varied && rslot){
         card.dataset.zf3Branch = '1';
-        const ann = zf3Real(zfNoticeDate(n) || n['announcement_date']);
-        route.innerHTML = `<p class="zf3-bhead">📑 공고문 ${nl.length}개 · 공고문마다 접수일이 달라요</p>`
-          + nl.map(x => `<div class="zf3-branch"><p class="zf3-bn"><span title="${zfAttr(x.title)}">${escapeHtml(x.name || x.title)}</span>${zfNoticeStateBadge(x.state, x.end, x.hmPassed, x.win2)}</p>${zf3LineHTML([{ k: '공고', d: ann }, { k: '접수', d: zf3Real(x.start), u: '미상' }, { k: '마감', d: zf3Real(x.end), u: '미상' }], x.name || x.title)}</div>`).join('');
+        const sp = [];
+        nl.forEach(x => { const t = zfSpanText(x.start, x.end); const o = sp.find(q => q.t === t); if(o) o.xs.push(x); else sp.push({ t, xs: [x] }); });
+        const nm = x => `<span title="${zfAttr(x.title)}">${escapeHtml(x.name || x.title)}</span>`;
+        const full = '접수일이 나뉘어 있어요 · ' + sp.map(q => `${q.xs.map(x => x.name || x.title).join(', ')} ${q.t}`.trim()).join(' · ');
+        const html = `<p class="zf-route-line zf-nt-route" data-route-kind="공고문" title="${zfAttr(full)}" onclick="event.stopPropagation();this.classList.toggle('open')"><span class="zf-route-text">📅 접수일이 나뉘어 있어요 · `
+          + sp.map(q => `${q.xs.map(nm).join(', ')} ${escapeHtml(q.t)}`.trim()).join(' · ') + `</span><span class="zf-route-more" aria-hidden="true"></span></p>`;
+        const keep = rslot.querySelector('.zf-route-line:not(.zf-nt-route):not([data-route-kind="②-가"])');   // 같은 뜻(②-가)은 두 번 말하지 않는다 · 다른 줄(순위·현장)은 아래에 그대로
+        rslot.innerHTML = html + (keep ? keep.outerHTML : '');
+        rslot.style.display = '';
+        rslot.dataset.filled = '1';
+        if(typeof zfMarkRouteFits === 'function') zfMarkRouteFits(rslot.firstElementChild);
         slot.classList.add('zf3-off');
       }
     }

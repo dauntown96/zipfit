@@ -220,7 +220,16 @@ try {
           const line = nm.closest('.zf-nt-line') || slot
           const sp = line.querySelector('.zf-nt-span'), st = line.querySelector('.zf-nt-state')
           let state = st ? (st.innerText || st.textContent).trim() : '(없음)'
-          if (br) { const b = br.find(x => x[0] === nm.getAttribute('title')); if (!b) state = '(갈래 없음)'; else if (b[1] !== state) state = `(갈래 상태 ${b[1]} ≠ ${state})` }
+          // 🔵 2026-11-17(우편함 「표시층 — 작은 판 2」 덧붙임 7 · 원칙 33) — 갈래 노선 대신 경로 한 줄(.zf-nt-route)이면 그 줄에 같은 공고문(title)과 같은 기간 글자가 있어야 한다.
+          const ntl = card && card.querySelector('.zf-nt-route')
+          if (ntl) {
+            const t = nm.getAttribute('title'), hit = [...ntl.querySelectorAll('span[title]')].find(s => s.getAttribute('title') === t)
+            const spx = sp ? (sp.innerText || sp.textContent).replace(/^접수\s*/, '').trim() : ''
+            const seg = hit ? (ntl.textContent || '').split(' · ').find(g => g.split(', ').some(x => x.trim().startsWith(hit.textContent))) || '' : ''
+            if (!hit) state = '(한 줄 없음)'
+            else if (spx && !seg.trim().endsWith(' ' + spx)) state = `(한 줄 기간 「${seg.trim()}」 ≠ ${spx})`
+          }
+          else if (br) { const b = br.find(x => x[0] === nm.getAttribute('title')); if (!b) state = '(갈래 없음)'; else if (b[1] !== state) state = `(갈래 상태 ${b[1]} ≠ ${state})` }
           nts.push([slot.getAttribute('data-notices-for'), nm.getAttribute('title'),
             sp ? (sp.innerText || sp.textContent).replace(/^접수\s*/, '').trim() : '(없음)', state, !!(st && st.dataset.zfHm === '1'), !!(st && st.dataset.zfWin2 === '1')])
         }
