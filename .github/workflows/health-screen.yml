@@ -173,7 +173,8 @@ jobs:
           # 🔴 GitHub 기본 셸은 bash -e 다 — 로그인 스크립트가 실패(exit 1)해도 끝까지 받아 다음 단계에 넘긴다(2026-11-02 run 41408017907).
           set +e
           set -uo pipefail
-          out=$(timeout 300 node scripts/login-walk.mjs --persona P2 --save 2>/dev/null | tail -1)
+          # 2026-11-17(「운영 장치 넷」 3) — 300 → 420초: test-login 링크·정리 기다림이 각각 30 → 75초(pg_net 대기열 늦음)라 그만큼 더 둔다.
+          out=$(timeout 420 node scripts/login-walk.mjs --persona P2 --save 2>/dev/null | tail -1)
           code=$?
           printf '%s' "$out" > login-walk.json
           echo "ran=1" >> "$GITHUB_OUTPUT"
