@@ -256,6 +256,12 @@
      "ratio": null,
      "bg": null,
      "why": "pseudoContent"
+    },
+    "span|#3d424a": {
+     "nodes": 2,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
     }
    }
   },
@@ -699,6 +705,12 @@
      "ratio": null,
      "bg": null,
      "why": "pseudoContent"
+    },
+    "span|#3d424a": {
+     "nodes": 2,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
     }
    }
   },
@@ -917,6 +929,12 @@
     },
     "span|#15171b": {
      "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span|#3d424a": {
+     "nodes": 2,
      "ratio": null,
      "bg": null,
      "why": "pseudoContent"
@@ -1147,6 +1165,24 @@
      "ratio": null,
      "bg": null,
      "why": "pseudoContent"
+    },
+    "div.zf-rent-line|#ecedef": {
+     "nodes": 2,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "div|#ecedef": {
+     "nodes": 2,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span|#c5c9d0": {
+     "nodes": 2,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
     }
    }
   },
@@ -1332,9 +1368,16 @@
      "ratio": null,
      "bg": null,
      "why": "pseudoContent"
+    },
+    "small|#3d424a": {
+     "nodes": 2,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
     }
    }
   }
  },
- "_note": "2026-11-12 — claude.ai 판정(#989 세 갈래 실제 대비 5.53·15.29·10.78)으로 --write-baseline 뒤 옛 기준선 갈래를 합쳤다(그날 첫 카드에 따라 갈래가 흔들려, 새로 잰 것만 두면 옛 갈래가 다시 「회귀」로 걸린다). · 2026-11-16 다시 씀(표시층 「12월 재편 A·B 새 시안」 0장 · claude.ai 승인): 위반 규칙·새 대비 미완 갈래는 그날 배포본(v304) 측정 · 그날 카드에 안 나타난 종전 대비 미완 갈래(62)는 상태별로 남김(다시 나타날 때 「아는 요소에 새 글자색」 거짓 실패를 막으려고)"
+ "_note": "2026-11-12 — claude.ai 판정(#989 세 갈래 실제 대비 5.53·15.29·10.78)으로 --write-baseline 뒤 옛 기준선 갈래를 합쳤다(그날 첫 카드에 따라 갈래가 흔들려, 새로 잰 것만 두면 옛 갈래가 다시 「회귀」로 걸린다). · 2026-11-16 다시 씀(표시층 「12월 재편 A·B 새 시안」 0장 · claude.ai 승인): 위반 규칙·새 대비 미완 갈래는 그날 배포본(v304) 측정 · 그날 카드에 안 나타난 종전 대비 미완 갈래(62)는 상태별로 남김(다시 나타날 때 「아는 요소에 새 글자색」 거짓 실패를 막으려고)",
+ "_note_2026_11_17": "우편함 「표시층 — 12월 재편 A·B 2차 시안」 0장 · #1054 — 갈래 7 더함(모두 pseudoContent · 페이지에서 잰 대비 10.11~14.23 ≥ 4.5): span|#3d424a(.zf3-bn 경로 가지 이름 --ink-2 · 영암 카드) ×3 상태 · 어두움 div.zf-rent-line|#ecedef · div|#ecedef(요약 가격 줄) · span|#c5c9d0(.zf3-bn 어두움) · match small|#3d424a(.zf3-wsw 「끝남」)"
 }
