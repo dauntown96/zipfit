@@ -17,9 +17,9 @@ on:
   workflow_dispatch:
     inputs:
       simulate:
-        description: '알림 경로 시험 — fail 이면 안 멈추는 실패 점검 하나를(health-ops-soft) · fail_hard 면 멈추는 실패 점검 하나를(health-ops) 일부러 더한다 · gap 이면 직전 점검 뒤 경과에 180분을 더한다 · runner 면 DB 점검을 처음에 끊는다(점검 불능 — health-ops-blind) · sec 면 보안 권고 허용 목록에서 한 줄을 뺀다(⚠️ 시험) · notify 면 제목 「시험 — 알림 확인」 이슈를 연다(휴대폰 알림 시험) · dispatch_bad 면 「24시간 안 204 아닌 발송」에 가짜 한 줄을 더한다(⚠️ 시험)'
+        description: '알림 경로 시험 — fail 이면 안 멈추는 실패 점검 하나를(health-ops-soft) · fail_hard 면 멈추는 실패 점검 하나를(health-ops) 일부러 더한다 · gap 이면 직전 점검 뒤 경과에 180분을 더한다 · runner 면 DB 점검을 처음에 끊는다(점검 불능 — health-ops-blind) · sec 면 보안 권고 허용 목록에서 한 줄을 뺀다(⚠️ 시험) · notify 면 제목 「시험 — 알림 확인」 이슈를 연다(휴대폰 알림 시험) · dispatch_bad 면 「24시간 안 204 아닌 발송」에 가짜 한 줄을 더한다(⚠️ 시험) · rent5 면 「월 = 보증금 × 5%」 점검이 닫힌 공고를 열린 것으로 친다(걸린 행이 0 이면 가짜 한 줄 — ⚠️ 시험 · 안 멈춤이라 이슈는 열지 않는다)'
         type: choice
-        options: [none, fail, fail_hard, gap, runner, sec, notify, dispatch_bad]
+        options: [none, fail, fail_hard, gap, runner, sec, notify, dispatch_bad, rent5]
         default: none
 
 permissions:

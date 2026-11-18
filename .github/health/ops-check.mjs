@@ -1037,6 +1037,8 @@ try {
       coalesce((select string_agg(s.aid || '(' || (select count(*) from t where t.aid = s.aid) || ')', ', ' order by s.aid) from s where s.op), '') open_ids,
       coalesce((select string_agg(s.aid || '(' || (select count(*) from t where t.aid = s.aid) || ')', ', ' order by s.aid) from s where not s.op), '') closed_ids`)
   const sim = process.env.SIMULATE === 'rent5'
+  // 🔵 2026-11-18(우편함 「코드·운영 — 8장」 ③) — 걸린 행이 0 이어도 시험이 보이게 가짜 한 줄(「시험(가짜 1행)」)을 더한다(dispatch_bad 와 같은 꼴).
+  if (sim && x.n === 0) { x.n = 1; x.open_ids = '시험(가짜 1행)' }
   const openIds = sim ? [x.open_ids, x.closed_ids].filter(Boolean).join(', ') : x.open_ids
   const closedIds = sim ? '' : x.closed_ids
   add('unit_rent_eq_deposit5', '세대 행 월임대료 = 보증금 × 5%(계약금이 월 칸에 든 꼴)', openIds ? 'warn' : (x.n > 0 ? 'info' : 'pass'),
