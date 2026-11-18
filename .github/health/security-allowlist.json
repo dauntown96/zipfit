@@ -62,6 +62,11 @@
    "why": "내부 표(2026-11-17 · 단지 도로명·좌표 자동 채움 시도 기록) — anon·authenticated 권한 0 · 화면 참조 0 · EF complex-geo-fill(service_role)·DB 함수·운영 점검(postgres)만 쓰고 읽는다. 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15)"
   },
   {
+   "key": "rls_enabled_no_policy_public_gh_complex_images",
+   "kind": "intended",
+   "why": "내부 표(2026-11-18 · GH 상세 「단지 관련 이미지 정보」 탭 목록) — anon·authenticated 권한 0 · 화면 참조 0 · EF collect-gh-announcements(service_role)·분석 회차(postgres)만 쓰고 읽는다. 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15)"
+  },
+  {
    "key": "rls_enabled_no_policy_public_analysis_dispatch_queue",
    "kind": "intended",
    "why": "내부 표 — anon·authenticated 권한 0 · 화면(index.html) 참조 0 · DB 함수·pg_cron·운영 점검(postgres)만 쓰고 읽는다. 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15)"
