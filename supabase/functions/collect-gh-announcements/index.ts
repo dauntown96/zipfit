@@ -19,7 +19,7 @@
 //   닫힘: 목록 상태 「마감」 또는 마감일 < 오늘이면 접수마감 · 목록에서 사라진 들인 공고는 upsert 뒤 apply_end < 오늘이면 접수마감(closeGone).
 
 import { createClient } from 'jsr:@supabase/supabase-js@2.116.0'
-import { parseList, parseTotalPages, parseDetail, applyWindow, winnerDate, sigunguOf, type GhBoard, type GhListRow, type GhFile } from './parse.ts'
+import { parseList, parseTotalPages, parseDetail, applyWindow, winnerDate, sigunguOf, type GhBoard, type GhListRow, type GhFile, type GhImage } from './parse.ts'
 
 // 코딩원칙 16번: `Deno.env.get()!`는 타입 단언일 뿐 런타임 검사가 아니다. 없으면 명시적으로 throw 한다.
 const requireEnv = (key: string): string => {
@@ -142,12 +142,14 @@ async function readLists(known: Set<string>, startedAt: number, errors: string[]
 }
 
 type DetailLog = { tried: number; with_files: number; files: number; failed: string[];
-  windows: { id: string; start: string; end: string; closed: boolean }[]; unread: string[]; sigungu: Record<string, string> }
+  windows: { id: string; start: string; end: string; closed: boolean }[]; unread: string[]; sigungu: Record<string, string>;
+  // 🔵 2026-11-18(우편함 「코드·운영 — 7장 …」 3) — 「단지 관련 이미지 정보」 탭(같은 상세 HTML 에서 읽는다 · 바깥 호출 증가 0)
+  with_images: number; images: number; gallery: Record<string, GhImage[]> }
 
 /** 열린(보이고 마감 아닌) 행만 상세를 연다 — 첨부 목록 · 접수 창 · 당첨자발표일 · 시·군. 🔴 상세 실패는 errors 에 넣지 않는다(SH 와 같음). */
 async function readDetails(list: GhListRow[], rows: Mapped[], startedAt: number, today: string): Promise<DetailLog> {
   const remain = () => RUN_FETCH_BUDGET_MS - (Date.now() - startedAt)
-  const log: DetailLog = { tried: 0, with_files: 0, files: 0, failed: [], windows: [], unread: [], sigungu: {} }
+  const log: DetailLog = { tried: 0, with_files: 0, files: 0, failed: [], windows: [], unread: [], sigungu: {}, with_images: 0, images: 0, gallery: {} }
   const byId = new Map(list.map(r => [`GH_${r.pbancNo}`, r]))
   for (const m of rows.filter(r => !r.hidden_from_listing && r.status !== '접수마감').slice(0, DETAIL_CAP)) {
     await sleep(PAGE_DELAY_MS)
@@ -168,6 +170,7 @@ async function readDetails(list: GhListRow[], rows: Mapped[], startedAt: number,
       m.winner_announce_date = winnerDate(d)
       const g = sigunguOf(d)
       if (g) log.sigungu[m.announcement_id] = g
+      if (d.images.length) { log.gallery[m.announcement_id] = d.images; log.with_images++; log.images += d.images.length }
       if (!d.files) { log.failed.push(`${m.announcement_id}: 공고문 첨부 없음`); continue }
       m.attachment_urls = d.files.map(({ url, label, filename }) => ({ url, label, filename }))
       log.with_files++; log.files += d.files.length
@@ -193,6 +196,7 @@ async function collect() {
     const L = await readLists(known, startedAt, errors, true)
     const rows: Mapped[] = L.rows.map(r => mapRow(r, L.today))
     const detail = await readDetails(L.rows, rows, startedAt, L.today)
+    const byBoard = new Map(L.rows.map(r => [`GH_${r.pbancNo}`, r.board]))
 
     let upserted = 0
     for (let i = 0; i < rows.length; i += 50) {
@@ -207,6 +211,19 @@ async function collect() {
         .eq('source', 'GH').eq('announcement_id', id).is('sigungu_nm', null).select('id')
       if (error) gu.failed.push(`${id}: ${error.message}`)
       else gu.filled += data?.length ?? 0
+    }
+    // 🔵 2026-11-18(우편함 「코드·운영 — 7장 …」 3) — 「단지 관련 이미지 정보」 탭 목록을 gh_complex_images 에 남긴다(목록만 — 받기·Drive·extras 연결은 분석 회차).
+    //   LH announcement_complex_images 와 따로 두는 까닭: 그 표의 sbd_lgo_no(LH 단지 코드)를 단지 잇기(complex_link_announcements)와 LH 문지기가 읽는다 — GH 값이 섞이면 단지 키가 오염된다.
+    //   상세를 연 공고만 · (공고 · 파일 번호 · 상세 번호)마다 한 행 · 다시 보이면 탭 표기 · ver · 받기 주소 · last_seen_at 만 갈아 쓴다(행을 지우지 않는다 — 지나간 목록은 다시 받을 수 없다).
+    const img = { upserted: 0, failed: null as string | null }
+    const imgRows = Object.entries(detail.gallery).flatMap(([id, xs]) => xs.map(x => ({
+      announcement_id: id, board: byBoard.get(id) ?? null, biz_cd: x.bizCd, atch_file_sn: Number(x.atchFileSn), atch_file_dtl_sn: Number(x.atchFileDtlSn),
+      ver: x.ver, tab_label: x.label, tab_index: x.index, download_url: x.url, last_seen_at: new Date().toISOString() })))
+    if (imgRows.length) {
+      const { data, error } = await supabase.from('gh_complex_images')
+        .upsert(imgRows, { onConflict: 'announcement_id,atch_file_sn,atch_file_dtl_sn', ignoreDuplicates: false }).select('id')
+      if (error) img.failed = error.message
+      else img.upserted = data?.length ?? 0
     }
     // 목록에서 사라진 들인 공고(조기 마감 · 내림) — 접수 끝(apply_end)이 오늘보다 앞이면 접수마감(SH sh-close-missing 과 같은 뜻 · 목록 오류 런은 건너뜀).
     const closeGone = { closed: 0, failed: null as string | null }
@@ -225,9 +242,10 @@ async function collect() {
       visible: rows.filter(r => !r.hidden_from_listing).length,
       duration_ms: Date.now() - startedAt, errors,
     }
-    await logRun({ mode: 'collect', ...result, detail: { ...detail, gu, closeGone } })
-    console.log(`[GH] ${JSON.stringify({ ...result, detail, gu, closeGone })}`)
-    return { ...result, detail, gu, closeGone }
+    const { gallery: _g, ...detailLog } = detail   // 런 로그에는 수만(탭 목록은 표에)
+    await logRun({ mode: 'collect', ...result, detail: { ...detailLog, gu, closeGone, img } })
+    console.log(`[GH] ${JSON.stringify({ ...result, detail: detailLog, gu, closeGone, img })}`)
+    return { ...result, detail: detailLog, gu, closeGone, img }
   } catch (e) {
     await logRun({ mode: 'collect', pages: null, parsed: null, picked: null, upserted: null, hidden: null, visible: null,
       duration_ms: Date.now() - startedAt, errors: [...errors, String(e)], detail: null })
@@ -268,9 +286,10 @@ async function observe() {
     hidden: rows.filter(r => r.hidden_from_listing).length, visible: rows.filter(r => !r.hidden_from_listing).length,
     duration_ms: Date.now() - startedAt, errors, observed, appeared, disappeared,
   }
-  await logRun({ ...result, detail: { ...detail, prev: prevNote } })
+  const { gallery: _g, ...detailLog } = detail
+  await logRun({ ...result, detail: { ...detailLog, prev: prevNote } })
   console.log(`[GH observe] ${JSON.stringify({ ...result, observed: ids })}`)
-  return { ...result, detail, prev: prevNote }
+  return { ...result, detail: detailLog, prev: prevNote }
 }
 
 /** DB 를 읽지도 쓰지도 않는다 — robots · 목록(열린 공고) · 상세(열린 공고 · 또는 ?pbanc=<board>:<pbancNo>:<pbancKndCd>:<bizTyNm>) 매핑 결과만 돌려준다. */

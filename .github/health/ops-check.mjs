@@ -1022,6 +1022,30 @@ try {
   add('unit_sigungu_city_only', '세대 행 시군구가 「시」만(주소에 같은 시 + 구 있음)', 'warn', String(e).slice(0, 200), 'housing_units 를 읽는다(못 읽으면 ⚠️)')
 }
 
+// ㉟ 월임대료 칸 = 보증금 × 5%(계약금이 월 칸에 들어간 꼴 · 2026-11-18 · 우편함 「코드·운영 — 7장 …」 1 · 백로그 「월임대료 칸에 계약금 …」).
+//    세대 행 |monthly_rent − deposit × 0.05| ≤ 10 ∧ deposit > 1,000,000 — 열린 카드(목록 대표 · 접수마감 아님)의 묶음에 걸리면 ⚠️ + 공고 ID ·
+//    닫힌 공고뿐이면 ℹ️ · 0 이면 ✅. 안 멈춤(gate.mjs HARD 밖). 기준값 2026-11-18: …20198 2행(닫힘).
+//    거짓 양성 전수(2026-11-18): 이 기준 밖 · 비율 0.048~0.052 행 63 중 매입(보증금 200만 · 월 9.6~10.4만 등)은 10원 안에 든 것 0.
+//    오차를 천 원 절사까지 넓히면 매입 실제 월세(…20713 · …20761)가 걸려 넓히지 않는다. SIMULATE=rent5 이면 걸린 공고를 열린 것으로 친다(⚠️ 경로 시험).
+try {
+  const [x] = await sqlRead(`with t as (select h.announcement_id aid from public.housing_units h
+      where h.deposit > 1000000 and h.monthly_rent is not null and abs(h.monthly_rent - h.deposit * 0.05) <= 10),
+    a as (select distinct aid from t),
+    o as (select g.announcement_id from public.get_announcements_deduped(null, null, null) g where g.status <> '접수마감'),
+    s as (select a.aid, exists (select 1 from public.get_announcement_group_ids(a.aid) gi where gi.announcement_id in (select announcement_id from o)) op from a)
+    select (select count(*) from t)::int n,
+      coalesce((select string_agg(s.aid || '(' || (select count(*) from t where t.aid = s.aid) || ')', ', ' order by s.aid) from s where s.op), '') open_ids,
+      coalesce((select string_agg(s.aid || '(' || (select count(*) from t where t.aid = s.aid) || ')', ', ' order by s.aid) from s where not s.op), '') closed_ids`)
+  const sim = process.env.SIMULATE === 'rent5'
+  const openIds = sim ? [x.open_ids, x.closed_ids].filter(Boolean).join(', ') : x.open_ids
+  const closedIds = sim ? '' : x.closed_ids
+  add('unit_rent_eq_deposit5', '세대 행 월임대료 = 보증금 × 5%(계약금이 월 칸에 든 꼴)', openIds ? 'warn' : (x.n > 0 ? 'info' : 'pass'),
+    x.n > 0 ? `${x.n}행 — 열린 카드 ${openIds || '0'} · 닫힘 ${closedIds || '0'}${sim ? '(시험 — 닫힌 것을 열린 것으로)' : ''}` : '0',
+    '|월 − 보증금×5%| ≤ 10원 ∧ 보증금 > 100만 — 열린 카드에 걸리면 ⚠️(안 멈춤) · 닫힌 것만이면 ℹ️ · 원문 임대조건 표로 고칠 몫')
+} catch (e) {
+  add('unit_rent_eq_deposit5', '세대 행 월임대료 = 보증금 × 5%(계약금이 월 칸에 든 꼴)', 'warn', String(e).slice(0, 200), 'housing_units · 목록 함수를 읽는다(못 읽으면 ⚠️)')
+}
+
 // ㉔ LH 합격점수 수집(2026-11-04 · 우편함 「코드·운영 — LH 건설임대 당첨 합격점수 수집 장치」 4 · ⚠️만 · gate.mjs HARD 밖) —
 //    lh_cutoff_run_log 의 years_ago = 0(주 1회 정기 · 최근 1년 창) 마지막 런: 8일 넘게 없음 · 시도 호출 실패(ok_calls < calls) · errors 비지 않음 = ⚠️.
 //    거름 위반(남긴 글자 중 금지 낱말 · 신청 5명 이하 · 상태 불일치) = 0 이 아니면 ⚠️(CHECK 가 막으므로 0 이 정상 — 거름이 풀리면 보이게).

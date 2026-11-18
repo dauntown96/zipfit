@@ -35,6 +35,12 @@ const cases = [
   ['당첨자발표일 하나', winnerDate(two), '2026-11-04'],
   ['지구 둘 같은 시 → 남양주시', sigunguOf(two), '남양주시'],
   ['창 둘 → null', applyWindow(diff).window, null],
+  // 2026-11-18(우편함 「코드·운영 — 7장 …」 3) — 「단지 관련 이미지 정보」 탭(811 실물 5장 · 792 매입 0)
+  ['상세 811 — 이미지 탭 표기 다섯(원문 순서)', d811.images.map(x => x.label), ['조감도', '단지배치도', '25A 평면도', '25B 평면도', '36A 평면도']],
+  ['상세 811 — 첫 탭 원본 받기 주소(페이지 스크립트 nextUrl 꼴)', d811.images[0].url,
+    'https://apply-cdn.gh.or.kr/sr/sr7150/selectCtlgFileDown.do?bizCd=2017029&atchFileSn=1296053&ver=20241119083407&atchFileDtlSn=1'],
+  ['상세 792(매입) — 이미지 탭 없음', d792.images, []],
+  ['nextUrl 스크립트가 없으면 탭을 내지 않는다(주소를 짓지 않음)', parseDetail(`<button onclick="javascript:fn_chgSn('1','2','1','3')" >조감도</button>`).images, []],
 ]
 let bad = 0
 for (const [name, got, want] of cases) {

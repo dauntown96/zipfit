@@ -26,6 +26,9 @@ export type GhListRow = {
 }
 
 export type GhFile = { url: string; label: string; filename: string; bytes: number | null }
+/** 상세 「단지 관련 이미지 정보」 탭 하나(2026-11-18 · 우편함 「코드·운영 — 7장 …」 3) — 탭 표기(「32B 평면도」 · 「조감도」)는 원문 글자 그대로.
+ *  url = 원본 받기(selectCtlgFileDown.do — 페이지 스크립트 nextUrl 과 같은 꼴 · 쿼리 넷). */
+export type GhImage = { label: string; index: number; bizCd: string; atchFileSn: string; atchFileDtlSn: string; ver: string; url: string }
 export type Window = { start: string; end: string }
 export type GhDetail = {
   title: string | null
@@ -36,6 +39,7 @@ export type GhDetail = {
   windows: { kind: string; raw: string }[]   // 「…접수기간」 줄 원문(지구 탭마다 · 중복 포함)
   winnerRaw: string[]                        // 「당첨자발표일」 줄 원문
   addresses: string[]                        // 지구별 소재지 원문
+  images: GhImage[]                          // 「단지 관련 이미지 정보」 탭(없으면 빈 배열)
 }
 
 export const decode = (s: string) => s
@@ -103,9 +107,23 @@ export function parseDetail(html: string): GhDetail {
     else if (/당첨자\s*발표/.test(kind)) winnerRaw.push(raw)
   }
   const addresses = [...h.matchAll(/<th scope="row">소재지<\/th>\s*<td[^>]*>\s*<span>([\s\S]*?)<\/span>/g)].map(m => text(m[1])).filter(Boolean)
+  // 「단지 관련 이미지 정보」 — 탭 단추 onclick="javascript:fn_chgSn('<bizCd>','<atchFileSn>','<atchFileDtlSn>','<ver>')" + 단추 글자(탭 표기).
+  //   원본 받기 주소의 앞부분은 같은 페이지 스크립트 「var nextUrl = "https://apply-cdn.gh.or.kr/sr/<게시판>/selectCtlgFileDown.do?…"」에서 읽는다(게시판 경로를 짓지 않는다).
+  //   스크립트에서 못 읽으면 받기 주소를 만들지 않고 탭도 내지 않는다(빈 배열 — 틀린 주소보다 빈 목록).
+  const base = (h.match(/var nextUrl = "(https:\/\/apply-cdn\.gh\.or\.kr\/sr\/sr715[05]\/selectCtlgFileDown\.do)\?/) ?? [])[1]
+  const images: GhImage[] = []
+  if (base) {
+    for (const m of h.matchAll(/fn_chgSn\('(\w+)','(\d+)','(\d+)','(\w+)'\)"[^>]*>([\s\S]*?)<\/button>/g)) {
+      const [, bizCd, atchFileSn, atchFileDtlSn, ver] = m
+      const label = text(m[5])
+      if (!label || images.some(x => x.atchFileSn === atchFileSn && x.atchFileDtlSn === atchFileDtlSn)) continue
+      images.push({ label, index: images.length, bizCd, atchFileSn, atchFileDtlSn, ver,
+        url: `${base}?${new URLSearchParams({ bizCd, atchFileSn, ver, atchFileDtlSn }).toString()}` })
+    }
+  }
   return {
     title: th('공고명'), status: th('공고상태'), type: th('유형'), announceDate: ymd(th('공고일')),
-    files: files.length ? files : null, windows, winnerRaw, addresses,
+    files: files.length ? files : null, windows, winnerRaw, addresses, images,
   }
 }
 
