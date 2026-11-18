@@ -164,9 +164,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
-| 2026-11-18 | **코드·운영 — 7장(월 = 보증금 × 5% 점검 · GH 단지 이미지 탭 수집)** — health-ops ㉟ `unit_rent_eq_deposit5`(열린 ⚠️ · 닫힌 ℹ️ · 안 멈춤 · 첫 값 0 — …20198은 착수 사이 고쳐짐) · `collect-gh-announcements`가 상세 「단지 관련 이미지 정보」 탭을 새 표 `gh_complex_images`에(바깥 호출 증가 0 · LH 표와 따로) · health-screen 전광판 다른 탭은 #1106 뒤로 ⏭ · PR 이 회차 |
+| 2026-11-18 | **코드·운영 — 7장(월 = 보증금 × 5% 점검 · GH 단지 이미지 탭 수집)** — health-ops ㉟ `unit_rent_eq_deposit5`(열린 ⚠️ · 닫힌 ℹ️ · 안 멈춤 · 첫 값 0 — …20198은 분석 묶음 20이 착수 사이 고침) · `collect-gh-announcements`가 상세 「단지 관련 이미지 정보」 탭을 새 표 `gh_complex_images`에(바깥 호출 증가 0 · LH 표와 따로) · health-screen 전광판 다른 탭은 #1106 뒤로 ⏭ · PR 이 회차 |
+| 2026-11-18 | **분석 묶음 20 — …20198 월 칸 계약금 꼴 · …20233 출처 이름** — (구)예산군청 세대 8행(요청 2 + 오차 밖 6) `monthly_rent` 계약금 칸 → 원문 p.3 월임대료 칸 · 양산사송 세대 2행 `source_file` 「공고문PDF」 → 실파일명 · 월과 보증금×5% 차 10 이하 전수 0 · 불변식 0 · PR 이 회차 |
 | 2026-11-18 | **조사 — 📚 사전 재계산 3차 + 재계산 스크립트** — 새 `scripts/dictionary-recheck.py`(SQL 49파일 관리 API 읽기 · `recheck-baseline.json`과 같음/늘어남/줄어듦/값·결론 바뀜/오류 표 · `--dump-old` 줄인 공고 ID · `--run-on-dump` 지난 기준선) · 오류 0 · 최장 8.5초 · 11-08 덤프 대비 줄어듦 4 · 값·결론 바뀜 3(㎡당 월세 신혼희망↔공공임대 순서 `…21062` 등) · DB 쓰기 0 · PR 이 회차 |
-| 2026-11-18 | **분석 묶음 19 — 문지기 normal 복원 · 남은 받기 · 임대조건 ↔ API 9 · 폴더 빈칸** — `lh_file_mode` normal(차단 꼴 3일 0) · …21075 zip = mp4 2·QR(갤러리 0) · …61212 단지 그림 4 · 리츠 그림 3 site_label · 9공고 모두 「API 기준 다름」(원문 = 우리 행) · 화성 …20243 월임대료 27행 계약금 칸 → 원문 월로 고침 · drive_folder_id 빈칸 74 → 14 · 불변식 0 · PR 이 회차 |
 ## 🚫 코딩 원칙
 
 1. **단일 파일 유지** — `index.html` 하나. JS/CSS 분리 금지
