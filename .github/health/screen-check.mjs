@@ -422,10 +422,20 @@ try {
   //    둘째 반쪽이 숨거나 너비가 다르면 한 바퀴 도중 처음으로 되감긴다(#451 카드용 .zf3-dup 숨김이 그랬다 · PR #659). 흐르는 모드(.zf3-run)일 때만 잰다 · 안 멈춤.
   //    SIMULATE=mq_half 이면 둘째 반쪽을 숨기고 잰다(실패해야 맞다).
   {
+    // 🔵 2026-11-18(우편함 「코드·운영 — 7장 …」 2) — 공고 탭(첫 화면)은 전광판을 뺐다(디자인 2차 1단계 · display:none) → 지금 탭에서 안 보이면
+    //    추천 탭(goMain(1) · 전광판이 그대로 흐르는 탭)으로 잠깐 옮겨 재고 원래 탭으로 돌려놓는다(뒤 점검이 보던 탭 그대로). 그래도 안 보이면 건너뛴다.
+    const boardHidden = () => page.evaluate(() => { const bd = document.getElementById('zf3Board'); return !!bd && getComputedStyle(bd).display === 'none' })
+    let mqTab = null, mqBack = null
+    if (await boardHidden()) {
+      mqBack = await page.evaluate(() => [1, 2, 3, 4, 5].find(i => !document.getElementById('main' + i)?.classList.contains('hidden')) ?? null)
+      await page.evaluate(() => goMain(1)); mqTab = '추천 탭'
+      // 탭을 옮긴 뒤 전광판이 보이기까지 몇 초 걸린다(배포본 실측 2초 none · 5초 block) — 보일 때까지 최대 10초 기다린다(안 보이면 아래에서 건너뜀).
+      await page.waitForFunction(() => { const bd = document.getElementById('zf3Board'); return !!bd && getComputedStyle(bd).display !== 'none' }, null, { timeout: 10000 }).catch(() => {})
+      await page.waitForTimeout(500)
+    }
     const mq = await page.evaluate(sim => {
-      // 2026-11-18(디자인 2차 1단계) — 공고 탭(첫 화면)은 전광판을 뺐다(display:none) · 다른 탭에서는 그대로 흐른다 → 보이지 않으면 건너뛴다.
       const bd = document.getElementById('zf3Board')
-      if (bd && getComputedStyle(bd).display === 'none') return { skip: '이 탭에서는 전광판 없음(공고 탭 — 디자인 2차 1단계)' }
+      if (bd && getComputedStyle(bd).display === 'none') return { skip: '이 탭에서도 전광판 없음(추천 탭으로 옮겨도 숨김)' }
       const tr = document.querySelector('#zf3Board .zf3-run .zf3-track')
       if (!tr) return { skip: (document.querySelector('#zf3Board .zf3-mq') || {}).className || '전광판 없음' }
       const hs = [...tr.querySelectorAll(':scope > .zf3-half')]
@@ -436,10 +446,12 @@ try {
       if (sim && hs[1]) hs[1].style.display = ''
       return { n: hs.length, w, shown, trw }
     }, process.env.SIMULATE === 'mq_half')
-    if (mq.skip) add('mq_half', '전광판 두 반쪽 너비 같음 · 둘 다 보임', 'skip', `흐르지 않는 모드(${String(mq.skip).slice(0, 60)})`, '흐르는 모드에서만 잰다')
+    if (mqBack) { await page.evaluate(n => goMain(n), mqBack); await page.waitForTimeout(500) }
+    const at = mqTab ? ` · ${mqTab}에서 잼` : ''
+    if (mq.skip) add('mq_half', '전광판 두 반쪽 너비 같음 · 둘 다 보임', 'skip', `흐르지 않는 모드(${String(mq.skip).slice(0, 60)})${at}`, '흐르는 모드에서만 잰다')
     else {
       const ok = mq.n === 2 && mq.shown.every(Boolean) && Math.abs(mq.w[0] - mq.w[1]) <= 1 && Math.abs(mq.trw - mq.w[0] - mq.w[1]) <= 1
-      add('mq_half', '전광판 두 반쪽 너비 같음 · 둘 다 보임', ok ? 'pass' : 'fail', `반쪽 ${mq.n} · 너비 ${mq.w.join(' / ')} · 보임 ${mq.shown.map(x => x ? 'O' : 'X').join('')} · 띠 ${mq.trw}`,
+      add('mq_half', '전광판 두 반쪽 너비 같음 · 둘 다 보임', ok ? 'pass' : 'fail', `반쪽 ${mq.n} · 너비 ${mq.w.join(' / ')} · 보임 ${mq.shown.map(x => x ? 'O' : 'X').join('')} · 띠 ${mq.trw}${at}`,
         '반쪽 2 · 둘 다 보임 · 너비 차 ≤ 1px · 띠 = 두 반쪽 합(다르면 한 바퀴 도중 되감김 — PR #659)')
     }
   }
