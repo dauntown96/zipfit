@@ -423,6 +423,9 @@ try {
   //    SIMULATE=mq_half 이면 둘째 반쪽을 숨기고 잰다(실패해야 맞다).
   {
     const mq = await page.evaluate(sim => {
+      // 2026-11-18(디자인 2차 1단계) — 공고 탭(첫 화면)은 전광판을 뺐다(display:none) · 다른 탭에서는 그대로 흐른다 → 보이지 않으면 건너뛴다.
+      const bd = document.getElementById('zf3Board')
+      if (bd && getComputedStyle(bd).display === 'none') return { skip: '이 탭에서는 전광판 없음(공고 탭 — 디자인 2차 1단계)' }
       const tr = document.querySelector('#zf3Board .zf3-run .zf3-track')
       if (!tr) return { skip: (document.querySelector('#zf3Board .zf3-mq') || {}).className || '전광판 없음' }
       const hs = [...tr.querySelectorAll(':scope > .zf3-half')]
@@ -1267,6 +1270,18 @@ try {
     const src = readFileSync(new URL('../../index.html', import.meta.url), 'utf8')
     const srcTitleAttr = (src.match(/\stitle="/g) || []).length
     const srcTitleJs = (src.match(/\.title\s*=(?!=)/g) || []).length
+    // ⑫-⑤ 날값 수(2026-11-18 · 우편함 「표시층 — 디자인 2차 1단계」 판정 기준 덧) — 정리한 날값(둥글기 · 글자 크기 · 색)이 다시 흩어지지 않는지 원본 수만 본다(ℹ️ · 판정 0).
+    //    둥글기 = border-radius 값에 px·% 날값이 든 곳 · 글자 = font-size:NNpx · 색 = #rgb/#rrggbb(토큰 정의 블록 안 값도 센다 — 추이만 본다).
+    {
+      const radRaw = (src.match(/border-radius:[^;}"'`]*\d(?:px|%)/g) || []).length
+      const fsRaw = (src.match(/font-size:\s*\d+(?:\.\d+)?px/g) || []).length
+      const fsSmall = (src.match(/font-size:\s*(?:\d|1[01])(?:\.\d+)?px/g) || []).length
+      const hexRaw = (src.match(/#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b(?![0-9a-fA-F])/g) || []).length
+      extra.watch_raw = { radRaw, fsRaw, fsSmall, hexRaw }
+      add('watch_raw', '날값 수(원본 index.html — 둥글기 · 글자 크기 · 색) — 추이(정보)', 'info',
+        `둥글기 날값 ${radRaw} · 글자 크기 날값 ${fsRaw}(12px 밑 ${fsSmall}) · 색 #값 ${hexRaw}`,
+        '정보 — 판정하지 않는다 · 줄어드는 쪽이 목표(디자인 2차 — 토큰 --r-s/--r-l/--r-pill/--r-round · --t-body/--t-sub/--t-title) · 결과 표로 추이를 본다')
+    }
     const tctx = await browser.newContext({ viewport: VIEWPORT, serviceWorkers: 'block', locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
     await tctx.route(/\/rest\/v1\/usage_events(\?|$)/, r => r.fulfill({ status: 201, body: '' }))
     const tp = await tctx.newPage()
