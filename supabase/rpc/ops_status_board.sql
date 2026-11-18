@@ -38,8 +38,12 @@ AS $function$
 -- 🔵 2026-11-09(우편함 「코드·운영 — 📚 사전 SQL 새 둘 + 개정 둘 · 상태판 이용 기록 같은 창 셈 …」 2 · #928 ⑦ 채택) — users.sessions_7d_kst 한 칸:
 --   이용 기록 세션 수를 usage_7d 와 같은 창(KST 날짜 · 어제까지 7일 = [오늘 0시 KST − 7일, 오늘 0시 KST))으로 — 운영 표지·운영자 세션 빼기는 sessions_7d 와 같은 셈을
 --   그 창 안에서 따로 한다(기존 sessions_* 는 창·셈 그대로). 개수만(원칙 36).
+-- 🔵 2026-11-18(우편함 「코드·운영 — 6장 …」 3 · 백로그 「상태판 이용자 지표」 ① · claude.ai 11-17 대조 15/15일) — users.sessions_7d 의 값을
+--   sessions_7d_kst 와 같은 셈(KST 날짜 · 어제까지 7일)으로 바꾼다. 키 이름은 그대로(화면이 이 키를 읽는다) · 두 칸 값이 같다.
+--   sessions_today · logged_in_7d · signups_7d 의 창은 그대로(now 기준).
 declare
   v_uid uuid := auth.uid();
+  v_s7kst bigint;
   cfg public.analysis_dispatch_config%rowtype;
   v_cov jsonb; v_disp jsonb; v_health jsonb; v_col jsonb; v_fu jsonb; v_hides jsonb; v_rates jsonb; v_runs jsonb; v_secrets jsonb; v_inst jsonb; v_users jsonb; v_usage jsonb;
   v_run record; v_last record;
@@ -152,6 +156,14 @@ begin
     into v_inst
     from zipfit_ops.instance_metrics_log l order by l.scraped_at desc limit 1;
 
+  v_s7kst := (with w as (select (((now() at time zone 'Asia/Seoul')::date - 7)::timestamp at time zone 'Asia/Seoul') as ws,
+                                          (((now() at time zone 'Asia/Seoul')::date)::timestamp at time zone 'Asia/Seoul') as we),
+                             ev2 as (select u.session_id, u.user_id, u.props from public.usage_events u, w
+                                      where u.occurred_at >= w.ws and u.occurred_at < w.we),
+                             ops2 as (select distinct e2.session_id from ev2 e2
+                                       where e2.props ? 'ops' or e2.user_id in (select a.user_id from zipfit_ops.admins a))
+                        select count(distinct e3.session_id) from ev2 e3 where e3.session_id not in (select o2.session_id from ops2 o2));
+
   with ev as (
     select u.session_id, u.user_id, u.occurred_at, u.props from public.usage_events u
      where u.occurred_at >= now() - interval '7 days'
@@ -164,15 +176,9 @@ begin
     'signups_7d', (select count(*) from public.user_profiles p where p.created_at >= now() - interval '7 days'),
     'sessions_today', (select count(distinct r.session_id) from r
                         where r.occurred_at >= (date_trunc('day', now() at time zone 'Asia/Seoul') at time zone 'Asia/Seoul')),
-    'sessions_7d', (select count(distinct r.session_id) from r),
+    'sessions_7d', v_s7kst,
     'logged_in_7d', (select count(distinct r.session_id) from r where r.user_id is not null),
-    'sessions_7d_kst', (with w as (select (((now() at time zone 'Asia/Seoul')::date - 7)::timestamp at time zone 'Asia/Seoul') as ws,
-                                          (((now() at time zone 'Asia/Seoul')::date)::timestamp at time zone 'Asia/Seoul') as we),
-                             ev2 as (select u.session_id, u.user_id, u.props from public.usage_events u, w
-                                      where u.occurred_at >= w.ws and u.occurred_at < w.we),
-                             ops2 as (select distinct e2.session_id from ev2 e2
-                                       where e2.props ? 'ops' or e2.user_id in (select a.user_id from zipfit_ops.admins a))
-                        select count(distinct e3.session_id) from ev2 e3 where e3.session_id not in (select o2.session_id from ops2 o2)),
+    'sessions_7d_kst', v_s7kst,
     'saved', (select count(*) from public.saved_announcements),
     'new_orgs_7d', (select coalesce(jsonb_agg(jsonb_build_object('org', f.supply_org, 'first_id', f.announcement_id, 'first_at', f.created_at)
                                               order by f.created_at desc), '[]'::jsonb)
