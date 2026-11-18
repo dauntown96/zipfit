@@ -6418,6 +6418,9 @@ ZF_MATCH_PREFILL.forEach(([id])=>{
   const el=document.getElementById(id);
   if(el){ const mark=()=>zfMatchTouched.add(id); el.addEventListener('input',mark); el.addEventListener('change',mark); }
 });
+// 🔵 2026-11-18(우편함 「표시층 — 매칭 판정 R3」 · 다운님 R3 안 (가)) — 특수 계층 칸(체크 일곱)을 한 번이라도 건드렸는지 — 건드렸으면 고르지 않은 계층 = 「없음」,
+//    안 건드렸으면 「모름」(가구원수 칸과 같은 꼴). 칸 값은 저장하지 않는다(N7 ⓐ ⓑ) — 표지도 이 페이지 메모리에만 · 로그아웃 때 함께 지운다(zfClearMatchPrefill).
+{ const cs=document.getElementById('zfClassSet'); if(cs) cs.addEventListener('change',e=>{ if(e.target && e.target.name==='zfClass') zfMatchTouched.add('zfClass'); }); }
 function zfPrefillMatchFromProfile(p){
   if(zfMatchPrefilled || !zfProfileLoaded || !p) return;
   zfMatchPrefilled=true;
@@ -7976,7 +7979,9 @@ function zfTargetClassHit(b, f){
 // 🔵 2026-10-14(우편함 「코드 — 공급대상 판정(v10.1 D-2 화면 먼저) …」 1) — 키 꼴 v10.1 D-1 의 `조건` 새 키 셋을 읽는다.
 //    혼인(「미혼」|「혼인 중 아님」|「혼인 중」) · 계층_중_하나(배열) · 가구원수_최대(정수). 🔴 셋 중 하나도 없는 갈래는 종전 함수 그대로다(순수 확장).
 //    있으면 갈래 상태 = 대상 판정 ∧ 조건마다 — 하나라도 no → no · 모두 ok → ok(확인필요가 있으면 check) · 그 밖 check.
-//    고르지 않은 계층 칸 · 비어 있는 혼인·가구원 칸은 「모름」이라 check 다(no 로 빼지 않는다 — 2026-10-13 N7 원칙).
+//    비어 있는 혼인·가구원 칸은 「모름」이라 check 다(no 로 빼지 않는다 — 2026-10-13 N7 원칙).
+//    🔵 2026-11-18(R3 안 (가)) — 계층 칸은 건드렸으면(f.classesKnown) 고르지 않은 계층 = 「없음」 → 계층_중_하나는 비움·안 맞음 → no ·
+//    안 건드렸으면 종전대로 「모름」 → check. 조건 없는 「계층」 대상(확인필요만)은 이 판정을 타지 않는다(바꾸지 않음 — R2 데이터 몫).
 const ZF_TARGET_NEW_KEYS = ['혼인', '계층_중_하나', '가구원수_최대'];
 const ZF_TARGET_MARRIED_ANY = ['married_7', 'newborn', 'pre', 'married_child6', 'married'];
 // 계층_중_하나 값 → 진단 특수 계층 칸 값. 「수급자」는 생계·의료·주거 셋 중 아무것.
@@ -7998,8 +8003,9 @@ function zfTargetCondState(k, v, f){
   }
   if(k === '계층_중_하나'){
     const want = (Array.isArray(v) ? v : []).flatMap(x => ZF_TARGET_CLASS_OF[String(x).replace(/\s/g, '')] || []);
-    if(!f.classes || !f.classes.size || !want.length) return 'check';
-    return want.some(c => f.classes.has(c)) ? 'ok' : 'check';
+    if(!want.length) return 'check';
+    if(f.classes && f.classes.size && want.some(c => f.classes.has(c))) return 'ok';
+    return f.classesKnown ? 'no' : 'check';
   }
   if(k === '가구원수_최대'){
     const n = Number(v), m = Number(f.members);
@@ -8224,8 +8230,9 @@ function zfTargetDiagFacts(){
   const mbEl = document.getElementById('members');
   const mbKnown = !!mbEl && (zfMatchTouched.has('members') || (zfMatchFilledVals.members != null && mbEl.value === zfMatchFilledVals.members));
   const mb = mbKnown ? (parseInt(mbEl.value) || 0) : 0;
-  return { marital: diagMarital || document.getElementById('marital')?.value || '', children: (ch == null || ch === '') ? null : (parseInt(ch) || 0), birthYear: by, classes: zfDiagClasses(), members: mb };
+  return { marital: diagMarital || document.getElementById('marital')?.value || '', children: (ch == null || ch === '') ? null : (parseInt(ch) || 0), birthYear: by, classes: zfDiagClasses(), classesKnown: zfMatchTouched.has('zfClass'), members: mb };
 }
+// 🔵 2026-11-18(R3) — 저장 조건에는 계층 칸이 없다(저장하지 않는 칸 — N7 ⓐ) → classesKnown 없음 = 늘 「모름」(계층_중_하나 check 그대로).
 function zfTargetProfileFacts(){
   const u = currentUser || {};
   const ch = u.children;
@@ -13541,8 +13548,10 @@ function zfOpsHtml(b, issues){
   //    이용 기록만으로 센 users.sessions_*(「지금부터 7일」)와 창·셈이 다름을 드러낸다(개수만 · 원칙 36).
   // 🔵 2026-11-09(우편함 「표시층 — 상태판 이용 기록 맞대기」) — 바로 아래 작은 글씨로 이용 기록(usage_events)만으로 센 「지금부터 7일」 세션(users.sessions_7d)을 맞댄다.
   //    두 셈은 창이 다르다(이용 기록 = 지금부터 7일 · 엣지 로그 = KST 어제까지 7일) — 이름과 창을 같이 적는다 · users 칸이 없는 응답이면 줄 없음.
+  //    🔵 2026-11-18(우편함 「표시층 — 매칭 판정 R3」 0장) — 코드·운영 6장이 users.sessions_7d 값을 KST 날짜 어제까지 7일로 바꿨다 → 글자도 「어제까지 7일(KST)」.
+  //    두 셈의 창은 이제 같고 셈만 다르다(이용 기록 세션 · 엣지 로그 사람 세션).
   const us7 = (b.users && b.users.sessions_7d != null)
-    ? `<span style="font-size:12px;color:var(--ink-3)">이용 기록 7일 ${Number(b.users.sessions_7d) || 0} <span>(이용 기록만으로 센 세션 · 지금부터 7일 · 운영 표지·운영자 뺌)</span></span>` : '';
+    ? `<span style="font-size:12px;color:var(--ink-3)">이용 기록 7일 ${Number(b.users.sessions_7d) || 0} <span>(이용 기록만으로 센 세션 · 어제까지 7일(KST) · 운영 표지·운영자 뺌)</span></span>` : '';
   if(!b.usage_7d && us7) out.push(line('ok', '이용 기록 7일', us7));
   if(b.usage_7d){
     const u = b.usage_7d, days = Number(u.days) || 0, heavy = Number(u.other_heavy) || 0;
