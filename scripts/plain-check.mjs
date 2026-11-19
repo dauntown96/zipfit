@@ -6,14 +6,23 @@
 //   ③ 부정·제한 갈래(부정 · 제외 · 한정)가 그대로 — 「불가 → 할 수 없어요」는 같은 갈래(부정)
 //   ④ 때 낱말(현재·금회·당해·이번 …)이 원문 그대로 · 같은 수
 //   ⑤ 주어 없는 원문 문장은 그대로 둔다(쉽게 쓴 말에 그 문장이 글자 그대로) — ⚠️ 근사(조사로 주어를 가늠한다) · 최종 판정은 claude.ai
+// 🔵 v3 요점 꼴(2026-11-19 · 우편함 「코드·운영 — 10장」 ① · 다운님 판정 2026-11-19 13:17 쉽게 쓴 말 (나)) — checkPlainPoint · PLAIN_CHECK_POINT_VERSION.
+//   content_plain = 문단의 「요점」 1~3줄(줄마다 80자 이하) · 본문은 화면이 원문 그대로 그린다. 위 ①·⑤는 끄고 넷만 본다:
+//   ⓐ 원문 밖 낱알 0(②와 같은 셈) · ⓑ 줄 꼴(1~3줄 · 줄마다 80자 이하 · 빈 줄 0) · ⓒ 부정·제한 갈래 양쪽(③ 그대로) · ⓓ 때 낱말 — 요점의 때 낱말은 원문에도 있다(새것 0 · 빠짐 허용).
+//   v2(checkPlain · PLAIN_CHECK_VERSION)는 그대로 — 이미 쓴 행은 content_plain_check = 'plain-check v2' 로 남는다.
 // 쓰는 법:
 //   node scripts/plain-check.mjs <원문.txt> <쉽게.txt>          — 한 쌍
 //   node scripts/plain-check.mjs --json <쌍.json>               — [{id?, raw, plain}, …]
+//   node scripts/plain-check.mjs --point …                      — 앞에 붙이면 요점 꼴(v3)로 본다(나머지 인자는 같다)
 //   통과 = 종료 코드 0 · 실패가 하나라도 있으면 1(사유를 찍는다). 시험: node scripts/plain-check.test.mjs
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 export const PLAIN_CHECK_VERSION = 'plain-check v2'
+export const PLAIN_CHECK_POINT_VERSION = 'plain-check v3 요점'
+// 요점 꼴 줄 상한(ⓑ)
+export const POINT_MAX_LINES = 3
+export const POINT_MAX_CHARS = 80
 
 // 조건어 — 낱알로 센다(①·② 양쪽).
 const COND_WORDS = ['이상', '이하', '초과', '미만', '이내']
@@ -108,19 +117,60 @@ export function checkPlain(raw, plain) {
   return { ok: fails.length === 0, fails }
 }
 
+// 요점 꼴(v3) — 위 머리 「v3 요점 꼴」.
+export function checkPlainPoint(raw, plain) {
+  const fails = []
+  const R = norm(raw), P = norm(plain)
+  if (!R.trim()) fails.push({ kind: '입력', detail: '원문이 비었다' })
+  if (!P.trim()) fails.push({ kind: '입력', detail: '요점이 비었다' })
+  if (fails.length) return { ok: false, fails }
+
+  // ⓐ 원문 밖 낱알
+  const gr = bag(grains(R)), gp = bag(grains(P))
+  const extra = [...gp].filter(([k, n]) => (gr.get(k) ?? 0) < n).map(([k, n]) => `${k}(${n - (gr.get(k) ?? 0)})`)
+  if (extra.length) fails.push({ kind: 'ⓐ원문 밖 낱알', detail: extra.join(' · ') })
+
+  // ⓑ 줄 꼴
+  const lines = P.split('\n')
+  const lf = []
+  if (lines.length > POINT_MAX_LINES) lf.push(`${lines.length}줄(상한 ${POINT_MAX_LINES})`)
+  lines.forEach((l, i) => {
+    if (!l.trim()) lf.push(`${i + 1}째 줄 비었다`)
+    const n = [...l].length
+    if (n > POINT_MAX_CHARS) lf.push(`${i + 1}째 줄 ${n}자(상한 ${POINT_MAX_CHARS})`)
+  })
+  if (lf.length) fails.push({ kind: 'ⓑ줄 꼴', detail: lf.join(' · ') })
+
+  // ⓒ 부정·제한 갈래(③ 그대로)
+  for (const [g, res] of Object.entries(POLARITY)) {
+    const inR = res.some((re) => re.test(R)), inP = res.some((re) => re.test(P))
+    if (inR && !inP) fails.push({ kind: 'ⓒ부정·제한 갈래', detail: `원문의 「${g}」 갈래가 요점에 없다` })
+    if (!inR && inP) fails.push({ kind: 'ⓒ부정·제한 갈래', detail: `원문에 없는 「${g}」 갈래가 요점에 있다` })
+  }
+
+  // ⓓ 때 낱말 — 새것 0
+  const tw = TIME_WORDS.filter((w) => count(P, w) > 0 && count(R, w) === 0)
+  if (tw.length) fails.push({ kind: 'ⓓ때 낱말', detail: `원문에 없는 때 낱말: ${tw.join(' · ')}` })
+
+  return { ok: fails.length === 0, fails }
+}
+
 function report(id, r) {
   console.log(`${r.ok ? '✓ 통과' : '✗ 실패'}${id ? ` ${id}` : ''}`)
   for (const f of r.fails) console.log(`   ${f.kind} — ${f.detail}`)
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  const a = process.argv.slice(2)
+  let a = process.argv.slice(2)
+  const point = a[0] === '--point'
+  if (point) a = a.slice(1)
+  const check = point ? checkPlainPoint : checkPlain
   let pairs
   if (a[0] === '--json' && a[1]) pairs = JSON.parse(readFileSync(a[1], 'utf8'))
   else if (a.length === 2) pairs = [{ raw: readFileSync(a[0], 'utf8'), plain: readFileSync(a[1], 'utf8') }]
-  else { console.error('쓰는 법: node scripts/plain-check.mjs <원문.txt> <쉽게.txt> | --json <쌍.json>'); process.exit(2) }
+  else { console.error('쓰는 법: node scripts/plain-check.mjs [--point] <원문.txt> <쉽게.txt> | [--point] --json <쌍.json>'); process.exit(2) }
   let bad = 0
-  for (const p of pairs) { const r = checkPlain(p.raw, p.plain); if (!r.ok) bad++; report(p.id, r) }
-  console.log(`— ${PLAIN_CHECK_VERSION} · 쌍 ${pairs.length} · 실패 ${bad}`)
+  for (const p of pairs) { const r = check(p.raw, p.plain); if (!r.ok) bad++; report(p.id, r) }
+  console.log(`— ${point ? PLAIN_CHECK_POINT_VERSION : PLAIN_CHECK_VERSION} · 쌍 ${pairs.length} · 실패 ${bad}`)
   process.exit(bad ? 1 : 0)
 }
