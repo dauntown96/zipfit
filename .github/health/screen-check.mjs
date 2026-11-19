@@ -71,7 +71,10 @@ const CONSOLE_IGNORE = [/dapi\.kakao\.com/, /kakao/i,
   // 🔵 2026-11-03 — 브랜치 점검(입력 ref · 러너 안 127.0.0.1:8201)은 카카오 지도 키의 등록 도메인 밖이라 SDK 가 안 온다 → 화면이 남기는 그 실패 한 줄만 뺀다.
   ...(/^http:\/\/127\.0\.0\.1:8201\//.test(SITE) ? [/카카오맵 SDK 로드 실패/] : [])]
 const checks = []
-const add = (id, name, status, value, rule) => checks.push({ id, name, status, value, rule })
+const add = (id, name, status, value, rule) => {
+  checks.push({ id, name, status, value, rule })
+  try { stage = `항목 「${id}」 다음` } catch { /* stage 선언 전 */ }   // 🔵 2026-11-19(16장) — 감시 시한이 「마지막 자리」로 싣는다
+}
 // 🔴 ④ 링크 문구는 두 갈래다(화면 zfPostLinkHtml) — LH 카드에 요약이 있으면 「함께 정리돼 있어요」, 없으면 「같은 게시물에 올라왔어요」.
 //    둘째 갈래를 판정표에 안 둬서 「알수없음」으로 떨어졌다(이슈 #283 · 2026-09-30 대구연호 두 카드). 화면 문구 갈래를 바꾸는 회차는 여기를 같은 PR 에서 고친다.
 const phraseOf = t =>
@@ -114,6 +117,19 @@ const STALE_DATE_FN = () => {
 
 const consoleErrors = []
 const browser = await chromium.launch()
+// 🔵 2026-11-19(우편함 「코드·운영 — 16장」 · 순위표 9위) — 점검 전체 감시 시한. 2026-11-19 06:18 UTC push 실행(run 44468234254)은 첫 열기 90초 초과 →
+//    「20초 뒤 한 번 다시 연다」 뒤 아무 줄 없이 20분 멈췄다가 작업 한도(25분)에 취소돼 「결과 파일을 남기지 못했다」로만 남았다(#1141 · 어디서 멈췄는지 0).
+//    이제 SCREEN_DEADLINE_MIN(기본 18분)을 넘기면 마지막으로 들어선 자리(stage)를 실은 runner ❌ 로 결과 파일을 쓰고 끝낸다 — 판정 뜻은 종전 그대로(실패 · 이슈).
+let stage = '시작'
+const DEADLINE_MIN = Number(process.env.SCREEN_DEADLINE_MIN || 18)
+const deadline = setTimeout(() => {
+  add('runner', '점검 실행', 'fail', `점검이 ${DEADLINE_MIN}분 넘게 끝나지 않음 — 마지막 자리: ${stage}`, `점검 스크립트가 ${DEADLINE_MIN}분 안에 끝까지 돈다`)
+  try { report('screen', 'A. 화면 점검', checks, extra) } catch (e) { console.error(String(e)) }
+  process.exit(0)
+}, DEADLINE_MIN * 60000)
+deadline.unref()
+// 한 걸음 시한 — Playwright 자체 시한이 듣지 않고 걸린 꼴(위 run)을 바깥에서 끊는다.
+const withTimeout = (p, ms, what) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(`${what} ${Math.round(ms / 1000)}초 넘음(바깥 시한)`)), ms).unref())])
 const extra = {}
 try {
   const ctx = await browser.newContext({ viewport: VIEWPORT, serviceWorkers: 'block', locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
@@ -140,13 +156,19 @@ try {
   // 🔵 2026-10-19(우편함 「표시층 — 화면 점검 오탐 막기」 3) — 첫 열기가 시간 초과면 20초 뒤 한 번만 다시 연다(점검 도중 다른 push 의 Pages 배포와 겹친 경우).
   //    두 번째도 안 열리면 종전대로 「점검 실행」 실패다 — 배포본이 정말 안 열리는 것은 숨기지 않는다.
   let mainRes = null
-  try { mainRes = await page.goto(SITE + '?health=' + Date.now(), { waitUntil: 'networkidle', timeout: 90000 }) }
+  stage = '첫 열기'
+  try { mainRes = await withTimeout(page.goto(SITE + '?health=' + Date.now(), { waitUntil: 'networkidle', timeout: 90000 }), 120000, '첫 열기') }
   catch (e) {
-    if (!/Timeout/i.test(String(e && e.message))) throw e
+    if (!/Timeout|시한/i.test(String(e && e.message))) throw e
     console.log('첫 열기 시간 초과 — 20초 뒤 한 번 다시 연다:', String(e.message).slice(0, 120))
-    await page.waitForTimeout(20000)
-    mainRes = await page.goto(SITE + '?health=' + Date.now(), { waitUntil: 'networkidle', timeout: 90000 })
+    // 🔵 2026-11-19(16장) — 걸린 탐색을 빈 쪽으로 끊고(15초) 다시 연다 · 다시 열기에도 바깥 시한 120초(두 번 다 넘으면 「점검 실행」 ❌ — 종전 뜻 그대로)
+    stage = '첫 열기 다시(빈 쪽으로 끊는 중)'
+    await withTimeout(page.goto('about:blank', { timeout: 15000 }), 20000, '빈 쪽').catch(err => console.log('빈 쪽으로 못 끊음:', String(err).slice(0, 120)))
+    await new Promise(r => setTimeout(r, 20000))
+    stage = '첫 열기 다시'
+    mainRes = await withTimeout(page.goto(SITE + '?health=' + Date.now(), { waitUntil: 'networkidle', timeout: 90000 }), 120000, '첫 열기 다시')
   }
+  stage = '첫 열기 뒤 목록 기다림'
   try { await page.waitForFunction(() => typeof noticeData !== 'undefined' && noticeData.length > 0, null, { timeout: 60000 }) }
   catch (e) {
     // 🔵 2026-11-03(브랜치 점검 site 입력) — 목록이 안 차면 문서 응답 상태·형식·CSP·화면 글자 앞부분을 실패 문구에 싣는다(githack 첫 실행이 단서 없이 끝났다).
@@ -1343,6 +1365,47 @@ try {
     }
     const listH = await tp.evaluate(styleHits)
     const listS = await tp.evaluate(small)
+    // ⑫-⑥ 누르는 자리 겹침 쌍 수(2026-11-19 · 우편함 「코드·운영 — 15장」 · 순위표 6위 · 표시층 2단계 회신 1 ⑦ 2) — ℹ️ 추이만(판정 0).
+    //    보이는 누를 것(위 small 과 같은 대상) 두 개의 사각형이 1px 넘게 겹치는 쌍 · 한쪽이 다른 쪽 안에 든 것(조상·자손)은 뺀다.
+    const overlap = () => {
+      const sel = 'a, button, summary, input, select, [role="button"], [onclick]'
+      const els = []
+      for (const el of document.querySelectorAll(sel)) {
+        const r = el.getBoundingClientRect(); if (r.width < 1 || r.height < 1) continue
+        let hid = false; for (let e = el; e; e = e.parentElement) { const s = getComputedStyle(e); if (s.display === 'none' || s.visibility === 'hidden') { hid = true; break } } if (hid) continue
+        els.push([el, r])
+      }
+      const name = el => el.tagName.toLowerCase() + ((el.getAttribute('class') || '').split(/\s+/).filter(Boolean)[0] ? '.' + el.getAttribute('class').split(/\s+/).filter(Boolean)[0] : '')
+      let n = 0; const kinds = {}
+      for (let i = 0; i < els.length; i++) for (let j = i + 1; j < els.length; j++) {
+        const [a, ra] = els[i], [b, rb] = els[j]
+        if (a.contains(b) || b.contains(a)) continue
+        const w = Math.min(ra.right, rb.right) - Math.max(ra.left, rb.left), h = Math.min(ra.bottom, rb.bottom) - Math.max(ra.top, rb.top)
+        if (w > 1 && h > 1) { n++; const k = [name(a), name(b)].sort().join(' ↔ '); kinds[k] = (kinds[k] || 0) + 1 }
+      }
+      return { n, all: els.length, top: Object.entries(kinds).sort((x, y) => y[1] - x[1]).slice(0, 3).map(([k, v]) => `${k} ${v}`) }
+    }
+    const listO = await tp.evaluate(overlap)
+    // ⑫-⑦ 390 첫 화면 카드 수 + 글자 폭 +10% 덧입힘(2026-11-19 · 우편함 「코드·운영 — 15장」 · 순위표 5위 · 표시층 2단계 회신 2 ⑦ 1) — ℹ️ 수치만(판정 0).
+    //    공고 탭 첫 화면(스크롤 0 · 창 높이 844) 안에 위 끝이 든 보이는 카드(.hcard) 수 · 아래 끝까지 든 수.
+    //    덧입힘 = 모든 요소에 letter-spacing +0.1em(한글 한 자 ≈ 1em 이라 글자 폭 +10% 근사 — Windows 글꼴이 같은 글자를 두 줄로 꺾은 꼴 · 11-19 검증) → 다시 잰 뒤 걷는다.
+    const fold = () => {
+      scrollTo(0, 0)
+      const H = innerHeight; let top = 0, full = 0
+      for (const c of document.querySelectorAll('.hcard')) {
+        if (c.offsetParent === null) continue
+        const r = c.getBoundingClientRect(); if (r.height < 1) continue
+        if (r.top < H && r.bottom > 0) { top++; if (r.bottom <= H) full++ }
+      }
+      const first = [...document.querySelectorAll('.hcard')].find(c => c.offsetParent !== null)
+      return { top, full, firstH: first ? Math.round(first.getBoundingClientRect().height) : null }
+    }
+    const fold0 = await tp.evaluate(fold)
+    await tp.evaluate(() => { const st = document.createElement('style'); st.id = 'zf-health-wide'; st.textContent = '*{letter-spacing:.1em !important}'; document.head.appendChild(st) })
+    await tp.waitForTimeout(500)
+    const fold1 = await tp.evaluate(fold)
+    await tp.evaluate(() => { document.getElementById('zf-health-wide')?.remove() })
+    await tp.waitForTimeout(300)
     await tp.evaluate(() => {
       const c = [...document.querySelectorAll('.hcard')].find(e => e.offsetParent !== null); if (!c) return
       const id = c.getAttribute('data-card-id') || (c.querySelector('[id^="ncard-"]') || {}).id || c.id
@@ -1350,6 +1413,7 @@ try {
     })
     await tp.waitForTimeout(5000)
     const detS = await tp.evaluate(small)
+    const detO = await tp.evaluate(overlap)
     const detH = await tp.evaluate(styleHits)
     await tctx.close()
     {
@@ -1369,8 +1433,18 @@ try {
     add('watch_target44', '누르는 자리 44px 미만 수(390 공고 탭 · 카드 펼침) — 정보', 'info',
       `공고 탭 ${listS.n}/${listS.all}(${listS.top.join(' · ')}) · 카드 펼침 ${detS.n}/${detS.all}(${detS.top.join(' · ')})`,
       '정보 — 판정하지 않는다 · axe target-size(24px) 밖이라 직접 셈 · 보이는 a·button·summary·input·select·[role=button]·[onclick] 중 너비나 높이 < 44')
+    extra.watch_overlap = { list: listO, detail: detO }
+    add('watch_overlap', '누르는 자리 겹침 쌍 수(390 공고 탭 · 카드 펼침) — 정보', 'info',
+      `공고 탭 ${listO.n}쌍/${listO.all}개${listO.top.length ? '(' + listO.top.join(' · ') + ')' : ''} · 카드 펼침 ${detO.n}쌍/${detO.all}개${detO.top.length ? '(' + detO.top.join(' · ') + ')' : ''}`,
+      '정보 — 판정하지 않는다 · 보이는 a·button·summary·input·select·[role=button]·[onclick] 두 사각형이 1px 넘게 겹치는 쌍(조상·자손 빼고) · 줄어드는 쪽이 목표 · 결과 표로 추이를 본다')
+    extra.watch_fold = { base: fold0, wide: fold1 }
+    add('watch_fold', '390 첫 화면 카드 수 · 글자 폭 +10% 덧입힘 — 정보', 'info',
+      `첫 화면 카드 ${fold0.top}장(끝까지 ${fold0.full}) · 첫 카드 ${fold0.firstH ?? '?'}px → 글자 폭 +10% ${fold1.top}장(끝까지 ${fold1.full}) · 첫 카드 ${fold1.firstH ?? '?'}px`,
+      '정보 — 판정하지 않는다 · 공고 탭 스크롤 0 · 창 390×844 안에 위 끝이 든 보이는 .hcard 수(끝까지 든 수) · 덧입힘 = letter-spacing +0.1em(한글 한 자 ≈ 1em — Windows 글꼴 근사) · 2장 밑으로 떨어지는 날을 숫자로 본다')
   } catch (e) {
     add('watch_title', 'title 속성 수(원본 · 390 공고 탭 DOM) — 추이(정보)', 'info', '못 잼: ' + String(e).slice(0, 160), '정보')
+    add('watch_overlap', '누르는 자리 겹침 쌍 수(390 공고 탭 · 카드 펼침) — 정보', 'info', '못 잼: ' + String(e).slice(0, 160), '정보')
+    add('watch_fold', '390 첫 화면 카드 수 · 글자 폭 +10% 덧입힘 — 정보', 'info', '못 잼: ' + String(e).slice(0, 160), '정보')
     add('watch_target44', '누르는 자리 44px 미만 수(390 공고 탭 · 카드 펼침) — 정보', 'info', '못 잼: ' + String(e).slice(0, 160), '정보')
   }
   // ⑫-④ 느린 망 로드 순서 — 둘째·셋째 <script> 사이 8초 멈춤(2026-11-12 · 우편함 「코드·운영 — 🔴 LH 목록 마감 … + 0장」 3 · #990 ⑦)
