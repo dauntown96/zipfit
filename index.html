@@ -14598,10 +14598,14 @@ function zf3DecorateIn(list, rowsMap, isMatch){
     if(card.dataset.zf3 === '1' && zfSide.loaded && card.dataset.zf3Hour !== '1'){
       card.dataset.zf3Hour = '1';
       const pill = card.querySelector('.zf3-dpill'), today = zf3Today();
-      if(pill && pill.textContent === '오늘 마감'){
+      // 🔵 2026-11-19(우편함 「표시층 — 회귀 고침: 오늘 마감 남은 시간」 2) — 재편(zf12PillTidy)이 먼저 돌면 알약은 이미 상태 글자(「접수 중」)라
+      //    원래 글자를 dataset.zf12Raw 에서 본다(순서와 무관하게). 차수 카드 「이번 차수 오늘 마감」도 같은 꼴(앞말 「이번 차수 」를 그대로 붙인다 · 새 낱말 0).
+      const base = pill && pill.dataset.zf12Shown && pill.textContent === pill.dataset.zf12Shown ? (pill.dataset.zf12Raw || '') : (pill ? pill.textContent : '');
+      const pre = base === '오늘 마감' ? '' : base === '이번 차수 오늘 마감' ? '이번 차수 ' : null;
+      if(pill && pre !== null){
         const e = zfEndHmOf(zfDedupKey(n['공고명']), today);
         if(e){
-          pill.dataset.zf3Hm = e.hm; pill.dataset.zf3End = today + 'T' + e.hm;
+          pill.dataset.zf3Hm = e.hm; pill.dataset.zf3End = today + 'T' + e.hm; pill.dataset.zf3Pre = pre;
           pill.title = '공고 원문 접수기간: ' + e.tip;
           if(e.parts){
             const top = pill.parentElement, p = document.createElement('p');
@@ -14992,8 +14996,8 @@ function zf3TickHour(pill){
     // 🔵 2026-10-28(우편함 「표시층 — … 오늘 마감 「N시간 M분 남음」」 ③ · 다운님 결정 A) — 시간을 내려 버리지 않는다(6시간 19분이 「6시간」으로 보였다).
     //    1시간 아래는 분만 · 0분이면 「N시간」만. 분은 올림이다 — 15:59:30 이 「0분 남음」이 되지 않게(남은 것이 있으면 1분 이상).
     const mins = Math.ceil(left / 60000), h = Math.floor(mins / 60), m = mins % 60;
-    pill.textContent = `오늘 ${hm}까지 · ${h ? h + '시간' + (m ? ' ' + m + '분' : '') : m + '분'} 남음`;
-  } else pill.textContent = `오늘 ${hm} 마감 시각 지남`;
+    pill.textContent = `${pill.dataset.zf3Pre || ''}오늘 ${hm}까지 · ${h ? h + '시간' + (m ? ' ' + m + '분' : '') : m + '분'} 남음`;
+  } else pill.textContent = `${pill.dataset.zf3Pre || ''}오늘 ${hm} 마감 시각 지남`;
 }
 let zf3HourT = null;
 function zf3HourTimer(){
@@ -16131,7 +16135,10 @@ function zf12PillTidy(card){
   const status = cls.contains('open') ? '접수 중' : cls.contains('before') ? '접수 예정' : parts[0];
   let left = '';
   if(cls.contains('open') || cls.contains('before') || /D-\d+|오늘/.test(raw)){
-    const dPart = parts.find(x => /D-\d+|오늘|시간 남음/.test(x)) || (parts[0] !== status ? parts[0] : '');
+    // 🔵 2026-11-19(우편함 「표시층 — 회귀 고침: 오늘 마감 남은 시간」 1) — 「오늘 16:00까지 · 2시간 8분 남음」은 두 조각이 한 말이다 —
+    //    종전에는 첫 조각만 옮겨 「n시간 m분 남음」이 버려졌다(2026-10-28 다운님 결정 A 회귀). 바로 뒤 조각이 「… 남음」이면 함께 옮긴다.
+    const di = parts.findIndex(x => /D-\d+|오늘|시간 남음/.test(x));
+    const dPart = di >= 0 ? parts[di] + (parts[di + 1] && /분 남음$|시간 남음$/.test(parts[di + 1]) ? ' · ' + parts[di + 1] : '') : (parts[0] !== status ? parts[0] : '');
     left = /^(접수 중|접수 예정)$/.test(dPart) ? '' : dPart;
   }
   pill.dataset.zf12Shown = status;
