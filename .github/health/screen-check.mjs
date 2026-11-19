@@ -1039,9 +1039,30 @@ try {
         value = `상세 ${r.x},${r.y} ${r.w}×${r.h} · 화면 ${r.W}×${r.H} · 가운데 점 ${r.inside ? '상세 안' : '상세 밖'}`
       }
     } catch (e) { value = '못 잼: ' + String(e.message || e).slice(0, 120) }
+    // ⑦-1a4 펼친 상세 공고일 칸(2026-11-19 · 우편함 「코드·운영 — 12장」 6 · 표시층 「회귀 고침 2」 회신 ⑦) — 겉 줄 구성이 바뀔 때
+    //    상세 날짜 칸이 조용히 비는 것(#1137 앞 회귀)을 막는다. 같은 문맥에서 분석 끝난 첫 카드(.zf-ana-pending 밖 — 분석 전 카드는 날짜 칸을 일부러 숨긴다)를
+    //    펼쳐 .detail-grid .zf-dcell-date 중 이름이 「공고일」이고 보이는 칸을 센다. SIMULATE=detail_date 이면 0 으로 잰다(실패해야 맞다).
+    let dv = '', dok = false
+    try {
+      const go2 = dp.locator('#notice-list .hcard:not(.zf-ana-pending) .zf3-go').first()
+      if (await go2.count()) {
+        const opened = await go2.evaluate(el => el.closest('.hcard').classList.contains('zf3-open'))
+        if (!opened) { await go2.scrollIntoViewIfNeeded(); await go2.click(); await dp.waitForTimeout(1500) }
+        const d = await go2.evaluate(el => {
+          const c = el.closest('.hcard')
+          const vis = [...c.querySelectorAll('.detail-grid .zf-dcell-date')].filter(x => x.getClientRects().length > 0)
+          return { aid: String(c.getAttribute('data-announcement-id') || ''), n: vis.filter(x => /공고일/.test((x.querySelector('span') || {}).textContent || '')).length }
+        })
+        if (process.env.SIMULATE === 'detail_date') d.n = 0
+        dok = d.n >= 1
+        dv = `…${d.aid.slice(-5)} 펼친 상세 공고일 칸 ${d.n}`
+      } else dv = '분석 끝난 카드 없음(셈 밖)'
+    } catch (e) { dv = '못 잼: ' + String(e.message || e).slice(0, 120) }
     await dctx.close()
     add('detail_1280', '1280 · 움직임 켬 — 펼친 상세 패널이 화면 안에 보인다', ok ? 'pass' : 'fail', value,
       '첫 카드 꺾쇠 클릭 → 상세 너비·높이 > 200 · 화면 안 · 가운데 점 = 상세 안 요소')
+    add('detail_date', '펼친 상세에 공고일 칸이 하나 이상 보인다', dv.startsWith('분석 끝난 카드 없음') ? 'skip' : dok ? 'pass' : 'fail', dv,
+      '≥ 1 — 분석 끝난 첫 카드 펼침 · .detail-grid .zf-dcell-date 중 「공고일」 · 보임(getClientRects) · 겉 줄 구성 바뀜이 상세 날짜를 비우지 않게(#1137)')
   }
   // ⑦-1b 완화 배지 글자(2026-10-15 · 우편함 「표시층 — 완화 배지 글자 …」 1 · 원칙 33) — 완화 공고 배지가 원문에 없는 모집 꼴을 말하지 않는가.
   //    종전에는 완화 카드 전부가 「🔓 자격완화 추가모집」이었다(열린 완화 12 중 제목에 「추가모집」 1). 기대 갈래는 DB 에서 **따로** — 목록 RPC 완화 행의
