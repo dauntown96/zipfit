@@ -692,6 +692,47 @@ try {
     add('open_count', '숫자가 말하는 「지금」 — 열린 공고 수 한 정의 · 누적 표기', ok ? 'pass' : 'fail', value,
       '공고 탭 기본 머리 = 「열린 공고 M건」 + 「접수 중 a · 예정 b[ · 미상 k]」 · a+b+k = M · a = 인사이트 「접수 중」 KPI · 인사이트 머리 「지금 열린 공고 M건」 · M = zfOpenNotices(noticeData) · 누적 T·기간 = DB')
   }
+  // ⑦-0′ 같은 수 두 곳(2026-11-19 · 우편함 「코드·운영 — 18장」 3 · 순위표 16위 · 10-20 다운님 실사용 「3일 안 마감 14 ↔ 13」) — ⚠️·ℹ️만(실패 0).
+  //    기본 거름(조건 0 · 숨기기 켬)의 공고 탭 머리 칩과 인사이트가 같은 공고를 세는 자리를 화면 글자로 맞댄다(화면 함수를 다시 부르지 않는다 — 보이는 숫자끼리):
+  //    ⓐ 칩 「3일 안 마감」 = 숫자판 「3일 안 마감」 = 「앞으로 14일 마감」 막대 오늘~3일 뒤 네 칸 합(index.html 주석이 같다고 밝힌 셋) — 어긋나면 ⚠️
+  //    ⓑ 칩 「새 공고 · 3일」 = 숫자판 「새 공고 · 3일」 — 어긋나면 ⚠️
+  //    ⓒ 칩 「오늘 마감」 ↔ 막대 오늘 칸 — 술어가 다르다(칩 = 접수 중 ∧ 이번 차수 마감 오늘 · 막대 = 마감일 오늘) · 차이는 ℹ️ 로 적기만.
+  //    SIMULATE=same_count 면 칩 「3일 안 마감」 숫자에 1을 더해 잰다(⚠️ 가 떠야 맞다).
+  {
+    const sc = await page.evaluate(async sim => {
+      if (typeof goMain !== 'function' || typeof loadInsightData !== 'function') return { err: '화면 함수 없음' }
+      goMain(2)
+      activeNoticeRegion = null; activeNoticeType = null; activeNoticeStatus = null; activeNoticeTarget = null
+      const q = document.getElementById('noticeSearchInput'); if (q) q.value = ''
+      const chk = document.getElementById('hideClosedChk'); if (chk) chk.checked = true
+      applyNoticeFiltersAndRender()
+      const num = t => { const m = String(t || '').replace(/,/g, '').match(/\d+/); return m ? Number(m[0]) : null }
+      const chips = {}
+      document.querySelectorAll('#zf3NoticeHead .zf3-stats .zf3-stat').forEach(b => { const n = num((b.querySelector('b') || {}).textContent); const bt = ((b.querySelector('b') || {}).textContent || ''); const l = b.textContent.trim().slice(bt.trim().length).trim(); chips[l] = n })
+      if (sim && chips['3일 안 마감'] != null) chips['3일 안 마감']++
+      goMain(3)
+      insightLoaded = false
+      await loadInsightData()
+      const kpi = {}
+      document.querySelectorAll('#insightContent .zf3-kpi .zf3-kc').forEach(k => { kpi[(k.querySelector('span') || {}).textContent?.trim()] = num((k.querySelector('b') || {}).textContent) })
+      const bars = [...document.querySelectorAll('#insightContent .zf3-tl .zf3-tc')].map(c => ({ n: num((c.querySelector('.n') || {}).textContent) || 0, hot: c.classList.contains('hot') }))
+      goMain(2)
+      return { chips, kpi, bars }
+    }, process.env.SIMULATE === 'same_count')
+    let status = 'warn', value
+    if (sc.err) value = `못 잼(${sc.err})`
+    else {
+      const c3 = sc.chips['3일 안 마감'], k3 = sc.kpi['3일 안 마감'], b3 = sc.bars.filter(b => b.hot).reduce((a, b) => a + b.n, 0)
+      const cN = sc.chips['새 공고 · 3일'], kN = sc.kpi['새 공고 · 3일'], c0 = sc.chips['오늘 마감'], b0 = sc.bars.length ? sc.bars[0].n : null
+      const okA = c3 != null && c3 === k3 && k3 === b3 && sc.bars.filter(b => b.hot).length === 4
+      const okB = cN != null && cN === kN
+      status = okA && okB ? (c0 === b0 ? 'pass' : 'info') : 'warn'
+      value = `3일 안 마감 — 칩 ${c3 ?? '?'} · 숫자판 ${k3 ?? '?'} · 막대 넷 합 ${b3}${okA ? '' : ' ✗'} · 새 공고 3일 — 칩 ${cN ?? '?'} · 숫자판 ${kN ?? '?'}${okB ? '' : ' ✗'} · (ℹ️) 오늘 마감 칩 ${c0 ?? '?'} ↔ 막대 오늘 ${b0 ?? '?'}${c0 === b0 ? '' : '(술어 다름 — 관찰)'}`
+      extra.same_count = sc
+    }
+    add('same_count', '같은 수 두 곳 — 머리 칩 ↔ 인사이트 숫자판 ↔ 14일 막대(기본 거름)', status, value,
+      '칩 「3일 안 마감」 = 숫자판 = 막대 오늘~3일 뒤 합 · 칩 「새 공고 · 3일」 = 숫자판 — 어긋나면 ⚠️ · 칩 「오늘 마감」 ↔ 막대 오늘 칸은 술어가 달라 ℹ️ · 실패 0')
+  }
   // ⑦-0 경계 판 갈이(2026-10-16 · 우편함 「표시층 — 지도 2026-07-01 개편 반영」 6) — 열린 카드가 말하는 시·군·구 이름 중 지도 경계 파일(배포본 ZF3_GEO)에 없는 것.
   //    행정구역이 바뀌면(통합·분할·새 구) 수집 이름이 먼저 바뀌고 지도만 옛 판에 남는다 — 2026-07-01 개편을 다운님이 먼저 찾았다(전남광주 · 인천 4구 · 화성 4구).
   //    0 이 아니면 경고만(멈춤 아님 · 이슈를 열지 않는다) — 새 판(vuski/admdongkor)을 받아 scripts/geo-build.py 를 돌릴 때다.

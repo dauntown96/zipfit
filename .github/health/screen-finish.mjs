@@ -70,8 +70,27 @@ if (process.env.PW_RAN !== '1') {
     extra.persona_walk = { hits: w.hits.length, screen_ok: okHits.length, kept: w.kept || null }
   }
 }
-const rest = checks.filter(c => !['login_walk', 'simulate_login_walk', 'persona_walk', 'simulate_persona_walk'].includes(c.id))
-const all = [...rest, login, persona]
+// ①″ 화면 퍼즈 항목(2026-11-19 · 우편함 「코드·운영 — 18장」 2) — 브랜치 점검(PR · ref)만 돈다 · 입력 screen-fuzz.json(scripts/screen-fuzz.mjs 의 FUZZ_JSON) · 환경 FZ_RAN=1.
+const FZ_NAME = '화면 퍼즈(목록·곁 표 응답 오염 → 스크립트 실행 0 · 브랜치 점검)'
+const FZ_RULE = '실행 · 만들어진 요소([data-zfx]) · javascript: 링크가 모두 0 이면 통과 · 하나라도 있으면 ❌(XSS 구멍 — 고침은 표시층) · 못 돌면 ⚠️'
+let fuzz
+if (process.env.FZ_RAN !== '1') {
+  fuzz = { id: 'screen_fuzz', name: FZ_NAME, status: 'skip', value: '이 실행은 퍼즈를 돌지 않는다(배포본 실행 — PR · ref 브랜치 점검만)', rule: FZ_RULE }
+} else {
+  let f = null
+  try { f = JSON.parse(readFileSync('screen-fuzz.json', 'utf8')) } catch {}
+  const sim = !!f?.simulate
+  if (!f || f.blind || !f.poisoned?.list) {
+    fuzz = { id: 'screen_fuzz', name: FZ_NAME, status: 'warn', value: f ? `못 잼 — ${(f.errors || []).join(' / ').slice(0, 200)}` : '결과 없음(스크립트가 못 돎 · 시간 초과 300초)', rule: FZ_RULE }
+  } else {
+    const hole = f.exec || f.elems || f.jsLinks
+    fuzz = { id: sim ? 'simulate_screen_fuzz' : 'screen_fuzz', name: FZ_NAME + (sim ? ' — 시험 구멍(simulate=fuzz)' : ''), status: hole ? 'fail' : 'pass',
+      value: `실행 ${f.exec} · 요소 ${f.elems} · javascript 링크 ${f.jsLinks} · 펼친 카드 ${f.opened} · 쪽 ${f.pagesSeen} · 화면 ${(f.views || []).join('·')} · 오염 글자 ${f.poisoned.strings} · URL ${f.poisoned.urls} · 곁 표 ${f.poisoned.side}`, rule: FZ_RULE }
+    extra.screen_fuzz = { exec: f.exec, elems: f.elems, jsLinks: f.jsLinks, opened: f.opened }
+  }
+}
+const rest = checks.filter(c => !['login_walk', 'simulate_login_walk', 'persona_walk', 'simulate_persona_walk', 'screen_fuzz', 'simulate_screen_fuzz'].includes(c.id))
+const all = [...rest, login, persona, fuzz]
 
 // ② 실행 요약 DB 한 줄(점검 단계의 시각 그대로 — 발송 뒤 90분 안 기록 셈과 맞춘다)
 if (process.env.SCREEN_RECORD !== '0') {
