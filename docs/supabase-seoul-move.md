@@ -7,14 +7,13 @@
 
 ## 1. 의존 목록
 
-### 1-0. 이전 날 바꿀 자리 = 3곳(ref) + anon 키 4곳 — 서울 이전 준비 ①(2026-11-19 · 마이그레이션 `2026-11-19_02_seoul_prep_project_ref`)
+### 1-0. 이전 날 바꿀 자리 = 3곳(ref·anon 키 함께) — 서울 이전 준비 ①(2026-11-19 · 마이그레이션 `2026-11-19_02_seoul_prep_project_ref`) · ①′(같은 날 · `2026-11-19_03_seoul_prep_anon_key`)
 
 | # | 자리 | 바꾸는 법 |
 |---|---|---|
-| 1 | **DB** `zipfit_ops.project_self` 한 행(`ref`) — `public.ops_project_url()`이 읽어 cron 14잡 · `analysis_dispatch_tick` · `ops_uptime_ping`이 주소를 만든다 | 새 DB에서 `update zipfit_ops.project_self set ref = '<새 ref>', updated_at = now();`(데이터 쓰기 · 관리 API) |
-| 2 | **저장소** `supabase/config.toml` `project_id` — `deploy-functions.yml`(「프로젝트 ref 읽기」 단계) · `.github/db/migrate.py` · `.github/health/lib.mjs` · `visual.mjs` · `scripts/` 5가 이 줄을 읽는다 | 한 줄 PR |
-| 3 | **화면** `index.html` `SUPABASE_URL` · `PROFILE_API_URL` · `DELETE_ACCOUNT_API_URL`(ref 글자 3줄) | 표시층과 겹치지 않는 회차에 · `sw.js` `CACHE_NAME` +1(원칙 9) |
-| 4 | **anon 키**(ref 글자는 아니지만 새 프로젝트에서 바뀐다) — `index.html` `SUPABASE_ANON_KEY` · `.github/health/lib.mjs` `ANON_KEY` · `.github/db/migrate.py` 공개 REST 확인 키 · DB `ops_uptime_ping` `v_anon` | 3과 같은 PR + `ops_uptime_ping`은 마이그레이션(원칙 32) |
+| 1 | **DB** `zipfit_ops.project_self` 한 행(`ref` · `anon_key`) — `public.ops_project_url()`이 읽어 cron 14잡 · `analysis_dispatch_tick` · `ops_uptime_ping`이 주소를 만들고, `public.ops_project_anon_key()`가 읽어 `ops_uptime_ping`이 공개 REST를 부른다 | 새 DB에서 `update zipfit_ops.project_self set ref = '<새 ref>', anon_key = '<새 anon 키>', updated_at = now();`(데이터 쓰기 · 관리 API) |
+| 2 | **저장소** `supabase/config.toml` `project_id`(ref) + `supabase/public-anon-key.txt`(anon 키 한 줄) — `deploy-functions.yml`(「프로젝트 ref 읽기」 단계) · `.github/db/migrate.py` · `.github/health/lib.mjs` · `visual.mjs` · `scripts/` 5가 읽는다(anon 키는 `migrate.py` 공개 REST 확인 · `lib.mjs` `ANON_KEY`) | 두 줄 한 PR |
+| 3 | **화면** `index.html` `SUPABASE_URL` · `PROFILE_API_URL` · `DELETE_ACCOUNT_API_URL`(ref 글자 3줄) · `SUPABASE_ANON_KEY` | 표시층과 겹치지 않는 회차에 · `sw.js` `CACHE_NAME` +1(원칙 9) |
 
 - 문서·기록은 바꾸지 않아도 동작에 영향 없음: `CLAUDE.md` 「Supabase 설정」(URL · anon 키 · 「싱가포르」) · `docs/network-allowlist.md`(클라우드 환경 허용 목록에 새 호스트 한 줄 — 다운님) · `docs/history.md` · `docs/dictionary/recheck-baseline.json`(뽑은 기록) · 적용된 `supabase/migrations/*`(적용 기록 — 고치지 않는다).
 - `docs/cron-jobs.sql`은 ref 글자 0 — 새 DB에서 그대로 돌리면 된다(1번 행이 먼저 있어야 한다 · 마이그레이션이 덤프의 `zipfit_ops`로 따라간다).
@@ -23,13 +22,13 @@
 
 | 자리 | 무엇 | 이전 때 |
 |---|---|---|
-| `index.html` | `SUPABASE_URL` · `SUPABASE_ANON_KEY` · EF `save-user-profile` · `delete-account` 주소 | 1-0 3·4 |
+| `index.html` | `SUPABASE_URL` · `SUPABASE_ANON_KEY` · EF `save-user-profile` · `delete-account` 주소 | 1-0 3 |
 | `sw.js` 32 | `supabase.co` 요청은 캐시 안 함(호스트 일반형) | 그대로 |
 | `CLAUDE.md` 「Supabase 설정」 · 「기술 스택」 DB 줄 | URL · anon 키 · 「싱가포르」 | 새 값 · 지역 |
 | `supabase/config.toml` `project_id` | 저장소의 유일한 ref 자리 | 1-0 2 |
-| `deploy-functions.yml` · `migrate.py` · `lib.mjs` · `visual.mjs` · `scripts/` 5 | ref는 1-0 2에서 읽음(2026-11-19 준비 ①) · `lib.mjs`·`migrate.py` anon 키는 글자 | 1-0 4 |
+| `deploy-functions.yml` · `migrate.py` · `lib.mjs` · `visual.mjs` · `scripts/` 5 | ref·anon 키는 1-0 2에서 읽음(2026-11-19 준비 ①·①′) | 1-0 2 |
 | `docs/cron-jobs.sql` | cron 32잡 사본 — EF 부르는 14잡은 `public.ops_project_url() || '/functions/v1/…'` | 그대로 |
-| DB 함수 `analysis_dispatch_tick` · `ops_uptime_ping` | 주소는 `ops_project_url()` · `ops_uptime_ping` anon 키는 글자 | 1-0 1·4 |
+| DB 함수 `analysis_dispatch_tick` · `ops_uptime_ping` | 주소는 `ops_project_url()` · anon 키는 `ops_project_anon_key()` | 1-0 1 |
 | `supabase/migrations/*`(옛 적용 파일) | 옛 ref URL | 고치지 않는다(적용 기록) |
 | `docs/network-allowlist.md` | 컨테이너 허용 목록 줄 `khdpjjyspmlqtzperoqg.supabase.co` | 클라우드 환경 「Default」에 새 호스트 한 줄(다운님) |
 
@@ -55,7 +54,7 @@
 |---|---|---|
 | cron | 32잡 — `net.http_post`로 EF 부르는 잡 14(주소 = `public.ops_project_url()` · `cron_secret_v2` · 2026-11-19 준비 ①로 ref 글자 0 · 조사 때 「15」는 1 많게 셈) · 함수 부르는 잡 · 정리 잡 | `cron` 스키마는 백업 덤프 밖 → `docs/cron-jobs.sql` 그대로 다시 만듦(1-0 1 행 먼저) · 🔴 옛 프로젝트 잡은 먼저 끔 |
 | Vault | 7 — `cron_secret_v2` · `gdrive_client_id` · `gdrive_client_secret` · `gdrive_refresh_token` · `github_actions_dispatch_token` · `zipfit_routine_fire_token` · `zipfit_routine_fire_url` | 값은 프로젝트 키로 암호화 → 새 프로젝트에서 못 풂(키 옮기기는 아래 3장) · 다시 넣음(다운님) |
-| DB가 바깥을 부르는 함수 | `ops_health_dispatch` · `ops_screen_dispatch` · `ops_backup_dispatch` · `ops_backup_poll` → `api.github.com` · `ops_uptime_ping` → `kkokzip.com` · 자기 REST · `analysis_dispatch_tick` → 자기 EF · 루틴 발사 URL | 자기 주소는 1-0 1 한 행(`ops_project_url()`) · `ops_uptime_ping` anon 키 |
+| DB가 바깥을 부르는 함수 | `ops_health_dispatch` · `ops_screen_dispatch` · `ops_backup_dispatch` · `ops_backup_poll` → `api.github.com` · `ops_uptime_ping` → `kkokzip.com` · 자기 REST · `analysis_dispatch_tick` → 자기 EF · 루틴 발사 URL | 자기 주소·anon 키는 1-0 1 한 행(`ops_project_url()` · `ops_project_anon_key()`) |
 | 확장 | pg_cron 1.6.4 · pg_net 0.20.3 · pg_stat_statements 1.11 · pgcrypto 1.3 · supabase_vault 0.3.1 · uuid-ossp 1.1 | 새 프로젝트에서 켬 |
 | 스키마 | public · zipfit_ops(우리) · auth · storage · cron · net · vault · graphql · realtime · supabase_migrations · extensions | auth는 공식 복원 길에 포함 |
 
@@ -104,12 +103,12 @@
 | # | 일 | 누가 | 화면 영향 |
 |---|---|---|---|
 | 0 | 새 프로젝트(서울 · Small) 만들기 · 확장 6 켜기 · 카카오 공급자 · 리디렉트 · 카카오 콘솔 새 콜백 더하기 · EF 비밀 7 · Better Stack 새 감시(꺼 둔 채) | 다운님 | 없음 |
-| 1 | 저장소 PR 준비(1-0 2·3·4 — `config.toml` `project_id` · `index.html` 3줄 + anon 키 · `lib.mjs`·`migrate.py` anon 키 · `ops_uptime_ping` anon 키 마이그레이션) — 병합은 6에서 · `docs/cron-jobs.sql`은 고칠 것 없음 | Claude Code | 없음 |
+| 1 | 저장소 PR 준비(1-0 2·3 — `config.toml` `project_id` · `supabase/public-anon-key.txt` · `index.html` 4줄) — 병합은 6에서 · `docs/cron-jobs.sql`·DB 함수는 고칠 것 없음 | Claude Code | 없음 |
 | 2 | 🔴 옛 프로젝트 cron 32 모두 끔(`cron.alter_job(…, active := false)`) · 진행 중 루틴 0 확인 | Claude Code(데이터 쓰기 · 승인 뒤) | 수집 멈춤 시작 |
 | 3 | 덤프 셋(roles · schema · data) | 다운님 PC 또는 Actions | 없음(읽기) |
 | 4 | 새 프로젝트에 복원 · pgsodium 루트 키 옮김(또는 Vault 7 값 다시 넣음) | 다운님 | 없음 |
 | 5 | 비교 SQL(아래 5장)로 옛 = 새 | Claude Code(읽기) | 없음 |
-| 6 | 새 DB `zipfit_ops.project_self` 행을 새 ref로(1-0 1 · 덤프가 옛 ref를 싣고 온다 — `docs/cron-jobs.sql`보다 먼저) → PR 병합 → EF 17 배포 · `ops_uptime_ping` 적용 · `docs/cron-jobs.sql` 새 DB에서 실행 · 화면 새 ref 배포(`CACHE_NAME` +1) | Claude Code | 🔴 전환 순간 — 로그인 사용자는 다시 로그인 |
+| 6 | 새 DB `zipfit_ops.project_self` 행을 새 ref·anon 키로(1-0 1 · 덤프가 옛 값을 싣고 온다 — `docs/cron-jobs.sql`보다 먼저) → PR 병합 → EF 17 배포 · `docs/cron-jobs.sql` 새 DB에서 실행 · 화면 새 ref 배포(`CACHE_NAME` +1) | Claude Code | 🔴 전환 순간 — 로그인 사용자는 다시 로그인 |
 | 7 | health-ops · health-screen · 공개 REST · 로그인 확인 · Better Stack 새 감시 켬 · 옛 감시 끔 · `zipfit-backup` Secret 바꿈 | 함께 | — |
 | 8 | 옛 프로젝트는 일시 중지(읽기 보존 · 되돌림 대비) → 며칠 뒤 삭제 | 다운님 | — |
 
