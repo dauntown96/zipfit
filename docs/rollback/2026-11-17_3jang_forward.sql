@@ -11,7 +11,7 @@ end $$;
 -- 0장 1 광명 9-8 302동(claude.ai 판정 — 공고문 「1-1+1R+입주자+모집공고.pdf」 p.27 「3단지 301동, 302동은 복도식 구조로…」 · juso 결과 ③)
 insert into public.complex_geo (matched_from, source, road_address, adm_cd, rn_mgt_sn, bd_mgt_sn, bd_nm, udrt_yn, buld_mnnm, buld_slno, ent_x, ent_y, lat, lng, source_url, note)
 values ('경기도 광명시 광명1동 9-8번지 일원 302동', 'juso', '경기도 광명시 사성로103번길 26 (광명동, 광명자이더샵포레나 3단지)', '4121010100', '412104361155', '4121010100100090008000591', '광명자이더샵포레나 3단지', '0', 26, 0,
-        943922.1707550667, 1943719.095635267, 37.49102081810927, 126.8656435239427,
+        null, null, null, null,  -- 🔴 좌표 넷(ent_x·ent_y·lat·lng — juso_coord)은 2026-11-19 걷었다(우편함 「코드·운영 — 11장」 · 행안부 답: 좌표제공 API 결과는 국내 서버에만 · 실행된 것은 그날 값)
         'https://business.juso.go.kr/addrlink/addrLinkApi.do · https://business.juso.go.kr/addrlink/addrCoordApi.do',
         'juso 정확 결과 3건 중 ③ — 사람 판정(claude.ai 2026-11-17 · 공고문 「1-1+1R+입주자+모집공고.pdf」 p.27 「3단지 301동, 302동은 복도식 구조로…」) · 좌표 juso_coord · pyproj(2026-11-17 KST)');
 update public.complex_geo_attempts set outcome = 'picked', tries = tries + 1, tried_at = now(),
