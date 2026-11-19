@@ -1457,6 +1457,27 @@ html[data-ui="d3"] #zf3NoticeHead .zf3-ctl .zf3-vseg button{padding:0 10px}
 html[data-ui="d3"] .zf3-stat{flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;padding:4px 8px;white-space:nowrap}
 html[data-ui="d3"] .zf3-stat b{font-size:var(--t-l)}
 @media (max-width:370px){html[data-ui="d3"] .zf3-stat{white-space:normal}}
+/* 🔵 2026-11-19(우편함 「표시층 — 디자인 2차 3단계」 · 다운님 판정 16:18 — 안 A · A · 묶음 그대로) */
+/* 1 ★ 눌림 꼴 — ★ 눌림은 테두리만 짙게(바탕 그대로) → 「전체」 검은 알약과 둘이 함께 검게 보이지 않는다(다운님 판정 16:18 안 A) */
+html[data-ui="d3"] #zf3NoticeHead .zf3-tq .zf3-tq-mine[aria-pressed="true"]{background:var(--paper);color:var(--ink);border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+/* 2 갈래 링크(접수 중 a · 예정 b) 누르는 자리 — 종전 44px(margin -12)가 위 오늘 판·아래 정렬 줄과 8px씩 겹쳤다 → 그 틈 28px 안으로(겹침 0 · 24px 기준 위 · 다운님 판정 16:18 안 A — 44를 지키면 390 첫 화면 카드 2장이 깨진다) */
+html[data-ui="d3"] #zf3NoticeHead .zf3-stl{min-height:28px;margin:-4px 0}
+/* 3 펼친 상세 — 절 머리를 구역 머리(굵은 제목 + 오른쪽 ›)로 · 아래 절(공고문 원문 · 정책 안내 · 제출서류)은 한 묶음 「원문 자료」로 접는다(누르면 그 셋이 종전 그대로) */
+html.zf12 .zf12-card [id^="ncard-"] :is([id^="notes-slot-"],[id^="cutoff-slot-"],[id^="elig-slot-"],[id^="schedule-slot-"],[id^="attachments-slot-"],[id^="policy-slot-"],[id^="docs-slot-"]) > details > summary,
+html.zf12 .zf13-more > summary{list-style:none;display:flex;align-items:center;gap:6px;min-height:var(--hit);box-sizing:border-box;padding:10px 0;margin:0;font-size:var(--t-body);font-weight:700;cursor:pointer}   /* 글자색은 종전 그대로(절 머리마다의 토큰) */
+html.zf12 .zf13-more > summary{color:var(--ink)}
+html.zf12 .zf12-card [id^="ncard-"] :is([id^="notes-slot-"],[id^="cutoff-slot-"],[id^="elig-slot-"],[id^="schedule-slot-"],[id^="attachments-slot-"],[id^="policy-slot-"],[id^="docs-slot-"]) > details > summary::-webkit-details-marker,
+html.zf12 .zf13-more > summary::-webkit-details-marker{display:none}
+html.zf12 .zf12-card [id^="ncard-"] :is([id^="notes-slot-"],[id^="cutoff-slot-"],[id^="elig-slot-"],[id^="schedule-slot-"],[id^="attachments-slot-"],[id^="policy-slot-"],[id^="docs-slot-"]) > details > summary::after,
+html.zf12 .zf13-more > summary::after{content:"›";margin-left:auto;padding-left:8px;font-size:var(--t-l);font-weight:400;line-height:1;color:var(--ink-3);transition:transform .15s}
+html.zf12 .zf12-card [id^="ncard-"] :is([id^="notes-slot-"],[id^="cutoff-slot-"],[id^="elig-slot-"],[id^="schedule-slot-"],[id^="attachments-slot-"],[id^="policy-slot-"],[id^="docs-slot-"]) > details[open] > summary::after,
+html.zf12 .zf13-more[open] > summary::after{transform:rotate(90deg)}
+@media (prefers-reduced-motion:reduce){html.zf12 .zf13-more > summary::after,html.zf12 .zf12-card [id^="ncard-"] [id$="-slot-"] summary::after{transition:none}}
+html.zf12 .zf12-card > [id^="ncard-"] .zf13-more{order:11;margin-top:12px;border-top:1px solid var(--line);padding-top:2px}
+html.zf12 .zf13-more > summary:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+html.zf12 .zf13-more-n{font-size:var(--t-sub);font-weight:400;color:var(--ink-3)}
+html.zf12 .zf13-more:not(:has(> div > div:not(:empty))){display:none}   /* 셋 다 빈 공고 — 묶음 머리도 그리지 않는다 */
+html.zf12 .zf13-more > div > .policy-wrap:first-child{margin-top:0}
 </style>
 </head>
 <body>
@@ -8730,6 +8751,14 @@ function toggleDetail(id, card, from){
       `<div id="policy-slot-${id}"></div>` +
       `<div id="docs-slot-${id}"></div>`;
     detailEl.appendChild(slots);
+    // 🔵 2026-11-19(디자인 2차 3단계 3 · 다운님 판정 16:18) — 새 카드 꼴(zf12)에서는 아래 절 셋(공고문 원문 · 정책 안내 · 제출서류)을 한 묶음으로 접는다.
+    //    슬롯 id·안의 그리기는 그대로(자리만 묶음 안으로) · 묶음을 펼치면 세 절이 종전 꼴로 보인다(사실 글자 변경 0).
+    if(typeof zf12On === 'function' && zf12On()){
+      const more = document.createElement('details'); more.className = 'zf13-more';
+      more.innerHTML = '<summary>원문 자료 <span class="zf13-more-n">공고문 원문 · 정책 안내 · 제출서류</span></summary><div></div>';
+      ['attachments', 'policy', 'docs'].forEach(k => { const s = slots.querySelector(`#${k}-slot-${CSS.escape(id)}`); if(s) more.lastElementChild.appendChild(s); });
+      slots.appendChild(more);
+    }
     renderSpecialNotes(cardEl, id);
     renderSupplySchedule(cardEl, id);
     loadScheduleLine(cardEl.dataset.announcementId || '', cardEl, id);
