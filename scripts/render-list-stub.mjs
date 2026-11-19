@@ -11,6 +11,7 @@
 // 쓰는 법(Playwright):
 //   import { stubListRpc } from '/home/user/zipfit/scripts/render-list-stub.mjs'
 //   const info = await stubListRpc(page)          // page.goto 전에 — 목록 POST 를 인자별 캐시로 돌려준다
+//   stubListRpc(page, { mutate: (buf, key) => buf })   // 선택 — 돌려주기 직전 응답 바이트를 바꾼다(퍼즈 점검 · 캐시 파일은 깨끗한 원본 그대로)
 //   console.log(info)                              // { dir, maxAgeMin, upstream, hits, keys: { '<인자>': { file, fetched, ageMin, bytes, hits } } } — 렌더가 진행되며 채워진다
 // 인자 키: 요청 본문 JSON 에서 null 값을 빼고 키를 정렬한 것 — 인자 없음 · {} · 전부 null 은 같은 키 '{}'(화면 zfRpcArgs 와 같은 거름).
 // 캐시 자리: 옵션 dir → 환경변수 ZIPFIT_RENDER_CACHE_DIR → 이 세션 scratchpad(/tmp/claude-*/…/<CLAUDE_CODE_SESSION_ID>/scratchpad) → os.tmpdir().
@@ -50,7 +51,7 @@ export function argKey(body) {
   return JSON.stringify(Object.fromEntries(kept.map(k => [k, o[k]])))
 }
 
-export async function stubListRpc(page, { dir, maxAgeMin = 30 } = {}) {
+export async function stubListRpc(page, { dir, maxAgeMin = 30, mutate = null } = {}) {
   dir = dir || process.env.ZIPFIT_RENDER_CACHE_DIR || sessionScratchpad() || tmpdir()
   mkdirSync(dir, { recursive: true })
   const info = { dir, maxAgeMin, upstream: 0, hits: 0, keys: {} }
@@ -102,7 +103,8 @@ export async function stubListRpc(page, { dir, maxAgeMin = 30 } = {}) {
     }
     if (!mine || r.cached) { info.hits++; info.keys[key].hits++ }
     info.keys[key].bytes = r.body.length
-    await route.fulfill({ status: 200, contentType: 'application/json; charset=utf-8', body: r.body })
+    // 🔵 2026-11-19(우편함 「코드·운영 — 18장」 2) — 퍼즈 점검(scripts/screen-fuzz.mjs)이 응답을 오염시켜 돌려줄 자리 · 캐시 파일은 그대로(오염본을 남기지 않는다).
+    await route.fulfill({ status: 200, contentType: 'application/json; charset=utf-8', body: mutate ? mutate(r.body, key) : r.body })
   })
   return info
 }
