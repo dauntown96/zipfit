@@ -45,47 +45,20 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
         run: bash scripts/skip-ci-check.sh
-      - name: Pages Liquid 글자
+      # 🔵 2026-11-19(우편함 「코드·운영 — 12장」) — 문서 검사 한 벌: Pages Liquid 글자(#785) · CLAUDE.md 「최근 작업 이력」 꼴 · 표 칸 수(CLAUDE.md · docs/history.md) ·
+      #    고지 문서 자리 표시 「{{」 — scripts/doc-check.sh 하나를 git pre-push 훅(.githooks/pre-push)과 같이 부른다(검사 두 벌 0). DB 를 부르지 않는다.
+      #    종전 세 단계(Pages Liquid 글자 · CLAUDE.md 이력 표 꼴 · 고지 문서 「{{」)를 합쳤다 — 판정 같음(이력 표 꼴의 경고 기간 HISTORY_FAIL_FROM 2026-10-20 은 지나 늘 실패였다).
+      - name: 문서 검사
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: bash scripts/pages-liquid-check.sh
-      # 🔵 2026-10-13(우편함 「코드 — 카드 머리 세대수」 0장 2) — CLAUDE.md 「최근 작업 이력」 꼴(그 절 머리 아래 표 한 벌 · 3행 · 행당 600B · 최신부터).
-      #    검사는 .claude/hooks/rule-check.py 의 history_problems() 한 벌(커밋 훅과 같은 함수 · 표준 라이브러리만 · DB 를 부르지 않는다).
-      #    처음 한 주는 경고만 — HISTORY_FAIL_FROM(KST 날짜)부터는 같은 문제를 실패로 낸다. 날짜를 옮기려면 이 값 한 줄만 고친다.
-      - name: CLAUDE.md 이력 표 꼴
-        env:
-          HISTORY_FAIL_FROM: '2026-10-20'
-        # 🔵 2026-10-18(우편함 「G8 확정 고침」 7) — 표 칸 수도 본다(CLAUDE.md · docs/history.md — 셀 안 `|` 는 `\|` · 행 끝 `|`). 같은 경고→실패 날짜를 따른다.
-        run: |
-          a=0; b=0
-          o1=$(python3 .claude/hooks/rule-check.py --history CLAUDE.md 2>&1) || a=1
-          o2=$(python3 .claude/hooks/rule-check.py --table-cols CLAUDE.md docs/history.md 2>&1) || b=1
-          out=$(printf '%s\n%s\n' "$o1" "$o2" | sed '/^$/d')
-          if [ "$a" = 0 ] && [ "$b" = 0 ]; then
-            echo "CLAUDE.md 「최근 작업 이력」 꼴 · 표 칸 수 — 통과"; exit 0
-          fi
-          printf '%s\n' "$out"
-          today=$(TZ=Asia/Seoul date +%F)
-          if [ "$today" \< "$HISTORY_FAIL_FROM" ]; then
-            printf '%s\n' "$out" | while IFS= read -r l; do echo "::warning::$l"; done
-            echo "경고만 — $HISTORY_FAIL_FROM(KST)부터 실패"; exit 0
-          fi
-          printf '%s\n' "$out" | while IFS= read -r l; do echo "::error::$l"; done
-          exit 1
+          DOC_CHECK_GH: '1'
+        run: bash scripts/doc-check.sh
       # 🔵 2026-10-29(우편함 「코드·운영 — 런칭 전날」 2) — index.html · sw.js 를 바꾼 PR 은 head CACHE_NAME = base + 1(원칙 9). 두 파일을 안 건드리면 건너뜀.
       #    DB 를 부르지 않는다 · scripts/ 파일이라 아래 「DB 파일을 건드렸나」의 다섯 경로에 들지 않는다.
       - name: CACHE 판(+1)
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: bash scripts/cache-bump-check.sh
-      # 🔵 2026-11-04(우편함 「코드·운영 — #732 지방공사 받기 …」 6 ② · 백로그 「네트워크 허용 문서가 낡았고 … 「{{」를 막는 PR 검사가 없다」) —
-      #    고지 문서(privacy.html · terms.html · notices.json)에 자리 표시 「{{」가 남은 채 main 으로 가면 실패. DB 를 부르지 않는다(grep 한 줄).
-      - name: 고지 문서 자리 표시 「{{」
-        run: |
-          hits=$(grep -n '{{' privacy.html terms.html notices.json 2>/dev/null || true)
-          if [ -z "$hits" ]; then echo "고지 문서 자리 표시 「{{」 0 — 통과"; exit 0; fi
-          printf '%s\n' "$hits" | while IFS= read -r l; do echo "::error::자리 표시가 남았다 — $l"; done
-          exit 1
       - name: DB 파일을 건드렸나
         id: scope
         env:
