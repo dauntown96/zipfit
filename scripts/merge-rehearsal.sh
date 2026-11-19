@@ -25,6 +25,11 @@
 #   ② 문법 검사: 그 단계에서 바뀐 .js·.mjs·.cjs 는 `node --check` · .html 은 인라인 <script>(src 없음 · JSON 제외)를 떠내 `node --check`
 #      — 실패면 「  ❌ 문법 오류: 파일 …」(겹쳐 붙은 `export const` 둘은 모듈 파싱에서 걸린다).
 #   예(#781 재현): bash scripts/merge-rehearsal.sh --squash --base 3e4640e c8a3604@87cd76d
+#   🔵 2026-11-19(우편함 「코드·운영 — 14장」 ② · 💡 「merge-rehearsal.sh 충돌 자리」) — 충돌 파일마다 자리를 줄로 낸다:
+#      「  └ 파일:줄~줄 (함수 이름)」 — 머지 결과 파일의 <<<<<<< ~ >>>>>>> 구간 · 함수 = 그 구간 첫 줄부터 위로 가장 가까운 function · 맨 앞 const … = ·
+#      CREATE FUNCTION · ## 머리 줄(없으면 생략). 한 파일 최대 8자리(넘으면 「… 외 N」).
+#      얕은 클론(.git/shallow)에서 기준과 가지의 merge-base 가 비면 `git fetch --deepen=400` 을 한 번 하고 다시 찾는다(2026-10-31 #726 —
+#      merge-base 가 비어 몸 대조가 엉뚱했다 · CLAUDE.md 컨테이너 메모 「얕은 클론」). 그래도 비면 「⚠️ 기준점 없음(얕은 클론)」을 찍는다.
 # 종료 코드: 충돌 0 ∧ 몸 대조 다름 0 ∧ 문법 오류 0 이면 0 · 하나라도 있으면 1 · 사용법·가져오기 실패는 2(판 경고는 넣지 않는다).
 # 🔴 원격에 아무것도 올리지 않는다(fetch 만) · 임시 작업트리(mktemp)에서만 머지한다 · 끝나면(오류여도) 작업트리를 지운다 ·
 #   지금 작업트리·가지·인덱스는 건드리지 않는다.
@@ -66,6 +71,45 @@ cleanup() { git worktree remove --force "$wt" >/dev/null 2>&1 || rm -rf "$wt"; g
 trap cleanup EXIT
 git worktree add -q --detach "$wt" "$base"
 
+# 얕은 클론 보정 — merge-base 가 비면 한 번 깊게 가져온다(💡 unshallow 흡수 · 2026-11-19)
+deepened=0
+mbase() {
+  local m
+  m=$(git merge-base "$1" "$2" 2>/dev/null || true)
+  if [ -z "$m" ] && [ "$deepened" = 0 ] && [ "$(git rev-parse --is-shallow-repository 2>/dev/null)" = true ]; then
+    deepened=1; echo "  (얕은 클론 — merge-base 없음 · git fetch --deepen=400 한 번)" >&2
+    git fetch -q --deepen=400 origin >/dev/null 2>&1 || true
+    m=$(git merge-base "$1" "$2" 2>/dev/null || true)
+  fi
+  printf '%s' "$m"
+}
+# 충돌 자리 — $1 파일(작업트리 안 경로) → 「  └ 파일:줄~줄 (함수)」 줄들
+conflict_spots() {
+  local f=$1
+  python3 - "$wt/$f" "$f" <<'PY' || true
+import re, sys
+path, name = sys.argv[1], sys.argv[2]
+try:
+    lines = open(path, encoding='utf-8', errors='replace').read().split('\n')
+except Exception:
+    sys.exit(0)
+head = re.compile(r'^\s*(?:export\s+)?(?:async\s+)?function\s*\*?\s*([A-Za-z_$][\w$]*)|^(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=|^\s*create\s+(?:or\s+replace\s+)?function\s+([\w.\"]+)|^\s*def\s+(\w+)|^\s*(#{1,4}\s+.+)', re.I)
+spots, start = [], None
+for i, l in enumerate(lines, 1):
+    if l.startswith('<<<<<<< '): start = i
+    elif l.startswith('>>>>>>> ') and start is not None:
+        fn = ''
+        for j in range(start, -1, -1):   # 충돌 첫 줄(ours 첫 줄)부터 위로 — 함수 머리 자체가 충돌이어도 잡는다
+            m = None if lines[j].startswith(("<<<<<<< ", "=======", "||||||| ")) else head.match(lines[j])
+            if m:
+                fn = next(g for g in m.groups() if g).strip()[:60]; break
+        spots.append((start, i, fn)); start = None
+for a, b, fn in spots[:8]:
+    print(f'  └ {name}:{a}~{b}' + (f' ({fn})' if fn else ''))
+if len(spots) > 8:
+    print(f'  └ {name} … 외 {len(spots) - 8}')
+PY
+}
 ver() { git -C "$wt" show "HEAD:sw.js" 2>/dev/null | sed -nE "s/^const CACHE_NAME = 'zipfit-v([0-9]+)';.*/\1/p" | head -1; }
 # ① 몸 대조 — $1 직전 커밋 · $2 가지 ref · $3 기준점 · $4 충돌 파일(공백 구분) → 다른 파일 이름들을 출력
 pid() { git -C "$wt" patch-id --stable 2>/dev/null | cut -d' ' -f1; }
@@ -112,7 +156,7 @@ total=0; warn=0; cmpbad=0; synbad=0
 for t in "${targets[@]}"; do
   ref=${t%%|*}; rest=${t#*|}; name=${rest%%|*}; bb=${rest#*|}
   before=$(git -C "$wt" rev-parse HEAD); v0=$(ver)
-  [ -n "$bb" ] || bb=$(git merge-base "$ref" "$base" 2>/dev/null || echo "$base")
+  if [ -z "$bb" ]; then bb=$(mbase "$ref" "$base"); [ -n "$bb" ] || { echo "  ⚠️ 기준점 없음(얕은 클론 — merge-base 빔 · 기준 $base 로 대조)"; bb=$base; }; fi
   if [ "$squash" = 1 ]; then
     ok=0; git -C "$wt" merge -q --squash "$ref" >/dev/null 2>&1 && git -C "$wt" -c user.name=rehearsal -c user.email=rehearsal@localhost commit -q --allow-empty -m "squash $name" >/dev/null 2>&1 && ok=1
   else
@@ -131,6 +175,7 @@ for t in "${targets[@]}"; do
     n=$(printf '%s' "$files" | wc -w)
     if [ "$n" -eq 0 ]; then echo "$name — 머지 실패(충돌 파일 없음 · 다른 오류)"; n=1; else
       echo "$name($(git rev-parse --short "$ref")) 충돌 $n: $files"
+      for cf in $files; do conflict_spots "$cf"; done
       d=$(body_cmp "$before" "$ref" "$bb" "$files"); if [ -n "$d" ]; then echo "  ❌ 몸 대조 다름 — 충돌 밖 파일(기준점 $(git rev-parse --short "$bb")): $d"; cmpbad=$((cmpbad + 1)); else echo "  └ 충돌 밖 파일 몸 대조 같음(기준점 $(git rev-parse --short "$bb"))"; fi
       e=$(syntax_check "$before" "$files"); if [ -n "$e" ]; then echo "  ❌ 문법 오류 — 충돌 밖 파일: $e"; synbad=$((synbad + 1)); fi
     fi
