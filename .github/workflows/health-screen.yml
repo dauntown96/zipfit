@@ -35,9 +35,9 @@ on:
   workflow_dispatch:
     inputs:
       simulate:
-        description: '알림 경로 시험 — fail 이면 카드 하나의 기대 문구를 없는 문구로 · notice 면 공고문 기대 마감일을 하루 옮긴다 · zipfit 이면 보이는 글자에 「ZipFit」을 하나 넣는다 · stale_date 면 히어로에 지난 날짜가 든 옛 배지를 넣는다 · objobj 면 보이는 글자에 「[object Object]」를 하나 넣는다 · target_out 이면 매칭 「대상이 달라 뺀 공고」에 키 없는 카드 하나를 끼워 넣는다 · open_count 면 공고 탭 머리의 열린 공고 수에 1을 더해 잰다 · route_gap 이면 차수 사이 카드를 경로 표 없이(종전 판정) 잰다 · relax_badge 면 완화 배지 기대 갈래 하나를 바꿔 잰다 · sched_line 이면 상세 노선 기대 일정 행 id 하나를 더해 잰다 · rev_date 면 행에서 관측 정정일(revision_seen_date)을 지우고 정정일 표지·자리를 잰다 · geo_names 면 열린 카드에 없는 구 이름 하나를 붙여 경계 판 갈이 점검을 잰다(경고) · ana_pending 이면 분석 전 카드 글자에 「접수 10-21 · D-3」을 넣고 잰다 · route_win 이면 일정 표 행 없이 노선 발표를 잰다 · mq_half 면 전광판 둘째 반쪽을 숨기고 잰다 · login_fail 이면 로그인 한 바퀴를 로그인 뒤 일부러 실패시킨다(정리는 그대로) · l2_dup 이면 펼친 첫 카드 2층 줄 하나를 복제해 잰다'
+        description: '알림 경로 시험 — fail 이면 카드 하나의 기대 문구를 없는 문구로 · notice 면 공고문 기대 마감일을 하루 옮긴다 · zipfit 이면 보이는 글자에 「ZipFit」을 하나 넣는다 · stale_date 면 히어로에 지난 날짜가 든 옛 배지를 넣는다 · objobj 면 보이는 글자에 「[object Object]」를 하나 넣는다 · target_out 이면 매칭 「대상이 달라 뺀 공고」에 키 없는 카드 하나를 끼워 넣는다 · open_count 면 공고 탭 머리의 열린 공고 수에 1을 더해 잰다 · route_gap 이면 차수 사이 카드를 경로 표 없이(종전 판정) 잰다 · relax_badge 면 완화 배지 기대 갈래 하나를 바꿔 잰다 · sched_line 이면 상세 노선 기대 일정 행 id 하나를 더해 잰다 · rev_date 면 행에서 관측 정정일(revision_seen_date)을 지우고 정정일 표지·자리를 잰다 · geo_names 면 열린 카드에 없는 구 이름 하나를 붙여 경계 판 갈이 점검을 잰다(경고) · ana_pending 이면 분석 전 카드 글자에 「접수 10-21 · D-3」을 넣고 잰다 · route_win 이면 일정 표 행 없이 노선 발표를 잰다 · mq_half 면 전광판 둘째 반쪽을 숨기고 잰다 · login_fail 이면 로그인 한 바퀴를 로그인 뒤 일부러 실패시킨다(정리는 그대로) · l2_dup 이면 펼친 첫 카드 2층 줄 하나를 복제해 잰다 · persona_walk 면 페르소나 여정 점검에 화면 맞음 위반 하나를 끼워 잰다(경고)'
         type: choice
-        options: [none, fail, notice, zipfit, stale_date, objobj, target_out, open_count, route_gap, relax_badge, sched_line, rev_date, geo_names, ana_pending, route_win, mq_half, login_fail, l2_dup]
+        options: [none, fail, notice, zipfit, stale_date, objobj, target_out, open_count, route_gap, relax_badge, sched_line, rev_date, geo_names, ana_pending, route_win, mq_half, login_fail, l2_dup, persona_walk]
         default: none
       # 🔵 2026-11-03(우편함 「코드·운영 — … health-screen 브랜치 점검 입력(site)」 3) — 병합 전 브랜치를 잰다.
       ref:
@@ -185,6 +185,20 @@ jobs:
           echo "ran=1" >> "$GITHUB_OUTPUT"
           echo "code=$code" >> "$GITHUB_OUTPUT"
           echo "로그인 흐름 종료 코드 $code"
+      # 🔵 2026-11-19(우편함 「코드·운영 — 14장」 ② · 💡 「페르소나 여정 점검기」) — 하루 1회(workflow_dispatch)만 고정 페르소나 다섯(P1~P5 · scripts/target-personas.json)이
+      #    이 체크아웃의 index.html 로 진단 → 매칭을 돌고, 남은 카드에 규칙(scripts/target-persona-rules.json — 「이 페르소나에게 이 제목만 가리키는 공고는 남지 않는다」)을 댄다.
+      #    판정은 ℹ️·⚠️만(실패 0 · 이슈 0 · 사람 걸음 0): 위반이 화면 「맞음」이면 ⚠️ · 확인·판정 없음이면 ℹ️ · 스크립트가 못 돌면 ⚠️. 시험 계정·DB 쓰기 0 · 목록 RPC 읽기 1회.
+      #    브랜치 점검(ref)에서도 돈다 — 체크아웃이 그 브랜치라 그 판을 잰다(PR 실행 = 브랜치에서 수동 실행).
+      - name: 페르소나 여정
+        id: persona
+        if: always() && steps.deploy.outputs.blind != '1' && github.event_name == 'workflow_dispatch'
+        run: |
+          set +e
+          set -uo pipefail
+          out=$(timeout 240 node scripts/target-persona-check.mjs --flow match --only P1,P2,P3,P4,P5 --rules scripts/target-persona-rules.json 2>/dev/null | sed -n 's/^PERSONA_WALK_JSON=//p' | tail -1)
+          printf '%s' "$out" > persona-walk.json
+          echo "ran=1" >> "$GITHUB_OUTPUT"
+          echo "페르소나 여정: ${out:0:300}"
       # 🔵 2026-11-03 — 마무리: login_walk 항목(통과/실패/건너뜀)을 더하고 → ops_health_record(kind=screen) 한 행 → 결과 파일·요약 다시 쓰기.
       #    로그인만 실패해도 DB 행 ok=false · 이슈 머리 「실패」가 된다(.github/health/screen-finish.mjs 머리).
       - name: 마무리(로그인 결과 · DB 실행 요약 · 결과 파일)
@@ -194,6 +208,7 @@ jobs:
           LW_RAN: ${{ steps.login.outputs.ran }}
           LW_CODE: ${{ steps.login.outputs.code }}
           LW_SIMULATE: ${{ inputs.simulate || '' }}
+          PW_RAN: ${{ steps.persona.outputs.ran }}
           SCREEN_RECORD: ${{ env.SCREEN_RECORD_ON }}
         run: node .github/health/screen-finish.mjs
       - name: 결과 올리기
@@ -205,6 +220,7 @@ jobs:
             health-result.json
             health-screen.png
             login-walk.json
+            persona-walk.json
           retention-days: 14
       - name: 알림(이슈 열기·닫기)
         # 🔵 2026-10-06 — health-ops 와 같이 main 에서만 이슈를 연다·닫는다. 가지에서 수동 실행(모의 simulate 포함)은 결과만 남긴다.
