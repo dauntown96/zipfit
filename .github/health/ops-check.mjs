@@ -19,6 +19,7 @@ import { judgeCronNames } from './cron-names.mjs'
 import { RENT_ARITH_SQL, rentArith, rentArithValue, rentWarnMissingSql } from './rent-arith.mjs'
 import { judgeApiExpiry } from './api-expiry.mjs'
 import { screenRunSql, judgeScreenRun } from './screen-run.mjs'
+import { INCOME_ROWS_SQL, judgeIncome } from './income-table.mjs'
 import { ELIG_FORM_NULL_SQL, RENT_NULL_SQL, ROUND_MIX_SQL, LH_CLOSED_WIN_SQL, DEDUP_KEY_PAREN_SQL, UNIT_AREA_ROUND_SQL, judgeEligFormNull, judgeRentNull, judgeRoundMix, judgeLhClosedWin, judgeDedupKeyParen, judgeUnitAreaRound } from './open-gaps.mjs'
 import { readdirSync, readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
@@ -1649,6 +1650,41 @@ for (const [id, name, sql, judge] of [
   } catch (e) {
     addBlind(id, `${name} — 점검 불능`, 'warn', String(e).slice(0, 200), '공고·세대 표를 읽는다(못 읽으면 ⚠️)')
   }
+}
+
+// ㊴b 소득기준 표 가구원수 줄(2026-11-19 · 우편함 「코드·운영 — 17장」 · 순위표 12위) — 판정·SQL 은 income-table.mjs 머리 주석.
+//    분석 스킬 불변식이 아니라 여기에 둔 까닭: 원문 오기(공급기관이 표를 틀리게 적음)는 「우리 데이터가 원문과 다름」이 아니라 ⚠️ 행을 쓸지 볼 신호라
+//    불변식(위반 = 반영 멈춤)과 뜻이 다르다 — 30분 점검이 열린 묶음에서 ⚠️ 행 없는 꼴만 ⚠️ 로 알린다(안 멈춤 · gate.mjs HARD 밖).
+try {
+  const [x] = await sqlRead(INCOME_ROWS_SQL)
+  const j = judgeIncome(x.j)
+  add('income_table_rows', '소득기준 표 가구원수 줄 — 줄 번호 겹침·건너뜀 · 칸 금액이 가구원수 따라 안 늚', j.status, j.value, j.rule)
+} catch (e) {
+  addBlind('income_table_rows', '소득기준 표 가구원수 줄 — 점검 불능', 'warn', String(e).slice(0, 200), '정책 표를 읽는다(못 읽으면 ⚠️)')
+}
+
+// ㊵ 부하 규칙 근거 다시 재기(2026-11-19 · 17장 · 순위표 14위 · 💡 「부하 규칙(분 단위 줄 · 하루 회차 수 등)의 근거 실측을 주간 ℹ️로」) — ℹ️ 정보(판정 0).
+//    재료 = zipfit_ops.list_rpc_probe_log(공개 목록 RPC anon 탐침 · 10분마다 :05 :15 :25 :35 :45 :55 · 7일) — 탐침이 운영 점검 발송(:25 · :55) 자리와
+//    겹치는 칸(:25 · :55)과 나머지 칸의 중앙 · p90 · 2초 넘음 · 실패, 그리고 KST 시간대별 중앙이 가장 높은 시간.
+//    🔴 한계: 「부하 줄」(:20~:24 · :50~:54 UTC — 데이터 쓰기를 피하는 분) 창 안은 탐침이 재지 않는다 — 값 칸에 적는다(창 안을 재려면 탐침 시각 하나를 옮기는 cron 변경 · 마이그레이션 몫).
+try {
+  const [x] = await sqlRead(`with p as (select ms, ok, extract(minute from at)::int mi, extract(hour from at at time zone 'Asia/Seoul')::int hk
+        from zipfit_ops.list_rpc_probe_log where at > now() - interval '7 days'),
+      b as (select (mi in (25, 55)) ops, count(*)::int n, round(percentile_cont(0.5) within group (order by ms)::numeric)::int med,
+              round(percentile_cont(0.9) within group (order by ms)::numeric)::int p90, count(*) filter (where ms > 2000)::int over2,
+              count(*) filter (where not ok)::int bad from p group by 1),
+      h as (select hk, round(percentile_cont(0.5) within group (order by ms)::numeric)::int med from p group by hk)
+    select (select row_to_json(b) from b where ops) o, (select row_to_json(b) from b where not ops) r,
+      (select json_build_object('h', hk, 'med', med) from h order by med desc limit 1) top, (select min(med) from h) low,
+      (select count(distinct mi) from p where mi between 20 and 24 or mi between 50 and 54)::int in_window`)
+  const o = x.o || {}, r = x.r || {}
+  const ratio = o.med && r.med ? (o.med / r.med).toFixed(2) : '?'
+  add('load_rule_basis', '부하 규칙 근거 — 운영 점검 자리(:25·:55) 탐침 ↔ 나머지(7일 · 정보)', 'info',
+    `:25·:55 중앙 ${o.med ?? '?'}ms · p90 ${o.p90 ?? '?'} · 2초 넘음 ${o.over2 ?? 0}/${o.n ?? 0} · 실패 ${o.bad ?? 0} ↔ 나머지 중앙 ${r.med ?? '?'}ms · p90 ${r.p90 ?? '?'} · 2초 넘음 ${r.over2 ?? 0}/${r.n ?? 0}(비 ${ratio})`
+      + ` · KST 시간대 중앙 가장 높음 ${x.top ? x.top.h + '시 ' + x.top.med + 'ms' : '?'}(가장 낮음 ${x.low ?? '?'}ms) · 부하 줄 창 안 탐침 ${x.in_window}칸(재지 않음)`,
+    '정보 — 판정하지 않는다 · 근거가 사라진 시간 규칙이 남지 않게 숫자를 둔다(2026-11-05 「12~14시 쓰기 피함」 걷음 선례) · 규칙 숫자를 바꾸는 것은 claude.ai 판정 · 서울 이전(2026-11-20) 뒤 다시 본다')
+} catch (e) {
+  add('load_rule_basis', '부하 규칙 근거 — 운영 점검 자리(:25·:55) 탐침 ↔ 나머지(7일 · 정보)', 'info', '못 잼: ' + String(e).slice(0, 160), '정보')
 }
 
 // ㉔·㉕ 열린 카드 데이터 빈칸 둘(2026-10-22) — 판정·SQL 은 open-gaps.mjs 머리 주석. ⚠️만 · 못 읽으면 ⚠️ 점검 불능.
