@@ -1478,6 +1478,17 @@ html.zf12 .zf13-more > summary:focus-visible{outline:2px solid var(--focus);outl
 html.zf12 .zf13-more-n{font-size:var(--t-sub);font-weight:400;color:var(--ink-3)}
 html.zf12 .zf13-more:not(:has(> div > div:not(:empty))){display:none}   /* 셋 다 빈 공고 — 묶음 머리도 그리지 않는다 */
 html.zf12 .zf13-more > div > .policy-wrap:first-child{margin-top:0}
+/* 🔵 2026-11-19(우편함 「표시층 — 계층 칩(청년 등) 결과에 「계층 구분 없이 누구나」 접힌 묶음」 2) — 계층 칩 결과 끝의 접힌 묶음. 머리는 카드 폭 막대 · 펼치면 같은 카드 꼴이 아래로. */
+.zf13-anyone{margin:16px 0 8px}
+.zf13-anyone > summary{list-style:none;position:relative;display:flex;flex-direction:column;gap:2px;min-height:var(--hit);box-sizing:border-box;padding:12px 44px 12px 16px;border:1px solid var(--line);border-radius:var(--r-l);background:var(--paper);cursor:pointer}
+.zf13-anyone > summary::-webkit-details-marker{display:none}
+.zf13-anyone > summary::after{content:"›";position:absolute;right:16px;top:50%;margin-top:-.6em;font-size:var(--t-l);line-height:1.2;color:var(--ink-3);transition:transform .15s}
+.zf13-anyone[open] > summary::after{transform:rotate(90deg)}
+.zf13-anyone[open] > summary{margin-bottom:10px}
+.zf13-anyone > summary:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.zf13-anyone > summary::after{transition:none}}
+.zf13-anyone-h{font-size:var(--t-body);font-weight:700;color:var(--ink)}
+.zf13-anyone-s{font-size:var(--t-sub);color:var(--ink-2)}
 /* 4단계 덧 3·4 — ① 줄 두 칸: 왼쪽(유형 · 지역 · 배지 — 칸 안에서 줄바꿈) · 오른쪽(접수 상태 알약 — 늘 오른쪽 위) */
 html.zf12 .zf12-card .zf3-ctop:has(> .zf13-cl){display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;column-gap:8px}
 html.zf12 .zf3-ctop .zf3-dpill.zf13-wait{background:var(--paper);border-color:var(--ink);color:var(--ink)}   /* 기준 위반 고침 2 — 끝 시각 지난 차수 알약: 대기(검은 바탕 걷음) */
@@ -2089,6 +2100,7 @@ let noticePage = 1;                 // 1부터
 let noticePageSize = 20;            // 10 · 20 · 30 · 50
 const NOTICE_PAGE_SIZES = [10, 20, 30, 50];
 let noticeFiltered = [];
+let noticeAnyone = [];   // 🔵 2026-11-19 — 계층 칩 결과 아래 「계층 구분 없이 누구나」 묶음(zfAnyoneState === 'anyone' · 칩 결과와 겹침 0)
 
 // 현재 선택된 필터값 (단일 선택, null = 전체)
 let activeNoticeRegion = null;
@@ -4555,29 +4567,41 @@ function zfNoticeHighlight(cards){
 //    목록 RPC 반환 칸은 바꾸지 않는다 — 칩을 처음 고를 때 두 표(자격 행 825 · supply_target 있는 세대 행 300 — 2026-10-13)와 그 공고 제목을 한 번 받아
 //    카드 그룹 키(zfDedupKey — 카드 상세가 산물을 모으는 get_announcement_group_ids 와 같은 제목 키)로 붙인다. 받기 전·실패면 제목만(종전 그대로).
 let zfTierTagsP = null, zfTierTagsReady = false;
-const zfTierByKey = new Map();
+const zfTierByKey = new Map(), zfEcByKey = new Map();
 function zfLoadTierTags(){
   if(zfTierTagsP) return zfTierTagsP;
   const h = zfAnonHeaders();
   const get = q => fetch(`${SUPABASE_URL}/rest/v1/${q}`, { headers: h }).then(r => { if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
   zfTierTagsP = Promise.all([
-    get('eligibility_criteria?select=announcement_id,supply_form,gk:verification_requirements->공급대상&limit=10000'),
+    get('eligibility_criteria?select=announcement_id,supply_form,age_min,age_max,gk:verification_requirements->공급대상&limit=10000'),
     get('housing_units?select=announcement_id,supply_target&supply_target=not.is.null&limit=10000'),
   ]).then(([ec, hu]) => {
     const textById = new Map();
     const add = (id, t) => { if(!id || !t) return; id = String(id); textById.set(id, (textById.get(id) || '') + ' ' + t); };
+    // 🔵 2026-11-19(우편함 「표시층 — 계층 칩 … 누구나 묶음」 1) — 같은 자격 행에서 「누구나형」 재료(행 수 · 공급대상 키 갈래 · 나이 칸 · supply_form)를 함께 모은다(재질의 0 · 같은 요청에 칸 둘).
+    const ecById = new Map();
     (ec || []).forEach(r => {
       add(r.announcement_id, r.supply_form);
       const g = r.gk;
-      if(g && typeof g === 'object' && Array.isArray(g['갈래'])) g['갈래'].forEach(b => { if(b){ add(r.announcement_id, b['대상']); add(r.announcement_id, b['확인필요']); } });
+      const br = (g && typeof g === 'object' && Array.isArray(g['갈래'])) ? g['갈래'].filter(Boolean) : [];
+      br.forEach(b => { add(r.announcement_id, b['대상']); add(r.announcement_id, b['확인필요']); });
+      if(!r.announcement_id) return;
+      const id = String(r.announcement_id), e = ecById.get(id) || { n: 0, gk: false, age: false, forms: [] };
+      e.n++; if(br.length) e.gk = true; if(r.age_min != null || r.age_max != null) e.age = true; e.forms.push(r.supply_form || '');
+      ecById.set(id, e);
     });
     (hu || []).forEach(r => add(r.announcement_id, r.supply_target));
-    const ids = [...textById.keys()];
+    const ids = [...new Set([...textById.keys(), ...ecById.keys()])];
     const chunks = [];
     for(let i = 0; i < ids.length; i += 120) chunks.push(ids.slice(i, i + 120));
     return Promise.all(chunks.map(c => get(`announcements?select=announcement_id,title&${idFilterFor(c)}`))).then(parts => {
       parts.flat().forEach(a => {
-        const key = zfDedupKey(a && a.title), t = textById.get(String(a && a.announcement_id));
+        const key = zfDedupKey(a && a.title), t = textById.get(String(a && a.announcement_id)), e = ecById.get(String(a && a.announcement_id));
+        if(key && e){
+          const w = zfEcByKey.get(key) || { n: 0, gk: false, age: false, forms: [] };
+          w.n += e.n; w.gk = w.gk || e.gk; w.age = w.age || e.age; w.forms.push(...e.forms);
+          zfEcByKey.set(key, w);
+        }
         if(!key || !t) return;
         const set = zfTierByKey.get(key) || new Set();
         // 「한부모」 갈래 이름은 표지 낱말(한부모가족)과 같은 규칙으로 읽힌다 — classifyDemographics 가 「한부모」를 본다.
@@ -4597,6 +4621,25 @@ function zfTierTagsPending(){ return !!activeNoticeTarget && !zfTierTagsReady &&
 function zfTierTagsOf(n){
   const s = zfTierByKey.get(zfDedupKey(n['공고명'] || ''));
   return s ? [...s] : [];
+}
+// 🔵 2026-11-19(우편함 「표시층 — 계층 칩(청년 등) 결과에 「계층 구분 없이 누구나」 접힌 묶음」 1 · 다운님 승인 17:50 ②안) — 「누구나형」 판정.
+//    계층 칩은 원문에 그 계층이 적힌 공고만 고른다 — 계층을 가리지 않고 「무주택 세대구성원 + 소득·자산」으로 뽑는 공고는 빠진다(조사 11-19 여섯 1).
+//    재료는 칩이 이미 받는 자격 행(zfEcByKey — 재질의 0): 행이 있고 ∧ 공급대상 키 갈래 0 ∧ 나이 칸(age_min·age_max) 0 ∧ 영구임대 아님 ∧
+//    supply_form 가운데 계층 낱말 없는 일반 꼴(일반·일반공급(…) · 입주자격(완화) · 전용면적 · 「N순위 월평균소득 …」 · 통합공공임대 일반공급대상자)이 하나 이상.
+//    영구임대는 가군·나군 조건이 앞에 서는 공고라 묶음에 넣지 않는다(claude.ai 판정 11-19 17:06). 자격 행 0은 「모름」 — 넣지 않는다.
+//    돌려주는 값: 'anyone' · 'perm'(영구임대) · 'unknown'(자격 행 0 · 받기 전) · 'no'(그 밖).
+function zfOpenSupplyForm(f){
+  const t = String(f || '').trim();
+  if(!t || classifyDemographics('', t).length) return false;
+  return /^일반(공급)?(\s*\(|$)/.test(t) || /^입주자격/.test(t) || /^전용/.test(t)
+    || /^\d순위\s*(가구원수별\s*)?월평균소득/.test(t) || /^통합공공임대\s*일반공급대상자$/.test(t) || /^일반임차자격$/.test(t);
+}
+function zfAnyoneState(n){
+  if(classifyNoticeType(n['공급유형'], n['공고명']) === '영구임대') return 'perm';
+  const e = zfEcByKey.get(zfDedupKey(n['공고명'] || ''));
+  if(!e || !e.n) return 'unknown';
+  if(e.gk || e.age) return 'no';
+  return e.forms.some(zfOpenSupplyForm) ? 'anyone' : 'no';
 }
 let zfSearchComposing = false;
 (function(){
@@ -4722,6 +4765,19 @@ function applyNoticeFiltersAndRender(keepPage){
   }
 
   noticeFiltered = filtered;
+  // 🔵 2026-11-19(우편함 「표시층 — 계층 칩 … 누구나 묶음」 2) — 계층 칩을 골랐으면 같은 다른 조건(상태 · 검색 · ★ · 지도 시군구)을 거친 행 가운데
+  //    누구나형이고 칩 결과에 없는 것을 묶음으로 둔다. 순서는 칩 결과와 같은 정렬. 계층 칩이 없으면 빈 묶음.
+  noticeAnyone = [];
+  if(activeNoticeTarget && zfTierTagsReady){
+    const hit = new Set(filtered), save = activeNoticeTarget;
+    activeNoticeTarget = null;
+    try{
+      let all = applyNoticeSubFilters(base);
+      if(typeof zf3MineFilter === 'function') all = zf3MineFilter(all);
+      if(typeof zf3PlaceFilter === 'function') all = zf3PlaceFilter(all);
+      noticeAnyone = all.filter(n => !hit.has(n) && zfAnyoneState(n) === 'anyone').sort((a,b) => cancelLast(a,b) || noticeSortCmp(a,b));
+    }finally{ activeNoticeTarget = save; }
+  }
   // 🔴 필터·칩·정렬·검색이 바뀌면 언제나 1쪽으로 간다 — 이 함수가 그 넷의 공통 관문이다.
   noticePage = 1;
   // 🔴 재질의(10분 경과 후 탭 재진입)만은 예외다(2026-09-16). 그것은 **사용자가 무언가를 바꾼 것이
@@ -6312,6 +6368,7 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
       : '<p class="rtitle">⚠ 조건에 맞는 공고가 없어요</p>';
     if(typeof zf3EmptyChips === 'function') statusEl.insertAdjacentHTML('beforeend', zf3EmptyChips());   // 🔵 D-3 b — d3 0건 화면에만 「빼면 n건」
     if(typeof zf3On === 'function' && zf3On()){ statusEl.classList.add('zf3-empty'); statusEl.insertAdjacentHTML('afterbegin', zf3EmptyArt()); }   // 🔵 빈 상태 한 꼴(아이디어 ⑤)
+    if(noticeAnyone.length) zfAnyoneMount(listEl);   // 🔵 2026-11-19 — 칩 결과 0건이어도 누구나 묶음(조사 ⑦2)
     return;
   }
 
@@ -6339,7 +6396,17 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
   const shown = filtered.slice(from, from + noticePageSize);
   // 「113건 중 21–40」 — 지금 보고 있는 자리를 한 줄로 적는다.
   let html = `<p class="pg-range">${filtered.length}건 중 ${from + 1}–${from + shown.length}</p>`;
-  shown.forEach((n, idx) => {
+  shown.forEach((n, idx) => { html += zfNoticeCardHtml(n, idx); });
+  html += noticePagerHtml(pageCount, noticePage);
+  listEl.innerHTML = html;
+  // 🔵 2026-11-19 — 누구나 묶음은 칩 결과 마지막 쪽 끝(쪽 단추 앞)에 둔다.
+  if(noticeAnyone.length && noticePage === pageCount) zfAnyoneMount(listEl, listEl.querySelector(':scope > .pg-bar'));
+  zfNoticeAfterRender(shown);
+}
+// 🔵 2026-11-19 — 카드 한 장의 HTML(종전 renderNoticeList 의 forEach 몸 그대로 옮김 — 누구나 묶음이 같은 카드 꼴을 쓴다).
+function zfNoticeCardHtml(n, idx){
+  let html = '';
+  {
     // 🔵 2026-10-19(우편함 「표시층 — 순위별 접수 창 사이 카드가 회색 …」) — 회색(흐림 · d3 zf3-closed)은 숨기기·상태 칩·노선과 같은 술어(isHiddenAsClosed)를 본다.
     //    종전 LH 원래 상태(처리상태 === '접수마감')만 보면 순위별 접수 창 사이의 열린 카드(…20706 · …20713 · …20737)가 끝난 공고처럼 흐렸다.
     const isClosed   = isHiddenAsClosed(n);
@@ -6437,9 +6504,11 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
       ${isCancelRow?'':zfNoticesSlotHtml(n)}
       ${detailHTML}
     </div>`;
-  });
-  html += noticePagerHtml(pageCount, noticePage);
-  listEl.innerHTML = html;
+  }
+  return html;
+}
+// 카드를 그린 뒤 한 번 — 요약·가격·경로 줄·강조·d3 덧입힘·펼침 유지(종전 renderNoticeList 끝 그대로 · 누구나 묶음을 펼칠 때도 부른다).
+function zfNoticeAfterRender(shown){
   zfPruneCardCaches();   // 🔴 안정 키는 낡지 않는 대신 쌓인다 — 화면에 없는 키를 비운다
   // 캐시에 이미 있는 것은 즉시(깜빡임 없음), 없는 것만 물어보고 도착하면 채운다.
   zfFillSummarySlots();
@@ -6450,6 +6519,22 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
   zfNavKeepOpen();        // 🔵 2026-10-21 뒤로가기 안 2 — 지금 이력 칸이 펼친 카드(주소창 ?n=)는 다시 그린 뒤에도 펼친 채로
 }
 
+// 🔵 2026-11-19(우편함 「표시층 — 계층 칩(청년 등) 결과에 「계층 구분 없이 누구나」 접힌 묶음」 2) — 접힌 묶음 하나.
+//    머리 「계층 구분 없이 누구나 신청하는 공고 N건」 + 한 줄 「소득·자산·무주택 조건은 공고마다 달라요」. 카드는 처음 펼칠 때 그린다(목록 그리기 무게 그대로).
+function zfAnyoneMount(listEl, before){
+  const rows = noticeAnyone.slice();
+  const d = document.createElement('details');
+  d.className = 'zf13-anyone';
+  d.innerHTML = `<summary><span class="zf13-anyone-h">계층 구분 없이 누구나 신청하는 공고 ${rows.length.toLocaleString()}건</span><span class="zf13-anyone-s">소득·자산·무주택 조건은 공고마다 달라요</span></summary><div class="zf13-anyone-list"></div>`;
+  d.addEventListener('toggle', () => {
+    const box = d.querySelector('.zf13-anyone-list');
+    if(!d.open || box.dataset.filled) return;
+    box.dataset.filled = '1';
+    box.innerHTML = rows.map((n, i) => zfNoticeCardHtml(n, 'a' + i)).join('');
+    zfNoticeAfterRender(rows);
+  });
+  listEl.insertBefore(d, before || null);
+}
 // 페이저 — 「‹ 이전 · 1 … 4 5 6 … 12 · 다음 ›」. 현재 쪽 좌우 1칸과 양 끝을 늘 보여주고
 // 사이가 벌어지면 「…」로 접는다. 🔵 한 쪽뿐이면 아무것도 그리지 않는다.
 function noticePageWindow(page, pageCount){
@@ -14549,6 +14634,7 @@ function zf3DecorateCards(){
     if((noticeFiltered || []).some(n => (!zfWinnerTrusted(n) && (zfWinFromSchedule(n['announcement_id']) || zfWinTextFromSchedule(n['announcement_id']))) || zfRouteSchedHit(n))){ zfWinSchedRedrawn = true; applyNoticeFiltersAndRender(noticePage); }
   });
   zf3CardRows = new Map((noticeFiltered || []).map((n, i) => ['ncard-' + zfCardKey(n['announcement_id'] || i), n]));
+  (noticeAnyone || []).forEach((n, i) => zf3CardRows.set('ncard-' + zfCardKey(n['announcement_id'] || ('a' + i)), n));   // 🔵 2026-11-19 — 누구나 묶음 카드도 같은 덧입힘
   const nl = document.getElementById('notice-list'), ml = document.getElementById('match-result');
   if(nl) zf3DecorateIn(nl, zf3CardRows);
   if(ml && zf3MatchRows.size) zf3DecorateIn(ml, zf3MatchRows, true);
