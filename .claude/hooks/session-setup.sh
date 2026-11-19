@@ -9,6 +9,12 @@ LOG=/tmp/zipfit-session-setup.log
 PY=/usr/bin/python3
 {
   echo "== $(date -u +%FT%TZ) session-setup"
+  # 🔵 2026-11-19(우편함 「코드·운영 — 12장」) — git pre-push 훅(.githooks/pre-push — push 전 문서 검사 · PR check 「문서 검사」와 같은 scripts/doc-check.sh)을 건다.
+  #    사람이 부르는 걸음 0 — 이 준비가 도는 세션이면 저절로 걸린다(이미 걸려 있으면 그대로).
+  REPO="$(cd "$(dirname "$0")/../.." && pwd)"
+  if [ -f "$REPO/.githooks/pre-push" ]; then
+    git -C "$REPO" config core.hooksPath .githooks && echo "pre-push 훅: core.hooksPath=.githooks"
+  fi
   need=()
   "$PY" -c 'import pdfplumber' 2>/dev/null || need+=(pdfplumber==0.11.10 cffi==2.1.1)
   "$PY" -c 'import pgdumplib' 2>/dev/null || need+=(pgdumplib==4.0.0)
