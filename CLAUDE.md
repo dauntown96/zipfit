@@ -166,7 +166,7 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
-| 2026-11-19 | **코드·운영 — 12장: push 전 문서 검사 pre-push 훅 · 상세 공고일 칸 점검** — `scripts/doc-check.sh` 한 벌(Liquid · 이력 꼴 · 표 칸 · 고지 「{{」)을 PR check 「문서 검사」와 `.githooks/pre-push`가 같이 부름 · 세션 준비가 `core.hooksPath` · `screen-check` `detail_date` · 「잡 0개 실패」 = 봇 push PR 실행 승인 대기 · PR 이 회차 |
+| 2026-11-19 | **코드·운영 — 12장: push 전 문서 검사 pre-push 훅 · 상세 공고일 칸 점검** — `scripts/doc-check.sh` 한 벌(Liquid · 이력 꼴 · 표 칸 · 고지 문서 자리 표시)을 PR check 「문서 검사」와 `.githooks/pre-push`가 같이 부름 · 세션 준비가 `core.hooksPath` · `screen-check` `detail_date` · 「잡 0개 실패」 = 봇 push PR 실행 승인 대기 · PR 이 회차 |
 | 2026-11-19 | **자동 분석 run 491 — 경기북부 3차 신혼·신생아 매입임대Ⅱ(전세형) 예비입주자 [완료]** — 정책 90(공고문 48 · QnA 41 · ⚠️ 1 Q&A 표 머리칸) · 일정 8 · 세대 62(공급대상 62호 일치) · 자격 5 · 갤러리 36(LH 홍보물) · 쉽게 쓴 말 55/89 · 불변식 위반 0 · 데이터 쓰기만 · 이력 PR |
 | 2026-11-19 | **자동 분석 run 490 — 경기북부 3차 신혼·신생아 매입임대Ⅰ 예비입주자 [완료]** — 정책 88(공고문 48 · QnA 40 · ⚠️ 0) · 일정 8 · 세대 167(공급대상 167호 일치) · 자격 4 · 갤러리 34(LH 홍보물) · 쉽게 쓴 말 56/88 · 불변식 위반 0 · 데이터 쓰기만 · 이력 PR |
 ## 🚫 코딩 원칙
