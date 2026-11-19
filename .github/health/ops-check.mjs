@@ -19,7 +19,7 @@ import { judgeCronNames } from './cron-names.mjs'
 import { RENT_ARITH_SQL, rentArith, rentArithValue, rentWarnMissingSql } from './rent-arith.mjs'
 import { judgeApiExpiry } from './api-expiry.mjs'
 import { screenRunSql, judgeScreenRun } from './screen-run.mjs'
-import { ELIG_FORM_NULL_SQL, RENT_NULL_SQL, ROUND_MIX_SQL, LH_CLOSED_WIN_SQL, judgeEligFormNull, judgeRentNull, judgeRoundMix, judgeLhClosedWin } from './open-gaps.mjs'
+import { ELIG_FORM_NULL_SQL, RENT_NULL_SQL, ROUND_MIX_SQL, LH_CLOSED_WIN_SQL, DEDUP_KEY_PAREN_SQL, UNIT_AREA_ROUND_SQL, judgeEligFormNull, judgeRentNull, judgeRoundMix, judgeLhClosedWin, judgeDedupKeyParen, judgeUnitAreaRound } from './open-gaps.mjs'
 import { readdirSync, readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 
@@ -231,6 +231,35 @@ try {
     add('anon_list_cap', '목록 응답이 REST 상한에서 잘리나(화면이 이어 받는 중인가)', list.total == null || cut ? 'warn' : 'pass',
       list.total == null ? `전체 행 수 머리(content-range) 없음 · ${list.data.length}행` : `${list.data.length}행 / 전체 ${list.total}행${cut ? ' — 잘림(화면은 ?offset= 으로 이어 받는다 · 목록 호출 2회)' : ''}`,
       '응답 행 수 = 전체 행 수(상한 안) — 잘리면 화면이 목록 함수를 한 번 더 부른다')
+  }
+  // ③-1b 전국 모집 거름(2026-11-19 · 우편함 「코드·운영 — 16장」 · 순위표 7위 · 💡 「화면 점검 「전국 모집 거름」 한 줄」 · N21 2026-10-18 재발 감시).
+  //    위 목록 응답(anon_list — 목록 함수를 더 부르지 않는다)의 열린 카드(apply_end ≥ 오늘 KST) 중 region_top ≠ 전국인 대표를 SQL 로 넘겨 둘을 센다:
+  //    ⓐ 묶음(title_dedup_key) 정책 행 category ~ 지역 ∧ content_raw ~ 전국 — 원문은 전국인데 한 시·도로만 걸리는 꼴(N21 nationwide_set 식보다 넓게 · 그 식이 놓친 꼴)
+  //    ⓑ region_names 없음 ∧ 묶음 행 시·도 둘 이상 — 시·군·구 없는 여러 시·도 공고가 대표 시·도 하나로 눌리는 꼴(N21 넷의 원인 꼴).
+  //    0 이 아니면 ⚠️(안 멈춤 · gate.mjs HARD 밖) · 못 읽으면 ⚠️ 점검 불능. 2026-11-19 첫 값 0 · 0(열린 비전국 94).
+  if (listOk) {
+    try {
+      const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10)
+      const reps = list.data.filter(r => r && r.apply_end && String(r.apply_end).slice(0, 10) >= today && (r.region_top || '') !== '전국')
+        .map(r => ({ id: String(r.announcement_id), rn: Array.isArray(r.region_names) ? r.region_names.length > 0 : !!r.region_names }))
+      const js = JSON.stringify(reps)
+      let tag = 'zfnw'; while (js.includes('$' + tag + '$')) tag += 'x'
+      const q = '$' + tag + '$'
+      const [x] = await sqlRead(`with r as (select (e->>'id') id, (e->>'rn')::boolean rn from jsonb_array_elements(${q}${js}${q}::jsonb) e),
+          g as (select r.id rep, r.rn, b.announcement_id, b.sido_nm from r join public.announcements a on a.announcement_id = r.id
+                  join public.announcements b on b.title_dedup_key = a.title_dedup_key)
+        select (select count(*) from r)::int n_open,
+          (select coalesce(json_agg(distinct g.rep), '[]'::json) from g join public.announcement_policies p on p.announcement_id = g.announcement_id
+             where p.category ~ '지역' and p.content_raw ~ '전국') loose,
+          (select coalesce(json_agg(rep), '[]'::json) from (select rep from g where not rn group by rep having count(distinct sido_nm) >= 2) z) multi`)
+      const n = x.loose.length + x.multi.length
+      add('nationwide_narrow', '전국 모집 거름 — 원문 전국 · 여러 시·도인데 한 시·도로만 걸리는 열린 카드', n > 0 ? 'warn' : 'pass',
+        n > 0 ? `원문 전국 ${x.loose.length}(${x.loose.slice(0, 5).join(', ')}) · 여러 시·도 ${x.multi.length}(${x.multi.slice(0, 5).join(', ')}) · 열린 비전국 ${x.n_open}`
+          : `0 · 0(열린 비전국 ${x.n_open})`,
+        '0 · 0 — 열린 카드(목록 응답 · region_top ≠ 전국) 묶음에 ⓐ 정책 행 category ~ 지역 ∧ 본문 ~ 전국 · ⓑ region_names 없음 ∧ 묶음 행 시·도 ≥ 2 · 넘으면 ⚠️(안 멈춤 · 지역 거름에서 빠지는 카드 — N21 2026-10-18)')
+    } catch (e) {
+      addBlind('nationwide_narrow', '전국 모집 거름 — 점검 불능', 'warn', String(e).slice(0, 200), '목록 응답 · 공고·정책 표를 읽는다(못 읽으면 ⚠️)')
+    }
   }
   // ③-2 화면이 실제로 보내는 인자 모양 — 칩을 고른 목록(loadNoticeData · matchHouses)은 p_region · p_type 을 붙여 부른다(index.html zfRpcArgs).
   //    🔵 2026-11-04(우편함 「코드·운영 — swap 처방 …」 4 · 처방 6 — 목록 호출 4 → 2) — 종전 셋(명시 null · 지역 · 유형)을 「인자 있는 길」 하나로 합친다.
@@ -1606,6 +1635,20 @@ try {
   add('screen_run_missing', '화면 점검 발송(204) 뒤 기록 없음', j.status, j.value, j.rule)
 } catch (e) {
   addBlind('screen_run_missing', '화면 점검 발송 뒤 기록 없음 — 점검 불능', 'warn', String(e).slice(0, 200), '발송 기록·점검 실행 표를 읽는다(못 읽으면 ⚠️)')
+}
+
+// ㊲ 머리 정정 괄호가 남은 저장 키 · ㊳ 회차 사이 같은 동 다른 전용면적(2026-11-19 · 우편함 「코드·운영 — 16장」 · 순위표 8·10위) — SQL·판정은 open-gaps.mjs.
+for (const [id, name, sql, judge] of [
+  ['dedup_key_paren', '저장 키(title_dedup_key) 머리에 정정·수정·변경·연장 괄호가 남음', DEDUP_KEY_PAREN_SQL, judgeDedupKeyParen],
+  ['unit_area_round', '회차 사이 같은 단지·같은 동·같은 건설 세대수인데 전용면적이 다름(정보)', UNIT_AREA_ROUND_SQL, judgeUnitAreaRound],
+]) {
+  try {
+    const [x] = await sqlRead(sql)
+    const j = judge(x.j)
+    add(id, name, j.status, j.value, j.rule)
+  } catch (e) {
+    addBlind(id, `${name} — 점검 불능`, 'warn', String(e).slice(0, 200), '공고·세대 표를 읽는다(못 읽으면 ⚠️)')
+  }
 }
 
 // ㉔·㉕ 열린 카드 데이터 빈칸 둘(2026-10-22) — 판정·SQL 은 open-gaps.mjs 머리 주석. ⚠️만 · 못 읽으면 ⚠️ 점검 불능.
