@@ -24,7 +24,7 @@ for (const [k, v] of Object.entries(r || {})) if (!RESERVED.has(k)) extra[k] = v
 
 // ① 로그인 흐름 항목
 const NAME = '로그인 흐름 한 바퀴(시험 계정 · 하루 1회)'
-const RULE = '로그인 → 조건 저장 → 추천 → 찜 저장·해제 → 정리(시험 계정 0 · 링크 응답 행 0 · 계정 없는 찜 0)'
+const RULE = '로그인 → 조건 저장 → 공고 탭 ★ 희망 조건 칩 → 추천 → 찜 저장·해제 → 정리(시험 계정 0 · 링크 응답 행 0 · 계정 없는 찜 0)'
 let login
 if (process.env.LW_RAN !== '1') {
   login = { id: 'login_walk', name: NAME, status: 'skip', value: '이 실행은 로그인 흐름을 돌지 않는다(병합 뒤 실행 · 하루 1회 발송·수동만)', rule: RULE }
@@ -37,8 +37,8 @@ if (process.env.LW_RAN !== '1') {
   const save = j?.result?.save ?? null
   const cl = clean ? `시험 계정 ${clean.test_accounts} · 링크 응답 행 ${clean.link_rows} · 계정 없는 찜 ${clean.saved_orphans ?? '?'}` : '정리 확인 없음'
   const value = ok
-    ? `로그인 → 조건 저장(${step?.msg || '저장'}) → 추천 ${step?.cards ?? '?'}장 → 찜 ${save ? `${save.afterSave}행 → 해제 ${save.afterClear}행` : '(안 돎)'} → 정리(${cl})`
-    : (j?.error ? String(j.error).slice(0, 200) : (j ? `정리 확인 실패 또는 저장·찜 실패${save && !save.ok ? `(찜 ${save.afterSave ?? '?'}→${save.afterClear ?? '?'}${save.why ? ' · ' + save.why : ''})` : ''}` : '결과 없음(스크립트가 죽음 · 시간 초과 300초)'))
+    ? `로그인 → 조건 저장(${step?.msg || '저장'}) → ★ 칩 ${step?.mineChip === true ? '있음' : step?.mineChip === false ? '없음' : '안 봄'} → 추천 ${step?.cards ?? '?'}장 → 찜 ${save ? `${save.afterSave}행 → 해제 ${save.afterClear}행` : '(안 돎)'} → 정리(${cl})`
+    : (j?.error ? String(j.error).slice(0, 200) : (j ? `${step?.mineChip === false ? '저장 직후 공고 탭 ★ 희망 조건 칩 없음 · ' : ''}정리 확인 실패 또는 저장·찜 실패${save && !save.ok ? `(찜 ${save.afterSave ?? '?'}→${save.afterClear ?? '?'}${save.why ? ' · ' + save.why : ''})` : ''}` : '결과 없음(스크립트가 죽음 · 시간 초과 300초)'))
       + (clean ? ` · 정리 뒤 ${cl}` : '')
   // 알림 경로 시험(simulate=login_fail)의 실패는 id 를 simulate_login_walk 로 — DB 행은 실패(ok=false)로 남되 런칭 게이트 셈(docs/launch-gates.sql
   //   realf: 'simulate%' 제외)이 실제 실패로 세지 않는다(운영 점검 simulate 와 같은 꼴).

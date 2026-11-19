@@ -1343,6 +1343,47 @@ try {
     }
     const listH = await tp.evaluate(styleHits)
     const listS = await tp.evaluate(small)
+    // ⑫-⑥ 누르는 자리 겹침 쌍 수(2026-11-19 · 우편함 「코드·운영 — 15장」 · 순위표 6위 · 표시층 2단계 회신 1 ⑦ 2) — ℹ️ 추이만(판정 0).
+    //    보이는 누를 것(위 small 과 같은 대상) 두 개의 사각형이 1px 넘게 겹치는 쌍 · 한쪽이 다른 쪽 안에 든 것(조상·자손)은 뺀다.
+    const overlap = () => {
+      const sel = 'a, button, summary, input, select, [role="button"], [onclick]'
+      const els = []
+      for (const el of document.querySelectorAll(sel)) {
+        const r = el.getBoundingClientRect(); if (r.width < 1 || r.height < 1) continue
+        let hid = false; for (let e = el; e; e = e.parentElement) { const s = getComputedStyle(e); if (s.display === 'none' || s.visibility === 'hidden') { hid = true; break } } if (hid) continue
+        els.push([el, r])
+      }
+      const name = el => el.tagName.toLowerCase() + ((el.getAttribute('class') || '').split(/\s+/).filter(Boolean)[0] ? '.' + el.getAttribute('class').split(/\s+/).filter(Boolean)[0] : '')
+      let n = 0; const kinds = {}
+      for (let i = 0; i < els.length; i++) for (let j = i + 1; j < els.length; j++) {
+        const [a, ra] = els[i], [b, rb] = els[j]
+        if (a.contains(b) || b.contains(a)) continue
+        const w = Math.min(ra.right, rb.right) - Math.max(ra.left, rb.left), h = Math.min(ra.bottom, rb.bottom) - Math.max(ra.top, rb.top)
+        if (w > 1 && h > 1) { n++; const k = [name(a), name(b)].sort().join(' ↔ '); kinds[k] = (kinds[k] || 0) + 1 }
+      }
+      return { n, all: els.length, top: Object.entries(kinds).sort((x, y) => y[1] - x[1]).slice(0, 3).map(([k, v]) => `${k} ${v}`) }
+    }
+    const listO = await tp.evaluate(overlap)
+    // ⑫-⑦ 390 첫 화면 카드 수 + 글자 폭 +10% 덧입힘(2026-11-19 · 우편함 「코드·운영 — 15장」 · 순위표 5위 · 표시층 2단계 회신 2 ⑦ 1) — ℹ️ 수치만(판정 0).
+    //    공고 탭 첫 화면(스크롤 0 · 창 높이 844) 안에 위 끝이 든 보이는 카드(.hcard) 수 · 아래 끝까지 든 수.
+    //    덧입힘 = 모든 요소에 letter-spacing +0.1em(한글 한 자 ≈ 1em 이라 글자 폭 +10% 근사 — Windows 글꼴이 같은 글자를 두 줄로 꺾은 꼴 · 11-19 검증) → 다시 잰 뒤 걷는다.
+    const fold = () => {
+      scrollTo(0, 0)
+      const H = innerHeight; let top = 0, full = 0
+      for (const c of document.querySelectorAll('.hcard')) {
+        if (c.offsetParent === null) continue
+        const r = c.getBoundingClientRect(); if (r.height < 1) continue
+        if (r.top < H && r.bottom > 0) { top++; if (r.bottom <= H) full++ }
+      }
+      const first = [...document.querySelectorAll('.hcard')].find(c => c.offsetParent !== null)
+      return { top, full, firstH: first ? Math.round(first.getBoundingClientRect().height) : null }
+    }
+    const fold0 = await tp.evaluate(fold)
+    await tp.evaluate(() => { const st = document.createElement('style'); st.id = 'zf-health-wide'; st.textContent = '*{letter-spacing:.1em !important}'; document.head.appendChild(st) })
+    await tp.waitForTimeout(500)
+    const fold1 = await tp.evaluate(fold)
+    await tp.evaluate(() => { document.getElementById('zf-health-wide')?.remove() })
+    await tp.waitForTimeout(300)
     await tp.evaluate(() => {
       const c = [...document.querySelectorAll('.hcard')].find(e => e.offsetParent !== null); if (!c) return
       const id = c.getAttribute('data-card-id') || (c.querySelector('[id^="ncard-"]') || {}).id || c.id
@@ -1350,6 +1391,7 @@ try {
     })
     await tp.waitForTimeout(5000)
     const detS = await tp.evaluate(small)
+    const detO = await tp.evaluate(overlap)
     const detH = await tp.evaluate(styleHits)
     await tctx.close()
     {
@@ -1369,8 +1411,18 @@ try {
     add('watch_target44', '누르는 자리 44px 미만 수(390 공고 탭 · 카드 펼침) — 정보', 'info',
       `공고 탭 ${listS.n}/${listS.all}(${listS.top.join(' · ')}) · 카드 펼침 ${detS.n}/${detS.all}(${detS.top.join(' · ')})`,
       '정보 — 판정하지 않는다 · axe target-size(24px) 밖이라 직접 셈 · 보이는 a·button·summary·input·select·[role=button]·[onclick] 중 너비나 높이 < 44')
+    extra.watch_overlap = { list: listO, detail: detO }
+    add('watch_overlap', '누르는 자리 겹침 쌍 수(390 공고 탭 · 카드 펼침) — 정보', 'info',
+      `공고 탭 ${listO.n}쌍/${listO.all}개${listO.top.length ? '(' + listO.top.join(' · ') + ')' : ''} · 카드 펼침 ${detO.n}쌍/${detO.all}개${detO.top.length ? '(' + detO.top.join(' · ') + ')' : ''}`,
+      '정보 — 판정하지 않는다 · 보이는 a·button·summary·input·select·[role=button]·[onclick] 두 사각형이 1px 넘게 겹치는 쌍(조상·자손 빼고) · 줄어드는 쪽이 목표 · 결과 표로 추이를 본다')
+    extra.watch_fold = { base: fold0, wide: fold1 }
+    add('watch_fold', '390 첫 화면 카드 수 · 글자 폭 +10% 덧입힘 — 정보', 'info',
+      `첫 화면 카드 ${fold0.top}장(끝까지 ${fold0.full}) · 첫 카드 ${fold0.firstH ?? '?'}px → 글자 폭 +10% ${fold1.top}장(끝까지 ${fold1.full}) · 첫 카드 ${fold1.firstH ?? '?'}px`,
+      '정보 — 판정하지 않는다 · 공고 탭 스크롤 0 · 창 390×844 안에 위 끝이 든 보이는 .hcard 수(끝까지 든 수) · 덧입힘 = letter-spacing +0.1em(한글 한 자 ≈ 1em — Windows 글꼴 근사) · 2장 밑으로 떨어지는 날을 숫자로 본다')
   } catch (e) {
     add('watch_title', 'title 속성 수(원본 · 390 공고 탭 DOM) — 추이(정보)', 'info', '못 잼: ' + String(e).slice(0, 160), '정보')
+    add('watch_overlap', '누르는 자리 겹침 쌍 수(390 공고 탭 · 카드 펼침) — 정보', 'info', '못 잼: ' + String(e).slice(0, 160), '정보')
+    add('watch_fold', '390 첫 화면 카드 수 · 글자 폭 +10% 덧입힘 — 정보', 'info', '못 잼: ' + String(e).slice(0, 160), '정보')
     add('watch_target44', '누르는 자리 44px 미만 수(390 공고 탭 · 카드 펼침) — 정보', 'info', '못 잼: ' + String(e).slice(0, 160), '정보')
   }
   // ⑫-④ 느린 망 로드 순서 — 둘째·셋째 <script> 사이 8초 멈춤(2026-11-12 · 우편함 「코드·운영 — 🔴 LH 목록 마감 … + 0장」 3 · #990 ⑦)
