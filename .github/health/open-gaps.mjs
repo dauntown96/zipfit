@@ -109,3 +109,35 @@ export function judgeLhClosedWin(j) {
   if (j.n === 0) return { status: j.covered ? 'info' : 'pass', value: `0(LH 마감 열린 행 ${j.lh_closed}${cov})`, rule }
   return { status: 'warn', value: `${j.n}: ${j.ids.slice(0, 5).join(', ')} — 일정 표에만 남은 접수 창(경로 행 0) · 화면이 「마감」으로 닫음${cov}`, rule }
 }
+
+// ㊲ 머리 정정 괄호가 남은 저장 키(2026-11-19 · 우편함 「코드·운영 — 16장」 · 순위표 8위 · 💡 「운영 점검에 「머리 정정 괄호가 남은 저장 키」」).
+//    …20937 창녕영산(2026-10-21) — 제목 머리 「('26.10.21. 정정)」이 키에 남아 카드 두 장 · 정정 몫 누락(PR #704 마이그레이션 2026-10-22_01 이 걷음).
+//    식 = 그 마이그레이션 가드 식 「^[\[(][^\])]*(수정|정정)[^\])]*[\])]」 + 변경 · 연장(💡) · 공고 행 전부(열림·닫힘) · 0 이 아니면 ⚠️(안 멈춤) · 2026-11-19 첫 값 0.
+export const DEDUP_KEY_PAREN_SQL = `
+with t as (select announcement_id, title_dedup_key k from public.announcements where title_dedup_key ~ '^[\\[(][^\\])]*(수정|정정|변경|연장)[^\\])]*[\\])]')
+select json_build_object('n', (select count(*) from t), 'ids', (select coalesce(json_agg(announcement_id order by announcement_id desc), '[]'::json) from (select announcement_id from t order by announcement_id desc limit 5) z)) j`
+export function judgeDedupKeyParen(j) {
+  const rule = '0 — 공고 행 title_dedup_key 가 머리 괄호(정정·수정·변경·연장)로 시작 · 넘으면 ⚠️(안 멈춤 · 정정이 카드를 쪼개고 정정본 분석에서 빠지는 꼴 — 2026-10-21 …20937 · 키 함수 머리 규칙에 그 꼴을 더할 몫)'
+  if (j.n === 0) return { status: 'pass', value: '0', rule }
+  return { status: 'warn', value: `${j.n}행: ${j.ids.join(', ')} — 같은 공고의 다른 행과 키가 갈려 카드가 쪼개질 수 있음`, rule }
+}
+
+// ㊳ 회차 사이 같은 동 다른 전용면적(2026-11-19 · 16장 · 순위표 10위 · 💡 「회차 사이 같은 동·다른 전용면적 감시」) — ℹ️ 정보(판정 0 · 원문 오기 후보).
+//    세대 행 extra_note 「해당동: …」 · 「건설 세대수: N호」가 같고 complex_id 가 같은 행을 묶어, 공고 둘 이상에 걸쳐 전용면적(area_sqm) 종류가
+//    한 공고 안 종류 수보다 많으면 센다(한 공고 안에서 원래 여러 형이면 빼는 셈). 근거: 광주하남1 101동 60호 8월 …20524 40.32㎡ ↔ 10월 …20970 31.32㎡(2026-11-02 국면 C 7회차).
+export const UNIT_AREA_ROUND_SQL = `
+with u as (select complex_id c, announcement_id aid, round(area_sqm::numeric, 2) a,
+    btrim(substring(extra_note from '해당동:\\s*([^;]+)')) dong, substring(extra_note from '건설 세대수:\\s*([0-9,]+)\\s*호') units
+  from public.housing_units where complex_id is not null and area_sqm is not null and extra_note ~ '해당동:'),
+per as (select c, dong, units, aid, count(distinct a) na from u where units is not null group by c, dong, units, aid),
+k as (select u.c, u.dong, u.units, count(distinct u.aid) n_ann, count(distinct u.a) n_area, max(p.na) per_ann,
+    array_agg(distinct u.aid) ids, array_agg(distinct u.a) areas
+  from u join per p on p.c = u.c and p.dong = u.dong and p.units = u.units and p.aid = u.aid where u.units is not null group by u.c, u.dong, u.units)
+select json_build_object('keys', (select count(*) from k), 'n', (select count(*) from k where n_ann >= 2 and n_area > per_ann),
+  'top', (select coalesce(json_agg(json_build_object('c', c, 'dong', dong, 'units', units, 'areas', areas, 'ids', ids)), '[]'::json)
+          from (select * from k where n_ann >= 2 and n_area > per_ann order by c limit 5) z)) j`
+export function judgeUnitAreaRound(j) {
+  const rule = '정보 — 판정하지 않는다 · 같은 단지(complex_id) · 같은 「해당동」 · 같은 「건설 세대수」 세대 행이 공고 둘 이상에 걸쳐 전용면적 종류가 한 공고 안보다 많음(원문 오기 후보 — 원문을 다시 볼 몫 · 한 공고 안 모순이 아니라 ⚠️ 아님)'
+  const top = (j.top || []).map(t => `단지 ${t.c} ${t.dong}동 ${t.units}호 ${t.areas.join('↔')}㎡(${t.ids.map(i => '…' + String(i).slice(-5)).join(' · ')})`).join(' / ')
+  return { status: 'info', value: `${j.n}${top ? ' — ' + top : ''} · 묶음 키 ${j.keys}`, rule }
+}

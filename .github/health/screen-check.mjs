@@ -71,7 +71,10 @@ const CONSOLE_IGNORE = [/dapi\.kakao\.com/, /kakao/i,
   // 🔵 2026-11-03 — 브랜치 점검(입력 ref · 러너 안 127.0.0.1:8201)은 카카오 지도 키의 등록 도메인 밖이라 SDK 가 안 온다 → 화면이 남기는 그 실패 한 줄만 뺀다.
   ...(/^http:\/\/127\.0\.0\.1:8201\//.test(SITE) ? [/카카오맵 SDK 로드 실패/] : [])]
 const checks = []
-const add = (id, name, status, value, rule) => checks.push({ id, name, status, value, rule })
+const add = (id, name, status, value, rule) => {
+  checks.push({ id, name, status, value, rule })
+  try { stage = `항목 「${id}」 다음` } catch { /* stage 선언 전 */ }   // 🔵 2026-11-19(16장) — 감시 시한이 「마지막 자리」로 싣는다
+}
 // 🔴 ④ 링크 문구는 두 갈래다(화면 zfPostLinkHtml) — LH 카드에 요약이 있으면 「함께 정리돼 있어요」, 없으면 「같은 게시물에 올라왔어요」.
 //    둘째 갈래를 판정표에 안 둬서 「알수없음」으로 떨어졌다(이슈 #283 · 2026-09-30 대구연호 두 카드). 화면 문구 갈래를 바꾸는 회차는 여기를 같은 PR 에서 고친다.
 const phraseOf = t =>
@@ -114,6 +117,19 @@ const STALE_DATE_FN = () => {
 
 const consoleErrors = []
 const browser = await chromium.launch()
+// 🔵 2026-11-19(우편함 「코드·운영 — 16장」 · 순위표 9위) — 점검 전체 감시 시한. 2026-11-19 06:18 UTC push 실행(run 44468234254)은 첫 열기 90초 초과 →
+//    「20초 뒤 한 번 다시 연다」 뒤 아무 줄 없이 20분 멈췄다가 작업 한도(25분)에 취소돼 「결과 파일을 남기지 못했다」로만 남았다(#1141 · 어디서 멈췄는지 0).
+//    이제 SCREEN_DEADLINE_MIN(기본 18분)을 넘기면 마지막으로 들어선 자리(stage)를 실은 runner ❌ 로 결과 파일을 쓰고 끝낸다 — 판정 뜻은 종전 그대로(실패 · 이슈).
+let stage = '시작'
+const DEADLINE_MIN = Number(process.env.SCREEN_DEADLINE_MIN || 18)
+const deadline = setTimeout(() => {
+  add('runner', '점검 실행', 'fail', `점검이 ${DEADLINE_MIN}분 넘게 끝나지 않음 — 마지막 자리: ${stage}`, `점검 스크립트가 ${DEADLINE_MIN}분 안에 끝까지 돈다`)
+  try { report('screen', 'A. 화면 점검', checks, extra) } catch (e) { console.error(String(e)) }
+  process.exit(0)
+}, DEADLINE_MIN * 60000)
+deadline.unref()
+// 한 걸음 시한 — Playwright 자체 시한이 듣지 않고 걸린 꼴(위 run)을 바깥에서 끊는다.
+const withTimeout = (p, ms, what) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(`${what} ${Math.round(ms / 1000)}초 넘음(바깥 시한)`)), ms).unref())])
 const extra = {}
 try {
   const ctx = await browser.newContext({ viewport: VIEWPORT, serviceWorkers: 'block', locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
@@ -140,13 +156,19 @@ try {
   // 🔵 2026-10-19(우편함 「표시층 — 화면 점검 오탐 막기」 3) — 첫 열기가 시간 초과면 20초 뒤 한 번만 다시 연다(점검 도중 다른 push 의 Pages 배포와 겹친 경우).
   //    두 번째도 안 열리면 종전대로 「점검 실행」 실패다 — 배포본이 정말 안 열리는 것은 숨기지 않는다.
   let mainRes = null
-  try { mainRes = await page.goto(SITE + '?health=' + Date.now(), { waitUntil: 'networkidle', timeout: 90000 }) }
+  stage = '첫 열기'
+  try { mainRes = await withTimeout(page.goto(SITE + '?health=' + Date.now(), { waitUntil: 'networkidle', timeout: 90000 }), 120000, '첫 열기') }
   catch (e) {
-    if (!/Timeout/i.test(String(e && e.message))) throw e
+    if (!/Timeout|시한/i.test(String(e && e.message))) throw e
     console.log('첫 열기 시간 초과 — 20초 뒤 한 번 다시 연다:', String(e.message).slice(0, 120))
-    await page.waitForTimeout(20000)
-    mainRes = await page.goto(SITE + '?health=' + Date.now(), { waitUntil: 'networkidle', timeout: 90000 })
+    // 🔵 2026-11-19(16장) — 걸린 탐색을 빈 쪽으로 끊고(15초) 다시 연다 · 다시 열기에도 바깥 시한 120초(두 번 다 넘으면 「점검 실행」 ❌ — 종전 뜻 그대로)
+    stage = '첫 열기 다시(빈 쪽으로 끊는 중)'
+    await withTimeout(page.goto('about:blank', { timeout: 15000 }), 20000, '빈 쪽').catch(err => console.log('빈 쪽으로 못 끊음:', String(err).slice(0, 120)))
+    await new Promise(r => setTimeout(r, 20000))
+    stage = '첫 열기 다시'
+    mainRes = await withTimeout(page.goto(SITE + '?health=' + Date.now(), { waitUntil: 'networkidle', timeout: 90000 }), 120000, '첫 열기 다시')
   }
+  stage = '첫 열기 뒤 목록 기다림'
   try { await page.waitForFunction(() => typeof noticeData !== 'undefined' && noticeData.length > 0, null, { timeout: 60000 }) }
   catch (e) {
     // 🔵 2026-11-03(브랜치 점검 site 입력) — 목록이 안 차면 문서 응답 상태·형식·CSP·화면 글자 앞부분을 실패 문구에 싣는다(githack 첫 실행이 단서 없이 끝났다).
