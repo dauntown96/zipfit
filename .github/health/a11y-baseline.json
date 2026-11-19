@@ -1447,6 +1447,12 @@
      "ratio": null,
      "bg": null,
      "why": "pseudoContent"
+    },
+    "p.zf12-who|#ecedef": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
     }
    }
   },
@@ -1712,5 +1718,6 @@
  "_note_2026_11_17": "우편함 「표시층 — 12월 재편 A·B 2차 시안」 0장 · #1054 — 갈래 7 더함(모두 pseudoContent · 페이지에서 잰 대비 10.11~14.23 ≥ 4.5): span|#3d424a(.zf3-bn 경로 가지 이름 --ink-2 · 영암 카드) ×3 상태 · 어두움 div.zf-rent-line|#ecedef · div|#ecedef(요약 가격 줄) · span|#c5c9d0(.zf3-bn 어두움) · match small|#3d424a(.zf3-wsw 「끝남」)",
  "_note_2026_11_17b": "우편함 「표시층 — 12월 재편 A·B 반영」 3 — detail-390 갈래 2 더함(pseudoContent · 페이지 계산 대비): b|#15171b(2층 「꼭 볼 것」 머리 · 17.94) · div.zf-rent-line|#4f6b62(2층으로 옮긴 ㎡당 줄 · 5.37)",
  "_note_2026_11_17c": "우편함 「표시층 — 작은 판 3」 4 — 12월 재편 새 요소 꼴 24(상태별 50) 더함 · 모두 pseudoContent·nonBmp(axe 미완) · 페이지에서 글자색 ↔ 실제 배경으로 잰 대비 최소 6.26(span.zf12-k·zf12-w·zf12-m #5a616b) ~ 17.94 · 미달 0: span.zf12-w/m/k/dd(겉 언제 줄 정거장) · span.zf12-cond/res · p.zf12-area · h4(꼭 볼 것) · span.zf12-pv(꼭 볼 것 머리 첫 문장)",
- "_note_2026_11_17d": "우편함 「표시층 — 작은 판 3」 4 덧 — 병합 뒤 배포본 점검(run 44046840809)에서 처음 본 꼴 2 더함: detail-390 summary.hu-title|#333333 · summary.extras-title|#333333(세대·사진 절 제목 · 배포본 detail-390에서 잰 대비 11.68 · 배경 #f7f6f2) · 미달 0"
+ "_note_2026_11_17d": "우편함 「표시층 — 작은 판 3」 4 덧 — 병합 뒤 배포본 점검(run 44046840809)에서 처음 본 꼴 2 더함: detail-390 summary.hu-title|#333333 · summary.extras-title|#333333(세대·사진 절 제목 · 배포본 detail-390에서 잰 대비 11.68 · 배경 #f7f6f2) · 미달 0",
+ "_note_2026_11_19": "notices-390-dark p.zf12-who|#ecedef 키 더함 — 4단계 ① 줄이 세 줄로 꺾인 카드(…21119)에서 왼쪽 유형 띠 넓이가 「👥」 줄 넓이의 25%를 넘어 axe pseudoContent 미완(글자색 종전 그대로 · 밝은 판 키는 이미 있음) · claude.ai 판정 (가) 2026-11-19"
 }
