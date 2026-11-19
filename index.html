@@ -922,7 +922,7 @@ html[data-ui="d3"] .zf3-card .chip-row .chip.zf3-minechip{background:var(--surfa
 .zf3-ins-card{background:var(--paper);border:1px solid var(--line-2);border-radius:var(--r-3);padding:16px}
 .zf3-ins-card h3{margin:0 0 2px;font-size:var(--t-l);color:var(--ink);display:flex;align-items:baseline;gap:8px}
 .zf3-ins-card h3 span{font-size:var(--t-xs);color:var(--ink-3);font-weight:500}
-.zf3-ins-note{margin:0 0 12px;font-size:var(--t-xs);color:var(--ink-3);line-height:1.5;word-break:keep-all}
+.zf3-ins-note{margin:0 0 12px;font-size:var(--t-body);color:var(--ink-3);line-height:1.5;word-break:keep-all}
 .zf3-ins-empty{margin:8px 0;font-size:var(--t-s);color:var(--ink-3);text-align:center}
 .zf3-tl{display:grid;grid-template-columns:repeat(14,1fr);gap:3px;align-items:end;height:128px}
 .zf3-tc{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0}
@@ -1411,6 +1411,51 @@ html[data-ui="d3"] .zf3-card:has(.zf3-dpill.hot) .zf3-today b{animation:none}
 /* ⑦ 누름 반응 하나 — 카드(접힌 것) · 단추 · 칩 · 펼침 머리. 줄이기 .98 · 움직임을 줄인 기기는 옅게만. */
 html[data-ui="d3"] :is(.hcard.zf3-card:not(.zf3-open),.zf3-go,.zf3-stat,.zf3-tq button,.zf3-chip,.chip,.btn,.zf3-close,.zf3-vseg button,summary):active{transform:scale(.98)}
 @media (prefers-reduced-motion:reduce){html[data-ui="d3"] :is(.hcard.zf3-card:not(.zf3-open),.zf3-go,.zf3-stat,.zf3-tq button,.zf3-chip,.chip,.btn,.zf3-close,.zf3-vseg button,summary):active{transform:none;opacity:.8}}
+/* ════ 🔵 2026-11-19 디자인 2차 2단계(우편함 「표시층 — 디자인 2차 2단계」) — 390 카드 2장을 데이터에 덜 기대게 ════
+   근거: 1단계 걱정 ①(여유 1px) · ②(「7일 안 접수 시작」 세 줄) · claude.ai 배포본 실측(둘째 카드 251px 이면 1장). 값은 토큰만 · 글자·숫자 그대로(자리만). */
+/* ① 결과 수 · 갈래 · 마지막 수집 — 글자 한 줄(넘치면 접힘 · 단추 높이 없음) */
+html[data-ui="d3"] #zf3NoticeHead .zf3-lsum{display:flex;flex-wrap:wrap;align-items:baseline;column-gap:8px;row-gap:2px;margin:0}
+html[data-ui="d3"] #zf3NoticeHead .zf3-lsum .zf3-lh{font-size:var(--t-body);line-height:1.4}
+html[data-ui="d3"] #zf3NoticeHead .zf3-lsum .zf3-lh .zf3-of{font-size:var(--t-sub)}
+html[data-ui="d3"] #zf3NoticeHead .zf3-lsum .zf3-lsub{margin:0;font-size:var(--t-sub)}
+html[data-ui="d3"] #zf3NoticeHead .zf3-lsum .zf3-coll{font-size:var(--t-sub)}
+/* ② 필터 · 정렬 · 목록/지도 한 줄 — 단추 높이는 그대로(--hit) · 목록/지도는 오른쪽 끝 */
+html[data-ui="d3"] #zf3NoticeHead .zf3-ctl{flex-wrap:nowrap;margin:4px 0 4px}
+/* 🔵 검증 고침(2026-11-19 · 첫 카드 235 + 둘째 220 기준) — 앱 머리 위아래 10 → 6(모든 탭 같은 머리 · 로고·AI 단추 44 그대로) ·
+   정렬 칸 테두리를 높이 안으로(46 → 44) · 공고 탭 머리 아래 틈 8 → 6 · 검색 줄 아래 8 → 6 */
+html[data-ui="d3"] .zf3-top{padding-top:6px;padding-bottom:6px}
+html[data-ui="d3"] #zf3NoticeHead .zf3-sortsel{border:0;box-shadow:inset 0 0 0 1px var(--line)}
+html[data-ui="d3"] #zf3NoticeHead.zf3-nhead{margin-bottom:6px}
+html[data-ui="d3"] #main2 .zf3-search{margin-bottom:6px}
+/* 유형 바로가기 칩 36 → 32 · 오늘 판 아래 틈 6 → 4 — 위 두 줄과 함께 첫 카드 위 395 → 약 326px(2단계 판정 기준 · 높은 카드 둘째 자리) */
+html[data-ui="d3"] #zf3NoticeHead .zf3-tq button{min-height:32px}
+html[data-ui="d3"] #zf3NoticeHead .zf3-tq{margin-bottom:2px}
+html[data-ui="d3"] #zf3NoticeHead .zf3-stats{margin-bottom:4px}
+/* ⑤ ★ 희망 조건 칩 — 유형 칩과 같은 꼴 · 별은 경고색 아닌 잉크 */
+html[data-ui="d3"] #zf3NoticeHead .zf3-tq .zf3-tq-mine{font-weight:700}
+html[data-ui="d3"] #zf3NoticeHead .zf3-tq .zf3-tq-mine span{font-size:var(--t-body);line-height:1}
+/* ⑥ 완화 공고 재계약 — 「🔓 자격완화」 칩 줄 아래 한 줄 머리 · 펼치면 원문 전문(정책 행 그대로) */
+.zf-relax-re{margin:6px 0 8px;border:1px solid var(--line);border-radius:var(--r-s);background:var(--paper)}
+.zf-relax-re>summary{list-style:none;display:flex;align-items:center;gap:8px;min-height:var(--hit);padding:0 12px;cursor:pointer;font-size:var(--t-body);font-weight:700;color:var(--ink)}
+.zf-relax-re>summary::-webkit-details-marker{display:none}
+.zf-relax-re>summary::after{content:"▾";margin-left:auto;color:var(--ink-3);font-weight:400}
+.zf-relax-re[open]>summary::after{content:"▴"}
+.zf-relax-re>summary:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.zf-relax-re-n{font-size:var(--t-sub);font-weight:400;color:var(--ink-3)}
+.zf-relax-re-i{padding:0 12px 10px}
+.zf-relax-re-i + .zf-relax-re-i{border-top:1px solid var(--line-2);padding-top:10px}
+.zf-relax-re-c{margin:0 0 4px;font-size:var(--t-sub);font-weight:700;color:var(--ink-2)}
+.zf-relax-re .policy-content{font-size:var(--t-body);color:var(--ink);line-height:1.6}
+/* ⑦ 대비 — 「다른 회차」 접기 머리(hu-past-title)의 날값 회색(흰 바탕 4.48:1 — 4.5 밑)을 토큰 --ink-3 으로(어둡게도 같은 토큰) */
+html[data-ui="d3"] .hu-past-title{color:var(--ink-3)}
+/* ④ 카드 겉 칩 줄 — 알약·⚠️ 칩이 유형 줄 아래로 꺾일 때 줄 틈 6 → 4(칩 높이·글자 그대로) */
+html.zf12 .zf12-card .zf3-ctop{row-gap:4px}
+html[data-ui="d3"] #zf3NoticeHead .zf3-ctl .zf3-vseg{margin-left:auto;padding:0}
+html[data-ui="d3"] #zf3NoticeHead .zf3-ctl .zf3-vseg button{padding:0 10px}
+/* ③ 오늘 판 네 칸 — 숫자 위 · 이름 아래 한 줄(꺾지 않음) → 네 칸 높이가 같다(종전 「7일 안 접수 시작」만 세 줄 51px) */
+html[data-ui="d3"] .zf3-stat{flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;padding:4px 8px;white-space:nowrap}
+html[data-ui="d3"] .zf3-stat b{font-size:var(--t-l)}
+@media (max-width:370px){html[data-ui="d3"] .zf3-stat{white-space:normal}}
 </style>
 </head>
 <body>
@@ -1438,7 +1483,7 @@ html[data-ui="d3"] :is(.hcard.zf3-card:not(.zf3-open),.zf3-go,.zf3-stat,.zf3-tq 
   <!-- 맞춤 공고 추천 (로그인 사용자 전용) -->
   <div id="personalizedPanel" class="panel" style="margin-bottom:1rem;display:none">
     <p class="panel-title" style="margin-bottom:0.5rem">🎯 맞춤 추천 공고</p>
-    <p style="font-size:12px;color:var(--ink-3);margin-bottom:1rem" id="personalizedDesc"></p>
+    <p style="font-size:var(--t-body);color:var(--ink-3);margin-bottom:1rem" id="personalizedDesc"></p>
     <div id="personalizedList"></div>
   </div>
   <div id="personalizedPrompt" class="rbox warn" style="margin-bottom:1rem;display:none">
@@ -1454,7 +1499,7 @@ html[data-ui="d3"] :is(.hcard.zf3-card:not(.zf3-open),.zf3-go,.zf3-stat,.zf3-tq 
   <!-- STEP 1 -->
   <div id="panel1" class="panel">
     <p class="panel-title">내 신청 자격을 확인해요</p>
-    <p id="zfMatchPrefillNote" class="hidden" style="font-size:12px;color:var(--ink);margin:-0.25rem 0 0.75rem">✅ 저장한 조건으로 채웠어요</p>
+    <p id="zfMatchPrefillNote" class="hidden" style="font-size:var(--t-body);color:var(--ink);margin:-0.25rem 0 0.75rem">✅ 저장한 조건으로 채웠어요</p>
     <div class="row">
       <div class="field">
         <label class="label" for="marital">혼인 상태</label>
@@ -1754,7 +1799,7 @@ html[data-ui="d3"] :is(.hcard.zf3-card:not(.zf3-open),.zf3-go,.zf3-stat,.zf3-tq 
         <div class="dday-sub" id="dday-sub"></div>
       </div>
       <!-- 🔴 2026-10-07(표시층 긴급 3) — 아래 목록은 유형별 고정 예시다. 원문 제출서류를 화면이 아직 읽지 않는다. -->
-      <p class="zf-doc-note" style="font-size:12px;border-radius:var(--r-2);padding:8px 10px;margin:0 0 10px">공고마다 제출서류가 다릅니다 — 공고 원문에서 확인하세요</p>
+      <p class="zf-doc-note" style="font-size:var(--t-body);border-radius:var(--r-2);padding:8px 10px;margin:0 0 10px">공고마다 제출서류가 다릅니다 — 공고 원문에서 확인하세요</p>
       <p class="slabel">📋 일반적으로 필요한 서류(예시)</p>
       <ul class="checklist" id="checklist-common"></ul>
       <p class="slabel" id="checklist-cond-title" style="margin-top:1.25rem">📎 자격별 추가 서류</p>
@@ -1779,13 +1824,13 @@ html[data-ui="d3"] :is(.hcard.zf3-card:not(.zf3-open),.zf3-go,.zf3-stat,.zf3-tq 
     <div id="loginGate" class="panel">
       <p class="panel-title">로그인</p>
       <p class="sub" style="margin-bottom:0.5rem">로그인하면 저장하신 조건과 알림 설정을 불러올 수 있어요.</p>
-      <p style="font-size:12px;color:var(--ink-3);margin:0 0 1rem;line-height:1.5">🔒 창이나 탭을 닫으면 자동으로 로그아웃돼요. 새로고침은 그대로 유지됩니다.</p>
+      <p style="font-size:var(--t-body);color:var(--ink-3);margin:0 0 1rem;line-height:1.5">🔒 창이나 탭을 닫으면 자동으로 로그아웃돼요. 새로고침은 그대로 유지됩니다.</p>
 
       <!-- 로그인 경로 — 카카오 -->
       <button class="btn" id="zfKakaoBtn" onclick="zfSignInKakao()"
               style="background:#FEE500;color:#191600;border:none;margin-bottom:0.75rem">카카오로 시작하기</button>
 
-      <p id="zfAuthMsg" style="font-size:12px;margin-top:8px;color:var(--ink-3)"></p>
+      <p id="zfAuthMsg" style="font-size:var(--t-body);margin-top:8px;color:var(--ink-3)"></p>
     </div>
 
     <!-- 카카오 로그인 직후: 알림 받을 이메일 수집 (필수 경로 — 카카오는 이메일을 주지 않음) -->
@@ -1798,14 +1843,14 @@ html[data-ui="d3"] :is(.hcard.zf3-card:not(.zf3-open),.zf3-go,.zf3-stat,.zf3-tq 
       </div>
       <button class="btn btn-primary" onclick="zfSaveAlertEmail()">저장하고 계속 →</button>
       <button class="btn btn-sec" onclick="zfSkipAlertEmail()">건너뛰기</button>
-      <p id="zfAlertEmailMsg" style="font-size:12px;margin-top:8px;color:var(--ink-3)"></p>
+      <p id="zfAlertEmailMsg" style="font-size:var(--t-body);margin-top:8px;color:var(--ink-3)"></p>
     </div>
 
     <!-- 로그인 후: 환경설정 본체 -->
     <div id="settingsBody" class="hidden">
       <div class="panel" style="margin-bottom:1rem">
         <p class="panel-title" style="margin-bottom:4px">⚙️ 환경설정</p>
-        <p style="font-size:12px;color:var(--ink-3)" id="currentUserEmail"></p>
+        <p style="font-size:var(--t-body);color:var(--ink-3)" id="currentUserEmail"></p>
       </div>
 
       <!-- 조건 설정 -->
@@ -1869,7 +1914,7 @@ html[data-ui="d3"] :is(.hcard.zf3-card:not(.zf3-open),.zf3-go,.zf3-stat,.zf3-tq 
           <div class="chip-group" id="settingsTypeChips"></div>
         </div>
         <button class="btn btn-primary" style="margin-top:1rem" onclick="saveSettings()">조건 저장하기</button>
-        <p id="settingsSaveMsg" style="font-size:12px;margin-top:8px;color:var(--ink-3)"></p>
+        <p id="settingsSaveMsg" style="font-size:var(--t-body);margin-top:8px;color:var(--ink-3)"></p>
       </div>
 
       <div class="panel" style="margin-bottom:1rem">
@@ -1882,7 +1927,7 @@ html[data-ui="d3"] :is(.hcard.zf3-card:not(.zf3-open),.zf3-go,.zf3-stat,.zf3-tq 
           <input type="email" id="zfSettingsAlertEmail" placeholder="example@email.com">
           <button class="btn btn-sec" style="margin-top:8px"
                   onclick="zfSaveAlertEmail('zfSettingsAlertEmail','zfSettingsAlertEmailMsg')">알림 이메일 저장</button>
-          <p id="zfSettingsAlertEmailMsg" style="font-size:12px;margin:6px 0 0;color:var(--ink-3)"></p>
+          <p id="zfSettingsAlertEmailMsg" style="font-size:var(--t-body);margin:6px 0 0;color:var(--ink-3)"></p>
         </div>
 
         <div class="setting-row">
@@ -1927,13 +1972,13 @@ html[data-ui="d3"] :is(.hcard.zf3-card:not(.zf3-open),.zf3-go,.zf3-stat,.zf3-tq 
       <div class="panel">
         <p class="slabel" style="margin:0 0 0.75rem">🚪 계정</p>
         <button class="btn btn-sec" onclick="logoutUser()">로그아웃하고 다른 계정으로 전환</button>
-        <p style="font-size:12px;color:var(--ink-3);margin:6px 0 0;line-height:1.5">지금 계정에서 로그아웃한 뒤 다른 계정으로 로그인합니다. 저장한 공고와 설정은 계정마다 따로 보관돼요.</p>
+        <p style="font-size:var(--t-body);color:var(--ink-3);margin:6px 0 0;line-height:1.5">지금 계정에서 로그아웃한 뒤 다른 계정으로 로그인합니다. 저장한 공고와 설정은 계정마다 따로 보관돼요.</p>
 
         <!-- 🔴 탈퇴는 로그아웃과 다른 일이라 선으로 끊고 색을 달리한다(2026-09-18). 이 패널 전체가
              #settingsBody 안이라 로그인 상태에서만 보인다 — 별도 분기를 두지 않는다. -->
         <div id="zfDeleteZone" style="margin-top:1.25rem;padding-top:1rem;border-top:1px solid #e8e8e0">
           <button id="zfDeleteBtn" class="btn btn-sec" style="border-color:#C0392B;color:#C0392B" onclick="zfDeleteAccountAsk()">회원 탈퇴</button>
-          <p style="font-size:12px;color:var(--ink-3);margin:6px 0 0;line-height:1.5">계정과 이 계정에 저장된 정보를 삭제합니다.</p>
+          <p style="font-size:var(--t-body);color:var(--ink-3);margin:6px 0 0;line-height:1.5">계정과 이 계정에 저장된 정보를 삭제합니다.</p>
 
           <div id="zfDeleteConfirm" class="hidden" style="margin-top:10px;padding:12px;border:1px solid #C0392B;border-radius:var(--r-2);background:#FDF3F2">
             <p style="font-size:13px;color:#7B241C;margin:0 0 10px;line-height:1.6">탈퇴하면 저장한 조건·찜한 공고·알림 설정과 이 계정에 연결된 이용 기록이 삭제됩니다. 되돌릴 수 없습니다.</p>
@@ -1941,7 +1986,7 @@ html[data-ui="d3"] :is(.hcard.zf3-card:not(.zf3-open),.zf3-go,.zf3-stat,.zf3-tq 
             <button class="btn btn-sec" style="margin-left:6px" onclick="zfDeleteAccountCancel()">취소</button>
           </div>
 
-          <p id="zfDeleteMsg" style="font-size:12px;margin:8px 0 0;line-height:1.5"></p>
+          <p id="zfDeleteMsg" style="font-size:var(--t-body);margin:8px 0 0;line-height:1.5"></p>
         </div>
       </div>
 
@@ -4534,6 +4579,8 @@ function applyNoticeFiltersAndRender(keepPage){
   if(activeNoticeStatus) base = base.filter(n => noticeStateLabel(n) === activeNoticeStatus);
   let filtered = applyNoticeSubFilters(base);
   // 🔵 D-3 단계 d — 지도에서 고른 시군구(d3 · 메모리만 · 칩 ✕로 뺀다). 지도는 이 줄 앞의 행으로 그린다(고른 곳을 빼고 센 분포).
+  // 🔵 2026-11-19(디자인 2차 2단계 2) — ★ 희망 조건 칩(로그인 · 희망 조건이 있을 때만) — 판정은 종전 zf3Mine(전광판 ★와 같은 규칙) 그대로.
+  if(typeof zf3MineFilter === 'function') filtered = zf3MineFilter(filtered);
   if(typeof zf3PlaceFilter === 'function') filtered = zf3PlaceFilter(filtered);
 
   const sortVal = document.getElementById('noticeSortSel')?.value || 'date-desc';
@@ -6746,7 +6793,7 @@ function renderPersonalizedRecommendations(){
       ${zfSafeUrl(n['공고URL']||n['url'])?`<a class="detail-link" href="${zfSafeHref(n['공고URL']||n['url'])}" target="_blank" rel="noopener" style="display:block" data-aid="${zfAttr((n['announcement_id']||'').toString().replace(/'/g,''))}" onclick="zfLog('recommend_click',{rank:${idx+1}},this.dataset.aid)"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`:''}
     </div>`;
   });
-  if(filtered.length>5) html+=`<p style="font-size:12px;color:var(--ink-3);text-align:center;margin-top:8px">외 ${filtered.length-5}건 더 — 공고 탭에서 전체 확인</p>`;
+  if(filtered.length>5) html+=`<p style="font-size:var(--t-body);color:var(--ink-3);text-align:center;margin-top:8px">외 ${filtered.length-5}건 더 — 공고 탭에서 전체 확인</p>`;
   html += zfTargetExcludedHtml(recOut);
   document.getElementById('personalizedList').innerHTML=html;
   // 🔴 공고 탭·매칭 탭과 같은 두 줄이다(2026-09-17). 새 문구·새 함수를 만들지 않고
@@ -7084,7 +7131,7 @@ function renderInsight(rows, wrap, statsRows){
                   : upcomingCnt>0
                     ? `<p style="font-size:14px;font-weight:700;color:var(--ink);margin:0">${upcomingCnt}건</p>
                        <p style="font-size:var(--t-xs);color:var(--ink-3);margin:2px 0 0">접수 예정 (접수 시작 전)</p>`
-                    : `<p style="font-size:12px;color:var(--ink-3);margin:0">접수중·접수예정 모두 없음</p>`}
+                    : `<p style="font-size:var(--t-body);color:var(--ink-3);margin:0">접수중·접수예정 모두 없음</p>`}
               </div>
             </div>`).join('')}
         </div>
@@ -7177,7 +7224,7 @@ function renderInsight(rows, wrap, statsRows){
 
     <div style="${S}">
       <p style="${T};margin-bottom:4px">📍 지역별 공고 현황 (${regionAll.length}개 지역)</p>
-      <p style="font-size:12px;color:var(--ink-3);margin:0 0 14px;line-height:1.5">신청할 수 없는 공고는 빼고 <strong style="color:#5a7af7">${regionRows.length.toLocaleString()}건</strong>을 세었어요 · 목록에 없는 지역은 지금 신청할 수 있는 공고가 없는 곳이에요</p>
+      <p style="font-size:var(--t-body);color:var(--ink-3);margin:0 0 14px;line-height:1.5">신청할 수 없는 공고는 빼고 <strong style="color:#5a7af7">${regionRows.length.toLocaleString()}건</strong>을 세었어요 · 목록에 없는 지역은 지금 신청할 수 있는 공고가 없는 곳이에요</p>
       ${regionAll.length===0 && !wideN ? '<p style="font-size:13px;color:var(--ink-3);text-align:center;padding:20px 0">지금 신청할 수 있는 공고가 없어요</p>' : `
       <div style="display:flex;flex-direction:column;gap:10px">
         ${wideN ? regionRowHTML(['전국 단위', {cnt: wideN}]) : ''}
@@ -7943,7 +7990,7 @@ function zfCheckNoteHtml(labels, typeNote){
   const lines = [];
   if(labels && labels.length) lines.push(`이 공고는 ${escapeHtml(labels.join('·'))} 대상 모집이에요 — 신청할 수 있는지 공고문에서 확인해 주세요`);
   if(typeNote) lines.push(`자격 진단에 이 유형(${escapeHtml(typeNote)}) 기준이 없어요 — 신청할 수 있는지 공고문에서 확인해 주세요`);
-  return lines.map(l => `<p class="zf-check-note" style="font-size:12px;border-radius:var(--r-2);padding:6px 10px;margin:0 0 8px">📄 ${l}</p>`).join('');
+  return lines.map(l => `<p class="zf-check-note" style="font-size:var(--t-body);border-radius:var(--r-2);padding:6px 10px;margin:0 0 8px">📄 ${l}</p>`).join('');
 }
 function zfDiagFacts(){
   const by = parseInt(document.getElementById('birthYear')?.value) || 0;
@@ -8365,7 +8412,7 @@ function zfTargetNoteHtml(v){
   const nm = escapeHtml((v.names || []).join('·'));
   // 🔵 2026-10-15(우편함 「코드 — 공급대상 안내 이름 빈칸 …」 1) — 대상 이름이 없는 갈래(`{조건:{혼인:"혼인 중"}}` — Ⅱ 5순위 「그 밖의 혼인가구」)만으로
   //    판정되면 이름 자리를 뺀다(우리 말로 이름을 짓지 않는다). 종전에는 「👥 대상 모집 — …」처럼 빈 이름이 그대로 그려졌다.
-  if(v.state === 'ok') return `<p class="zf-target-ok" style="font-size:12px;border-radius:var(--r-2);padding:6px 10px;margin:0 0 8px">👥 ${nm ? `${nm} 대상 모집 — ` : ''}입력하신 정보로는 대상 조건에 맞아요</p>`;
+  if(v.state === 'ok') return `<p class="zf-target-ok" style="font-size:var(--t-body);border-radius:var(--r-2);padding:6px 10px;margin:0 0 8px">👥 ${nm ? `${nm} 대상 모집 — ` : ''}입력하신 정보로는 대상 조건에 맞아요</p>`;
   if(v.state === 'check' && v.asset){
     // 🔵 2026-11-09(우편함 「표시층 — 카드 ✓ 관문 자산 축」) — 대상·소득은 맞는데 자산·자동차가 이 공고 기준을 넘거나(출산 가산 금액을 몰라) 못 잰 카드.
     const a = v.asset, prof = a.src === 'profile', what = a.kind === 'car' ? '자동차가액' : '자산';
@@ -8373,7 +8420,7 @@ function zfTargetNoteHtml(v){
     const tail = a.why === 'birth'
       ? `${prof ? '저장한' : '입력하신'} ${what}이 이 공고 기본 ${what} 기준(${lim})을 넘어요 · 이 공고는 2023년 3월 28일 이후 출산 자녀가 있으면 ${what} 기준이 올라가는데 그 금액은 공고문에서 확인해야 해요`
       : `${prof ? '저장한' : '입력하신'} ${what}이 이 공고 ${what} 기준(${lim})을 넘어요`;
-    return `<p class="zf-check-note" style="font-size:12px;border-radius:var(--r-2);padding:6px 10px;margin:0 0 8px">📄 ${nm ? `${nm} ` : ''}대상 조건은 맞지만 ${escapeHtml(tail)} — 신청할 수 있는지 공고문에서 확인해 주세요</p>`;
+    return `<p class="zf-check-note" style="font-size:var(--t-body);border-radius:var(--r-2);padding:6px 10px;margin:0 0 8px">📄 ${nm ? `${nm} ` : ''}대상 조건은 맞지만 ${escapeHtml(tail)} — 신청할 수 있는지 공고문에서 확인해 주세요</p>`;
   }
   if(v.state === 'check' && v.income){
     // 🔵 2026-10-16(N12) — 대상 조건은 맞는데 소득을 볼 수 없거나 넘는 카드. 금액은 만원 단위 반올림(「약」)이다.
@@ -8383,12 +8430,12 @@ function zfTargetNoteHtml(v){
         ? (prof ? `저장한 소득이 이 공고 기본 소득 기준(${lim} · 맞벌이·출산 가산 전)보다 많아요` : `입력하신 소득이 이 공고 소득 기준(${lim})을 넘어요`)
       : v.income.why === 'unknown' ? (prof ? '저장한 조건에 소득이 없어 소득 기준은 보지 못했어요' : '소득을 입력하지 않아 소득 기준은 보지 못했어요')
       : '이 공고 소득 기준을 화면에서 계산하지 못했어요';
-    return `<p class="zf-check-note" style="font-size:12px;border-radius:var(--r-2);padding:6px 10px;margin:0 0 8px">📄 ${nm ? `${nm} ` : ''}대상 조건은 맞지만 ${tail} — 신청할 수 있는지 공고문에서 확인해 주세요</p>`;
+    return `<p class="zf-check-note" style="font-size:var(--t-body);border-radius:var(--r-2);padding:6px 10px;margin:0 0 8px">📄 ${nm ? `${nm} ` : ''}대상 조건은 맞지만 ${tail} — 신청할 수 있는지 공고문에서 확인해 주세요</p>`;
   }
   if(v.state === 'check'){
     const why = (v.checks || []).length ? ` (${escapeHtml(v.checks.join(' · '))})` : '';
-    if((v.targets || []).length) return `<p class="zf-check-note" style="font-size:12px;border-radius:var(--r-2);padding:6px 10px;margin:0 0 8px">📄 이 공고의 모집 대상은 ${v.targets.map(t => `「${escapeHtml(t)}」`).join(' · ')}이에요${why} — 신청할 수 있는지 공고문에서 확인해 주세요</p>`;
-    return `<p class="zf-check-note" style="font-size:12px;border-radius:var(--r-2);padding:6px 10px;margin:0 0 8px">📄 ${nm ? `이 공고는 ${nm} 대상 모집이에요` : '대상 조건이 있는 공고예요'}${why} — 신청할 수 있는지 공고문에서 확인해 주세요</p>`;
+    if((v.targets || []).length) return `<p class="zf-check-note" style="font-size:var(--t-body);border-radius:var(--r-2);padding:6px 10px;margin:0 0 8px">📄 이 공고의 모집 대상은 ${v.targets.map(t => `「${escapeHtml(t)}」`).join(' · ')}이에요${why} — 신청할 수 있는지 공고문에서 확인해 주세요</p>`;
+    return `<p class="zf-check-note" style="font-size:var(--t-body);border-radius:var(--r-2);padding:6px 10px;margin:0 0 8px">📄 ${nm ? `이 공고는 ${nm} 대상 모집이에요` : '대상 조건이 있는 공고예요'}${why} — 신청할 수 있는지 공고문에서 확인해 주세요</p>`;
   }
   return '';
 }
@@ -8402,7 +8449,7 @@ function zfTargetExcludedHtml(list){
     const qh = q ? `<br><span class="zf-tq" style="color:var(--ink-3);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden">원문: ${escapeHtml(q)}</span><button type="button" class="zf-tq-more" style="border:0;background:none;color:var(--ink-2);font-size:12px;padding:2px 0;cursor:pointer" onclick="event.stopPropagation();const p=this.previousElementSibling;p.style.webkitLineClamp='unset';p.style.display='block';this.remove()">더 보기</button>` : '';
     return `<li style="margin:0 0 8px"><span style="font-weight:600">${t}</span>${nm ? `<br><span style="color:var(--ink-2)">${nm} 대상 모집</span>` : ''}${qh}</li>`;
   }).join('');
-  return `<details class="zf-target-out" style="margin-top:10px;background:#f6f6f2;border-radius:var(--r-s);padding:8px 12px;font-size:12px">
+  return `<details class="zf-target-out" style="margin-top:10px;background:#f6f6f2;border-radius:var(--r-s);padding:8px 12px;font-size:var(--t-body)">
     <summary style="cursor:pointer;font-weight:600;color:var(--ink-2)">👥 공급 대상이 달라 뺀 공고 ${list.length}</summary>
     <ul style="margin:8px 0 0;padding-left:16px">${items}</ul>
   </details>`;
@@ -10672,6 +10719,31 @@ function zfPolicyNotes(curRows, annId, id, ownerAnn, slot, wrap){
     if(!zfPlaceWeakHead(id)){ if(!hu || !hu.parentNode) put(html); }
   });
 }
+// 🔵 2026-11-19(우편함 「표시층 — 디자인 2차 2단계」 3 · 백로그 「완화 공고 재계약 규칙」 후보 2 · 다운님 승인 2026-11-18 21:12) —
+//    펼친 카드의 「🔓 자격완화」 칩(data-zf-relax) 아래에 「재계약」 한 줄 머리 → 누르면 이 공고(이번 회차) 정책 행 중 category 에 「재계약」이 든 행의
+//    원문 전문(content_raw 그대로 · 이름표 = category). ⚠️ 행은 종전 자리(⚠️ 줄 · 정책 안내)에만 둔다. AI 정리 한 줄은 두지 않는다(저장 칸 미정).
+//    재료는 정책 안내가 이미 받은 행(새 요청 0) · 같은 category+원문은 한 번만.
+function zfRelaxRenewal(cardEl, rows){
+  if(!cardEl) return;
+  cardEl.querySelectorAll('.zf-relax-re').forEach(x => x.remove());
+  const chip = cardEl.querySelector('[data-zf-relax]');
+  if(!chip || !chip.parentElement) return;
+  const seen = new Set();
+  const re = (rows || []).filter(p => {
+    const c = String(p.category || '');
+    if(!c.includes('재계약') || /^⚠️/.test(c) || !String(p.content_raw || '').trim()) return false;
+    const k = c + '|' + p.content_raw;
+    if(seen.has(k)) return false;
+    seen.add(k); return true;
+  });
+  if(!re.length) return;
+  const d = document.createElement('details');
+  d.className = 'zf-relax-re';
+  d.innerHTML = `<summary>재계약 <span class="zf-relax-re-n">원문 ${re.length}건</span></summary>`
+    + re.map(p => `<div class="zf-relax-re-i"><p class="zf-relax-re-c">${escapeHtml(p.category)}</p><div class="policy-content">${escapeHtml(p.content_raw)}</div></div>`).join('');
+  d.addEventListener('click', e => e.stopPropagation());
+  chip.parentElement.after(d);
+}
 function loadAnnouncementPolicies(annId, detailEl, id, useGroup){
   if(!annId) return;
   const ownerAnn = zfCardAnn(id);
@@ -10706,6 +10778,7 @@ function loadAnnouncementPolicies(annId, detailEl, id, useGroup){
     }
     // 🔴 이번 회차 행이 하나도 없으면(orphan) 가르지 않는다 — 종전 동작 그대로(사양 6).
     const polSplit = curPol.length > 0 && otherPol.length > 0;
+    zfRelaxRenewal(polCardEl, curPol);
     // 그룹조회로 형제 announcement_id 여러 곳에 동일 정책이 중복 백필된 경우를 대비해
     // 카테고리+내용이 완전히 같은 행은 하나만 남긴다. 🔴 가른 뒤에는 이번 회차 쪽을 먼저 남긴다 —
     // 같은 행이 두 회차에 다 있으면 이번 회차 쪽에 한 번만 나온다.
@@ -12593,16 +12666,16 @@ function renderMatchResults(rows){
 
   html += `<div class="alert-signup-box" id="alertSignupBox">
     <p style="font-size:14px;font-weight:600;color:#111;margin-bottom:6px">💾 이 검색 조건을 저장할까요?</p>
-    <p style="font-size:12px;color:var(--ink-3);margin-bottom:12px">저장해두면 다음에 다시 입력하지 않아도 바로 검색할 수 있어요.</p>
+    <p style="font-size:var(--t-body);color:var(--ink-3);margin-bottom:12px">저장해두면 다음에 다시 입력하지 않아도 바로 검색할 수 있어요.</p>
     ${currentUser
-      ? `<p style="font-size:12px;color:var(--ink);margin-bottom:10px">✅ ${escapeHtml(currentUser.alert_email||currentUser.email||'로그인한 계정')}으로 저장됩니다</p>`
-      : `<p style="font-size:12px;color:var(--warn);margin-bottom:10px">설정 탭에서 로그인하면 조건을 저장할 수 있어요.</p>`}
+      ? `<p style="font-size:var(--t-body);color:var(--ink);margin-bottom:10px">✅ ${escapeHtml(currentUser.alert_email||currentUser.email||'로그인한 계정')}으로 저장됩니다</p>`
+      : `<p style="font-size:var(--t-body);color:var(--warn);margin-bottom:10px">설정 탭에서 로그인하면 조건을 저장할 수 있어요.</p>`}
     <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#444;margin-bottom:12px;cursor:pointer">
       <input type="checkbox" id="newNoticeOptIn" checked style="width:16px;height:16px">
       새 공고 알림 받기 (준비 중)
     </label>
     <button class="btn btn-primary" style="margin:0" onclick="saveUserProfile('low')">조건 저장하기</button>
-    <p id="alertSignupMsg" style="font-size:12px;margin-top:8px"></p>
+    <p id="alertSignupMsg" style="font-size:var(--t-body);margin-top:8px"></p>
   </div>`;
 
   html += `<button class="btn btn-primary" onclick="goMain(4);goStep(3)" style="margin-top:0.5rem">서류 체크리스트 보기 →</button>`;
@@ -12735,7 +12808,7 @@ function buildChecklist(){
     selectorEl.innerHTML = `<div class="rbox" style="text-align:center;padding:1.5rem 1rem;margin-bottom:16px">
       <p style="font-size:1.8rem;margin-bottom:8px">🔖</p>
       <p style="font-size:13px;color:var(--ink-2);font-weight:600;margin-bottom:4px">저장한 공고가 없습니다</p>
-      <p style="font-size:12px;color:var(--ink-3);margin-bottom:12px">공고 탭에서 공고를 저장해주세요.</p>
+      <p style="font-size:var(--t-body);color:var(--ink-3);margin-bottom:12px">공고 탭에서 공고를 저장해주세요.</p>
       <button class="btn btn-sec btn-sm" onclick="goMain(2)">공고 탭으로 이동 →</button>
     </div>`;
     if(typeof zf3On === 'function' && zf3On()) selectorEl.innerHTML = zf3EmptyHTML('아직 저장한 공고가 없어요', '공고 상세의 🔖 저장을 누르면 서류와 일정이 여기 모여요.', { label: '공고 보러 가기 →', on: 'goMain(2)' });   // 🔵 빈 상태 한 꼴
@@ -14753,20 +14826,23 @@ function zf3CondChips(){
   const chk = document.getElementById('hideClosedChk');
   if(chk && !chk.checked && !activeNoticeStatus) out.push(['closed', '신청할 수 없는 공고 포함']);
   if(zf3PlaceSel && zf3PlaceName) out.push(['place', `📍 ${zf3PlaceName}`]);
+  if(zf3MineOn && zf3Prefs()) out.push(['mine', '★ 희망 조건']);
   return out;
 }
 // 표제란 「마지막 수집」 — 목록을 받은 날짜가 아니라 실제 마지막 수집 시각(RPC get_last_collected_at · 출처별 셋 중 가장 늦은 것).
 //    🔴 수집 주기 문구를 쓰지 않는다(낮 · 밤 · SH 주기가 달라 한 문장이 늘 틀린다 — 우편함 「표시층 — 실사용 1회차 반영」 3).
 //    받기 전·실패면 「확인 중」 · 10분마다 다시 묻고 그 칸 글자만 바꾼다. 출처 표시는 푸터(.zf-src)로 옮겼다(지우지 않는다 — ⑨ 4-1).
 let zf3Collected = null, zf3CollectedT = null;
-function zf3CollText(){
+// 🔵 2026-11-19(디자인 2차 2단계 · 검증 고침) — short = 머리 한 줄용 「오늘 10:50」(KST 표기를 뺀 꼴 · 숫자 그대로). 전문은 aria-label · title 로 같이 둔다.
+function zf3CollText(short){
   if(!zf3Collected) return '확인 중';
   const k = new Date(zf3Collected + 9 * 3600 * 1000).toISOString();
   const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
   const yest = new Date(Date.now() - 15 * 3600 * 1000).toISOString().slice(0, 10);
   const day = k.slice(0, 10) === today ? '오늘' : k.slice(0, 10) === yest ? '어제' : k.slice(5, 10).replace('-', '.');
-  return `${day} ${k.slice(11, 16)} KST`;
+  return short ? `${day} ${k.slice(11, 16)}` : `${day} ${k.slice(11, 16)} KST`;
 }
+function zf3CollNote(){ const s = zf3Collected ? zf3CollText(true) + ' 수집' : '수집 확인 중'; const full = '마지막 수집 ' + zf3CollText(); return { s, full }; }
 async function zf3LoadCollected(){
   try{
     const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_last_collected_at`, {method:'POST', headers: zfAnonHeaders(), body: '{}'});
@@ -14776,6 +14852,7 @@ async function zf3LoadCollected(){
     zf3Collected = ts.length ? Math.max(...ts) : null;
   }catch(err){ console.warn('꼭집 마지막 수집 시각을 못 받았어요:', err); }
   document.querySelectorAll('[data-zf3-coll]').forEach(e => { e.textContent = zf3CollText(); });
+  document.querySelectorAll('[data-zf3-colls]').forEach(e => { const c = zf3CollNote(); e.textContent = c.s; e.setAttribute('aria-label', c.full); e.title = c.full; });
 }
 function zf3RenderNoticeHead(filtered){
   if(!zf3On()) return;
@@ -14803,10 +14880,14 @@ function zf3RenderNoticeHead(filtered){
   const sn = document.querySelector('[data-zf3-sheetcount]');
   if(sn) sn.textContent = chips.length ? `조건에 맞는 ${n.toLocaleString()}건` : (closedExcluded ? `열린 공고 ${o.n.toLocaleString()}건` : `마감 포함 ${n.toLocaleString()}건`);
   // 🔵 2026-11-18(우편함 「표시층 — 디자인 2차 1단계」 2) — 순서: 검색(머리 밖) → 유형 바로가기 줄 → 밝은 오늘 판(한 줄 네 칸) → 결과 수 · 갈래 · 필터·정렬.
-  el.innerHTML = zf3TypeRow() + zf3StatChips(filtered, chips) + `<div class="zf3-lhrow"><p class="zf3-lh">${head}</p><span class="zf3-vseg" role="group" aria-label="보기"><button type="button" data-act="view" data-v="list" aria-pressed="${zf3View !== 'map'}">목록</button><button type="button" data-act="view" data-v="map" aria-pressed="${zf3View === 'map'}">지도</button></span></div>`
-    + `<p class="zf3-lsub zf3-lsub-row"><span>${closedExcluded ? '' : `열린 ${o.n.toLocaleString()}건: `}${zf3StLink('접수 중', '접수 중', o.a)} · ${zf3StLink('예정', '접수 예정', o.b)}${o.k ? ` · ${zf3StLink('미상', '접수기간 미상', o.k)}` : ''}</span><span class="zf3-coll" role="note">마지막 수집 <span data-zf3-coll>${escapeHtml(zf3CollText())}</span></span></p>`
+  // 🔵 2026-11-19(우편함 「표시층 — 디자인 2차 2단계」 1) — 390 첫 화면 카드 2장이 데이터(높은 카드)에 덜 기대게 머리 줄을 셋 → 둘로:
+  //    결과 수 · 갈래(접수 중 · 예정 · 미상) · 마지막 수집을 글자 한 줄(.zf3-lsum)에 · 목록/지도 단추는 필터·정렬 줄 오른쪽 끝으로. 글자·숫자·링크는 종전 그대로(자리만).
+//    마지막 수집은 짧은 꼴 「오늘 10:50 수집」(전문 「마지막 수집 오늘 10:50 KST」는 aria-label · title) — 기본 머리가 Windows 글꼴에서도 한 줄(검증 2026-11-19 · 종전 꼴은 두 줄 40px로 꺾여 카드 2장이 깨졌다).
+  el.innerHTML = zf3TypeRow() + zf3StatChips(filtered, chips)
+    + `<div class="zf3-lsum"><p class="zf3-lh">${head}</p><p class="zf3-lsub"><span>${closedExcluded ? '' : `열린 ${o.n.toLocaleString()}건: `}${zf3StLink('접수 중', '접수 중', o.a)} · ${zf3StLink('예정', '접수 예정', o.b)}${o.k ? ` · ${zf3StLink('미상', '접수기간 미상', o.k)}` : ''}</span></p>${(c => `<span class="zf3-coll" role="note" data-zf3-colls aria-label="${zfAttr(c.full)}" title="${zfAttr(c.full)}">${escapeHtml(c.s)}</span>`)(zf3CollNote())}</div>`
     + `<div class="zf3-ctl"><button type="button" class="zf3-chip add zf3-fbtn" data-act="sheet" aria-expanded="${sheetOpen}" aria-controls="noticeFilterPanel">${ZF3_ICO_FILTER}필터${chips.length ? ` <b>${chips.length}</b>` : ''}</button>`
-    + (sortOpts ? `<span class="zf3-sortsel">${ZF3_ICO_SORT}<select data-act="sortsel" autocomplete="off" aria-label="정렬">${sortOpts}</select><span class="cv" aria-hidden="true">▾</span></span>` : '') + `</div>`
+    + (sortOpts ? `<span class="zf3-sortsel">${ZF3_ICO_SORT}<select data-act="sortsel" autocomplete="off" aria-label="정렬">${sortOpts}</select><span class="cv" aria-hidden="true">▾</span></span>` : '')
+    + `<span class="zf3-vseg" role="group" aria-label="보기"><button type="button" data-act="view" data-v="list" aria-pressed="${zf3View !== 'map'}">목록</button><button type="button" data-act="view" data-v="map" aria-pressed="${zf3View === 'map'}">지도</button></span></div>`
     + (chips.length ? `<div class="zf3-chips" role="group" aria-label="걸린 조건">${chips.map(([k, t]) => `<button type="button" class="zf3-chip on" data-act="clear" data-k="${k}" aria-label="${zfAttr(t)} 조건 빼기">${escapeHtml(t)}<span aria-hidden="true">✕</span></button>`).join('')}</div>` : '');
   el.hidden = false;
   zf3TqMore(el.querySelector('.zf3-tq'));
@@ -14857,6 +14938,7 @@ function zf3ClearCond(k){
   if(k === 'q'){ const q = document.getElementById('noticeSearchInput'); if(q) q.value = ''; }
   if(k === 'closed'){ const c = document.getElementById('hideClosedChk'); if(c) c.checked = true; }
   if(k === 'place'){ zf3PlaceSel = null; zf3PlaceName = ''; }
+  if(k === 'mine') zf3MineOn = false;
   updateFilterToggleBtn();
   applyNoticeFiltersAndRender();
 }
@@ -15088,8 +15170,12 @@ function zf3MinePcs(){
 function zf3TypeRow(){
   const src = document.getElementById('noticeTypeChips');
   const chips = src ? [...src.querySelectorAll('.chip')].filter(c => c.textContent.trim()) : [];
-  if(chips.length < 2) return '';
-  return `<div class="zf3-tq more" role="group" aria-label="공급 유형 바로가기">` + chips.map(c => {
+  // 🔵 2026-11-19(디자인 2차 2단계 2 · 1단계 회신 ⑦ 1) — 맨 앞 「★ 희망 조건」: 로그인 + 희망 조건(지역·유형·최대 보증금 중 하나)이 있을 때만 그린다(빈 칩 0).
+  //    누르면 지금 목록을 종전 zf3Mine 으로 거른다(새 판정 0 · 걸린 조건 칩 「★ 희망 조건」 ✕로도 뺀다).
+  const mine = zf3Prefs() ? `<button type="button" class="zf3-tq-mine" data-act="mine" aria-pressed="${zf3MineOn}" title="희망 지역·유형·보증금에 맞는 공고만 — 자격 판정은 아니에요"><span aria-hidden="true">★</span>희망 조건</button>` : '';
+  if(chips.length < 2 && !mine) return '';
+  if(chips.length < 2) return `<div class="zf3-tq" role="group" aria-label="공급 유형 바로가기">${mine}</div>`;
+  return `<div class="zf3-tq more" role="group" aria-label="공급 유형 바로가기">` + mine + chips.map(c => {
     const v = c.dataset.value || '', on = c.classList.contains('sel'), t = c.textContent.trim();
     const ln = v ? zf3LineOf(t)[0] : '';
     return `<button type="button" data-act="type" data-v="${zfAttr(v)}" aria-pressed="${on}"${ln ? ` style="--ln:var(--ln-${ln})"` : ''}>${ln ? '<i aria-hidden="true"></i>' : ''}${escapeHtml(t)}</button>`;
@@ -15258,6 +15344,20 @@ function zf3PlacesOfRow(n){
   const parts = names.length ? names.map(x => { const i = x.indexOf(' '); return i < 0 ? [x, ''] : [x.slice(0, i), x.slice(i + 1)]; }) : [[n['sido_nm'], n['sigungu_nm']]];
   parts.forEach(([sd, sg]) => { const pl = zf3PlaceOf(sd, sg); if(pl && !out.has(pl.key)) out.set(pl.key, pl); });
   return [...out.values()];
+}
+// 🔵 2026-11-19(디자인 2차 2단계 2) — ★ 희망 조건 거름. 판정 = zf3Mine(전광판 ★ · 추천 탭과 같은 규칙) 그대로 · 상태는 메모리만.
+//    최대 보증금이 있으면 보증금 거름에 가격 요약이 든다 — 전광판(zf3BoardPrices)과 같은 길로 후보만 묻고, 받은 뒤 목록을 다시 그린다.
+let zf3MineOn = false;
+function zf3MineFilter(rows){
+  const p = zf3Prefs();
+  if(!p){ zf3MineOn = false; return rows; }
+  if(!zf3On() || !zf3MineOn) return rows;
+  if(p.dep > 0){
+    const pt = Object.assign({}, p, { dep: 0 });
+    const ids = (rows || []).filter(n => zf3Mine(n, pt)).map(n => String(n['announcement_id'] || '')).filter(id => id && !zfPriceCache.has(id) && !zf3PriceAsked.has(id));
+    if(ids.length){ ids.forEach(id => zf3PriceAsked.add(id)); zfEnsurePriceSummaries(ids).then(ok => { if(ok && zf3MineOn) applyNoticeFiltersAndRender(); }); }
+  }
+  return (rows || []).filter(n => zf3Mine(n, p));
 }
 function zf3PlaceFilter(rows){
   zf3PrePlace = rows || [];
@@ -15806,6 +15906,7 @@ function zf3Init(){
     if(b.dataset.act === 'type'){ const v = b.dataset.v, src = document.getElementById('noticeTypeChips');
       const c = src && (v ? [...src.querySelectorAll('.chip')].find(x => x.dataset.value === v) : src.querySelector('.chip-all'));
       if(c) c.click(); const f = document.querySelector(`#zf3NoticeHead [data-act="type"][data-v="${CSS.escape(v)}"]`); if(f) f.focus(); }
+    else if(b.dataset.act === 'mine'){ zf3MineOn = !zf3MineOn; applyNoticeFiltersAndRender(); const f = document.querySelector('#zf3NoticeHead [data-act="mine"]'); if(f) f.focus(); }
     else if(b.dataset.act === 'clear') zf3ClearCond(b.dataset.k);
     else if(b.dataset.act === 'sheet') zf3ToggleSheet();
     else if(b.dataset.act === 'view') zf3SetView(b.dataset.v);
