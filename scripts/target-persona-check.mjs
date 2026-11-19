@@ -20,6 +20,9 @@
 //   특수 계층 칸은 두 갈래로 돈다: 「안 건드림」(체크만 넣고 건드림 표지 없음 = 모름) · 「건드림」(zfMatchTouched 에 'zfClass' — R3 이후 판만 읽는다).
 //   --base <ref> 면 같은 데이터로 그 판과 작업 트리 판을 돌려 갈래 × 페르소나마다 「남음 → 👥」 · 「👥 → 남음」 카드를 찍는다(잘못 빠짐은 사람이 원문으로 본다).
 //   예: node scripts/target-persona-check.mjs --flow match --base origin/main --only P1,P2,MC1,P3,P4,P5
+// 🔵 2026-11-19(우편함 「코드·운영 — 14장」 ② · 💡 「페르소나 여정 점검기」) — --flow match --rules scripts/target-persona-rules.json:
+//   남은 카드에 「이 페르소나에게 이 제목만 가리키는 공고는 남지 않는다」 규칙을 대고 마지막 줄 PERSONA_WALK_JSON= 을 낸다(health-screen 하루 1회 · 판정 ℹ️/⚠️만).
+//   예: node scripts/target-persona-check.mjs --flow match --only P1,P2,P3,P4,P5 --rules scripts/target-persona-rules.json
 // 목록 RPC 는 scripts/render-list-stub.mjs 캐시(운영 anon 응답 그대로 · 원칙 26)를 쓴다. 키 행·소득 표는 화면이 부르는 운영 anon REST 그대로다.
 // DB 쓰기 0 · 운영 화면을 재는 것이 아니다(배포본이 아니라 로컬 판을 띄운다).
 
@@ -238,7 +241,15 @@ async function runMatch(browser, ref, personas) {
         await diagnose()
         selectedRegions.clear(); selectedTypes.clear()
         await matchHouses()
-        return { types: [...(window.eligibleTypes || [])], kept: lastFiltered.map(r => String(r.announcement_id)).sort(),
+        // 🔵 2026-11-19(--rules) — 남은 카드마다 화면 판정(소득 관문 뒤) — 규칙 위반을 「화면이 맞음이라 함 / 거르지 못함」으로 가른다
+        const f = zfTargetDiagFacts(), m = zfDiagMoneyInputs()
+        const [uT, mT] = await Promise.all([loadUrbanIncome(), loadMedianIncome()])
+        const tables = (uT && mT) ? { '도시근로자': uT, '기준중위소득': mT } : null
+        const screen = Object.fromEntries(lastFiltered.map(r => {
+          const g = zfTargetIncomeGate(zfTargetVerdictFor(r.announcement_id, f, r.title), r.announcement_id, r.title, f, m, tables)
+          return [String(r.announcement_id), g ? g.state : 'none']
+        }))
+        return { types: [...(window.eligibleTypes || [])], kept: lastFiltered.map(r => String(r.announcement_id)).sort(), screen,
           out: lastTargetOut.map(x => String(x.id)).sort(), titles: Object.fromEntries([...lastFiltered, ...lastTargetOut].map(r => [String(r.announcement_id || r.id), r.title || ''])) }
       }, { p: p.inputs, year, touched })
     }
@@ -274,6 +285,36 @@ function matchDiff(a, b, personas) {
   return { text: L.join('\n'), moved }
 }
 
+// ── --rules: 페르소나 여정 점검(health-screen 하루 1회 · 2026-11-19 우편함 「코드·운영 — 14장」 ②) ──
+//   규칙 파일(scripts/target-persona-rules.json)의 「이 페르소나에게 이 제목만 가리키는 공고는 남지 않는다」를 계층 칸 「안 건드림」 갈래(기본 사용자 상태)에 댄다.
+//   위반마다 화면 판정을 함께 — ok(화면이 맞음) = ⚠️ 후보 · check·none = ℹ️(화면이 거르지 못함 — 판정 재료 없음·확인필요).
+//   마지막 줄 PERSONA_WALK_JSON={...} — 워크플로가 읽는다(.github/health/screen-finish.mjs persona_walk). 제목·id 만 낸다(개인정보 없음 · 페르소나는 지어낸 입력).
+function applyRules(r, personas, rulesDoc) {
+  const year = new Date().getFullYear()
+  const other = new RegExp(rulesDoc.other)
+  const per = r.branches['안 건드림']
+  const hits = []
+  for (const rule of rulesDoc.rules) {
+    const tre = new RegExp(rule.title)
+    for (const p of personas) {
+      const i = p.inputs, age = i.birthYear != null ? year - i.birthYear : i.age
+      const w = rule.when || {}
+      if (w.children_eq != null && i.children !== w.children_eq) continue
+      if (w.age_gte != null && !(age >= w.age_gte)) continue
+      const x = per[p.id]
+      for (const id of x.kept) {
+        const t = x.titles[id] || ''
+        if (!tre.test(t)) continue
+        if (other.test(t.replace(new RegExp(rule.title, 'g'), ''))) continue   // 다른 대상 낱말이 함께 — 규칙 밖
+        hits.push({ rule: rule.id, persona: p.id, id, title: t.slice(0, 60), screen: x.screen?.[id] || 'none' })
+      }
+    }
+  }
+  const okHits = hits.filter(h => h.screen === 'ok')
+  return { ok: okHits.length === 0, rules: rulesDoc.rules.length, personas: personas.map(p => p.id),
+    kept: Object.fromEntries(personas.map(p => [p.id, per[p.id].kept.length])), hits, screen_ok: okHits.length, page_errors: r.meta.페이지_오류 }
+}
+
 const personas = JSON.parse(readFileSync(personasFile, 'utf8')).personas.filter(p => !only.length || only.includes(p.id))
 const browser = await chromium.launch()
 if (opt('--flow') === 'match') {
@@ -281,6 +322,13 @@ if (opt('--flow') === 'match') {
     const after = await runMatch(browser, opt('--ref'), personas)
     writeFileSync(outFile, JSON.stringify(after, null, 1))
     let text = matchTable(after, personas)
+    if (opt('--rules')) {
+      const w = applyRules(after, personas, JSON.parse(readFileSync(opt('--rules'), 'utf8')))
+      text += `\n## 규칙 대조(계층 칸 안 건드림)\n\n위반 ${w.hits.length}(화면 맞음 ${w.screen_ok})\n` + w.hits.map(h => `- ${h.rule} ${h.persona} ${h.id} ${h.title} — 화면 ${SYM[h.screen] || h.screen}`).join('\n') + '\n'
+      console.log(text); if (mdFile) writeFileSync(mdFile, text + '\n')
+      console.log('PERSONA_WALK_JSON=' + JSON.stringify(w))
+      await browser.close(); process.exit(0)
+    }
     if (opt('--base')) { const before = await runMatch(browser, opt('--base'), personas); text += '\n' + matchDiff(before, after, personas).text }
     console.log(text); if (mdFile) writeFileSync(mdFile, text + '\n')
     console.log(`\n결과 JSON: ${outFile}`)

@@ -46,8 +46,32 @@ if (process.env.LW_RAN !== '1') {
   login = { id: sim && !ok ? 'simulate_login_walk' : 'login_walk', name: NAME + (sim ? ' — 시험 실패(simulate=login_fail)' : ''), status: ok ? 'pass' : 'fail', value, rule: RULE }
   extra.login_walk = { ok, why: ok ? null : value, clean }
 }
-const rest = checks.filter(c => c.id !== 'login_walk' && c.id !== 'simulate_login_walk')
-const all = [...rest, login]
+// ①′ 페르소나 여정 항목(2026-11-19 · 우편함 「코드·운영 — 14장」 ②) — 판정 ℹ️·⚠️만(실패로 세지 않는다 · 이슈를 열지 않는다)
+//   입력 persona-walk.json(scripts/target-persona-check.mjs --rules 의 PERSONA_WALK_JSON) · 환경 PW_RAN=1(단계가 돌았다).
+const PW_NAME = '페르소나 여정(P1~P5 진단 → 매칭 · 제목 규칙 · 하루 1회)'
+const PW_RULE = '규칙(scripts/target-persona-rules.json) 위반이 화면 「맞음」이면 ⚠️ · 확인·판정 없음이면 ℹ️(화면이 거르지 못함 — 관찰) · 못 돌면 ⚠️ · 실패 0'
+let persona
+if (process.env.PW_RAN !== '1') {
+  persona = { id: 'persona_walk', name: PW_NAME, status: 'skip', value: '이 실행은 페르소나 여정을 돌지 않는다(병합 뒤 실행 · 하루 1회 발송·수동만)', rule: PW_RULE }
+} else {
+  let w = null
+  try { w = JSON.parse(readFileSync('persona-walk.json', 'utf8')) } catch {}
+  const sim = process.env.LW_SIMULATE === 'persona_walk'
+  if (w && sim) w.hits = [...(w.hits || []), { rule: 'R1', persona: 'P1', id: 'simulate', title: '(시험) 다자녀 전세임대', screen: 'ok' }]
+  if (!w || !Array.isArray(w.hits)) {
+    persona = { id: 'persona_walk', name: PW_NAME, status: 'warn', value: '결과 없음(스크립트가 못 돎 · 시간 초과 240초)', rule: PW_RULE }
+  } else {
+    const okHits = w.hits.filter(h => h.screen === 'ok')
+    const kept = Object.entries(w.kept || {}).map(([p, n]) => `${p} ${n}`).join(' · ')
+    const list = w.hits.slice(0, 6).map(h => `${h.rule} ${h.persona} …${String(h.id).slice(-6)} ${h.title}(화면 ${h.screen})`).join(' / ')
+    persona = { id: sim ? 'simulate_persona_walk' : 'persona_walk', name: PW_NAME + (sim ? ' — 시험 위반(simulate=persona_walk)' : ''),
+      status: okHits.length ? 'warn' : 'info',
+      value: `남은 카드 ${kept} · 규칙 ${w.rules} · 위반 ${w.hits.length}(화면 맞음 ${okHits.length})${list ? ' — ' + list : ''}${w.page_errors ? ` · 페이지 오류 ${w.page_errors}` : ''}`, rule: PW_RULE }
+    extra.persona_walk = { hits: w.hits.length, screen_ok: okHits.length, kept: w.kept || null }
+  }
+}
+const rest = checks.filter(c => !['login_walk', 'simulate_login_walk', 'persona_walk', 'simulate_persona_walk'].includes(c.id))
+const all = [...rest, login, persona]
 
 // ② 실행 요약 DB 한 줄(점검 단계의 시각 그대로 — 발송 뒤 90분 안 기록 셈과 맞춘다)
 if (process.env.SCREEN_RECORD !== '0') {
