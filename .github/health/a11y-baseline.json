@@ -322,6 +322,12 @@
   "detail-390": {
    "rules": {},
    "contrast_incomplete": {
+    "p.zf12-who|#15171b": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": null
+    },
     "span.zf3-ai-ic|#5a616b": {
      "nodes": 1,
      "ratio": null,

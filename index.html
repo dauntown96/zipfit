@@ -1420,9 +1420,17 @@ html[data-ui="d3"] #zf3NoticeHead .zf3-lsum .zf3-lh .zf3-of{font-size:var(--t-su
 html[data-ui="d3"] #zf3NoticeHead .zf3-lsum .zf3-lsub{margin:0;font-size:var(--t-sub)}
 html[data-ui="d3"] #zf3NoticeHead .zf3-lsum .zf3-coll{font-size:var(--t-sub)}
 /* ② 필터 · 정렬 · 목록/지도 한 줄 — 단추 높이는 그대로(--hit) · 목록/지도는 오른쪽 끝 */
-html[data-ui="d3"] #zf3NoticeHead .zf3-ctl{flex-wrap:nowrap;margin:6px 0 6px}
+html[data-ui="d3"] #zf3NoticeHead .zf3-ctl{flex-wrap:nowrap;margin:4px 0 4px}
+/* 🔵 검증 고침(2026-11-19 · 첫 카드 235 + 둘째 220 기준) — 앱 머리 위아래 10 → 6(모든 탭 같은 머리 · 로고·AI 단추 44 그대로) ·
+   정렬 칸 테두리를 높이 안으로(46 → 44) · 공고 탭 머리 아래 틈 8 → 6 · 검색 줄 아래 8 → 6 */
+html[data-ui="d3"] .zf3-top{padding-top:6px;padding-bottom:6px}
+html[data-ui="d3"] #zf3NoticeHead .zf3-sortsel{box-sizing:border-box;height:var(--hit);min-height:0}
+html[data-ui="d3"] #zf3NoticeHead .zf3-sortsel select{min-height:calc(var(--hit) - 2px)}
+html[data-ui="d3"] #zf3NoticeHead.zf3-nhead{margin-bottom:6px}
+html[data-ui="d3"] #main2 .zf3-search{margin-bottom:6px}
 /* 유형 바로가기 칩 36 → 32 · 오늘 판 아래 틈 6 → 4 — 위 두 줄과 함께 첫 카드 위 395 → 약 326px(2단계 판정 기준 · 높은 카드 둘째 자리) */
 html[data-ui="d3"] #zf3NoticeHead .zf3-tq button{min-height:32px}
+html[data-ui="d3"] #zf3NoticeHead .zf3-tq{margin-bottom:2px}
 html[data-ui="d3"] #zf3NoticeHead .zf3-stats{margin-bottom:4px}
 /* ⑤ ★ 희망 조건 칩 — 유형 칩과 같은 꼴 · 별은 경고색 아닌 잉크 */
 html[data-ui="d3"] #zf3NoticeHead .zf3-tq .zf3-tq-mine{font-weight:700}
@@ -14826,14 +14834,16 @@ function zf3CondChips(){
 //    🔴 수집 주기 문구를 쓰지 않는다(낮 · 밤 · SH 주기가 달라 한 문장이 늘 틀린다 — 우편함 「표시층 — 실사용 1회차 반영」 3).
 //    받기 전·실패면 「확인 중」 · 10분마다 다시 묻고 그 칸 글자만 바꾼다. 출처 표시는 푸터(.zf-src)로 옮겼다(지우지 않는다 — ⑨ 4-1).
 let zf3Collected = null, zf3CollectedT = null;
-function zf3CollText(){
+// 🔵 2026-11-19(디자인 2차 2단계 · 검증 고침) — short = 머리 한 줄용 「오늘 10:50」(KST 표기를 뺀 꼴 · 숫자 그대로). 전문은 aria-label · title 로 같이 둔다.
+function zf3CollText(short){
   if(!zf3Collected) return '확인 중';
   const k = new Date(zf3Collected + 9 * 3600 * 1000).toISOString();
   const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
   const yest = new Date(Date.now() - 15 * 3600 * 1000).toISOString().slice(0, 10);
   const day = k.slice(0, 10) === today ? '오늘' : k.slice(0, 10) === yest ? '어제' : k.slice(5, 10).replace('-', '.');
-  return `${day} ${k.slice(11, 16)} KST`;
+  return short ? `${day} ${k.slice(11, 16)}` : `${day} ${k.slice(11, 16)} KST`;
 }
+function zf3CollNote(){ const s = zf3Collected ? zf3CollText(true) + ' 수집' : '수집 확인 중'; const full = '마지막 수집 ' + zf3CollText(); return { s, full }; }
 async function zf3LoadCollected(){
   try{
     const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_last_collected_at`, {method:'POST', headers: zfAnonHeaders(), body: '{}'});
@@ -14843,6 +14853,7 @@ async function zf3LoadCollected(){
     zf3Collected = ts.length ? Math.max(...ts) : null;
   }catch(err){ console.warn('꼭집 마지막 수집 시각을 못 받았어요:', err); }
   document.querySelectorAll('[data-zf3-coll]').forEach(e => { e.textContent = zf3CollText(); });
+  document.querySelectorAll('[data-zf3-colls]').forEach(e => { const c = zf3CollNote(); e.textContent = c.s; e.setAttribute('aria-label', c.full); e.title = c.full; });
 }
 function zf3RenderNoticeHead(filtered){
   if(!zf3On()) return;
@@ -14872,8 +14883,9 @@ function zf3RenderNoticeHead(filtered){
   // 🔵 2026-11-18(우편함 「표시층 — 디자인 2차 1단계」 2) — 순서: 검색(머리 밖) → 유형 바로가기 줄 → 밝은 오늘 판(한 줄 네 칸) → 결과 수 · 갈래 · 필터·정렬.
   // 🔵 2026-11-19(우편함 「표시층 — 디자인 2차 2단계」 1) — 390 첫 화면 카드 2장이 데이터(높은 카드)에 덜 기대게 머리 줄을 셋 → 둘로:
   //    결과 수 · 갈래(접수 중 · 예정 · 미상) · 마지막 수집을 글자 한 줄(.zf3-lsum)에 · 목록/지도 단추는 필터·정렬 줄 오른쪽 끝으로. 글자·숫자·링크는 종전 그대로(자리만).
+//    마지막 수집은 짧은 꼴 「오늘 10:50 수집」(전문 「마지막 수집 오늘 10:50 KST」는 aria-label · title) — 기본 머리가 Windows 글꼴에서도 한 줄(검증 2026-11-19 · 종전 꼴은 두 줄 40px로 꺾여 카드 2장이 깨졌다).
   el.innerHTML = zf3TypeRow() + zf3StatChips(filtered, chips)
-    + `<div class="zf3-lsum"><p class="zf3-lh">${head}</p><p class="zf3-lsub"><span>${closedExcluded ? '' : `열린 ${o.n.toLocaleString()}건: `}${zf3StLink('접수 중', '접수 중', o.a)} · ${zf3StLink('예정', '접수 예정', o.b)}${o.k ? ` · ${zf3StLink('미상', '접수기간 미상', o.k)}` : ''}</span></p><span class="zf3-coll" role="note">마지막 수집 <span data-zf3-coll>${escapeHtml(zf3CollText())}</span></span></div>`
+    + `<div class="zf3-lsum"><p class="zf3-lh">${head}</p><p class="zf3-lsub"><span>${closedExcluded ? '' : `열린 ${o.n.toLocaleString()}건: `}${zf3StLink('접수 중', '접수 중', o.a)} · ${zf3StLink('예정', '접수 예정', o.b)}${o.k ? ` · ${zf3StLink('미상', '접수기간 미상', o.k)}` : ''}</span></p>${(c => `<span class="zf3-coll" role="note" data-zf3-colls aria-label="${zfAttr(c.full)}" title="${zfAttr(c.full)}">${escapeHtml(c.s)}</span>`)(zf3CollNote())}</div>`
     + `<div class="zf3-ctl"><button type="button" class="zf3-chip add zf3-fbtn" data-act="sheet" aria-expanded="${sheetOpen}" aria-controls="noticeFilterPanel">${ZF3_ICO_FILTER}필터${chips.length ? ` <b>${chips.length}</b>` : ''}</button>`
     + (sortOpts ? `<span class="zf3-sortsel">${ZF3_ICO_SORT}<select data-act="sortsel" autocomplete="off" aria-label="정렬">${sortOpts}</select><span class="cv" aria-hidden="true">▾</span></span>` : '')
     + `<span class="zf3-vseg" role="group" aria-label="보기"><button type="button" data-act="view" data-v="list" aria-pressed="${zf3View !== 'map'}">목록</button><button type="button" data-act="view" data-v="map" aria-pressed="${zf3View === 'map'}">지도</button></span></div>`
