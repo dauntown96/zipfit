@@ -2,9 +2,10 @@
 import assert from 'node:assert/strict'
 import { keywordOf, keywordWithoutBadSido, isExact, exactCandidates, pickByName, pickByBldhub, utmkToWgs84 } from './logic.ts'
 
-// 좌표: complex_geo 2·6·27 행(pyproj 값)과 1e-7도(약 1cm) 안
-for (const [x, y, lat, lng] of [[943367.116642833, 1942830.35267813, 37.4829765897757, 126.859433471491],
-  [961784.4751677, 1918749.85606953, 37.2668703736731, 127.068986660595], [969021.8807264, 1757067.41525577, 35.8095779415765, 127.157109151052]]) {
+// 좌표: 합성 격자점(juso 값 아님 — 2026-11-19 우편함 「코드·운영 — 11장」 · juso 좌표는 국내 서버에만) · 기대값은 pyproj EPSG:5179 → 4326 · 1e-7도(약 1cm) 안
+//   (1000000, 2000000) = UTM-K 원점(위도 38 · 경도 127.5 — 정의값)
+for (const [x, y, lat, lng] of [[1000000, 2000000, 38, 127.5],
+  [950000, 1950000, 37.5479809948, 126.9339656293], [960000, 1800000, 36.1963176016, 127.0550809177]]) {
   const r = utmkToWgs84(x, y)
   assert.ok(Math.abs(r.lat - lat) < 1e-7 && Math.abs(r.lng - lng) < 1e-7, `${r.lat},${r.lng}`)
 }

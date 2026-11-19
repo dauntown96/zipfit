@@ -11,6 +11,8 @@
 //      juso 는 EF seoul-api(서울 실행)로만 부른다 — 키는 그 함수 비밀값에서만.
 //   ③ 「정확」 결과(logic.ts isExact)가 하나면 고름 · 여럿이면 원문 단지명 → 건축HUB newPlatPlc → 둘 다 못 고르면 비움 + 사람 판정(multi).
 //   ④ 고른 결과의 좌표(juso_coord · UTM-K → WGS84) · RPC complex_geo_put 이 complex_geo 한 행 + 시도 기록 + 그 공고 단지 잇기를 한 트랜잭션에.
+//      🔴 2026-11-19(우편함 「코드·운영 — 11장」 · 행안부 도로명주소 도움센터 답) — 좌표제공 API 결과는 공간정보라 국내 서버에만 저장한다.
+//         서울 이전 전까지 좌표 단계를 끈다(JUSO_COORD_ENABLED = false) — juso_coord 를 부르지 않고 좌표 칸은 비워 쓴다. 도로명·건물관리번호는 그대로.
 // 🔴 원문(housing_units.address)은 건드리지 않는다 · juso 값만 쓴다(source juso) · 짓는 중 택지(결과 0)는 complex_geo 에 쓰지 않고 시도 기록만(none).
 // mode=dry: ①~③(바깥 호출 포함)까지만 하고 쓰지 않는다(모의 실행).
 
@@ -27,6 +29,8 @@ const SUPABASE_URL = requireEnv('SUPABASE_URL')
 const SERVICE_KEY = requireEnv('SUPABASE_SERVICE_ROLE_KEY')
 const CRON_SECRET = requireEnv('CRON_SECRET_V2')
 const supabase = createClient(SUPABASE_URL, SERVICE_KEY)
+// 🔴 좌표 단계 스위치(2026-11-19 · 위 ④) — 서울 이전(국내 서버) 뒤에 true 로 바꾸는 PR 한 줄로 켠다.
+const JUSO_COORD_ENABLED = false
 
 const MAX_PER_RUN = 6
 const GAP_MS = 3_000
@@ -94,7 +98,7 @@ const solve = async (t: Target): Promise<Outcome> => {
     const brief = (j: JusoRow) => ({ roadAddr: j.roadAddr, bdNm: j.bdNm || null, jibunAddr: j.jibunAddr })
     if (!ex.length) return { ...base, outcome: 'none', total: rows.length, exact: 0, candidates: rows.slice(0, 5).map(brief), note: `juso 정확 결과 0(결과 ${rows.length}) · 키워드 「${kw}」` }
     let pick: JusoRow | null = null; let how = ''
-    const used = [JUSO_SEARCH_URL, JUSO_COORD_URL]
+    const used = JUSO_COORD_ENABLED ? [JUSO_SEARCH_URL, JUSO_COORD_URL] : [JUSO_SEARCH_URL]
     if (ex.length === 1) { pick = ex[0]; how = `juso 정확 결과 1건` }
     else {
       pick = pickByName(ex, t.names)
@@ -109,7 +113,7 @@ const solve = async (t: Target): Promise<Outcome> => {
       }
     }
     let xy: { x: number; y: number } | null = null
-    try { xy = await coord(pick) } catch { xy = null }
+    if (JUSO_COORD_ENABLED) { try { xy = await coord(pick) } catch { xy = null } }
     const ll = xy ? utmkToWgs84(xy.x, xy.y) : null
     const row = {
       road_address: pick.roadAddr, adm_cd: pick.admCd ?? null, rn_mgt_sn: pick.rnMgtSn ?? null, bd_mgt_sn: pick.bdMgtSn ?? null,
@@ -117,7 +121,7 @@ const solve = async (t: Target): Promise<Outcome> => {
       buld_mnnm: pick.buldMnnm != null ? Number(pick.buldMnnm) : null, buld_slno: pick.buldSlno != null ? Number(pick.buldSlno) : null,
       ent_x: xy?.x ?? null, ent_y: xy?.y ?? null, lat: ll?.lat ?? null, lng: ll?.lng ?? null,
       source_url: used.join(' · '),
-      note: `${how} · ${xy ? '좌표 juso_coord' : '좌표 없음'} · 자동 채움 complex-geo-fill(${kstNow()})`,
+      note: `${how} · ${xy ? '좌표 juso_coord' : JUSO_COORD_ENABLED ? '좌표 없음' : '좌표 단계 꺼짐(국내 보관 — 서울 이전 뒤 켬)'} · 자동 채움 complex-geo-fill(${kstNow()})`,
     }
     return { ...base, outcome: 'picked', how, total: rows.length, exact: ex.length, candidates: ex.map(brief), row, note: row.note }
   } catch (e) {

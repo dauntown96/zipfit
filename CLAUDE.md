@@ -89,6 +89,7 @@
 - 🔴 **저장소는 얕은 클론(깊이 50)이다 — 오래된 가지를 머지하기 전에 `git fetch --deepen=N origin main <가지>`부터**(2026-11-04 · #873 — #732 가지 머지가 「refusing to merge unrelated histories」로 거부됐는데 환경 탓이었다 · `--deepen=400`으로 기준점이 보인 뒤 정상 머지). `git rev-parse --is-shallow-repository`가 `true`면 기준점(`git merge-base`)이 비는지 먼저 본다.
 - 🔴 **백업 덤프(`zipfit-backup/dumps/*.dump` — pg_dump 17 형식)를 조사에 쓸 때 컨테이너 `pg_restore` 16은 못 읽는다**(`unsupported version (1.16) in file header` — 2026-09-30 실측). **`pgdumplib`로 읽는다**(위 세션 준비 스크립트가 깐다) — `pgdumplib.load(경로)`.
 - **국토부 아파트 전월세 실거래 API** — 컨테이너 환경변수 `MOLIT_RENT_API_KEY`(이름만 적는다) · `https://apis.data.go.kr/1613000/RTMSDataSvcAptRent/getRTMSDataSvcAptRent`(`LAWD_CD` 5자리 · `DEAL_YMD` YYYYMM) · 🔴 **전북은 새 코드 `52xxx`**(군산 `52130` — 2026-08 totalCount 293, B51 실측) · 금액은 만원 단위 쉼표 문자열(`deposit`·`monthlyRent`).
+- 🔴 **juso 좌표(좌표제공 API 결과 — `entX`·`entY`·위경도)는 파일·로그·회신·PR·Notion에 적지 않는다 — 셈만**(2026-11-19 · 행안부 답: 공간정보라 국내 서버에만 저장 · 우편함 「코드·운영 — 11장」). 서울 이전 전까지 `complex-geo-fill` 좌표 단계는 꺼져 있다(`JUSO_COORD_ENABLED`) · 도로명·건물관리번호(검색 API)는 그대로 쓴다 · 켜는 순서는 `docs/supabase-seoul-move.md` 3장 7′.
 
 ---
 
@@ -165,9 +166,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-11-19 | **코드·운영 — 11장: juso 좌표 국내 보관(행안부 답)** — `complex-geo-fill` 좌표 단계 끔(`JUSO_COORD_ENABLED = false`) · DB `complex_geo` juso 20행 좌표 넷 NULL(도로명 그대로) · 좌표 실린 `net._http_response` 삭제 · 저장소 HEAD juso 좌표 0(표본 칸 걷음 · 시험은 합성 격자점) · 화면은 카카오 지오코딩으로 · 백업·git 이력은 목록만 · PR 이 회차 |
 | 2026-11-19 | **코드·운영 — 10장 ①·②: plain-check v3 「요점」 꼴 · 서울 이전 준비 ①′ anon 키 모으기** — ① `checkPlainPoint`(1~3줄 · 80자 · 원문 밖 낱알 0 · 부정·제한 갈래 양쪽 · 새 때 낱말 0) · v2 그대로 · 시험 32/32 · ② anon 키 = 저장소 `supabase/public-anon-key.txt` · DB `project_self.anon_key`(`ops_project_anon_key()` → `ops_uptime_ping`) · 장마다 PR |
 | 2026-11-19 | **코드·운영 — 서울 이전 준비 ①: 프로젝트 ref를 한 곳으로(동작 변화 0)** — DB `zipfit_ops.project_self` 한 행 + `ops_project_url()` → cron 14잡 · `analysis_dispatch_tick` · `ops_uptime_ping` · 저장소 `config.toml` `project_id` 하나를 워크플로·점검·스크립트 9곳이 읽음 · `index.html`·`sw.js` 0 · PR 이 회차 |
-| 2026-11-19 | **표시층 — 디자인 2차 2단계(390 카드 2장 · ★ 희망 조건 칩 · 재계약 원문 접기 · a11y · 다른 탭 본문 14)** — 공고 탭 머리 셋 → 둘(첫 카드 위 395 → 312 · 「오늘 11:00 수집」 짧은 꼴 · 첫 235 + 둘째 220도 2장) · 오늘 판 칸 높이 같게 · ★ 칩 = 종전 `zf3Mine` · 「🔓 자격완화」 아래 「재계약 · 원문 n건」(`content_raw` 그대로) · `.hu-past-title` → `--ink-3` · 다른 탭 문장 28곳 → `--t-body` · 글자 전후 같음 · `sw.js` v315 · PR 이 회차(병합은 판정 뒤) |
 
 ## 🚫 코딩 원칙
 

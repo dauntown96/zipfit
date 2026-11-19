@@ -27,7 +27,7 @@
 | `CLAUDE.md` 「Supabase 설정」 · 「기술 스택」 DB 줄 | URL · anon 키 · 「싱가포르」 | 새 값 · 지역 |
 | `supabase/config.toml` `project_id` | 저장소의 유일한 ref 자리 | 1-0 2 |
 | `deploy-functions.yml` · `migrate.py` · `lib.mjs` · `visual.mjs` · `scripts/` 5 | ref·anon 키는 1-0 2에서 읽음(2026-11-19 준비 ①·①′) | 1-0 2 |
-| `docs/cron-jobs.sql` | cron 32잡 사본 — EF 부르는 14잡은 `public.ops_project_url() || '/functions/v1/…'` | 그대로 |
+| `docs/cron-jobs.sql` | cron 32잡 사본 — EF 부르는 14잡은 `public.ops_project_url() \|\| '/functions/v1/…'` | 그대로 |
 | DB 함수 `analysis_dispatch_tick` · `ops_uptime_ping` | 주소는 `ops_project_url()` · anon 키는 `ops_project_anon_key()` | 1-0 1 |
 | `supabase/migrations/*`(옛 적용 파일) | 옛 ref URL | 고치지 않는다(적용 기록) |
 | `docs/network-allowlist.md` | 컨테이너 허용 목록 줄 `khdpjjyspmlqtzperoqg.supabase.co` | 클라우드 환경 「Default」에 새 호스트 한 줄(다운님) |
@@ -110,6 +110,7 @@
 | 5 | 비교 SQL(아래 5장)로 옛 = 새 | Claude Code(읽기) | 없음 |
 | 6 | 새 DB `zipfit_ops.project_self` 행을 새 ref·anon 키로(1-0 1 · 덤프가 옛 값을 싣고 온다 — `docs/cron-jobs.sql`보다 먼저) → PR 병합 → EF 17 배포 · `docs/cron-jobs.sql` 새 DB에서 실행 · 화면 새 ref 배포(`CACHE_NAME` +1) | Claude Code | 🔴 전환 순간 — 로그인 사용자는 다시 로그인 |
 | 7 | health-ops · health-screen · 공개 REST · 로그인 확인 · Better Stack 새 감시 켬 · 옛 감시 끔 · `zipfit-backup` Secret 바꿈 | 함께 | — |
+| 7′ | 🔴 juso 좌표 단계 켜기 + 전 단지 채움(행안부 답 — 좌표제공 API 결과는 국내 서버에만 · 2026-11-19 우편함 「코드·운영 — 11장」): `complex-geo-fill` `JUSO_COORD_ENABLED = true` PR(병합 = 배포) → 좌표 빈 `complex_geo` juso 행 다시 채움 → 전 단지 넓히기. 순서는 아래 「서울 이전 뒤 좌표 켜는 순서」 | Claude Code | 지도 핀이 카카오 지오코딩에서 juso 좌표로(대략 원 줄어듦) |
 | 8 | 옛 프로젝트는 일시 중지(읽기 보존 · 되돌림 대비) → 며칠 뒤 삭제 | 다운님 | — |
 
 - **cron 두 곳 동시 실행 막기**: 2(옛 잡 모두 끔)를 6(새 잡 만듦)보다 먼저 · 새 잡은 복원 뒤 「대조」 SELECT로 32잡을 확인한 다음에만.
