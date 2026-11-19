@@ -14,7 +14,10 @@
 //   5. 운영 표지: 배포본 redirect_to 가 ?ops=1 이고, 모든 쪽에 localStorage zf_ops=1 을 미리 심는다 → usage_events 에 props.ops=1(집계에서 빠진다).
 // DB 는 관리 API(api.supabase.com · 프록시가 인증을 넣는다)로만 부른다 — 이 파일이 내는 SQL 은 아래 셋뿐이다(링크 받기 · 정리 · 확인).
 
-const PROJECT = 'khdpjjyspmlqtzperoqg'
+import { readFileSync } from 'node:fs'
+// 🔵 2026-11-19(우편함 「코드·운영 — 서울 이전 준비 ①」) — 프로젝트 ref 는 supabase/config.toml 의 project_id 한 곳에서 읽는다.
+const PROJECT = (readFileSync(new URL('../supabase/config.toml', import.meta.url), 'utf8').match(/^project_id\s*=\s*"([a-z0-9]+)"\s*$/m) || [])[1]
+if (!PROJECT) throw new Error('supabase/config.toml 에 project_id 가 없다')
 const QUERY_URL = `https://api.supabase.com/v1/projects/${PROJECT}/database/query`
 const EF_URL = `https://${PROJECT}.supabase.co/functions/v1/test-login`
 export const DEPLOYED = 'https://kkokzip.com'

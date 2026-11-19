@@ -346,7 +346,7 @@ begin
    where q.state = 'waiting' and q.needs_promo and q.ready_at is null and q.enqueued_at = now();
   if v_promo_ids is not null then
     perform net.http_post(
-      url := 'https://khdpjjyspmlqtzperoqg.supabase.co/functions/v1/collect-lh-promo?mode=collect&soft=1&id=' || v_promo_ids,
+      url := public.ops_project_url() || '/functions/v1/collect-lh-promo?mode=collect&soft=1&id=' || v_promo_ids,  -- 🔵 2026-11-19 주소는 ops_project_url()(서울 이전 준비 ①)
       headers := jsonb_build_object('Content-Type', 'application/json', 'x-cron-secret',
         (select decrypted_secret from vault.decrypted_secrets where name = 'cron_secret_v2')),
       body := '{}'::jsonb,
