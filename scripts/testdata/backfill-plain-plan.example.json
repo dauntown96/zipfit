@@ -1,0 +1,15 @@
+{
+ "table": "announcement_policies",
+ "guard": "content_raw",
+ "note": "예시 — 쉽게 쓴 말 소급(분석 스킬 v11.8 뒤 첫 사용처 · 2026-11-19 15장). 행마다 id · 요점 꼴 content_plain(1~3줄 · 줄마다 80자 이하) · 쓴 때 now() · 검사 판. 이 id 는 자리 표시다 — 실제 계획은 회차가 DB 행 id 로 만든다. 순서: check → gen → run test.sql(400 + RESULT) → run apply.sql → 읽기로 대조 · 되돌림은 rollback.sql.",
+ "rows": [
+  {
+   "id": "00000000-0000-4000-8000-000000000001",
+   "set": {
+    "content_plain": "신청은 인터넷으로만 받아요.\n현장 접수는 없어요.",
+    "content_plain_at": {"sql": "now()"},
+    "content_plain_check": "plain-check v3 요점"
+   }
+  }
+ ]
+}

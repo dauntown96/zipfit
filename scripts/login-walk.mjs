@@ -10,6 +10,7 @@
 //     --reload   첫 페르소나 저장 뒤 한 번 새로고침(저장한 조건을 든 채 세션에 다시 들어온 꼴 — G3-B 「설정 바꿔 저장 → 진단 옛 값」 재현)
 //     --save     마지막에 찜 한 바퀴(공고 하나 저장 → 서버 1행 → 해제 → 서버 0행 · 2026-11-03 health-screen 이 켠다)
 //     --shot     캡처 폴더(쪽마다 png — 세션 scratchpad 를 준다 · 🔴 저장소 안에 두지 않는다)
+//   🔵 저장 직후 공고 탭 「★ 희망 조건」 칩(.zf3-tq-mine)도 본다 — 희망 지역을 눌러 저장한 걸음에서 칩이 없으면 실패(2026-11-19 · 15장).
 //   끝에 JSON 한 줄(링크·토큰·사용자 id 0)과 정리 결과(계정 0 · 링크 응답 행 0 · 계정 없는 찜 행 0)를 찍고, 정리가 깨끗하지 않으면 종료 코드 1.
 // 🔴 규칙은 scripts/test-login.mjs 머리(⑦ 1-3 시험 계정 예외). 로컬 판은 미리 띄워 둔다(예: python3 -m http.server 8201 — 저장소 뿌리에서).
 import { readFileSync, mkdirSync } from 'node:fs'
@@ -59,9 +60,17 @@ try {
     for (const p of personas) {
       const saved = await applyPersona(page, p)
       if (shot) await page.screenshot({ path: join(shot, `${p.id}-settings-${width}.png`), fullPage: false })
+      // 🔵 2026-11-19(우편함 「코드·운영 — 15장」 · 순위표 4위 · 표시층 2단계 회신 3 ⑦ 1) — 설정 저장 직후 공고 탭 머리에 「★ 희망 조건」 칩(.zf3-tq-mine)이 있는가.
+      //    희망 지역을 눌러 저장한 걸음(regionOk ∧ saved)에서만 기대한다 — 없으면 이 걸음 실패(#1129 전 배포본: 저장 직후 칩 없음).
+      let mineChip = null
+      if (saved.saved && saved.regionOk) {
+        await page.evaluate(() => goMain(2))
+        await page.waitForSelector('.zf3-tq-mine', { timeout: 8000 }).catch(() => {})
+        mineChip = await page.evaluate(() => { const b = document.querySelector('.zf3-tq-mine'); return !!(b && b.getClientRects().length) })
+      }
       const rec = await openRecommend(page)
       if (shot) await page.screenshot({ path: join(shot, `${p.id}-recommend-${width}.png`), fullPage: true })
-      steps.push({ persona: p.id, saved: saved.saved, msg: saved.msg, region: saved.region, regionChip: saved.regionOk, cards: rec.cards, prompt: rec.promptTitle, diag: rec.diag })
+      steps.push({ persona: p.id, saved: saved.saved, msg: saved.msg, region: saved.region, regionChip: saved.regionOk, mineChip, cards: rec.cards, prompt: rec.promptTitle, diag: rec.diag })
       if (reload && p === personas[0] && personas.length > 1) { await reloadLoggedIn(page); steps.push({ reloaded: true, diag: (await openRecommend(page)).diag }) }
     }
     // 🔵 2026-11-03(우편함 「코드·운영 — 로그인 결과 DB 기록 · 이슈 머리 · 찜 바퀴 …」 A ③) — 찜 저장 → 해제(끝에 그 계정 찜 0)
@@ -80,6 +89,6 @@ try {
   await browser.close().catch(() => {})
 }
 const ok = out.clean && out.clean.test_accounts === 0 && out.clean.link_rows === 0 && (out.clean.saved_orphans ?? 0) === 0
-  && out.result.steps.every(s => s.reloaded || s.saved) && (!save || out.result.save?.ok === true)
+  && out.result.steps.every(s => s.reloaded || s.saved) && out.result.steps.every(s => s.mineChip !== false) && (!save || out.result.save?.ok === true)
 console.log(JSON.stringify({ ok, ...out }))
 process.exit(ok ? 0 : 1)
