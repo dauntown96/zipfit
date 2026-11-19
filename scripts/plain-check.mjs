@@ -13,10 +13,16 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
-export const PLAIN_CHECK_VERSION = 'plain-check v1'
+export const PLAIN_CHECK_VERSION = 'plain-check v2'
 
 // 조건어 — 낱알로 센다(①·② 양쪽).
 const COND_WORDS = ['이상', '이하', '초과', '미만', '이내']
+// 🔵 v2(2026-11-18 · 우편함 「코드·운영 — 8장」 ① · 분석 묶음 21 거짓 걸림 셋) — 낱말 경계로 센다.
+//   조건어: 바로 앞 글자가 한글이면 수·단위 글자일 때만 센다(「70%이하」·「19세 이하」·「2인이상」·「120000원이하」는 세고 「상이하고」·「무이하」는 거른다).
+//   때 낱말: 바로 앞 글자가 한글이 아닐 때만 센다(「당해 연도」는 세고 「담당해」·「감당해」는 거른다).
+const COND_UNIT = '원세명호년월일회점개인배층위분시주천만억차대평형'
+const condRe = (w) => new RegExp(`(?:^|(?<=[^가-힣])|(?<=[${COND_UNIT}]))${w}`, 'g')
+const timeRe = (w) => new RegExp(`(?<![가-힣])${w}`, 'g')
 // 때 낱말 — 원문과 같은 낱말·같은 수(④).
 export const TIME_WORDS = ['현재', '금회', '당해', '이번', '금번', '기존', '종전', '최초']
 // 부정·제한 갈래(③) — 갈래마다 표지 하나라도 있으면 「있음」. 원문에 있는 갈래는 쉽게 쓴 말에도, 없는 갈래는 쉽게 쓴 말에도 없어야 한다.
@@ -24,7 +30,8 @@ const POLARITY = {
   부정: [/않/, /없/, /불가/, /못\s?[하해합]/, /금지/, /아니/, /안\s?[되돼됩]/, /불허/, /불인정/, /무효/],
   제외: [/제외/, /빼고/, /뺀/, /배제/],
   // 「만」은 한글·닫는 괄호 뒤 · 띄어쓰기·문장부호·조사 앞만(「1,000만 원」·「만 19세」·「만들다」를 거른다)
-  한정: [/[가-힣)」]만[이을은의도]?(?![가-힣])/u, /한하여/, /한함/, /한정/, /에\s?한해/, /에\s?한한/, /뿐/],
+  // 🔵 v2 — 「지만」(하지만 · 있지만)·「다만」(단서)은 한정이 아니다(분석 묶음 21 거짓 걸림).
+  한정: [/[가-힣)」](?<![지다])만[이을은의도]?(?![가-힣])/u, /한하여/, /한함/, /한정/, /에\s?한해/, /에\s?한한/, /뿐/],
 }
 
 const norm = (s) => String(s ?? '').normalize('NFC').replace(/\r\n?/g, '\n')
@@ -43,12 +50,12 @@ export function grains(text) {
   take(/\d{1,2}\s*:\s*\d{2}/g, '시각', (m) => m.replace(/\s+/g, '').replace(/^0(?=\d)/, ''))
   take(/\d[\d,]*(?:\.\d+)?\s*%/g, '%', (m) => m.replace(/[\s,]/g, ''))
   take(/\d[\d,]*(?:\.\d+)?/g, '수', (m) => m.replace(/,/g, ''))
-  for (const w of COND_WORDS) for (const _ of norm(text).matchAll(new RegExp(w, 'g'))) out.push(`조건어:${w}`)
+  for (const w of COND_WORDS) for (const _ of norm(text).matchAll(condRe(w))) out.push(`조건어:${w}`)
   return out
 }
 
 const bag = (arr) => arr.reduce((m, x) => m.set(x, (m.get(x) ?? 0) + 1), new Map())
-const count = (s, w) => (norm(s).match(new RegExp(w, 'g')) ?? []).length
+const count = (s, w) => (norm(s).match(timeRe(w)) ?? []).length
 
 // 문장 나누기 — 줄바꿈 · 마침표·물음표·느낌표 뒤 띄어쓰기(숫자 사이 점은 가르지 않는다).
 export function sentences(text) {
