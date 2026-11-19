@@ -1489,6 +1489,8 @@ html.zf12 .zf13-more > div > .policy-wrap:first-child{margin-top:0}
 @media (prefers-reduced-motion:reduce){.zf13-anyone > summary::after{transition:none}}
 .zf13-anyone-h{font-size:var(--t-body);font-weight:700;color:var(--ink)}
 .zf13-anyone-s{font-size:var(--t-sub);color:var(--ink-2)}
+html.zf12 .zf13-tcond{margin:0 0 8px;font-size:var(--t-sub);color:var(--ink-2);line-height:1.45}
+html.zf12 .zf13-tcond-k{font-weight:700;color:var(--ink);margin-right:4px}
 /* 4단계 덧 3·4 — ① 줄 두 칸: 왼쪽(유형 · 지역 · 배지 — 칸 안에서 줄바꿈) · 오른쪽(접수 상태 알약 — 늘 오른쪽 위) */
 html.zf12 .zf12-card .zf3-ctop:has(> .zf13-cl){display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;column-gap:8px}
 html.zf12 .zf3-ctop .zf3-dpill.zf13-wait{background:var(--paper);border-color:var(--ink);color:var(--ink)}   /* 기준 위반 고침 2 — 끝 시각 지난 차수 알약: 대기(검은 바탕 걷음) */
@@ -4586,8 +4588,19 @@ function zfLoadTierTags(){
       const br = (g && typeof g === 'object' && Array.isArray(g['갈래'])) ? g['갈래'].filter(Boolean) : [];
       br.forEach(b => { add(r.announcement_id, b['대상']); add(r.announcement_id, b['확인필요']); });
       if(!r.announcement_id) return;
-      const id = String(r.announcement_id), e = ecById.get(id) || { n: 0, gk: false, age: false, forms: [] };
+      const id = String(r.announcement_id), e = ecById.get(id) || { n: 0, gk: false, age: false, forms: [], tight: 0, cond: [] };
       e.n++; if(br.length) e.gk = true; if(r.age_min != null || r.age_max != null) e.age = true; e.forms.push(r.supply_form || '');
+      // 🔵 2026-11-19(같은 회차 ② 검증 — 다운님 판정 18:27 「칩에 남기되 카드에 원문 조건 한 줄」) — 갈래마다 조건이 계층_중_하나(수급자·차상위 등)이거나
+      //    미성년자녀_최소 ≥ 2(다자녀)로 묶인 행. 한 줄 글자는 원문 그대로 — 계층_중_하나는 그 낱말이 든 supply_form(없으면 두지 않음) · 다자녀는 공급대상 원문 조각.
+      const tight = br.length && br.every(b => { const c = b['조건'] || {}; return (Array.isArray(c['계층_중_하나']) && c['계층_중_하나'].length) || Number(c['미성년자녀_최소']) >= 2; });
+      if(tight){
+        e.tight++;
+        br.forEach(b => {
+          const c = b['조건'] || {}, f = String(r.supply_form || '');
+          if(Number(c['미성년자녀_최소']) >= 2){ const m = String((g && g['원문']) || '').match(/\d+명 이상의 직계비속.*?을 양육하는 가구/); if(m) e.cond.push(m[0]); }
+          else if(Array.isArray(c['계층_중_하나']) && c['계층_중_하나'].some(k => f.includes(String(k).replace(/가구$/, '')))) e.cond.push(f);   // supply_form 에 그 낱말이 없으면 한 줄을 두지 않는다(키 값을 원문처럼 쓰지 않음)
+        });
+      }
       ecById.set(id, e);
     });
     (hu || []).forEach(r => add(r.announcement_id, r.supply_target));
@@ -4598,8 +4611,8 @@ function zfLoadTierTags(){
       parts.flat().forEach(a => {
         const key = zfDedupKey(a && a.title), t = textById.get(String(a && a.announcement_id)), e = ecById.get(String(a && a.announcement_id));
         if(key && e){
-          const w = zfEcByKey.get(key) || { n: 0, gk: false, age: false, forms: [] };
-          w.n += e.n; w.gk = w.gk || e.gk; w.age = w.age || e.age; w.forms.push(...e.forms);
+          const w = zfEcByKey.get(key) || { n: 0, gk: false, age: false, forms: [], tight: 0, cond: [] };
+          w.n += e.n; w.gk = w.gk || e.gk; w.age = w.age || e.age; w.forms.push(...e.forms); w.tight += e.tight; w.cond.push(...e.cond);
           zfEcByKey.set(key, w);
         }
         if(!key || !t) return;
@@ -4640,6 +4653,12 @@ function zfAnyoneState(n){
   if(!e || !e.n) return 'unknown';
   if(e.gk || e.age) return 'no';
   return e.forms.some(zfOpenSupplyForm) ? 'anyone' : 'no';
+}
+// 🔵 2026-11-19(같은 회차 · 다운님 판정 18:27) — 계층 칩으로 걸렸지만 모든 자격 행이 계층_중_하나·다자녀로 묶인 공고(ⓑ)의 원문 조건 한 줄. 아니면 ''.
+function zfTightCondOf(n){
+  const e = zfEcByKey.get(zfDedupKey(n['공고명'] || ''));
+  if(!e || !e.n || e.tight !== e.n || !e.cond.length) return '';
+  return [...new Set(e.cond)].join(' · ');
 }
 let zfSearchComposing = false;
 (function(){
@@ -6365,7 +6384,7 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
         //    마감이라고 한 것. 라벨만 바꾸고 여기를 두면 같은 필터를 두 이름으로 부르게 된다.
         + `<p class="rdesc">신청할 수 없는 공고까지 포함하면 ${hiddenClosedCount}건이 있어요.</p>`
         + `<button class="btn btn-sec btn-sm" style="margin-top:8px" onclick="showClosedNotices()">신청할 수 없는 공고까지 보기 (${hiddenClosedCount}건) →</button>`
-      : '<p class="rtitle">⚠ 조건에 맞는 공고가 없어요</p>';
+      : (activeNoticeTarget ? '<p class="rtitle">⚠ 이 계층으로 표시된 공고는 없어요</p>' : '<p class="rtitle">⚠ 조건에 맞는 공고가 없어요</p>');   // 🔵 2026-11-19 — 계층 칩이면 좁힌 말(아래 누구나 묶음과 함께 읽히게 · 시안)
     if(typeof zf3EmptyChips === 'function') statusEl.insertAdjacentHTML('beforeend', zf3EmptyChips());   // 🔵 D-3 b — d3 0건 화면에만 「빼면 n건」
     if(typeof zf3On === 'function' && zf3On()){ statusEl.classList.add('zf3-empty'); statusEl.insertAdjacentHTML('afterbegin', zf3EmptyArt()); }   // 🔵 빈 상태 한 꼴(아이디어 ⑤)
     if(noticeAnyone.length) zfAnyoneMount(listEl);   // 🔵 2026-11-19 — 칩 결과 0건이어도 누구나 묶음(조사 ⑦2)
@@ -16249,7 +16268,7 @@ function zf12WhenHTML(n){
 }
 // 🔵 2026-11-18(디자인 2차 1단계 5) — 이번 회차는 카드 겉 요소를 더하거나 빼지 않았다(유형 바로가기 줄·오늘 판·공지 한 줄은 카드 밖 공고 탭 머리) → 목록 그대로.
 //    카드 겉에 새 요소를 두는 회차는 여기에 그 선택자를 더해야 한다 — 없으면 카드 정리가 상세 2층으로 옮긴다(조사 회신 2 ⑦ 2).
-const ZF12_FRONT_KEEP = el => el.matches('.zf3-ctop,.htop,.haddr,.zf12-who,[data-sum-for],.zf12-when,.zf12-l2-host,[id^="ncard-"],[id^="mcard-"],.zf3-close') || el.hidden || getComputedStyle(el).display === 'none';
+const ZF12_FRONT_KEEP = el => el.matches('.zf3-ctop,.htop,.haddr,.zf12-who,.zf13-tcond,[data-sum-for],.zf12-when,.zf12-l2-host,[id^="ncard-"],[id^="mcard-"],.zf3-close') || el.hidden || getComputedStyle(el).display === 'none';
 function zf12Sweep(card){
   const l2 = card.querySelector('.zf12-l2'); if(!l2) return;
   // 겉에 다시 그려진 같은 꼴 줄(지난 회차 줄 등 — 그리는 쪽이 겉에서 옛것을 못 찾아 새로 만든다)은 2층의 옛것과 바꿔 끼운다(두 번 서지 않게)
@@ -16297,6 +16316,9 @@ function zf12Front(card, n){
   const who = document.createElement('p'); who.className = 'zf12-who'; who.hidden = true;
   who.dataset.zf12Ann = String(n['announcement_id'] || '');
   if(addr) addr.after(who);
+  // 🔵 2026-11-19(우편함 「표시층 — 계층 칩 … 누구나 묶음」 ② · 다운님 판정 18:27) — 계층 칩 결과(묶음 밖)에서, 모든 자격 행이 계층_중_하나·다자녀로 묶인 공고면 원문 조건 한 줄.
+  const tc = activeNoticeTarget && !card.closest('.zf13-anyone') ? zfTightCondOf(n) : '';
+  if(tc){ const t = document.createElement('p'); t.className = 'zf13-tcond'; t.innerHTML = `<span class="zf13-tcond-k">원문 조건</span> ${escapeHtml(tc)}`; who.after(t); }
   const when = zf12WhenHTML(n);
   const sum = card.querySelector('[data-sum-for]');
   if(when){
