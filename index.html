@@ -6826,6 +6826,9 @@ function goMain(n){
   if(n===2 && !noticeLoaded) initNoticeFilters();
   // 🔵 보던 쪽을 들려 보낸다 — 재질의가 3쪽을 1쪽으로 되돌리던 것을 막는다(2026-09-16).
   else if(n===2 && (Date.now() - noticeLoadedAt) >= NOTICE_REFETCH_MS) loadNoticeData(noticePage);
+  // 🔵 2026-11-19(#1125 뒤 배포본 시험 계정 한 바퀴) — 설정에서 희망 조건을 저장(또는 지움)한 뒤 공고 탭으로 오면 머리의 「★ 희망 조건」 칩 유무가
+  //    희망 조건과 어긋난 채였다(머리는 목록을 그릴 때만 그린다). 어긋나면 머리만 다시 그린다(목록·쪽 그대로).
+  else if(n===2 && typeof zf3On === 'function' && zf3On() && !!document.querySelector('#zf3NoticeHead [data-act="mine"]') !== !!zf3Prefs()) zf3RenderNoticeHead(zf3ListRows);
   if(n===3) loadInsightData();
   if(n===4) zfRenderSavedTab();
   if(n===5) renderSettingsGate();
