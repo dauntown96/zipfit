@@ -1011,11 +1011,11 @@ try {
   //    position:fixed 패널을 카드 안에 가뒀다). 새 문맥 1280×900 · 움직임 켬(줄이기 아님) · 실제 마우스로 첫 카드 꺾쇠를 눌러
   //    펼친 상세가 화면 안에 있고(너비·높이 > 200 · 화면 밖으로 넘치지 않음) 그 가운데 점을 누르면 그 상세 안 요소가 잡히는가.
   {
-    let value = '', ok = false
+    let value = '', ok = false, dp = null
     const dctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: 'no-preference', serviceWorkers: 'block', locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
     try {
       await dctx.route(/\/rest\/v1\/usage_events(\?|$)/, r => r.fulfill({ status: 201, body: '' }))
-      const dp = await dctx.newPage()
+      dp = await dctx.newPage()
       await dp.goto(SITE + '?wide=' + Date.now(), { waitUntil: 'networkidle', timeout: 90000 })
       await dp.waitForFunction(() => typeof noticeData !== 'undefined' && noticeData.length > 0 && noticeLoaded, null, { timeout: 60000 })
       await dp.evaluate(() => { goMain(2); if (typeof zf3SetView === 'function') zf3SetView('list') })
@@ -1044,6 +1044,7 @@ try {
     //    펼쳐 .detail-grid .zf-dcell-date 중 이름이 「공고일」이고 보이는 칸을 센다. SIMULATE=detail_date 이면 0 으로 잰다(실패해야 맞다).
     let dv = '', dok = false
     try {
+      if (!dp) throw new Error('상세 쪽을 못 열었다')
       const go2 = dp.locator('#notice-list .hcard:not(.zf-ana-pending) .zf3-go').first()
       if (await go2.count()) {
         const opened = await go2.evaluate(el => el.closest('.hcard').classList.contains('zf3-open'))
