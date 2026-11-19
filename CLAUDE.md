@@ -166,9 +166,9 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-11-19 | **표시층 — 회귀 고침 2: 공고일·정정일·순위 「다른 창」 줄(상세 칸) · NEW 표지(겉) 되돌림** — 상세 칸은 「접수기간」(다른 창 줄 없는 것)만 숨김 · 공고일 10/10 · 정정일 2/2 · 다른 창 2/2 다시 보임 · 「🆕 NEW」 = 경고 칩 자리(`.zf12-badges`)로 겉 3/10 · 겉 요소 5 그대로 · `sw.js` v318 · PR 이 회차(병합은 검증 뒤) |
 | 2026-11-19 | **코드·운영 — 11장: juso 좌표 국내 보관(행안부 답)** — `complex-geo-fill` 좌표 단계 끔(`JUSO_COORD_ENABLED = false`) · DB `complex_geo` juso 20행 좌표 넷 NULL(도로명 그대로) · 좌표 실린 `net._http_response` 삭제 · 저장소 HEAD juso 좌표 0(표본 칸 걷음 · 시험은 합성 격자점) · 화면은 카카오 지오코딩으로 · 백업·git 이력은 목록만 · PR 이 회차 |
 | 2026-11-19 | **코드·운영 — 10장 ①·②: plain-check v3 「요점」 꼴 · 서울 이전 준비 ①′ anon 키 모으기** — ① `checkPlainPoint`(1~3줄 · 80자 · 원문 밖 낱알 0 · 부정·제한 갈래 양쪽 · 새 때 낱말 0) · v2 그대로 · 시험 32/32 · ② anon 키 = 저장소 `supabase/public-anon-key.txt` · DB `project_self.anon_key`(`ops_project_anon_key()` → `ops_uptime_ping`) · 장마다 PR |
-| 2026-11-19 | **코드·운영 — 서울 이전 준비 ①: 프로젝트 ref를 한 곳으로(동작 변화 0)** — DB `zipfit_ops.project_self` 한 행 + `ops_project_url()` → cron 14잡 · `analysis_dispatch_tick` · `ops_uptime_ping` · 저장소 `config.toml` `project_id` 하나를 워크플로·점검·스크립트 9곳이 읽음 · `index.html`·`sw.js` 0 · PR 이 회차 |
 
 ## 🚫 코딩 원칙
 
