@@ -4,9 +4,14 @@
 //    🔵 예외 둘: recordFindings 가 경고·실패를 public.ops_health_record(jsonb) 한 함수로만 넘긴다(2026-10-06 · 우편함 「코드 — 1-B …」 6)
 //    · recordInstanceMetrics 가 인스턴스 지표 숫자를 zipfit_ops.instance_metrics_record(jsonb) 한 함수로만 넘긴다(2026-10-17 · 「인스턴스 지표 정기 기록」 1).
 // 🔴 비밀값은 SUPABASE_ACCESS_TOKEN(기존 Actions Secret) 하나 · 공개 anon 키. 어떤 값도 출력하지 않는다.
-import { writeFileSync, appendFileSync } from 'node:fs'
+import { writeFileSync, appendFileSync, readFileSync } from 'node:fs'
 
-export const PROJECT_REF = 'khdpjjyspmlqtzperoqg'
+// 🔵 2026-11-19(우편함 「코드·운영 — 서울 이전 준비 ①」) — 프로젝트 ref 는 supabase/config.toml 의 project_id 한 곳에서 읽는다.
+export const PROJECT_REF = (() => {
+  const m = readFileSync(new URL('../../supabase/config.toml', import.meta.url), 'utf8').match(/^project_id\s*=\s*"([a-z0-9]+)"\s*$/m)
+  if (!m) throw new Error('supabase/config.toml 에 project_id 가 없다')
+  return m[1]
+})()
 export const SUPABASE_URL = `https://${PROJECT_REF}.supabase.co`
 // 공개 anon 키 — index.html 과 CLAUDE.md 에 이미 공개된 값이다(비밀 아님).
 export const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtoZHBqanlzcG1scXR6cGVyb3FnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxMTYyNDUsImV4cCI6MjA5NzY5MjI0NX0.XwSOuOk2UJiR8vTnwwqDZayJWOUstzD2DeB1COG4azs'

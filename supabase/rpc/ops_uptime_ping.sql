@@ -20,7 +20,7 @@ begin
     headers := jsonb_build_object('User-Agent', 'ZipFitBot-uptime', 'Cache-Control', 'no-cache', 'Range', 'bytes=0-4095'),
     timeout_milliseconds := 20000);
   v_rest := net.http_get(
-    url := 'https://khdpjjyspmlqtzperoqg.supabase.co/rest/v1/announcements?select=announcement_id&limit=1',
+    url := public.ops_project_url() || '/rest/v1/announcements?select=announcement_id&limit=1',  -- 🔵 2026-11-19 주소는 ops_project_url()(서울 이전 준비 ①)
     headers := jsonb_build_object('apikey', v_anon, 'Authorization', 'Bearer ' || v_anon, 'User-Agent', 'ZipFitBot-uptime'),
     timeout_milliseconds := 20000);
   insert into public.ops_uptime_log (target, url, net_request_id) values

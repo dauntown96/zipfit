@@ -31,7 +31,13 @@ import sys
 import time
 import urllib.request
 
-PROJECT = "khdpjjyspmlqtzperoqg"
+# 🔵 2026-11-19(우편함 「코드·운영 — 서울 이전 준비 ①」) — 프로젝트 ref 는 supabase/config.toml 의 project_id 한 곳에서 읽는다.
+def _project_ref(root):
+    m = re.search(r'^project_id\s*=\s*"([a-z0-9]+)"\s*$', open(os.path.join(root, 'supabase', 'config.toml'), encoding='utf-8').read(), re.M)
+    if not m:
+        raise SystemExit('supabase/config.toml 에 project_id 가 없다')
+    return m.group(1)
+PROJECT = _project_ref(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 QUERY_URL = f"https://api.supabase.com/v1/projects/{PROJECT}/database/query"
 EF = f"https://{PROJECT}.supabase.co/functions/v1/fetch-attachment?mode=list_folder&folder_id="
 CA = "/root/.ccr/ca-bundle.crt"

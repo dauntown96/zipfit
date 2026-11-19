@@ -43,7 +43,10 @@ const THEMES = ['light', 'dark']
 const DIFF_MIN_PX = 25
 const DIFF_RATIO = 0.0002
 
-const SUPA = /^https:\/\/khdpjjyspmlqtzperoqg\.supabase\.co\//
+// 🔵 2026-11-19(우편함 「코드·운영 — 서울 이전 준비 ①」) — 프로젝트 ref 는 supabase/config.toml 의 project_id 한 곳에서 읽는다.
+const PROJECT_REF = (fs.readFileSync(path.join(HERE, '..', '..', 'supabase', 'config.toml'), 'utf8').match(/^project_id\s*=\s*"([a-z0-9]+)"\s*$/m) || [])[1]
+if (!PROJECT_REF) throw new Error('supabase/config.toml 에 project_id 가 없다')
+const SUPA = new RegExp('^https://' + PROJECT_REF + '\\.supabase\\.co/')
 const BLOCK = /dapi\.kakao\.com|kakaocdn\.net|daumcdn\.net|drive\.google\.com|googleusercontent\.com|api\.github\.com|googletagmanager|google-analytics/
 const LIST_RPC = '/rest/v1/rpc/get_announcements_deduped'
 

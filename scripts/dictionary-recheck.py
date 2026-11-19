@@ -16,7 +16,7 @@
   README). 이 스크립트는 쓰기 호출을 하지 않는다. 쓰기 낱말(insert·update·delete·alter·drop·create·grant·truncate)이
   주석 밖에 있는 파일은 실행하지 않고 「오류(쓰기 낱말)」로 적는다.
 - 인증: 클라우드 세션은 프록시가 붙인다(헤더 없음). 다른 곳에서는 환경변수 SUPABASE_ACCESS_TOKEN만 읽는다 — 값은 찍지 않는다.
-  프로젝트는 SUPABASE_PROJECT_REF(기본 khdpjjyspmlqtzperoqg).
+  프로젝트는 SUPABASE_PROJECT_REF(기본 = supabase/config.toml project_id).
 - 부하 분(:x0 · :x5 · :20~:24 · :50~:54)에는 다음 허용 분까지 기다렸다 부른다(--no-wait로 끔).
 - 비교 축: 결과 JSON을 잎(경로 → 값)으로 편다. 문자열 목록(…_ex 예시 ID)은 예시라 비교하지 않는다.
   객체 목록은 문자열 칸들로 이름을 붙인다(예 by_std_sido의 std·sido). 숫자 잎은 기본이 「셈」이고,
@@ -49,7 +49,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SQL_DIR = ROOT / "docs" / "dictionary"
 BASELINE = SQL_DIR / "recheck-baseline.json"
-REF = os.environ.get("SUPABASE_PROJECT_REF", "khdpjjyspmlqtzperoqg")
+# 🔵 2026-11-19(우편함 「코드·운영 — 서울 이전 준비 ①」) — 프로젝트 ref 는 supabase/config.toml 의 project_id 한 곳에서 읽는다.
+def _project_ref(root):
+    m = re.search(r'^project_id\s*=\s*"([a-z0-9]+)"\s*$', open(os.path.join(root, 'supabase', 'config.toml'), encoding='utf-8').read(), re.M)
+    if not m:
+        raise SystemExit('supabase/config.toml 에 project_id 가 없다')
+    return m.group(1)
+REF = os.environ.get("SUPABASE_PROJECT_REF") or _project_ref(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 API = f"https://api.supabase.com/v1/projects/{REF}/database/query"
 KST = dt.timezone(dt.timedelta(hours=9))
 WRITE_WORDS = re.compile(r"\b(insert|update|delete|alter|drop|create|grant|revoke|truncate|copy|vacuum|call)\b", re.I)

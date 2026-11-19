@@ -1,4 +1,5 @@
 -- pg_cron 잡 사본 — 정본은 DB `cron.job` (뽑은 시각 2026-10-21 15:30 KST · pg_cron 1.6.4 · 23잡 · 2026-11-02 대조 23잡 일치 뒤 24째 zipfit-purge-cron-run-details(jobid 71) · 2026-11-02 25째 zipfit-purge-collection-run-log 더함 → 25잡 · 2026-11-09 재추출 29잡 일치(26째 purge-lh-file-fetch-log 84 · 빠졌던 gh-observe 75 · collect-lh-cutoff 78 · collect-lh-notices 82 더함))
+-- 🔵 2026-11-19(서울 이전 준비 ①) — EF 를 부르는 14잡의 주소는 `public.ops_project_url() || '/functions/v1/…'`(값 = zipfit_ops.project_self 한 행) — ref 글자 0 · 새 DB 에서는 그 행을 먼저 새 ref 로.
 -- 2026-10-21 신설 (우편함 「코드·운영 — 문서·SQL만(B): docs/cron-jobs.sql … + docs/ops-audit.sql …」 · 근거 조사 「런칭 전 점검 ① Supabase」 회신 ② · claude.ai 판정 1).
 -- 왜: 백업(zipfit-backup backup.yml)은 public·zipfit_ops 만 덤프한다 — cron 스키마는 담기지 않아, DB를 복원해도 자동화(수집 · 분석 발송 · 점검 · 백업 깨우기)가
 --   살아나지 않는다. 수집 잡 4·8·11·12·13 은 만든 SQL도 저장소에 없었다. 이 파일이 그 구멍을 메운다.
@@ -25,13 +26,13 @@
 --   6. 끝에 「대조」 SELECT 로 25잡 · command md5 가 이 파일과 같은지 본다.
 
 
--- jobid 4 · zipfit-collect-announcements · '*/10 0-9 * * *' = KST 09:00~18:50 10분마다 · active=true · command md5 cb52125abe49d37f49a3748c819e15ec
+-- jobid 4 · zipfit-collect-announcements · '*/10 0-9 * * *' = KST 09:00~18:50 10분마다 · active=true · command md5 1b05dfd89128e9009ca67f0afe2c79a2
 select cron.schedule('zipfit-collect-announcements', '*/10 0-9 * * *', $cmd$
   -- 🔴 시크릿을 이 명령에 평문으로 박지 않는다. Vault에서 실행 시점에 읽는다.
   -- cron.job은 anon에 SELECT 권한이 붙어 있어(스키마 USAGE가 없어 현재는 도달 불가하나)
   -- 명령문에 값을 남기면 그 권한 하나가 풀리는 순간 그대로 노출된다.
   SELECT net.http_post(
-    url := 'https://khdpjjyspmlqtzperoqg.supabase.co/functions/v1/collect-announcements',
+    url := public.ops_project_url() || '/functions/v1/collect-announcements',
     headers := jsonb_build_object('Content-Type','application/json','x-cron-secret',
       (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'cron_secret_v2')),
     body := '{}'::jsonb,
@@ -39,11 +40,11 @@ select cron.schedule('zipfit-collect-announcements', '*/10 0-9 * * *', $cmd$
   );
 $cmd$);
 
--- jobid 8 · zipfit-collect-sh-announcements · '0 0,3,6,9 * * *' = KST 09·12·15·18시 · active=true · command md5 b055202a86fdfe4ea42fed39822ce2cb
+-- jobid 8 · zipfit-collect-sh-announcements · '0 0,3,6,9 * * *' = KST 09·12·15·18시 · active=true · command md5 c2da055fdd29036e24d533c5452af9ac
 select cron.schedule('zipfit-collect-sh-announcements', '0 0,3,6,9 * * *', $cmd$
   -- 시크릿은 Vault에서 실행 시점에 읽는다(jobid 4와 동일한 이유).
   SELECT net.http_post(
-    url := 'https://khdpjjyspmlqtzperoqg.supabase.co/functions/v1/collect-sh-announcements?mode=collect',
+    url := public.ops_project_url() || '/functions/v1/collect-sh-announcements?mode=collect',
     headers := jsonb_build_object('Content-Type','application/json','x-cron-secret',
       (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'cron_secret_v2')),
     body := '{}'::jsonb,
@@ -51,11 +52,11 @@ select cron.schedule('zipfit-collect-sh-announcements', '0 0,3,6,9 * * *', $cmd$
   );
 $cmd$);
 
--- jobid 11 · zipfit-collect-rental-stats · '0 18 * * 0' = KST 월 03:00 · active=true · command md5 06a5152866d1e7d9bc84dc3065391454
+-- jobid 11 · zipfit-collect-rental-stats · '0 18 * * 0' = KST 월 03:00 · active=true · command md5 bf19fbe83dfaaaab3aae4ca3f7053fe3
 select cron.schedule('zipfit-collect-rental-stats', '0 18 * * 0', $cmd$
   -- 시크릿은 Vault에서 실행 시점에 읽는다(jobid 4와 동일한 이유).
   SELECT net.http_post(
-    url := 'https://khdpjjyspmlqtzperoqg.supabase.co/functions/v1/collect-rental-stats',
+    url := public.ops_project_url() || '/functions/v1/collect-rental-stats',
     headers := jsonb_build_object('Content-Type','application/json','x-cron-secret',
       (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'cron_secret_v2')),
     body := '{}'::jsonb,
@@ -63,13 +64,13 @@ select cron.schedule('zipfit-collect-rental-stats', '0 18 * * 0', $cmd$
   );
 $cmd$);
 
--- jobid 12 · zipfit-collect-announcements-warmup · '40,50 23 * * *' = KST 08:40·08:50 · active=true · command md5 cb52125abe49d37f49a3748c819e15ec
+-- jobid 12 · zipfit-collect-announcements-warmup · '40,50 23 * * *' = KST 08:40·08:50 · active=true · command md5 1b05dfd89128e9009ca67f0afe2c79a2
 select cron.schedule('zipfit-collect-announcements-warmup', '40,50 23 * * *', $cmd$
   -- 🔴 시크릿을 이 명령에 평문으로 박지 않는다. Vault에서 실행 시점에 읽는다.
   -- cron.job은 anon에 SELECT 권한이 붙어 있어(스키마 USAGE가 없어 현재는 도달 불가하나)
   -- 명령문에 값을 남기면 그 권한 하나가 풀리는 순간 그대로 노출된다.
   SELECT net.http_post(
-    url := 'https://khdpjjyspmlqtzperoqg.supabase.co/functions/v1/collect-announcements',
+    url := public.ops_project_url() || '/functions/v1/collect-announcements',
     headers := jsonb_build_object('Content-Type','application/json','x-cron-secret',
       (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'cron_secret_v2')),
     body := '{}'::jsonb,
@@ -77,13 +78,13 @@ select cron.schedule('zipfit-collect-announcements-warmup', '40,50 23 * * *', $c
   );
 $cmd$);
 
--- jobid 13 · zipfit-collect-announcements-night · '0 18 * * *' = KST 03:00 · active=true · command md5 cb52125abe49d37f49a3748c819e15ec
+-- jobid 13 · zipfit-collect-announcements-night · '0 18 * * *' = KST 03:00 · active=true · command md5 1b05dfd89128e9009ca67f0afe2c79a2
 select cron.schedule('zipfit-collect-announcements-night', '0 18 * * *', $cmd$
   -- 🔴 시크릿을 이 명령에 평문으로 박지 않는다. Vault에서 실행 시점에 읽는다.
   -- cron.job은 anon에 SELECT 권한이 붙어 있어(스키마 USAGE가 없어 현재는 도달 불가하나)
   -- 명령문에 값을 남기면 그 권한 하나가 풀리는 순간 그대로 노출된다.
   SELECT net.http_post(
-    url := 'https://khdpjjyspmlqtzperoqg.supabase.co/functions/v1/collect-announcements',
+    url := public.ops_project_url() || '/functions/v1/collect-announcements',
     headers := jsonb_build_object('Content-Type','application/json','x-cron-secret',
       (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'cron_secret_v2')),
     body := '{}'::jsonb,
@@ -125,11 +126,11 @@ select cron.schedule('zipfit-sh-close-missing', '20 0,3,6,9 * * *', $cmd$
   SELECT public.sh_close_missing();
   $cmd$);
 
--- jobid 19 · zipfit-collect-lh-promo · '5,35 0-9 * * *' = KST 09:05~18:35 30분마다 · active=true · command md5 fe93813aae6b5da66ce997788a395ce5
+-- jobid 19 · zipfit-collect-lh-promo · '5,35 0-9 * * *' = KST 09:05~18:35 30분마다 · active=true · command md5 a4750d6f4a07ad2d7cef762d17cd15aa
 select cron.schedule('zipfit-collect-lh-promo', '5,35 0-9 * * *', $cmd$
   -- 시크릿은 Vault에서 실행 시점에 읽는다(jobid 4와 동일한 이유).
   SELECT net.http_post(
-    url := 'https://khdpjjyspmlqtzperoqg.supabase.co/functions/v1/collect-lh-promo?mode=collect',
+    url := public.ops_project_url() || '/functions/v1/collect-lh-promo?mode=collect',
     headers := jsonb_build_object('Content-Type','application/json','x-cron-secret',
       (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'cron_secret_v2')),
     body := '{}'::jsonb,
@@ -143,10 +144,10 @@ select cron.schedule('zipfit-refresh-post-links', '3-59/10 * * * *', $cmd$select
 -- jobid 28 · zipfit-analysis-dispatch · '6-59/10 * * * *' = 10분마다(6분부터) · active=true · command md5 b9749b17da922f91d40b64e4ae3b3502
 select cron.schedule('zipfit-analysis-dispatch', '6-59/10 * * * *', $cmd$select public.analysis_dispatch_tick()$cmd$);
 
--- jobid 30 · zipfit-collect-lh-images · '17,47 0-9 * * *' = KST 09:17~18:47 30분마다 · active=true · command md5 1c7675308817220128a36053e6dbb4fb
+-- jobid 30 · zipfit-collect-lh-images · '17,47 0-9 * * *' = KST 09:17~18:47 30분마다 · active=true · command md5 15c273dad58ac0438886d86246b4688f
 select cron.schedule('zipfit-collect-lh-images', '17,47 0-9 * * *', $cmd$
   SELECT net.http_post(
-    url := 'https://khdpjjyspmlqtzperoqg.supabase.co/functions/v1/collect-lh-images?mode=collect',
+    url := public.ops_project_url() || '/functions/v1/collect-lh-images?mode=collect',
     headers := jsonb_build_object('Content-Type','application/json','x-cron-secret',
       (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'cron_secret_v2')),
     body := '{}'::jsonb,
@@ -160,10 +161,10 @@ select cron.schedule('zipfit-health-ops-dispatch', '25,55 * * * *', $cmd$ select
 -- jobid 37 · zipfit-health-screen-dispatch · '50 23 * * *' = KST 08:50 · active=true · command md5 5f8b329a9dd78b216952499821f42abb
 select cron.schedule('zipfit-health-screen-dispatch', '50 23 * * *', $cmd$ select public.ops_screen_dispatch(); $cmd$);
 
--- jobid 39 · zipfit-check-source-pages · '30-50/5 11,21 * * *' = KST 20:30~20:50 · 06:30~06:50 5분마다 · active=true · command md5 968fab1ec415b7f009a24bf3d6aa99b6
+-- jobid 39 · zipfit-check-source-pages · '30-50/5 11,21 * * *' = KST 20:30~20:50 · 06:30~06:50 5분마다 · active=true · command md5 d96a97e34f329a21e0c02a73882c1698
 select cron.schedule('zipfit-check-source-pages', '30-50/5 11,21 * * *', $cmd$
   SELECT net.http_post(
-    url := 'https://khdpjjyspmlqtzperoqg.supabase.co/functions/v1/check-source-pages?mode=collect',
+    url := public.ops_project_url() || '/functions/v1/check-source-pages?mode=collect',
     headers := jsonb_build_object('Content-Type','application/json','x-cron-secret',
       (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'cron_secret_v2')),
     body := '{}'::jsonb,
@@ -189,10 +190,10 @@ $cmd$);
 -- jobid 57 · zipfit-purge-stale-sessions · '10 15 * * *' = KST 00:10 · active=true · command md5 df78fb88f7fb3293e51975a614c52f3c
 select cron.schedule('zipfit-purge-stale-sessions', '10 15 * * *', $cmd$select zipfit_ops.purge_stale_auth_sessions(30)$cmd$);
 
--- jobid 60 · zipfit-check-source-pages-new-sh · '10 0,3,6,9 * * *' = KST 09·12·15·18시 10분 · active=true · command md5 d15ad0c34cf47bda5fb65eb783ed2fd7
+-- jobid 60 · zipfit-check-source-pages-new-sh · '10 0,3,6,9 * * *' = KST 09·12·15·18시 10분 · active=true · command md5 8d4ac2a32f511e87aac2db1ff16a955d
 select cron.schedule('zipfit-check-source-pages-new-sh', '10 0,3,6,9 * * *', $cmd$
   SELECT net.http_post(
-    url := 'https://khdpjjyspmlqtzperoqg.supabase.co/functions/v1/check-source-pages?mode=collect&new=sh',
+    url := public.ops_project_url() || '/functions/v1/check-source-pages?mode=collect&new=sh',
     headers := jsonb_build_object('Content-Type','application/json','x-cron-secret',
       (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'cron_secret_v2')),
     body := '{}'::jsonb,
@@ -222,12 +223,12 @@ select cron.schedule('zipfit-purge-lh-file-fetch-log', '37 15 * * *', $cmd$delet
 --   2026-11-12 신설(supabase/migrations/2026-11-12_04_complex_link_pending_cron.sql) — 새 분석 공고 세대 행 단지 잇기 안전망(zipfit_ops.complex_link_pending).
 select cron.schedule('zipfit-complex-link-pending', '41 * * * *', $cmd$select zipfit_ops.complex_link_pending()$cmd$);
 
--- jobid 75 · zipfit-gh-observe · '31 0,3,6,9 * * *' = KST 09:31·12:31·15:31·18:31 · active=true · command md5 32c19763f9e323ab6ddcb57e723e1aae
+-- jobid 75 · zipfit-gh-observe · '31 0,3,6,9 * * *' = KST 09:31·12:31·15:31·18:31 · active=true · command md5 9ccc801a14136ef479d41d0ba45051f1
 --   2026-11-03 신설(supabase/migrations/2026-11-03_04_gh_observe.sql) — GH 공고 목록 관찰만(announcements 쓰기 0) · 2026-11-09 사본 재추출로 더함.
 select cron.schedule('zipfit-gh-observe', '31 0,3,6,9 * * *', $cmd$
   -- 시크릿은 Vault에서 실행 시점에 읽는다(다른 수집 잡과 같은 꼴). 관찰만 — announcements 쓰기 0.
   SELECT net.http_post(
-    url := 'https://khdpjjyspmlqtzperoqg.supabase.co/functions/v1/collect-gh-announcements?mode=observe',
+    url := public.ops_project_url() || '/functions/v1/collect-gh-announcements?mode=observe',
     headers := jsonb_build_object('Content-Type','application/json','x-cron-secret',
       (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'cron_secret_v2')),
     body := '{}'::jsonb,
@@ -240,7 +241,7 @@ $cmd$);
 select cron.schedule('zipfit-collect-gh-announcements', '38 0,3,6,9 * * *', $cmd$
   -- 시크릿은 Vault에서 실행 시점에 읽는다(다른 수집 잡과 같은 꼴). 마감일 있는 열린 GH 공고만 announcements 에 쓴다.
   SELECT net.http_post(
-    url := 'https://khdpjjyspmlqtzperoqg.supabase.co/functions/v1/collect-gh-announcements?mode=collect',
+    url := public.ops_project_url() || '/functions/v1/collect-gh-announcements?mode=collect',
     headers := jsonb_build_object('Content-Type','application/json','x-cron-secret',
       (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'cron_secret_v2')),
     body := '{}'::jsonb,
@@ -248,11 +249,11 @@ select cron.schedule('zipfit-collect-gh-announcements', '38 0,3,6,9 * * *', $cmd
   );
 $cmd$);
 
--- jobid 78 · zipfit-collect-lh-cutoff · '13 20 * * 0' = KST 월 05:13(일 20:13 UTC) 주 1회 · active=true · command md5 31bfe212268599196b6ff8ad6769ea5d
+-- jobid 78 · zipfit-collect-lh-cutoff · '13 20 * * 0' = KST 월 05:13(일 20:13 UTC) 주 1회 · active=true · command md5 848a5c493df2fb2e0528229c9bdad7af
 --   2026-11-04 신설(supabase/migrations/2026-11-04_04_lh_cutoff_scores.sql) — LH 건설임대 당첨 합격점수 · 2026-11-09 사본 재추출로 더함.
 select cron.schedule('zipfit-collect-lh-cutoff', '13 20 * * 0', $cmd$
   SELECT net.http_post(
-    url := 'https://khdpjjyspmlqtzperoqg.supabase.co/functions/v1/collect-lh-cutoff?mode=collect',
+    url := public.ops_project_url() || '/functions/v1/collect-lh-cutoff?mode=collect',
     headers := jsonb_build_object('Content-Type','application/json','x-cron-secret',
       (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'cron_secret_v2')),
     body := '{}'::jsonb,
@@ -260,11 +261,11 @@ select cron.schedule('zipfit-collect-lh-cutoff', '13 20 * * 0', $cmd$
   );
 $cmd$);
 
--- jobid 82 · zipfit-collect-lh-notices · '13 1,4,7,10 * * *' = KST 10·13·16·19시 13분 · active=true · command md5 daf7c21646ec75e55fb3294469f8219e
+-- jobid 82 · zipfit-collect-lh-notices · '13 1,4,7,10 * * *' = KST 10·13·16·19시 13분 · active=true · command md5 9104a8d8272d19eb0d819d69ca9fb950
 --   2026-11-05 신설(supabase/migrations/2026-11-05_04_lh_notice_matches.sql) — LH 대상주택 공지 감지 · 2026-11-09 사본 재추출로 더함.
 select cron.schedule('zipfit-collect-lh-notices', '13 1,4,7,10 * * *', $cmd$
   SELECT net.http_post(
-    url := 'https://khdpjjyspmlqtzperoqg.supabase.co/functions/v1/collect-lh-notices?mode=collect',
+    url := public.ops_project_url() || '/functions/v1/collect-lh-notices?mode=collect',
     headers := jsonb_build_object('Content-Type','application/json','x-cron-secret',
       (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'cron_secret_v2')),
     body := '{}'::jsonb,
@@ -278,7 +279,7 @@ $cmd$);
 select cron.schedule('zipfit-complex-geo-fill', '34 * * * *', $cmd$
   -- 시크릿은 Vault에서 실행 시점에 읽는다(다른 수집 잡과 같은 꼴). 대상 0 이면 EF 가 바깥을 부르지 않는다.
   SELECT net.http_post(
-    url := 'https://khdpjjyspmlqtzperoqg.supabase.co/functions/v1/complex-geo-fill?mode=collect',
+    url := public.ops_project_url() || '/functions/v1/complex-geo-fill?mode=collect',
     headers := jsonb_build_object('Content-Type','application/json','x-cron-secret',
       (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'cron_secret_v2')),
     body := '{}'::jsonb,
