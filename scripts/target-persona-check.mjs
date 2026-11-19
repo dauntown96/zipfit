@@ -15,6 +15,11 @@
 //   node scripts/target-persona-check.mjs --diff scripts/target-persona-baseline.json   # 저장한 기준과 비교(데이터가 바뀐 칸은 따로 가른다)
 //   node scripts/target-persona-check.mjs --save scripts/target-persona-baseline.json   # 기준 저장
 // 선택: --ref <git ref>(그 판 index.html 로) · --personas <파일> · --out <결과 JSON> · --md <사람이 읽는 표 .md> · --only P1,SP45
+// 🔵 2026-11-18(우편함 「표시층 — 매칭 판정 R3」 4 · 조사 「매칭이 공급형태를 모른다」 ⑦) — --flow match:
+//   판정 함수만이 아니라 진단 → 매칭 실제 경로를 잰다 — 진단 칸 채움 → diagnose() → 지역·유형 칩 없이 matchHouses() → lastFiltered(남은 카드) · lastTargetOut(👥 뺀 카드).
+//   특수 계층 칸은 두 갈래로 돈다: 「안 건드림」(체크만 넣고 건드림 표지 없음 = 모름) · 「건드림」(zfMatchTouched 에 'zfClass' — R3 이후 판만 읽는다).
+//   --base <ref> 면 같은 데이터로 그 판과 작업 트리 판을 돌려 갈래 × 페르소나마다 「남음 → 👥」 · 「👥 → 남음」 카드를 찍는다(잘못 빠짐은 사람이 원문으로 본다).
+//   예: node scripts/target-persona-check.mjs --flow match --base origin/main --only P1,P2,MC1,P3,P4,P5
 // 목록 RPC 는 scripts/render-list-stub.mjs 캐시(운영 anon 응답 그대로 · 원칙 26)를 쓴다. 키 행·소득 표는 화면이 부르는 운영 anon REST 그대로다.
 // DB 쓰기 0 · 운영 화면을 재는 것이 아니다(배포본이 아니라 로컬 판을 띄운다).
 
@@ -198,8 +203,90 @@ function diff(a, b) {
   return { text: L.join('\n'), changed: rows.length }
 }
 
+// ── --flow match: 진단 → 매칭 실제 경로(위 머리 주석) ──
+async function runMatch(browser, ref, personas) {
+  const { html, label } = htmlFor(ref)
+  const srv = await serve(html)
+  const ctx = await browser.newContext({ serviceWorkers: 'block' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', e => errors.push(String(e)))
+  await page.route(/dapi\.kakao\.com|t1\.kakaocdn\.net|googletagmanager|google-analytics/, r => r.abort())
+  const stub = await stubListRpc(page)
+  await page.goto(`http://127.0.0.1:${srv.address().port}/`, { waitUntil: 'domcontentloaded' })
+  await page.waitForFunction(() => typeof diagnose === 'function' && typeof matchHouses === 'function' && typeof zfTargetDiagFacts === 'function', null, { timeout: 30000 })
+  const year = new Date().getFullYear()
+  const branches = {}
+  for (const touched of [false, true]) {
+    const per = {}
+    for (const p of personas) {
+      per[p.id] = await page.evaluate(async ({ p, year, touched }) => {
+        const set = (id, v) => { const el = document.getElementById(id); if (el && v != null) el.value = String(v) }
+        zfMatchTouched.clear(); zfMatchFilledVals = {}
+        diagMarital = p.marital || ''
+        set('marital', p.marital || '')
+        const by = p.birthYear != null ? p.birthYear : (p.age != null ? year - p.age : '')
+        document.getElementById('birthYear').value = String(by)
+        set('children', p.children != null ? p.children : 0)
+        if (p.members != null) { set('members', p.members); zfMatchTouched.add('members') } else set('members', 2)
+        document.getElementById('income').value = p.income != null ? String(p.income) : ''
+        set('dualIncome', p.dualIncome || 'unknown')
+        set('birthAfterBase', p.birthAfterBase || 'unknown')
+        document.querySelectorAll('#zfClassSet input[name="zfClass"]').forEach(i => { i.checked = (p.classes || []).includes(i.value) })
+        if (touched) zfMatchTouched.add('zfClass')   // 이벤트 없이 표지만 — 「한 번이라도 건드림」과 같은 상태
+        const assets = document.getElementById('assets'); if (assets) assets.value = ''
+        await diagnose()
+        selectedRegions.clear(); selectedTypes.clear()
+        await matchHouses()
+        return { types: [...(window.eligibleTypes || [])], kept: lastFiltered.map(r => String(r.announcement_id)).sort(),
+          out: lastTargetOut.map(x => String(x.id)).sort(), titles: Object.fromEntries([...lastFiltered, ...lastTargetOut].map(r => [String(r.announcement_id || r.id), r.title || ''])) }
+      }, { p: p.inputs, year, touched })
+    }
+    branches[touched ? '건드림' : '안 건드림'] = per
+  }
+  await ctx.close(); srv.close()
+  if (errors.length) console.error(`⚠️ ${label} 페이지 오류 ${errors.length}:`, errors.slice(0, 3))
+  return { meta: { 판: label, index_md5: md5(html).slice(0, 12), 잰_시각: new Date().toISOString(), 목록_rpc_캐시: stub, 페이지_오류: errors.length }, branches }
+}
+function matchTable(r, personas) {
+  const L = [`# 진단 → 매칭 페르소나 대조 — ${r.meta.판} · index ${r.meta.index_md5} · ${r.meta.잰_시각}`, '']
+  for (const [b, per] of Object.entries(r.branches)) {
+    L.push(`## 계층 칸 ${b}`, '', '| 페르소나 | 진단 유형 | 매칭 결과 | 👥 뺌 |', '|---|---|---|---|')
+    personas.forEach(p => { const x = per[p.id]; L.push(`| ${p.id} ${p.name} | ${x.types.join('·')} | ${x.kept.length} | ${x.out.length} |`) })
+    L.push('')
+  }
+  return L.join('\n')
+}
+function matchDiff(a, b, personas) {
+  const L = [`# 매칭 전후 — 전 ${a.meta.판} → 후 ${b.meta.판}`, '']
+  let moved = 0
+  for (const br of Object.keys(b.branches)) {
+    L.push(`## 계층 칸 ${br}`, '', '| 페르소나 | 매칭 결과 전 → 후 | 남음 → 👥 | 👥 → 남음 |', '|---|---|---|---|')
+    personas.forEach(p => {
+      const x = a.branches[br][p.id], y = b.branches[br][p.id]
+      const toOut = x.kept.filter(id => y.out.includes(id)), toIn = x.out.filter(id => y.kept.includes(id))
+      moved += toOut.length + toIn.length
+      const nm = id => `${id}(${(y.titles[id] || x.titles[id] || '').slice(0, 20)})`
+      L.push(`| ${p.id} | ${x.kept.length} → ${y.kept.length} | ${toOut.map(nm).join(' · ') || '없음'} | ${toIn.map(nm).join(' · ') || '없음'} |`)
+    })
+    L.push('')
+  }
+  return { text: L.join('\n'), moved }
+}
+
 const personas = JSON.parse(readFileSync(personasFile, 'utf8')).personas.filter(p => !only.length || only.includes(p.id))
 const browser = await chromium.launch()
+if (opt('--flow') === 'match') {
+  try {
+    const after = await runMatch(browser, opt('--ref'), personas)
+    writeFileSync(outFile, JSON.stringify(after, null, 1))
+    let text = matchTable(after, personas)
+    if (opt('--base')) { const before = await runMatch(browser, opt('--base'), personas); text += '\n' + matchDiff(before, after, personas).text }
+    console.log(text); if (mdFile) writeFileSync(mdFile, text + '\n')
+    console.log(`\n결과 JSON: ${outFile}`)
+  } finally { await browser.close() }
+  process.exit(0)
+}
 try {
   const base = opt('--base')
   const after = await run(browser, opt('--ref'), personas)

@@ -595,7 +595,7 @@ try {
       const y = new Date().getFullYear()
       // members "diag_untouched" — 진단 칸에 이벤트 없이 2를 넣고(사용자가 안 건드린 기본값과 같은 꼴) 화면 zfTargetDiagFacts 가 내는 값을 쓴다(2026-10-15).
       const diagMembers = () => { const el = document.getElementById('members'); if (el) el.value = '2'; return typeof zfTargetDiagFacts === 'function' ? zfTargetDiagFacts().members : NaN }
-      const fx = s => ({ marital: s.facts.marital, children: s.facts.children ?? null, birthYear: y - s.facts.age, classes: new Set(s.facts.classes),
+      const fx = s => ({ marital: s.facts.marital, children: s.facts.children ?? null, birthYear: y - s.facts.age, classes: new Set(s.facts.classes), classesKnown: !!s.facts.classesKnown,   // 2026-11-18 R3 — 계층 칸 건드림(표본에 없으면 안 건드림 = 모름)
         members: s.facts.members === 'diag_untouched' ? diagMembers() : s.facts.members })
       // 카드 표본(2026-10-15 · 우편함 「코드 — 공급대상 갈래 「no 먼저」 …」) — zfTargetVerdict 의 state 와 checks(안내 괄호 안 낱말 · 순서까지).
       const v = vs.map(s => { const r = zfTargetVerdict(s.rows, fx(s)) || {}
