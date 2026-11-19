@@ -1252,6 +1252,7 @@ html.zf12 .zf12-card .zf3-ctop{flex-wrap:wrap;row-gap:6px}
 html.zf12 .zf12-badges{display:contents}
 html.zf12 .zf12-badges .chip{display:inline-flex;align-items:center;min-height:24px;padding:2px 8px!important;border-radius:var(--r-1);font-size:var(--t-xs)!important;font-weight:700;background:var(--warn-bg)!important;border:1px solid var(--warn)!important;color:var(--warn)!important;cursor:default}
 html.zf12 .zf12-cov{font-size:var(--t-xs);color:var(--ink-3)}
+html.zf12 .zf12-badges .chip.zf-chip-new{background:var(--ink)!important;border-color:var(--ink)!important;color:var(--paper)!important}   /* NEW = 재편 전 겉 꼴 그대로(경고 색 아님) */
 html.zf12 .zf12-badges .chip[role=button]{position:relative}
 html.zf12 .zf12-badges .chip[role=button]::after{content:"";position:absolute;left:0;right:0;top:-10px;bottom:-10px}   /* 누르는 자리 44px(보이는 높이 24 + 위아래 10) */
 html.zf12 .zf3-ctop .zf3-dpill:is(.hot,.zf12-soon){background:var(--ink);border-color:var(--ink);color:var(--paper)}   /* 2차 2 — 알약은 상태만 · 임박 경고는 일정 줄 남은 날 조각(.zf12-dd.hot)이 맡는다 */
@@ -1322,7 +1323,7 @@ html.zf12 .zf12-card > [id^="ncard-"] > .detail-grid{order:14;margin-top:10px}
 html.zf12 .zf12-card > [id^="ncard-"] > .zf-places{order:15}
 html.zf12 .zf12-card > [id^="ncard-"] > .zf-nonaffil{order:16}
 html.zf12 .zf12-card > [id^="ncard-"] > .zf3-close{order:17}
-html.zf12 .zf12-card .detail-grid .zf-dcell-date{display:none}   /* 공고일·접수기간 = 겉 ⑤와 같은 사실(한 사실 한 층) */
+html.zf12 .zf12-card .detail-grid .zf-dcell-apply:not(:has(.zf-win-other)){display:none}   /* 접수기간 = 겉 ⑤와 같은 사실(한 사실 한 층) · 공고일·정정일은 겉 줄에 없다 → 상세 칸에 둔다 · 순위별 「다른 창」 줄이 든 칸도 둔다(2026-11-19 회귀 고침 2) */
 /* 세대 — 1200 이상: 계층 줄을 표처럼(계층 · 보증금·월 · ㎡당 열 맞춤) */
 @media (min-width:1200px){
   html.zf12 .zf12-hut .hu-ug-line{display:grid;grid-template-columns:minmax(7em,1fr) 2fr auto;gap:10px;align-items:baseline}
@@ -6311,7 +6312,7 @@ function renderNoticeList(filtered, totalCount, hiddenClosedCount){
     const detailHTML = detailRows.length
       ? `<div id="${cardId}" data-ann-id="${(n['announcement_id']||'').toString().replace(/"/g,'&quot;')}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 var(--r-l) var(--r-l);transition:all 0.2s" onclick="event.stopPropagation()">
           <div class="detail-grid">
-            ${detailRows.map(([k,v])=>`<div${ZF_DCELL_DATE.test(k)?' class="zf-dcell-date"':''} style="font-size:12px"><span style="color:var(--ink-3)">${k}</span><br><span style="color:#333;font-weight:500">${v}</span></div>`).join('')}
+            ${detailRows.map(([k,v])=>`<div${ZF_DCELL_DATE.test(k)?` class="zf-dcell-date${k==='접수기간'?' zf-dcell-apply':''}"`:''} style="font-size:12px"><span style="color:var(--ink-3)">${k}</span><br><span style="color:#333;font-weight:500">${v}</span></div>`).join('')}
           </div>
           ${zfPlacesLine(n['region_names'], n['announcement_id'])}
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
@@ -12622,7 +12623,7 @@ function renderMatchResults(rows){
     const detailHTML = detailRows.length
       ? `<div id="${cardId}" data-ann-id="${(n.announcement_id||'').toString().replace(/"/g,'&quot;')}" style="display:none;margin:12px -1.25rem -1rem;padding:12px 1.25rem 1rem;background:#f8f8f8;border-top:1px solid #e8e8e0;border-radius:0 0 var(--r-l) var(--r-l)" onclick="event.stopPropagation()">
           <div class="detail-grid">
-            ${detailRows.map(([k,v])=>`<div${ZF_DCELL_DATE.test(k)?' class="zf-dcell-date"':''} style="font-size:12px"><span style="color:var(--ink-3)">${k}</span><br><span style="color:#333;font-weight:500">${v}</span></div>`).join('')}
+            ${detailRows.map(([k,v])=>`<div${ZF_DCELL_DATE.test(k)?` class="zf-dcell-date${k==='접수기간'?' zf-dcell-apply':''}"`:''} style="font-size:12px"><span style="color:var(--ink-3)">${k}</span><br><span style="color:#333;font-weight:500">${v}</span></div>`).join('')}
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
             ${zfSafeUrl(n.url)?`<a class="detail-link" href="${zfSafeHref(n.url)}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block"><span class="zf-ai-lbl">AI 정리 · </span>원문 보기 →</a>`:''}
@@ -16072,7 +16073,7 @@ function zf12Sweep(card){
     twin ? twin.replaceWith(el) : l2.appendChild(el);
   });
   card.querySelectorAll('.zf12-badges').forEach(b => {   // 늦게 붙은 경고 칩도 ①로
-    card.querySelectorAll('.zf12-l2 .chip-row .zf-chip-warn').forEach(x => b.appendChild(x));
+    card.querySelectorAll('.zf12-l2 .chip-row .zf-chip-warn, .zf12-l2 .chip-row .zf-chip-new').forEach(x => b.appendChild(x));
   });
 }
 function zf12Front(card, n){
@@ -16088,7 +16089,7 @@ function zf12Front(card, n){
   const det = document.getElementById(card.getAttribute('data-card-id'));
   const top = card.querySelector('.zf3-ctop');
   const bw = document.createElement('span'); bw.className = 'zf12-badges';
-  card.querySelectorAll('.chip-row .zf-chip-warn').forEach(x => {
+  card.querySelectorAll('.chip-row .zf-chip-warn, .chip-row .zf-chip-new').forEach(x => {   // 「🆕 NEW」도 ①로(재편 전처럼 겉 — 2026-11-19 회귀 고침 2)
     // 「⏰ 마감임박」은 상태 알약(D-n)과 같은 사실 — 알약을 경고 모양으로 하고 배지는 접는다(한 사실 한 자리)
     if(/마감임박/.test(x.textContent) && top && top.querySelector('.zf3-dpill')){ top.querySelector('.zf3-dpill').classList.add('zf12-soon'); x.classList.add('zf12-off'); return; }
     bw.appendChild(x);
