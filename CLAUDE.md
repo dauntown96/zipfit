@@ -63,7 +63,7 @@
 ### Supabase 설정
 - **URL**: `https://khdpjjyspmlqtzperoqg.supabase.co`
 - **anon key**: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtoZHBqanlzcG1scXR6cGVyb3FnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxMTYyNDUsImV4cCI6MjA5NzY5MjI0NX0.XwSOuOk2UJiR8vTnwwqDZayJWOUstzD2DeB1COG4azs`
-- **프로젝트 ref 자리**: 저장소 = `supabase/config.toml` `project_id` 한 줄(워크플로·점검·스크립트가 읽는다) · DB = `zipfit_ops.project_self` 한 행(`public.ops_project_url()` — cron·함수가 읽는다) · 화면 = `index.html`. 이전 날 목록은 `docs/supabase-seoul-move.md` 1-0(2026-11-19)
+- **프로젝트 ref·anon 키 자리**: 저장소 = `supabase/config.toml` `project_id` 한 줄 + `supabase/public-anon-key.txt`(워크플로·점검·스크립트가 읽는다) · DB = `zipfit_ops.project_self` 한 행(`ref` · `anon_key` — `public.ops_project_url()` · `ops_project_anon_key()`로 cron·함수가 읽는다) · 화면 = `index.html`. 이전 날 목록은 `docs/supabase-seoul-move.md` 1-0(2026-11-19)
 - **RPC**: `get_announcements_deduped(p_region, p_type, p_status)` — null 시 전체 반환
 - **인증**: Supabase Auth 세션(localStorage). 쿠키 `zipfit_email`은 2026-08-13 폐지
 
@@ -165,7 +165,7 @@ diagnose() / matchHouses() / renderMatchResults(rows)
 
 | 날짜 | 내용 |
 |---|---|
-| 2026-11-19 | **코드·운영 — 10장 ①: plain-check v3 「요점」 꼴** — `checkPlainPoint`(1~3줄 · 80자 · 원문 밖 낱알 0 · 부정·제한 갈래 양쪽 · 새 때 낱말 0) · `plain-check v3 요점` · `--point` · v2 그대로 · 시험 32/32 · PR 이 회차 |
+| 2026-11-19 | **코드·운영 — 10장 ①·②: plain-check v3 「요점」 꼴 · 서울 이전 준비 ①′ anon 키 모으기** — ① `checkPlainPoint`(1~3줄 · 80자 · 원문 밖 낱알 0 · 부정·제한 갈래 양쪽 · 새 때 낱말 0) · v2 그대로 · 시험 32/32 · ② anon 키 = 저장소 `supabase/public-anon-key.txt` · DB `project_self.anon_key`(`ops_project_anon_key()` → `ops_uptime_ping`) · 장마다 PR |
 | 2026-11-19 | **코드·운영 — 서울 이전 준비 ①: 프로젝트 ref를 한 곳으로(동작 변화 0)** — DB `zipfit_ops.project_self` 한 행 + `ops_project_url()` → cron 14잡 · `analysis_dispatch_tick` · `ops_uptime_ping` · 저장소 `config.toml` `project_id` 하나를 워크플로·점검·스크립트 9곳이 읽음 · `index.html`·`sw.js` 0 · PR 이 회차 |
 | 2026-11-19 | **표시층 — 디자인 2차 2단계(390 카드 2장 · ★ 희망 조건 칩 · 재계약 원문 접기 · a11y · 다른 탭 본문 14)** — 공고 탭 머리 셋 → 둘(첫 카드 위 395 → 312 · 「오늘 11:00 수집」 짧은 꼴 · 첫 235 + 둘째 220도 2장) · 오늘 판 칸 높이 같게 · ★ 칩 = 종전 `zf3Mine` · 「🔓 자격완화」 아래 「재계약 · 원문 n건」(`content_raw` 그대로) · `.hu-past-title` → `--ink-3` · 다른 탭 문장 28곳 → `--t-body` · 글자 전후 같음 · `sw.js` v315 · PR 이 회차(병합은 판정 뒤) |
 

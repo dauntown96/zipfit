@@ -653,8 +653,13 @@ def cmd_check():
 #    잠깐 끊김(목록 함수 3초 한도 500 등)으로 이슈가 열리지 않게 REST_PROBE_WAIT_S 쉬고 최대 REST_PROBE_TRIES 번 — 한 번이라도 통과면 통과.
 #    🔴 anon 키는 공개 키다(index.html · .github/health/lib.mjs 에 이미 있음) — 서비스 키는 쓰지 않는다.
 SUPABASE_URL = f'https://{PROJECT_REF}.supabase.co'
-ANON_KEY = ('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtoZHBqanlzcG1scXR6cGVyb3FnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxMTYyNDUsImV4cCI6MjA5NzY5MjI0NX0'
-            '.XwSOuOk2UJiR8vTnwwqDZayJWOUstzD2DeB1COG4azs')
+# 🔵 2026-11-19(우편함 「코드·운영 — 10장」 ②) — 공개 anon 키는 supabase/public-anon-key.txt 한 곳에서 읽는다.
+def _anon_key(root):
+    v = open(os.path.join(root, 'supabase', 'public-anon-key.txt'), encoding='utf-8').read().strip()
+    if not re.fullmatch(r'[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+', v):
+        raise SystemExit('supabase/public-anon-key.txt 꼴이 아니다')
+    return v
+ANON_KEY = _anon_key(ROOT)
 REST_PROBE_PATH = '/rest/v1/rpc/get_announcements_deduped'
 REST_PROBE_TRIES = 3
 REST_PROBE_WAIT_S = 5

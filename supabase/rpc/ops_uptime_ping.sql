@@ -10,7 +10,7 @@ AS $function$
 -- 🔴 DB 가 죽으면 이 감시도 함께 죽는다 — 그 축은 바깥 서비스(2단계) 몫이다.
 declare
   v_site bigint; v_rest bigint;
-  v_anon constant text := 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtoZHBqanlzcG1scXR6cGVyb3FnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxMTYyNDUsImV4cCI6MjA5NzY5MjI0NX0.XwSOuOk2UJiR8vTnwwqDZayJWOUstzD2DeB1COG4azs';
+  v_anon constant text := public.ops_project_anon_key();  -- 🔵 2026-11-19 공개 anon 키는 zipfit_ops.project_self(서울 이전 준비 ①′)
 begin
   perform public.ops_uptime_fill();
   -- 🔵 2026-10-08(운영 기반 후속 5) — 첫 4KB 만 받는다(Range · 206). 종전에는 첫 화면 전체(599KB)를 10분마다 받아 net._http_response 에 쌓았다.
