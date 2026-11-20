@@ -45,7 +45,7 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
         run: bash scripts/skip-ci-check.sh
-      # 🔵 2026-11-19(우편함 「코드·운영 — 12장」) — 문서 검사 한 벌: Pages Liquid 글자(#785) · CLAUDE.md 「최근 작업 이력」 꼴 · 표 칸 수(CLAUDE.md · docs/history.md) ·
+      # 🔵 2026-11-19(우편함 「코드·운영 — 12장」) — 문서 검사 한 벌: Pages Liquid 글자(#785) · 이력 새 꼴(2026-11-20 13장 — docs/history.d/ PR마다 새 파일) · 표 칸 수(base 이후 바뀐 .md) ·
       #    고지 문서 자리 표시 「{{」 — scripts/doc-check.sh 하나를 git pre-push 훅(.githooks/pre-push)과 같이 부른다(검사 두 벌 0). DB 를 부르지 않는다.
       #    종전 세 단계(Pages Liquid 글자 · CLAUDE.md 이력 표 꼴 · 고지 문서 「{{」)를 합쳤다 — 판정 같음(이력 표 꼴의 경고 기간 HISTORY_FAIL_FROM 2026-10-20 은 지나 늘 실패였다).
       - name: 문서 검사

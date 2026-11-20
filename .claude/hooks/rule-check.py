@@ -2,17 +2,18 @@
 """PreToolUse(Bash) 규칙 훅 — 경고만 한다(막지 않는다). 2026-10-12 · 우편함 「코드 — Claude Code 장비 정비」 3.
 
 ① `git push --force*` 앞: 원격 브랜치 head ↔ origin/main 의 diff 가 비었는지(원칙 13 — squash 병합 뒤 같은 브랜치 재사용).
-② `git commit` 앞(CLAUDE.md 가 커밋에 실릴 때): 「최근 작업 이력」 표가 그 절 머리 아래 한 벌 · 3행 · 행당 600B 안 ·
-   날짜가 최신부터인지(원칙 21 · #430 꼴).
+② `git commit` 앞(CLAUDE.md 가 커밋에 실릴 때): 이력 꼴 표 행(`| YYYY-MM-DD |`)이 없는지(원칙 21 · 2026-11-20 「코드·운영 — 13장」 —
+   그 전에는 「최근 작업 이력」 3행 표의 꼴을 봤다 · 이력은 이제 docs/history.d/ 에 PR마다 새 파일).
 
 경고는 모델 문맥(additionalContext)과 사람 화면(systemMessage)에 함께 내고, /tmp/zipfit-rule-hook.log 에 한 줄 남긴다.
-🔴 훅은 경고만 한다(언제나 exit 0 · 훅이 스스로 죽어도 명령은 그대로 간다). 막는 쪽은 PR check 다 — `db-migrations.yml` 「CLAUDE.md 이력 표 꼴」이
-   같은 ② 검사를 2026-10-20(HISTORY_FAIL_FROM)부터 실패로 낸다(아래 --history · --table-cols).
+🔴 훅은 경고만 한다(언제나 exit 0 · 훅이 스스로 죽어도 명령은 그대로 간다). 막는 쪽은 PR check 다 — `db-migrations.yml` 「문서 검사」
+   (scripts/doc-check.sh)가 같은 ② 검사를 실패로 낸다(아래 --history · --history-files · --table-cols).
 🔴 두 저장소가 함께 붙은 세션(루틴 포함)에서는 저장소 .claude/settings.json 의 훅이 돌지 않는다 — 회신 참조.
 시험: echo '{"tool_input":{"command":"git commit -m x"},"cwd":"/home/user/zipfit"}' | python3 .claude/hooks/rule-check.py
 🔵 2026-10-13(우편함 「코드 — 카드 머리 세대수」 0장 2) — PR check 도 같은 ② 검사를 부른다:
-   python3 .claude/hooks/rule-check.py --history CLAUDE.md   → 문제 없으면 exit 0 · 있으면 줄마다 출력하고 exit 1
-   python3 .claude/hooks/rule-check.py --table-cols CLAUDE.md docs/history.md   → 표 행마다 칸 구분자 수 = 표 머리(같은 출력·종료 꼴)
+   python3 .claude/hooks/rule-check.py --history CLAUDE.md   → 이력 꼴 표 행이 없으면 exit 0 · 있으면 줄마다 출력하고 exit 1
+   python3 .claude/hooks/rule-check.py --history-files docs/history.d/<파일>…   → 이름·첫 줄 꼴 · 표 행 0(같은 출력·종료 꼴 · 2026-11-20)
+   python3 .claude/hooks/rule-check.py --table-cols <.md>…   → 표 행마다 칸 구분자 수 = 표 머리(같은 출력·종료 꼴)
    (표준 라이브러리만 · 훅 경로와 같은 history_problems() 한 벌 — 사본 없음. 경고/실패는 워크플로가 정한다.)
 """
 import json
@@ -71,35 +72,33 @@ def check_force_push(cmd, repo):
 
 
 def history_problems(text):
-    lines = text.split('\n')
-    h = next((i for i, l in enumerate(lines) if l.startswith('## ') and '최근 작업 이력' in l), None)
-    if h is None:
-        return ['「최근 작업 이력」 절 머리가 없다']
-    end = next((i for i in range(h + 1, len(lines)) if lines[i].startswith('## ')), len(lines))
+    """CLAUDE.md 에 이력 꼴 표 행(`| YYYY-MM-DD |`)이 없어야 한다(원칙 21 · 2026-11-20 「코드·운영 — 13장」 — 「최근 작업 이력」 표를 걷음).
+
+    이력은 docs/history.d/ 에 PR마다 새 파일 하나다. 표 행이 다시 생기면 두 PR이 같은 줄을 건드려 충돌하던 꼴(조사 #1134)이 돌아온다.
+    """
     row_re = re.compile(r'^\|\s*(\d{4}-\d{2}-\d{2})\s*\|')
+    rows = [n for n, l in enumerate(text.split('\n'), 1) if row_re.match(l)]
+    if rows:
+        return [f'이력 꼴 표 행이 있다(줄 {", ".join(map(str, rows[:5]))}) — 이력은 docs/history.d/YYYY-MM-DD-<가지>.md 새 파일로(원칙 21)']
+    return []
+
+
+HIST_NAME = re.compile(r'^(\d{4}-\d{2}-\d{2})-[A-Za-z0-9][A-Za-z0-9._-]*\.md$')
+
+
+def history_file_problems(path, text):
+    """docs/history.d/ 파일 하나의 꼴 — 이름 YYYY-MM-DD-<가지>.md · 첫 줄 `# YYYY-MM-DD — <회차>`(이름의 날짜와 같음) · 표 행 0."""
+    name = os.path.basename(path)
+    m = HIST_NAME.match(name)
+    if not m:
+        return [f'이름이 YYYY-MM-DD-<가지>.md 꼴이 아니다({name})']
     probs = []
-    heads = [i for i in range(h + 1, end) if re.match(r'^\|\s*날짜\s*\|\s*내용\s*\|', lines[i])]
-    if len(heads) != 1:
-        probs.append(f'절 안 표 머리(| 날짜 | 내용 |)가 {len(heads)}벌')
-        return probs
-    i = heads[0] + 2
-    rows = []
-    while i < end and row_re.match(lines[i]):
-        rows.append(lines[i]); i += 1
-    stray = [j + 1 for j, l in enumerate(lines) if row_re.match(l) and not (heads[0] + 2 <= j < heads[0] + 2 + len(rows))]
-    if stray:
-        probs.append(f'표 밖에 이력 꼴 행이 있다(줄 {", ".join(map(str, stray[:5]))}) — 표 머리 위·다른 절에 끼었는가(#430 꼴)')
-    if len(rows) != 3:
-        probs.append(f'이력 행이 {len(rows)}개 — 3개여야 한다(넘친 것은 docs/history.md 로)')
-    for r in rows:
-        b = len(r.encode('utf-8'))
-        if b > 600:
-            probs.append(f'{row_re.match(r).group(1)} 행이 {b}B — 600B 안')
-        if re.search(r'\|\s*-{3,}\s*$', r):
-            probs.append(f'{row_re.match(r).group(1)} 행 끝에 「|---」가 붙었다 — 절 구분선은 행 뒤 빈 줄 다음 줄에(행을 갈아 끼우며 꼬리가 옮겨 다닌다 · 2026-10-21)')
-    dates = [row_re.match(r).group(1) for r in rows]
-    if dates != sorted(dates, reverse=True):
-        probs.append(f'날짜가 최신부터가 아니다({" → ".join(dates)})')
+    lines = text.split('\n')
+    first = lines[0] if lines else ''
+    if not re.match(r'^# ' + re.escape(m.group(1)) + r' — \S', first):
+        probs.append(f'첫 줄이 「# {m.group(1)} — <회차 이름>」이 아니다')
+    if any(l.startswith('|') for l in lines):
+        probs.append('표 행이 있다 — 이력 파일은 표로 쓰지 않는다(원칙 21)')
     return probs
 
 
@@ -140,7 +139,7 @@ def check_commit(cmd, repo):
     probs = history_problems(text)
     if not probs:
         return None
-    return '원칙 21 — CLAUDE.md 「최근 작업 이력」: ' + ' · '.join(probs) + '. 새 줄은 맨 위에 먼저 넣고 넘친 행을 아래에서 빼 docs/history.md 로.'
+    return '원칙 21 — CLAUDE.md: ' + ' · '.join(probs) + '.'
 
 
 def main():
@@ -180,13 +179,20 @@ def history_cli(path):
     with open(path, encoding='utf-8') as f:
         probs = history_problems(f.read())
     for p in probs:
-        print(f'{path} 「최근 작업 이력」: {p}')
+        print(f'{path}: {p}')
     return 1 if probs else 0
 
 
 if __name__ == '__main__':
     if len(sys.argv) >= 3 and sys.argv[1] == '--history':
         sys.exit(history_cli(sys.argv[2]))
+    if len(sys.argv) >= 3 and sys.argv[1] == '--history-files':
+        bad = 0
+        for path in sys.argv[2:]:
+            with open(path, encoding='utf-8') as f:
+                for p in history_file_problems(path, f.read()):
+                    print(f'{path} 이력 파일: {p}'); bad = 1
+        sys.exit(bad)
     if len(sys.argv) >= 3 and sys.argv[1] == '--table-cols':
         bad = 0
         for path in sys.argv[2:]:
