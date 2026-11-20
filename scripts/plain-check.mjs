@@ -159,12 +159,30 @@ export function checkPlainPoint(raw, plain) {
   const tw = TIME_WORDS.filter((w) => count(P, w) > 0 && count(R, w) === 0)
   if (tw.length) fails.push({ kind: 'ⓓ때 낱말', detail: `원문에 없는 때 낱말: ${tw.join(' · ')}` })
 
-  return { ok: fails.length === 0, fails }
+  return { ok: fails.length === 0, fails, warns: scopeWarns(R, P) }
+}
+
+// 🔵 2026-11-20(요점 소급 5회차 0장 2) — 「또는 범위 줄임」 경고(실패 아님 · 통과 유지 · 경고 행은 반영 전 사람이 한 번 본다).
+//    원문에 범위를 넓히는 말(「1호 또는 1세대」 · 「분리배우자와」 · 「신청자 또는 신청자의 배우자와」)이 있는데
+//    요점이 같은 자리(「1호」 · 「등재」)를 좁힘 말(「만」 · 「에 한해」 — 한정 갈래)로 쓰면서 넓히는 말을 빼면 경고.
+//    4회차 보조 에이전트 초안 15행 · 앞 회차 14행이 낱알·갈래 검사를 모두 통과한 채 이렇게 줄어 있었다.
+const SCOPE_WIDE = [
+  { name: '1호 또는 1세대', raw: /1\s*호\s*(?:\(\s*세대\s*\)|또는\s*1\s*세대)/, at: /1\s*호/, keep: /1\s*세대|\(\s*세대\s*\)/ },
+  { name: '분리배우자', raw: /분리\s*배우자\s*(?:와|\(|포함\)?와)/, at: /등재/, keep: /분리\s*배우자/ },
+  { name: '신청자 또는 배우자', raw: /신청자\s*또는\s*(?:신청자의\s*)?배우자[^\n]{0,20}함께\s*등재/, at: /등재/, keep: /배우자/ },
+]
+export function scopeWarns(raw, plain) {
+  const R = norm(raw), P = norm(plain)
+  const narrow = POLARITY['한정'].some((re) => re.test(P))
+  if (!narrow) return []
+  return SCOPE_WIDE.filter((w) => w.raw.test(R) && w.at.test(P) && !w.keep.test(P))
+    .map((w) => ({ kind: '⚠범위 줄임', detail: `원문의 「${w.name}」 넓힘이 요점에 없고 좁힘 말이 있다` }))
 }
 
 function report(id, r) {
   console.log(`${r.ok ? '✓ 통과' : '✗ 실패'}${id ? ` ${id}` : ''}`)
   for (const f of r.fails) console.log(`   ${f.kind} — ${f.detail}`)
+  for (const w of r.warns ?? []) console.log(`   ${w.kind} — ${w.detail}`)
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
@@ -176,8 +194,8 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   if (a[0] === '--json' && a[1]) pairs = JSON.parse(readFileSync(a[1], 'utf8'))
   else if (a.length === 2) pairs = [{ raw: readFileSync(a[0], 'utf8'), plain: readFileSync(a[1], 'utf8') }]
   else { console.error('쓰는 법: node scripts/plain-check.mjs [--point] <원문.txt> <쉽게.txt> | [--point] --json <쌍.json>'); process.exit(2) }
-  let bad = 0
-  for (const p of pairs) { const r = check(p.raw, p.plain); if (!r.ok) bad++; report(p.id, r) }
-  console.log(`— ${point ? PLAIN_CHECK_POINT_VERSION : PLAIN_CHECK_VERSION} · 쌍 ${pairs.length} · 실패 ${bad}`)
+  let bad = 0, warn = 0
+  for (const p of pairs) { const r = check(p.raw, p.plain); if (!r.ok) bad++; if (r.warns?.length) warn++; report(p.id, r) }
+  console.log(`— ${point ? PLAIN_CHECK_POINT_VERSION : PLAIN_CHECK_VERSION} · 쌍 ${pairs.length} · 실패 ${bad}${point ? ` · 경고 ${warn}` : ''}`)
   process.exit(bad ? 1 : 0)
 }
