@@ -6732,8 +6732,8 @@ function fmtEok(n){
 function fmtR(n){return (Math.round(n/1000)/10).toLocaleString()+'만원';}
 
 // ── 지역/유형 칩을 데이터에서 동적으로 생성 (행정구역이 바뀌어도 자동 대응) ──
-const SUPABASE_URL='https://khdpjjyspmlqtzperoqg.supabase.co';
-const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtoZHBqanlzcG1scXR6cGVyb3FnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxMTYyNDUsImV4cCI6MjA5NzY5MjI0NX0.XwSOuOk2UJiR8vTnwwqDZayJWOUstzD2DeB1COG4azs';
+const SUPABASE_URL='https://neuaeexdxfkkcvyzsicb.supabase.co';
+const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ldWFlZXhkeGZra2N2eXpzaWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUxNDIxNTIsImV4cCI6MjExMDcxODE1Mn0.2Y7so-QZFDvhLOD-g43GRrvDZJfMxcw9ad6rG27w5TI';
 zfLoadTypeStd();   // 🔵 2026-09-30 — 카드 유형 표준(zfTypeLabel). 목록과 따로 한 번만 받는다.
 zfLoadRentStats();   // 🔵 2026-11-02 — ㎡당 월세 전국 같은 유형 통계(목록 응답 뒤 한 번 · 위 zfRentLineHtml).
 
@@ -13214,7 +13214,7 @@ function zfChkOrgSupply(sel){
 loadRegionsFromSupabase(); // ② 전국 지역 동적 로드 후 buildChipOptions() 호출
 
 // ===== 환경설정 / 이메일 식별 시스템 =====
-const PROFILE_API_URL = "https://khdpjjyspmlqtzperoqg.supabase.co/functions/v1/save-user-profile";
+const PROFILE_API_URL = "https://neuaeexdxfkkcvyzsicb.supabase.co/functions/v1/save-user-profile";
 let currentUser = null; // { email, alert_email, marital, children, ... }
 // 프로필 GET 성공 여부. currentUser의 truthy 여부와 별개로 관리한다 —
 // 조회 실패 시 currentUser에 최소 객체를 채우는데, 그 상태로 POST하면
@@ -14063,7 +14063,7 @@ async function onSettingChange(patch){
 // 🔴 되돌릴 수 없는 일이라 두 단계를 둔다 — 버튼 한 번으로는 지워지지 않는다.
 // 🔴 EF(delete-account)가 토큰의 sub 만 보고 지운다. 여기서 사용자 id 를 보내지 않는다 —
 //    보내면 「프론트가 준 id 를 지우는」 경로가 있는 것처럼 보여 다음 사람이 그걸 쓰게 된다.
-const DELETE_ACCOUNT_API_URL = "https://khdpjjyspmlqtzperoqg.supabase.co/functions/v1/delete-account";
+const DELETE_ACCOUNT_API_URL = "https://neuaeexdxfkkcvyzsicb.supabase.co/functions/v1/delete-account";
 const ZF_DELETE_FAIL_MSG = '탈퇴 처리에 실패했습니다. 잠시 후 다시 시도해 주시고, 계속 실패하면 설정 · 개인정보 처리방침의 연락처로 알려 주세요.';
 
 function zfDeleteMsg(text, tone){
