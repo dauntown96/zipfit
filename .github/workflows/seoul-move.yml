@@ -138,7 +138,7 @@ jobs:
             -Atc "select string_agg(extname||' '||extversion, ' · ' order by extname) from pg_extension"
           set +e
           psql "$NEW" -X -q --single-transaction -v ON_ERROR_STOP=1 \
-            -f "$D/roles.sql" -f "$D/schema.sql" \
+            -f scripts/seoul-move-pre.sql -f "$D/roles.sql" -f "$D/schema.sql" \
             -c 'SET session_replication_role = replica' \
             -f "$D/data.sql" -f "$D/data_auth.sql" > /dev/null 2> "$D/er"
           rc=$?
