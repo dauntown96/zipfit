@@ -62,8 +62,10 @@ export function grains(text) {
   //    공백 둔 「/」는 표 칸 구분자라 날짜로 읽지 않는다(…21061 · …21067 모집대상 주택 표 거짓 걸림). 「.」·「-」는 종전대로 공백 무시.
   take(/\d{2,4}(?:\s*[.\-]\s*|\/)\d{1,2}(?:\s*[.\-]\s*|\/)\d{1,2}\.?/g, '날짜', (m) => m.replace(/\s+/g, '').replace(/\.$/, '').replace(/[-/]/g, '.').split('.').map((x) => String(+x)).join('.'))
   take(/\d{1,2}\s*:\s*\d{2}/g, '시각', (m) => m.replace(/\s+/g, '').replace(/^0(?=\d)/, ''))
-  take(/\d[\d,]*(?:\.\d+)?\s*%/g, '%', (m) => m.replace(/[\s,]/g, ''))
-  take(/\d[\d,]*(?:\.\d+)?/g, '수', (m) => m.replace(/,/g, ''))
+  // 🔵 2026-11-20(요점 소급 4회차 0장 1) — 쉼표는 뒤가 꼭 세 자리 숫자일 때만 천 단위 자리표다. 「제1,2순위」의 「1,2」는
+  //    수 1 · 2 두 낱알(종전 「12」 한 수로 읽어 거짓 걸림). 「3,973,800」·「1,234」는 그대로 한 수.
+  take(/\d+(?:,\d{3}(?!\d))*(?:\.\d+)?\s*%/g, '%', (m) => m.replace(/[\s,]/g, ''))
+  take(/\d+(?:,\d{3}(?!\d))*(?:\.\d+)?/g, '수', (m) => m.replace(/,/g, ''))
   for (const w of COND_WORDS) for (const _ of norm(text).matchAll(condRe(w))) out.push(`조건어:${w}`)
   return out
 }

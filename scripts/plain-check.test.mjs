@@ -131,4 +131,12 @@ ok(JSON.stringify(grains('1,000만 원 · 2026-11-09 · 10:00 · 30 %')) === JSO
 ok(hasSubject('신청자는 서류를 냅니다.') && !hasSubject('신청서 제출 시 신분증 지참.') && !hasSubject('해당하는 경우 또는 필요한 때 제출.'), '주어 근사(「또는」·「하는」 거름)')
 ok(!checkPlain('', 'x').ok, '빈 원문 → 실패')
 
+// ── 2026-11-20 요점 소급 4회차 0장 1 — 쉼표 뒤가 세 자리가 아니면 천 단위로 묶지 않음
+const nums = (s) => JSON.stringify(grains(s).filter((g) => g.startsWith('수')))
+ok(nums('제1,2순위') === JSON.stringify(['수:1', '수:2']), '「1,2순위」 → 낱알 1 · 2')
+ok(nums('3,973,800원') === JSON.stringify(['수:3973800']), '「3,973,800」 한 수')
+ok(nums('1,234명') === JSON.stringify(['수:1234']), '「1,234」 한 수')
+ok(nums('1,2345') === JSON.stringify(['수:1', '수:2345']), '쉼표 뒤 네 자리는 천 단위 아님')
+ok(checkPlainPoint('제1,2순위 입주자를 선정합니다.', '1순위와 2순위 입주자를 골라요.').ok, '「제1,2순위」 → 「1순위와 2순위」 통과')
+
 process.exit(bad ? 1 : 0)
