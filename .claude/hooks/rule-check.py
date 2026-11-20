@@ -79,20 +79,25 @@ def history_problems(text):
     row_re = re.compile(r'^\|\s*(\d{4}-\d{2}-\d{2})\s*\|')
     rows = [n for n, l in enumerate(text.split('\n'), 1) if row_re.match(l)]
     if rows:
-        return [f'이력 꼴 표 행이 있다(줄 {", ".join(map(str, rows[:5]))}) — 이력은 docs/history.d/YYYY-MM-DD-<가지>.md 새 파일로(원칙 21)']
+        return [f'이력 꼴 표 행이 있다(줄 {", ".join(map(str, rows[:5]))}) — 이력은 docs/history.d/YYYY-MM-DD-HHMM-<가지>.md 새 파일로(원칙 21)']
     return []
 
 
-HIST_NAME = re.compile(r'^(\d{4}-\d{2}-\d{2})-[A-Za-z0-9][A-Za-z0-9._-]*\.md$')
+# 이름 = YYYY-MM-DD-HHMM-<가지>.md(HHMM = KST · 2026-11-20 14장 — 같은 가지 같은 날 두 번째 PR이 같은 이름이 되던 것) ·
+# 옛 꼴 YYYY-MM-DD-<가지>.md 도 받는다(13장~14장 사이에 만든 파일 · 루틴 지시 교체 전 회차 — 고치지 않는다).
+HIST_NAME = re.compile(r'^(\d{4}-\d{2}-\d{2})-(?:(\d{4})-)?[A-Za-z0-9][A-Za-z0-9._-]*\.md$')
 
 
 def history_file_problems(path, text):
-    """docs/history.d/ 파일 하나의 꼴 — 이름 YYYY-MM-DD-<가지>.md · 첫 줄 `# YYYY-MM-DD — <회차>`(이름의 날짜와 같음) · 표 행 0."""
+    """docs/history.d/ 파일 하나의 꼴 — 이름 YYYY-MM-DD-HHMM-<가지>.md(옛 꼴 YYYY-MM-DD-<가지>.md 도 받음) · 첫 줄 `# YYYY-MM-DD — <회차>`(이름의 날짜와 같음) · 표 행 0."""
     name = os.path.basename(path)
     m = HIST_NAME.match(name)
     if not m:
-        return [f'이름이 YYYY-MM-DD-<가지>.md 꼴이 아니다({name})']
+        return [f'이름이 YYYY-MM-DD-HHMM-<가지>.md 꼴이 아니다({name})']
     probs = []
+    hhmm = m.group(2)
+    if hhmm and not (int(hhmm[:2]) <= 23 and int(hhmm[2:]) <= 59):
+        probs.append(f'이름의 시각 {hhmm}이 HHMM(0000~2359)이 아니다')
     lines = text.split('\n')
     first = lines[0] if lines else ''
     if not re.match(r'^# ' + re.escape(m.group(1)) + r' — \S', first):

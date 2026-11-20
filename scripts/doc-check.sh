@@ -50,7 +50,7 @@ if [ -n "${BASE_SHA:-}" ]; then
   fi
   hrows=$(git diff -U0 "$BASE_SHA"..."$head" -- docs/history.md 2>/dev/null | grep -E '^\+\|' | grep -vE '^\+\+\+' || true)
   if [ -n "$hrows" ]; then
-    say "docs/history.md 에 표 행을 더했다 — 이 파일에는 더 쓰지 않는다 · 이력은 docs/history.d/YYYY-MM-DD-<가지>.md 새 파일로(원칙 21)"
+    say "docs/history.md 에 표 행을 더했다 — 이 파일에는 더 쓰지 않는다 · 이력은 docs/history.d/YYYY-MM-DD-HHMM-<가지>.md 새 파일로(원칙 21)"
     fail=1
   fi
   md_files=$(git diff --name-only --diff-filter=AM "$BASE_SHA"..."$head" -- '*.md' 2>/dev/null | while IFS= read -r f; do [ -f "$f" ] && echo "$f"; done)
