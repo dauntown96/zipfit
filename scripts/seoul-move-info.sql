@@ -10,6 +10,8 @@ select pg_get_userbyid(relowner) as owner, count(*) from pg_class c join pg_name
 union all select 'fn:'||pg_get_userbyid(proowner), count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname in ('public','zipfit_ops') group by 1 order by 1;
 \echo '== auth 표에 걸린 우리 트리거(덤프 밖 — 있으면 따로 옮김)'
 select event_object_schema||'.'||event_object_table as t, trigger_name from information_schema.triggers where event_object_schema='auth' order by 1,2;
+\echo '== 기본 권한(public) — 옛·새가 같아야 비교 ④가 맞는다(supabase_admin 줄은 덤프에서 걸러 새 프로젝트 것을 그대로 쓴다)'
+select pg_get_userbyid(d.defaclrole) as role, d.defaclobjtype, d.defaclacl::text from pg_default_acl d left join pg_namespace n on n.oid = d.defaclnamespace where n.nspname = 'public' order by 1,2;
 \echo '== 확장'
 select extname, extversion from pg_extension order by 1;
 \echo '== cron · Vault(6 뒤 대조)'

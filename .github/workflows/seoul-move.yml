@@ -5,6 +5,9 @@
 # mode=dry : 옛 DB 덤프 셋만(새 DB 쓰기 0) — 연결 · 버전 · 권한 · 크기 시험 + 두 DB 사전 조사 + 옛 DB 비교 SQL.
 # mode=run : 옛 cron active 0 확인(아니면 실패) → 덤프 셋 → 새 DB 가 비었는지 확인 → 확장 켬 → 한 트랜잭션 복원
 #            → (따로) pgsodium 루트 키 · Vault 옮김 시도(실패해도 계속 — Vault 7 은 다운님 ⑧) → 비교 SQL 옛 · 새 → 같음/다름.
+# mode=self : 새 DB zipfit_ops.project_self 한 행을 새 ref · 새 anon 키(supabase/public-anon-key.txt — 전환 PR 병합 뒤 main 값)로(요청서 6 첫 줄).
+# mode=cron : 새 DB에 docs/cron-jobs.sql(새 잡은 켜진 채 만들어진다 — EF 배포 뒤에만) → 옛 DB와 jobname · schedule · command md5 대조.
+#   (이 세션의 관리 API 토큰은 새 프로젝트에 403 — 2026-11-20 실측 · 그래서 self · cron 도 이 워크플로가 psql 로 한다)
 # 🔴 출력은 표 이름 · 수 · md5 만. 연결 문자열 · 값 · 덤프 파일은 찍지도 올리지도 않는다(개인정보 표가 덤프에 있다 — 원칙 36).
 #    psql 오류는 「파일:줄 · 오류 첫 줄」만, 괄호 속 값은 가린다(COPY 데이터 줄 · 키 값이 로그로 새지 않게).
 # 쓰는 비밀값: MOVE_OLD_DB_URL · MOVE_NEW_DB_URL(세션 풀러 5432 — 이전 끝나면 다운님이 지운다) · SUPABASE_ACCESS_TOKEN(pgsodium 키만).
@@ -15,9 +18,9 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'dry = 덤프·조사만(새 DB 쓰기 0) · run = 옛 cron 꺼짐 확인 뒤 복원·비교'
+        description: 'dry = 덤프·조사만 · run = 옛 cron 꺼짐 확인 뒤 복원·비교 · self = 새 DB project_self 한 행 · cron = 새 DB에 docs/cron-jobs.sql + 옛과 대조'
         type: choice
-        options: [dry, run]
+        options: [dry, run, self, cron]
         default: dry
 
 permissions:
@@ -91,6 +94,7 @@ jobs:
           [ "$n" = "0" ] || { echo "::error::옛 cron 이 아직 켜져 있다($n) — 요청서 2(옛 cron 32 끔)를 먼저"; exit 1; }
 
       - name: 덤프 셋(roles · schema · data)
+        if: inputs.mode == 'dry' || inputs.mode == 'run'
         run: |
           set -euo pipefail
           D="$RUNNER_TEMP/move"; mkdir -p "$D"; chmod 700 "$D"
@@ -116,6 +120,7 @@ jobs:
           grep -oE '^ALTER DEFAULT PRIVILEGES FOR ROLE [^ ]+' "$D/schema.sql" | sort | uniq -c || true
 
       - name: 비교 SQL — 옛 DB(dry 는 SQL 시험)
+        if: inputs.mode == 'dry' || inputs.mode == 'run'
         run: |
           set -euo pipefail
           psql "$OLD" -X -q -v ON_ERROR_STOP=1 -f scripts/seoul-move-compare.sql > "$RUNNER_TEMP/cmp_old.txt" 2> "$RUNNER_TEMP/ce" || { sed -E 's/=\([^)]*\)/=(…)/g' "$RUNNER_TEMP/ce" | head; exit 1; }
@@ -181,6 +186,36 @@ jobs:
             exit 1
           fi
           echo "### 참고(6 뒤 대조)"; psql "$NEW" -X -q -v ON_ERROR_STOP=0 -c "select (select count(*) from cron.job) cron_jobs, (select count(*) from vault.secrets) vault_secrets" 2>&1 | head -5
+
+      - name: 새 DB project_self(self 만)
+        if: inputs.mode == 'self'
+        run: |
+          set -euo pipefail
+          key=$(tr -d '[:space:]' < supabase/public-anon-key.txt)
+          ref=$(sed -nE 's/^project_id = "([a-z0-9]+)"$/\1/p' supabase/config.toml)
+          [ "$ref" = "$NEW_REF" ] || { echo "::error::main 의 config.toml project_id($ref)가 새 ref 가 아니다 — 전환 PR 병합 뒤에 부른다"; exit 1; }
+          payload=$(python3 -c 'import base64,json,sys; p=sys.argv[1].split(".")[1]; d=json.loads(base64.urlsafe_b64decode(p+"="*(-len(p)%4))); print(d.get("ref"), d.get("role"))' "$key")
+          echo "anon 키 속 = $payload"
+          case "$payload" in "$NEW_REF anon") ;; *) echo "::error::public-anon-key.txt 가 새 프로젝트 anon 키가 아니다"; exit 1;; esac
+          psql "$NEW" -X -q -v ON_ERROR_STOP=1 -v ref="$ref" -v key="$key" <<'SQL'
+          update zipfit_ops.project_self set ref = :'ref', anon_key = :'key', updated_at = now();
+          SQL
+          psql "$NEW" -X -Atc "select count(*) || ' 행 · ref=' || string_agg(ref, ',') || ' · anon 키 길이=' || string_agg(length(anon_key)::text, ',') || ' · ops_project_url=' || public.ops_project_url() from zipfit_ops.project_self"
+
+      - name: 새 DB cron — docs/cron-jobs.sql · 옛과 대조(cron 만)
+        if: inputs.mode == 'cron'
+        run: |
+          set -euo pipefail
+          r=$(psql "$NEW" -X -Atc "select ref from zipfit_ops.project_self")
+          [ "$r" = "$NEW_REF" ] || { echo "::error::새 DB project_self.ref($r)가 새 ref 가 아니다 — self 먼저"; exit 1; }
+          oa=$(psql "$OLD" -X -Atc "select count(*) from cron.job where active")
+          [ "$oa" = "0" ] || { echo "::error::옛 cron active $oa — 두 곳 동시 실행 금지 · 옛 것을 먼저 끈다"; exit 1; }
+          psql "$NEW" -X -q -v ON_ERROR_STOP=1 -f docs/cron-jobs.sql > /dev/null 2> "$RUNNER_TEMP/ec" || { grep ERROR "$RUNNER_TEMP/ec" | cut -c1-200 | head -5; exit 1; }
+          Q="select jobname || ' | ' || schedule || ' | ' || md5(command) from cron.job order by jobname"
+          psql "$OLD" -X -Atc "$Q" > "$RUNNER_TEMP/cron_old.txt"
+          psql "$NEW" -X -Atc "$Q" > "$RUNNER_TEMP/cron_new.txt"
+          echo "옛 $(wc -l < "$RUNNER_TEMP/cron_old.txt")잡 · 새 $(wc -l < "$RUNNER_TEMP/cron_new.txt")잡 · 새 active $(psql "$NEW" -X -Atc 'select count(*) from cron.job where active')"
+          if diff -u "$RUNNER_TEMP/cron_old.txt" "$RUNNER_TEMP/cron_new.txt"; then echo "✅ cron 옛 = 새(이름 · 주기 · 명령 md5)"; else echo "::error::cron 다름 — 새 잡을 끈다"; psql "$NEW" -X -q -c "select cron.alter_job(jobid, active := false) from cron.job" > /dev/null; exit 1; fi
 
       - name: 덤프 지움
         if: always()
