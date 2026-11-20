@@ -1,0 +1,54 @@
+# ⑨ 5장 「검색 키워드 사전」 빈칸 찾기 — 최근 30일 PR 제목 중 사전 사본(docs/routing/dict5-keywords.txt)에 없는 낱말 상위 30
+# (2026-11-20 · 우편함 「조사 — Notion 정리 1회차의 저장소 몫 하나: scripts/dict-gap.mjs」).
+# 🔴 이슈를 열지 않는다 — 결과는 실행 요약(표)과 아티팩트(md·json)뿐. 사전에 넣을지는 ⑨를 고치는 쪽(claude.ai)이 고른다.
+# 언제: 매주 월요일 10:17 KST(01:17 UTC) · 수동 · 이 장치를 고친 PR(시험만).
+# 무엇을 부르나: GitHub API PR 목록(읽기만 · GITHUB_TOKEN) · DB·Notion 호출 0.
+name: Dict gap
+
+on:
+  schedule:
+    - cron: '17 1 * * 1'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'scripts/dict-gap.mjs'
+      - 'scripts/dict-gap.test.mjs'
+      - 'docs/routing/dict5-keywords.txt'
+      - '.github/workflows/dict-gap.yml'
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: dict-gap-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gap:
+    name: 사전 빈칸
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: 시험
+        run: node scripts/dict-gap.test.mjs
+      - name: 최근 30일 PR 제목 대조
+        if: github.event_name != 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node scripts/dict-gap.mjs --days 30 --top 30 --md dict-gap.md --json dict-gap.json
+          cat dict-gap.md >> "$GITHUB_STEP_SUMMARY"
+      - name: 결과 올리기
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v6
+        with:
+          name: dict-gap
+          path: |
+            dict-gap.md
+            dict-gap.json
+          retention-days: 30
