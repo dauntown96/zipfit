@@ -42,5 +42,19 @@ t("가드 칸 바꾸기 거름", bad_plan({"table": "announcement_policies", "gu
 t("같은 행 두 번 거름", bad_plan({"table": "announcement_policies", "rows": [{"id": A, "set": {"x": 1}}, {"id": A, "set": {"x": 2}}]}))
 try: kit.lit({"sql": "drop table x"}, "text"); t("sql 값 거름", False)
 except SystemExit: t("sql 값 거름", True)
+# ── 2026-11-20 요점 소급 6회차 0장 3 — 경고 문지기(⚠범위 줄임 + 사람 확인 표지 scope_checked). plain-check 를 실제로 부른다(DB 없음).
+import subprocess
+SEP = "• 신청자의 직계존속 : 신청자와 세대별 주민등록표상에 함께 등재되어 있는 사람 및 신청자의 분리배우자와 세대별 주민등록표상에 함께 등재되어 있는 사람에 한함"
+pairs = [{"id": A, "raw": SEP, "plain": "직계존속은 함께 등재된 사람에 한해요."},          # 경고
+         {"id": B, "raw": SEP, "plain": "직계존속은 신청자 또는 분리배우자와 함께 등재된 사람에 한해요."}]  # 경고 없음
+f = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8"); json.dump(pairs, f, ensure_ascii=False); f.close()
+out = subprocess.run(["node", os.path.join(here, "plain-check.mjs"), "--point", "--json", f.name], capture_output=True, text=True).stdout
+os.unlink(f.name)
+w = kit.warned_ids(out)
+t("경고 행 뽑기", w == {A})
+t("경고 + 표지 없음 = 멈춤", kit.scope_gate([{"id": A}, {"id": B}], w) == [A])
+t("경고 + 표지 = 통과", kit.scope_gate([{"id": A, "scope_checked": "원문도 한쪽 — 전혼 자녀는 신청자와만"}, {"id": B}], w) == [])
+t("빈 표지는 표지 아님", kit.scope_gate([{"id": A, "scope_checked": "  "}], w) == [A])
+t("경고 없음 = 통과", kit.scope_gate([{"id": B}], w) == [])
 print(f"backfill-kit 시험 {ok}/{ok + bad}")
 sys.exit(1 if bad else 0)

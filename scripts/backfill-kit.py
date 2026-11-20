@@ -10,7 +10,7 @@
 #   diff <공고 A> <공고 B> [--plan-out 계획.json]
 #       틀 diff — 두 공고의 정책 행을 category 로 짝지어 원문(content_raw) md5 가 같음 · 다름 · 한쪽만을 센다.
 #       --plan-out: B 의 행 중 「A 에 원문 md5 가 같은 행이 있고 A 행은 쉽게 쓴 말이 있고 B 행은 비었음」을 복사 계획으로 쓴다(값은 A 그대로 · 검사 판도 A 그대로).
-#   check <계획.json>
+#   check <계획.json>   (⚠범위 줄임 경고 행은 계획 행에 "scope_checked": "<근거>" 표지가 없으면 걸림 — 6회차)
 #       원문 대조 — 계획의 content_plain 을 DB content_raw 와 짝지어 scripts/plain-check.mjs 로 본다
 #       (content_plain_check 가 「plain-check v3 요점」이면 --point · 아니면 v2). 걸린 행 수 > 0 이면 종료 코드 1.
 #   gen <계획.json> --out <폴더>
@@ -303,8 +303,35 @@ def cmd_check(a):
         if p.returncode != 0:
             bad += 1
             print("\n".join("    " + x for x in (p.stdout + p.stderr).strip().splitlines()[:20]))
+        if point:
+            warned = warned_ids(p.stdout)
+            unchecked = scope_gate(grp, warned)
+            if warned:
+                print(f"  ⚠범위 줄임 경고 {len(warned)}행 · 사람 확인 표지(scope_checked) 있음 {len(warned) - len(unchecked)} · 없음 {len(unchecked)}")
+            for i in unchecked:
+                print(f"    ✗ 경고 행에 사람 확인 표지 없음 {i}"); bad += 1
     print("원문 대조 — " + ("통과" if bad == 0 else f"걸림 {bad}"))
     sys.exit(0 if bad == 0 else 1)
+
+
+# 🔵 2026-11-20(요점 소급 6회차 0장 3) — 「또는 범위 줄임」 경고 문지기.
+#    plain-check 가 ⚠범위 줄임(실패 아님)을 낸 행은 계획 행에 사람 확인 표지 "scope_checked": "<원문과 맞춰 본 근거 한 줄>" 이
+#    있어야 check 를 통과한다(set 밖 칸이라 DB 에 쓰이지 않는다). 표지 없이 남으면 걸림 → gen·apply 전에 멈춘다.
+def warned_ids(stdout):
+    """plain-check CLI 출력에서 ⚠범위 줄임 경고가 붙은 행 id 집합."""
+    out, cur = set(), None
+    for line in stdout.splitlines():
+        m = re.match(r"^[✓✗] (?:통과|실패) (\S+)", line)
+        if m:
+            cur = m.group(1); continue
+        if cur and line.strip().startswith("⚠범위 줄임"):
+            out.add(cur)
+    return out
+
+
+def scope_gate(rows, warned):
+    """경고 행 가운데 사람 확인 표지가 없는 행 id(계획 순서)."""
+    return [r["id"] for r in rows if r["id"] in warned and not str(r.get("scope_checked") or "").strip()]
 
 
 def main():
