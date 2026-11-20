@@ -57,12 +57,12 @@
 | 공고 첨부 수신 | Edge Function `fetch-attachment`는 호출자가 준 URL(허용목록 호스트만)의 바이트를 돌려주거나 `mode=upload`로 Google Drive `[임시] <announcement_id>` 폴더에 직접 올린다(폴더는 `mode=ensure_folder`로 먼저 확보해 `folder_id`로 넘긴다 · DB 쓰기 없음). 운반 상한은 기본 6MB이고 `mode=upload&large=resumable`만 200MB이며, 인증은 Vault `cron_secret_v2`의 `x-cron-secret`이다. 🔵 해외 IP를 막는 호스트(`SEOUL_ONLY` — 지금 `www.bmc.busan.kr` 부산도시공사)는 서울 지역(`ap-northeast-2`) 실행에서만 열고, 다른 지역에서 불리면 함수가 `x-region`으로 자신에게 한 번 넘긴다 — 호출하는 쪽은 그대로 부른다(2026-10-12). 상세: ⑩ 「공고 첨부 수신 — fetch-attachment는 무엇을 하고 어떻게 부르나」 |
 | 알림·트리거 | 🔴 **없음 — Make.com은 2026-08-27 미사용 확정**. 검토했고 안 쓰기로 한 것이지 미검토가 아니다(재검토 트리거는 📦 아카이브 「MCP 생태계 보류」에). 알림 경로는 미구현 상태이며 후보는 백로그 「카카오 알림톡」 |
 | 외부 API | LH 분양임대공고 API, 마이홈포털 API, 카카오맵 API |
-| DB | Supabase PostgreSQL (프로젝트 ID: `khdpjjyspmlqtzperoqg`, 싱가포르) |
+| DB | Supabase PostgreSQL (프로젝트 ID: `neuaeexdxfkkcvyzsicb`, 서울 `ap-northeast-2` — 2026-11-20 싱가포르 `khdpjjyspmlqtzperoqg`에서 옮김 · 옛 프로젝트는 일시 중지 뒤 삭제(다운님)) |
 | 인증 | **Supabase Auth** (카카오 OAuth 하나 — 이메일 매직링크 화면·코드는 2026-09-18 걷음(PR #173) · Supabase 이메일 provider는 다운님이 끔(2026-10-11 공개 설정 `external.email=false` 확인) · 옛 이메일 계정 1은 2026-10-12 삭제(고지 회차 3 — provider email 0)). 신원은 JWT(`auth.uid()`), 프로필 API는 `verify_jwt=true`. 이메일+쿠키(`zipfit_email`) 경로는 2026-08-13 **완전 제거**. `user_profiles`는 RLS를 켠 채 정책 0 · `authenticated` 권한 0 — EF 둘(service_role)로만 읽고 쓴다(2026-10-12 고지 회차 3 · 원칙 15) |
 
 ### Supabase 설정
-- **URL**: `https://khdpjjyspmlqtzperoqg.supabase.co`
-- **anon key**: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtoZHBqanlzcG1scXR6cGVyb3FnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxMTYyNDUsImV4cCI6MjA5NzY5MjI0NX0.XwSOuOk2UJiR8vTnwwqDZayJWOUstzD2DeB1COG4azs`
+- **URL**: `https://neuaeexdxfkkcvyzsicb.supabase.co`
+- **anon key**: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ldWFlZXhkeGZra2N2eXpzaWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUxNDIxNTIsImV4cCI6MjExMDcxODE1Mn0.2Y7so-QZFDvhLOD-g43GRrvDZJfMxcw9ad6rG27w5TI`
 - **프로젝트 ref·anon 키 자리**: 저장소 = `supabase/config.toml` `project_id` 한 줄 + `supabase/public-anon-key.txt`(워크플로·점검·스크립트가 읽는다) · DB = `zipfit_ops.project_self` 한 행(`ref` · `anon_key` — `public.ops_project_url()` · `ops_project_anon_key()`로 cron·함수가 읽는다) · 화면 = `index.html`. 이전 날 목록은 `docs/supabase-seoul-move.md` 1-0(2026-11-19)
 - **RPC**: `get_announcements_deduped(p_region, p_type, p_status)` — null 시 전체 반환
 - **인증**: Supabase Auth 세션(localStorage). 쿠키 `zipfit_email`은 2026-08-13 폐지
@@ -74,7 +74,7 @@
 - 🔴 **파이썬 패키지(pdfplumber · pgdumplib · python-hwpx)는 「있다/없다」를 여기 적지 않는다 — 세션 첫 작업 전에 `bash /home/user/zipfit/.claude/hooks/session-setup.sh`를 한 번 돌린다**(버전 고정 · 있으면 몇 초 · 결과는 `/tmp/zipfit-session-setup.log`). 컨테이너마다 달랐다(2026-09-22 pdfplumber 없음 · 2026-10-12 pdfplumber 있음·pgdumplib·python-hwpx 없음). 🔴 저장소 `.claude/settings.json`의 SessionStart 훅은 **두 저장소가 함께 붙은 세션(루틴 포함)에서는 돌지 않는다**(Claude Code 문서 · 2026-10-12 실측 — 우편함 「코드 — Claude Code 장비 정비」) — 그래서 손으로 돌린다. PDF는 `/usr/bin/python3`(3.13 · 2026-10-13 실측)에서 `pdfplumber`로 읽는다 · ⚠️ `cryptography`는 debian 패키지라 `--upgrade`가 `RECORD file not found`로 실패하지만 **그대로 동작한다** — 재시도하지 않는다.
 - 🔴 **`CLAUDE.md`는 Edit 도구로 고친다 — Bash(python·sed 치환)로 고치지 않는다**(2026-10-13 실측 · 우편함 「표시층 — 공고 탭 다듬기」 0장 2): 자동 모드 분류기가 Bash 안의 `CLAUDE.md` 원칙 치환을 [Instruction Poisoning]으로, `.claude/hooks/rule-check.py` 직접 실행을 [Self-Modification]으로 거부했다(지난 회차). 같은 원칙 14 수정을 Edit 도구로 하면 막히지 않았다(작업 디렉터리 안 파일 편집 · `CLAUDE.md`는 보호 경로 아님). `.claude/settings.json` 수정은 Edit 도구여도 보호 경로라 [Self-Modification]으로 거부된다 — 허용 규칙을 넣으려면 다운님 손(GitHub 웹 편집). 문서 검사(`BASE_SHA=$(git merge-base origin/main HEAD) bash scripts/doc-check.sh` — 읽기만 · 그 안에서 `rule-check.py`를 부른다)는 막히면 PR check(`db-migrations.yml` 「문서 검사」)로 본다 — 분류기 판정은 회차마다 다를 수 있다.
 - 🔵 **hwp → hwpx는 `python-hwpx`의 `hwpx.hwp5.package.convert(바이트)` → `to_hwpx_bytes(결과.files)`**(run 182 ② 제안 · claude.ai 채택). ⚠️ 모듈 경로는 `hwp5.package`가 아니라 `hwpx.hwp5.package`다(2026-10-12 실측 · 2026-10-13 같은 `/usr/bin/python3`에서 `convert` 있음 재확인).
-- 🔴 **DB 쓰기의 기본 경로는 관리 API 파일 실행이다**(B51 실측 · B54 판정). ⚠️ **데이터 쓰기(INSERT·UPDATE·DELETE)만이다 — 스키마·함수 변경(DDL)은 원칙 32**(2026-09-30). `POST https://api.supabase.com/v1/projects/khdpjjyspmlqtzperoqg/database/query`에 `{"query": "<SQL>"}`를 싣는다 — SQL을 파일로 쓰고 `python3 -c 'import json,sys; print(json.dumps({"query": open(sys.argv[1], encoding="utf-8").read()}))' f.sql | curl -sS -X POST <엔드포인트> -H 'Content-Type: application/json' --data-binary @-`. 🔴 **`jq -Rs`로 싣지 않는다**(B57 실측 — 168KB 파일에서 한글 5글자가 깨졌다. 입력을 조각으로 읽다 UTF-8 멀티바이트를 가른다. 가드가 잡아 롤백됐다). 🔴 **인증은 프록시가 주입한다** — 토큰 환경변수는 없고 헤더를 붙이지 않는다. 키·토큰 값을 회신·로그·커밋에 찍지 않는다.
+- 🔴 **DB 쓰기의 기본 경로는 관리 API 파일 실행이다**(B51 실측 · B54 판정). ⚠️ **데이터 쓰기(INSERT·UPDATE·DELETE)만이다 — 스키마·함수 변경(DDL)은 원칙 32**(2026-09-30). `POST https://api.supabase.com/v1/projects/neuaeexdxfkkcvyzsicb/database/query`에 `{"query": "<SQL>"}`를 싣는다 — SQL을 파일로 쓰고 `python3 -c 'import json,sys; print(json.dumps({"query": open(sys.argv[1], encoding="utf-8").read()}))' f.sql | curl -sS -X POST <엔드포인트> -H 'Content-Type: application/json' --data-binary @-`. 🔴 **`jq -Rs`로 싣지 않는다**(B57 실측 — 168KB 파일에서 한글 5글자가 깨졌다. 입력을 조각으로 읽다 UTF-8 멀티바이트를 가른다. 가드가 잡아 롤백됐다). 🔴 **인증은 프록시가 주입한다** — 토큰 환경변수는 없고 헤더를 붙이지 않는다. 키·토큰 값을 회신·로그·커밋에 찍지 않는다.
   - 요청 하나 = 트랜잭션 하나(명시 `BEGIN`/`COMMIT`도 된다) · `DO` 가드가 예외를 던지면 **HTTP 400으로 요청 전체가 롤백**된다 · 성공은 201 · **마지막 문장의 결과만** 돌아온다 · 1,025,039B 페이로드 통과 · `statement_timeout` 2분.
   - 🔴 **응답은 약 30초에 프록시 502(`upstream request failed`)로 끊길 수 있다**(2026-10-07 실측 3회 · 30.4~30.6초 — `statement_timeout` 2분보다 먼저). 끊겨도 서버의 트랜잭션은 커밋됐을 수 있다 — **커밋 여부는 기록 표·행 수로 따로 확인**한다. 긴 쓰기는 트랜잭션 안 검증을 줄여 30초 안에 두고, 전수 대조는 커밋 뒤 읽기로 한다. 롤백 전용 시험 파일을 잘라 쓸 때는 끝 예외(`raise exception 'RESULT …'`)를 함께 남긴다(같은 날 시험 파일의 「시험 전용 스위치 끄기」 한 줄이 커밋된 사고).
   - **롤백 전용 시험**: `DO` 블록 안에서 쓰고 읽은 값을 `raise exception 'RESULT …'`로 내보내면 결과는 400 메시지로 보이고 쓰기는 남지 않는다(B53 트리거 시험). 🔴 **되돌리기 전용 시험의 시간 상한은 요청 첫 문장 `set statement_timeout = '…';`으로 건다 — `DO` 안에서 걸지 않는다**(이미 시작된 문장에 먹지 않는다 · 2026-10-28 DB 묶음 회차 부하 시험이 서버에서 약 40초 돌았다).
@@ -376,5 +376,5 @@ const requireEnv = (key: string): string => {
 |---|---|
 | 배포 | https://kkokzip.com |
 | GitHub | https://github.com/dauntown96/zipfit |
-| Supabase | https://supabase.com/dashboard/project/khdpjjyspmlqtzperoqg |
+| Supabase | https://supabase.com/dashboard/project/neuaeexdxfkkcvyzsicb |
 | 노션 시작점 | 🏠 L0 — https://www.notion.so/3b48aaa7e15581f88981d0c636de780c |
