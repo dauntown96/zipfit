@@ -4577,7 +4577,12 @@ function zfLoadTierTags(){
   zfTierTagsP = Promise.all([
     get('eligibility_criteria?select=announcement_id,supply_form,age_min,age_max,gk:verification_requirements->공급대상&limit=10000'),
     get('housing_units?select=announcement_id,supply_target&supply_target=not.is.null&limit=10000'),
-  ]).then(([ec, hu]) => {
+    // 🔵 2026-11-20(같은 회차 판정 ③ · 다운님 「걸러 받는 요청 하나」) — 갈래 조건에 계층_중_하나가 있는 자격 행만 원문 칸 전체(약 10KB). supply_form 에 계층 낱말이 없는 행(SH …313268 「홀몸어르신」)의
+    //    원문 조건 한 줄 재료 — 같은 요청에 칸을 더하면 전 행이 실려 약 14배가 된다. 실패해도 나머지는 그대로(그 한 줄만 안 선다).
+    get('eligibility_criteria?select=announcement_id,supply_form,vr:verification_requirements&verification_requirements->공급대상->갈래=cs.' + encodeURIComponent('[{"조건":{"계층_중_하나":[]}}]') + '&limit=10000').catch(() => []),
+  ]).then(([ec, hu, vt]) => {
+    const vrByRow = new Map();
+    (vt || []).forEach(r => { if(r && r.announcement_id && r.vr && typeof r.vr === 'object') vrByRow.set(String(r.announcement_id) + '\u0001' + String(r.supply_form || ''), r.vr); });
     const textById = new Map();
     const add = (id, t) => { if(!id || !t) return; id = String(id); textById.set(id, (textById.get(id) || '') + ' ' + t); };
     // 🔵 2026-11-19(우편함 「표시층 — 계층 칩 … 누구나 묶음」 1) — 같은 자격 행에서 「누구나형」 재료(행 수 · 공급대상 키 갈래 · 나이 칸 · supply_form)를 함께 모은다(재질의 0 · 같은 요청에 칸 둘).
@@ -4598,7 +4603,16 @@ function zfLoadTierTags(){
         br.forEach(b => {
           const c = b['조건'] || {}, f = String(r.supply_form || '');
           if(Number(c['미성년자녀_최소']) >= 2){ const m = String((g && g['원문']) || '').match(/\d+명 이상의 직계비속.*?을 양육하는 가구/); if(m) e.cond.push(m[0]); }
-          else if(Array.isArray(c['계층_중_하나']) && c['계층_중_하나'].some(k => f.includes(String(k).replace(/가구$/, '')))) e.cond.push(f);   // supply_form 에 그 낱말이 없으면 한 줄을 두지 않는다(키 값을 원문처럼 쓰지 않음)
+          else if(Array.isArray(c['계층_중_하나']) && c['계층_중_하나'].length){
+            const ws = c['계층_중_하나'].map(k => String(k).replace(/가구$/, '')).filter(Boolean);
+            if(ws.some(w => f.includes(w))) e.cond.push(f);
+            else {
+              // supply_form 에 그 낱말이 없으면 같은 행 원문 칸의 머리(키 이름 — 공고문 항목 제목 그대로) 중 그 낱말이 든 것 하나를 원문 그대로 쓴다(앞 번호 「①」만 뗌) · 없으면 두지 않는다(키 값을 원문처럼 쓰지 않음).
+              const vr = vrByRow.get(id + '\u0001' + f);
+              const hk = vr ? Object.keys(vr).find(k => k !== '공급대상' && ws.some(w => k.includes(w))) : null;
+              if(hk) e.cond.push(hk.replace(/^[①-⑳\s]+/, '').trim());
+            }
+          }
         });
       }
       ecById.set(id, e);
