@@ -34,4 +34,10 @@ select table_schema, table_name, string_agg(privilege_type, ',' order by privile
  where grantee='anon' and table_schema in ('public','zipfit_ops') group by 1,2 order by 1,2;
 \echo '== ④ 정책·함수 권한 묶음 md5'
 select (select md5(coalesce(string_agg(schemaname||'.'||tablename||'|'||policyname||'|'||cmd||'|'||array_to_string(roles,',')||'|'||coalesce(qual,'')||'|'||coalesce(with_check,''), E'\n' order by schemaname, tablename, policyname),'')) from pg_policies where schemaname in ('public','zipfit_ops')) as policies_md5,
-       (select md5(coalesce(string_agg(n.nspname||'.'||p.proname||'('||pg_get_function_identity_arguments(p.oid)||')|'||coalesce(p.proacl::text,'')||'|'||p.prosecdef, E'\n' order by 1),'')) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname in ('public','zipfit_ops')) as func_acl_md5;
+       -- 함수 권한은 순서 무관(2026-11-20 run 3 — proacl::text 배열 순서만 달라 옛≠새로 나왔다 · claude.ai 순서 무관 대조 옛=새 ddec44bc… · 75개)
+       (select md5(coalesce(string_agg(x, E'\n' order by x),'')) from (
+          select n.nspname||'.'||p.proname||'('||pg_get_function_identity_arguments(p.oid)||')|'||p.prosecdef||'|'||
+                 coalesce(case when a.grantee = 0 then 'PUBLIC' else pg_get_userbyid(a.grantee) end,'-')||'|'||coalesce(a.privilege_type,'-')||'|'||coalesce(a.is_grantable::text,'-') as x
+            from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+            left join lateral aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a on true
+           where n.nspname in ('public','zipfit_ops')) s) as func_acl_md5;

@@ -8,6 +8,8 @@
 # mode=self : 새 DB zipfit_ops.project_self 한 행을 새 ref · 새 anon 키(supabase/public-anon-key.txt — 전환 PR 병합 뒤 main 값)로(요청서 6 첫 줄).
 # mode=cron : 새 DB에 docs/cron-jobs.sql(새 잡은 켜진 채 만들어진다 — EF 배포 뒤에만) → 옛 DB와 jobname · schedule · command md5 대조.
 #   (이 세션의 관리 API 토큰은 새 프로젝트에 403 — 2026-11-20 실측 · 그래서 self · cron 도 이 워크플로가 psql 로 한다)
+# mode=wipe : 새 DB 우리 객체만 비운다(scripts/seoul-move-wipe.sql · 한 트랜잭션) — 가드: 새 DB project_self.ref ≠ 새 ref(전환 전) ∧ 새 DB cron 잡 0.
+# mode=verify : 비교 SQL 옛 · 새 diff 만(두 DB 쓰기 0).
 # 🔴 출력은 표 이름 · 수 · md5 만. 연결 문자열 · 값 · 덤프 파일은 찍지도 올리지도 않는다(개인정보 표가 덤프에 있다 — 원칙 36).
 #    psql 오류는 「파일:줄 · 오류 첫 줄」만, 괄호 속 값은 가린다(COPY 데이터 줄 · 키 값이 로그로 새지 않게).
 # 쓰는 비밀값: MOVE_OLD_DB_URL · MOVE_NEW_DB_URL(세션 풀러 5432 — 이전 끝나면 다운님이 지운다) · SUPABASE_ACCESS_TOKEN(pgsodium 키만).
@@ -18,9 +20,9 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'dry = 덤프·조사만 · run = 옛 cron 꺼짐 확인 뒤 복원·비교 · self = 새 DB project_self 한 행 · cron = 새 DB에 docs/cron-jobs.sql + 옛과 대조'
+        description: 'dry = 덤프·조사만 · run = 옛 cron 꺼짐 확인 뒤 복원·비교 · self = 새 DB project_self 한 행 · cron = 새 DB에 docs/cron-jobs.sql + 옛과 대조 · wipe = 새 DB 우리 객체 비움(전환 전만) · verify = 비교 SQL 옛·새(쓰기 0)'
         type: choice
-        options: [dry, run, self, cron]
+        options: [dry, run, self, cron, wipe, verify]
         default: dry
 
 permissions:
@@ -217,6 +219,32 @@ jobs:
           echo "옛 $(wc -l < "$RUNNER_TEMP/cron_old.txt")잡 · 새 $(wc -l < "$RUNNER_TEMP/cron_new.txt")잡 · 새 active $(psql "$NEW" -X -Atc 'select count(*) from cron.job where active')"
           if diff -u "$RUNNER_TEMP/cron_old.txt" "$RUNNER_TEMP/cron_new.txt"; then echo "✅ cron 옛 = 새(이름 · 주기 · 명령 md5)"; else echo "::error::cron 다름 — 새 잡을 끈다"; psql "$NEW" -X -q -c "select cron.alter_job(jobid, active := false) from cron.job" > /dev/null; exit 1; fi
 
+      - name: 새 DB 비우기(wipe 만 · 전환 전만)
+        if: inputs.mode == 'wipe'
+        run: |
+          set -euo pipefail
+          has=$(psql "$NEW" -X -Atc "select to_regclass('zipfit_ops.project_self') is not null")
+          if [ "$has" = "t" ]; then
+            r=$(psql "$NEW" -X -Atc "select coalesce(string_agg(ref, ','), '') from zipfit_ops.project_self")
+            echo "새 DB project_self.ref = $r"
+            [ "$r" != "$NEW_REF" ] || { echo "::error::새 DB 가 이미 전환됐다(project_self.ref = 새 ref) — 비우지 않는다"; exit 1; }
+          fi
+          c=$(psql "$NEW" -X -Atc "select case when to_regclass('cron.job') is null then 0 else (select count(*) from cron.job) end")
+          echo "새 DB cron 잡 = $c"
+          [ "$c" = "0" ] || { echo "::error::새 DB 에 cron 잡이 있다($c) — 비우지 않는다"; exit 1; }
+          psql "$NEW" -X -q --single-transaction -v ON_ERROR_STOP=1 -f scripts/seoul-move-wipe.sql > /dev/null 2> "$RUNNER_TEMP/ew" \
+            || { echo "::error::wipe 실패 — 한 트랜잭션이라 남은 변경 0"; grep ERROR "$RUNNER_TEMP/ew" | sed -E 's/=\([^)]*\)/=(…)/g' | cut -c1-300 | head -5; exit 1; }
+          psql "$NEW" -X -Atc "select 'public·zipfit_ops 객체 = ' || (select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname in ('public','zipfit_ops')) || ' · public 함수 = ' || (select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public') || ' · zipfit_ops 스키마 = ' || (select count(*) from pg_namespace where nspname='zipfit_ops') || ' · auth.users = ' || (select count(*) from auth.users) || ' · auth.identities = ' || (select count(*) from auth.identities)"
+
+      - name: 비교 SQL 옛 · 새(verify 만 · 쓰기 0)
+        if: inputs.mode == 'verify'
+        run: |
+          set -euo pipefail
+          psql "$OLD" -X -q -v ON_ERROR_STOP=1 -f scripts/seoul-move-compare.sql > "$RUNNER_TEMP/v_old.txt"
+          psql "$NEW" -X -q -v ON_ERROR_STOP=1 -f scripts/seoul-move-compare.sql > "$RUNNER_TEMP/v_new.txt"
+          if diff -u "$RUNNER_TEMP/v_old.txt" "$RUNNER_TEMP/v_new.txt"; then echo "✅ 옛 = 새"; else echo "(위가 다른 줄 — verify 는 판정만 · 실패로 끝내지 않는다)"; fi
+          grep -A3 '정책·함수 권한' "$RUNNER_TEMP/v_new.txt" || true
+
       - name: 덤프 지움
         if: always()
-        run: rm -rf "$RUNNER_TEMP/move" "$RUNNER_TEMP"/cmp_* || true
+        run: rm -rf "$RUNNER_TEMP/move" "$RUNNER_TEMP"/cmp_* "$RUNNER_TEMP"/v_* || true
