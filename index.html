@@ -438,8 +438,8 @@ body.theme-dark .hu-x-chip{background:#1f2229;border-color:#2c2f38;color:var(--i
 .hu-group-body .hu-row{background:#fafaf6}
 /* 🔵 주택형 묶음 — 원문 주택형(unit_group)이 있는 행만 묶는다. 표가 아니라 목록이다:
    360px 폭에서 「계층·면적·보증금·월임대료」를 표로 두면 가로로 넘친다(직전 협의).
-   머리줄은 접을 수 있고 기본은 펼침 — 이 목록은 이미 「세대별 정보」와 「건물」 두 겹 안에 있어
-   세 번째 겹까지 접으면 금액을 보는 데 세 번을 눌러야 한다. */
+   🔵 5단계 시안 — 묶음이 하나면 펼친 채 · 둘 이상이면 모두 접음(행 하나뿐인 묶음도). 접힌 머리 둘째 줄(.hu-ug-range)에
+   원문 값 범위(보증금 · 월)와 계층 수를 둬 펼치지 않고도 묶음끼리 견준다(renderHousingUnitList · zfUgRangeText). */
 .hu-ug{border:1px solid #e8e8e0;border-radius:var(--r-s);overflow:hidden;background:#fff}
 .hu-ug>.hu-ug-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:4px 8px;background:#f8f8f8;padding:8px 10px;font-size:12px}
 .hu-ug>summary{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:4px 8px;background:#f8f8f8;padding:8px 10px;cursor:pointer;font-size:12px;list-style:none}
@@ -453,6 +453,8 @@ body.theme-dark .hu-x-chip{background:#1f2229;border-color:#2c2f38;color:var(--i
       flex-grow 는 1 로 둔다 — 0 으로 두면 justify-content:space-between 이 이름을 오른쪽으로 민다. */
 .hu-ug-name{font-weight:700;color:#333;flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hu-ug-meta{color:#888;font-size:var(--t-xs);white-space:nowrap;flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.hu-ug-range{flex:1 0 100%;font-size:var(--t-xs);color:var(--ink-2,#555);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.hu-ug[open]>summary .hu-ug-range{display:none}
 .hu-ug-list{display:flex;flex-direction:column;gap:8px;padding:8px}
 .hu-ug-row{border-bottom:1px dashed #eee;padding-bottom:8px}
 .hu-ug-row:last-child{border-bottom:0;padding-bottom:0}
@@ -1333,10 +1335,11 @@ html.zf12 .zf12-card .detail-grid .zf-dcell-apply:not(:has(.zf-win-other)){displ
 /* 1280 목록형 C — 왼쪽 ①②③ · 오른쪽 ④ 얼마 · ⑤ 언제(상세는 오른쪽 패널 그대로) */
 @media (min-width:1200px){
   html.zf12 #notice-list .zf12-card{display:grid;grid-template-columns:minmax(0,1fr) 350px;column-gap:20px;align-items:start}
-  html.zf12 #notice-list .zf12-card > .zf3-ctop{grid-column:1;grid-row:1}
+  /* 🔵 5단계 시안(4단계 판정 「1280 ① 줄 두 칸 걸침 변형」) — ① 줄이 카드 두 칸에 걸친다(알약이 오른쪽 위 끝 · 왼쪽 칸에서 꺾이던 배지가 한 줄로) · 얼마 칸은 한 줄 아래로 */
+  html.zf12 #notice-list .zf12-card > .zf3-ctop{grid-column:1 / -1;grid-row:1}
   html.zf12 #notice-list .zf12-card > .htop{grid-column:1;grid-row:2}
   html.zf12 #notice-list .zf12-card > .haddr,html.zf12 #notice-list .zf12-card > .zf12-who{grid-column:1;grid-row:3}
-  html.zf12 #notice-list .zf12-card > [data-sum-for]{grid-column:2;grid-row:1 / span 2;align-self:end}
+  html.zf12 #notice-list .zf12-card > [data-sum-for]{grid-column:2;grid-row:2;align-self:start}
   html.zf12 #notice-list .zf12-card > .zf12-when{grid-column:2;grid-row:3;margin:6px 0 10px}
   html.zf12 #notice-list .zf12-card > [id^="ncard-"]{grid-column:1 / -1}
 }
@@ -1491,6 +1494,10 @@ html.zf12 .zf13-more > div > .policy-wrap:first-child{margin-top:0}
 .zf13-anyone-s{font-size:var(--t-sub);color:var(--ink-2)}
 html.zf12 .zf13-tcond{margin:0 0 8px;font-size:var(--t-sub);color:var(--ink-2);line-height:1.45}
 html.zf12 .zf13-tcond-k{font-weight:700;color:var(--ink);margin-right:4px}
+/* 5단계 시안 — 필터 시트 안 「공고 유형」 칸: 목록 위 유형 바로가기 줄이 서 있으면 칩을 숨기고 한 줄 안내(칩은 DOM에 남는다 — 바로가기가 그 칩을 누른다 · 필터 개수 배지·✕ 그대로) */
+.zf13-type-note{display:none;margin:0;font-size:var(--t-s);color:var(--ink-2)}
+html.zf12:has(.zf3-tq [data-act="type"]) #noticeFilterPanel .field:has(> #noticeTypeChips) > :is(.label, #noticeTypeChips){display:none}
+html.zf12:has(.zf3-tq [data-act="type"]) #noticeFilterPanel .zf13-type-note{display:block}
 /* 4단계 덧 3·4 — ① 줄 두 칸: 왼쪽(유형 · 지역 · 배지 — 칸 안에서 줄바꿈) · 오른쪽(접수 상태 알약 — 늘 오른쪽 위) */
 html.zf12 .zf12-card .zf3-ctop:has(> .zf13-cl){display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;column-gap:8px}
 html.zf12 .zf3-ctop .zf3-dpill.zf13-wait{background:var(--paper);border-color:var(--ink);color:var(--ink)}   /* 기준 위반 고침 2 — 끝 시각 지난 차수 알약: 대기(검은 바탕 걷음) */
@@ -1784,6 +1791,7 @@ html.zf12 .zf13-mok-s{margin:0 0 10px;font-size:var(--t-sub);color:var(--ink-2);
       <div class="field">
         <label class="label">공고 유형</label>
         <div class="chip-group" id="noticeTypeChips"></div>
+        <p class="zf13-type-note">유형은 목록 위 바로가기에서 골라요</p>
       </div>
       <div class="field">
         <label class="label">지역</label>
@@ -12092,7 +12100,23 @@ function renderHousingUnitList(units){
   if(!Array.isArray(units) || units.length === 0) return '';
   const b = buildHousingUnitList(units);
   if(b.groups.length === 0) return b.plain.map(renderHousingUnitRow).join('');
-  return b.groups.map(renderHousingUnitGroup).join('') + b.plain.map(renderHousingUnitRow).join('');
+  // 🔵 5단계 시안(백로그 「디자인 2차」 11-19 ⑤ · 다음 행동) — 묶음이 하나면 펼친 채 · 둘 이상이면 모두 접음(행 하나뿐인 묶음도 접는다 — 꼴 하나로).
+  //    접힌 머리에 원문 값 범위(보증금 · 월)와 계층 수를 둬 접힌 채로도 견준다.
+  const many = b.groups.length > 1;
+  return b.groups.map(g => renderHousingUnitGroup(g, many ? 'fold' : 'open')).join('') + b.plain.map(renderHousingUnitRow).join('');
+}
+// 접힌 묶음 머리의 원문 값 범위 — 기본 임대조건(deposit · monthly_rent)만 · 원 단위 그대로(반올림 0) · 두 번째 조건(…_priority1)은 섞지 않는다(행 줄에 「또는」으로 있다).
+function zfUgRangeText(g){
+  const dep = g.units.map(u => u.deposit).filter(v => v != null).map(Number);
+  const rent = g.units.map(u => u.monthly_rent).filter(v => v != null).map(Number);
+  const rng = (a, f) => { const lo = Math.min(...a), hi = Math.max(...a); return lo === hi ? f(lo) : f(lo) + '~' + f(hi); };
+  const won = v => v.toLocaleString() + '원';
+  const out = [];
+  if(dep.length) out.push('보증금 ' + rng(dep, won));
+  if(rent.length) out.push(rent.every(v => v === 0) ? '월세없음' : '월 ' + rng(rent, won));
+  const tiers = new Set((g.lines || []).map(ln => ln.u && (ln.u.supply_target || ln.u.unit_type) || '').filter(Boolean));
+  if(tiers.size > 1) out.push(`계층 ${tiers.size}`);
+  return out.join(' · ');
 }
 
 // 면적은 **소수 둘째 자리까지** 적는다 — 평면(A1·A2)이 16.74/16.68 처럼 둘째 자리에서만 갈려서
@@ -12153,7 +12177,7 @@ function buildUnitGroupLines(g){
   return lines;
 }
 
-function renderHousingUnitGroup(g){
+function renderHousingUnitGroup(g, mode){
   const lines = g.lines || buildUnitGroupLines(g);
   const allAreas = g.allAreas || [];
   const headAreas = allAreas.length ? ` · 전용 ${allAreas.join('·')}` : '';
@@ -12211,12 +12235,14 @@ function renderHousingUnitGroup(g){
   }).join('');
   // 🔵 2026-11-17(우편함 「표시층 — 작은 판 2」 3) — 행이 하나뿐인 묶음은 접고 펴는 칸 없이 그 행을 바로 보인다(머리 줄은 그대로 · 칩 자리 키도 묶음 키 그대로).
   const head = `<span class="hu-ug-name">${escapeHtml(zfUgHeadLabel(g.group, g.units[0] && g.units[0].building_name))}</span><span class="hu-ug-meta"${headPick ? ` title="${zfAttr('원문: ' + headPick.texts.join(' / '))}"` : ''}>${escapeHtml(headAreas + headCount)}</span>${headWait ? zfWaitReserveHtml(g.units) : ''}${zfUnitChipSlot(zfUnitTypeKey(g.units[0], g.group))}`;
-  if(lines.length === 1) return `<div class="hu-ug hu-ug-one">
+  // 🔵 5단계 시안 — 묶음이 둘 이상인 목록(mode 'fold')에서는 행 하나뿐인 묶음도 접는다 · 묶음이 하나면(mode 'open') 펼친 채.
+  if(lines.length === 1 && mode !== 'fold') return `<div class="hu-ug hu-ug-one">
     <div class="hu-ug-head">${head}</div>
     <div class="hu-ug-list">${body}</div>
   </div>`;
-  return `<details class="hu-ug">
-    <summary><span class="hu-ug-name">${escapeHtml(zfUgHeadLabel(g.group, g.units[0] && g.units[0].building_name))}</span><span class="hu-ug-meta"${headPick ? ` title="${zfAttr('원문: ' + headPick.texts.join(' / '))}"` : ''}>${escapeHtml(headAreas + headCount)}</span>${headWait ? zfWaitReserveHtml(g.units) : ''}${zfUnitChipSlot(zfUnitTypeKey(g.units[0], g.group))}</summary>
+  const rangeTxt = mode === 'fold' ? zfUgRangeText(g) : '';
+  return `<details class="hu-ug"${mode === 'open' ? ' open' : ''}>
+    <summary><span class="hu-ug-name">${escapeHtml(zfUgHeadLabel(g.group, g.units[0] && g.units[0].building_name))}</span><span class="hu-ug-meta"${headPick ? ` title="${zfAttr('원문: ' + headPick.texts.join(' / '))}"` : ''}>${escapeHtml(headAreas + headCount)}</span>${headWait ? zfWaitReserveHtml(g.units) : ''}${zfUnitChipSlot(zfUnitTypeKey(g.units[0], g.group))}${rangeTxt ? `<span class="hu-ug-range">${escapeHtml(rangeTxt)}</span>` : ''}</summary>
     <div class="hu-ug-list">${body}</div>
   </details>`;
 }
@@ -16429,7 +16455,7 @@ function zf12SchedBadge(card, cats){
   const l2 = card.querySelector('.zf12-l2');
   if(l2) l2.insertAdjacentHTML('afterbegin', `<p class="zf12-schedwhy">⚠️ 일정 확인 필요 — 원문에 같은 단계 날짜가 둘 적혀 있어요: ${cats.map(c => escapeHtml(c.replace(/^⚠️\s*/, ''))).join(' · ')} (아래 ⚠️ 행)</p>`);
 }
-// ④ 얼마 — 겉은 「보증금 · 월」 한 줄(조건별이면 「조건별 다름」) · 전용 · 합친 범위 설명 · ㎡당 비교는 2층으로
+// ④ 얼마 — 겉은 「보증금 · 월」 한 줄(조건이 갈리면 「두 조건」·「가·나군별」·「소득 구간별」) · 전용 · 합친 범위 설명 · ㎡당 비교는 2층으로
 function zf12Price(){
   if(!zf12On()) return;
   document.querySelectorAll('.zf12-card [data-sum-for]').forEach(el => {
@@ -16442,7 +16468,9 @@ function zf12Price(){
     if(s.rent_min != null) parts.push((Number(s.rent_min) === 0 && Number(s.rent_max) === 0) ? '월세 없음' : '월 ' + zfPriceRange(s.rent_min, s.rent_max, 10000, 1, '만', true));
     const dual = box.querySelector('.zf-dual-tag'), round = box.querySelector('.zf-round-tag,.zf-sum-round');
     box.dataset.zf12 = '1';
-    box.innerHTML = escapeHtml(parts.join(' · ')) + (dual ? ' <span class="zf12-cond">· 조건별 다름</span>' : '');
+    // 🔵 5단계 시안(백로그 「디자인 2차」 11-19 ③) — 「조건별 다름」 대신 무엇이 갈리는지 짧은 말로(이름표 글자에서만 · 새 판정 0).
+    const dt = dual ? dual.textContent : '', dshort = /가군/.test(dt) ? '가·나군별' : /구간/.test(dt) ? '소득 구간별' : '두 조건';
+    box.innerHTML = escapeHtml(parts.join(' · ')) + (dual ? ` <span class="zf12-cond">· ${dshort}</span>` : '');
     if(round) box.appendChild(round);
     if(l2){
       let sq = l2.querySelector('.zf12-sqm');
