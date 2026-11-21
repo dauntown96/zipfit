@@ -12,7 +12,7 @@
 | 서버 응답(200 · 301 · 302 · 400 · 401 · 403 · 404) | **열림** — 서버까지 닿았다(루트 경로라 404·400도 정상) | — |
 | `000`인데 CONNECT는 200(시간 초과 curl 28 · `Connection reset by peer` curl 56) | 판정 보류 — 터널은 열렸고 서버 쪽이 끊었다 · 한 번 더 부른다(스크립트가 저절로) | 서버·기관 축(해외 IP 차단 · 기관 서버 불안정) |
 | `000`인데 CONNECT는 200 · curl **60**(인증서 검증 실패 — 발급자 없음) · **35**(TLS 핸드셰이크에서 끊김) | 서버 TLS 축 — 허용 목록은 열렸다. 60은 서버가 사슬(중간 인증서)을 빠뜨린 꼴이 흔하다 — `openssl s_client -showcerts`로 사슬 길이를 본다(검증을 끄지 않는다) | 서버 축 — 고치는 길은 EF 쪽 추가 인증서(`supabase/functions/_shared/board-hosts.ts` `extraCaPem` — 광주 선례 2026-10-26) |
-| Postgres(5432 · 풀러·직접 둘 다) — CONNECT는 200인데 첫 신호(SSLRequest)에 10초 응답 0 | 🔴 **프록시가 HTTPS 아닌 통신을 실어 나르지 않는다** — 이 컨테이너에서 `psql`·`pg_dump`로 Supabase DB에 붙을 길이 없다(2026-11-20 서울 이전 ② 실측) · DB 읽기·쓰기는 관리 API(HTTPS) · 덤프·복원은 Actions(`seoul-move.yml` · `zipfit-backup` `backup.yml`) | 환경 축 — 허용 목록에 더해도 풀리지 않는다 |
+| Postgres(5432 · 풀러·직접 둘 다) — CONNECT는 200인데 첫 신호(SSLRequest)에 10초 응답 0 | 🔴 **프록시가 HTTPS 아닌 통신을 실어 나르지 않는다** — 이 컨테이너에서 `psql`·`pg_dump`로 Supabase DB에 붙을 길이 없다(2026-11-20 서울 이전 ② 실측) · DB 읽기·쓰기는 관리 API(HTTPS) · 덤프·복원은 Actions(`zipfit-backup` `backup.yml` · `restore-drill.yml` — 이전용 `seoul-move.yml`은 2026-11-21 걷음) | 환경 축 — 허용 목록에 더해도 풀리지 않는다 |
 
 - ⚠️ 서버가 돌려준 403(`t1.kakaocdn.net` 루트 등)은 **열림**이다 — 허용 목록 403은 언제나 CONNECT 단계에서 나고 `%{http_code}`는 000이다.
 - 🔴 **해외 IP 축은 허용 목록에 넣은 뒤에야 보인다** — 허용 목록이 막는 동안에는 서버까지 가지 않는다. 해외 IP를 막는 기관은 서울 지역 EF(`SEOUL_ONLY` — 부산도시공사 선례)나 claude.ai(다운님 PC)로 돌아간다.
