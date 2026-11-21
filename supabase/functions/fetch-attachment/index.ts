@@ -759,6 +759,34 @@ const deleteDriveFile = async (id: string, token: string, s: DriveSecrets) => {
   await driveFetch(`https://www.googleapis.com/drive/v3/files/${id}`, { method: 'DELETE' }, token, s)
 }
 
+// ───────────────────────── 같은 이름 · 다른 내용 = [정정N] 이름 ─────────────────────────
+// 🔵 2026-11-21(우편함 「코드·운영 — 첫 묶음」 A 3 · ⑧ 판례 「LH 조용한 고침 — 덮지 않고 [정정N]」) — on_dupe=revise(기본):
+//   같은 이름 파일이 있고 내용(sha256 · 없으면 크기)이 다르면 덮지도 버리지도 않고 `[정정N] 원래이름`으로 올린다.
+//   N = 1부터 비어 있는 첫 번호. 이미 있는 [정정k] 가운데 내용이 같은 것이 있으면 새로 올리지 않는다(skipped_identical · 그 파일).
+//   on_dupe=skip 은 종전(conflict — 아무것도 바꾸지 않음) · on_dupe=replace 는 종전(기존 파일 덮음).
+const REVISE_MAX = 20
+const revisedName = (name: string, n: number): string => `[정정${n}] ${name}`.slice(0, 200)
+const sameContent = (f: Record<string, unknown>, sha: string | null, size: number | null): boolean => {
+  const fs = typeof f.sha256Checksum === 'string' ? (f.sha256Checksum as string).toLowerCase() : null
+  if (fs && sha) return fs === sha.toLowerCase()
+  return size !== null && f.size !== undefined && Number(f.size) === size
+}
+// 결과: { hit } = 같은 내용의 [정정k] 가 이미 있음 · { name } = 올릴 이름 · { full } = 번호가 다 참(REVISE_MAX)
+const pickRevised = async (
+  name: string, parent: string, sha: string | null, size: number | null, token: string, s: DriveSecrets,
+): Promise<{ hit?: Record<string, unknown>; name?: string; full?: true }> => {
+  for (let n = 1; n <= REVISE_MAX; n++) {
+    const cand = revisedName(name, n)
+    const f = await findFileInFolder(cand, parent, token, s)
+    if (!f) return { name: cand }
+    if (sameContent(f, sha, size)) return { hit: f }
+  }
+  return { full: true }
+}
+const renameDriveFile = async (id: string, name: string, token: string, s: DriveSecrets): Promise<Record<string, unknown>> =>
+  await driveFetch(`https://www.googleapis.com/drive/v3/files/${id}?fields=${FILE_FIELDS}`,
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) }, token, s)
+
 // ───────────────────────── Drive 안 zip 풀기(mode=unzip_drive) ─────────────────────────
 // 🔵 2026-11-09(우편함 「코드·운영 — fetch-attachment unzip_drive 모드 · 리츠 0000061201 홍보물 5개 …」 1 · #924 회신 3 꼴 · 다운님 결정 길 A).
 //   Drive 에 이미 있는 zip(이 앱이 올린 것 — drive.file 범위라 다른 앱·사람이 올린 파일은 404)을 LH 를 다시 부르지 않고 같은 폴더에 풀어 올린다.
@@ -868,7 +896,8 @@ const safeName = (name: string): string =>
 // 종전 업로드 경로와 응답 모양을 맞춘다(uploaded · drive.{action,…}). 다른 점:
 //   · 원본 sha256을 계산하지 않는다(위 주석) — `sha256`은 null, 비교는 Drive 값으로 한다
 //   · 같은 이름이 있으면 **올린 뒤에** 가린다: 내용이 같으면 새 파일을 지우고 skipped_identical,
-//     다르면 on_dupe=skip은 새 파일을 지우고 conflict(종전처럼 아무것도 바뀌지 않는다),
+//     다르면 on_dupe=revise(기본 · 2026-11-21)는 새 파일 이름을 [정정N] 원래이름으로 바꿔 남기고(같은 내용의 [정정k] 가 있으면 새 것만 지움),
+//     on_dupe=skip은 새 파일을 지우고 conflict(종전처럼 아무것도 바뀌지 않는다),
 //     on_dupe=replace는 처음부터 기존 파일 ID에 PATCH 세션을 연다
 //   · 재는 값: 걸린 시간(LH 수신+Drive 전송) · 청크 수 · 메모리(`Deno.memoryUsage`, 있으면)
 const handleResumable = async (
@@ -940,15 +969,28 @@ const handleResumable = async (
         comparedBy = 'size'
         same = (existing.size === undefined ? null : Number(existing.size)) === uploadedSize
       }
-      // 🔴 방금 올린 것을 지운다 — 같은 이름 두 벌을 폴더에 남기지 않는다.
-      await deleteDriveFile(uploaded.id as string, token, secrets)
-      action = same ? 'skipped_identical' : 'conflict'
-      file = existing
+      if (!same && p.onDupe === 'revise') {
+        // 🔵 2026-11-21 — 다른 내용이면 방금 올린 파일을 [정정N] 이름으로 바꾼다(지우지 않는다). 같은 내용의 [정정k] 가 있으면 새 것만 지운다.
+        const pr = await pickRevised(filename, p.folderId, (uploaded.sha256Checksum as string | undefined) ?? null, uploadedSize, token, secrets)
+        if (pr.name) {
+          file = await renameDriveFile(uploaded.id as string, pr.name, token, secrets)
+          action = 'uploaded_revised'
+        } else {
+          await deleteDriveFile(uploaded.id as string, token, secrets)
+          action = pr.hit ? 'skipped_identical' : 'conflict'
+          file = pr.hit ?? existing
+        }
+      } else {
+        // 🔴 방금 올린 것을 지운다 — 같은 이름 두 벌을 폴더에 남기지 않는다.
+        await deleteDriveFile(uploaded.id as string, token, secrets)
+        action = same ? 'skipped_identical' : 'conflict'
+        file = existing
+      }
     }
     // 🔵 2026-11-03(「잘림·HTML 거름」 1) — 분할 경로는 선언 크기와 보낸 바이트가 다르면 잘린 것이다 — 방금 올린(또는 덮은) 파일을 남기지 않는다.
     //   새로 올린 것만 지운다(replace 는 기존 파일 id 에 덮었으므로 지우지 않고 오류만 — 그 경우 Drive 가 선언 크기와 다른 끝을 거부하는 것이 보통).
     if (declaredLen !== null && Number.isFinite(declaredLen) && declaredLen !== r.sent) {
-      if (action === 'uploaded' && uploaded.id) await deleteDriveFile(uploaded.id as string, token, secrets)   // 같은 이름 갈래에서 이미 지웠으면 다시 안 지움
+      if ((action === 'uploaded' || action === 'uploaded_revised') && uploaded.id) await deleteDriveFile(uploaded.id as string, token, secrets)   // 같은 이름 갈래에서 이미 지웠으면 다시 안 지움
       return finish({ ok: false, uploaded: false, body_included: false, reason: 'truncated', bytes: r.sent,
         detail: `보낸 ${r.sent}B ≠ Content-Length ${declaredLen}B — 받기가 중간에 끊겼다(${action === 'uploaded' ? '방금 올린 파일 지움' : '기존 파일은 그대로 둠'} · 다시 부를 것)` }, 502)
     }
@@ -972,7 +1014,7 @@ const handleResumable = async (
       content_sha256: contentSha,
       bytes: r.sent,
       sha256: null,
-      uploaded: action === 'uploaded' || action === 'replaced',
+      uploaded: action === 'uploaded' || action === 'replaced' || action === 'uploaded_revised',
       body_included: false,
       reason: 'uploaded_via_drive',
       transfer_ms: transferMs,
@@ -1146,7 +1188,8 @@ const handleRequest = async (req: Request): Promise<Response> => {
   const announcementId = reqUrl.searchParams.get('announcement_id')
   const nameOverride = reqUrl.searchParams.get('filename')
   // 같은 이름이 이미 있고 내용이 다를 때만 의미가 있다. 기본은 건드리지 않는 것.
-  const onDupe = reqUrl.searchParams.get('on_dupe') ?? 'skip'
+  // 🔵 2026-11-21 — 기본 revise(다른 내용 = [정정N] 이름으로 올림 · 위 pickRevised). skip = 종전 conflict · replace = 덮음.
+  const onDupe = reqUrl.searchParams.get('on_dupe') ?? 'revise'
   // 🔵 2026-11-03 — 같은 내용 파일 재사용(위 findReusable). 기본 켬 · `reuse=off` 면 종전대로 늘 올린다.
   const reuseOn = reqUrl.searchParams.get('reuse') !== 'off'
   // 🔴 미리 확보해 둔 공고 폴더의 ID. 오면 폴더를 찾지도 만들지도 않는다.
@@ -1356,8 +1399,8 @@ const handleRequest = async (req: Request): Promise<Response> => {
   if (wantUpload && !announcementId) {
     return json({ ok: false, error: 'mode=upload에는 announcement_id가 필요하다' }, 400)
   }
-  if (wantUpload && !['skip', 'replace'].includes(onDupe)) {
-    return json({ ok: false, error: `on_dupe는 skip 또는 replace다: ${onDupe}` }, 400)
+  if (wantUpload && !['skip', 'replace', 'revise'].includes(onDupe)) {
+    return json({ ok: false, error: `on_dupe는 revise · skip · replace 중 하나다: ${onDupe}` }, 400)
   }
   // 형식 검사는 Drive를 부르기 전에 한다. 이상한 값을 질의문에 넣지 않는다.
   if (wantUpload && folderIdParam !== null && !DRIVE_ID_RE.test(folderIdParam)) {
@@ -1635,6 +1678,16 @@ const handleRequest = async (req: Request): Promise<Response> => {
               { name: filename, parent: notice.id, mimeType, bytes, replaceFileId: existing.id as string },
               token, secrets,
             )
+          } else if (onDupe === 'revise') {
+            // 🔵 2026-11-21 — 다른 내용 = [정정N] 이름으로 새로 올린다(기존 파일은 그대로). 같은 내용의 [정정k] 가 있으면 그것을 돌려준다.
+            const pr = await pickRevised(filename, notice.id, srcSha, bytes.length, token, secrets)
+            if (pr.name) {
+              action = 'uploaded_revised'
+              file = await uploadFile({ name: pr.name, parent: notice.id, mimeType, bytes, replaceFileId: null }, token, secrets)
+            } else {
+              action = pr.hit ? 'skipped_identical' : 'conflict'
+              file = pr.hit ?? existing
+            }
           } else {
             // 🔴 같은 이름인데 내용이 다르다. 지우지도 덮지도 않고 알린다.
             action = 'conflict'
@@ -1648,7 +1701,7 @@ const handleRequest = async (req: Request): Promise<Response> => {
         }
 
         const uploadedSize = file.size === undefined ? null : Number(file.size)
-        payload.uploaded = action === 'uploaded' || action === 'replaced'
+        payload.uploaded = action === 'uploaded' || action === 'replaced' || action === 'uploaded_revised'
         payload.drive = {
           action,
           secret_source: secrets.source,

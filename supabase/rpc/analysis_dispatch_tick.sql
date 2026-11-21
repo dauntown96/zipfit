@@ -79,6 +79,14 @@ AS $function$
 --   대기열 키 = 묶음 키 || ' #차수 ' || scope_text 로 올린다(apply_end = 대표 apply_end · note 에 공지 BBS_SN · 주소 · 후보 수).
 --   루틴은 group_key 의 ' #차수 ' 를 보고 신규 분석이 아니라 reverify 스킬 「차수 공지」 갈래로 처리한다(공지 첨부를 다 읽고 ⚠️ 차수 행을 쓴다).
 --   🔴 켜기 칸 analysis_dispatch_config.wave_notice_enabled 가 참일 때만 후보가 생긴다(기본 거짓 — 루틴 v2.15 · reverify v5.3 교체 뒤 켠다).
+-- 🔵 분석 뒤 첨부 변경(2026-11-21 · 우편함 「코드·운영 — 첫 묶음」 A (가)) — #첨부 갈래(다섯째 후보):
+--   attachment_change_candidates() — get_reanalysis_queue() 「분석 뒤 첨부 변경」과 같은 조건 + apply_end ≥ 오늘(KST) — 를
+--   대기열 키 = 묶음 키 || ' #첨부 ' || 마지막 첨부 변경 시각(KST 분)으로 올린다(note 에 seen_at). 같은 공고가 일반·정정본·차수 후보면 그쪽이 먼저다.
+--   루틴은 group_key 의 ' #첨부 ' 를 보고 신규 분석이 아니라 reverify 「첨부 변경」 갈래로 처리한다 — 바뀐 첨부를 받아 sha 를 대조하고
+--   (fileid 만 바뀌고 내용 같으면 attachment_reviewed_at 만 채워 닫는다 · fetch-attachment upload 가 같은 이름·같은 sha 면 skipped_same · 다르면 [정정N] 이름).
+--   🔴 sha 는 DB 에 없다(공고문 첨부의 내용 해시를 적는 표 없음) — 거름은 받은 뒤 루틴이 한다.
+--   🔴 켜기 칸 analysis_dispatch_config.attachment_change_enabled 가 참일 때만 후보가 생긴다(기본 거짓 — reverify 「첨부 변경」 갈래가 선 뒤 켠다).
+--   꺼져 있는 동안 빈틈은 health-ops attachment_review_gap ⚠️ 가 센다.
 --   꺼져 있으면 맞은 공지는 lh_notice_matches 에 쌓이기만 하고 대기열 0 · ⚠️ 차수 행이 쓰이면 대상에서 빠져 waiting 몫은 ② 정리가 dropped 로 옮긴다.
 -- 🔴 LH 첨부 경로 쓰임 가름(2026-11-05 · 우편함 「코드·운영 — LH 첨부 경로(lhFile.do) 사용 중단 …」 「🔴 요청 고침」 2장 · 다운님 결정) — analysis_dispatch_config.lh_file_mode:
 --   'paused' 면 analysis_needs_lh_file(공고, 키) 가 참인 대기 몫(같은 묶음 첨부에 lhFile.do · #차수 몫)은 ready 가 되지 않고, 이미 ready 인 것도 ready_at 을 거둔다 —
@@ -284,17 +292,29 @@ begin
     where cfg.wave_notice_enabled is true and t.due and not t.has_warn and r.apply_end is not null
       and exists (select 1 from public.lh_notice_matches m where m.announcement_id = t.announcement_id and m.scope_text = t.scope_text)
   ),
+  acand as (
+    select r.announcement_id, r.title, r.source, r.housing_type, r.apply_start, r.apply_end, x.group_key as k, x.seen_at
+    from public.attachment_change_candidates() x
+    join reps r on r.announcement_id = x.announcement_id
+    where cfg.attachment_change_enabled is true and r.apply_end is not null
+      and not exists (select 1 from cand c where c.announcement_id = x.announcement_id)
+      and not exists (select 1 from rcand c where c.announcement_id = x.announcement_id)
+      and not exists (select 1 from wcand c where c.announcement_id = x.announcement_id)
+  ),
   allc as (
     select c.announcement_id, c.title, c.source, c.housing_type, c.apply_start,
            coalesce(c.apply_end, date '9999-12-31') as apply_end,
            case when c.apply_end is null then c.k || ' #접수기간 없음 ' || coalesce(c.announcement_date::text, '공고일 없음') else c.k end as k,
-           false as rev, (c.apply_end is null) as noend, false as wave, null::text as wnote
+           false as rev, (c.apply_end is null) as noend, false as wave, null::text as wnote, false as att
     from cand c
     where not exists (select 1 from rcand x where x.announcement_id = c.announcement_id)
     union all
-    select x.announcement_id, x.title, x.source, x.housing_type, x.apply_start, x.apply_end, x.k, true, false, false, null::text from rcand x
+    select x.announcement_id, x.title, x.source, x.housing_type, x.apply_start, x.apply_end, x.k, true, false, false, null::text, false from rcand x
     union all
-    select w.announcement_id, w.title, w.source, w.housing_type, w.apply_start, w.apply_end, w.k, false, false, true, w.wnote from wcand w
+    select w.announcement_id, w.title, w.source, w.housing_type, w.apply_start, w.apply_end, w.k, false, false, true, w.wnote, false from wcand w
+    union all
+    select t.announcement_id, t.title, t.source, t.housing_type, t.apply_start, t.apply_end, t.k, false, false, false,
+           '첨부 변경 ' || to_char(t.seen_at at time zone 'Asia/Seoul', 'YYYY-MM-DD HH24:MI') || ' KST', true from acand t
   ),
   ins as (
     insert into public.analysis_dispatch_queue (group_key, apply_end, announcement_id, title, apply_start, phase, needs_promo, note)
@@ -302,6 +322,7 @@ begin
            case when c.noend then '접수기간 없음' when c.apply_start > (now() at time zone 'Asia/Seoul')::date then '접수 전' else '접수 중' end,
            (c.source = 'LH' and c.housing_type = '주거복지 - 매입임대'),
            case when c.wave then '차수 대상주택 — reverify 스킬 「차수 공지」 갈래 · ' || coalesce(c.wnote, '')
+                when c.att then '분석 뒤 첨부 변경 — reverify 스킬 「첨부 변경」 갈래(sha 대조) · ' || coalesce(c.wnote, '')
                 when c.rev then '정정본 — reverify 스킬 「정정공고」 갈래'
                 when c.noend then '접수기간 없음(SH 목록 모집중) — apply_end 9999-12-31 은 대기열 키 전용 · 접수기간은 원문으로 확정' end
     from allc c
