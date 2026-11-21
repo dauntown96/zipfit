@@ -168,15 +168,35 @@ export function checkPlainPoint(raw, plain) {
 //    4회차 보조 에이전트 초안 15행 · 앞 회차 14행이 낱알·갈래 검사를 모두 통과한 채 이렇게 줄어 있었다.
 const SCOPE_WIDE = [
   { name: '1호 또는 1세대', raw: /1\s*호\s*(?:\(\s*세대\s*\)|또는\s*1\s*세대)/, at: /1\s*호/, keep: /1\s*세대|\(\s*세대\s*\)/ },
-  { name: '분리배우자', raw: /분리\s*배우자\s*(?:와|\(|포함\)?와)/, at: /등재/, keep: /분리\s*배우자/ },
-  { name: '신청자 또는 배우자', raw: /신청자\s*또는\s*(?:신청자의\s*)?배우자[^\n]{0,20}함께\s*등재/, at: /등재/, keep: /배우자/ },
+  { name: '분리배우자', raw: /분리\s*배우자\s*(?:와|\(|포함\)?와)/, at: /등재/, keep: /분리\s*배우자/, who: true },
+  { name: '신청자 또는 배우자', raw: /신청자\s*또는\s*(?:신청자의\s*)?배우자[^\n]{0,20}함께\s*등재/, at: /등재/, keep: /배우자/, who: true },
 ]
+// 🔵 2026-11-21(요점 소급 7회차 0장 1 · 6회차 ⑦1 채택) — 줄 단위로 본다: 좁힘 말 · 자리 말(at)이 **같은 요점 줄**에 있고
+//    그 줄에 넓힘 말(keep)이 없을 때만. 「누구와 함께 등재」 넓힘(분리배우자 · 신청자 또는 배우자)은 하나 더 —
+//    원문에서 넓힘 말이 든 줄(과 그 윗줄)의 대상어(직계존속 · 직계비속 · 형제·자매 · 자녀 · 부양가족)가 그 요점 줄에도 있을 때만.
+//    6회차 오탐 2행(…21062 1e6214f3 · GH_843 1e7910a9)은 다른 대상(자녀)의 줄이 다른 문단 넓힘 말에 걸렸다.
+const SCOPE_WHO = [
+  ['존속', /직계\s*존|존속/],
+  ['비속', /비속/],
+  ['형제·자매', /형제|자매/],
+  ['자녀', /자녀/],
+  ['부양가족', /부양가족/],
+]
+const whoOf = (s) => SCOPE_WHO.filter(([, re]) => re.test(s)).map(([n]) => n)
 export function scopeWarns(raw, plain) {
   const R = norm(raw), P = norm(plain)
-  const narrow = POLARITY['한정'].some((re) => re.test(P))
-  if (!narrow) return []
-  return SCOPE_WIDE.filter((w) => w.raw.test(R) && w.at.test(P) && !w.keep.test(P))
-    .map((w) => ({ kind: '⚠범위 줄임', detail: `원문의 「${w.name}」 넓힘이 요점에 없고 좁힘 말이 있다` }))
+  const rawLines = R.split('\n'), lines = P.split('\n')
+  const out = []
+  for (const w of SCOPE_WIDE) {
+    // 표 칸이 줄로 갈려 대상어가 바로 윗줄(행 머리)에 있는 꼴(…21041 a2691fca)이 있어 윗줄 하나까지 본다
+    const hitLines = rawLines.flatMap((l, i) => (w.raw.test(l) ? [l, rawLines[i - 1] ?? ''] : []))
+    if (!hitLines.length) continue
+    const who = w.who ? new Set(hitLines.flatMap(whoOf)) : null
+    const bad = lines.some((l) => POLARITY['한정'].some((re) => re.test(l)) && w.at.test(l) && !w.keep.test(l)
+      && (!who || whoOf(l).some((n) => who.has(n))))
+    if (bad) out.push({ kind: '⚠범위 줄임', detail: `원문의 「${w.name}」 넓힘이 요점에 없고 좁힘 말이 있다` })
+  }
+  return out
 }
 
 function report(id, r) {
