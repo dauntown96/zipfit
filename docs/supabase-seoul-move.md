@@ -172,3 +172,13 @@ select name from vault.secrets order by name;
 - **서울 ↔ 싱가포르 넘김 비용 ≈ 중앙값 차 63ms**(226 − 163) — 이전 뒤 없어지는 자리.
 - 서울에서 돌며 싱가포르 DB를 읽는 EF 로그는 지난 24시간 0건(`save-user-profile` 4건은 us-east-1) — 「서울 EF ↔ 싱가포르 DB 왕복」 자체는 이미 있는 로그로 잴 수 없다.
 - 그 밖 EF(수집 · 점검)는 모두 ap-southeast-1(싱가포르 DB의 `net.http_post`가 부름) — 이전 뒤에는 서울에서 돈다.
+
+## 7. 끝 상태(2026-11-21 · 우편함 「코드·운영 — 서울 이전 뒷정리 회차」)
+
+- **전환**: 2026-11-20 — 운영 DB = `neuaeexdxfkkcvyzsicb`(`ap-northeast-2`) · 저장소 ref 자리 1-0 셋(`config.toml` · `public-anon-key.txt` · `index.html`) 서울 · PR #1178~#1182 · #1179 `f1ed3f1`. 옛 `khdpjjyspmlqtzperoqg`는 일시 중지 뒤 삭제(다운님 · 11-23 예정).
+- **Vault 설명칸 7**: 복원 때 빈 문자열로 왔다(값은 옮겨짐) → 11-21 옛 DB 글자 그대로 `vault.update_secret` 설명만(비밀 본문 md5 전후 같음 가드) — health-ops `secret_expiry` 가 다시 `expires=` 를 읽는다.
+- **`zipfit_ops.secret_expiry_external`** Supabase 토큰 줄: 11-20 새 토큰 — `basis`에 「만료일 다운님 확인 대기」 · `expires`는 옛 토큰 날짜(2026-12-27) 그대로(다운님 날짜가 오면 고침).
+- **시각 회귀 고정본**: 요청 열쇠가 전체 주소(호스트 포함)라 서울 ref로 다시 매김(85건 · 내용·시각 그대로 · 기준 그림 그대로) — PR #1187 `ea105d0`.
+- **일회용 `seoul-move.yml` 걷음**(11-21). `scripts/seoul-move-*.sql` 넷은 이 문서·이력이 가리키는 기록으로 남긴다(부르는 곳 0). 비교 SQL ③④는 `zipfit-backup` 복원 리허설로 옮겼다(`scripts/drill_origin.py` — 원천 = 덤프를 뜬 DB · 복원본 · `project_ref`와 「`collection_run_log` 덤프 시각 전 행 수」가 다르면 실패).
+- **출구 지역**(서울 DB `net.http_get` · 11-21): bmc 403 · juso 200 · `data.myhome.go.kr` 시간 초과 → `SEOUL_ONLY`·`x-region`·`seoul-api` 넘김은 남긴다(`docs/data-sources.md` 「출구 지역」).
+- **남은 것**: 7′ juso 좌표 켜기(`JUSO_COORD_ENABLED = false` 그대로) · 처리방침 「싱가포르」 두 자리(5장) · 옛 프로젝트 삭제(다운님) · Actions 비밀 `MOVE_OLD_DB_URL`·`MOVE_NEW_DB_URL`(이전용 — 지우기는 다운님 · 저장소 Settings → Secrets).
