@@ -12,6 +12,9 @@ on:
   #    ops_health_dispatch() 로 이 워크플로를 workflow_dispatch 로 부른다(마이그레이션 2026-10-02_05 · Vault github_actions_dispatch_token).
   #    GitHub schedule 은 하루 몇 번만 돌았다(25·55분 설정 · 10-02 08:39Z 뒤 14:5xZ까지 0회) — 그래서 예비로만 2시간마다 40분에 둔다
   #    (pg_cron 경로가 죽었을 때 ops_dispatch 점검이 실패로 알리게 하는 자리).
+  #    🔵 2026-11-21(우편함 「코드·운영 — 둘째 묶음」 A) — 예비는 늦게 뜬다(12:40Z 자리가 12:57Z에 떠 12:55Z 발송 회차와 2분 차로 이어 돎 ·
+  #    run 44906244112 · 44906420669). 그래서 아래 관문(gate)이 schedule 실행만 「40분 안에 workflow_dispatch 회차가 시작됐으면 건너뜀」.
+  #    pg_cron 이 멈춘 날은 dispatch 회차가 없어 예비가 그대로 돈다(보험은 남는다).
   schedule:
     - cron: '40 */2 * * *'
   workflow_dispatch:
@@ -25,13 +28,40 @@ on:
 permissions:
   contents: read
   issues: write
+  actions: read   # 관문이 이 워크플로의 최근 실행을 읽는다
 
 concurrency:
   group: health-ops
   cancel-in-progress: false
 
 jobs:
+  # 🔵 2026-11-21 — 예비 schedule 관문. dispatch·수동 실행은 늘 돈다.
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.g.outputs.run }}
+    steps:
+      - id: g
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -uo pipefail
+          run=true; why=''
+          if [ "$EVENT" = "schedule" ]; then
+            last=$(gh api "repos/${{ github.repository }}/actions/workflows/health-ops.yml/runs?event=workflow_dispatch&per_page=1" --jq '.workflow_runs[0].created_at' 2>/dev/null || true)
+            if [ -n "$last" ] && [ "$last" != "null" ]; then
+              age=$(( $(date -u +%s) - $(date -u -d "$last" +%s) ))
+              if [ "$age" -lt 2400 ]; then run=false; why="workflow_dispatch 회차가 $((age / 60))분 전에 시작됨($last) — 예비 건너뜀"; fi
+            else
+              why='dispatch 회차를 읽지 못함 — 예비 그대로 돎'
+            fi
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+          echo "event=$EVENT → run=$run $why"
   ops:
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
