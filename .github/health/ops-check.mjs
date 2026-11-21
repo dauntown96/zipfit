@@ -224,7 +224,7 @@ try {
   const listOk = (list.status === 200 || list.status === 206) && Array.isArray(list.data) && list.data.length > 0
   add('anon_list', '비로그인 get_announcements_deduped', listOk && list.ms <= 10000 ? 'pass' : 'fail',
     `${list.status} · ${Array.isArray(list.data) ? list.data.length : 0}행 · ${list.ms}ms${list.snippet ? ' · ' + list.snippet : ''}`,
-    '200 · 행 > 0 · 왕복 ≤ 10초(서버 한도 3초는 200 여부로 잰다 — 넘으면 500. 왕복은 러너↔싱가포르 1.9MB라 넉넉히)')
+    '200 · 행 > 0 · 왕복 ≤ 10초(서버 한도 3초는 200 여부로 잰다 — 넘으면 500. 왕복은 GitHub 러너↔서울 DB · 목록 약 2MB라 넉넉히 — 2026-11-20 서울 이전 뒤 문구)')
   // ③-1 REST 상한 — 한 응답 행 수 < 전체 행 수면 화면은 이어 받기(index.html zfListRpc · ?offset=)로 목록 호출을 한 번 더 한다(함수가 한 번 더 돈다).
   //    화면은 맞게 나오므로 ❌ 가 아니라 ⚠️(안 멈춤) — 상한을 올리면(다운님 · Supabase 설정 API 「Max rows」) 다시 한 번 호출로 돌아간다.
   if (listOk) {
@@ -444,6 +444,13 @@ try {
       -- 🔵 2026-10-28(우편함 「코드·운영 — 런칭 뒤 첫 주 DB 쪽 묶음」 2 · 백로그 「첨부를 못 받는 공고는 …」) — 첨부 0 · 미분석 열린 대표.
       --    발송기 후보(analysis_dispatch_tick cand)와 dispatch_orphan 이 같은 「묶음 첨부 > 0」 조건이라, 첨부를 못 받는 호스트의 공고는 어디에도 안 잡힌다.
       --    열린 대표(apply_end ≥ 오늘) ∧ 같은 묶음(링크 키 포함) 첨부 0 ∧ 완료 계열 분석 0 ∧ 접수 시작이 오늘+14일 안(이미 시작 포함 · NULL 은 빼지 않고 센다).
+      -- 🔵 2026-11-21(우편함 「코드·운영 — 첫 묶음」 A (나)) — 분석 뒤 첨부 변경이 있는 열린 공고 중 대기열에 산 행(waiting·sent·claimed)이 없는 것.
+      --    후보 정의는 attachment_change_candidates() 한 곳(발송기 다섯째 후보 acand 와 같다). 켜기 칸(attachment_change_enabled)이 거짓이면 늘 대기열 밖이다.
+      'attachment_review_gap', (select json_build_object(
+           'enabled', (select c.attachment_change_enabled from analysis_dispatch_config c where c.id = 1),
+           'ids', coalesce(json_agg(json_build_object('id', x.announcement_id, 'seen', to_char(x.seen_at at time zone 'Asia/Seoul', 'MM-DD HH24:MI')) order by x.apply_end, x.announcement_id), '[]'::json))
+         from attachment_change_candidates() x
+        where not exists (select 1 from analysis_dispatch_queue q where q.announcement_id = x.announcement_id and q.state in ('waiting', 'sent', 'claimed'))),
       'attach0_unanalyzed', (with lm as (select distinct on (l.linked_announcement_id) l.linked_announcement_id aid, announcement_dedup_key(lh.title) lh_key
              from announcement_post_links l join announcements lh on lh.announcement_id = l.lh_announcement_id
             where lh.title is not null and lh.hidden_from_listing is not true order by l.linked_announcement_id, l.lh_announcement_id),
@@ -605,6 +612,16 @@ try {
     add('dispatch_orphan', '분석할 것이 있는 열린 대표인데 대기열에 없음(발송기 누락)', ids.length === 0 ? 'pass' : 'fail',
       ids.length ? `${ids.length}: ${ids.slice(0, 5).join(', ')}` : 0,
       '0 — 대표 ∧ 들어온·정정된 지 60분 ∧ 묶음 첨부 > 0 ∧ (정정본 분석 없음(apply_end ≥ 오늘) ∨ 같은 회차 완료 분석 없음(apply_end ≥ 오늘+3)) ∧ 대기열 waiting·sent·claimed 행 없음 · 넘으면 ❌(health-ops-soft — 루틴 착수를 막지 않는다)')
+  }
+  // ⑧-2a″ 분석 뒤 첨부 변경 대기열 빈틈(2026-11-21 · 우편함 「코드·운영 — 첫 묶음」 A (나) · 백로그 「분석 뒤 LH가 공고문을 조용히 바꿔도 …」).
+  //    🔴 ⚠️ 경고만이다(이슈를 열지 않는다 · gate.mjs HARD 밖) — 고치는 길이 재확인 회차(루틴 reverify 「첨부 변경」)라 루틴 착수를 막으면 스스로 풀리지 않는다.
+  //    켜기 칸이 거짓인 동안은 생기면 늘 여기 걸린다(그것이 이 줄의 몫 — 발송기가 집지 않는 빈틈을 보이게).
+  {
+    const g = d.attachment_review_gap || { ids: [] }
+    const xs = g.ids || []
+    add('attachment_review_gap', '분석 뒤 첨부 변경 — 열린 공고인데 대기열에 없음', xs.length === 0 ? 'pass' : 'warn',
+      xs.length ? `${xs.length}: ${xs.slice(0, 5).map(x => `${x.id}(변경 ${x.seen} KST)`).join(', ')} · 발송기 #첨부 갈래 ${g.enabled ? '켜짐' : '꺼짐'}` : `0 · 발송기 #첨부 갈래 ${g.enabled ? '켜짐' : '꺼짐'}`,
+      '0 — attachment_change_candidates()(완료 계열 분석 ∧ analyzed_at·attachment_reviewed_at 뒤 첨부 이력 ∧ 첫 채움 아님 ∧ apply_end ≥ 오늘 KST) 중 대기열 waiting·sent·claimed 행 없음 · 넘으면 ⚠️ 경고만(이슈를 열지 않는다 — 재확인 회차 몫)')
   }
   // ⑧-2a′ 첨부 0 · 미분석 열린 대표(2026-10-28 · 우편함 「코드·운영 — 런칭 뒤 첫 주 DB 쪽 묶음」 2) — 발송기·dispatch_orphan 이 둘 다 「묶음 첨부 > 0」을 보아
   //    첨부를 못 받는 호스트(나라키움 kohom · 제천 cbdc — 그 기관의 DB 첫 행)의 공고는 조용히 미분석으로 남았다(화면은 「꼭집 미분석」 표지).
