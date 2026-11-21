@@ -225,6 +225,30 @@ details.pol-item>summary::-webkit-details-marker{display:none}
 details.pol-item>summary::after{content:' ▾';color:#aaa;font-weight:400}
 details.pol-item[open]>summary::after{content:' ▴'}
 details.pol-item>.policy-content{padding:0 12px 10px}
+/* 🔵 2026-11-21(우편함 「표시층 — 쉽게 쓴 말(요점) 화면 켜기」) — 정책 행 요점 층: 요점(content_plain · 줄 = 한 칸) 먼저 · 원문(content_raw)은 바로 아래 접기.
+   글자는 DB 그대로(점은 CSS 표지라 글자가 아니다) · 절 머리 스위치로 끄면 그 공고의 모든 행이 원문만(.pol-plain-off — 저장하지 않는다 · 처리방침 3). */
+.pol-plain-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 10px;margin:0 0 8px;padding:8px 10px;border:1px solid var(--line-2);border-radius:var(--r-s);background:var(--surface)}
+.pol-plain-note{margin:0;flex:1 1 220px;min-width:0;font-size:var(--t-xs);line-height:1.5;color:var(--ink-2)}
+.pol-plain-note b{color:var(--ink);font-weight:700}
+.pol-plain-sw{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;min-height:var(--hit);box-sizing:border-box;padding:0 4px;border:0;background:none;font:inherit;font-size:var(--t-xs);font-weight:600;color:var(--ink);cursor:pointer}
+.pol-plain-sw i{position:relative;width:32px;height:18px;border-radius:var(--r-pill);background:var(--ink);transition:background .15s}
+.pol-plain-sw i::after{content:"";position:absolute;top:2px;left:16px;width:14px;height:14px;border-radius:var(--r-round);background:var(--paper);transition:left .15s}
+.pol-plain-sw[aria-checked="false"] i{background:var(--paper);box-shadow:inset 0 0 0 2px var(--ink-3)}   /* 꺼짐 — 테두리·손잡이 --ink-3(글자 아닌 요소 3:1 · WCAG 1.4.11) */
+.pol-plain-sw[aria-checked="false"] i::after{left:2px;background:var(--ink-3)}
+.pol-plain-sw:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.pol-plain-sw i,.pol-plain-sw i::after{transition:none}}
+.pol-pl{list-style:none;margin:0;padding:0 12px 6px}
+.pol-pl li{position:relative;padding-left:12px;font-size:var(--t-body);line-height:1.55;color:var(--ink);overflow-wrap:anywhere}
+.pol-pl li::before{content:"";position:absolute;left:2px;top:.7em;width:4px;height:4px;border-radius:var(--r-round);background:var(--ink-3)}
+.pol-raw{margin:0 12px 10px;border-top:1px dashed var(--line-2)}
+.pol-raw>summary{list-style:none;cursor:pointer;display:flex;align-items:center;min-height:var(--hit);box-sizing:border-box;font-size:var(--t-xs);font-weight:600;color:var(--ink-2)}
+.pol-raw>summary::-webkit-details-marker{display:none}
+.pol-raw>summary::after{content:' ▾';margin-left:4px;font-weight:400}
+.pol-raw[open]>summary::after{content:' ▴'}
+.pol-raw>.policy-content{padding:0 0 2px}
+.pol-plain-off .pol-pl,.pol-plain-off .pol-raw>summary,.pol-plain-off .pol-plain-note{display:none}
+.pol-plain-off .pol-raw{margin:0;border-top:0}
+.pol-plain-off .pol-raw>.policy-content{padding:0 12px 10px}
 .pol-site{display:inline-block;margin-right:6px;padding:0 6px;border-radius:var(--r-pill);background:#EEF2FA;color:#3D5A99;font-size:var(--t-xs);font-weight:600;vertical-align:1px}
 .pol-empty{font-size:12px;color:#888;padding:6px 2px}
 .pol-xref{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;margin:4px 0 8px;font-size:12px;color:#6B6B63}
@@ -10625,9 +10649,36 @@ function zfPolItemHtml(p, opts){
   const o = opts || {};
   const site = p._zfSite ? `<span class="pol-site">${escapeHtml(p._zfSite)}</span>`
     : (p._zfCommon ? `<span class="pol-site pol-common">공통</span>` : '');
+  // 🔵 2026-11-21 — 요점 층(zfPolPlainOk): 요점 줄을 먼저 · 원문은 바로 아래 접기(「원문 보기」). 끈 상세(.pol-plain-off)에서는 원문 접기가 펼친 채 원문만 보인다.
+  const body = zfPolPlainOk(p)
+    ? `<ul class="pol-pl">${zfPolPlainLines(p.content_plain).map(l => `<li>${escapeHtml(l)}</li>`).join('')}</ul>`
+      + `<details class="pol-raw"${o.rawOpen ? ' open' : ''} onclick="event.stopPropagation()"><summary>원문 보기</summary><div class="policy-content">${escapeHtml(p.content_raw || '')}</div></details>`
+    : `<div class="policy-content">${escapeHtml(p.content_raw || '')}</div>`;
   return `<details class="policy-item pol-item${o.pinned ? ' pol-pinned' : ''}" data-pid="${zfAttr(p.id)}" data-zf-site="${zfAttr(String(p._zfSite || ''))}"${o.open ? ' open data-zf-auto="1"' : ''}>`
-    + `<summary>${site}${escapeHtml(p.category || '')}</summary>`
-    + `<div class="policy-content">${escapeHtml(p.content_raw || '')}</div></details>`;
+    + `<summary>${site}${escapeHtml(p.category || '')}</summary>` + body + `</details>`;
+}
+// 🔵 2026-11-21(우편함 「표시층 — 쉽게 쓴 말(요점) 화면 켜기」 · 다운님 결정 11-21 21:19 목표 = 「요점」) — 요점을 보이는 행:
+//    ⚠️ 행(갈림 · 기관에 확인)이 아니고 · content_plain 이 비지 않았고 · content_plain_check 가 plain-check v3 요점.
+//    🔴 화면은 content_plain 글자를 그대로 그린다 — 줄을 나누기만 하고(빈 줄만 건너뜀) 새로 만들거나 고치지 않는다.
+function zfPolPlainOk(p){
+  return !!p && !/^\s*⚠️/.test(String(p.category || '')) && String(p.content_plain || '').trim() !== ''
+    && /^plain-check v3 요점/.test(String(p.content_plain_check || ''));
+}
+function zfPolPlainLines(s){ return String(s || '').split(/\r?\n/).filter(l => l.trim() !== ''); }
+// 절 머리 스위치 — 끄면 그 공고(상세 하나)의 모든 행이 원문만. 🔴 저장하지 않는다(처리방침 3 「브라우저에 저장되는 정보」 밖) — 그 자리 상태뿐.
+function zfPolPlainToggle(btn){
+  const wrap = btn && btn.closest('.policy-wrap');
+  if(!wrap) return;
+  const on = btn.getAttribute('aria-checked') !== 'true';
+  btn.setAttribute('aria-checked', on ? 'true' : 'false');
+  wrap.classList.toggle('pol-plain-off', !on);
+  const st = zfPolState[btn.dataset.polId || ''];
+  if(st) st.plainOff = !on;
+  zfPolPlainApply(wrap, !on);
+}
+// 끈 상태 — 원문 접기를 펼친 채 둔다(접기 머리는 CSS 로 숨김) · 다시 켜면 접는다.
+function zfPolPlainApply(wrap, off){
+  if(wrap) wrap.querySelectorAll('details.pol-raw').forEach(d => { d.open = !!off; });
 }
 // 🔴 2026-10-01 — 블록 ID 정책 행 머리의 단지 칩. 규약 29로 단지마다 다른 조항은 블록 ID 에, 두 공고문 공통 조항은 대표(LH) ID 에 산다
 //    (대구연호 …0855 — LH 58 · A-2BL 23 · A-3BL 26). 칩이 없으면 어느 단지 조항인지 화면에서 알 수 없었다.
@@ -10671,10 +10722,16 @@ function zfPolicyBodyHtml(rows, cls, id){
   // 한 행의 칩을 칩 순서로 — 첫 칩이 그 행이 사는 묶음이다.
   const chipsOf = p => zfPolClassOf(cls, p, 'user').filter(n => cls && cls.userOrder.has(n))
     .sort((a, b) => cls.userOrder.get(a) - cls.userOrder.get(b));
-  zfPolState[id] = { rest, pinned, chips, chipsOf, pick: null, q: '' };
+  zfPolState[id] = { rest, pinned, chips, chipsOf, pick: null, q: '', plainOff: false };
   // 🔴 2026-09-30(표시층·필터) — 카드 안 아코디언은 처음에 전부 접힌다(다운님 지시). 고정 행(⚠️·정정·모집일정)도
   //    맨 위 자리는 그대로 두고 펼침만 걷었다. 검색 중 맞은 행 펼침·「모두 펼치기」는 사용자 동작이라 그대로다.
-  let html = pinned.map(p => zfPolItemHtml(p, { pinned: true })).join('');
+  let html = '';
+  // 🔵 2026-11-21 — 요점이 있는 행이 하나라도 있으면 절 머리에 표지(다운님 결정 글자 그대로) + 끄기 스위치를 한 번 둔다.
+  if(rows.some(zfPolPlainOk)){
+    html += `<div class="pol-plain-bar"><p class="pol-plain-note"><b>꼭집 요점</b> — 원문에서 중요한 것만 골랐어요 · 숫자·날짜·조건은 원문 그대로 · 전체는 아래 원문</p>`
+      + `<button type="button" class="pol-plain-sw" role="switch" aria-checked="true" data-pol-id="${zfAttr(id)}" onclick="event.stopPropagation();zfPolPlainToggle(this)"><i aria-hidden="true"></i>요점 먼저 보기</button></div>`;
+  }
+  html += pinned.map(p => zfPolItemHtml(p, { pinned: true })).join('');
   if(rows.length >= 10){
     html += `<span class="zf-clr-wrap zf-clr-block"><input type="search" class="pol-search" placeholder="정책 안내에서 찾기" aria-label="정책 안내 검색" data-pol-id="${zfAttr(id)}" oninput="zfPolSearch(this)" onkeydown="zfClearKey(event,this)" onclick="event.stopPropagation()"><button type="button" class="zf-clr" aria-label="검색어 지우기" onmousedown="event.preventDefault()" onclick="zfClearSearch(this,event)">×</button></span>`;
   }
@@ -10696,15 +10753,16 @@ function zfPolListHtml(id){
   const st = zfPolState[id];
   if(!st) return '';
   const q = st.q.trim().toLowerCase();
-  const hit = p => !q || (String(p.category || '') + ' ' + String(p.content_raw || '')).toLowerCase().indexOf(q) !== -1;
+  const hit = p => !q || (String(p.category || '') + ' ' + String(p.content_raw || '') + (zfPolPlainOk(p) && !st.plainOff ? ' ' + String(p.content_plain || '') : '')).toLowerCase().indexOf(q) !== -1;
   const open = !!q;   // 찾는 중이면 맞은 행을 펼쳐 보인다
+  const rawOpen = !!st.plainOff;   // 요점을 끈 상세는 원문 접기를 펼친 채 그린다
   const rows = st.rest.filter(hit);
   // 🔵 2026-10-02 — 맞은 글자가 위 고정 행에만 있으면 「없어요」라고 하지 않는다(고정 행은 펼쳐져 강조돼 있다).
   if(!rows.length) return `<p class="pol-empty">${q ? ((st.pinned || []).some(hit) ? '위 고정 안내에서 찾았어요.' : '찾는 말이 들어간 안내가 없어요.') : ''}</p>`;
   if(st.pick){
     const list = rows.filter(p => st.chipsOf(p).indexOf(st.pick) !== -1);
     return list.length
-      ? `<div class="pol-group-head">${escapeHtml(st.pick)} (${list.length})</div>` + list.map(p => zfPolItemHtml(p, { open })).join('')
+      ? `<div class="pol-group-head">${escapeHtml(st.pick)} (${list.length})</div>` + list.map(p => zfPolItemHtml(p, { open, rawOpen })).join('')
       : `<p class="pol-empty">이 분류에 맞는 안내가 없어요.</p>`;
   }
   let html = '';
@@ -10714,14 +10772,14 @@ function zfPolListHtml(id){
     const list = rows.filter(p => st.chipsOf(p)[0] === n);
     const also = rows.filter(p => st.chipsOf(p).indexOf(n) > 0);
     if(!list.length && !also.length) return;
-    html += `<div class="pol-group-head">${escapeHtml(n)} (${list.length + also.length})</div>` + list.map(p => zfPolItemHtml(p, { open })).join('');
+    html += `<div class="pol-group-head">${escapeHtml(n)} (${list.length + also.length})</div>` + list.map(p => zfPolItemHtml(p, { open, rawOpen })).join('');
     if(also.length){
       const where = [...new Set(also.map(p => st.chipsOf(p)[0]))].map(w => `「${escapeHtml(w)}」`).join('·');
       html += `<p class="pol-xref">${also.length}건은 ${where} 묶음에 있어요 <button type="button" class="pol-xref-btn" data-pol-id="${zfAttr(id)}" data-chip="${zfAttr(n)}" onclick="event.stopPropagation();zfPolPickName(this)">${escapeHtml(n)}만 보기</button></p>`;
     }
   });
   const etc = rows.filter(p => !st.chipsOf(p).length);
-  if(etc.length) html += (st.chips.length ? `<div class="pol-group-head">기타 (${etc.length})</div>` : '') + etc.map(p => zfPolItemHtml(p, { open })).join('');
+  if(etc.length) html += (st.chips.length ? `<div class="pol-group-head">기타 (${etc.length})</div>` : '') + etc.map(p => zfPolItemHtml(p, { open, rawOpen })).join('');
   return html;
 }
 function zfPolRerender(id){
