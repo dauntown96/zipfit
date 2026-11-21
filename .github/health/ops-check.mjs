@@ -452,6 +452,15 @@ try {
            'ids', coalesce(json_agg(json_build_object('id', x.announcement_id, 'seen', to_char(x.seen_at at time zone 'Asia/Seoul', 'MM-DD HH24:MI')) order by x.apply_end, x.announcement_id), '[]'::json))
          from attachment_change_candidates() x
         where not exists (select 1 from analysis_dispatch_queue q where q.announcement_id = x.announcement_id and q.state in ('waiting', 'sent', 'claimed'))),
+      -- 🔵 2026-11-21(우편함 「코드·운영 — 둘째 묶음」 B · 운영 점검 후보 묶음 13위) — 지방공사 호스트 매일 관측의 가장 최근 회차.
+      --    zipfit_ops.host_probe_log(host_probe_tick · cron zipfit-host-probe KST 10:07 쏘기 · 10:37 거두기) — 관측 대상 밖(out_of_scope)은 셈 밖.
+      'host_probe', (with d as (select max(run_date) d from zipfit_ops.host_probe_log)
+         select json_build_object('run_date', (select d from d),
+           'rows', coalesce(json_agg(json_build_object('host', l.host, 'http', l.http_status, 'harvested', l.harvested_at is not null,
+                     'lost', coalesce((l.result ->> 'lost')::boolean, false), 'timed_out', coalesce((l.result ->> 'timed_out')::boolean, false),
+                     'detail_status', l.result -> 'detail_status', 'detail_error', l.result ->> 'detail_error', 'file_status', l.result -> 'file_status',
+                     'file_error', l.result ->> 'file_error', 'region', l.result ->> 'region') order by l.host), '[]'::json))
+           from zipfit_ops.host_probe_log l where l.run_date = (select d from d) and l.out_of_scope is not true),
       'attach0_unanalyzed', (with lm as (select distinct on (l.linked_announcement_id) l.linked_announcement_id aid, announcement_dedup_key(lh.title) lh_key
              from announcement_post_links l join announcements lh on lh.announcement_id = l.lh_announcement_id
             where lh.title is not null and lh.hidden_from_listing is not true order by l.linked_announcement_id, l.lh_announcement_id),
@@ -623,6 +632,23 @@ try {
     add('attachment_review_gap', '분석 뒤 첨부 변경 — 열린 공고인데 대기열에 없음', xs.length === 0 ? 'pass' : 'warn',
       xs.length ? `${xs.length}: ${xs.slice(0, 5).map(x => `${x.id}(변경 ${x.seen} KST)`).join(', ')} · 발송기 #첨부 갈래 ${g.enabled ? '켜짐' : '꺼짐'}` : `0 · 발송기 #첨부 갈래 ${g.enabled ? '켜짐' : '꺼짐'}`,
       '0 — attachment_change_candidates()(완료 계열 분석 ∧ analyzed_at·attachment_reviewed_at 뒤 첨부 이력 ∧ 첫 채움 아님 ∧ apply_end ≥ 오늘 KST) 중 대기열 waiting·sent·claimed 행 없음 · 넘으면 ⚠️ 경고만(이슈를 열지 않는다 — 재확인 회차 몫)')
+  }
+  // ⑧-2a‴ 지방공사 호스트 매일 관측(2026-11-21 · 우편함 「코드·운영 — 둘째 묶음」 B · 13위).
+  //    🔴 ⚠️ 경고만이다(이슈를 열지 않는다 · gate.mjs HARD 밖) — 바깥 기관 서버 축이라 고치는 길이 우리 코드가 아니다(받기 길 · 서울 전용 표를 고칠 신호).
+  {
+    const hp = d.host_probe || { rows: [] }
+    const rows = hp.rows || []
+    const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10)
+    const ageDays = hp.run_date ? Math.round((Date.parse(today) - Date.parse(hp.run_date)) / 864e5) : null
+    const bad = rows.filter(r => r.harvested && (r.lost || r.timed_out || r.http !== 200 || r.detail_error || (r.detail_status ?? 0) >= 400 || r.file_error || (r.file_status ?? 0) >= 400))
+    const pending = rows.filter(r => !r.harvested)
+    const why = r => r.lost ? '응답 없음' : r.timed_out ? '시간 초과' : r.http !== 200 ? `EF ${r.http}` : r.detail_error ? r.detail_error : (r.detail_status ?? 0) >= 400 ? `상세 ${r.detail_status}` : r.file_error ? `첨부 ${r.file_error}` : `첨부 ${r.file_status}`
+    const stale = ageDays !== null && ageDays > 1
+    const st = !hp.run_date ? 'info' : (bad.length || stale) ? 'warn' : 'pass'
+    add('host_probe', '지방공사 호스트 매일 관측(서울 · 읽기만)', st,
+      !hp.run_date ? '기록 없음(첫 회차 전)'
+        : `${hp.run_date} · 관측 ${rows.length} · 열림 ${rows.length - bad.length - pending.length} · 안 열림 ${bad.length}${bad.length ? ': ' + bad.slice(0, 6).map(r => `${r.host}(${why(r)})`).join(', ') : ''}${pending.length ? ` · 거두기 전 ${pending.length}` : ''}${stale ? ` · ⚠️ 최근 회차 ${ageDays}일 전` : ''}`,
+      '0 — zipfit_ops.host_probe_log 가장 최근 회차(KST 10:07 쏘기 · 10:37 거두기)의 관측 대상 호스트 중 EF 200 ∧ 상세 < 400 ∧ 첨부 < 400 ∧ 오류 없음이 아닌 것 · 최근 회차가 1일 넘게 앞이면 ⚠️ · 넘으면 ⚠️ 경고만(이슈를 열지 않는다 — 바깥 기관 축)')
   }
   // ⑧-2a′ 첨부 0 · 미분석 열린 대표(2026-10-28 · 우편함 「코드·운영 — 런칭 뒤 첫 주 DB 쪽 묶음」 2) — 발송기·dispatch_orphan 이 둘 다 「묶음 첨부 > 0」을 보아
   //    첨부를 못 받는 호스트(나라키움 kohom · 제천 cbdc — 그 기관의 DB 첫 행)의 공고는 조용히 미분석으로 남았다(화면은 「꼭집 미분석」 표지).
