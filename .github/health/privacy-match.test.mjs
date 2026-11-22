@@ -23,5 +23,23 @@ t('옛 칸 값', judgePrivacyMatch({ ...base, db: { ...db, email_nn: 1 } }).out.
 t('새 칸', judgePrivacyMatch({ ...base, db: { ...db, cols: { ...cols, user_profiles: [...cols.user_profiles, 'phone'] } } }).out.some(x => /user_profiles\.phone/.test(x)))
 t('새 호스트', judgePrivacyMatch({ ...base, indexHtml: index + ` <img src="https://tracker.example.net/p.gif">` }).out.some(x => /tracker\.example\.net/.test(x)))
 t('시행일 못 읽음', judgePrivacyMatch({ ...base, indexHtml: index.replace(/ZF_PRIVACY_V2_START/, 'X') }).out.some(x => /못 읽음/.test(x)))
+// 이전 판 사슬(2026-11-22 · 다섯째 묶음 2)
+{
+  const { judgePrivacyChain } = await import('./privacy-match.mjs')
+  const head = (a, b, note = '') => `<p>적용기간 ${a}${b ? ' ~ ' + b : '부터 새 판 시행일 전날까지'} ${note}</p><p>현행 개인정보 처리방침 보기</p>`
+  const files = { 'a.html': head('2026. 9. 10.', '2026. 9. 13.'), 'b.html': head('2026. 9. 14.', '2026. 10. 11.', '(같은 날 고침 전까지)'),
+    'c.html': head('2026. 10. 11.', '2026. 10. 20.'), 'd.html': head('2026. 10. 21.', null) }
+  const link = (n, t) => `<a href="./docs/privacy/${n}">${t}</a>`
+  const priv = (ls) => `<p>시행일 2026. 11. 29. — 이전 판(적용기간): ${ls.join(' · ')}</p>`
+  const ok = priv([link('d.html', '2026. 10. 21. ~ 이 방침 시행일 전날'), link('c.html', '2026. 10. 11. ~ 2026. 10. 20.'), link('b.html', '2026. 9. 14. ~ 2026. 10. 11.'), link('a.html', '2026. 9. 10. ~ 2026. 9. 13.')])
+  t('사슬 깨끗 0', judgePrivacyChain({ privacyHtml: ok, files }).out.length === 0)
+  const gap = { ...files, 'c.html': head('2026. 10. 13.', '2026. 10. 20.') }
+  t('사슬 빈틈', judgePrivacyChain({ privacyHtml: ok.replace('2026. 10. 11. ~ 2026. 10. 20.', '2026. 10. 13. ~ 2026. 10. 20.'), files: gap }).out.some(x => /^빈틈 b\.html/.test(x)))
+  const ov = { ...files, 'b.html': head('2026. 9. 14.', '2026. 10. 12.') }
+  t('사슬 겹침', judgePrivacyChain({ privacyHtml: ok.replace('2026. 9. 14. ~ 2026. 10. 11.', '2026. 9. 14. ~ 2026. 10. 12.'), files: ov }).out.some(x => /^겹침 b\.html/.test(x)))
+  t('끊긴 링크', judgePrivacyChain({ privacyHtml: ok.replace('a.html', 'z.html'), files }).out.some(x => /끊긴 링크 z\.html/.test(x)))
+  t('링크 없는 판', judgePrivacyChain({ privacyHtml: ok.replace('a.html', 'z.html'), files }).out.some(x => /링크 없는 판 a\.html/.test(x)))
+  t('링크 글자 ≠ 머리', judgePrivacyChain({ privacyHtml: ok.replace('2026. 9. 10. ~ 2026. 9. 13.', '2026. 9. 10. ~ 2026. 9. 12.'), files }).out.some(x => /a\.html 링크 글자/.test(x)))
+}
 console.log(`privacy-match 시험 ${ok}/${ok + bad}`)
 process.exit(bad ? 1 : 0)

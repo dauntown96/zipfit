@@ -112,7 +112,17 @@ begin
     'attach0', (select jsonb_build_object('run_at', h.run_at,
                                           'value', (select f.reason from public.ops_health_findings f
                                                      where f.run_at = h.run_at and f.item = 'attach0_unanalyzed' limit 1))
-                  from public.ops_health_runs h where h.ref = 'main' and h.kind = 'ops' and h.simulate is null order by h.run_at desc limit 1))
+                  from public.ops_health_runs h where h.ref = 'main' and h.kind = 'ops' and h.simulate is null order by h.run_at desc limit 1),
+    -- 🔵 2026-11-22(우편함 「코드·운영 — 다섯째 묶음」 4 · 순위 38) — health.screen_stall: 14일 안 마지막 「화면 점검 감시 시한 멈춤」
+    --   (ops_health_findings item 'runner' · kind 'screen' · reason 에 「마지막 자리: …」 — screen-check.mjs 감시 시한이 적고 screen-finish 가 싣는다)
+    --   {run_at, stage(「마지막 자리: 」 뒤 글자), run_url, ok_after(그 뒤 화면 점검 통과 실행 있음)} · 없으면 null. 화면이 이 칸을 쓰는 일은 표시층 다음 판.
+    'screen_stall', (select jsonb_build_object('run_at', f.run_at,
+                                               'stage', nullif(btrim(substring(f.reason from '마지막 자리:\s*(.*)$')), ''),
+                                               'run_url', f.run_url,
+                                               'ok_after', exists (select 1 from public.ops_health_runs r where r.kind = 'screen' and r.ok and r.run_at > f.run_at))
+                       from public.ops_health_findings f
+                      where f.kind = 'screen' and f.item = 'runner' and f.reason ~ '마지막 자리:' and f.run_at > now() - interval '14 days'
+                      order by f.run_at desc limit 1))
     into v_health;
 
   select coalesce(jsonb_agg(jsonb_build_object('source', c.source, 'at', c.last_collected_at) order by c.source), '[]'::jsonb)

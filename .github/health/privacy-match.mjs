@@ -76,7 +76,7 @@ export const hostsOf = (indexHtml) => {
 // 주석·문서 안 주소(예 「drive.google.com/file/d/…」 설명)도 세므로, 대조표 밖 호스트는 「실물에 쓰이는 곳」인지 사람이 본다(⚠️ 값에 이름을 싣는다).
 const IGNORE_HOSTS = /(^|\.)(w3\.org|example\.com|kkokzip\.com|github\.io)$/
 
-export function judgePrivacyMatch({ privacyHtml, indexHtml, db, today }) {
+export function judgePrivacyMatch({ privacyHtml, indexHtml, db, today, privacyFiles }) {
   const text = String(privacyHtml || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ')
   const has = (p) => text.includes(p)
   const v2Start = v2StartOf(indexHtml)
@@ -113,7 +113,60 @@ export function judgePrivacyMatch({ privacyHtml, indexHtml, db, today }) {
   const hosts = hostsOf(indexHtml).filter(h => !IGNORE_HOSTS.test(h))
   for (const h of hosts) if (!MAP.hosts[h]) out.push(`호스트 ${h} — 대조표 없음`)
   for (const [h, p] of Object.entries(MAP.hosts)) if (!has(p)) out.push(`호스트 ${h} 문구 「${p}」 방침에 없음`)
-  const seen = `이벤트 ${logEv.length} · DB 이벤트 ${Object.keys(db.events || {}).length} · 키 ${Object.keys(db.props || {}).length} · 칸 ${Object.values(db.cols || {}).flat().length} · 호스트 ${hosts.length} · 시행일 ${v2Start ?? '?'}(${pre ? '전' : '뒤'})`
-  const rule = '0 — 대조표(privacy-match.mjs MAP: 이벤트 · props 키 · 프로필·의견·찜 칸 · index.html 바깥 호스트 → 처리방침 문구) 밖의 실물 · 방침에서 빠진 문구 · 옛 칸(email · marketing_alert) 값 · 시행일(ZF_PRIVACY_V2_START) 전 v2 키 — 넘으면 ⚠️(안 멈춤 · 값은 이름·개수만)'
+  // 이전 판 사슬(privacyFiles = { 'YYYY-MM-DD.html': 글 } — 넘겨 받았을 때만)
+  let chain = null
+  if (privacyFiles) { chain = judgePrivacyChain({ privacyHtml, files: privacyFiles }); for (const o of chain.out) out.push(`사슬 — ${o}`) }
+  const seen = `이벤트 ${logEv.length} · DB 이벤트 ${Object.keys(db.events || {}).length} · 키 ${Object.keys(db.props || {}).length} · 칸 ${Object.values(db.cols || {}).flat().length} · 호스트 ${hosts.length} · 시행일 ${v2Start ?? '?'}(${pre ? '전' : '뒤'})${chain ? ` · 이전 판 사슬 ${chain.n}판 · 링크 ${chain.links} · ${chain.first} ~ 현행 ${chain.current}` : ''}`
+  const rule = '0 — 대조표(privacy-match.mjs MAP: 이벤트 · props 키 · 프로필·의견·찜 칸 · index.html 바깥 호스트 → 처리방침 문구) 밖의 실물 · 방침에서 빠진 문구 · 옛 칸(email · marketing_alert) 값 · 시행일(ZF_PRIVACY_V2_START) 전 v2 키 · 이전 판 사슬(docs/privacy 파일 = 링크 · 적용기간 빈틈·겹침 0 · 링크 글자 = 판 머리) — 넘으면 ⚠️(안 멈춤 · 값은 이름·개수만)'
   return { status: out.length ? 'warn' : 'pass', value: out.length ? `${out.length}: ${out.slice(0, 6).join(' / ')} · ${seen}` : `0(${seen})`, rule, out }
+}
+
+// ── 처리방침 이전 판 사슬(2026-11-22 · 우편함 「코드·운영 — 다섯째 묶음」 2 · 💡 「처리방침 이전 판 사슬 검사」 승인 · #1197 손 고침 계기) ──
+//    ① docs/privacy/*.html 파일 목록 = privacy.html 「이전 판(적용기간)」 링크 목록(끊긴 링크 · 링크 없는 판)
+//    ② 판마다 머리 「적용기간 A ~ B」(B 가 「… 전날까지」면 열린 끝) — 시작 순으로 다음 시작 = 앞 끝 + 1일(빈틈·겹침 없음).
+//       같은 날 고친 판(앞 판 기간 글에 「같은 날」)은 다음 시작 = 앞 끝(하루 겹침) 허용.
+//    ③ 열린 끝은 마지막 판 하나만 · ④ 링크 글자 기간 = 그 파일 머리 기간. ⚠️만.
+const D = /(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\./
+const toDay = (m) => m ? `${m[1]}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}` : null
+const addDay = (s, n) => { const d = new Date(s + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10) }
+const plain = (h) => String(h || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ')
+export const periodOf = (text) => {
+  const m = /적용기간\s*(\d{4}\.\s*\d{1,2}\.\s*\d{1,2}\.)\s*(?:~\s*(\d{4}\.\s*\d{1,2}\.\s*\d{1,2}\.)|부터)?([^현새]{0,40})/.exec(plain(text))
+  if (!m) return null
+  return { start: toDay(D.exec(m[1])), end: m[2] ? toDay(D.exec(m[2])) : null, note: (m[3] || '').trim() }
+}
+export function judgePrivacyChain({ privacyHtml, files }) {
+  const out = []
+  const line = (/이전 판\(적용기간\):([\s\S]*?)<\/p>/.exec(privacyHtml || '') || [])[1] || ''
+  const links = [...line.matchAll(/<a href="\.\/docs\/privacy\/([^"]+)">([^<]*)<\/a>/g)].map(m => ({ name: m[1], text: m[2] }))
+  if (!links.length) out.push('privacy.html 「이전 판(적용기간)」 링크를 못 읽음')
+  const names = Object.keys(files || {})
+  for (const l of links) if (!names.includes(l.name)) out.push(`끊긴 링크 ${l.name}`)
+  for (const n of names) if (!links.some(l => l.name === n)) out.push(`링크 없는 판 ${n}`)
+  const cur = toDay(D.exec((/시행일\s*(\d{4}\.\s*\d{1,2}\.\s*\d{1,2}\.)/.exec(plain(privacyHtml)) || [])[1] || ''))
+  const ps = []
+  for (const n of names) {
+    const p = periodOf(files[n])
+    if (!p || !p.start) { out.push(`${n} 머리 적용기간 못 읽음`); continue }
+    ps.push({ name: n, ...p })
+    const l = links.find(x => x.name === n)
+    if (l) {
+      const ls = toDay(D.exec(l.text)), le = toDay(D.exec(l.text.replace(D, '')))
+      if (ls !== p.start || (p.end && le !== p.end)) out.push(`${n} 링크 글자 기간(${ls} ~ ${le ?? '열림'}) ≠ 머리(${p.start} ~ ${p.end ?? '열림'})`)
+    }
+  }
+  ps.sort((a, b) => a.start < b.start ? -1 : a.start > b.start ? 1 : (a.name < b.name ? -1 : 1))
+  ps.forEach((p, i) => {
+    if (!p.end && i !== ps.length - 1) out.push(`${p.name} 열린 끝인데 마지막 판이 아님`)
+    if (i === 0) return
+    const a = ps[i - 1]
+    if (!a.end) return
+    const want = addDay(a.end, 1)
+    if (p.start === want) return
+    if (p.start === a.end && /같은 날/.test(a.note)) return
+    out.push(p.start > want ? `빈틈 ${a.name}(~${a.end}) → ${p.name}(${p.start}~)` : `겹침 ${a.name}(~${a.end}) → ${p.name}(${p.start}~)`)
+  })
+  const last = ps[ps.length - 1]
+  if (last && last.end && cur && addDay(last.end, 1) !== cur) out.push(`마지막 판 ${last.name}(~${last.end}) → 현행 시행일 ${cur} 이 이어지지 않음`)
+  return { out, n: ps.length, links: links.length, current: cur, first: ps[0]?.start ?? null }
 }
