@@ -57,6 +57,11 @@
    "why": "내부 표 — anon·authenticated 권한 0 · 화면(index.html) 참조 0 · DB 함수·pg_cron·운영 점검(postgres)만 쓰고 읽는다. 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15)"
   },
   {
+   "key": "rls_enabled_no_policy_public_attachment_content_sha",
+   "kind": "intended",
+   "why": "내부 표(2026-11-22 · 첨부 (공고, LH fileid) 내용 sha) — anon·authenticated 권한 0 · 화면 참조 0 · EF fetch-attachment(service_role · attachment_sha_put)·DB 함수 attachment_change_candidates·운영 점검(postgres)만 쓰고 읽는다. 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15)"
+  },
+  {
    "key": "rls_enabled_no_policy_public_complex_geo_attempts",
    "kind": "intended",
    "why": "내부 표(2026-11-17 · 단지 도로명·좌표 자동 채움 시도 기록) — anon·authenticated 권한 0 · 화면 참조 0 · EF complex-geo-fill(service_role)·DB 함수·운영 점검(postgres)만 쓰고 읽는다. 정책 없음 = 클라이언트 전면 거부가 의도(원칙 15)"
