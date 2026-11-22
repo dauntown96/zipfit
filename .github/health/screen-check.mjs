@@ -1650,8 +1650,9 @@ try {
           if (el.offsetParent === null) return
           out.n++
           const t = (el.textContent || '').replace(/\s+/g, ' ').trim()
-          const box = el.parentElement
-          const over = box && box.scrollWidth > box.clientWidth + 1
+          // 넘침 = 짧은 말 자체가 상자 안쪽 오른끝 밖으로 나감(상자는 nowrap · 말줄임 — 뒤에 붙는 회차 꼬리는 셈 밖)
+          const box = el.parentElement, br = box ? box.getBoundingClientRect() : null
+          const over = !!br && el.getBoundingClientRect().right > br.right - (parseFloat(getComputedStyle(box).paddingRight) || 0) + 0.5
           const aid = (el.closest('[data-sum-for]') || {}).getAttribute?.('data-sum-for') || ''
           if (ok.includes(t)) out.kinds[t.slice(2)] = (out.kinds[t.slice(2)] || 0) + 1
           if (!ok.includes(t) || over) out.bad.push(`${aid.slice(-5)} 「${t.slice(0, 20)}」${over ? ' 넘침' : ''}`)
@@ -1662,7 +1663,7 @@ try {
       add('price_cond', '얼마 줄 짧은 말(두 조건 · 가·나군별 · 소득 구간별) — 글자·넘침', cond.bad.length ? 'warn' : 'info',
         cond.bad.length ? `${cond.bad.length}/${cond.n}: ${cond.bad.slice(0, 4).join(' / ')}`
           : (cond.n ? Object.entries(cond.kinds).map(([k, v]) => `${k} ${v}`).join(' · ') : '보이는 짧은 말 0'),
-        '390 공고 탭 첫 쪽 카드 · 글자가 셋 중 하나 ∧ 줄이 상자 안 — 어긋나면 ⚠️(경고만 · 이슈 0) · 새 조회 0')
+        '390 공고 탭 첫 쪽 카드 · 글자가 셋 중 하나 ∧ 짧은 말이 상자 안(말줄임에 잘리지 않음) — 어긋나면 ⚠️(경고만 · 이슈 0) · 새 조회 0')
     } catch (e) {
       add('price_cond', '얼마 줄 짧은 말(두 조건 · 가·나군별 · 소득 구간별) — 글자·넘침', 'warn', '못 잼: ' + String(e).slice(0, 160), '경고만')
     }
