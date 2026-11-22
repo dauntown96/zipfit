@@ -501,6 +501,7 @@ body.theme-dark .hu-ug-name,body.theme-dark .hu-ug-target,body.theme-dark .hu-ug
 .poi-dist{color:#999;font-size:var(--t-xs)}
 .poi-loading{font-size:12px;color:#999;padding:8px;text-align:center}
 /* 추정 핀 안내. 색은 기존 .warn 토큰(#FAEEDA/#FAC775/#854F0B) 그대로 — 새 색을 만들지 않는다 */
+.map-src{margin:6px 2px 0;font-size:var(--t-xs);line-height:1.5;color:var(--ink-3)}   /* 2026-11-22 상세 지도 출처 줄(주소정보 좌표 핀일 때만) */
 .map-approx{font-size:12px;line-height:1.55;color:#854F0B;background:#FAEEDA;border:1px solid #FAC775;border-radius:var(--r-s);padding:7px 10px;margin-top:6px}
 /* 시·도까지만 아는 공고 — 지도 대신 문구로 닫는다. 빈 상자를 만들지 않는다 */
 .map-closed{display:flex;flex-direction:column;justify-content:center;height:100%;margin:0;padding:0 18px;text-align:center;font-size:13px;line-height:1.6;color:#666}
@@ -1328,6 +1329,16 @@ html.zf12 .zf12-must summary{cursor:pointer;padding:12px 0;min-height:var(--hit)
 html.zf12 .zf12-must summary b{color:var(--ink);font-weight:700}
 html.zf12 .zf12-must details[open] > summary .zf12-pv{display:none}   /* 작은 판 3 — 펼치면 본문이 같은 첫 문장을 말한다 */
 html.zf12 .zf12-raw{white-space:pre-wrap;font-size:var(--t-xs);line-height:1.6;color:var(--ink-2);margin:0 0 8px}
+/* 🔵 2026-11-22(우편함 「표시층 — 다음 판: 2층 「꼭 볼 것」도 요점으로」) — 요점 행: 머리 = 요점 첫 줄 · 펼치면 요점 줄 + 「원문 보기」 접기 · 끈 상세(.zf-plain-off)는 원문만(정책 절과 같은 꼴) */
+html.zf12 .zf12-pltag{margin-left:6px;padding:1px 7px;border:1px solid var(--line-2);border-radius:var(--r-pill);font-size:var(--t-xs);font-weight:600;color:var(--ink-2);vertical-align:1px}
+html.zf12 .zf12-must .zf12-pvr{display:none}
+html.zf12 .zf12-must .zf12-pl{padding:0 0 4px}
+html.zf12 .zf12-must .zf12-rawd{margin:0 0 8px}
+html.zf12 .zf12-must .zf12-rawd > .zf12-raw{margin:0 0 4px}
+html.zf12 .zf-plain-off .zf12-must .zf12-pvp,html.zf12 .zf-plain-off .zf12-must .zf12-pl,html.zf12 .zf-plain-off .zf12-must .zf12-rawd>summary,html.zf12 .zf-plain-off .zf12-pltag{display:none}
+html.zf12 .zf-plain-off .zf12-must .zf12-pvr{display:inline}
+html.zf12 .zf-plain-off .zf12-must details[open] > summary .zf12-pvr{display:none}
+html.zf12 .zf-plain-off .zf12-must .zf12-rawd{border-top:0;margin:0}
 /* 안 — 층 순서(DOM 은 그대로 · 순서만): 머리 → 행동 줄 → 2층 → 특이사항 → 세대 → 지난 회차 → 자격 → 일정 → 어디 → 그림 → 원문 → 기본 정보 */
 html.zf12 .zf12-card.zf3-open > [id^="ncard-"]{display:flex!important;flex-direction:column}
 html.zf12 .zf12-card > [id^="ncard-"] > div:has(> [id^="notes-slot-"]){display:contents}
@@ -10675,6 +10686,9 @@ function zfPolPlainToggle(btn){
   const st = zfPolState[btn.dataset.polId || ''];
   if(st) st.plainOff = !on;
   zfPolPlainApply(wrap, !on);
+  // 🔵 2026-11-22(우편함 「표시층 — 다음 판」 1) — 같은 상세의 2층 「꼭 볼 것」도 같은 스위치로(저장 안 함 그대로).
+  const card = wrap.closest('.hcard');
+  if(card){ card.classList.toggle('zf-plain-off', !on); card.querySelectorAll('.zf12-must details.zf12-rawd').forEach(d => { d.open = !on; }); }
 }
 // 끈 상태 — 원문 접기를 펼친 채 둔다(접기 머리는 CSS 로 숨김) · 다시 켜면 접는다.
 function zfPolPlainApply(wrap, off){
@@ -12638,6 +12652,7 @@ function initMapForHouse(h,id){
     if(zf3Exact) lblKeep();
     zfMapApproxShape(huMapState[id], coords, approx);
     setMapApproxNote(mapEl, approx);
+    setMapSrcNote(mapEl, !!(result[0] && result[0]._zfJuso));
     buildPoiTabs(id, coords);
   };
   // 🔵 2026-11-17(우편함 「표시층 — 3판」 1) — 단지 도로명·좌표 표(complex_geo · 공식 공공 API 값)에 이 주소(matched_from = 세대·블록 주소 원문 그대로)의
@@ -12645,7 +12660,7 @@ function initMapForHouse(h,id){
   //    화면 주소 글자는 원문 그대로(이 표는 핀 자리만) · 표는 첫 지도에서 한 번만 읽는다(좌표 있는 행만 · anon 공개 읽기).
   Promise.all([loadKakao(), zfComplexGeo()]).then(([, geo])=>{
     const cg = !h.approx && geo && geo.get(String(h.addr || '').trim());
-    if(cg && cg.lat != null && cg.lng != null){ renderMap([{ x: String(cg.lng), y: String(cg.lat), address_type: 'ROAD_ADDR' }], false); return; }
+    if(cg && cg.lat != null && cg.lng != null){ renderMap([{ x: String(cg.lng), y: String(cg.lat), address_type: 'ROAD_ADDR', _zfJuso: true }], false); return; }
     const geocoder = new kakao.maps.services.Geocoder();
     // 쉼표로 이어붙은 복수 지번("지번1 , 지번2")은 지오코딩 API가 파싱하지 못해
     // 상위 행정구역 대표좌표로 튀는 문제가 있어, Lv1부터 첫 번째 지번만 남겨 사용
@@ -12799,6 +12814,25 @@ function setMapApproxNote(mapEl, approx){
   }
   if(approx) note.textContent = ZF_MAP_APPROX_TEXT[approx] || ZF_MAP_APPROX_TEXT.fallback;
   note.hidden = !approx;             // 같은 지도를 다시 쓸 때(건물 클릭) 되돌아간다
+}
+
+// 🔵 2026-11-22(우편함 「표시층 — 다음 판 … 지도 출처 줄」 요청 덧 · 다운님 결정 11-22 12:14 (가)) — 상세 지도 출처 줄.
+//    핀이 단지 좌표 표(complex_geo · 주소정보 좌표)로 그려졌을 때만 지도 아래 한 줄 · 카카오 지오코딩 · 시군구 중심(대략)이면 숨긴다.
+//    글자는 행안부 답의 출처 표기 그대로(우편함 「조사 — 단지 좌표」). 한 상자의 핀은 하나라(건물 클릭 = 핀 옮김) 줄은 지금 핀을 따른다.
+const ZF_MAP_JUSO_SRC = '주소 좌표: 주소정보 관리기관(행정안전부, 시도, 시군구)';
+function setMapSrcNote(mapEl, on){
+  const box = mapEl && mapEl.parentElement;
+  if(!box) return;
+  let note = box.querySelector(':scope > .map-src');
+  if(!note){
+    if(!on) return;                  // 지울 것이 없으면 만들지 않는다
+    note = document.createElement('p');
+    note.className = 'map-src';
+    note.textContent = ZF_MAP_JUSO_SRC;
+    const ap = mapEl.nextElementSibling;
+    (ap && ap.classList && ap.classList.contains('map-approx') ? ap : mapEl).insertAdjacentElement('afterend', note);
+  }
+  note.hidden = !on;
 }
 
 function buildPoiTabs(id,coords){
@@ -16544,19 +16578,33 @@ function zf12Must(card, n){
   const id = String(n['announcement_id'] || ''), l2 = card.querySelector('.zf12-l2');
   if(!l2 || l2.querySelector('.zf12-must') || l2.dataset.zf12Must === 'none') return;
   if(!zf12MustMemo.has(id)){
-    zf12MustMemo.set(id, (zf12LoadP.get(id) || Promise.resolve()).then(() => (zf12Info.get(id) || {}).ids || [id]).then(ids => fetch(`${SUPABASE_URL}/rest/v1/announcement_policies?select=category,content_raw,key_rank,seq&${idFilterFor(ids)}&key_rank=not.is.null&order=key_rank,seq`, { headers: zfAnonHeaders() }).then(r => r.ok ? r.json() : []).catch(() => [])));
+    zf12MustMemo.set(id, (zf12LoadP.get(id) || Promise.resolve()).then(() => (zf12Info.get(id) || {}).ids || [id]).then(ids => fetch(`${SUPABASE_URL}/rest/v1/announcement_policies?select=category,content_raw,content_plain,content_plain_check,key_rank,seq&${idFilterFor(ids)}&key_rank=not.is.null&order=key_rank,seq`, { headers: zfAnonHeaders() }).then(r => r.ok ? r.json() : []).catch(() => [])));
   }
   zf12MustMemo.get(id).then(rows => {
     if(l2.querySelector('.zf12-must')) return;
     const seen = new Set(), list = (Array.isArray(rows) ? rows : []).filter(r => { const k = String(r.content_raw || '').trim(); if(!k || seen.has(k)) return false; seen.add(k); return true; }).slice(0, 3);
     if(!list.length){ l2.dataset.zf12Must = 'none'; return; }
     const sec = document.createElement('section'); sec.className = 'zf12-must';
-    sec.innerHTML = `<h4>꼭 볼 것</h4><ol>${list.map(r => {
+    // 🔵 2026-11-22(우편함 「표시층 — 다음 판: 2층 「꼭 볼 것」도 요점으로」 1) — 정책 절과 같은 조건(zfPolPlainOk)의 행은 요점 먼저:
+    //    접힌 머리 = 분류 + 요점 첫 줄 · 펼치면 요점 줄 전부(content_plain 글자 그대로 · 줄 나눔만) + 바로 아래 「원문 보기」 접기(원문 전체).
+    //    조건 밖(⚠️ · 요점 없음 · 판정 밖)은 종전 그대로(분류 + 원문 첫 문장 · 펼치면 원문). 표지는 머리에 짧게 「꼭집 요점」 한 번(긴 안내는 정책 절 머리에만).
+    //    정책 절 「요점 먼저 보기」를 끄면 같은 상세(.hcard.zf-plain-off)의 2층도 원문만 — 저장하지 않는다(처리방침 3 밖 · 정책 절 스위치와 같은 축).
+    const rawFirst = r => {
       let f = zf12FirstSentence(r.content_raw); const cat = String(r.category || '').trim();
       if(cat && f.startsWith(cat) && /^[\s:·■]/.test(f.slice(cat.length))) f = f.slice(cat.length).replace(/^[\s:·■]+/, '');   // 원문 첫머리가 분류 이름과 같으면 한 번만
+      return f;
+    };
+    const anyPlain = list.some(zfPolPlainOk);
+    const cardEl = l2.closest('.hcard'), off = !!(cardEl && cardEl.classList.contains('zf-plain-off'));
+    sec.innerHTML = `<h4>꼭 볼 것${anyPlain ? ' <span class="zf12-pltag">꼭집 요점</span>' : ''}</h4><ol>${list.map(r => {
+      const f = rawFirst(r);
       // 🔵 2026-11-17(우편함 「표시층 — 작은 판 3」 2) — 접힌 머리 = 분류 + 첫 문장 전체(종전 88자에서 「…」로 문장 중간을 잘랐다 · 첫 문장 최대 166자) ·
       //    펼치면 머리의 첫 문장(.zf12-pv)은 숨긴다 — 본문(원문 전체)이 같은 문장으로 시작해 두 번 보이던 자리(…21100 「모집 신청과 관련하여 매우 중요한 사항」).
-      return `<li><details><summary><b>${escapeHtml(r.category || '')}</b> <span class="zf12-pv">${escapeHtml(f)}</span></summary><p class="zf12-raw">${escapeHtml(r.content_raw)}</p></details></li>`;
+      if(!zfPolPlainOk(r)) return `<li><details><summary><b>${escapeHtml(r.category || '')}</b> <span class="zf12-pv">${escapeHtml(f)}</span></summary><p class="zf12-raw">${escapeHtml(r.content_raw)}</p></details></li>`;
+      const pl = zfPolPlainLines(r.content_plain);
+      return `<li class="zf12-plr"><details><summary><b>${escapeHtml(r.category || '')}</b> <span class="zf12-pv zf12-pvp">${escapeHtml(pl[0] || '')}</span><span class="zf12-pv zf12-pvr">${escapeHtml(f)}</span></summary>`
+        + `<ul class="pol-pl zf12-pl">${pl.map(l => `<li>${escapeHtml(l)}</li>`).join('')}</ul>`
+        + `<details class="pol-raw zf12-rawd"${off ? ' open' : ''} onclick="event.stopPropagation()"><summary>원문 보기</summary><p class="zf12-raw">${escapeHtml(r.content_raw)}</p></details></details></li>`;
     }).join('')}</ol>`;
     const why = l2.querySelector('.zf12-schedwhy');
     why ? why.after(sec) : l2.prepend(sec);
