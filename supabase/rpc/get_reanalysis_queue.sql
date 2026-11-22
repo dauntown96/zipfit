@@ -92,16 +92,9 @@ SELECT a.announcement_id, a.source, a.title, a.announcement_date,
 FROM announcement_analysis aa
 JOIN announcements a ON a.announcement_id = aa.announcement_id
 WHERE aa.status IN ('완료', '완료(보조 누락)', '완료(판정 대기)', '완료(소급)')
-  AND EXISTS (
-    SELECT 1 FROM announcement_attachment_history h
-    WHERE h.announcement_id = aa.announcement_id
-      -- 🔵 2026-09-29 코드 회차 2 잔여 C-2 — 재확인이 첨부 변경을 보고 나면 attachment_reviewed_at 을 채운다.
-      --   그 뒤에 생긴 이력만 센다(greatest 는 NULL 을 건너뛴다 — 칸이 비면 analyzed_at 만 본다).
-      AND h.seen_at > greatest(aa.analyzed_at, aa.attachment_reviewed_at)
-      -- 🔵 C-1 — 첫 채움(옛 목록이 NULL·빈 배열)은 내용이 바뀐 것이 아니라 거른다.
-      AND h.files IS NOT NULL
-      AND jsonb_typeof(h.files) = 'array'
-      AND jsonb_array_length(h.files) > 0
-  )
+  -- 🔵 2026-11-22(우편함 「코드 — 첨부 변경 갈래 켜기」 1) — 판정은 attachment_change_pending() 한 벌(attachment_change_candidates() 와 같은 함수):
+  --   analyzed_at·attachment_reviewed_at 뒤 이력(첫 채움 거름 — C-1 · 재확인 뒤 이력만 — C-2) ∧ 「새 fileid · 내용 같음」 아님(넷째 묶음 A sha 표).
+  --   이 갈래는 apply_end 를 보지 않는다(닫힌 공고도 올린다 — 종전 그대로).
+  AND public.attachment_change_pending(aa.announcement_id, greatest(aa.analyzed_at, aa.attachment_reviewed_at))
 ORDER BY 7 DESC, 1;
 $function$
