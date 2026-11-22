@@ -89,7 +89,7 @@
 - 🔴 **저장소는 얕은 클론(깊이 50)이다 — 오래된 가지를 머지하기 전에 `git fetch --deepen=N origin main <가지>`부터**(2026-11-04 · #873 — #732 가지 머지가 「refusing to merge unrelated histories」로 거부됐는데 환경 탓이었다 · `--deepen=400`으로 기준점이 보인 뒤 정상 머지). `git rev-parse --is-shallow-repository`가 `true`면 기준점(`git merge-base`)이 비는지 먼저 본다.
 - 🔴 **백업 덤프(`zipfit-backup/dumps/*.dump` — pg_dump 17 형식)를 조사에 쓸 때 컨테이너 `pg_restore` 16은 못 읽는다**(`unsupported version (1.16) in file header` — 2026-09-30 실측). **`pgdumplib`로 읽는다**(위 세션 준비 스크립트가 깐다) — `pgdumplib.load(경로)`.
 - **국토부 아파트 전월세 실거래 API** — 컨테이너 환경변수 `MOLIT_RENT_API_KEY`(이름만 적는다) · `https://apis.data.go.kr/1613000/RTMSDataSvcAptRent/getRTMSDataSvcAptRent`(`LAWD_CD` 5자리 · `DEAL_YMD` YYYYMM) · 🔴 **전북은 새 코드 `52xxx`**(군산 `52130` — 2026-08 totalCount 293, B51 실측) · 금액은 만원 단위 쉼표 문자열(`deposit`·`monthlyRent`).
-- 🔴 **juso 좌표(좌표제공 API 결과 — `entX`·`entY`·위경도)는 파일·로그·회신·PR·Notion에 적지 않는다 — 셈만**(2026-11-19 · 행안부 답: 공간정보라 국내 서버에만 저장 · 우편함 「코드·운영 — 11장」). 서울 이전 전까지 `complex-geo-fill` 좌표 단계는 꺼져 있다(`JUSO_COORD_ENABLED`) · 도로명·건물관리번호(검색 API)는 그대로 쓴다 · 켜는 순서는 `docs/supabase-seoul-move.md` 3장 7′.
+- 🔴 **juso 좌표(좌표제공 API 결과 — `entX`·`entY`·위경도)는 파일·로그·회신·PR·Notion에 적지 않는다 — 셈만**(2026-11-19 · 행안부 답: 공간정보라 국내 서버에만 저장 · 우편함 「코드·운영 — 11장」). `complex-geo-fill` 좌표 단계는 서울 이전 뒤 2026-11-22에 켰다(`JUSO_COORD_ENABLED` · 저장은 서울 DB에만 · EF 응답은 좌표 대신 `has_xy`) · 도로명·건물관리번호(검색 API)는 그대로 쓴다 · 경위는 `docs/supabase-seoul-move.md` 3장 7′.
 
 ---
 

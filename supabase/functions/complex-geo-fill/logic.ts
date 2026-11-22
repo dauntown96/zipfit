@@ -117,3 +117,11 @@ export const utmkToWgs84 = (x: number, y: number): { lat: number; lng: number } 
   const lng = lon0 + (D - (1 + 2 * T1 + C1) * D ** 3 / 6 + (5 - 2 * C1 + 28 * T1 - 3 * C1 ** 2 + 8 * ep2 + 24 * T1 ** 2) * D ** 5 / 120) / Math.cos(p1)
   return { lat: lat * 180 / Math.PI, lng: lng * 180 / Math.PI }
 }
+
+// 🔵 2026-11-22(우편함 「코드·운영 — 셋째 묶음」 A 1) — 단지 단위 키워드 = 시도 + 시군구 + road_key 의 도로명·번호(앞 약칭 시도 뺌).
+//   조사 「단지 좌표」(docs/complex-geo-sample.md B 갈래 — 표본 100 중 road_key 키워드로 정확 100/100)와 같은 꼴.
+export const keywordOfComplex = (sido: string | null, sgg: string | null, roadKey: string): string => {
+  const t = (roadKey ?? '').trim().split(/\s+/)
+  const road = t.length >= 3 ? t.slice(1).join(' ') : t.join(' ')
+  return [sido, sgg, road].map(x => (x ?? '').trim()).filter(Boolean).join(' ')
+}

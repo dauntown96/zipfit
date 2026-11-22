@@ -1,6 +1,6 @@
 // node --experimental-strip-types supabase/functions/complex-geo-fill/logic.test.mts
 import assert from 'node:assert/strict'
-import { keywordOf, keywordWithoutBadSido, isExact, exactCandidates, pickByName, pickByBldhub, utmkToWgs84 } from './logic.ts'
+import { keywordOf, keywordWithoutBadSido, isExact, exactCandidates, pickByName, pickByBldhub, utmkToWgs84, keywordOfComplex } from './logic.ts'
 
 // 좌표: 합성 격자점(juso 값 아님 — 2026-11-19 우편함 「코드·운영 — 11장」 · juso 좌표는 국내 서버에만) · 기대값은 pyproj EPSG:5179 → 4326 · 1e-7도(약 1cm) 안
 //   (1000000, 2000000) = UTM-K 원점(위도 38 · 경도 127.5 — 정의값)
@@ -50,3 +50,8 @@ assert.equal(pickByBldhub(ex, ['경기도 광명시 오리로 5 (광명동)'])?.
 assert.equal(pickByBldhub(ex, ['경기도 광명시 오리로 55 (광명동)']), null)
 assert.equal(pickByBldhub(ex, []), null)
 console.log('logic.test ok')
+
+// 단지 단위 키워드(2026-11-22 · 우편함 「코드·운영 — 셋째 묶음」)
+assert.equal(keywordOfComplex('경기도', '화성시 동탄구', '경기 동탄기흥로277번길 12'), '경기도 화성시 동탄구 동탄기흥로277번길 12')
+assert.equal(keywordOfComplex('세종특별자치시', null, '세종 시청대로 643'), '세종특별자치시 시청대로 643')
+assert.equal(keywordOfComplex('전남광주통합특별시', '북구', '전남광주 일곡마을로 129-14'), '전남광주통합특별시 북구 일곡마을로 129-14')

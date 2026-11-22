@@ -110,7 +110,7 @@
 | 5 | 비교 SQL(아래 5장)로 옛 = 새 | Claude Code(읽기) | 없음 |
 | 6 | 새 DB `zipfit_ops.project_self` 행을 새 ref·anon 키로(1-0 1 · 덤프가 옛 값을 싣고 온다 — `docs/cron-jobs.sql`보다 먼저) → PR 병합 → EF 17 배포 · `docs/cron-jobs.sql` 새 DB에서 실행 · 화면 새 ref 배포(`CACHE_NAME` +1) | Claude Code | 🔴 전환 순간 — 로그인 사용자는 다시 로그인 |
 | 7 | health-ops · health-screen · 공개 REST · 로그인 확인 · Better Stack 새 감시 켬 · 옛 감시 끔 · `zipfit-backup` Secret 바꿈 | 함께 | — |
-| 7′ | 🔴 juso 좌표 단계 켜기 + 전 단지 채움(행안부 답 — 좌표제공 API 결과는 국내 서버에만 · 2026-11-19 우편함 「코드·운영 — 11장」): `complex-geo-fill` `JUSO_COORD_ENABLED = true` PR(병합 = 배포) → 좌표 빈 `complex_geo` juso 행 다시 채움 → 전 단지 넓히기. 순서는 아래 「서울 이전 뒤 좌표 켜는 순서」 | Claude Code | 지도 핀이 카카오 지오코딩에서 juso 좌표로(대략 원 줄어듦) |
+| 7′ | 🔴 juso 좌표 단계 켜기 + 전 단지 채움(행안부 답 — 좌표제공 API 결과는 국내 서버에만 · 2026-11-19 우편함 「코드·운영 — 11장」): `complex-geo-fill` `JUSO_COORD_ENABLED = true` PR(병합 = 배포) → 좌표 빈 `complex_geo` juso 행 다시 채움 → 전 단지 넓히기. 순서는 아래 「서울 이전 뒤 좌표 켜는 순서」 · 🔵 2026-11-22 켬(우편함 「코드·운영 — 셋째 묶음」 — 스위치 true · `?mode=complex` · cron `zipfit-complex-geo-fill-complex` KST 09~20시 시간당 3번 · 마이그레이션 `2026-11-22_01_complex_geo_all_complexes.sql`) | Claude Code | 지도 핀이 카카오 지오코딩에서 juso 좌표로(대략 원 줄어듦) |
 | 8 | 옛 프로젝트는 일시 중지(읽기 보존 · 되돌림 대비) → 며칠 뒤 삭제 | 다운님 | — |
 
 - **cron 두 곳 동시 실행 막기**: 2(옛 잡 모두 끔)를 6(새 잡 만듦)보다 먼저 · 새 잡은 복원 뒤 「대조」 SELECT로 32잡을 확인한 다음에만.
@@ -181,4 +181,4 @@ select name from vault.secrets order by name;
 - **시각 회귀 고정본**: 요청 열쇠가 전체 주소(호스트 포함)라 서울 ref로 다시 매김(85건 · 내용·시각 그대로 · 기준 그림 그대로) — PR #1187 `ea105d0`.
 - **일회용 `seoul-move.yml` 걷음**(11-21). `scripts/seoul-move-*.sql` 넷은 이 문서·이력이 가리키는 기록으로 남긴다(부르는 곳 0). 비교 SQL ③④는 `zipfit-backup` 복원 리허설로 옮겼다(`scripts/drill_origin.py` — 원천 = 덤프를 뜬 DB · 복원본 · `project_ref`와 「`collection_run_log` 덤프 시각 전 행 수」가 다르면 실패).
 - **출구 지역**(서울 DB `net.http_get` · 11-21): bmc 403 · juso 200 · `data.myhome.go.kr` 시간 초과 → `SEOUL_ONLY`·`x-region`·`seoul-api` 넘김은 남긴다(`docs/data-sources.md` 「출구 지역」).
-- **남은 것**: 7′ juso 좌표 켜기(`JUSO_COORD_ENABLED = false` 그대로) · 처리방침 「싱가포르」 두 자리(5장) · 옛 프로젝트 삭제(다운님) · Actions 비밀 `MOVE_OLD_DB_URL`·`MOVE_NEW_DB_URL`(이전용 — 지우기는 다운님 · 저장소 Settings → Secrets).
+- **남은 것**: 7′ juso 좌표 켜기(🔵 2026-11-22 켬 — 전 단지 채움은 낮 창으로 며칠 · 위 표 7′ 줄) · 처리방침 「싱가포르」 두 자리(5장) · 옛 프로젝트 삭제(다운님) · Actions 비밀 `MOVE_OLD_DB_URL`·`MOVE_NEW_DB_URL`(이전용 — 지우기는 다운님 · 저장소 Settings → Secrets).
