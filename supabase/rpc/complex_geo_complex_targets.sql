@@ -1,7 +1,7 @@
 CREATE OR REPLACE FUNCTION public.complex_geo_complex_targets(p_limit integer DEFAULT 20)
  RETURNS jsonb
  LANGUAGE sql
- STABLE
+ STABLE SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
 AS $function$
   -- 단지 좌표 전 단지 채움 대상(2026-11-22 · 우편함 「코드·운영 — 셋째 묶음」 A) — EF complex-geo-fill ?mode=complex 가 런마다 부른다.
