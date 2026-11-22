@@ -1785,7 +1785,17 @@ Deno.serve(async (req: Request) => {
   if (logId != null) {
     let j: Record<string, unknown> | null = null
     try { j = await res.clone().json() as Record<string, unknown> } catch { /* 본문이 json 이 아니면 상태로만 */ }
-    await lhGateDone(logId, lhOutcome(res, j).slice(0, 60))
+    const outcome = lhOutcome(res, j).slice(0, 60)
+    await lhGateDone(logId, outcome)
+    // 🔵 2026-11-22(우편함 「코드·운영 — 넷째 묶음」 A) — 받은 파일의 내용 sha 를 (공고, fileid) 표에 적는다(쓰기만 · 응답을 바꾸지 않는다).
+    //   sha = 받은 바이트 sha256 · 없으면(분할 올림) Drive 가 계산한 sha256Checksum(같은 내용 해시) · 잘린 받기(length_match false)는 적지 않는다.
+    //   (공고, fileid)는 같은 기록 행(lh_file_fetch_log)에서 DB 가 읽는다 — 부르는 쪽이 넘기지 않는다.
+    if (outcome === 'ok' && j && j.length_match !== false) {
+      const drive = (j.drive ?? null) as Record<string, unknown> | null
+      const sha = [j.sha256, j.content_sha256, drive?.file_sha256].find(v => typeof v === 'string' && /^[0-9a-fA-F]{64}$/.test(v as string)) as string | undefined
+      const bytes = typeof j.bytes === 'number' ? j.bytes : null
+      if (sha) { try { await rpcPost('attachment_sha_put', { p_log_id: logId, p_sha256: sha.toLowerCase(), p_bytes: bytes }) } catch { /* 기록 실패는 응답을 바꾸지 않는다 */ } }
+    }
   }
   return res
 })
