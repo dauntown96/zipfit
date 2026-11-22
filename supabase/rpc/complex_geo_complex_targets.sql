@@ -37,4 +37,3 @@ AS $function$
                                                || array(select distinct nullif(btrim(h.building_name), '') from public.housing_units h where h.complex_id = cx.id), null))
                                   order by cx.id) from cx), '[]'::jsonb))
 $function$
-

@@ -62,4 +62,3 @@ begin
   return jsonb_build_object('kind', 'complex', 'outcome', v_out, 'geo_inserted', n, 'xy', n > 0 and v_ok);
 end
 $function$
-
