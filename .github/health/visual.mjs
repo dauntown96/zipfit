@@ -12,6 +12,7 @@
 //   node .github/health/visual.mjs --record-missing   # 있는 고정본(시각 그대로)에 화면이 새로 낸 요청만 운영에서 받아 더한다(🔴 컨테이너 · anon 읽기만)
 //   node .github/health/visual.mjs --update     # 기준 그림을 새로 쓴다 — 워크플로 visual.yml 「기준 갱신」(누가·언제가 baseline.json 과 커밋에 남는다)
 //   node .github/health/visual.mjs              # 견준다 → visual-out/(차이 그림 · 결과 visual-result.json · 요약 visual-summary.md) · 실패면 종료 코드 1
+//   node .github/health/visual.mjs --rekey      # 고정본 열쇠를 옛 꼴(호스트 든 주소)에서 새 꼴(경로+쿼리+본문)로 한 번 옮긴다(바깥 호출 0 · 고정본만 씀)
 //   --site <주소>  잴 페이지(기본: 저장소 뿌리를 이 스크립트가 127.0.0.1 임시 서버로 띄운다)
 // 🔴 기준 그림은 GitHub 러너(ubuntu · 워크플로가 까는 Playwright 판)에서만 만든다 — 글꼴·렌더러가 다른 곳에서 만든 그림과는 늘 다르다.
 import fs from 'fs'
@@ -52,11 +53,16 @@ const LIST_RPC = '/rest/v1/rpc/get_announcements_deduped'
 
 const argv = process.argv.slice(2)
 const ADD_MISSING = argv.includes('--record-missing')
-const MODE = argv.includes('--record') || ADD_MISSING ? 'record' : argv.includes('--update') ? 'update' : 'compare'
+const REKEY = argv.includes('--rekey')
+const MODE = argv.includes('--record') || ADD_MISSING ? 'record' : argv.includes('--update') ? 'update' : REKEY ? 'rekey' : 'compare'
 const si = argv.indexOf('--site')
 
-// 요청 열쇠 — 방법 · 주소(쿼리 포함) · 본문. 머리(키)는 넣지 않는다.
-const keyOf = (method, url, body) => crypto.createHash('sha1').update(method + ' ' + url + '\n' + (body || '')).digest('hex').slice(0, 16)
+// 요청 열쇠 — 방법 · 경로+쿼리 · 본문. 머리(키)는 넣지 않는다.
+// 🔵 2026-11-22(우편함 「코드·운영 — 다섯째 묶음」 1 · 순위 37) — 호스트를 뺀다: ref·도메인이 바뀌면 고정본 전부가 「고정본 밖 요청」이 됐다(#1179 · #1187 다시 매김).
+//    옛 꼴(호스트 든 주소)은 --rekey 한 번 옮김에만 쓴다(legacyKeyOf).
+const pathOf = (url) => String(url).replace(/^https?:\/\/[^/]+/, '')
+const keyOf = (method, url, body) => crypto.createHash('sha1').update(method + ' ' + pathOf(url) + '\n' + (body || '')).digest('hex').slice(0, 16)
+const legacyKeyOf = (method, url, body) => crypto.createHash('sha1').update(method + ' ' + url + '\n' + (body || '')).digest('hex').slice(0, 16)
 
 function serveRoot () {
   const server = http.createServer((req, res) => {
@@ -76,6 +82,7 @@ async function main () {
   if (!site) { server = await serveRoot(); site = `http://127.0.0.1:${server.address().port}/index.html` }
 
   let fixture = null
+  const rekeyed = {}   // --rekey: 새 열쇠 → 항목(이번 렌더가 실제로 낸 요청만)
   if (MODE !== 'record') {
     if (!fs.existsSync(FIXTURE)) throw new Error('고정본 없음 — --record 로 먼저 뜬다')
     fixture = JSON.parse(zlib.gunzipSync(fs.readFileSync(FIXTURE)).toString('utf8'))
@@ -114,6 +121,12 @@ async function main () {
             const h = res.headers()
             e = fixture.entries[k] = { m: req.method(), u: u.replace(/^https:\/\/[^/]+/, ''), s: res.status() === 206 ? 200 : res.status(), t: h['content-type'] || 'application/json', b: body }
           }
+          return route.fulfill({ status: e.s, contentType: e.t, body: e.b })
+        }
+        if (MODE === 'rekey') {
+          const e = fixture.entries[k] || fixture.entries[legacyKeyOf(req.method(), u, req.postData())]
+          if (!e) { misses.push(req.method() + ' ' + pathOf(u).slice(0, 140)); return route.fulfill({ status: 404, contentType: 'application/json', body: '{}' }) }
+          rekeyed[k] = e
           return route.fulfill({ status: e.s, contentType: e.t, body: e.b })
         }
         const e = fixture.entries[k]
@@ -161,6 +174,15 @@ async function main () {
     fs.writeFileSync(FIXTURE, zlib.gzipSync(JSON.stringify(fixture), { level: 9 }))
     console.log(JSON.stringify({ mode: 'record', at: fixture._at, entries: Object.keys(fixture.entries).length, bytes: fs.statSync(FIXTURE).size, shots: shots.length, missing: shots.filter(s => s.missing).map(s => s.name) }))
     return 0
+  }
+
+  if (MODE === 'rekey') {
+    const before = Object.keys(fixture.entries).length
+    fixture.entries = rekeyed
+    fs.writeFileSync(FIXTURE, zlib.gzipSync(JSON.stringify(fixture), { level: 9 }))
+    console.log(JSON.stringify({ mode: 'rekey', at: fixture._at, entries_before: before, entries_after: Object.keys(rekeyed).length, dropped_unused: before - Object.keys(rekeyed).length,
+      misses: misses.length, miss_list: misses.slice(0, 10), shots: shots.length, missing: shots.filter(s => s.missing).map(s => s.name) }))
+    return misses.length ? 1 : 0
   }
 
   if (MODE === 'update') {
