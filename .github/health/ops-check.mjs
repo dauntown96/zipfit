@@ -1715,8 +1715,10 @@ try {
   const privacyHtml = readFileSync(new URL('../../privacy.html', import.meta.url), 'utf8')
   const v2Start = v2StartOf(indexHtml)
   const [x] = await sqlRead(PRIVACY_MATCH_SQL(v2Start ?? '2999-12-31'))
-  const j = judgePrivacyMatch({ privacyHtml, indexHtml, db: x.j, today: new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10) })
-  add('privacy_match', '처리방침 ↔ 실물(이벤트 키 · 프로필·의견·찜 칸 · 바깥 호스트 · 시행 전 키)', j.status, j.value, j.rule)
+  const privDir = new URL('../../docs/privacy/', import.meta.url)
+  const privacyFiles = Object.fromEntries(readdirSync(privDir).filter(f => /^\d{4}-\d{2}-\d{2}\.html$/.test(f)).map(f => [f, readFileSync(new URL(f, privDir), 'utf8')]))
+  const j = judgePrivacyMatch({ privacyHtml, indexHtml, db: x.j, today: new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10), privacyFiles })
+  add('privacy_match', '처리방침 ↔ 실물(이벤트 키 · 프로필·의견·찜 칸 · 바깥 호스트 · 시행 전 키 · 이전 판 사슬)', j.status, j.value, j.rule)
 } catch (e) {
   addBlind('privacy_match', '처리방침 ↔ 실물 대조 — 점검 불능', 'warn', String(e).slice(0, 200), 'index.html · privacy.html · 이용 기록·프로필 칸 이름을 읽는다(못 읽으면 ⚠️)')
 }
