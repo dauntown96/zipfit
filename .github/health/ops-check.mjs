@@ -20,6 +20,7 @@ import { RENT_ARITH_SQL, rentArith, rentArithValue, rentWarnMissingSql } from '.
 import { judgeApiExpiry } from './api-expiry.mjs'
 import { screenRunSql, judgeScreenRun } from './screen-run.mjs'
 import { INCOME_ROWS_SQL, judgeIncome } from './income-table.mjs'
+import { PRIVACY_MATCH_SQL, judgePrivacyMatch, v2StartOf } from './privacy-match.mjs'
 import { ELIG_FORM_NULL_SQL, RENT_NULL_SQL, ROUND_MIX_SQL, LH_CLOSED_WIN_SQL, DEDUP_KEY_PAREN_SQL, UNIT_AREA_ROUND_SQL, judgeEligFormNull, judgeRentNull, judgeRoundMix, judgeLhClosedWin, judgeDedupKeyParen, judgeUnitAreaRound } from './open-gaps.mjs'
 import { readdirSync, readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
@@ -1705,6 +1706,18 @@ try {
   add('income_table_rows', '소득기준 표 가구원수 줄 — 줄 번호 겹침·건너뜀 · 칸 금액이 가구원수 따라 안 늚', j.status, j.value, j.rule)
 } catch (e) {
   addBlind('income_table_rows', '소득기준 표 가구원수 줄 — 점검 불능', 'warn', String(e).slice(0, 200), '정책 표를 읽는다(못 읽으면 ⚠️)')
+}
+
+// ㊶ 처리방침 ↔ 실물 대조(2026-11-22 · 우편함 「코드·운영 — 넷째 묶음」 C · 순위표 17위) — 대조표·판정은 privacy-match.mjs 머리 주석. ⚠️만 · 못 읽으면 ⚠️ 점검 불능.
+try {
+  const indexHtml = readFileSync(new URL('../../index.html', import.meta.url), 'utf8')
+  const privacyHtml = readFileSync(new URL('../../privacy.html', import.meta.url), 'utf8')
+  const v2Start = v2StartOf(indexHtml)
+  const [x] = await sqlRead(PRIVACY_MATCH_SQL(v2Start ?? '2999-12-31'))
+  const j = judgePrivacyMatch({ privacyHtml, indexHtml, db: x.j, today: new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10) })
+  add('privacy_match', '처리방침 ↔ 실물(이벤트 키 · 프로필·의견·찜 칸 · 바깥 호스트 · 시행 전 키)', j.status, j.value, j.rule)
+} catch (e) {
+  addBlind('privacy_match', '처리방침 ↔ 실물 대조 — 점검 불능', 'warn', String(e).slice(0, 200), 'index.html · privacy.html · 이용 기록·프로필 칸 이름을 읽는다(못 읽으면 ⚠️)')
 }
 
 // ㊵ 부하 규칙 근거 다시 재기(2026-11-19 · 17장 · 순위표 14위 · 💡 「부하 규칙(분 단위 줄 · 하루 회차 수 등)의 근거 실측을 주간 ℹ️로」) — ℹ️ 정보(판정 0).

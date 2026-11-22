@@ -37,5 +37,19 @@ t('줄 하나면 안 봄', checkRow('1인가구 : 3,813,363원').lines === 1)
 const j = judgeIncome({ rows: [{ a: 'A', id: 'x', raw: gwangju, open: true, warned: true }, { a: 'B', id: 'y', raw: gwangju, open: true, warned: false }, { a: 'C', id: 'z', raw: fixed, open: true, warned: false }, { a: 'D', raw: gwangju, open: false, warned: false }] })
 t('후보 1 · 알고 있음 1 · 닫힌 1 → ⚠️', j.status === 'warn' && j.hits.length === 3 && /후보 1/.test(j.value) && /알고 있음 1/.test(j.value) && /닫힌·⚠️ 없음 1/.test(j.value))
 t('후보 0 → ℹ️', judgeIncome({ rows: [{ a: 'A', raw: gwangju, open: true, warned: true }] }).status === 'info')
+// SH_313610 꼴(2026-11-22 · 넷째 묶음 B 1) — 전체 표(1~8인) + 「가구원수 :」 머리 줄 + 요약 표(1~7인) → 표 둘로 끊어 걸림 0
+const two = gwangju.replace(/^/, `1인 : 50% 1,906,682 · 60% 2,288,018
+2인 : 50% 2,933,135 · 60% 3,519,762
+3인 : 50% 4,084,215 · 60% 4,901,057
+가구원수 : 월평균 소득 50%(1인 가구 70%, 2인 가구 60%) · 월평균 소득 70%
+`).replace(/\n6인가구 : 5,242,771/, '\n7인가구 : 5,242,771')
+const c2 = checkRow(two)
+t('SH_313610 꼴 표 둘 · 걸림 0', c2.tables === 2 && c2.seq.length === 0 && c2.amt.length === 0)
+// 머리 줄 없이 두 표가 이어지면 종전대로 걸린다(끊는 것은 머리 줄에서만)
+const noHead = two.replace(/^가구원수 :.*\n/m, '')
+t('머리 줄 없으면 걸림', checkRow(noHead).seq.length > 0)
+// 둘째 표 안의 겹침은 「표2」 표지로 걸린다
+const bad2 = two.replace(/\n7인가구 : 5,242,771/, '\n6인가구 : 5,242,771')
+t('둘째 표 겹침 걸림', checkRow(bad2).seq.some(x => /^표2 7째 줄 6인/.test(x)))
 console.log(`income-table 시험 ${ok}/${ok + bad}`)
 process.exit(bad ? 1 : 0)

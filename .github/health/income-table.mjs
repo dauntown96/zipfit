@@ -11,31 +11,41 @@ export const LINE = /^\s*(\d)\s*인\s*(?:가구)?\s*(이상)?\s*(?:[:：]\s*|\s+
 const AMT = /([0-9]{1,3}(?:,[0-9]{3}){1,3})(?![0-9,])/g   // 쉼표 든 금액만(「원」 있어도 없어도 · 면적·연도 숫자는 안 셈)
 const COMBO = /^\s*\d+\s*명/                                // 「1인 0명 : …」 조합 표
 
-export function parseLines(text) {
-  const out = []
+// 🔵 2026-11-22(우편함 「코드·운영 — 넷째 묶음」 B 1) — 한 정책 행 안에 표가 둘(전체 표 + 「1인 가구 : …원 이하」 요약 표)이면
+//    머리 줄(「가구원수 :」 · 「구분」 · 「가구구성」 — HEAD)에서 새 표로 끊어 센다. 근거 SH_313610 6e98806e(11-22 claude.ai 판정 오경보 —
+//    요약 표 21칸 전부 전체 표와 일치 · 두 표를 한 줄로 이어 세어 9째 줄 「1인」을 겹침으로 셈).
+export const HEAD = /^\s*(가구원\s*수|구\s*분|가구\s*구성)\s*[:：|]/
+export function parseTables(text) {
+  const tables = [[]]
   for (const raw of String(text || '').split('\n')) {
+    if (HEAD.test(raw)) { if (tables[tables.length - 1].length) tables.push([]); continue }
     const m = LINE.exec(raw)
     if (!m || COMBO.test(m[3])) continue
     const amts = [...m[3].matchAll(AMT)].map(x => Number(x[1].replace(/,/g, ''))).filter(a => a >= 100000)
     if (!amts.length) continue
-    out.push({ n: Number(m[1]), open: !!m[2], amts, line: raw.trim().slice(0, 80) })
+    tables[tables.length - 1].push({ n: Number(m[1]), open: !!m[2], amts, line: raw.trim().slice(0, 80) })
   }
-  return out
+  return tables.filter(t => t.length)
 }
+export function parseLines(text) { return parseTables(text).flat() }
 
 export function checkRow(text) {
-  const lines = parseLines(text)
-  if (lines.length < 2) return { lines: lines.length, seq: [], amt: [] }
-  const seq = []
-  lines.forEach((l, i) => { if (l.n !== i + 1) seq.push(`${i + 1}째 줄 ${l.n}인`) })
-  const amt = []
-  for (let i = 1; i < lines.length; i++) {
-    const a = lines[i - 1], b = lines[i]
-    if (a.amts.length !== b.amts.length) continue
-    const k = b.amts.findIndex((x, j) => x <= a.amts[j])
-    if (k >= 0) amt.push(`${b.n}인 ${k + 1}째 칸 ${b.amts[k].toLocaleString('en-US')} ≤ 앞 줄 ${a.amts[k].toLocaleString('en-US')}`)
-  }
-  return { lines: lines.length, seq, amt }
+  const tables = parseTables(text)
+  const seq = [], amt = []
+  let lines = 0
+  tables.forEach((t, ti) => {
+    lines += t.length
+    if (t.length < 2) return
+    const tag = tables.length > 1 ? `표${ti + 1} ` : ''
+    t.forEach((l, i) => { if (l.n !== i + 1) seq.push(`${tag}${i + 1}째 줄 ${l.n}인`) })
+    for (let i = 1; i < t.length; i++) {
+      const a = t[i - 1], b = t[i]
+      if (a.amts.length !== b.amts.length) continue
+      const k = b.amts.findIndex((x, j) => x <= a.amts[j])
+      if (k >= 0) amt.push(`${tag}${b.n}인 ${k + 1}째 칸 ${b.amts[k].toLocaleString('en-US')} ≤ 앞 줄 ${a.amts[k].toLocaleString('en-US')}`)
+    }
+  })
+  return { lines, tables: tables.length, seq, amt }
 }
 
 export const INCOME_ROWS_SQL = `

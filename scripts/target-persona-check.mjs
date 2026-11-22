@@ -75,7 +75,7 @@ function serve(html) {
 async function run(browser, ref, personas) {
   const { html, label } = htmlFor(ref)
   const srv = await serve(html)
-  const ctx = await browser.newContext({ serviceWorkers: 'block' })
+  const ctx = await browser.newContext({ serviceWorkers: 'block', timezoneId: 'Asia/Seoul' })  // 🔵 2026-11-22 — 「오늘」 KST(Actions UTC · KST 08:50 회차가 어제로 셈 · 넷째 묶음 D)
   const page = await ctx.newPage()
   const errors = []
   page.on('pageerror', e => errors.push(String(e)))
@@ -210,7 +210,7 @@ function diff(a, b) {
 async function runMatch(browser, ref, personas) {
   const { html, label } = htmlFor(ref)
   const srv = await serve(html)
-  const ctx = await browser.newContext({ serviceWorkers: 'block' })
+  const ctx = await browser.newContext({ serviceWorkers: 'block', timezoneId: 'Asia/Seoul' })  // 🔵 2026-11-22 — 「오늘」 KST(Actions UTC · KST 08:50 회차가 어제로 셈 · 넷째 묶음 D)
   const page = await ctx.newPage()
   const errors = []
   page.on('pageerror', e => errors.push(String(e)))

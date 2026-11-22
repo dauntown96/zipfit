@@ -45,6 +45,11 @@ begin
         from (select substring(a.url from '^https?://([^/:?#]+)') as h, a.url, a.apply_end, a.updated_at
                 from public.announcements a where a.url ~ '^https?://') s
        where s.h is not null and s.h not in ('apply.lh.or.kr', 'www.i-sh.co.kr', 'housing.seoul.go.kr', 'www.myhome.go.kr')
+         -- 🔵 2026-11-22(우편함 「코드·운영 — 넷째 묶음」 B 2) — 그 호스트의 마지막 관측이 「관측 밖」(EF 400 · _shared/board-hosts.ts probe 아님)이고
+         --   7일 안이면 부르지 않는다(GH · 충북 · 나라키움 하루 3번 헛 호출 → 주 1번). 관측 대상에 더해지면 7일 안에 스스로 다시 부른다.
+         and not exists (select 1 from (select l.out_of_scope, l.run_date from zipfit_ops.host_probe_log l
+                                         where l.host = s.h and l.harvested_at is not null order by l.run_date desc limit 1) z
+                          where z.out_of_scope and z.run_date > v_today - 7)
        order by s.h, s.apply_end desc nulls last, s.updated_at desc
     loop
       v_rid := net.http_post(
