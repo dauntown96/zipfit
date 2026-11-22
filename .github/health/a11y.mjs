@@ -11,6 +11,7 @@
 //   node /home/user/zipfit/.github/health/a11y.mjs                    # 배포본(kkokzip.com)
 //   node /home/user/zipfit/.github/health/a11y.mjs --local            # 저장소 index.html(127.0.0.1 임시 서버 · ?ui=d3 같은 쿼리는 --query)
 //   node /home/user/zipfit/.github/health/a11y.mjs --write-baseline   # 기준선을 새로 쓴다(🔴 claude.ai 판정 뒤에만)
+//   --mode each                                                        # 종전 방식(상태마다 새 문맥) — 쪽 둘 방식과 견줄 때(2026-11-22)
 import fs from 'fs'
 import http from 'http'
 import path from 'path'
@@ -73,39 +74,84 @@ export function contrastKinds (incomplete, colors = {}) {
   return kinds
 }
 
+// 한 상태를 잰다(페이지는 이미 그 상태) → { rules, contrast_incomplete }
+async function axeState (page, AxeBuilder) {
+  const res = await new AxeBuilder({ page }).withTags(TAGS).analyze()
+  const rules = {}
+  for (const v of res.violations) {
+    rules[v.id] = { impact: v.impact, nodes: v.nodes.length, sample: (v.nodes[0]?.target || []).join(' ').slice(0, 90) }
+  }
+  // 대비 미완 노드의 글자색은 axe 가 데이터로 주지 않는다(pseudoContent 등) — 같은 노드의 계산된 color 를 페이지에서 읽어 갈래 열쇠에 넣는다.
+  const ci = (res.incomplete || []).find(x => x.id === 'color-contrast')
+  const sels = [...new Set(((ci && ci.nodes) || []).map(n => (n.target || [])[0]).filter(t => typeof t === 'string'))]
+  const colors = sels.length ? await page.evaluate(ss => Object.fromEntries(ss.map(s => {
+    let c = null
+    try { const e = document.querySelector(s); if (e) { const m = getComputedStyle(e).color.match(/\d+(\.\d+)?/g) || []; c = '#' + m.slice(0, 3).map(x => Math.round(+x).toString(16).padStart(2, '0')).join('') } } catch (_) {}
+    return [s, c]
+  })), sels) : {}
+  return { rules, contrast_incomplete: contrastKinds(res.incomplete, colors) }
+}
+
+// 🔵 2026-11-22(우편함 「표시층 — 화면 점검 가볍게」 2) — 여섯 상태를 쪽 둘에서 잰다(종전 상태마다 새 문맥 · 쪽 여섯).
+//    390 쪽 하나가 home → notices → match → notices(어둡게) → detail 차례로 상태만 바꾸고, 1280 쪽 하나가 notices-1280 을 잰다.
+//    차례는 앞 상태가 뒤 상태에 남기는 것이 없게 골랐다 — 매칭은 추천 탭 안(공고 탭 그대로) · 어둡게는 재고 곧바로 밝게로 되돌림 · 카드 펼침(detail)은 맨 끝.
+//    판정 뜻(상태 여섯 · 규칙 · 대상 · 기준선)은 그대로 — 2026-11-22 같은 판에서 종전 방식(mode 'each')과 위반 목록 대조(회신 표).
+const SHARED_ORDER = [
+  [390, ['home-390', 'notices-390', 'match-390', 'notices-390-dark', 'detail-390']],
+  [1280, ['notices-1280']],
+]
+const byName = Object.fromEntries(STATES.map(s => [s[0], s]))
+
 // browser 하나로 여섯 상태를 잰다 → { state: { rules: { id: { impact, nodes, sample } }, err? } }
-export async function measure (browser, url, { AxeBuilder }) {
+//   prepCtx(ctx) — 문맥마다 먼저 걸 것(화면 점검은 목록 RPC 대역을 건다 · 2026-11-22) · mode 'each' = 종전(상태마다 새 문맥)
+export async function measure (browser, url, { AxeBuilder, prepCtx = null, mode = 'shared' }) {
   const out = {}
-  for (const [name, width, dark, prep] of STATES) {
+  const open = async (width, dark) => {
     const ctx = await browser.newContext({ viewport: { width, height: 844 }, serviceWorkers: 'block', locale: 'ko-KR', timezoneId: 'Asia/Seoul', colorScheme: dark ? 'dark' : 'light' })
     // 점검은 운영 이용 기록에 쓰지 않는다(screen-check 와 같은 이유 · 고지 회차 1 · 6)
     await ctx.route(/\/rest\/v1\/usage_events(\?|$)/, r => r.fulfill({ status: 201, body: '' }))
+    if (prepCtx) await prepCtx(ctx)
     const page = await ctx.newPage()
-    try {
-      await page.goto(url, { waitUntil: 'networkidle', timeout: 90000 })
-      await waitList(page)
-      await prep(page)
-      const res = await new AxeBuilder({ page }).withTags(TAGS).analyze()
-      const rules = {}
-      for (const v of res.violations) {
-        rules[v.id] = { impact: v.impact, nodes: v.nodes.length, sample: (v.nodes[0]?.target || []).join(' ').slice(0, 90) }
-      }
-      // 대비 미완 노드의 글자색은 axe 가 데이터로 주지 않는다(pseudoContent 등) — 같은 노드의 계산된 color 를 페이지에서 읽어 갈래 열쇠에 넣는다.
-      const ci = (res.incomplete || []).find(x => x.id === 'color-contrast')
-      const sels = [...new Set(((ci && ci.nodes) || []).map(n => (n.target || [])[0]).filter(t => typeof t === 'string'))]
-      const colors = sels.length ? await page.evaluate(ss => Object.fromEntries(ss.map(s => {
-        let c = null
-        try { const e = document.querySelector(s); if (e) { const m = getComputedStyle(e).color.match(/\d+(\.\d+)?/g) || []; c = '#' + m.slice(0, 3).map(x => Math.round(+x).toString(16).padStart(2, '0')).join('') } } catch (_) {}
-        return [s, c]
-      })), sels) : {}
-      out[name] = { rules, contrast_incomplete: contrastKinds(res.incomplete, colors) }
-    } catch (e) {
-      out[name] = { err: String(e).slice(0, 200) }
-    } finally {
-      await ctx.close()
-    }
+    await page.goto(url, { waitUntil: 'networkidle', timeout: 90000 })
+    await waitList(page)
+    return { ctx, page }
   }
-  return out
+  if (mode === 'each') {
+    for (const [name, width, dark, prep] of STATES) {
+      let ctx = null
+      try {
+        const o = await open(width, dark); ctx = o.ctx
+        await prep(o.page)
+        out[name] = await axeState(o.page, AxeBuilder)
+      } catch (e) {
+        out[name] = { err: String(e).slice(0, 200) }
+      } finally {
+        if (ctx) await ctx.close()
+      }
+    }
+    return out
+  }
+  for (const [width, names] of SHARED_ORDER) {
+    let ctx = null, page = null, openErr = null
+    try { const o = await open(width, false); ctx = o.ctx; page = o.page } catch (e) { openErr = String(e).slice(0, 200) }
+    for (const name of names) {
+      if (openErr) { out[name] = { err: openErr }; continue }
+      const [, , dark, prep] = byName[name]
+      try {
+        if (dark) await page.emulateMedia({ colorScheme: 'dark' })
+        await prep(page)
+        out[name] = await axeState(page, AxeBuilder)
+      } catch (e) {
+        out[name] = { err: String(e).slice(0, 200) }
+      } finally {
+        // 어둡게는 그 상태만 — 다음 상태 전에 밝게로 되돌린다
+        if (dark) { await page.evaluate(() => setTheme('light', true)).catch(() => {}); await page.emulateMedia({ colorScheme: 'light' }).catch(() => {}) }
+      }
+    }
+    if (ctx) await ctx.close()
+  }
+  // 결과 차례는 STATES 차례(기준선 파일과 같은 꼴)
+  return Object.fromEntries(STATES.map(s => [s[0], out[s[0]]]).filter(([, v]) => v))
 }
 
 // 기준선과 견준다 → { status: 'pass'|'warn'|'fail', value, increased: [...] }
@@ -185,7 +231,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   }
   url += (query ? (query.startsWith('?') ? query : '?' + query) : '?a11y=' + Date.now())
   const browser = await chromium.launch()
-  const got = await measure(browser, url, { AxeBuilder })
+  const mi = argv.indexOf('--mode')
+  const got = await measure(browser, url, { AxeBuilder, mode: mi >= 0 ? argv[mi + 1] : 'shared' })
   await browser.close()
   if (server) server.close()
   if (argv.includes('--write-baseline')) {

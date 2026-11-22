@@ -14,6 +14,10 @@ import { chromium } from 'playwright'
 import { sqlRead, report, recordFindings, SITE } from './lib.mjs'
 import { readFileSync } from 'node:fs'
 import { ANA_DATE_RE } from './ana-date-re.mjs'
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join as pjoin } from 'node:path'
+import { stubListRpc, listKeyOf, seedListCache } from '../../scripts/render-list-stub.mjs'
 
 const VIEWPORT = { width: 390, height: 844 }
 const MAX_PAGES = 30
@@ -117,6 +121,14 @@ const STALE_DATE_FN = () => {
 
 const consoleErrors = []
 const browser = await chromium.launch()
+// 🔵 2026-11-22(우편함 「표시층 — 화면 점검 가볍게」 1 · 백로그 「화면 점검 회차마다 DB 가용 메모리가 500~900MB 떨어진다」) —
+//    목록 RPC(get_announcements_deduped)는 한 실행에 운영에서 한 번(인자·쪽마다)만 받는다. 측정용 첫 열기(아래 page)는 종전 그대로 운영을 부르고,
+//    그 응답 바이트를 이 실행만의 캐시 폴더에 심는다(seedListCache). 같은 실행의 다른 문맥(1280 · 입력 · 날값 · 빈 탭 · 접근성)은
+//    scripts/render-list-stub.mjs 대역으로 그 캐시를 받는다 — 화면 매핑·그리기는 실물 그대로(원칙 26 · 응답까지만 대역).
+//    탐침 뜻이 「운영에서 받는가」인 자리(첫 열기 · 느린 망 8초 · 로그인 바퀴 · 퍼즈 · 페르소나)는 대역을 걸지 않는다.
+const LIST_DIR = mkdtempSync(pjoin(tmpdir(), 'screen-list-'))
+const listCount = { main: 0, seeded: 0, stubs: [] }
+const stubCtx = async c => { const info = await stubListRpc(c, { dir: LIST_DIR, maxAgeMin: 120 }); listCount.stubs.push(info); return info }
 // 🔵 2026-11-19(우편함 「코드·운영 — 16장」 · 순위표 9위) — 점검 전체 감시 시한. 2026-11-19 06:18 UTC push 실행(run 44468234254)은 첫 열기 90초 초과 →
 //    「20초 뒤 한 번 다시 연다」 뒤 아무 줄 없이 20분 멈췄다가 작업 한도(25분)에 취소돼 「결과 파일을 남기지 못했다」로만 남았다(#1141 · 어디서 멈췄는지 0).
 //    이제 SCREEN_DEADLINE_MIN(기본 18분)을 넘기면 마지막으로 들어선 자리(stage)를 실은 runner ❌ 로 결과 파일을 쓰고 끝낸다 — 판정 뜻은 종전 그대로(실패 · 이슈).
@@ -137,6 +149,16 @@ try {
   //    여기서 받아 201 로 끝낸다 — 화면 동작은 그대로(송신은 fire-and-forget) · 처리방침 「이용 기록」 목적 밖의 행이 집계를 부풀리지 않게.
   await ctx.route(/\/rest\/v1\/usage_events(\?|$)/, r => r.fulfill({ status: 201, body: '' }))
   const page = await ctx.newPage()
+  // 측정용 첫 열기 — 운영 응답 그대로 받고, 받은 목록을 캐시에 심는다(위 LIST_DIR).
+  page.on('response', async r => {
+    try {
+      if (!/\/rest\/v1\/rpc\/get_announcements_deduped/.test(r.url())) return
+      listCount.main++
+      const key = listKeyOf(r.request())
+      if (key == null || (r.status() !== 200 && r.status() !== 206)) return
+      seedListCache(LIST_DIR, key, await r.body()); listCount.seeded++
+    } catch (_) { /* 심지 못하면 대역이 운영에서 한 번 받는다 */ }
+  })
   page.on('console', m => {
     if (m.type() !== 'error') return
     const where = (m.location() && m.location().url) || ''
@@ -1078,6 +1100,7 @@ try {
     const dctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: 'no-preference', serviceWorkers: 'block', locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
     try {
       await dctx.route(/\/rest\/v1\/usage_events(\?|$)/, r => r.fulfill({ status: 201, body: '' }))
+      await stubCtx(dctx)
       dp = await dctx.newPage()
       await dp.goto(SITE + '?wide=' + Date.now(), { waitUntil: 'networkidle', timeout: 90000 })
       await dp.waitForFunction(() => typeof noticeData !== 'undefined' && noticeData.length > 0 && noticeLoaded, null, { timeout: 60000 })
@@ -1309,6 +1332,7 @@ try {
     const ictx = await browser.newContext({ viewport: VIEWPORT, serviceWorkers: 'block', locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
     try {
       await ictx.route(/\/rest\/v1\/usage_events(\?|$)/, r => r.fulfill({ status: 201, body: '' }))
+      await stubCtx(ictx)
       const ip = await ictx.newPage()
       await ip.goto(SITE + '?ime=' + Date.now(), { waitUntil: 'networkidle', timeout: 90000 })
       await ip.waitForFunction(() => typeof noticeData !== 'undefined' && noticeData.length > 0 && noticeLoaded, null, { timeout: 60000 })
@@ -1381,6 +1405,7 @@ try {
     }
     const tctx = await browser.newContext({ viewport: VIEWPORT, serviceWorkers: 'block', locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
     await tctx.route(/\/rest\/v1\/usage_events(\?|$)/, r => r.fulfill({ status: 201, body: '' }))
+    await stubCtx(tctx)
     const tp = await tctx.newPage()
     await tp.goto(SITE + '?watch=' + Date.now(), { waitUntil: 'networkidle', timeout: 90000 })
     await tp.waitForFunction(() => typeof noticeData !== 'undefined' && noticeData.length > 0, null, { timeout: 60000 })
@@ -1557,7 +1582,8 @@ try {
   try {
     const { measure, compare, loadBaseline } = await import('./a11y.mjs')
     const AxeBuilder = (await import('@axe-core/playwright')).default
-    const got = await measure(browser, SITE + '?a11y=' + Date.now(), { AxeBuilder })
+    // 🔵 2026-11-22(우편함 「표시층 — 화면 점검 가볍게」 1·2) — 여섯 상태를 쪽 둘에서(a11y.mjs measure 'shared') · 목록은 이 실행 캐시 대역
+    const got = await measure(browser, SITE + '?a11y=' + Date.now(), { AxeBuilder, prepCtx: stubCtx })
     const c = compare(got, loadBaseline())
     extra.a11y = { states: got, increased: c.increased }
     add('a11y', '접근성(axe-core · WCAG 2.1 A·AA) — 기준선보다 늘었나', c.status, c.value,
@@ -1594,6 +1620,7 @@ try {
   //    로그인·저장 0 상태는 여기서 재지 않는다(점검은 비로그인 — 실사용 회차 몫). 실패는 안 멈춤(gate.mjs 밖 · health-screen 이슈).
   try {
     const tp = await ctx.newPage()
+    await stubCtx(tp)   // 쪽 단위 대역(같은 문맥의 측정용 첫 열기 page 에는 걸리지 않는다)
     await tp.goto(SITE + '?health=' + Date.now(), { waitUntil: 'networkidle', timeout: 90000 })
     await tp.waitForFunction(() => typeof noticeData !== 'undefined' && noticeData.length > 0, null, { timeout: 60000 })
     const tabs = []
@@ -1611,6 +1638,35 @@ try {
         return { n, name, chars: text.length, empty, act, why }
       }, i))
     }
+    // 🔵 2026-11-22(우편함 「표시층 — 화면 점검 가볍게」 4 · 💡 승인 11-22) — 카드 겉 「얼마」 줄의 짧은 말(.zf12-cond) 세 갈래 — 두 조건 · 가·나군별 · 소득 구간별.
+    //    새 공고에서 처음 설 때 글자가 셋 밖이거나 줄이 상자 밖으로 넘치면 ⚠️ · 아니면 ℹ️(갈래별 수). 새 조회 0 — 이 쪽이 이미 받은 응답으로 그린 카드만 읽는다.
+    try {
+      await tp.evaluate(() => goMain(2))
+      await tp.waitForTimeout(4000)
+      const cond = await tp.evaluate(() => {
+        const ok = ['· 두 조건', '· 가·나군별', '· 소득 구간별']
+        const out = { n: 0, kinds: {}, bad: [] }
+        document.querySelectorAll('.zf12-card [data-sum-for] .zf12-cond').forEach(el => {
+          if (el.offsetParent === null) return
+          out.n++
+          const t = (el.textContent || '').replace(/\s+/g, ' ').trim()
+          // 넘침 = 짧은 말 자체가 상자 안쪽 오른끝 밖으로 나감(상자는 nowrap · 말줄임 — 뒤에 붙는 회차 꼬리는 셈 밖)
+          const box = el.parentElement, br = box ? box.getBoundingClientRect() : null
+          const over = !!br && el.getBoundingClientRect().right > br.right - (parseFloat(getComputedStyle(box).paddingRight) || 0) + 0.5
+          const aid = (el.closest('[data-sum-for]') || {}).getAttribute?.('data-sum-for') || ''
+          if (ok.includes(t)) out.kinds[t.slice(2)] = (out.kinds[t.slice(2)] || 0) + 1
+          if (!ok.includes(t) || over) out.bad.push(`${aid.slice(-5)} 「${t.slice(0, 20)}」${over ? ' 넘침' : ''}`)
+        })
+        return out
+      })
+      extra.price_cond = cond
+      add('price_cond', '얼마 줄 짧은 말(두 조건 · 가·나군별 · 소득 구간별) — 글자·넘침', cond.bad.length ? 'warn' : 'info',
+        cond.bad.length ? `${cond.bad.length}/${cond.n}: ${cond.bad.slice(0, 4).join(' / ')}`
+          : (cond.n ? Object.entries(cond.kinds).map(([k, v]) => `${k} ${v}`).join(' · ') : '보이는 짧은 말 0'),
+        '390 공고 탭 첫 쪽 카드 · 글자가 셋 중 하나 ∧ 짧은 말이 상자 안(말줄임에 잘리지 않음) — 어긋나면 ⚠️(경고만 · 이슈 0) · 새 조회 0')
+    } catch (e) {
+      add('price_cond', '얼마 줄 짧은 말(두 조건 · 가·나군별 · 소득 구간별) — 글자·넘침', 'warn', '못 잼: ' + String(e).slice(0, 160), '경고만')
+    }
     await tp.close()
     extra.empty_tabs = tabs
     const bad = tabs.filter(t => t.why)
@@ -1626,6 +1682,11 @@ try {
 } finally {
   await browser.close()
 }
+// 목록 RPC 셈(2026-11-22 · 기록만) — main = 측정용 첫 열기가 운영에서 받은 수 · seeded = 캐시에 심은 수 ·
+//   stub_upstream = 대역이 캐시에 없어 운영으로 보낸 수(인자가 다른 호출 · 심지 못한 쪽) · stub_hits = 캐시로 돌려준 수. 느린 망 8초(stall8)는 셈 밖(운영 그대로 1회).
+extra.list_rpc = { main: listCount.main, seeded: listCount.seeded, stub_contexts: listCount.stubs.length,
+  stub_upstream: listCount.stubs.reduce((a, i) => a + i.upstream, 0), stub_hits: listCount.stubs.reduce((a, i) => a + i.hits, 0) }
+console.log('목록 RPC 셈', JSON.stringify(extra.list_rpc))
 // ③ 콘솔 오류
 extra.console_errors = consoleErrors
 add('console', '콘솔 오류(카카오맵 제외)', consoleErrors.length === 0 ? 'pass' : 'fail', consoleErrors.length ? `${consoleErrors.length}: ${consoleErrors.slice(0, 2).join(' / ')}` : 0, '0')
