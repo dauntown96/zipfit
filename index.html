@@ -501,6 +501,7 @@ body.theme-dark .hu-ug-name,body.theme-dark .hu-ug-target,body.theme-dark .hu-ug
 .poi-dist{color:#999;font-size:var(--t-xs)}
 .poi-loading{font-size:12px;color:#999;padding:8px;text-align:center}
 /* 추정 핀 안내. 색은 기존 .warn 토큰(#FAEEDA/#FAC775/#854F0B) 그대로 — 새 색을 만들지 않는다 */
+.map-src{margin:6px 2px 0;font-size:var(--t-xs);line-height:1.5;color:var(--ink-3)}   /* 2026-11-22 상세 지도 출처 줄(주소정보 좌표 핀일 때만) */
 .map-approx{font-size:12px;line-height:1.55;color:#854F0B;background:#FAEEDA;border:1px solid #FAC775;border-radius:var(--r-s);padding:7px 10px;margin-top:6px}
 /* 시·도까지만 아는 공고 — 지도 대신 문구로 닫는다. 빈 상자를 만들지 않는다 */
 .map-closed{display:flex;flex-direction:column;justify-content:center;height:100%;margin:0;padding:0 18px;text-align:center;font-size:13px;line-height:1.6;color:#666}
@@ -12651,6 +12652,7 @@ function initMapForHouse(h,id){
     if(zf3Exact) lblKeep();
     zfMapApproxShape(huMapState[id], coords, approx);
     setMapApproxNote(mapEl, approx);
+    setMapSrcNote(mapEl, !!(result[0] && result[0]._zfJuso));
     buildPoiTabs(id, coords);
   };
   // 🔵 2026-11-17(우편함 「표시층 — 3판」 1) — 단지 도로명·좌표 표(complex_geo · 공식 공공 API 값)에 이 주소(matched_from = 세대·블록 주소 원문 그대로)의
@@ -12658,7 +12660,7 @@ function initMapForHouse(h,id){
   //    화면 주소 글자는 원문 그대로(이 표는 핀 자리만) · 표는 첫 지도에서 한 번만 읽는다(좌표 있는 행만 · anon 공개 읽기).
   Promise.all([loadKakao(), zfComplexGeo()]).then(([, geo])=>{
     const cg = !h.approx && geo && geo.get(String(h.addr || '').trim());
-    if(cg && cg.lat != null && cg.lng != null){ renderMap([{ x: String(cg.lng), y: String(cg.lat), address_type: 'ROAD_ADDR' }], false); return; }
+    if(cg && cg.lat != null && cg.lng != null){ renderMap([{ x: String(cg.lng), y: String(cg.lat), address_type: 'ROAD_ADDR', _zfJuso: true }], false); return; }
     const geocoder = new kakao.maps.services.Geocoder();
     // 쉼표로 이어붙은 복수 지번("지번1 , 지번2")은 지오코딩 API가 파싱하지 못해
     // 상위 행정구역 대표좌표로 튀는 문제가 있어, Lv1부터 첫 번째 지번만 남겨 사용
@@ -12812,6 +12814,25 @@ function setMapApproxNote(mapEl, approx){
   }
   if(approx) note.textContent = ZF_MAP_APPROX_TEXT[approx] || ZF_MAP_APPROX_TEXT.fallback;
   note.hidden = !approx;             // 같은 지도를 다시 쓸 때(건물 클릭) 되돌아간다
+}
+
+// 🔵 2026-11-22(우편함 「표시층 — 다음 판 … 지도 출처 줄」 요청 덧 · 다운님 결정 11-22 12:14 (가)) — 상세 지도 출처 줄.
+//    핀이 단지 좌표 표(complex_geo · 주소정보 좌표)로 그려졌을 때만 지도 아래 한 줄 · 카카오 지오코딩 · 시군구 중심(대략)이면 숨긴다.
+//    글자는 행안부 답의 출처 표기 그대로(우편함 「조사 — 단지 좌표」). 한 상자의 핀은 하나라(건물 클릭 = 핀 옮김) 줄은 지금 핀을 따른다.
+const ZF_MAP_JUSO_SRC = '주소 좌표: 주소정보 관리기관(행정안전부, 시도, 시군구)';
+function setMapSrcNote(mapEl, on){
+  const box = mapEl && mapEl.parentElement;
+  if(!box) return;
+  let note = box.querySelector(':scope > .map-src');
+  if(!note){
+    if(!on) return;                  // 지울 것이 없으면 만들지 않는다
+    note = document.createElement('p');
+    note.className = 'map-src';
+    note.textContent = ZF_MAP_JUSO_SRC;
+    const ap = mapEl.nextElementSibling;
+    (ap && ap.classList && ap.classList.contains('map-approx') ? ap : mapEl).insertAdjacentElement('afterend', note);
+  }
+  note.hidden = !on;
 }
 
 function buildPoiTabs(id,coords){
