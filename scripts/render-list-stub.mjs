@@ -51,6 +51,26 @@ export function argKey(body) {
   return JSON.stringify(Object.fromEntries(kept.map(k => [k, o[k]])))
 }
 
+// 캐시 파일 자리 — 인자 키(offset 꼬리 포함)마다 하나.
+export const listCacheFile = (dir, key) => join(dir, `list-rpc-${createHash('md5').update(key).digest('hex').slice(0, 12)}.json`)
+// 요청 → 캐시 키(인자 키 + offset 꼬리) · 캐시하지 않는 요청(POST 아님 · 본문이 JSON 아님)은 null.
+export function listKeyOf(req) {
+  let key = req.method() === 'POST' ? argKey(req.postData()) : null
+  if (key == null) return null
+  const off = new URL(req.url()).searchParams.get('offset')
+  return off ? key + ` offset=${off}` : key
+}
+// 🔵 2026-11-22(우편함 「표시층 — 화면 점검 가볍게」 1) — 운영에서 이미 받은 응답을 캐시에 심는다(화면 점검의 측정용 첫 열기가 받은 목록을
+//    같은 실행의 다른 문맥이 다시 받지 않게). 받은 바이트 그대로 — 손으로 옮기지 않는다.
+export function seedListCache(dir, key, body) {
+  mkdirSync(dir, { recursive: true })
+  const file = listCacheFile(dir, key)
+  writeFileSync(file + '.part', body)
+  renameSync(file + '.part', file)
+  return file
+}
+
+// page 자리에 BrowserContext 를 줘도 된다(같은 route 꼴 — 그 문맥의 모든 쪽에 걸린다).
 export async function stubListRpc(page, { dir, maxAgeMin = 30, mutate = null } = {}) {
   dir = dir || process.env.ZIPFIT_RENDER_CACHE_DIR || sessionScratchpad() || tmpdir()
   mkdirSync(dir, { recursive: true })
@@ -58,7 +78,7 @@ export async function stubListRpc(page, { dir, maxAgeMin = 30, mutate = null } =
   const inflight = new Map()   // 같은 인자가 한 렌더 안에서 동시에 와도 운영은 한 번
 
   const load = async (key, route) => {
-    const file = join(dir, `list-rpc-${createHash('md5').update(key).digest('hex').slice(0, 12)}.json`)
+    const file = listCacheFile(dir, key)
     const k = info.keys[key] || (info.keys[key] = { file, fetched: false, ageMin: null, bytes: 0, hits: 0 })
     const ageMin = existsSync(file) ? (Date.now() - statSync(file).mtimeMs) / 60000 : Infinity
     if (ageMin <= maxAgeMin) {
@@ -85,11 +105,9 @@ export async function stubListRpc(page, { dir, maxAgeMin = 30, mutate = null } =
   await page.route(/\/(rest\/v1\/user_feedback|functions\/v1\/submit-feedback)(\?|$)/, r => r.fulfill({ status: 201, contentType: 'application/json', body: '{"ok":true}' }))
   await page.route(`**${RPC}*`, async route => {
     const req = route.request()
-    let key = req.method() === 'POST' ? argKey(req.postData()) : null
-    if (key == null) return route.continue()
     // 🔵 2026-11-10 — 화면이 상한(1000행)에서 잘린 목록을 ?offset= 으로 이어 받는다(index.html zfListRpc). 쪽마다 따로 캐시한다(키에 offset 을 붙인다).
-    const off = new URL(req.url()).searchParams.get('offset')
-    if (off) key += ` offset=${off}`
+    const key = listKeyOf(req)
+    if (key == null) return route.continue()
     let p = inflight.get(key)
     const mine = !p
     if (mine) { p = load(key, route); inflight.set(key, p) }
