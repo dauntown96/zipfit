@@ -878,6 +878,11 @@ html[data-ui="d3"] .zf-ana-box a{color:var(--ink)!important}
 .hcard.zf-lo .zf3-ctop .zf3-dpill{order:2}
 html[data-ui="d3"] .hcard.zf-lo .zf3-ctop::after{background:var(--ink-2);color:var(--paper)}
 .zf-sch-stop>summary::-webkit-details-marker{display:none}
+/* 판 C 5 ② — 곁가지 역(게시 기간 「모집공고」): 노선 옆으로 한 칸 들여 작은 빈 점 + 점선 가지 · 역 차례(다음·진행 중)에 들지 않는다 */
+html[data-ui="d3"] .zf3-vline .policy-item.zf-sch-side{padding-left:46px!important}
+html[data-ui="d3"] .zf3-vline .policy-item.zf-sch-side::after{left:26px;top:5px;width:9px;height:9px;border-width:2px;border-style:dashed;border-color:var(--ink-3);background:var(--paper);box-shadow:none}
+html[data-ui="d3"] .zf3-vline .policy-item.zf-sch-side>details::before{content:"";position:absolute;left:12px;top:9px;width:14px;border-top:2px dashed var(--rail)}
+html[data-ui="d3"] .zf3-vline .policy-item.zf-sch-side .policy-content{font-size:12px!important;font-weight:600;color:var(--ink-2)!important}
 .zf-sch-stop>summary>.policy-category,.zf-sch-stop>summary>.policy-content{display:block}
 .zf-sch-stop .zf-sch-more{font-family:inherit;font-size:var(--t-xs);font-weight:600;color:var(--ink-3,#777);margin-left:8px;white-space:nowrap}
 .zf-sch-stop .zf-sch-more::after{content:" ▾"}
@@ -9565,7 +9570,9 @@ function zfScheduleItemHTML(r, showScope){
   const d1 = r.start_date || r.end_date || '', d2 = r.end_date || r.start_date || '';
   const sc = [showScope ? r.scope_text : '', r.site_label].filter(Boolean).map(escapeHtml).join(' · ');
   const rawMark = ZF_RAW_REPEAT.test(r.stage_text || '') ? ' <span class="zf-sch-rawmark" title="공고문에 적힌 글자 그대로예요">(원문 표기)</span>' : '';
-  const head = `<span class="policy-category">${ZF_STAGE_ICON[r.stage] ? ZF_STAGE_ICON[r.stage] + ' ' : ''}${escapeHtml(r.stage_text || '')}${rawMark}${sc ? ` <span class="zf-sch-scope">${sc}</span>` : ''}</span>`;
+  // 🔵 판 C 5 ① — 카드 접수기간과 같은 기간인 역(일정 표에 접수 행이 없는 공고)은 그 역에 「접수기간」 표지를 달고 따로 역을 세우지 않는다.
+  const apMark = r._applySame ? ` <span class="zf-sch-scope">📅 접수기간</span>` : '';
+  const head = `<span class="policy-category">${ZF_STAGE_ICON[r.stage] ? ZF_STAGE_ICON[r.stage] + ' ' : ''}${escapeHtml(r.stage_text || '')}${rawMark}${sc ? ` <span class="zf-sch-scope">${sc}</span>` : ''}${apMark}</span>`;
   // 🔵 2026-11-03 — 합친 역(r._grp)은 행 id 를 모두 싣고(data-sch-ids) 「원문」 펼침을 행마다 가른다(data-sch-rid) · 경로 대상 글(_notes)은 따로 —
   //    health-screen sched_line 이 역 id·원문 글 = DB period_text 를 행마다 잰다(원칙 33).
   const grp = r._grp || null, notes = r._notes || [];
@@ -9577,7 +9584,7 @@ function zfScheduleItemHTML(r, showScope){
   const inner = dl
     ? `<summary>${head}<span class="policy-content">${escapeHtml(dl)}<span class="zf-sch-more" aria-hidden="true">원문</span></span>${rl}</summary><div class="zf-sch-raw">${raw}</div>`
     : `<summary>${head}<span class="policy-content zf-sch-nd">${raw}</span></summary>`;
-  return `<div class="policy-item" data-zf-d="${zfAttr(d1)}" data-zf-e="${zfAttr(d2)}"${r.id != null ? ` data-sch-id="${zfAttr(r.id)}"` : ''}${grp ? ` data-sch-ids="${zfAttr(grp.map(g => g.id).join(' '))}"` : ''}><details class="zf-sch-stop">${inner}</details></div>`;
+  return `<div class="policy-item${r._side ? ' zf-sch-side' : ''}" data-zf-d="${zfAttr(d1)}" data-zf-e="${zfAttr(d2)}"${r.id != null ? ` data-sch-id="${zfAttr(r.id)}"` : ''}${grp ? ` data-sch-ids="${zfAttr(grp.map(g => g.id).join(' '))}"` : ''}><details class="zf-sch-stop">${inner}</details></div>`;
 }
 // 🔵 2026-11-03(우편함 「표시층 — 다음 판 시안」 A · 백로그 「상세 「공급일정」 노선에서 현장 접수가 별 역으로 서…」) — 접수 단계에서 경로만 다른 행은 한 역.
 //    일정 표 접수 행이 이어서 둘 이상이고 날짜 창이 서로 겹치면(인터넷 11-16~18 · 현장 11-17 — …20896) 한 역으로 합치고(날짜 = 가장 이른 시작 ~ 가장 늦은 끝 ·
@@ -9593,19 +9600,22 @@ function zfSchMergeApply(list, routes){
   const out = [];
   list.forEach(x => {
     const last = out[out.length - 1];
-    if(last && x.r.stage === '접수' && last.r.stage === '접수' && (last.r.site_label || '') === (x.r.site_label || '') && zfSchOverlap(last.r, x.r)){
+    // 🔵 판 C 5 ③ — 접수 밖 단계도 같은 단계 · 같은 날짜(시작·끝 모두 같음)인 이어진 행은 한 역 + 경로 줄(김해 …21034 서류 제출 「인터넷 제출」·「방문/등기우편 제출」).
+    const sameDates = (a, b) => !!(a.start_date && a.end_date) && a.start_date === b.start_date && a.end_date === b.end_date;
+    if(last && x.r.stage === last.r.stage && (last.r.site_label || '') === (x.r.site_label || '')
+      && (x.r.stage === '접수' ? zfSchOverlap(last.r, x.r) : x.r.stage !== '공고' && sameDates(last._first || last.r, x.r))){
       const m = last.r._grp ? last.r : Object.assign({}, last.r, { _grp: [last.r] });
       m._grp.push(x.r);
       m.start_date = m._grp.map(r => r.start_date || r.end_date).sort()[0];
       m.end_date = m._grp.map(r => r.end_date || r.start_date).sort().slice(-1)[0];
       m.stage_text = [...new Set(m._grp.map(r => r.stage_text || ''))].filter(Boolean).join(' · ');
-      out[out.length - 1] = { r: m, s: false };
+      out[out.length - 1] = { r: m, s: false, _first: last._first || last.r };
       return;
     }
     out.push(x);
   });
   return out.map(x => {
-    if(x.r.stage !== '접수') return x;
+    if(x.r.stage !== '접수') return x.r._grp ? { r: Object.assign({}, x.r, { _routes: x.r._grp.map(r => ({ name: r.scope_text || r.stage_text || '', dl: zfSchDateLine(r), place: '' })) }), s: x.s } : x;
     const hit = (routes || []).filter(rt => zfSchOverlap(rt, x.r));
     let lines = null;
     if(new Set(hit.map(rt => rt.route)).size >= 2){
@@ -9620,7 +9630,8 @@ function zfSchMergeApply(list, routes){
 }
 function zfScheduleMarkLine(box){
   const today = zf3Today();
-  const items = [...box.querySelectorAll(':scope > .policy-item')];
+  box.querySelectorAll(':scope > .policy-item.zf-sch-side').forEach(it => it.classList.add('side'));   // 판 C 5 ② — 곁가지는 역 차례(지남·진행 중·다음)에 들지 않는다
+  const items = [...box.querySelectorAll(':scope > .policy-item:not(.zf-sch-side)')];
   const nextI = items.findIndex(it => (it.dataset.zfD || '') > today);
   items.forEach((it, i) => it.classList.add(!it.dataset.zfD ? 'unk' : it.dataset.zfD <= today ? ((it.dataset.zfE || '') >= today ? 'now' : 'past') : i === nextI ? 'next' : 'fut'));
   return items.some(it => (it.dataset.zfE || '') >= today);
@@ -9660,7 +9671,12 @@ function loadScheduleLine(annId, cardEl, id){
     const ord = new Map(); cur.forEach((r, i) => ord.set(r, i));
     // 접수 행이 없으면 카드 접수기간(확정값)을 첫 「접수 뒤」 단계 앞에 종전 이름으로
     const aS = cardEl.dataset.applyStart || '', aE = cardEl.dataset.applyEnd || '';
-    const extraApply = !cur.some(r => r.stage === '접수') && (aS || aE)
+    // 🔵 판 C 5 ① — 접수 행이 없고 카드 접수기간과 시작·끝이 모두 같은 일정 행이 있으면 그 행이 접수 역이다(익산제3 …20850 「동호지정 및 계약체결」 = 접수기간 — 같은 기간 두 역이 섰다).
+    const sameAp = !cur.some(r => r.stage === '접수') && aS && aE ? cur.filter(r => r.start_date === aS && r.end_date === aE) : [];
+    sameAp.forEach(r => { r._applySame = true; });
+    // 🔵 판 C 5 ② — 「공고」 단계가 기간(시작 < 끝)이고 다른 역과 겹치면(SH 「모집공고」 게시 기간이 접수·공개를 품음) 곁가지로.
+    cur.forEach(r => { r._side = r.stage === '공고' && !!(r.start_date && r.end_date) && r.start_date < r.end_date && cur.some(o => o !== r && o.stage !== '공고' && zfSchOverlap(o, r)); });
+    const extraApply = !sameAp.length && !cur.some(r => r.stage === '접수') && (aS || aE)
       ? `<div class="policy-item" data-zf-d="${zfAttr(aS || aE)}" data-zf-e="${zfAttr(aE || aS)}"><div class="policy-category">📅 접수기간</div><div class="policy-content">${escapeHtml(`${aS || '-'} ~ ${aE || '-'}`)}</div></div>` : '';
     // 🔵 2026-11-12 — 일정 표에 「공고」 단계 행이 없으면 첫 정거장 = 카드 노선과 같은 공고일(zfScheduleAnnItem · 노선마다 맨 앞)
     const annItem = cur.some(r => r.stage === '공고') ? '' : zfScheduleAnnItem(cardEl);
