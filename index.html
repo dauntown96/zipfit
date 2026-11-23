@@ -16518,6 +16518,27 @@ async function zf12Load(rows){
       });
       zf12Info.set(id, { ids, heads, res: ep.length ? zf12Res(ep[0].content_raw) : '', sched });
     });
+    // 🔵 판 C 1 (가)(2026-11-23 · 「처음 온 사람」 걷기 두 번 모두 🅰 첫 칸 함정) — 세대 행이 없는 공고(전세임대 등)는 「누가」 재료가 없어 👥 줄이 서지 않았다.
+    //    세대 계층도 거주 조각도 없을 때만 자격 행 공급대상 키(분석이 원문 대상 낱말로 쓴 값 — 매칭 판정과 같은 키)의 「대상」을 쓴다 ·
+    //    「조건.계층_중_하나」가 있으면 괄호로(원문 「아래 1순위 유형 중 어느 하나」 — 청년 전세임대 1순위). 낱말은 키 값 그대로 · 새 말 0.
+    const bare = grp.filter(([id]) => { const I = zf12Info.get(id); return I && !I.heads.length && !I.res; });
+    if(bare.length){
+      const bIds = [...new Set(bare.flatMap(g => g[1]))];
+      const ek = await fetch(`${SUPABASE_URL}/rest/v1/eligibility_criteria?select=announcement_id,gk:verification_requirements-%3E${encodeURIComponent('공급대상')}&${idFilterFor(bIds)}&verification_requirements-%3E${encodeURIComponent('공급대상')}=not.is.null`, { headers: zfAnonHeaders() }).then(r => r.ok ? r.json() : []).catch(() => []);
+      bare.forEach(([id, ids]) => {
+        const set = new Set(ids), out = [];
+        (Array.isArray(ek) ? ek : []).filter(r => set.has(String(r.announcement_id))).forEach(r => {
+          const br = r.gk && Array.isArray(r.gk['갈래']) ? r.gk['갈래'] : [];
+          br.forEach(b => {
+            const who = String((b && b['대상']) || '').trim(); if(!who || /^(계층|일반)$/.test(who)) return;   // 「계층」·「일반」은 매칭 갈래 이름(원문 대상 낱말 아님 — …21117 철거민 우선공급)
+            const tier = b['조건'] && Array.isArray(b['조건']['계층_중_하나']) ? b['조건']['계층_중_하나'].map(x => String(x).trim()).filter(Boolean) : [];
+            const h = tier.length ? `${who}(${tier.join('·')})` : who;
+            if(!out.includes(h)) out.push(h);
+          });
+        });
+        if(out.length) zf12Info.get(id).heads = out;
+      });
+    }
     return true;
   }catch(e){ console.warn('시안 「누가」 재료 실패', e); return false; }
   finally{ need.forEach(id => zf12Pend.delete(id)); done(); }
