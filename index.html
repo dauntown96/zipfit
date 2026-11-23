@@ -6089,6 +6089,33 @@ function zfLoadRentStats(){
     if(zfRentStats.size) zfFillSummarySlots();
   }).catch(err => { zfRentStatsState = 2; console.warn('ZipFit ㎡당 통계 로드 실패(줄 없이 그린다):', err); });
 }
+// 🔵 2026-11-23(판 B ④ ①) — 단지 여럿(매입임대 빼고)이면 ㎡당 줄에 「단지마다 ○~○원」 범위. 카드 값(공고 전체 중앙값) 하나가 단지 차이를 가렸다(사전 조사 — 열린 30장).
+//    재료 = 상세를 열면 오는 이번 회차 세대 행(huGroupsCache — 건물 묶음) · 묶음마다 월세 ÷ 전용면적 중앙값을 RPC rent_per_sqm_med 와 같은 거름으로
+//    (월세 > 0 · 면적 > 0 · 영구임대는 「나군」 표기 행만) · 값이 선 묶음이 둘 이상일 때만 그 최솟값~최댓값. 새 요청 0(상세가 이미 받는 행).
+const zfRentRange = new Map();   // announcement_id → [lo, hi]
+const ZF_NA_RE = /나[\s「」『』'"]{0,2}군/;
+function zfRentRangeHtml(rg){ return `<span class="zf-rent-range"> · 단지마다 ${Math.round(rg[0]).toLocaleString()}~${Math.round(rg[1]).toLocaleString()}원</span>`; }
+function zfRentRangeFromGroups(annId, groups){
+  const row = (noticeData || []).find(n => String(n['announcement_id']) === String(annId));
+  const tk = row ? zfRentTypeKey(row, '') : '';
+  if(!tk || /매입/.test(tk)) return;
+  const perm = /^영구임대/.test(tk);
+  const meds = [];
+  (groups || []).forEach(g => {
+    const v = ((g && g.units) || []).filter(u => u && Number(u.monthly_rent) > 0 && Number(u.area_sqm) > 0
+        && (!perm || ZF_NA_RE.test([u.unit_group, u.supply_target, u.unit_type].filter(Boolean).join(' '))))
+      .map(u => Number(u.monthly_rent) / Number(u.area_sqm)).sort((a, b) => a - b);
+    if(v.length) meds.push(zfQuantile(v, 0.5));
+  });
+  if(meds.length < 2) return;
+  const rg = [Math.min(...meds), Math.max(...meds)];
+  zfRentRange.set(String(annId), rg);
+  // 이미 그려진 줄에도 붙인다(줄은 목록 때 섰고 세대 행은 상세를 열 때 온다)
+  document.querySelectorAll(`[data-sum-for="${CSS.escape(String(annId))}"]`).forEach(el => {
+    const card = el.closest('.hcard'); if(!card) return;
+    card.querySelectorAll('.zf-rent-line').forEach(l => { if(l.querySelector('.zf-rent-range')) return; const b = l.querySelector('.zf-rent-basis'); if(b) b.insertAdjacentHTML('afterend', zfRentRangeHtml(rg)); });
+  });
+}
 function zfRentLineHtml(id, s){
   if(!s || s.round_state !== 'current' || s.rent_per_sqm_med == null || !zfRentStats.size) return '';
   const row = (noticeData || []).find(n => String(n['announcement_id']) === String(id));
@@ -6100,10 +6127,13 @@ function zfRentLineHtml(id, s){
   const st = stS || (tk && zfRentStats.get(tk));
   if(!st) return '';
   const v = Number(s.rent_per_sqm_med);
-  const pos = v < st.q1 ? '낮은 편' : (v > st.q3 ? '높은 편' : '비슷');
+  // 🔴 2026-11-23(우편함 「표시층 — 실사용 판 B 시안」 ④ ② · 다운님 14:31 「같은 시·도 비교일 때만 판정어 · 전국 비교는 숫자만」 · 사전 조사 4장) —
+  //    전국 비교는 서울 행복주택을 지방 표본과 견주는 꼴이라(…21098) 「높은 편」이 공고가 비싼지가 아니라 지역 집값 차이를 말했다. 전국 줄은 중앙값·곳 수까지만.
+  const pos = stS ? (v < st.q1 ? '낮은 편' : (v > st.q3 ? '높은 편' : '비슷')) : '';
   const won = x => Math.round(x).toLocaleString() + '원';
   const where = stS ? zf3ShortSido(sd.split(' ')[0]) : '전국';
-  return `<div class="zf-rent-line" data-zf-rent="${zfAttr(pos)}">㎡당 월 ${won(v)}${s.rent_basis === 'na' ? '(나군)' : ''}<span class="zf-rent-basis"> · 기본 임대조건 중앙값</span> · ${escapeHtml(where)} 같은 유형 열린 공고 중앙값 ${won(st.med)}(${st.n}곳) — <b>${pos}</b></div>`;
+  const rg = zfRentRange.get(String(id));
+  return `<div class="zf-rent-line" data-zf-rent="${zfAttr(pos || 'none')}">㎡당 월 ${won(v)}${s.rent_basis === 'na' ? '(나군)' : ''}<span class="zf-rent-basis"> · 기본 임대조건 중앙값</span>${rg ? zfRentRangeHtml(rg) : ''} · ${escapeHtml(where)} 같은 유형 열린 공고 중앙값 ${won(st.med)}(${st.n}곳)${pos ? ` — <b>${pos}</b>` : ''}</div>`;
 }
 function zfFillSummarySlots(){
   document.querySelectorAll('[data-sum-for]').forEach(el => {
@@ -10430,6 +10460,12 @@ function loadAnnouncementBlocks(annId, id, detailEl){
       return;
     }
     blockAnnIds[id] = blocks.map(b => b.announcement_id);
+    // 🔵 2026-11-23(판 B ④ ①) — 블록(단지·자리) 둘 이상 카드의 「단지마다 ㎡당」 범위 재료 — 블록 세대 행은 블록을 펼칠 때만 오므로, 상세를 열 때 블록 id 전부의
+    //    세대 행에서 중앙값에 드는 칸만 한 번 받는다(블록 카드 상세 한 번에 요청 +1 · 실패하면 범위 없이 종전 줄).
+    //    단지 = 세대 행 building_name(같은 공고 id 안에 자리가 여럿인 블록도 이것으로 갈린다 · 이름 없는 행은 빼고 셈).
+    if(!zfRentRange.has(String(annId))) zfGetAll(`housing_units?select=announcement_id,building_name,monthly_rent,area_sqm,unit_group,supply_target,unit_type&${idFilterFor([...new Set(blockAnnIds[id])])}`, { order: 'id' })
+      .then(rows => { const by = new Map(); rows.forEach(u => { const k = String(u.building_name || '').trim(); if(!k) return; if(!by.has(k)) by.set(k, []); by.get(k).push(u); }); zfRentRangeFromGroups(annId, [...by.values()].map(units => ({ units }))); })
+      .catch(() => {});
     blockSites[id] = blocks.map(b => String(b.site_label || ''));
     blockInfo[id] = blocks;
     blockHuFallback[id] = false;
@@ -11814,6 +11850,7 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
     { const mv = zfCardMoveIn.get(String(annId)) || null; (units || []).concat(pastUnits || []).forEach(u => { if(u) u.zfCardMoveIn = mv; }); }   // 🔵 2026-11-09 표기 1차 ⓓ
     const groups = groupHousingUnits(huUnitsCache[id]);
     huGroupsCache[id] = groups;
+    if(!pastOnly && !huIsBlock) zfRentRangeFromGroups(annId, groups);   // 🔵 판 B ④ ① — 단지마다 ㎡당 범위(이번 회차 행 · 블록 본문은 빼고)
     const wrap = document.createElement('details');
     wrap.className = 'hu-wrap';
     // 접힌 안에서도 회차 배지를 그대로 단다 — 지난 회차가 여럿이면 그 안에서 또 갈려야 한다.
