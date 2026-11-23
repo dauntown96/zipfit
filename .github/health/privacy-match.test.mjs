@@ -7,8 +7,8 @@ const privacy = '<p>' + phrases.join('</p><p>') + '</p>'
 const index = `const ZF_LOG_EVENTS = new Set(['page_view','notice_open','search','recommend_click','card_reaction']);
 const ZF_PRIVACY_V2_START = '2026-11-29';
 <script src="//dapi.kakao.com/v2/maps/sdk.js"></script> fetch('https://neuaeexdxfkkcvyzsicb.supabase.co/rest/v1/x')`
-const cols = { user_profiles: ['id', 'user_id', 'email', 'marketing_alert', ...Object.keys(MAP.cols.user_profiles)], user_feedback: ['id', 'received_at', ...Object.keys(MAP.cols.user_feedback)], saved_announcements: ['id', 'user_id', 'announcement_id', 'created_at'] }
-const db = { events: { page_view: 10, search: 2 }, events_pre: { page_view: 10, search: 2 }, props: { 'page_view.tab': 10, 'page_view.ops': 3, 'search.q': 2 }, props_pre: { 'page_view.tab': 10 }, cols, email_nn: 0, mkt_true: 0 }
+const cols = { user_profiles: ['id', 'user_id', 'email', ...Object.keys(MAP.cols.user_profiles)], user_feedback: ['id', 'received_at', ...Object.keys(MAP.cols.user_feedback)], saved_announcements: ['id', 'user_id', 'announcement_id', 'created_at'] }
+const db = { events: { page_view: 10, search: 2 }, events_pre: { page_view: 10, search: 2 }, props: { 'page_view.tab': 10, 'page_view.ops': 3, 'search.q': 2 }, props_pre: { 'page_view.tab': 10 }, cols, email_nn: 0 }
 const base = { privacyHtml: privacy, indexHtml: index, db, today: '2026-11-22' }
 t('읽기 셋', v2StartOf(index) === '2026-11-29' && logEventsOf(index).length === 5 && hostsOf(index).length === 2)
 t('깨끗한 꼴 0', judgePrivacyMatch(base).status === 'pass')

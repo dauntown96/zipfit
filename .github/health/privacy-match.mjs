@@ -1,7 +1,7 @@
 // ㊶ 처리방침 ↔ 실물 대조(2026-11-22 · 우편함 「코드·운영 — 넷째 묶음」 C · docs/ops-check-backlog.md 17위 · 근거 사건 10-18 고지 넷 어긋남).
 //    대조표(아래 MAP) = 실물 이름 → 처리방침(privacy.html) 안의 문구. 세 축을 본다:
 //      ⓐ 이벤트 키 — index.html ZF_LOG_EVENTS · DB usage_events 최근 30일의 event · props 키(이름·개수만 — 값은 읽지 않는다)
-//      ⓑ 칸 — user_profiles · user_feedback · saved_announcements 의 칸 이름(information_schema) · 옛 칸(email · marketing_alert)은 값이 든 행 수만
+//      ⓑ 칸 — user_profiles · user_feedback · saved_announcements 의 칸 이름(information_schema) · 옛 칸(email)은 값이 든 행 수만(marketing_alert 는 2026-11-23 DROP)
 //      ⓒ 호스트 — index.html 안의 바깥 호스트(//host · https://host) → 수탁자·이동 문구
 //    걸리는 꼴: 실물에 있는데 대조표에 없음(새 키·칸·호스트) · 대조표 문구가 privacy.html 에 없음(방침에서 빠짐) · 옛 칸에 값 있음 ·
 //    🔵 「시행 전 키 있음」 — 처리방침 v2 시행일(index.html ZF_PRIVACY_V2_START — 2026-11-29) 전 날짜(KST)에 v2 키(카드 반응 · 처음 열기 구간 셋)가 DB 에 있음.
@@ -37,7 +37,7 @@ export const MAP = {
   },
   techCols: ['id', 'user_id', 'created_at', 'updated_at', 'received_at'],
   // 옛 칸 — 방침에 없다(카카오에서 이메일을 받지 않음 · 마케팅 알림 없음). 칸은 남아 있어도 값이 든 행이 0 이어야 한다.
-  legacyCols: { 'user_profiles.email': 'email_nn', 'user_profiles.marketing_alert': 'mkt_true' },
+  legacyCols: { 'user_profiles.email': 'email_nn' },   // marketing_alert 는 2026-11-23 DROP(열다섯째 A장 2)
   hosts: {
     'neuaeexdxfkkcvyzsicb.supabase.co': 'Supabase', 'dapi.kakao.com': '카카오', 'cdn.jsdelivr.net': 'jsDelivr',
     'drive.google.com': 'Google', 'api.github.com': 'GitHub', 'apply.lh.or.kr': '한국토지주택공사(LH)',
@@ -56,8 +56,7 @@ select json_build_object(
              jsonb_object_keys(case when jsonb_typeof(ue.props) = 'object' then ue.props else '{}'::jsonb end) k where not ue.v2 group by 1) y),
   'cols', (select coalesce(json_object_agg(t, c), '{}'::json) from (select table_name t, json_agg(column_name order by ordinal_position) c
              from information_schema.columns where table_schema = 'public' and table_name in ('user_profiles', 'user_feedback', 'saved_announcements') group by 1) z),
-  'email_nn', (select count(*) from public.user_profiles where email is not null),
-  'mkt_true', (select count(*) from public.user_profiles where marketing_alert is true)) j`
+  'email_nn', (select count(*) from public.user_profiles where email is not null)) j`
 
 export const v2StartOf = (indexHtml) => {
   const m = /const\s+ZF_PRIVACY_V2_START\s*=\s*'(\d{4}-\d{2}-\d{2})'/.exec(indexHtml || '')
@@ -117,7 +116,7 @@ export function judgePrivacyMatch({ privacyHtml, indexHtml, db, today, privacyFi
   let chain = null
   if (privacyFiles) { chain = judgePrivacyChain({ privacyHtml, files: privacyFiles }); for (const o of chain.out) out.push(`사슬 — ${o}`) }
   const seen = `이벤트 ${logEv.length} · DB 이벤트 ${Object.keys(db.events || {}).length} · 키 ${Object.keys(db.props || {}).length} · 칸 ${Object.values(db.cols || {}).flat().length} · 호스트 ${hosts.length} · 시행일 ${v2Start ?? '?'}(${pre ? '전' : '뒤'})${chain ? ` · 이전 판 사슬 ${chain.n}판 · 링크 ${chain.links} · ${chain.first} ~ 현행 ${chain.current}` : ''}`
-  const rule = '0 — 대조표(privacy-match.mjs MAP: 이벤트 · props 키 · 프로필·의견·찜 칸 · index.html 바깥 호스트 → 처리방침 문구) 밖의 실물 · 방침에서 빠진 문구 · 옛 칸(email · marketing_alert) 값 · 시행일(ZF_PRIVACY_V2_START) 전 v2 키 · 이전 판 사슬(docs/privacy 파일 = 링크 · 적용기간 빈틈·겹침 0 · 링크 글자 = 판 머리) — 넘으면 ⚠️(안 멈춤 · 값은 이름·개수만)'
+  const rule = '0 — 대조표(privacy-match.mjs MAP: 이벤트 · props 키 · 프로필·의견·찜 칸 · index.html 바깥 호스트 → 처리방침 문구) 밖의 실물 · 방침에서 빠진 문구 · 옛 칸(email) 값 · 시행일(ZF_PRIVACY_V2_START) 전 v2 키 · 이전 판 사슬(docs/privacy 파일 = 링크 · 적용기간 빈틈·겹침 0 · 링크 글자 = 판 머리) — 넘으면 ⚠️(안 멈춤 · 값은 이름·개수만)'
   return { status: out.length ? 'warn' : 'pass', value: out.length ? `${out.length}: ${out.slice(0, 6).join(' / ')} · ${seen}` : `0(${seen})`, rule, out }
 }
 
