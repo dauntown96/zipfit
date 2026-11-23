@@ -242,6 +242,16 @@
    "why": "목록 RPC 가 로그인 사용자로 부를 때 같은 키 목록(위와 같다) · search_path 고정"
   },
   {
+   "key": "anon_security_definer_function_executable_public_listing_pending_rechecks_",
+   "kind": "intended",
+   "why": "목록 RPC get_announcements_deduped 가 anon 으로 부르는 재확인 몫 목록(rpc/listing_pending_rechecks · 2026-11-23 열넷째 묶음 · 칸 recheck_pending) · 대기열 analysis_dispatch_queue(anon GRANT 0)에서 공고 id·갈래만 낸다 — 키 글자·상태·메모 없음 · 개인정보 없음 · search_path 고정"
+  },
+  {
+   "key": "authenticated_security_definer_function_executable_public_listing_pending_rechecks_",
+   "kind": "intended",
+   "why": "목록 RPC 가 로그인 사용자로 부를 때 같은 몫 목록(위와 같다) · search_path 고정"
+  },
+  {
    "key": "authenticated_security_definer_function_executable_public_ops_is_admin_",
    "kind": "intended",
    "why": "설정 탭 「운영」 구역을 그릴지(참/거짓 하나 · auth.uid() ∈ zipfit_ops.admins · 인자 없음 · 2026-10-16) · anon 닫힘 · search_path 고정"
