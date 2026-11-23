@@ -35,6 +35,12 @@
 #       "other_rows_same": "announcement_id" — 🔵 2026-11-23(아홉째 묶음 2) 같은 묶음 칸(보통 announcement_id) 값을 가진 **대상 밖** 행 전체의 md5 가 반영 전후 같아야 한다
 #                                          (트리거·실수로 이웃 행이 함께 바뀌면 멈춤 · 2회차 손 가드 「14공고 경로 행 다른 칸 md5 전후 같음」과 같은 뜻)
 #       "open_only": true                — 대상 행의 공고가 열려 있어야 한다(announcements.status 공고중·접수중·정정공고중 — health-ops 「열린 공고」와 같은 셋)
+#   🔵 2026-11-23(열셋째 묶음 2) — 행 지우기·합치기도 받는다: 계획 행 { "id": "<id>", "delete": true }(「set」 대신).
+#     가드 = 행 전체 md5(to_jsonb(t)) = BEFORE · 지운 행 수 = 계획 지우기 행 수. 지우기 행이 하나라도 있으면 gen --round "<우편함 회차 이름 또는 PR>" 이 있어야 하고(비면 멈춤),
+#     같은 트랜잭션 안에 의도된 감소 장부 한 줄(zipfit_ops.intended_drops — 표 · 지운 행 수 · 회차)을 함께 짓는다(docs/intended-drops.md).
+#     보관 정리 표(생존 신호 RETENTION_DAYS)는 장부를 쓰지 않는다(RETENTION_TABLES — 지금 TABLES 와 겹침 0이지만 늘 때를 막는다).
+#     합치기 = 남길 행은 set · 지울 행은 delete 로 한 계획에 담는다. 되돌림은 BEFORE 행 전체를 다시 넣는다(overriding system value) — 장부 줄은 지우지 않는다
+#     (덧붙이기만 하는 표 · 되돌린 날 생존 신호는 「장부와 실제가 다르다」 🔴 를 낸다 — 되돌림이 있었다는 신호로 둔다).
 #     gen 은 history.md(이력 파일 틀 — docs/history.d 꼴 첫 줄 · 행 수 · 가드 목록 · 되돌리기 한 줄)도 함께 쓴다(SQL 은 만들기만 · 보내기는 사람이 run 으로).
 # 시험: python3 scripts/backfill-kit.test.py (DB 없이 SQL 만들기만 본다)
 import argparse
@@ -58,6 +64,9 @@ COL_RE = re.compile(r"^[a-z_][a-z0-9_]*$")
 ANN_RE = re.compile(r"^[A-Za-z0-9_가-힣.\-]+$")
 CA = "/root/.ccr/ca-bundle.crt"
 POINT = "plain-check v3 요점"
+# 생존 신호(zipfit-backup scripts/heartbeat_report.py RETENTION_DAYS)의 보관 정리 표 — 장부를 쓰지 않는다.
+RETENTION_TABLES = {"collection_run_log", "sh_collection_run_log", "ops_health_findings", "ops_health_runs", "ops_uptime_log", "ops_dispatch_log"}
+LEDGER = "zipfit_ops.intended_drops"
 
 
 def _project_ref():
@@ -134,6 +143,10 @@ def load_plan(path):
         if r["id"] in seen:
             raise SystemExit(f"같은 행 두 번: {r['id']}")
         seen.add(r["id"])
+        if r.get("delete") is not None:
+            if r.get("delete") is not True or r.get("set"):
+                raise SystemExit(f"지우기 행은 \"delete\": true 하나만(set 없이): {r['id']}")
+            continue
         if not r.get("set"):
             raise SystemExit(f"바꿀 칸 없음: {r['id']}")
         for c in r["set"]:
@@ -164,9 +177,25 @@ def id_lit(i, typ):
 
 
 # ── SQL 만들기(DB 없이 — 시험이 이것만 본다) ──
-def build_sql(plan, types, before, label):
+def is_del(r):
+    return r.get("delete") is True
+
+
+def ledger_line(t, nd, round_, note):
+    """의도된 감소 장부 한 줄(같은 트랜잭션) — 회차가 비면 멈춘다(장부 표의 빈 회차 금지와 같은 축)."""
+    if t in RETENTION_TABLES:
+        return ""
+    if not (round_ or "").strip():
+        raise SystemExit("지우기 행이 있다 — gen --round \"<우편함 회차 이름 또는 PR>\" 가 있어야 장부 줄을 짓는다(빈 회차 금지)")
+    return (f"  insert into {LEDGER} (table_name, expected_drop, round, note) values "
+            f"({dq(t)}, {nd}, {dq(round_.strip())}, {dq(note)});\n")
+
+
+def build_sql(plan, types, before, label, round_=None):
     t, g = plan["table"], plan.get("guard")
-    rows = plan["rows"]
+    rows_all = plan["rows"]
+    dels = [r for r in rows_all if is_del(r)]
+    rows = [r for r in rows_all if not is_del(r)]
     cols = sorted({c for r in rows for c in r["set"]})
     it = types.get("id", "uuid")
     subs = list(plan.get("source_substring") or [])
@@ -179,6 +208,8 @@ def build_sql(plan, types, before, label):
         if c not in types:
             raise SystemExit(f"{t} 에 칸 {c!r} 없음")
     n = len(rows)
+    nd = len(dels)
+    na = n + nd
     # 가드: 행마다 md5(가드 칸) = BEFORE · 바꿀 칸 = BEFORE 값(행이 바꾸는 칸만)
     def guard_pred(r, b, alias="t"):
         p = [f"{alias}.id = {id_lit(r['id'], it)}"]
@@ -194,14 +225,20 @@ def build_sql(plan, types, before, label):
                 continue
             p.append(f"{alias}.{c} is not distinct from {lit(v, types[c])}")
         return "(" + " and ".join(p) + ")"
-    guards = "\n      or ".join(guard_pred(r, before[r["id"]]) for r in rows)
+    def del_pred(r, b, alias="t"):
+        return f"({alias}.id = {id_lit(r['id'], it)} and md5(to_jsonb({alias})::text) is not distinct from {dq(b['row_md5'])})"
+    guards = "\n      or ".join([guard_pred(r, before[r["id"]]) for r in rows] + [del_pred(r, before[r["id"]]) for r in dels])
     updates = []
     for r in rows:
         sets = ", ".join(f"{c} = {lit(v, types[c])}" for c, v in r["set"].items())
         updates.append(f"  update public.{t} t set {sets} where {guard_pred(r, before[r['id']])};\n  get diagnostics k = row_count; n := n + k;")
+    for r in dels:
+        updates.append(f"  delete from public.{t} t where {del_pred(r, before[r['id']])};\n  get diagnostics k = row_count; d := d + k;")
     body = "\n".join(updates)
+    ledger = ledger_line(t, nd, round_, f"backfill-kit · {label} · 지우기 {nd}행") if nd else ""
     extra = []   # 2026-11-23 선택 가드
-    ids_sql = ids_arr([r["id"] for r in rows], it)
+    ids_sql = ids_arr([r["id"] for r in rows], it)           # 바꾸는 행(다른 칸 md5 · 원문 가드)
+    all_ids_sql = ids_arr([r["id"] for r in rows_all], it)   # 대상 전체(열린 공고 · 대상 밖 행)
     if subs:
         preds = []
         for r in rows:
@@ -213,9 +250,9 @@ def build_sql(plan, types, before, label):
                           f"  if s <> {len(preds)} then raise exception '원문 가드 실패: 같은 공고 정책 행 원문에 값 글자가 있는 행 %/{len(preds)}', s; end if;\n"))
     if plan.get("open_only"):
         st = ", ".join(dq(x) for x in OPEN_STATUS)
-        extra.append(("pre", f"  select count(*) into s from public.{t} t join public.announcements a on a.announcement_id = t.announcement_id where t.id = any({ids_sql}) and a.status in ({st});\n"
-                      f"  if s <> {n} then raise exception '열린 공고 가드 실패: 열린 공고 행 %/{n}', s; end if;\n"))
-    if plan.get("other_cols_same"):
+        extra.append(("pre", f"  select count(*) into s from public.{t} t join public.announcements a on a.announcement_id = t.announcement_id where t.id = any({all_ids_sql}) and a.status in ({st});\n"
+                      f"  if s <> {na} then raise exception '열린 공고 가드 실패: 열린 공고 행 %/{na}', s; end if;\n"))
+    if plan.get("other_cols_same") and rows:
         drop = "array[" + ", ".join(dq(c) for c in cols) + "]"
         m = f"select md5(coalesce(string_agg((to_jsonb(t) - {drop})::text, E'\\n' order by t.id), '')) from public.{t} t where t.id = any({ids_sql})"
         extra.append(("pre", f"  {m} into m0;\n"))
@@ -224,34 +261,40 @@ def build_sql(plan, types, before, label):
     if orc:
         if orc not in types:
             raise SystemExit(f"{t} 에 other_rows_same 칸 {orc!r} 없음")
-        mo = (f"select md5(coalesce(string_agg(to_jsonb(o)::text, E'\\n' order by o.id), '')) from public.{t} o "
-              f"where o.{orc} in (select t.{orc} from public.{t} t where t.id = any({ids_sql})) and not (o.id = any({ids_sql}))")
+        mo = (f"select md5(coalesce(string_agg(to_jsonb(o)::text, E'\\n' order by o.id), '')) from public.{t} o " +
+              (f"where o.{orc} in (select t.{orc} from public.{t} t where t.id = any({ids_sql})) and not (o.id = any({ids_sql}))" if not dels else
+               # 지우기 행이 있으면 지운 뒤 대상 행 쪽 부분 질의가 비므로 BEFORE 의 묶음 값 목록으로 고정한다
+               f"where o.{orc} in ({', '.join(lit(v, types[orc]) for v in sorted({str(before[r['id']]['grp']) for r in rows_all if before[r['id']].get('grp') is not None})) or 'null'}) and not (o.id = any({all_ids_sql}))"))
         extra.append(("pre", f"  {mo} into m2;\n"))
         extra.append(("post", f"  {mo} into m3;\n  if m3 is distinct from m2 then raise exception '다른 행 가드 실패: 같은 {orc} 의 대상 밖 행 md5 전후 다름'; end if;\n"))
     pre = "".join(x for w, x in extra if w == "pre")
     post = "".join(x for w, x in extra if w == "post")
-    gnames = [f"BEFORE 같은 행 = {n}", f"반영 행 = {n}"] + (["가드 칸 md5"] if g else []) + ([f"원문 부분 문자열({', '.join(subs)})"] if subs else []) \
+    gnames = [f"BEFORE 같은 행 = {na}", f"반영 행 = {n}"] + ([f"지운 행 = {nd}(행 전체 md5)", f"장부 줄 {LEDGER} 1"] if nd and ledger else []) + ([f"지운 행 = {nd}(행 전체 md5)"] if nd and not ledger else []) + (["가드 칸 md5"] if g else []) + ([f"원문 부분 문자열({', '.join(subs)})"] if subs else []) \
         + (["열린 공고"] if plan.get("open_only") else []) + (["다른 칸 md5 전후 같음"] if plan.get("other_cols_same") else []) \
         + ([f"같은 {plan['other_rows_same']} 대상 밖 행 md5 전후 같음"] if plan.get("other_rows_same") else [])
-    head = f"-- {label} · 표 {t} · 행 {n} · 칸 {', '.join(cols)} · 가드 {g or '없음'} · 가드 목록 {' · '.join(gnames)} · scripts/backfill-kit.py gen"
+    head = f"-- {label} · 표 {t} · 행 {na}(바꿈 {n} · 지움 {nd}) · 칸 {', '.join(cols)} · 가드 {g or '없음'} · 가드 목록 {' · '.join(gnames)} · scripts/backfill-kit.py gen"
     def do(final):
-        return (f"do $zfdo$\ndeclare n int := 0; k int; g int; s int; m0 text; m1 text; m2 text; m3 text;\nbegin\n"
+        return (f"do $zfdo$\ndeclare n int := 0; d int := 0; k int; g int; s int; m0 text; m1 text; m2 text; m3 text;\nbegin\n"
                 f"  select count(*) into g from public.{t} t where {guards};\n"
-                f"  if g <> {n} then raise exception '가드 실패: BEFORE 와 같은 행 %/{n} — 그사이 바뀐 행이 있다', g; end if;\n"
+                f"  if g <> {na} then raise exception '가드 실패: BEFORE 와 같은 행 %/{na} — 그사이 바뀐 행이 있다', g; end if;\n"
                 f"{pre}{body}\n"
                 f"  if n <> {n} then raise exception '반영 행 수 %/{n}', n; end if;\n"
-                f"{post}{final}end $zfdo$;\n")
+                + (f"  if d <> {nd} then raise exception '지운 행 수 %/{nd}', d; end if;\n{ledger}" if nd else "")
+                + f"{post}{final}end $zfdo$;\n")
     test = f"set statement_timeout = '60s';\n{head} · 되돌리기 전용 시험(쓰기 0)\n" + do(
-        f"  raise exception 'RESULT 반영 % 행 · 가드 통과 — 되돌리기 전용 시험(쓰기 0)', n;\n")
+        f"  raise exception 'RESULT 반영 % 행 · 지움 % 행 · 가드 통과 — 되돌리기 전용 시험(쓰기 0)', n, d;\n")
     apply = f"{head} · 반영(커밋)\n" + do("")
     rb_upd = []
     for r in rows:
         b = before[r["id"]]
         sets = ", ".join(f"{c} = {lit(b['cur'].get(c), types[c])}" for c in r["set"])
         rb_upd.append(f"  update public.{t} t set {sets} where {after_pred(r)};\n  get diagnostics k = row_count; n := n + k;")
-    rollback = (f"{head} · 되돌림(지금 값 = 계획 값인 행만 BEFORE 로)\n"
+    for r in dels:
+        rb_upd.append(f"  insert into public.{t} overriding system value select * from jsonb_populate_record(null::public.{t}, {dq(json.dumps(before[r['id']]['row'], ensure_ascii=False))}::jsonb)"
+                      f" where not exists (select 1 from public.{t} x where x.id = {id_lit(r['id'], it)});\n  get diagnostics k = row_count; n := n + k;")
+    rollback = (f"{head} · 되돌림(지금 값 = 계획 값인 행만 BEFORE 로 · 지운 행은 BEFORE 행 전체로 다시 넣음 · 장부 줄은 그대로)\n"
                 f"do $zfdo$\ndeclare n int := 0; k int;\nbegin\n" + "\n".join(rb_upd) +
-                f"\n  if n <> {n} then raise exception '되돌린 행 수 %/{n} — 계획 값과 다른 행이 있다', n; end if;\nend $zfdo$;\n")
+                f"\n  if n <> {na} then raise exception '되돌린 행 수 %/{na} — 계획 값과 다른 행이 있다', n; end if;\nend $zfdo$;\n")
     build_sql.guard_names = gnames
     return test, apply, rollback
 
@@ -261,22 +304,28 @@ def history_stub(plan, label, gnames, rows_n):
     import datetime
     kst = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=9)
     t = plan["table"]
-    cols = sorted({c for r in plan["rows"] for c in r["set"]})
+    cols = sorted({c for r in plan["rows"] if not is_del(r) for c in r["set"]})
+    nd = sum(1 for r in plan["rows"] if is_del(r))
     ids = ",".join(r["id"] for r in plan["rows"])
     return (f"# {kst:%Y-%m-%d} — 〈회차 이름〉\n\n우편함 같은 이름 · 〈판정 규칙 · 스킬 판〉.\n\n"
             f"- **운영 DB 데이터 쓰기(관리 API · 〈HH:MM〉 KST 한 트랜잭션)** — `{t}.{', '.join(cols)}` {rows_n}행. 원문 = 〈공고문 · 쪽〉.\n"
             f"- 가드: {' · '.join(gnames)} · 롤백 전용 시험 먼저(〈HH:MM〉 · test.sql RESULT).\n"
             f"- 되돌리기: rollback.sql(지금 값 = 계획 값인 행만 BEFORE 로 · 행 수 {rows_n}) · 대상 id {ids}.\n"
-            f"- 계획 파일 {label} · scripts/backfill-kit.py gen.\n")
+            f"- 계획 파일 {label} · scripts/backfill-kit.py gen.\n"
+            + (f"- 지운 행 {nd} — 의도된 감소 장부 `zipfit_ops.intended_drops` 한 줄을 같은 트랜잭션에 씀(키트가 지음).\n" if nd else ""))
 
 
 def fetch_before(plan, it="uuid"):
     t, g = plan["table"], plan.get("guard")
     ids = [r["id"] for r in plan["rows"]]
-    cols = sorted({c for r in plan["rows"] for c in r["set"]})
-    parts = [f"'id', id"] + ([f"'guard_md5', md5({g}::text)"] if g else []) + [f"'cur', jsonb_build_object({', '.join(f'{dq(c)}, {c}' for c in cols)})"]
-    j = q1(f"select json_agg(json_build_object({', '.join(parts)})) from public.{t} where id = any({ids_arr(ids, it)})")
-    got = {str(r["id"]): {"guard_md5": r.get("guard_md5"), "cur": r["cur"]} for r in (j or [])}
+    cols = sorted({c for r in plan["rows"] if not is_del(r) for c in r["set"]})
+    orc = plan.get("other_rows_same")
+    parts = [f"'id', t.id"] + ([f"'guard_md5', md5(t.{g}::text)"] if g else []) + [f"'cur', jsonb_build_object({', '.join(f'{dq(c)}, t.{c}' for c in cols)})"] \
+        + [f"'row', to_jsonb(t)", f"'row_md5', md5(to_jsonb(t)::text)"] + ([f"'grp', t.{orc}"] if orc else [])
+    j = q1(f"select json_agg(json_build_object({', '.join(parts)})) from public.{t} t where t.id = any({ids_arr(ids, it)})")
+    dset = {r["id"] for r in plan["rows"] if is_del(r)}
+    got = {str(r["id"]): {"guard_md5": r.get("guard_md5"), "cur": r["cur"], "grp": r.get("grp"),
+                          **({"row": r["row"], "row_md5": r["row_md5"]} if str(r["id"]) in dset else {})} for r in (j or [])}
     missing = [i for i in ids if i not in got]
     if missing:
         raise SystemExit(f"DB 에 없는 행 {len(missing)}: {missing[:3]}")
@@ -288,7 +337,7 @@ def cmd_gen(a):
     types = col_types(plan["table"])
     before = fetch_before(plan, types.get("id", "uuid"))
     label = os.path.basename(a.plan)
-    test, apply, rollback = build_sql(plan, types, before, label)
+    test, apply, rollback = build_sql(plan, types, before, label, a.round)
     os.makedirs(a.out, exist_ok=True)
     hist = history_stub(plan, label, build_sql.guard_names, len(plan["rows"]))
     for name, body in (("test.sql", test), ("apply.sql", apply), ("rollback.sql", rollback), ("history.md", hist)):
@@ -416,7 +465,7 @@ def main():
     sp = ap.add_subparsers(dest="cmd", required=True)
     d = sp.add_parser("diff"); d.add_argument("a"); d.add_argument("b"); d.add_argument("--plan-out"); d.set_defaults(f=cmd_diff)
     c = sp.add_parser("check"); c.add_argument("plan"); c.set_defaults(f=cmd_check)
-    g = sp.add_parser("gen"); g.add_argument("plan"); g.add_argument("--out", required=True); g.set_defaults(f=cmd_gen)
+    g = sp.add_parser("gen"); g.add_argument("plan"); g.add_argument("--out", required=True); g.add_argument("--round", help="우편함 회차 이름 또는 PR — 지우기 행이 있으면 반드시(의도된 감소 장부 줄)"); g.set_defaults(f=cmd_gen)
     r = sp.add_parser("run"); r.add_argument("file"); r.set_defaults(f=cmd_run)
     a = ap.parse_args()
     a.f(a)
