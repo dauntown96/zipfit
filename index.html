@@ -3101,7 +3101,7 @@ function zfLoadCardSide(){
   // 🔵 2026-10-22(우편함 「표시층 C 묶음 5」 2) — 일정 표 접수 행(결과발표·계약과 한 요청 · zfLoadWinSched)도 기다려 같은 공고 제목 조회에 id 를 싣는다
   //    (새 요청 0 — 일정 행은 공고 id 만 있어 카드 제목 키로 붙이려면 제목이 필요하다). 실패하면 접수 행 없이(종전 그대로).
   zfSidePromise = Promise.all([
-    paged('announcement_apply_routes?select=announcement_id,route,site_text,phase_text,start_date,end_date,sort_order,period_text,place_text,note_text', 'announcement_id,sort_order,route'),
+    paged('announcement_apply_routes?select=announcement_id,route,site_text,phase_text,start_date,end_date,sort_order,period_text,place_text,note_text,target_text', 'announcement_id,sort_order,route'),   // target_text — 2026-11-23 현장 접수 대상 꼬리(zfRouteTargetTail)
     zfPostLinksAll().catch(err => { console.error('ZipFit 곁 데이터 로드 실패:', err); return null; }),
     zfAfterFirstList().then(() => zfLoadWinSched()).catch(() => false)   // 이름은 뒤 스크립트 블록에 있다 — 부를 때 찾는다
   ]).then(async ([routes, links]) => {
@@ -3591,7 +3591,16 @@ function zfRouteInetLead(rs){
   return `인터넷·모바일 ${s === e ? zfMdDow(s) : zfMdDow(s) + '~' + zfMdDow(e)} · `;
 }
 // 현장 행 원문(비고 · 기간 칸)이 대상을 「…에 한하여」로 적었으면 그 구절을 원문 그대로 붙인다 · 없으면 빈 글자(추측 0).
+// 🔵 2026-11-23(우편함 「표시층 — 현장 접수 대상 꼬리를 target_text에서 …」 1) — 그 현장 행의 대상 칸(target_text — 분석이 원문 낱말 그대로 넣는다 ·
+//    2026-11-21 칸 신설 · 소급 1·2회차)이 있으면 그 글자 그대로 꼬리 「 · …에 한하여」에 넣는다(꼴은 종전 그대로 — 글자 출처만 바꿈).
+//    없으면 종전대로 note_text · period_text 의 「…에 한하여」 구절. 대상 칸이 있는 행이 먼저다(같은 카드에 현장 행이 둘 이상이면 앞 행부터).
+//    글자는 부르는 쪽이 escapeHtml 로 그린다(종전 구절과 같은 자리).
 function zfRouteTargetTail(rs){
+  for(const r of (rs || [])){
+    if(r.route !== '현장') continue;
+    const tt = String(r.target_text || '').trim();
+    if(tt) return ` · ${tt}에 한하여`;
+  }
   for(const r of (rs || [])){
     if(r.route !== '현장') continue;
     for(const t of [r.note_text, r.period_text]){
@@ -8561,23 +8570,23 @@ const ZF_TARGET_MONEY_COLS = 'income_base,income_pct,income_pct_dual_income,inco
 function zfLoadTargetRows(){
   if(zfTargetRowsP) return zfTargetRowsP;
   const h = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
-  zfTargetRowsP = fetch(`${SUPABASE_URL}/rest/v1/eligibility_criteria?select=announcement_id,gk:verification_requirements->공급대상&verification_requirements->공급대상=not.is.null&limit=10000`, { headers: h })
-    .then(r => r.ok ? r.json() : [])
+  // 🔵 2026-11-23(우편함 「표시층 — 현장 접수 대상 꼬리 … 남은 넓은 조회 둘」 2) — 세 요청을 쪽 나눔(zfGetAll · 자격 행 id 차례 · 공고 announcement_id 차례).
+  //    종전 limit=10000 은 max_rows(2000)에서 조용히 잘렸다(11-22 조사 356행 — 멀다). 실패는 종전대로 그 요청만 빈 목록(r.ok ? json : [] 꼴)으로 잇는다.
+  const all = (path, order) => zfGetAll(path, { order, headers: h }).catch(() => []);
+  zfTargetRowsP = all('eligibility_criteria?select=announcement_id,gk:verification_requirements->공급대상&verification_requirements->공급대상=not.is.null', 'id')
     .then(rows => {
       const ids = [...new Set((rows || []).filter(r => r && r.gk && typeof r.gk === 'object' && !Array.isArray(r.gk)).map(r => r.announcement_id))];
       if(!ids.length) return true;
       // 🔵 2026-10-16(N12) — 같은 행의 소득 칸도 함께 받는다(✓ 소득 관문 zfTargetIncomeGate · 한도 계산은 zfLimitsFor 한 벌). 키 배열과 같은 순서로 zfTargetMoneyOf 에 둔다.
-      return fetch(`${SUPABASE_URL}/rest/v1/eligibility_criteria?select=announcement_id,gk:verification_requirements->공급대상,${ZF_TARGET_MONEY_COLS}&${idFilterFor(ids)}&limit=10000`, { headers: h })
-        .then(r => r.ok ? r.json() : [])
-        .then(all => { (all || []).forEach(r => {
+      return all(`eligibility_criteria?select=announcement_id,gk:verification_requirements->공급대상,${ZF_TARGET_MONEY_COLS}&${idFilterFor(ids)}`, 'id')
+        .then(rs => { (rs || []).forEach(r => {
           const a = String(r.announcement_id);
           if(!zfTargetRowsByAnn.has(a)){ const g = []; zfTargetRowsByAnn.set(a, g); zfTargetMoneyOf.set(g, []); }
           const g = zfTargetRowsByAnn.get(a);
           g.push(r.gk ?? null);
           zfTargetMoneyOf.get(g).push(Object.assign({}, r, { gk: undefined, verification_requirements: r.cap ? { '가구원수별_가산상한': r.cap } : null }));
         }); })
-        .then(() => fetch(`${SUPABASE_URL}/rest/v1/announcements?select=announcement_id,title&${idFilterFor(ids)}&limit=10000`, { headers: h }))
-        .then(r => r && r.ok ? r.json() : [])
+        .then(() => all(`announcements?select=announcement_id,title&${idFilterFor(ids)}`, 'announcement_id'))
         .then(ts => {
           const pick = new Map();
           (ts || []).forEach(t => {
@@ -9560,7 +9569,7 @@ function loadScheduleLine(annId, cardEl, id){
       .then(r => r.ok ? r.json() : null).catch(() => null),
     fetchGroupRounds(ids, Array.isArray(ids) && ids.length >= 2),
     Promise.resolve(ids),
-    fetch(`${SUPABASE_URL}/rest/v1/announcement_apply_routes?select=announcement_id,route,phase_text,start_date,end_date,place_text,note_text,sort_order&${idFilterFor(ids)}&order=announcement_id,sort_order`, { headers: zfAnonHeaders() })
+    fetch(`${SUPABASE_URL}/rest/v1/announcement_apply_routes?select=announcement_id,route,phase_text,start_date,end_date,place_text,note_text,target_text,sort_order&${idFilterFor(ids)}&order=announcement_id,sort_order`, { headers: zfAnonHeaders() })
       .then(r => r.ok ? r.json() : []).catch(() => [])
   ])).then(([rows, roundMap, ids, apRoutes]) => {
     if(!zfStillOurs(id, ownerAnn) || !Array.isArray(rows) || !rows.length) return;
@@ -10351,9 +10360,8 @@ function zfBlockHuFallback(annId, blkIds){
   return resolveAnnouncementIds(annId, true, true).then(ids => {
     const outside = ids.filter(x => blkIds.indexOf(x) === -1);
     if(!outside.length) return false;
-    return fetch(`${SUPABASE_URL}/rest/v1/housing_units?select=announcement_id&${idFilterFor(ids)}&limit=5000`, {
-      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
-    }).then(r => r.ok ? r.json() : null).then(rows => {
+    // 🔵 2026-11-23(같은 회차 2) — 쪽 나눔(zfGetAll · id 차례 · 종전 limit=5000 은 max_rows 2000에서 잘렸다 — 한 공고 묶음이라 11-22 조사 최대 565행). 실패는 종전대로 false.
+    return zfGetAll(`housing_units?select=announcement_id&${idFilterFor(ids)}`, { order: 'id', headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }).then(rows => {
       if(!Array.isArray(rows)) return false;
       const inBlk = rows.filter(u => blkIds.indexOf(u.announcement_id) !== -1).length;
       return inBlk === 0 && rows.length > 0;
