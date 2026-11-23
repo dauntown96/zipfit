@@ -1327,6 +1327,7 @@ html.zf12 .zf12-nu .zf-ai-lbl{display:none}
 /* 안 2층 머리 — 겉에서 내린 것 · 꼭 볼 것 · 정정 · ㎡당 */
 html.zf12 .zf12-l2{display:flex;flex-direction:column;gap:10px;margin:4px 0 12px;padding:12px;border:1px solid var(--line-2);border-radius:var(--r-2);background:var(--surface)}
 html.zf12 .zf12-l2:empty{display:none}
+.zf-match-natgrp{margin:18px 2px 8px;padding-top:12px;border-top:1px solid var(--line);font-size:var(--t-s);font-weight:700;color:var(--ink-2)}   /* 판 C 1 (나) 매칭 끝 묶음 머리 */
 html.zf12 .zf12-l2 > *{margin:0!important;order:20}
 /* 2층 차례는 도착 순서가 아니라 고정(늦게 붙는 것이 있어도 같은 그림) · 창 단추·가지 머리가 없는 카드는 노선 그림을 접는다(겉 한 줄과 같은 말) — 늦게 붙는 단추도 :has 로 따라간다 */
 /* 판 C 4 — 자식이 모두 빈 2층 머리(빈 칩 줄 · 빈 자리표) — 다자녀 전세임대처럼 세대 목록·경로·공고문 여럿이 없는 공고에서 빈 둥근 상자가 남았다(:empty 는 칩 줄의 공백 글자 때문에 못 받음) */
@@ -13039,6 +13040,12 @@ function renderMatchResults(rows){
     return;
   }
 
+  // 🔵 판 C 1 (나)(2026-11-23) — 전국 수시모집 전세임대(지역 「… 외」 · 제목 「수시모집」·「상시」)는 매칭 목록 끝 묶음으로 — 특정 단지 공고가 먼저 오게.
+  //    순서만 옮긴다(거르기 0 · 건수 그대로) · 묶음 머리 글은 지도 칸 「전세임대는 미리 정해진 단지가 없어요」 풀이와 같은 말.
+  const natJ = n => /전세임대/.test(String(n.housing_type || '')) && /수시\s*모집|상시/.test(String(n.title || '')) && /외$/.test(String(n.region || '').trim());
+  const natN = rows.filter(natJ).length;
+  if(natN && natN < rows.length) rows = rows.filter(n => !natJ(n)).concat(rows.filter(natJ));
+  const natFrom = natN && natN < rows.length ? rows.length - natN : -1;
   const shown = rows.slice(0, visibleCount);
   let html = matchNoTypeFilter
     ? `<div class="rbox warn" style="margin-bottom:6px"><p class="rdesc" style="margin:0">신청 가능한 유형이 확인되지 않아 전체 공고를 보여드려요.</p></div>`
@@ -13060,6 +13067,7 @@ function renderMatchResults(rows){
     const annDate     = n.announcement_date||'';
     const dateLine    = applyDateLine(n, annDate, applyStart, applyEnd, n.url||'');
     const cardId = 'mcard-' + zfCardKey(n.announcement_id || idx);
+    if(idx === natFrom) html += `<p class="zf-match-natgrp">🏠 전국 수시모집 전세임대 ${natN}건 — 입주자가 조건에 맞는 주택을 직접 찾아 계약하는 유형이에요</p>`;
 
     const detailRows = [];
     if(n.supply_org) detailRows.push(['공급기관', escapeHtml(n.supply_org)]);
