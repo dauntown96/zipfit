@@ -41,7 +41,25 @@ export function bodyOf(src, marker) {
   return out.join('\n')
 }
 
-// index.html 의 `/rest/v1/` 줄 중 표지가 없고 SPOTS 함수 밖인 것 → [{ line, fn }] · fn = 그 줄 위 가장 가까운 함수 선언 이름
+// index.html 의 `/rest/v1/` 자리 중 거름·쪽 표지가 없고 SPOTS 함수 밖인 것 → [{ line, fn }] · fn = 그 자리 위 가장 가까운 함수 선언 이름
+//    🔵 2026-11-23(여덟째 묶음 1) — 줄 단위 → 「호출 한 덩이」 단위: 그 줄(또는 세 줄 위까지)에서 가장 가까운 앞쪽 `fetch(` 부터 짝 괄호까지(최대 4000자 ·
+//       못 찾으면 그 줄). 거름이 다음 줄에 붙는 조회(`zfFilterExistingAnnouncementIds` 등)가 거짓 양성으로 잡히던 것을 뺀다.
+//       덩이에서 빼는 것: PAGED_OR_FILTERED 표지 · RPC 인자의 id 묶음(ID_ARG_RE — p_ids · p_id · p_announcement_id) · 표의 `in.(` 거름(id 묶음) · 표에 POST(쓰기).
+export const ID_ARG_RE = /\bp_(?:ids|id|announcement_id|announcement_ids)\b/
+export function callChunk(lines, i) {
+  const from = Math.max(0, i - 3)
+  const head = lines.slice(from, i + 1).join('\n')
+  const k = head.lastIndexOf('fetch(')
+  if (k < 0) return lines[i]
+  const rest = head.slice(k) + '\n' + lines.slice(i + 1, i + 40).join('\n')
+  let depth = 0
+  for (let p = 0; p < rest.length && p < 4000; p++) {
+    const c = rest[p]
+    if (c === '(') depth++
+    else if (c === ')') { depth--; if (depth === 0) return rest.slice(0, p + 1) }
+  }
+  return rest.slice(0, 4000)
+}
 export function outsideSpots(src) {
   const lines = String(src || '').split('\n')
   const spotFns = new Set(SPOTS.filter(s => s.file === 'index.html').map(s => s.fn.replace(/^(async )?function |\($/g, '')))
@@ -51,8 +69,12 @@ export function outsideSpots(src) {
     const m = /^(?:async )?function ([A-Za-z0-9_$]+)\(/.exec(l)
     if (m) fn = m[1]
     if (!l.includes('/rest/v1/') || /^\s*\/\//.test(l)) return
-    if (PAGED_OR_FILTERED.some(k => l.includes(k))) return
     if (spotFns.has(fn)) return
+    const ch = callChunk(lines, i)
+    if (PAGED_OR_FILTERED.some(k => ch.includes(k))) return
+    const rpc = /\/rest\/v1\/rpc\//.test(ch)
+    if (rpc && ID_ARG_RE.test(ch)) return
+    if (!rpc && (ch.includes('in.(') || /method\s*:\s*['"]POST['"]/.test(ch))) return
     out.push({ line: i + 1, fn: fn || '(최상위)' })
   })
   return out
