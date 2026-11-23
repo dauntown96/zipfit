@@ -1277,7 +1277,7 @@ html[data-ui="d3"] .pg-btn{min-width:var(--hit);height:var(--hit);font-size:var(
 html.zf12 .zf12-off{display:none!important}
 html.zf12 .hcard.zf-ana-pending :is(.zf12-when,.zf12-badges){display:none!important}   /* 분석 전 카드 — 「분석 중」만(수집값 날짜·상태·경고 칩 0 — 종전 .zf-ana-pending 규칙과 같은 거름) */
 /* 겉 ① 유형 · (지역) · 상태 알약 · 경고 배지(빨강 하나 — 경고만) */
-html.zf12 .zf12-card .zf3-ctop{flex-wrap:wrap;row-gap:6px}
+html.zf12 .zf12-card .zf3-ctop{flex-wrap:wrap;row-gap:var(--sp-1)}
 html.zf12 .zf12-badges{display:contents}
 html.zf12 .zf12-badges button.zf12-sched{font-family:inherit;line-height:inherit;cursor:pointer}   /* 판 B ⑤ — 누를 수 있는 배지(단추) · 모양은 종전 칩 그대로 */
 html.zf12 .zf12-badges button.zf12-sched:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
@@ -1291,7 +1291,7 @@ html.zf12 .zf12-cov::before{content:"· ";color:var(--ink-3)}
 /* 겉 ② 제목 최대 2줄 */
 html.zf12 .zf12-card .hname{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 /* 겉 ③ 누가(원문 칸 글자) */
-html.zf12 .zf12-who{margin:2px 0 8px;font-size:var(--t-s);font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html.zf12 .zf12-who{margin:var(--sp-1) 0 var(--sp-2);font-size:var(--t-s);font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 html.zf12 .zf12-who .zf12-res{font-weight:400;color:var(--ink-2)}
 html.zf12 .zf12-wi{margin-right:4px}
 /* 겉 ④ 얼마 — 한 줄 */
@@ -1304,7 +1304,7 @@ html.zf12 .zf12-card [data-sum-for] > div.zf12-hascond > *{white-space:nowrap}
 html.zf12 .zf12-card [data-sum-for] > div.zf12-hascond > .zf12-amt{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}
 html.zf12 .zf12-cond{font-weight:500;color:var(--ink-2)}
 /* 겉 ⑤ 언제 — 노선 한 줄(● 지남 · ◉ 다음 · ○ 앞으로) */
-html.zf12 .zf12-when{display:flex;flex-wrap:wrap;align-items:center;gap:2px 6px;margin:8px 0 12px;font-size:var(--t-xs);color:var(--ink-2)}   /* 좁으면 정거장 단위로 다음 줄(글자를 자르지 않는다) */
+html.zf12 .zf12-when{display:flex;flex-wrap:wrap;align-items:center;gap:2px 6px;margin:var(--sp-2) 0 var(--sp-3);font-size:var(--t-xs);color:var(--ink-2)}   /* 좁으면 정거장 단위로 다음 줄(글자를 자르지 않는다) */
 html.zf12 .zf12-w{display:inline-flex;align-items:baseline;gap:3px;font-family:var(--f-ui);white-space:nowrap}
 html.zf12 .zf12-w .zf12-k{color:var(--ink-3)}
 html.zf12 .zf12-w.past{color:var(--ink-3)}
@@ -1389,7 +1389,8 @@ html.zf12 .zf12-card .detail-grid .zf-dcell-apply:not(:has(.zf-win-other)){displ
   html.zf12 #notice-list .zf12-card > .htop{grid-column:1;grid-row:2}
   html.zf12 #notice-list .zf12-card > .haddr,html.zf12 #notice-list .zf12-card > .zf12-who{grid-column:1;grid-row:3}
   html.zf12 #notice-list .zf12-card > [data-sum-for]{grid-column:2;grid-row:2;align-self:start}
-  html.zf12 #notice-list .zf12-card > .zf12-when{grid-column:2;grid-row:3;margin:6px 0 10px}
+  html.zf12 #notice-list .zf12-card > .zf12-when{grid-column:2;grid-row:3;margin:var(--sp-1) 0 var(--sp-2)}   /* 판 B ② — 6/10 → 4/8(토큰) */
+  html.zf12 #notice-list .zf12-card > .zf12-who{margin-top:0}   /* 판 B ② — 그리드 칸끼리는 여백이 겹치지 않아 제목 아래 4(.htop)만 둔다 */
   html.zf12 #notice-list .zf12-card > [id^="ncard-"]{grid-column:1 / -1}
   /* 🔵 2026-11-23(우편함 「표시층 — 실사용 판 B 시안」 ① · 사전 조사 docs/panb-preresearch.md 1장 후보 B) — 펼침 「›」(.zf3-gotop)를 제목 줄 끝(카드 가운데쯤 x 266)에서
      카드 오른쪽 끝 · 세로 가운데로(오른쪽 안쪽 8px — 맨 위로 단추와 맞닿지 않게). 단추는 DOM 자리 그대로(.htop 안 — 키보드 차례 그대로) · 자리만 absolute.
@@ -1508,7 +1509,7 @@ html[data-ui="d3"] #zf3NoticeHead .zf3-tq .zf3-tq-mine span{font-size:var(--t-bo
 /* ⑦ 대비 — 「다른 회차」 접기 머리(hu-past-title)의 날값 회색(흰 바탕 4.48:1 — 4.5 밑)을 토큰 --ink-3 으로(어둡게도 같은 토큰) */
 html[data-ui="d3"] .hu-past-title{color:var(--ink-3)}
 /* ④ 카드 겉 칩 줄 — 알약·⚠️ 칩이 유형 줄 아래로 꺾일 때 줄 틈 6 → 4(칩 높이·글자 그대로) */
-html.zf12 .zf12-card .zf3-ctop{row-gap:4px}
+html.zf12 .zf12-card .zf3-ctop{row-gap:var(--sp-1)}
 html[data-ui="d3"] #zf3NoticeHead .zf3-ctl .zf3-vseg{margin-left:auto;padding:0}
 html[data-ui="d3"] #zf3NoticeHead .zf3-ctl .zf3-vseg button{padding:0 10px}
 /* ③ 오늘 판 네 칸 — 숫자 위 · 이름 아래 한 줄(꺾지 않음) → 네 칸 높이가 같다(종전 「7일 안 접수 시작」만 세 줄 51px) */
@@ -1558,7 +1559,10 @@ html.zf12 .zf12-card .zf3-ctop:has(> .zf13-cl){display:grid;grid-template-column
 html.zf12 .zf3-ctop .zf3-dpill.zf13-wait{background:var(--paper);border-color:var(--ink);color:var(--ink)}   /* 기준 위반 고침 2 — 끝 시각 지난 차수 알약: 대기(검은 바탕 걷음) */
 html.zf12 .zf3-ctop .zf3-dpill.closed{background:transparent;border-color:var(--line);color:var(--ink-3)}
 html.zf12 .zf12-cov.zf13-lead::before{content:none}   /* 줄 첫머리 지역 — 앞 가운뎃점 꾸밈만 숨김 */
-html.zf12 .zf13-cl{display:flex;flex-wrap:wrap;align-items:center;gap:0 6px;min-width:0}   /* 줄 틈 0 — 지역이 올라와 배지가 둘째 줄로 꺾여도 걷은 지역 줄 높이와 같게(첫 화면 카드 2장) */
+html.zf12 .zf13-cl{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-1) 6px;min-width:0}   /* 🔵 2026-11-23(판 B ② · 다운님 지적) — 꺾인 배지 줄 사이 0 → 4(배지 묶음 .zf12-badges 는 display:contents 라 이 줄 틈을 쓴다) · 종전 0은 「첫 화면 카드 2장」 때문이었다 — 회신 셈 */
+/* 🔵 2026-11-23(우편함 「표시층 — 실사용 판 B 시안」 ② · docs/card-spacing.md) — 카드 안 세로 간격 세 값: 딸린 줄 4(--sp-1) · 묶음 사이 8(--sp-2) · 칸 사이 16(--sp-4) · 카드 아래 끝만 12(--sp-3 · 높이 유지) */
+html.zf12 .zf12-card > .zf3-ctop{margin-bottom:var(--sp-2)}   /* ① 줄 → 제목 6 → 8 */
+html.zf12 .zf3-card.zf12-card > .htop{margin-bottom:var(--sp-1)}   /* 제목 → 딸린 줄(누구 · 얼마) 2 → 4 */
 html.zf12 .zf12-card .zf3-ctop > .zf3-dpill{margin-left:0;align-self:start}
 /* 4단계 2 — 자격 절 목(가·나목 …)마다 한 줄 · 펼치면 원문 문장(구역 머리 꼴: 제목 + ›) */
 html.zf12 .zf13-moks{list-style:none;margin:2px 0 6px;padding:0;font-size:var(--t-body);color:var(--ink)}
