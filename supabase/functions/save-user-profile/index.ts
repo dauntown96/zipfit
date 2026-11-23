@@ -28,6 +28,7 @@ const CORS = {
 
 // 프론트가 실제로 소비하는 컬럼만 반환한다(select('*') 금지).
 // 최소 방 수(min_rooms)는 2026-10-11 걷었다(우편함 「고지 회차 2」 5 · 다운님 결정 「받지 않기」) — 읽지도 쓰지도 않는다. 옛 화면이 보내는 minRooms 는 FIELD_MAP 에 없어 무시된다.
+// 마케팅 알림(marketing_alert)은 2026-11-23 걷었다(우편함 「코드·운영 — 열다섯째 A장」 2 · 토글은 PR #626) — 읽지도 쓰지도 않는다 · 옛 화면이 보내는 marketingAlert 는 FIELD_MAP 에 없어 무시된다 · 칸은 다음 마이그레이션에서 DROP(값 파기).
 const PROFILE_COLUMNS = [
   'email',
   'alert_email',
@@ -42,7 +43,6 @@ const PROFILE_COLUMNS = [
   'max_deposit',
   'alert_on',
   'new_notice_alert',
-  'marketing_alert',
   'theme',
   'font_size',
   'usage_log_consent',
@@ -95,7 +95,6 @@ const FIELD_MAP: Record<string, { col: string; conv: (v: unknown) => unknown }> 
   maxDeposit: { col: 'max_deposit', conv: toIntOrNull },
   alertOn: { col: 'alert_on', conv: toBool },
   newNoticeAlert: { col: 'new_notice_alert', conv: toBool },
-  marketingAlert: { col: 'marketing_alert', conv: toBool },
   theme: { col: 'theme', conv: toTextOrNull },
   fontSize: { col: 'font_size', conv: toTextOrNull },
   usageLogConsent: { col: 'usage_log_consent', conv: toBool },

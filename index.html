@@ -2073,7 +2073,7 @@ html.zf12 .zf13-mok-s{margin:0 0 10px;font-size:var(--t-sub);color:var(--ink-2);
           <label class="toggle"><input type="checkbox" id="toggleNewNotice" checked onchange="onSettingChange({newNoticeAlert:this.checked?'Y':'N'})"><span class="toggle-slider"></span></label>
         </div>
         <!-- 「마케팅 소식 알림」 토글은 걷었다(2026-10-18 G8 고지 — 발송 기능 없음 · 광고성 정보 수신 동의를 지금 받지 않는다).
-             칸 marketing_alert은 DB에 남고 화면은 더 이상 보내지 않는다(EF는 키가 있을 때만 바꾼다). -->
+             칸 marketing_alert은 2026-11-23 EF가 받지 않게 했고 이어서 DROP한다(열다섯째 A장 2 · 값 파기). -->
       </div>
 
       <div class="panel" style="margin-bottom:1rem">
@@ -7675,7 +7675,7 @@ async function loadUrbanIncome(){
 // 기준 중위소득 가구원수별 기준액 캐시 (페이지 로드 1회 조회)
 // 🔴 두 번째 밑값 표다. 통합공공임대는 소득 한도를 도시근로자가 아니라 이 표에 곱한다.
 //    어느 표를 쓰는지는 유형이 아니라 **행**이 정한다 — eligibility_criteria.income_base.
-//    로드 규칙은 위 loadUrbanIncome 과 같다(최신 연도 · 1~8인 완비 아니면 null).
+//    로드 규칙: 올해(KST) 이하 연도 중 1~8인 완비인 가장 큰 해 · 없으면 null(2026-11-23 — loadUrbanIncome 은 최신 연도 그대로).
 let _medianIncome = null;
 async function loadMedianIncome(){
   if(_medianIncome) return _medianIncome;
@@ -7685,12 +7685,15 @@ async function loadMedianIncome(){
     if(res.ok){
       const rows = await res.json();
       if(Array.isArray(rows) && rows.length > 0){
-        const year = Math.max(...rows.map(r => Number(r.standard_year)));
-        const table = {};
-        rows.filter(r => Number(r.standard_year) === year)
-            .forEach(r => { table[Number(r.household_size)] = Number(r.income_100); });
-        const complete = [1,2,3,4,5,6,7,8].every(n => Number.isFinite(table[n]) && table[n] > 0);
-        if(complete){ _medianIncome = { year, table }; return _medianIncome; }
+        // 🔵 2026-11-23(우편함 「코드·운영 — 열다섯째 A장」 1) — 고시 연도 = 적용 연도(1월 1일)라 「올해(KST) 이하 연도 중 1~8인 완비인 가장 큰 해」(새해 고시를 미리 넣어도 그해 0시 전엔 안 쓴다 · 도시근로자 로더는 그대로).
+        const kstYear = new Date(Date.now() + 9 * 3600e3).getUTCFullYear();
+        for(const year of [...new Set(rows.map(r => Number(r.standard_year)))].filter(y => y <= kstYear).sort((a, b) => b - a)){
+          const table = {};
+          rows.filter(r => Number(r.standard_year) === year)
+              .forEach(r => { table[Number(r.household_size)] = Number(r.income_100); });
+          const complete = [1,2,3,4,5,6,7,8].every(n => Number.isFinite(table[n]) && table[n] > 0);
+          if(complete){ _medianIncome = { year, table }; return _medianIncome; }
+        }
       }
     }
   } catch(e){ console.warn('median_income_monthly 로드 실패:', e); }

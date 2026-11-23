@@ -1517,6 +1517,58 @@ select jsonb_build_object(
   }
 }
 
+// ㉟ 장부 없이 줄어든 재생산 불가 표(2026-11-23 · 우편함 「코드·운영 — 열다섯째 A장」 3 · ⚠️ 안 멈춤) — zipfit_ops.irreplaceable_drop_record 가
+//    재생산 불가 23표(zipfit-backup heartbeat_report.py IRREPLACEABLE 와 같게)의 count 를 직전 회차 스냅숏과 견주고 그 사이 의도된 감소 장부 합을 붙인다.
+//    감소 ≠ 장부 합인 표가 있으면 ⚠️(생존 신호보다 먼저 — 다음 날 아침이 아니라 30분 안에). 첫 회차(스냅숏 없음)는 통과 + 「첫 스냅숏」.
+try {
+  const j = (await callRecord('zipfit_ops.irreplaceable_drop_record', {})) || {}
+  const drops = j.drops || []
+  add('irreplaceable_drop', '재생산 불가 표 행 감소가 의도된 감소 장부와 다름(직전 회차 대비)', (j.unmatched || 0) > 0 ? 'warn' : 'pass',
+    !j.prev_at ? `첫 스냅숏(${j.tables}표)` : (drops.length
+      ? drops.map(d => `${d.t} −${d.drop}(장부 ${d.ledger})`).join(' · ') + ` · 어긋남 ${j.unmatched}`
+      : `줄어든 표 0/${j.tables}`),
+    '0 — 직전 health-ops 회차 뒤 줄어든 재생산 불가 표의 감소가 그 사이 zipfit_ops.intended_drops 합과 다르면 ⚠️(안 멈춤 · 생존 신호와 같은 「정확히 같음」) · count(*) · 보관 정리 표 밖')
+} catch (e) {
+  add('irreplaceable_drop', '재생산 불가 표 행 감소가 의도된 감소 장부와 다름(직전 회차 대비)', 'warn', String(e).slice(0, 200), 'zipfit_ops.irreplaceable_drop_record 를 부른다(못 부르면 ⚠️)')
+}
+
+// ㊱ 회차 고리 미분석 · 분석 행 없는 산물 · 재확인 대기 체류(2026-11-23 · 열다섯째 A장 4·5) — 한 쿼리.
+//    ⓐ round_chain_unanalyzed ℹ️ — 열린 카드(get_announcements_deduped · 마감 ≥ 오늘 KST) 중 회차 고리(get_announcement_round_chain_ids hop ≥ 1)에
+//       완료 계열 분석이 하나도 없는 묶음(그 구성원의 get_announcement_group_ids 어디에도 완료 계열 없음)이 있는 대표 수 — 숫자만.
+//    ⓑ product_without_analysis ℹ️ — 세대 행 또는 정책 행이 있는데 announcement_analysis 행이 없는 공고 수 — 숫자만.
+//    ⓒ recheck_wait_max — 끝나지 않은(state ∉ done·dropped) #정정·#첨부·#차수 몫의 now() − enqueued_at 최대 · 1시간 넘으면 ⚠️(안 멈춤 · 화면이 recheck_pending 을 읽기 전 유일한 눈).
+try {
+  const [x] = await sqlRead(`with t as (select (now() at time zone 'Asia/Seoul')::date d),
+op as (select x.announcement_id rep from public.get_announcements_deduped() x, t where x.apply_end >= t.d),
+ch as (select op.rep, c.announcement_id m from op cross join lateral public.get_announcement_round_chain_ids(op.rep) c where c.hop >= 1),
+un as (select distinct ch.rep from ch where not exists (
+         select 1 from public.get_announcement_group_ids(ch.m) g join public.announcement_analysis aa on aa.announcement_id = g.announcement_id
+          where aa.status in ('완료', '완료(보조 누락)', '완료(판정 대기)', '완료(소급)'))),
+pr as (select a.announcement_id from public.announcements a
+        where not exists (select 1 from public.announcement_analysis aa where aa.announcement_id = a.announcement_id)
+          and (exists (select 1 from public.housing_units h where h.announcement_id = a.announcement_id)
+               or exists (select 1 from public.announcement_policies p where p.announcement_id = a.announcement_id))),
+rq as (select q.enqueued_at from public.analysis_dispatch_queue q where q.state not in ('done', 'dropped') and q.group_key ~ ' #(정정|첨부|차수) ')
+select json_build_object(
+  'open', (select count(*) from op), 'chain_reps', (select count(distinct rep) from ch),
+  'un', (select coalesce(json_agg(rep order by rep), '[]'::json) from un),
+  'pr', (select coalesce(json_agg(announcement_id order by announcement_id), '[]'::json) from pr),
+  'rq_n', (select count(*) from rq),
+  'rq_max_min', (select round(extract(epoch from now() - min(enqueued_at)) / 60) from rq)) as j`)
+  const c = x.j
+  const top = (a, k = 5) => a.slice(0, k).join(', ') + (a.length > k ? ` 외 ${a.length - k}` : '')
+  add('round_chain_unanalyzed', '열린 카드 회차 고리에 미분석 회차가 있는 대표(셈)', 'info',
+    `${c.un.length}/${c.chain_reps}(고리 있는 열린 대표 · 열린 ${c.open})${c.un.length ? ': ' + top(c.un) : ''}`,
+    'ℹ️ 숫자만(판정 0 · 안 멈춤) — 회차 고리 hop ≥ 1 묶음에 완료 계열 분석 0')
+  add('product_without_analysis', '세대·정책 행이 있는데 분석 행이 없는 공고(셈)', 'info',
+    `${c.pr.length}${c.pr.length ? ': ' + top(c.pr) : ''}`, 'ℹ️ 숫자만(판정 0 · 안 멈춤)')
+  add('recheck_wait_max', '재확인 몫(정정·첨부·차수) 대기 체류 최대(분)', (c.rq_max_min ?? 0) > 60 ? 'warn' : 'pass',
+    c.rq_n ? `끝나지 않은 몫 ${c.rq_n} · 최대 ${c.rq_max_min}분` : '끝나지 않은 몫 0',
+    '≤ 60분 — 넘으면 ⚠️(안 멈춤 · 목록 칸 recheck_pending 을 화면이 읽기 전 유일한 눈)')
+} catch (e) {
+  add('round_chain_unanalyzed', '회차 고리 미분석 · 분석 행 없는 산물 · 재확인 체류(셋)', 'warn', String(e).slice(0, 200), '목록 RPC · 회차 고리 · 분석 · 대기열 표를 읽는다(못 읽으면 ⚠️)')
+}
+
 // ⑱ 비밀값 만료(2026-10-17 · 우편함 「코드·운영 — 인스턴스 지표 정기 기록 · Vault 밖 만료 표 · 비밀값 30일 전 ⚠️ …」 3) — zipfit_ops.secret_expiry_list() 한 정의
 //    (Vault 설명칸 「expires=…」 + Vault 밖 표 zipfit_ops.secret_expiry_external · 관리자 상태판 secrets 와 같다)를 읽는다.
 //    날짜 있는 것 중 남은 날 ≤ 30 = ⚠️(이름·날짜) · 지난 것 = ❌(안 멈춤 — gate.mjs HARD 밖) · 설명칸 꼴이 없는 Vault 비밀(missing) = ⚠️.

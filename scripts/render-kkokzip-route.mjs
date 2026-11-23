@@ -19,7 +19,7 @@
 //   node scripts/render-kkokzip-route.mjs --id 2015122300020357 [--width 390] [--dark] [--shot /tmp/…/top.png] [--shot-map /tmp/…/map.png]
 //   (--shot = 화면 첫 자리 · --shot-map = 지도 상자와 출처 줄만 · id 는 목록 카드의 대표 id — 묶음 구성원 id 면 상세가 안 열린다(2026-11-23 실측))
 //   → { id, map_tiles, juso_src_note, served, missing, blocked, console_errors } 한 줄(JSON)
-//   (ESM 이라 playwright 를 찾을 자리가 필요하면 NODE_PATH 대신 scripts/node_modules 링크를 임시로: ln -sfn /opt/node-tools/node_modules scripts/node_modules)
+//   (ESM import 가 전역 playwright 를 못 찾으면 스스로 CJS 해석(NODE_PATH)으로 물러난다 — 2026-11-23 · 링크 필요 없음)
 
 import { readFileSync, existsSync, statSync } from 'node:fs'
 import { join, resolve, extname, dirname } from 'node:path'
@@ -59,7 +59,10 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const id = val('--id')
   if (!id) { console.error('--id <공고 id> 가 필요하다'); process.exit(2) }
   const width = Number(val('--width') || 390)
-  const { chromium } = await import('playwright')
+  // 🔵 2026-11-23(열다섯째 A장 6) — 컨테이너 전역 playwright 는 ESM import 가 못 찾는다(NODE_PATH 는 CJS 만) → CJS 해석으로 물러난다.
+  let pw
+  try { pw = await import('playwright') } catch { pw = (await import('node:module')).createRequire(import.meta.url)('playwright') }
+  const { chromium } = pw
   const { stubListRpc } = await import('./render-list-stub.mjs')
   const browser = await chromium.launch()
   const ctx = await browser.newContext({ viewport: { width, height: 900 }, serviceWorkers: 'block', locale: 'ko-KR', timezoneId: 'Asia/Seoul',
