@@ -6099,10 +6099,16 @@ function zfLoadRentStats(){
 const zfRentRange = new Map();   // announcement_id → [lo, hi]
 const ZF_NA_RE = /나[\s「」『』'"]{0,2}군/;
 function zfRentRangeHtml(rg){ return `<span class="zf-rent-range"> · 단지마다 ${Math.round(rg[0]).toLocaleString()}~${Math.round(rg[1]).toLocaleString()}원</span>`; }
-function zfRentRangeFromGroups(annId, groups){
+// 범위를 셀 카드인가 — 유형을 알고 매입임대가 아닐 때만(매입은 「단지」가 주택 하나하나라 범위가 넓어져 뜻이 옅다 · 사전 조사 4장)
+function zfRentRangeWanted(annId){
   const row = (noticeData || []).find(n => String(n['announcement_id']) === String(annId));
   const tk = row ? zfRentTypeKey(row, '') : '';
-  if(!tk || /매입/.test(tk)) return;
+  return !!tk && !/매입/.test(tk);
+}
+function zfRentRangeFromGroups(annId, groups){
+  if(!zfRentRangeWanted(annId)) return;
+  const row = (noticeData || []).find(n => String(n['announcement_id']) === String(annId));
+  const tk = zfRentTypeKey(row, '');
   const perm = /^영구임대/.test(tk);
   const meds = [];
   (groups || []).forEach(g => {
@@ -10467,7 +10473,7 @@ function loadAnnouncementBlocks(annId, id, detailEl){
     // 🔵 2026-11-23(판 B ④ ①) — 블록(단지·자리) 둘 이상 카드의 「단지마다 ㎡당」 범위 재료 — 블록 세대 행은 블록을 펼칠 때만 오므로, 상세를 열 때 블록 id 전부의
     //    세대 행에서 중앙값에 드는 칸만 한 번 받는다(블록 카드 상세 한 번에 요청 +1 · 실패하면 범위 없이 종전 줄).
     //    단지 = 세대 행 building_name(같은 공고 id 안에 자리가 여럿인 블록도 이것으로 갈린다 · 이름 없는 행은 빼고 셈).
-    if(!zfRentRange.has(String(annId))) zfGetAll(`housing_units?select=announcement_id,building_name,monthly_rent,area_sqm,unit_group,supply_target,unit_type&${idFilterFor([...new Set(blockAnnIds[id])])}`, { order: 'id' })
+    if(!zfRentRange.has(String(annId)) && zfRentRangeWanted(annId)) zfGetAll(`housing_units?select=announcement_id,building_name,monthly_rent,area_sqm,unit_group,supply_target,unit_type&${idFilterFor([...new Set(blockAnnIds[id])])}`, { order: 'id' })
       .then(rows => { const by = new Map(); rows.forEach(u => { const k = String(u.building_name || '').trim(); if(!k) return; if(!by.has(k)) by.set(k, []); by.get(k).push(u); }); zfRentRangeFromGroups(annId, [...by.values()].map(units => ({ units }))); })
       .catch(() => {});
     blockSites[id] = blocks.map(b => String(b.site_label || ''));
