@@ -1,7 +1,7 @@
 // wide-fetch.mjs 시험(2026-11-23 · 여섯째 묶음 2) — node .github/health/wide-fetch.test.mjs
 //    실제 소스(index.html · screen-check.mjs)로 「지금 자리를 찾는가」와, 낮춘 문턱에서 한 번 뜨는가를 본다.
 import { readFileSync } from 'node:fs'
-import { judgeWideFetch, bodyOf, SPOTS } from './wide-fetch.mjs'
+import { judgeWideFetch, bodyOf, outsideSpots, SPOTS } from './wide-fetch.mjs'
 let ok = 0, bad = 0
 const t = (name, c) => { if (c) ok++; else { bad++; console.log('✗', name) } }
 const root = new URL('../../', import.meta.url)
@@ -23,5 +23,12 @@ t('쪽 나눔 들어간 자리는 대상 밖', jp.status === 'pass' && jp.paged.
 t('자리를 못 찾으면 ⚠️', judgeWideFetch({ sources: { ...sources, 'index.html': '' }, counts: small, maxRows: 2000 }).status === 'warn')
 t('bodyOf 는 다음 최상위 선언에서 끊는다', bodyOf('function a(){\n  x\n}\nfunction b(){ offset= }', 'function a(') === '){\n  x\n}')
 t('bodyOf 는 같은 깊이 다음 문장에서 끊는다', bodyOf('  const o = await f(() => {\n    y\n  })\n  const z = 1 // offset=', 'const o = ') === 'await f(() => {\n    y\n  })')
+// 🔵 2026-11-23(일곱째 묶음 3·4)
+const getAllSrc = { ...sources, 'index.html': sources['index.html'].replace('function zfLoadWinSched(){', "function zfLoadWinSched(){ zfGetAll('announcement_schedule?select=x');") }
+const jg = judgeWideFetch({ sources: getAllSrc, counts: { ...small, win_sched: 99999 }, maxRows: 2000 })
+t('zfGetAll 꼴 본문은 대상 밖', jg.status === 'pass' && jg.paged.some(p => p.key === 'win_sched'))
+const os = outsideSpots('function a(){\n  fetch(`${U}/rest/v1/t?select=x`)\n  fetch(`${U}/rest/v1/t?select=x&limit=5`)\n  // fetch(`${U}/rest/v1/c`)\n}\nfunction zfLoadWinSched(){\n  fetch(`${U}/rest/v1/s?select=y`)\n}')
+t('SPOTS 밖 통째 조회 — 표지 없는 줄만 · SPOTS 함수·주석 뺌', os.length === 1 && os[0].fn === 'a')
+t('값 칸에 SPOTS 밖 수', /ℹ️ SPOTS 밖 통째 조회 \d+/.test(j0.value))
 console.log(`wide-fetch 시험 ${ok}/${ok + bad}`)
 if (bad) process.exit(1)
