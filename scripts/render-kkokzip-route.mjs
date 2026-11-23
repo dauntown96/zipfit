@@ -16,7 +16,8 @@
 //   await stubListRpc(page)
 //   await page.goto('https://kkokzip.com/?n=2015122300020357')   // ?n= 은 그 공고 상세를 연다
 // 바로 재 보기(명령 줄):
-//   node scripts/render-kkokzip-route.mjs --id 2015122300020357 [--width 390] [--dark] [--shot /tmp/…/map.png]
+//   node scripts/render-kkokzip-route.mjs --id 2015122300020357 [--width 390] [--dark] [--shot /tmp/…/top.png] [--shot-map /tmp/…/map.png]
+//   (--shot = 화면 첫 자리 · --shot-map = 지도 상자와 출처 줄만 · id 는 목록 카드의 대표 id — 묶음 구성원 id 면 상세가 안 열린다(2026-11-23 실측))
 //   → { id, map_tiles, juso_src_note, served, missing, blocked, console_errors } 한 줄(JSON)
 //   (ESM 이라 playwright 를 찾을 자리가 필요하면 NODE_PATH 대신 scripts/node_modules 링크를 임시로: ln -sfn /opt/node-tools/node_modules scripts/node_modules)
 
@@ -81,6 +82,16 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   }, id)
   const shot = val('--shot')
   if (shot) await page.screenshot({ path: shot, fullPage: false })
+  // 🔵 2026-11-23(우편함 「코드·운영 — 아홉째 묶음」 3) — --shot-map <경로>: 지도 상자(와 바로 아래 출처 줄)만 찍는다 · 상자로 굴려 내린 뒤 지도 조각이 다시 그려질 틈을 준다.
+  //    --shot 은 화면 첫 자리만 찍어 상세 지도가 그림 밖이었다(같은 날 시험).
+  const shotMap = val('--shot-map')
+  if (shotMap && r.box) {
+    const box = page.locator(`[id^="map-"][id*="${id}"]`).first()
+    await box.scrollIntoViewIfNeeded()
+    await page.waitForTimeout(2500)
+    const bb = await box.boundingBox()
+    if (bb) await page.screenshot({ path: shotMap, clip: { x: 0, y: Math.max(0, bb.y - 8), width, height: Math.min(900, bb.height + 64) } })
+  }
   console.log(JSON.stringify({ id, width, map_box: r.box, map_tiles: r.tiles, juso_src_note: r.note, served: info.served, missing: info.missing.slice(0, 10),
     blocked: info.blocked, console_errors: errors.length, errors: errors.slice(0, 3) }))
   await browser.close()
