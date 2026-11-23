@@ -1748,7 +1748,7 @@ try {
   const sources = Object.fromEntries([...new Set(WIDE_SPOTS.map(s => s.file))].map(f => [f, readFileSync(new URL('../../' + f, import.meta.url), 'utf8')]))
   const j = judgeWideFetch({ sources, counts: { ...x.j, price_ids: wideListTotal }, maxRows })
   add('wide_fetch', '넓은 조회 — 쪽 나눔 없이 통째로 받는 자리의 행 수(max_rows × 0.8 넘으면 ⚠️)', j.status, j.value,
-    '자리마다 지금 행 수 < max_rows × 0.8 — 넘거나 셈 못 하면 ⚠️(안 멈춤 · health-ops-soft) · 쪽 나눔(offset=)이 들어간 자리는 대상 밖 · 자리 목록 wide-fetch.mjs SPOTS')
+    '자리마다 지금 행 수 < max_rows × 0.8 — 넘거나 셈 못 하면 ⚠️(안 멈춤 · health-ops-soft) · 쪽 나눔(offset= · zfGetAll()이 들어간 자리는 대상 밖 · 자리 목록 wide-fetch.mjs SPOTS · 값 칸 끝 「SPOTS 밖 통째 조회 n」은 ℹ️ 수치만(판정 0)')
 } catch (e) {
   addBlind('wide_fetch', '넓은 조회 — 점검 불능', 'warn', String(e).slice(0, 200), '자격·세대·일정 표 행 수와 index.html · screen-check.mjs 를 읽는다(못 읽으면 ⚠️)')
 }
