@@ -12,6 +12,12 @@
   "home-390": {
    "rules": {},
    "contrast_incomplete": {
+    "span.zf3-tg|#17181c": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
     "span.zf3-ai-ic|#5a616b": {
      "nodes": 1,
      "ratio": null,
@@ -1495,6 +1501,12 @@
   "match-390": {
    "rules": {},
    "contrast_incomplete": {
+    "span.zf3-tg|#17181c": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
     "span.zf3-ai-ic|#5a616b": {
      "nodes": 1,
      "ratio": null,
