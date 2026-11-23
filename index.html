@@ -1056,6 +1056,8 @@ html.zf3-mapview[data-ui="d3"] #notice-list{display:none}
 .zf3-map{margin:0 0 14px}
 .zf3-map-wait{margin:20px 0;text-align:center;font-size:var(--t-s);color:var(--ink-3)}
 .zf3-radar{position:relative;border:1px solid var(--line);border-radius:var(--r-3);background:var(--map-sea);overflow:hidden}
+/* 🔵 2026-11-23(우편함 「표시층 — 실사용 판 A」 3) — 지도를 눌러 휠 확대가 켜진 동안(zf3MapWheelOn) 테두리를 진하게: 지금 휠이 지도를 움직인다는 표시 · 손을 떼면(지도 밖으로) 종전 테두리 */
+.zf3-map.zf3-wheel-on .zf3-radar{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
 .zf3-radar svg{display:block;width:100%;height:auto;max-height:70vh}
 /* 지도 휠 안내(S1 PR-1 ③) — 그냥 휠이 쪽 스크롤을 막지 않게 글자만 잠깐(누름 통과) */
 .zf3-whint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:grid;gap:2px;justify-items:center;max-width:86%;padding:8px 14px;border-radius:var(--r-s);background:rgba(20,20,18,.78);color:#fff;font-size:var(--t-s);text-align:center;pointer-events:none;opacity:0;transition:opacity var(--m-fast) var(--ease);z-index:3}
@@ -1329,6 +1331,10 @@ html.zf12 .zf12-l2 > .zf-wave-slot{order:8}
 html.zf12 .zf12-card:not(:has(.zf3-wsw,.zf3-bhead)) .zf3-route{display:none!important}
 html.zf12 .zf12-area{font-size:var(--t-xs);color:var(--ink-2);margin:0 0 4px}
 html.zf12 .zf12-schedwhy{font-size:var(--t-s);font-weight:700;color:var(--warn);background:var(--warn-bg);border:1px solid var(--warn-line);border-radius:var(--r-1);padding:8px 10px}
+/* 🔵 2026-11-23(실사용 판 A 2) — 배너 = 머리 한 줄 + ⚠️ 행마다 원문 첫 문장 한 줄(누르면 그 행) · 글자는 배너 색 그대로 · 밑줄로 누를 수 있음을 보인다 */
+html.zf12 .zf12-schedwhy .zf12-schedh{margin:0 0 4px}
+html.zf12 .zf12-schedwhy .zf12-schedgo{display:block;width:100%;min-height:var(--hit);box-sizing:border-box;padding:6px 0;margin:0;border:0;border-top:1px dashed var(--warn-line);background:none;font:inherit;font-weight:400;color:inherit;text-align:left;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+html.zf12 .zf12-schedwhy .zf12-schedgo:focus-visible{outline:2px solid var(--warn);outline-offset:2px}
 html.zf12 .zf12-must h4{margin:0 0 4px;font-size:var(--t-s);font-weight:700;color:var(--ink)}
 html.zf12 .zf12-must ol{margin:0;padding:0;list-style:none;font-size:var(--t-s);color:var(--ink)}
 html.zf12 .zf12-must summary{cursor:pointer;padding:12px 0;min-height:var(--hit);box-sizing:border-box;line-height:1.5;color:var(--ink-2)}
@@ -15752,6 +15758,10 @@ function zf3PlaceFilter(rows){
   return hit;
 }
 const zf3Wide = () => { try{ return matchMedia('(min-width:1200px)').matches; }catch(e){ return false; } };
+// 🔴 2026-11-23(우편함 「표시층 — 실사용 판 A」 1 · 백로그 「넓은 화면 지도 단이 비고」) — 좁은 창(1200 밑)에서 목록 보기로 열면 zf3RenderMap 이 지도를 hidden 으로 두고,
+//    창을 넓혀도 다시 그리는 길이 없어 오른쪽 단이 빈 채였다(넓은 화면은 목록/지도 단추도 숨어 열 길 0). 폭이 1200 을 넘나들 때 다시 그린다 —
+//    넓어지면 지도 단 보임 · 좁아지면 지금 보기(zf3View — 목록이면 숨김 · 지도면 그대로)대로. 공고 탭 밖(zf3On 아님)이면 zf3RenderMap 이 아무것도 안 한다.
+try{ matchMedia('(min-width:1200px)').addEventListener('change', () => zf3RenderMap()); }catch(e){}
 function zf3SetView(v){
   // 🔵 S1 PR-1 ③ — 좁은 화면에서 목록 → 지도로 돌아오면 고른 곳(📍)을 푼다: 지도는 다시 고르는 자리라 한 곳만 남은 목록을 들고 오지 않는다.
   //    넓은 화면(1200px~)은 지도·목록이 같이 보여 그대로 · 목록의 시·군·구 칩으로 고른 것도 지도로 갈 때만 풀린다.
@@ -16013,8 +16023,9 @@ function zf3MapWire(box){
     live();
   }, { passive: false });
   box.addEventListener('touchend', e => { if(zf3MapDrag && zf3MapDrag.pinch && e.touches.length < 2){ zf3MapDrag = null; settle(); } });
-  box.addEventListener('pointerdown', e => { if(e.target.closest('.zf3-radar svg')) zf3MapWheelOn = true; });
-  box.addEventListener('pointerleave', () => { zf3MapWheelOn = false; });
+  // 🔵 2026-11-23(실사용 판 A 3) — 휠 확대가 켜진 동안 테두리 표시(.zf3-wheel-on) — 켜고 끄는 자리는 종전 둘 그대로
+  box.addEventListener('pointerdown', e => { if(e.target.closest('.zf3-radar svg')){ zf3MapWheelOn = true; box.classList.add('zf3-wheel-on'); } });
+  box.addEventListener('pointerleave', () => { zf3MapWheelOn = false; box.classList.remove('zf3-wheel-on'); });
   box.addEventListener('wheel', e => {
     if(!e.target.closest('.zf3-radar svg')) return;
     if(!(e.ctrlKey || e.metaKey) && !zf3MapWheelOn){ zf3WheelHint(box); return; }
@@ -16361,7 +16372,13 @@ if('serviceWorker' in navigator){
 //    겉에서 내린 것(칩 줄 · ㎡당 비교 · 경고 상자 · 순위별 꼬리 · 창 단추 · 공고문 여러 개 · 지난 회차 줄)은 상세 2층 머리(.zf12-l2)로 옮긴다 — 지우지 않는다.
 //    「누가」 = 세대 supply_target 계층 이름(괄호 꼬리 떼기 · 원문 순서 · 중복 없이) 앞에 자격 첫 문장의 「OO에 거주하는」 원문 조각 · 그 밖은 숨김(조사 회신 5의 ①③④).
 const ZF12_ELIG_CATS = ['신청자격', '신청 자격', '입주자격', '입주자 신청자격', '공급대상'];
-const ZF12_SCHED_RE = /일정|기간|날짜|일자|발표일|마감일|접수일/;   // 날짜를 다루는 ⚠️ 행만(「접수 방법」 같은 꼴은 아님)
+// 🔴 2026-11-23(우편함 「표시층 — 실사용 판 A」 2 ① · 백로그 「⚠️ 분류 이름 사전 초안」 분류 1~3) — 「일정 확인 필요」를 세울 ⚠️ 행 = 분류 이름이 일정 갈래인 행.
+//    분류 1 요일 · 2 시각·시간 · 3 날짜·기간. 「거주기간」(배점·최장 거주 연수 — 분류 8 자격)은 일정이 아니다 → 먼저 지우고 본다
+//    (종전 /일정|기간|…/ 이 「배점기준표 거주기간 지역 표기」·「최장 거주기간 표기 주의」에 걸려 일정과 무관한 카드에 배지가 섰다 · 2026-11-23 열린 4장).
+//    🔴 판정의 정본은 여기 한 곳(zf12IsSched) — 다른 자리는 이 함수를 부른다. 「입주 시기」는 사전 초안대로 다음 판(분류 10 → 3).
+const ZF12_SCHED_RE = /일정|기간|날짜|일자|발표일|마감일|접수일|요일|시각|시간/;
+const ZF12_SCHED_NOT_RE = /거주\s*기간/g;
+function zf12IsSched(cat){ const c = String(cat || ''); return /^\s*⚠️/.test(c) && ZF12_SCHED_RE.test(c.replace(ZF12_SCHED_NOT_RE, '')); }
 const zf12Info = new Map();     // 카드 대표 id → { ids, heads, res, sched }
 const zf12Pend = new Set();
 const zf12MustMemo = new Map(); // 카드 대표 id → Promise(꼭 볼 것 행)
@@ -16395,14 +16412,19 @@ async function zf12Load(rows){
     const cats = ZF12_ELIG_CATS.map(c => `"${c}"`).join(',');
     const [hu, pol] = await Promise.all([
       fetch(`${SUPABASE_URL}/rest/v1/housing_units?select=announcement_id,supply_target,seq&${idFilterFor(all)}&order=seq`, { headers: zfAnonHeaders() }).then(r => r.ok ? r.json() : []),
-      fetch(`${SUPABASE_URL}/rest/v1/announcement_policies?select=announcement_id,category,seq,content_raw&${idFilterFor(all)}&or=(category.in.(${encodeURIComponent(cats)}),category.like.${encodeURIComponent('⚠️*')})&order=seq`, { headers: zfAnonHeaders() }).then(r => r.ok ? r.json() : [])
+      fetch(`${SUPABASE_URL}/rest/v1/announcement_policies?select=id,announcement_id,category,seq,content_raw&${idFilterFor(all)}&or=(category.in.(${encodeURIComponent(cats)}),category.like.${encodeURIComponent('⚠️*')})&order=seq`, { headers: zfAnonHeaders() }).then(r => r.ok ? r.json() : [])
     ]);
     grp.forEach(([id, ids]) => {
       const set = new Set(ids), mine = r => set.has(String(r.announcement_id));
       const heads = zf12Heads((Array.isArray(hu) ? hu : []).filter(mine).map(r => r.supply_target));
       const P = (Array.isArray(pol) ? pol : []).filter(mine);
       const ep = P.filter(r => ZF12_ELIG_CATS.includes(r.category));
-      const sched = P.filter(r => /^⚠️/.test(r.category || '') && ZF12_SCHED_RE.test(r.category || '')).map(r => r.category);
+      // 🔵 2026-11-23(실사용 판 A 2 ②) — 행마다 { 행 id · 분류 · 원문 첫 문장 } — 배너 글자는 그 ⚠️ 행 content_raw 첫 문장 그대로(같은 문장은 한 번 · 묶음 형제·정정이 물려받은 행).
+      const sched = [];
+      P.filter(r => zf12IsSched(r.category)).forEach(r => {
+        const first = zf12FirstSentence(r.content_raw).trim() || String(r.category || '').replace(/^\s*⚠️\s*/, '');
+        if(!sched.some(x => x.first === first)) sched.push({ pid: String(r.id || ''), cat: r.category, first });
+      });
       zf12Info.set(id, { ids, heads, res: ep.length ? zf12Res(ep[0].content_raw) : '', sched });
     });
     return true;
@@ -16578,13 +16600,34 @@ function zf12FillWho(){
     if(cov && top){ cov.classList.add('zf12-cov'); top.insertBefore(cov, top.querySelector('.zf3-dpill')); card.querySelector('.haddr').classList.add('zf12-off'); }
   });
 }
-function zf12SchedBadge(card, cats){
+function zf12SchedBadge(card, rows){
   if(card.querySelector('.zf12-sched')) return;
   const b = card.querySelector('.zf12-badges'); if(!b) return;
-  // 「일정 확인 필요」 — 설계 14절 규칙 5(다운님 판정 2026-11-12 ①) · 근거 행 이름은 펼치면 2층 첫 줄에
+  // 「일정 확인 필요」 — 설계 14절 규칙 5(다운님 판정 2026-11-12 ①) · 근거는 펼치면 2층 첫 자리에
   b.insertAdjacentHTML('beforeend', `<span class="chip sel zf-chip-warn zf12-sched">⚠️ 일정 확인 필요</span>`);
   const l2 = card.querySelector('.zf12-l2');
-  if(l2) l2.insertAdjacentHTML('afterbegin', `<p class="zf12-schedwhy">⚠️ 일정 확인 필요 — 원문에 같은 단계 날짜가 둘 적혀 있어요: ${cats.map(c => escapeHtml(c.replace(/^⚠️\s*/, ''))).join(' · ')} (아래 ⚠️ 행)</p>`);
+  // 🔴 2026-11-23(우편함 「표시층 — 실사용 판 A」 2 ②③ · 다운님 승인 13:06 「배너 문구 = ⚠️ 행 첫 문장 그대로」) — 종전 일괄 문장 「원문에 같은 단계 날짜가 둘 적혀 있어요」는
+  //    요일만 다름 · 날짜 하나가 깨짐 · 시각만 다름(수원당수 …21119 현장접수 16시 ↔ 17시)에서 틀린 말이었다. 이제 행마다 그 ⚠️ 행 원문 첫 문장 한 줄(글자 그대로) ·
+  //    한 줄을 누르면 그 행(「⚠️ 특이사항 안내」 안 정책 행)을 펼치고 그리로 옮겨 초점을 둔다(zf12SchedGo).
+  if(l2) l2.insertAdjacentHTML('afterbegin', `<div class="zf12-schedwhy" role="group" aria-label="일정 확인 필요"><p class="zf12-schedh">⚠️ 일정 확인 필요</p>`
+    + rows.map(r => `<button type="button" class="zf12-schedgo" data-pid="${zfAttr(r.pid)}" onclick="event.stopPropagation();zf12SchedGo(this)">${escapeHtml(r.first)}</button>`).join('') + `</div>`);
+}
+// 배너 한 줄 → 그 ⚠️ 정책 행: 감싼 접기(<details> — 「⚠️ 특이사항 안내」·더 보기)를 모두 펴고 · 행을 펴고 · 화면 가운데로 · 머리에 초점.
+//    정책 행은 상세를 연 뒤 늦게 올 수 있어 잠깐(최대 약 4초) 기다린다 · 끝내 없으면 아무것도 하지 않는다(배너 글자가 이미 그 행의 첫 문장).
+function zf12SchedGo(btn){
+  const card = btn && btn.closest('.hcard'), pid = btn && btn.dataset.pid;
+  if(!card || !pid) return;
+  let n = 0;
+  const go = () => {
+    const it = card.querySelector(`details.policy-item[data-pid="${CSS.escape(pid)}"]`);
+    if(!it){ if(++n < 14) setTimeout(go, 300); return; }
+    for(let x = it.parentElement; x && x !== card; x = x.parentElement) if(x.tagName === 'DETAILS') x.open = true;
+    it.open = true;
+    const sm = it.querySelector('summary');
+    it.scrollIntoView({ block: 'center', behavior: (() => { try{ return matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){ return true; } })() ? 'auto' : 'smooth' });
+    if(sm) sm.focus({ preventScroll: true });
+  };
+  go();
 }
 // ④ 얼마 — 겉은 「보증금 · 월」 한 줄(조건이 갈리면 「두 조건」·「가·나군별」·「소득 구간별」) · 전용 · 합친 범위 설명 · ㎡당 비교는 2층으로
 function zf12Price(){
