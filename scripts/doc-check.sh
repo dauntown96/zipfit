@@ -9,6 +9,8 @@
 #   ③ 표 칸 수(셀 안 `|` 는 `\|` · 행 끝 `|`) — .claude/hooks/rule-check.py --table-cols · 대상 = base 이후 바뀐 .md 전부
 #      (2026-11-20 · 12장 ⑦ — 종전 CLAUDE.md · docs/history.md 둘. BASE_SHA 가 비면 CLAUDE.md 하나)
 #   ④ 고지 문서(privacy.html · terms.html · notices.json) 자리 표시 「{{」
+#   ⑤ 🔵 2026-11-23(우편함 「코드·운영 — 열째 묶음」 2) 운영 점검 같은 물음 — base 에 없던 ops-check.mjs 새 항목 이름이 기존 이름과 핵심 낱말 넷 이상 ∧ 비율 ≥ 0.8
+#      겹치면 ⚠️ 경고만(실패 아님 · 종료 코드에 안 넣음) — scripts/ops-name-overlap.mjs · BASE_SHA 가 비거나 node 가 없으면 건너뜀
 # 쓰는 법: BASE_SHA=<기준 sha> bash scripts/doc-check.sh [HEAD 참조 — 기본 HEAD]
 #   BASE_SHA 가 비면 ①과 ②의 base 대조를 건너뛰고 ③은 CLAUDE.md 만 본다(훅이 기준점을 못 찾을 때 — 얕은 클론 등). 파일 내용은 작업 트리를 본다.
 #   DOC_CHECK_GH=1 이면 실패 줄을 GitHub Actions ::error:: 꼴로도 낸다(워크플로).
@@ -65,6 +67,17 @@ if [ -n "$hits" ]; then
   fail=1
 fi
 
+# ⑤ 운영 점검 같은 물음(경고만)
+ovl=건너뜀
+if [ -n "${BASE_SHA:-}" ] && command -v node >/dev/null 2>&1 && git cat-file -e "$BASE_SHA:.github/health/ops-check.mjs" 2>/dev/null; then
+  if out=$(node scripts/ops-name-overlap.mjs --base "$BASE_SHA" 2>&1); then
+    ovl=봄
+    printf '%s\n' "$out" | grep -F '같은 물음일 수 있음' | while IFS= read -r l; do
+      if [ "${DOC_CHECK_GH:-}" = 1 ]; then echo "$l"; else echo "⚠️ ${l##*::}"; fi
+    done
+  fi
+fi
+
 liq=봄; [ -n "${BASE_SHA:-}" ] || liq=건너뜀
-if [ "$fail" = 0 ]; then echo "문서 검사 — 통과(Liquid $liq · 이력 새 꼴 · 표 칸 · 고지 「{{」)"; fi
+if [ "$fail" = 0 ]; then echo "문서 검사 — 통과(Liquid $liq · 이력 새 꼴 · 표 칸 · 고지 「{{」 · 점검 같은 물음 $ovl)"; fi
 exit "$fail"
