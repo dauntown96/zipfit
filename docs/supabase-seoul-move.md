@@ -182,3 +182,11 @@ select name from vault.secrets order by name;
 - **일회용 `seoul-move.yml` 걷음**(11-21). `scripts/seoul-move-*.sql` 넷은 이 문서·이력이 가리키는 기록으로 남긴다(부르는 곳 0). 비교 SQL ③④는 `zipfit-backup` 복원 리허설로 옮겼다(`scripts/drill_origin.py` — 원천 = 덤프를 뜬 DB · 복원본 · `project_ref`와 「`collection_run_log` 덤프 시각 전 행 수」가 다르면 실패).
 - **출구 지역**(서울 DB `net.http_get` · 11-21): bmc 403 · juso 200 · `data.myhome.go.kr` 시간 초과 → `SEOUL_ONLY`·`x-region`·`seoul-api` 넘김은 남긴다(`docs/data-sources.md` 「출구 지역」).
 - **남은 것**: 7′ juso 좌표 켜기(🔵 2026-11-22 켬 — 전 단지 채움은 낮 창으로 며칠 · 위 표 7′ 줄) · 처리방침 「싱가포르」 두 자리(5장) · 옛 프로젝트 삭제(다운님) · Actions 비밀 `MOVE_OLD_DB_URL`·`MOVE_NEW_DB_URL`(이전용 — 지우기는 다운님 · 저장소 Settings → Secrets).
+
+## 8. 마무리(2026-11-23 · 우편함 「코드·운영 — 서울 이전 마무리: 백업 덤프에서 juso 좌표 빼기 · 처리방침 옛 서버 삭제 날짜 · 비밀값 만료 표」)
+
+- **옛 프로젝트 삭제**: `khdpjjyspmlqtzperoqg`(싱가포르) — 2026-11-23 다운님 삭제(claude.ai 09:4x 프로젝트 목록에서 사라짐 확인). 그 사업자 백업에서는 최대 7일 뒤 지워진다.
+- **옛 토큰 폐기**: 옛 관리 토큰 `zipfit-claude-code` · 7일 토큰 — 2026-11-23 09:22 다운님 폐기. `zipfit_ops.secret_expiry_external`에는 두 줄이 없었다(11-21 새 토큰 줄로 바꿔 둠 · 지울 것 0). 새 줄 `NOTION_TOKEN`(만료 없음) — 표가 만료일 빈칸을 「만료 없음」(state `none`)으로 받게 `2026-11-23_01_secret_expiry_none.sql`.
+- **백업 덤프 좌표 제외**: `zipfit-backup` 정기 덤프(2026-11-23 수동 1회 · 그날 밤 03:00 KST부터)에 `complex_geo` 표 데이터를 담지 않는다(표 정의·정책·권한은 담김 · pg_dump는 칸 단위 제외가 없어 표 통째 · `scripts/data_excluded.py` `COORD_EXCLUDED`). 복구하면 빈 채로 돌아오고 채움 잡 `complex-geo-fill`을 다시 돌린다(`zipfit-backup` README 「복구 절차」 8). 🔴 2026-11-22까지의 덤프와 두 저장소 git 이력은 다시 쓰지 않는다(다운님 결정 (가) 「앞으로만 막는다」 · 09:44).
+- **처리방침**: 「11. 23.에 지울 예정 … (삭제 날짜는 실제 삭제 뒤 확정)」 → 「11. 23.에 지웠으며 …」 — `privacy.html`(11-29 판) · `docs/privacy/2026-11-21.html`(시행 중 판) 각 두 자리.
+- **남은 것**: Actions 비밀 `MOVE_OLD_DB_URL`·`MOVE_NEW_DB_URL` 지우기(다운님 · 저장소 Settings → Secrets) · 옛 DB 사본이 `zipfit-backup` 이력에 남는 사실을 처리방침에 적을지(claude.ai 판정 거리).

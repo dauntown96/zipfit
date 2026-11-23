@@ -9,6 +9,7 @@ AS $function$
 --   vault 줄 = vault.secrets 의 이름·설명칸 머리 「expires=YYYY-MM-DD|none|unknown」만(🔴 secret 칸·decrypted_secrets 는 읽지 않는다 · 꼴이 없으면 missing)
 --   · fixed 줄 = Vault 밖 만료 표 zipfit_ops.secret_expiry_external(토큰을 갈면 그 표 한 줄을 고친다).
 --   days_left = KST 오늘부터 · 날짜 있는 것부터 남은 날 오름차순.
+--   🔵 2026-11-23(우편함 「코드·운영 — 서울 이전 마무리」 3) — fixed 줄 만료일이 비면(만료 없는 토큰) state = none(Vault 「expires=none」과 같은 뜻).
 select s.source, s.name, s.state, s.expires, s.expires - (now() at time zone 'Asia/Seoul')::date
   from (select 'vault' as source, v.name,
                case when m.tok ~ '^\d{4}-\d{2}-\d{2}$' then 'date' when m.tok in ('none', 'unknown') then m.tok else 'missing' end as state,
@@ -16,7 +17,7 @@ select s.source, s.name, s.state, s.expires, s.expires - (now() at time zone 'As
           from vault.secrets v
           cross join lateral (select lower(trim(substring(coalesce(v.description, '') from '^\s*expires=([^;]*)'))) as tok) m
         union all
-        select 'fixed', e.name, 'date', e.expires
+        select 'fixed', e.name, case when e.expires is null then 'none' else 'date' end, e.expires
           from zipfit_ops.secret_expiry_external e) s
  order by s.expires nulls last, s.source desc, s.name;
 $function$
