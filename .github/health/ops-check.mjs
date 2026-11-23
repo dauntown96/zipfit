@@ -23,6 +23,7 @@ import { INCOME_ROWS_SQL, judgeIncome } from './income-table.mjs'
 import { PRIVACY_MATCH_SQL, judgePrivacyMatch, v2StartOf } from './privacy-match.mjs'
 import { judgeWideFetch, SPOTS as WIDE_SPOTS } from './wide-fetch.mjs'
 import { judgeUnitUnknown, sidoAliasesOf } from './unit-sigungu.mjs'
+import { NEG_TAIL_SQL, judgeNegTail, inSlot as negTailSlot } from './neg-tail.mjs'
 import { ELIG_FORM_NULL_SQL, RENT_NULL_SQL, ROUND_MIX_SQL, LH_CLOSED_WIN_SQL, DEDUP_KEY_PAREN_SQL, UNIT_AREA_ROUND_SQL, judgeEligFormNull, judgeRentNull, judgeRoundMix, judgeLhClosedWin, judgeDedupKeyParen, judgeUnitAreaRound } from './open-gaps.mjs'
 import { readdirSync, readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
@@ -1495,6 +1496,25 @@ select jsonb_build_object(
     '길이 다름 = 짧은/긴 < 0.33 ∧ 긴 ≥ 500자 — ℹ️ 셈만(판정 없음) · 글자마다 줄바꿈 = 50자 이상 ∧ 줄바꿈/글자 > 0.3 — 0 넘으면 ⚠️(안 멈춤)')
 } catch (e) {
   add('screen_gaps', '화면 빈칸 점검 셋(마감 시각 · 세대 시군구 · 회차 정책 글)', 'warn', String(e).slice(0, 200), '공고·일정·경로·세대·정책 표를 읽는다(못 읽으면 ⚠️)')
+}
+
+// ㉞ 부정 표지 밖 글자(2026-11-23 · 우편함 「코드·운영 — 열두째 묶음」 B · ℹ️ 판정 0 · 안 멈춤) — 정책 원문 「못」·「안」 뒤 첫 글자 중
+//    요점 검사기 부정 표지(scripts/plain-check.mjs NEG_MARKERS)에도 기준선(neg-tail.json)에도 없는 글자 = 값 칸에 글자·행 수.
+//    주 1회(KST 월 10시대 앞 회차) — 그 밖 회차는 skip(원문 전체 정규식이라 30분마다 돌리지 않는다).
+{
+  const ntConf = JSON.parse(readFileSync(new URL('./neg-tail.json', import.meta.url), 'utf8'))
+  const ntName = '정책 원문 「못」·「안」 뒤 부정 표지 밖 새 글자(주 1회)'
+  const ntRule = '기준선(neg-tail.json) 밖 새 글자 0 — 있으면 ℹ️ 값만(판정 0 · 안 멈춤) · 표지 = plain-check.mjs NEG_MARKERS · 「잘못」 뒤는 거름 · KST 월 10시대 앞 회차에만 센다'
+  if (!negTailSlot(now, ntConf.slot)) add('neg_tail', '정책 원문 「못」·「안」 뒤 부정 표지 밖 새 글자(주 1회)', 'skip', '주 1회 창 밖(KST 월 10시대 앞 회차)', ntRule)
+  else {
+    try {
+      const [x] = await sqlRead(NEG_TAIL_SQL)
+      const nt = judgeNegTail({ rows: x.j, conf: ntConf })
+      add('neg_tail', ntName, nt.status, nt.value, ntRule)
+    } catch (e) {
+      add('neg_tail', ntName, 'info', '셈 불능: ' + String(e).slice(0, 160), ntRule)
+    }
+  }
 }
 
 // ⑱ 비밀값 만료(2026-10-17 · 우편함 「코드·운영 — 인스턴스 지표 정기 기록 · Vault 밖 만료 표 · 비밀값 30일 전 ⚠️ …」 3) — zipfit_ops.secret_expiry_list() 한 정의
