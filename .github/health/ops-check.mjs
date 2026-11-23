@@ -22,7 +22,7 @@ import { screenRunSql, judgeScreenRun } from './screen-run.mjs'
 import { INCOME_ROWS_SQL, judgeIncome } from './income-table.mjs'
 import { PRIVACY_MATCH_SQL, judgePrivacyMatch, v2StartOf } from './privacy-match.mjs'
 import { judgeWideFetch, SPOTS as WIDE_SPOTS } from './wide-fetch.mjs'
-import { UNIT_SIGUNGU_SQL, judgeUnitSigungu, sidoAliasesOf } from './unit-sigungu.mjs'
+import { judgeUnitUnknown, sidoAliasesOf } from './unit-sigungu.mjs'
 import { ELIG_FORM_NULL_SQL, RENT_NULL_SQL, ROUND_MIX_SQL, LH_CLOSED_WIN_SQL, DEDUP_KEY_PAREN_SQL, UNIT_AREA_ROUND_SQL, judgeEligFormNull, judgeRentNull, judgeRoundMix, judgeLhClosedWin, judgeDedupKeyParen, judgeUnitAreaRound } from './open-gaps.mjs'
 import { readdirSync, readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
@@ -1436,12 +1436,14 @@ try {
 //       같은 자리 둘째 셈 — 열린 카드 ∧ 분석 완료 계열 ∧ 일정 표 행 있음 ∧ 「접수」 행 없음 ∧ 경로 표 0(마감 날이 멀어도 미리 잡는다 · …20923 은 이 꼴이었다).
 //    ⓑ unit_sigungu_unknown — 세대 행 시군구가 공고 행 시군구 이름(공백 무시)에도 경계 파일 geo/kr-2026-07.json 「cent」 시·군·구 이름에도 없는 것.
 //       예외 1: 「양산」(…19919 · 원문 주소에 「시」가 없다 — 2026-11-04 분석 묶음이 그대로 둠). unit_sigungu_city_only(「시」만 ∧ 주소에 구)와는 고칠 몫이 달라 따로 둔다.
+//       🔵 2026-11-23(열째 묶음 1) — 같은 물음의 unit_sigungu(#1222)를 걷고 하나로: 예외 정본 = unit-sigungu.json(코드 상수 걷음) · 경계 대조는 시·도별
+//          (ZF_SIDO_ALIASES 를 index.html 에서 읽음) — 판정 unit-sigungu.mjs judgeUnitUnknown · SQL 은 공고 행 이름에 없는 후보만 돌려준다.
 //    ⓒ round_policy_diff — 회차 링크 쌍(announcement_round_links)의 같은 칸 이름(category) 정책 글 길이가 크게 다름(짧은 쪽/긴 쪽 < 0.33 ∧ 긴 쪽 ≥ 500자) = ℹ️ 셈만
 //       (회차마다 원문이 실제로 다를 수 있어 판정하지 않는다) · 같은 자리 「글자마다 줄바꿈」(50자 이상 ∧ 줄바꿈/글자 > 0.3 · 포항블루밸리 …20963 꼴) 정책 행 수 = 0 넘으면 ⚠️.
-const UNIT_SG_EXCEPT = new Set(['2015122300019919|양산'])
 try {
-  const geoNames = Object.keys(JSON.parse(readFileSync(new URL('../../geo/kr-2026-07.json', import.meta.url), 'utf8')).cent).map(k => k.split('|')[1])
-  const lit = `array[${geoNames.map(s => `'${s.replace(/'/g, "''")}'`).join(',')}]::text[]`
+  const usConf = JSON.parse(readFileSync(new URL('./unit-sigungu.json', import.meta.url), 'utf8'))
+  const usGeo = JSON.parse(readFileSync(new URL('../../' + usConf.geo, import.meta.url), 'utf8'))
+  const usAliases = sidoAliasesOf(readFileSync(new URL('../../index.html', import.meta.url), 'utf8'))
   const [x] = await sqlRead(`with t as (select (now() at time zone 'Asia/Seoul')::date d),
 op as (select x.announcement_id rep, x.apply_end dy, public.announcement_dedup_key(a.title) k
          from public.get_announcements_deduped() x join public.announcements a on a.announcement_id = x.announcement_id, t
@@ -1458,10 +1460,9 @@ gs as (select g.rep,
          bool_or(exists (select 1 from public.announcement_schedule s where s.announcement_id = g.aid and s.stage = '접수')) jeopsu,
          bool_or(exists (select 1 from public.announcement_apply_routes ro where ro.announcement_id = g.aid)) route
          from g group by g.rep),
-ks as (select distinct replace(btrim(sigungu_nm), ' ', '') sg from public.announcements where nullif(btrim(sigungu_nm), '') is not null
-       union select unnest(${lit})),
-uu as (select h.announcement_id aid, btrim(h.sigungu_nm) sg, count(*) n from public.housing_units h
-        where nullif(btrim(h.sigungu_nm), '') is not null and replace(btrim(h.sigungu_nm), ' ', '') not in (select sg from ks) group by 1, 2),
+ks as (select distinct replace(btrim(sigungu_nm), ' ', '') sg from public.announcements where nullif(btrim(sigungu_nm), '') is not null),
+uu as (select h.announcement_id aid, btrim(coalesce(h.sido_nm, '')) sd, btrim(h.sigungu_nm) sg, count(*) n from public.housing_units h
+        where nullif(btrim(h.sigungu_nm), '') is not null and replace(btrim(h.sigungu_nm), ' ', '') not in (select sg from ks) group by 1, 2, 3),
 lk as (select earlier_announcement_id e, later_announcement_id la from public.announcement_round_links),
 pc as (select lk.e, lk.la, p.announcement_id aid, p.category, sum(length(p.content_raw)) n
          from lk join public.announcement_policies p on p.announcement_id in (lk.e, lk.la) group by 1, 2, 3, 4),
@@ -1472,7 +1473,7 @@ select jsonb_build_object(
   'hm_notime', (select coalesce(jsonb_agg(rep order by rep), '[]'::jsonb) from hm where n > 0 and hm = 0),
   'hm_cards', (select count(*) from hm),
   'no_jeopsu', (select coalesce(jsonb_agg(rep order by rep), '[]'::jsonb) from gs where done and sched and not jeopsu and not route),
-  'unit_unknown', (select coalesce(jsonb_agg(jsonb_build_array(aid, sg, n) order by n desc, aid), '[]'::jsonb) from uu),
+  'unit_unknown', (select coalesce(jsonb_agg(jsonb_build_array(aid, sd, sg, n) order by n desc, aid), '[]'::jsonb) from uu),
   'pd_cat', (select count(*) from pd), 'pd_links', (select count(distinct (e, la)) from pd), 'links', (select count(*) from lk),
   'pd_top', (select coalesce(jsonb_agg(z.e || '→' || z.la order by z.e, z.la), '[]'::jsonb) from (select distinct e, la from pd) z),
   'nl_char', (select coalesce(jsonb_agg(announcement_id order by announcement_id), '[]'::jsonb) from public.announcement_policies
@@ -1486,11 +1487,9 @@ select jsonb_build_object(
      `ℹ️ 행은 있는데 원문 시각 없음 ${c.hm_notime.length}${c.hm_notime.length ? ': ' + top(c.hm_notime) : ''}`,
      `열린 분석 완료 ∧ 일정 행 있음 ∧ 접수 행 없음 ∧ 경로 표 0 = ${c.no_jeopsu.length}${c.no_jeopsu.length ? ': ' + top(c.no_jeopsu) : ''}`].join(' · '),
     '앞 셈 0 ∧ 끝 셈 0 — 넘으면 ⚠️(안 멈춤) · 원문 시각 없음은 ℹ️ 값만 · 카드 = 제목 키 같은 공고 전부(화면 zfEndHmOf 재료와 같다)')
-  const uu = c.unit_unknown.filter(([aid, sg]) => !UNIT_SG_EXCEPT.has(`${aid}|${sg}`))
-  add('unit_sigungu_unknown', '세대 행 시군구가 공고 행·경계 파일 어디에도 없는 이름', uu.length ? 'warn' : 'pass',
-    uu.length ? uu.slice(0, 5).map(([aid, sg, n]) => `${aid} 「${sg}」 ${n}행`).join(', ') + (uu.length > 5 ? ` 외 ${uu.length - 5}` : '') + ` · 예외 ${c.unit_unknown.length - uu.length}`
-      : `0 · 예외 ${c.unit_unknown.length - uu.length}(양산 …19919)`,
-    '0(예외 목록 밖) — 넘으면 ⚠️(안 멈춤) · 공백 무시 · 경계 geo/kr-2026-07.json cent 256 · 예외 = UNIT_SG_EXCEPT')
+  const us = judgeUnitUnknown({ rows: c.unit_unknown, geo: usGeo, conf: usConf, aliases: usAliases })
+  add('unit_sigungu_unknown', '세대 행 시군구가 공고 행·경계 파일 어디에도 없는 이름', us.status, us.value,
+    '0(예외 목록 밖) — 넘으면 ⚠️(안 멈춤) · 공백 무시 · 경계는 세대 행 시·도별(geo/kr-2026-07.json cent · 옛 시·도 이름은 index.html ZF_SIDO_ALIASES) · 예외 정본 unit-sigungu.json')
   add('round_policy_diff', '회차 링크 쌍 같은 칸 정책 글 길이 크게 다름(셈) · 글자마다 줄바꿈 정책 행', c.nl_char.length ? 'warn' : 'info',
     `길이 다름 ${c.pd_cat}칸 · ${c.pd_links}쌍(링크 ${c.links})${c.pd_top.length ? ': ' + top(c.pd_top, 3) : ''} · 글자마다 줄바꿈 ${c.nl_char.length}${c.nl_char.length ? ': ' + top([...new Set(c.nl_char)]) : ''}`,
     '길이 다름 = 짧은/긴 < 0.33 ∧ 긴 ≥ 500자 — ℹ️ 셈만(판정 없음) · 글자마다 줄바꿈 = 50자 이상 ∧ 줄바꿈/글자 > 0.3 — 0 넘으면 ⚠️(안 멈춤)')
@@ -1766,20 +1765,6 @@ try {
     '0(평소) — 복구 뒤에만 뜬다 · ℹ️ 정보(판정 0)')
 } catch (e) {
   addBlind('geo_fill_blocked', '막힌 좌표 채움 — 점검 불능', 'warn', String(e).slice(0, 200), 'complex_geo · complex_geo_attempts 를 읽는다(못 읽으면 ⚠️)')
-}
-
-// ㊼ 세대 시군구 이름 ℹ️(2026-11-23 · 우편함 「코드·운영 — 여덟째 묶음」 3) — 열린 공고 세대 행 sigungu_nm 중 같은 공고 행 지역 글자에도 지도 경계 파일에도 없는 이름.
-//    기대값 · 예외 목록 · ⚠️ 문턱(warn_over · 처음 null = ℹ️만) 정본 = unit-sigungu.json · 판정 unit-sigungu.mjs · 시·도 별칭은 index.html ZF_SIDO_ALIASES 를 그대로 읽는다.
-try {
-  const conf = JSON.parse(readFileSync(new URL('./unit-sigungu.json', import.meta.url), 'utf8'))
-  const geo = JSON.parse(readFileSync(new URL('../../' + conf.geo, import.meta.url), 'utf8'))
-  const aliases = sidoAliasesOf(readFileSync(new URL('../../index.html', import.meta.url), 'utf8'))
-  const [x] = await sqlRead(UNIT_SIGUNGU_SQL)
-  const j = judgeUnitSigungu({ rows: x.j, geo, conf, aliases })
-  add('unit_sigungu', '세대 시군구 이름 — 공고 행·지도 경계 파일 어디에도 없는 이름(정보)', j.status, j.value,
-    '기대 0 — 0이 아니면 ℹ️(판정 0 · warn_over 가 숫자면 넘을 때 ⚠️ · 안 멈춤) · 예외·문턱 정본 unit-sigungu.json')
-} catch (e) {
-  addBlind('unit_sigungu', '세대 시군구 이름 — 점검 불능', 'warn', String(e).slice(0, 200), '세대·공고 행과 경계 파일 · index.html 을 읽는다(못 읽으면 ⚠️)')
 }
 
 // ㊵ 부하 규칙 근거 다시 재기(2026-11-19 · 17장 · 순위표 14위 · 💡 「부하 규칙(분 단위 줄 · 하루 회차 수 등)의 근거 실측을 주간 ℹ️로」) — ℹ️ 정보(판정 0).
