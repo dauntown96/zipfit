@@ -22,6 +22,7 @@ import { screenRunSql, judgeScreenRun } from './screen-run.mjs'
 import { INCOME_ROWS_SQL, judgeIncome } from './income-table.mjs'
 import { PRIVACY_MATCH_SQL, judgePrivacyMatch, v2StartOf } from './privacy-match.mjs'
 import { judgeWideFetch, SPOTS as WIDE_SPOTS } from './wide-fetch.mjs'
+import { UNIT_SIGUNGU_SQL, judgeUnitSigungu, sidoAliasesOf } from './unit-sigungu.mjs'
 import { ELIG_FORM_NULL_SQL, RENT_NULL_SQL, ROUND_MIX_SQL, LH_CLOSED_WIN_SQL, DEDUP_KEY_PAREN_SQL, UNIT_AREA_ROUND_SQL, judgeEligFormNull, judgeRentNull, judgeRoundMix, judgeLhClosedWin, judgeDedupKeyParen, judgeUnitAreaRound } from './open-gaps.mjs'
 import { readdirSync, readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
@@ -1748,7 +1749,7 @@ try {
   const sources = Object.fromEntries([...new Set(WIDE_SPOTS.map(s => s.file))].map(f => [f, readFileSync(new URL('../../' + f, import.meta.url), 'utf8')]))
   const j = judgeWideFetch({ sources, counts: { ...x.j, price_ids: wideListTotal }, maxRows })
   add('wide_fetch', '넓은 조회 — 쪽 나눔 없이 통째로 받는 자리의 행 수(max_rows × 0.8 넘으면 ⚠️)', j.status, j.value,
-    '자리마다 지금 행 수 < max_rows × 0.8 — 넘거나 셈 못 하면 ⚠️(안 멈춤 · health-ops-soft) · 쪽 나눔(offset= · zfGetAll()이 들어간 자리는 대상 밖 · 자리 목록 wide-fetch.mjs SPOTS · 값 칸 끝 「SPOTS 밖 통째 조회 n」은 ℹ️ 수치만(판정 0)')
+    '자리마다 지금 행 수 < max_rows × 0.8 — 넘거나 셈 못 하면 ⚠️(안 멈춤 · health-ops-soft) · 쪽 나눔(offset= · zfGetAll()이 들어간 자리는 대상 밖 · 자리 목록 wide-fetch.mjs SPOTS · 값 칸 끝 「SPOTS 밖 통째 조회 n」은 ℹ️ 수치만(판정 0 · 호출 한 덩이 단위 — id 묶음 인자·in. 거름·쓰기는 뺌)')
 } catch (e) {
   addBlind('wide_fetch', '넓은 조회 — 점검 불능', 'warn', String(e).slice(0, 200), '자격·세대·일정 표 행 수와 index.html · screen-check.mjs 를 읽는다(못 읽으면 ⚠️)')
 }
@@ -1765,6 +1766,20 @@ try {
     '0(평소) — 복구 뒤에만 뜬다 · ℹ️ 정보(판정 0)')
 } catch (e) {
   addBlind('geo_fill_blocked', '막힌 좌표 채움 — 점검 불능', 'warn', String(e).slice(0, 200), 'complex_geo · complex_geo_attempts 를 읽는다(못 읽으면 ⚠️)')
+}
+
+// ㊼ 세대 시군구 이름 ℹ️(2026-11-23 · 우편함 「코드·운영 — 여덟째 묶음」 3) — 열린 공고 세대 행 sigungu_nm 중 같은 공고 행 지역 글자에도 지도 경계 파일에도 없는 이름.
+//    기대값 · 예외 목록 · ⚠️ 문턱(warn_over · 처음 null = ℹ️만) 정본 = unit-sigungu.json · 판정 unit-sigungu.mjs · 시·도 별칭은 index.html ZF_SIDO_ALIASES 를 그대로 읽는다.
+try {
+  const conf = JSON.parse(readFileSync(new URL('./unit-sigungu.json', import.meta.url), 'utf8'))
+  const geo = JSON.parse(readFileSync(new URL('../../' + conf.geo, import.meta.url), 'utf8'))
+  const aliases = sidoAliasesOf(readFileSync(new URL('../../index.html', import.meta.url), 'utf8'))
+  const [x] = await sqlRead(UNIT_SIGUNGU_SQL)
+  const j = judgeUnitSigungu({ rows: x.j, geo, conf, aliases })
+  add('unit_sigungu', '세대 시군구 이름 — 공고 행·지도 경계 파일 어디에도 없는 이름(정보)', j.status, j.value,
+    '기대 0 — 0이 아니면 ℹ️(판정 0 · warn_over 가 숫자면 넘을 때 ⚠️ · 안 멈춤) · 예외·문턱 정본 unit-sigungu.json')
+} catch (e) {
+  addBlind('unit_sigungu', '세대 시군구 이름 — 점검 불능', 'warn', String(e).slice(0, 200), '세대·공고 행과 경계 파일 · index.html 을 읽는다(못 읽으면 ⚠️)')
 }
 
 // ㊵ 부하 규칙 근거 다시 재기(2026-11-19 · 17장 · 순위표 14위 · 💡 「부하 규칙(분 단위 줄 · 하루 회차 수 등)의 근거 실측을 주간 ℹ️로」) — ℹ️ 정보(판정 0).
