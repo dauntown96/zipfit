@@ -6319,14 +6319,14 @@ async function zfRenderCutoffDetail(annId, id){
       const n = num(r.rqpr_cnt), sup = num(r.spl_rmno), cr = num(r.competition_ratio);
       const over = (n != null && sup != null) ? n - sup : null;
       const raw = [`${n != null ? n : 0}명 신청`, sup != null ? `${sup}호` : null].filter(Boolean).join(' · ');
-      const tail = [(cr != null && n) ? `· ${cr} : 1` : null, (over != null && over >= 1) ? `→ 넘침 ${over}명` : null].filter(Boolean);
+      const tail = [(cr != null && n) ? `· ${cr}\u00a0:\u00a01` : null, (over != null && over >= 1) ? `→ 넘침 ${over}명` : null].filter(Boolean);
       return escapeHtml(raw) + (tail.length ? ' ' + calc(escapeHtml(tail.join(' '))) : '');
     };
     // 예비자만 있는 주택형(예비입주자 모집) — 신청 · 정원(원문) + 경쟁률(계산 · 1 이상일 때만).
     const waitOnlyCell = r => {
       const n = num(r.rqpr_cnt), sup = num(r.spl_rmno), cr = num(r.competition_ratio);
       const raw = [`신청 ${n != null ? n : 0}명`, sup != null ? `정원 ${sup}명` : null].filter(Boolean).join(' · ');
-      return escapeHtml(raw) + ((cr != null && cr >= 1 && n) ? ' ' + calc(escapeHtml(`${cr} : 1`)) : '');
+      return escapeHtml(raw) + ((cr != null && cr >= 1 && n) ? ' ' + calc(escapeHtml(`${cr}\u00a0:\u00a01`)) : '');   // 판 B ③ — 「n : 1」이 줄 끝에서 꺾이지 않게(붙는 빈칸)
     };
     // 지난 신청 추이(주택형마다) — history = 같은 단지·주택형·신청유형의 회차별 {d 모집공고일 · n 신청 · s 공급(spl_rmno)} (RPC).
     // 🔵 2026-11-19(우편함 「표시층 — 디자인 2차 4단계」 1) — 회차마다 「신청/공급」(예비자 행은 이 표의 다른 칸처럼 「정원」 — 같은 spl_rmno) ·
@@ -6348,11 +6348,14 @@ async function zfRenderCutoffDetail(annId, id){
         + `<details class="zf-cut-all"><summary>전체 ${h.length}회 보기</summary><ol>${all}</ol></details>`;
     };
     const ncol = 1 + (waitOnlyAll ? 1 : 2) + (dropCut ? 0 : 1);   // 둘째 줄(좁은 칸) 열 수 — 추이 열은 좁을 때 숨는다
+    let noGenRow = false;   // 판 B ③ — 이 단지 표에 일반공급 행 없는 주택형이 있으면 표 아래 범례 한 줄
     const trs = types.map(g => {
       const dot = mine.has(ukey(g.name)) ? '●\u00a0' : '';   // 점과 주택형이 갈라지지 않게
       let mid;
       if(waitOnlyAll) mid = `<td style="${td}">${waitOnlyCell(g.wait)}</td>`;
-      else if(!g.gen) mid = `<td style="${td}" colspan="2">예비입주자 모집 — ${waitOnlyCell(g.wait)}</td>`;
+      // 🔵 2026-11-23(우편함 「표시층 — 실사용 판 B 시안」 ③ · 사전 조사 3장) — 예비자만 있는 주택형도 두 칸을 합치지 않는다(종전 colspan 「예비입주자 모집 — …」은
+      //    「일반공급」 머리 아래에서 시작해 「일반공급 = 예비입주자 모집」으로 읽혔다 · 인천논현 …21121 44A/A1). 일반공급 칸 「—」 + 표 아래 범례 · 예비자 칸에 값.
+      else if(!g.gen){ noGenRow = true; mid = `<td style="${td}">—</td><td style="${td};word-break:keep-all">${waitOnlyCell(g.wait)}</td>`; }
       else {
         // 🔵 2026-11-09(우편함 「… 봇 걸러내기 · 미달 주택형 예비자 칸」 3 · 다운님 승인 2026-11-09) — 일반공급 신청 ≤ 공급이면 넘친 사람이 없다 → 「넘친 신청 없음(정원 n)」(n = 예비자 행 공급).
         const gn = num(g.gen.rqpr_cnt), gs = num(g.gen.spl_rmno), ws = g.wait ? num(g.wait.spl_rmno) : null;
@@ -6384,8 +6387,9 @@ async function zfRenderCutoffDetail(annId, id){
     const above = (date ? `<p class="zf-cut-date" style="${note}">모집공고 ${date}</p>` : '')
       + (dropCut ? `<p class="zf-cut-why" style="${note}">행복주택은 추첨이라 LH가 커트라인을 공개하지 않아요</p>` : '')
       + (anyMine ? `<p class="zf-cut-legend" style="${note}">● 이번 공고와 같은 주택형</p>` : '');
-    const below = whyTypes.size
-      ? `<p class="zf-cut-why" style="${note}">— : ${[...whyTypes].map(([w, t]) => `${escapeHtml(w)}(${[...t].map(escapeHtml).join(' · ')})`).join(' / ')}</p>` : '';
+    const below = (whyTypes.size
+      ? `<p class="zf-cut-why" style="${note}">— : ${[...whyTypes].map(([w, t]) => `${escapeHtml(w)}(${[...t].map(escapeHtml).join(' · ')})`).join(' / ')}</p>` : '')
+      + (noGenRow ? `<p class="zf-cut-nogen" style="${note}">일반공급 칸 — = 그 회차 일반공급 행 없음</p>` : '');   // 판 B ③ — LH 자료에 그 회차 일반공급 행이 없다는 사실만
     // 계층(특별공급) 행 — 주택형마다 「계층 n명」 · 신청 많은 순 · 공급·경쟁률은 쓰지 않는다.
     // 🔵 2026-11-11(우편함 「표시층 — 커트라인 칸 셋」 2) — 신청 0인 계층은 빼고 · 그 회차 계층 신청이 전부 0이면 접힘 자체를 숨긴다 · 「(특별공급)」은 원천에 없는 말이라 걷는다.
     const clsLines = [...types, ...clsOnly].map(g => ({ ...g, cls: g.cls.filter(r => (num(r.rqpr_cnt) || 0) > 0) })).filter(g => g.cls.length).map(g => {
