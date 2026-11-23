@@ -1279,6 +1279,8 @@ html.zf12 .hcard.zf-ana-pending :is(.zf12-when,.zf12-badges){display:none!import
 /* 겉 ① 유형 · (지역) · 상태 알약 · 경고 배지(빨강 하나 — 경고만) */
 html.zf12 .zf12-card .zf3-ctop{flex-wrap:wrap;row-gap:6px}
 html.zf12 .zf12-badges{display:contents}
+html.zf12 .zf12-badges button.zf12-sched{font-family:inherit;line-height:inherit;cursor:pointer}   /* 판 B ⑤ — 누를 수 있는 배지(단추) · 모양은 종전 칩 그대로 */
+html.zf12 .zf12-badges button.zf12-sched:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 html.zf12 .zf12-badges .chip{display:inline-flex;align-items:center;min-height:24px;padding:2px 8px!important;border-radius:var(--r-1);font-size:var(--t-xs)!important;font-weight:700;background:var(--warn-bg)!important;border:1px solid var(--warn)!important;color:var(--warn)!important;cursor:default}
 html.zf12 .zf12-cov{font-size:var(--t-xs);color:var(--ink-3)}
 html.zf12 .zf12-badges .chip.zf-chip-new{background:var(--ink)!important;border-color:var(--ink)!important;color:var(--paper)!important}   /* NEW = 재편 전 겉 꼴 그대로(경고 색 아님) */
@@ -16617,13 +16619,23 @@ function zf12SchedBadge(card, rows){
   if(card.querySelector('.zf12-sched')) return;
   const b = card.querySelector('.zf12-badges'); if(!b) return;
   // 「일정 확인 필요」 — 설계 14절 규칙 5(다운님 판정 2026-11-12 ①) · 근거는 펼치면 2층 첫 자리에
-  b.insertAdjacentHTML('beforeend', `<span class="chip sel zf-chip-warn zf12-sched">⚠️ 일정 확인 필요</span>`);
+  // 🔵 2026-11-23(우편함 「표시층 — 실사용 판 B 시안」 ⑤ · 판 A ⑦1) — 배지를 누르면 상세를 열고 첫 배너 줄과 같은 동작(zf12SchedGo) — 목록에서 한 번에 근거 행까지.
+  b.insertAdjacentHTML('beforeend', `<button type="button" class="chip sel zf-chip-warn zf12-sched" aria-label="일정 확인 필요 — 근거 행 보기" onclick="event.stopPropagation();zf12SchedBadgeGo(this)">⚠️ 일정 확인 필요</button>`);
   const l2 = card.querySelector('.zf12-l2');
   // 🔴 2026-11-23(우편함 「표시층 — 실사용 판 A」 2 ②③ · 다운님 승인 13:06 「배너 문구 = ⚠️ 행 첫 문장 그대로」) — 종전 일괄 문장 「원문에 같은 단계 날짜가 둘 적혀 있어요」는
   //    요일만 다름 · 날짜 하나가 깨짐 · 시각만 다름(수원당수 …21119 현장접수 16시 ↔ 17시)에서 틀린 말이었다. 이제 행마다 그 ⚠️ 행 원문 첫 문장 한 줄(글자 그대로) ·
   //    한 줄을 누르면 그 행(「⚠️ 특이사항 안내」 안 정책 행)을 펼치고 그리로 옮겨 초점을 둔다(zf12SchedGo).
   if(l2) l2.insertAdjacentHTML('afterbegin', `<div class="zf12-schedwhy" role="group" aria-label="일정 확인 필요"><p class="zf12-schedh">⚠️ 일정 확인 필요</p>`
     + rows.map(r => `<button type="button" class="zf12-schedgo" data-pid="${zfAttr(r.pid)}" onclick="event.stopPropagation();zf12SchedGo(this)">${escapeHtml(r.first)}</button>`).join('') + `</div>`);
+}
+// 1층 배지 → 상세가 닫혀 있으면 펴고(카드 펼침 단추 그대로) · 2층 첫 배너 줄이 서면 그 줄과 같은 동작. 배너는 배지와 함께 서므로 대개 바로 있다 · 없으면 잠깐(최대 약 4초) 기다린다.
+function zf12SchedBadgeGo(el){
+  const card = el && el.closest('.hcard'); if(!card) return;
+  const g = card.querySelector('.zf3-gotop');
+  if(g && g.getAttribute('aria-expanded') !== 'true') g.click();
+  let n = 0;
+  const go = () => { const first = card.querySelector('.zf12-schedgo'); if(first) zf12SchedGo(first); else if(++n < 14) setTimeout(go, 300); };
+  setTimeout(go, 50);
 }
 // 배너 한 줄 → 그 ⚠️ 정책 행: 감싼 접기(<details> — 「⚠️ 특이사항 안내」·더 보기)를 모두 펴고 · 행을 펴고 · 화면 가운데로 · 머리에 초점.
 //    정책 행은 상세를 연 뒤 늦게 올 수 있어 잠깐(최대 약 4초) 기다린다 · 끝내 없으면 아무것도 하지 않는다(배너 글자가 이미 그 행의 첫 문장).
