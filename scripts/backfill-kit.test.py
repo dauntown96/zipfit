@@ -78,5 +78,28 @@ t("다른 행 가드(other_rows_same)", "o.announcement_id in (select t.announce
 t("다른 행 가드는 반영 뒤", ra.index("into m3") > ra.index("update public.announcement_apply_routes"))
 t("other_rows_same 칸 꼴 거름", bad_plan({"table": "announcement_apply_routes", "other_rows_same": "x;--", "rows": [{"id": "1", "set": {"target_text": "a"}}]}))
 t("source_substring 은 바꾸는 칸만", bad_plan({"table": "announcement_apply_routes", "source_substring": ["x;"], "rows": [{"id": "1", "set": {"target_text": "a"}}]}))
+# ── 2026-11-23(열셋째 묶음 2) — 지우기·합치기 → 의도된 감소 장부 줄을 키트가 짓는다
+C = "33333333-3333-3333-3333-333333333333"
+dp = {"table": "announcement_policies", "guard": "content_raw", "rows": [
+    {"id": A, "set": {"content_plain": "남길 행", "content_plain_at": {"sql": "now()"}, "content_plain_check": "plain-check v3 요점"}},
+    {"id": B, "delete": True}, {"id": C, "delete": True}]}
+dbefore = {A: {"guard_md5": "aa", "cur": {"content_plain": None, "content_plain_at": None, "content_plain_check": None}},
+           B: {"guard_md5": "bb", "cur": {}, "row": {"id": B}, "row_md5": "b0"}, C: {"guard_md5": "cc", "cur": {}, "row": {"id": C}, "row_md5": "c0"}}
+dt_, da, dr = kit.build_sql(dp, types, dbefore, "d.json", "우편함 시험 회차")
+t("장부 줄 한 번(반영)", da.count("insert into zipfit_ops.intended_drops") == 1)
+t("장부 줄 한 번(시험 판 — 예외로 되돌려짐)", dt_.count("insert into zipfit_ops.intended_drops") == 1 and "RESULT" in dt_)
+t("장부 수 = 키트 셈(지우기 행 2)", "values ($zfv$announcement_policies$zfv$, 2, $zfv$우편함 시험 회차$zfv$," in da)
+t("장부 줄은 지운 행 수 확인 뒤", da.index("insert into zipfit_ops.intended_drops") > da.index("if d <> 2"))
+t("지우기 가드 = 행 전체 md5", "md5(to_jsonb(t)::text) is not distinct from $zfv$b0$zfv$" in da and "delete from public.announcement_policies t where" in da)
+t("BEFORE 같은 행 = 3 · 반영 1", "g <> 3" in da and "n <> 1" in da)
+t("되돌림 = 지운 행 다시 넣음 · 장부 그대로", dr.count("overriding system value") == 2 and "insert into zipfit_ops.intended_drops" not in dr and "n <> 3" in dr)
+try: kit.build_sql(dp, types, dbefore, "d.json", "  "); t("빈 회차 → 멈춤", False)
+except SystemExit: t("빈 회차 → 멈춤", True)
+try: kit.build_sql(dp, types, dbefore, "d.json", None); t("회차 없음 → 멈춤", False)
+except SystemExit: t("회차 없음 → 멈춤", True)
+t("바꾸기만 = 장부 줄 0(회차 없어도 됨)", "intended_drops" not in kit.build_sql(plan, types, before, "t.json")[1])
+t("보관 정리 표 = 장부 줄 0", kit.ledger_line("collection_run_log", 5, "회차", "n") == "")
+t("지우기 + set 같이 = 거름", bad_plan({"table": "announcement_policies", "rows": [{"id": A, "delete": True, "set": {"x": 1}}]}))
+t("delete 값 true 아님 = 거름", bad_plan({"table": "announcement_policies", "rows": [{"id": A, "delete": "yes"}]}))
 print(f"backfill-kit 시험 {ok}/{ok + bad}")
 sys.exit(1 if bad else 0)

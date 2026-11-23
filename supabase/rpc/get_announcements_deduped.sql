@@ -1,8 +1,13 @@
 CREATE OR REPLACE FUNCTION public.get_announcements_deduped(p_region text DEFAULT NULL::text, p_type text DEFAULT NULL::text, p_status text DEFAULT NULL::text)
- RETURNS TABLE(source text, announcement_id text, title text, region text, region_top text, sido_nm text, sigungu_nm text, housing_type text, supply_org text, announcement_date date, apply_start date, apply_end date, status text, url text, is_revised boolean, area_min numeric, area_max numeric, rent_min integer, deposit_min bigint, total_units integer, move_in_date text, created_at timestamp with time zone, mymy_applicable boolean, supply_form text, application_method text, recruit_multiplier text, pair_announcement_key text, precise_address text, is_relaxed_recruitment boolean, relaxation_detail text, selection_method text, contract_before_verification boolean, rent_exemption_until date, rent_exemption_note text, revision_note text, revised_at timestamp with time zone, special_notes jsonb, revised_at_source text, first_seen_at timestamp with time zone, doc_submit_announce_date date, doc_submit_start date, doc_submit_end date, winner_announce_date date, contract_start date, contract_end date, building_name text, attachment_urls jsonb, has_cancel_notice boolean, region_names text[], block_count integer, first_announcement_date date, schedule_varies boolean, apply_end_confirmed date, apply_period_check boolean, revision_seen_date date)
+ RETURNS TABLE(source text, announcement_id text, title text, region text, region_top text, sido_nm text, sigungu_nm text, housing_type text, supply_org text, announcement_date date, apply_start date, apply_end date, status text, url text, is_revised boolean, area_min numeric, area_max numeric, rent_min integer, deposit_min bigint, total_units integer, move_in_date text, created_at timestamp with time zone, mymy_applicable boolean, supply_form text, application_method text, recruit_multiplier text, pair_announcement_key text, precise_address text, is_relaxed_recruitment boolean, relaxation_detail text, selection_method text, contract_before_verification boolean, rent_exemption_until date, rent_exemption_note text, revision_note text, revised_at timestamp with time zone, special_notes jsonb, revised_at_source text, first_seen_at timestamp with time zone, doc_submit_announce_date date, doc_submit_start date, doc_submit_end date, winner_announce_date date, contract_start date, contract_end date, building_name text, attachment_urls jsonb, has_cancel_notice boolean, region_names text[], block_count integer, first_announcement_date date, schedule_varies boolean, apply_end_confirmed date, apply_period_check boolean, revision_seen_date date, recheck_pending text)
  LANGUAGE sql
  STABLE
 AS $function$
+-- 🔵 2026-11-23(우편함 「코드·운영 — 열넷째 묶음(단독 · 원칙 29)」) — 칸 recheck_pending 하나를 끝에 더한다(행 집합·다른 칸은 그대로).
+--   카드 묶음(dedup_key)의 어느 구성원이든 분석 대기열(analysis_dispatch_queue)에 **끝나지 않은**(state ∉ done·dropped) 재확인 몫이 있으면
+--   그 갈래 글자('정정' · '첨부' · '차수' — 둘 이상이면 쉼표 · 가나다 순), 없으면 NULL. 「정정본이 반영되기 전 카드가 아무 표시 없이 정정 전 내용을 보인다」의 재료.
+--   대기열 표는 anon·authenticated GRANT 0 — 몫 목록(공고 id · 갈래)만 내는 SECURITY DEFINER listing_pending_rechecks() 를 한 번(MATERIALIZED) 부른다.
+--   대표를 정정이 바꿔도(마감·대표 id) 몫의 공고 id 는 같은 묶음에 남는다 — 그래서 키 글자가 아니라 구성원 id 로 맞춘다. 화면이 읽는 것은 다음 표시층 판.
 -- 🔵 2026-10-18(우편함 「코드·운영 — 목록 RPC 응답에서 화면이 안 쓰는 칸 걷기」) — 화면·점검·다른 DB 함수가 읽지 않는 출력 칸 9개를 뺐다
 --   (id · status_normalized · rent_max · deposit_max · target_type · heating_type · updated_at · subscription_months_required ·
 --   subscription_payments_required — 행 집합·남는 칸 값은 그대로 · 표 칸은 그대로). 다시 읽게 하려면 출력 칸을 되돌리는 마이그레이션이 먼저다.
@@ -365,6 +370,12 @@ complex_name AS MATERIALIZED (
     AND (n <> substring(w_building_name FROM '\s외\s+(\d+)개\s*단지\s*$')::int + 1
          -- 🔵 2026-09-29(매입 홍보물 회차 3) — 수가 같아도 대표 이름이 같은 회차 단지 키에 없으면 고른다(군산 …0663).
          OR NOT lead_found)
+),
+recheck_pending AS MATERIALIZED (
+  SELECT b.dedup_key, string_agg(DISTINCT p.branch, ',' ORDER BY p.branch) AS branches
+  FROM public.listing_pending_rechecks() p
+  JOIN base b ON b.announcement_id = p.announcement_id
+  GROUP BY b.dedup_key
 )
 SELECT
   w.source, w.announcement_id, w.title, w.region,
@@ -440,7 +451,8 @@ SELECT
                        AND o.announcement_id <> w.announcement_id
                        AND o.first_announcement_date = w.first_announcement_date
                        AND o.created_at < w.created_at - interval '5 minutes')
-       THEN (w.created_at AT TIME ZONE 'Asia/Seoul')::date END AS revision_seen_date
+       THEN (w.created_at AT TIME ZONE 'Asia/Seoul')::date END AS revision_seen_date,
+  rp.branches AS recheck_pending
 FROM winner w
 JOIN best_location bl ON bl.dedup_key = w.dedup_key
 JOIN best_schedule bs ON bs.dedup_key = w.dedup_key
@@ -451,6 +463,7 @@ LEFT JOIN unit_best ub ON ub.dedup_key = w.dedup_key
 LEFT JOIN block_count bc ON bc.dedup_key = w.dedup_key
 LEFT JOIN complex_name cn ON cn.dedup_key = w.dedup_key
 LEFT JOIN public.supply_org_period_trust pt ON pt.supply_org = w.supply_org
+LEFT JOIN recheck_pending rp ON rp.dedup_key = w.dedup_key
 WHERE (
     p_region IS NULL
     OR bl.best_sido = p_region

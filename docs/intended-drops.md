@@ -12,4 +12,6 @@ values ('announcement_analysis', 101, '분석 묶음 — ○○ 합치기', '같
 
 - 표 이름은 `public` 표 이름 그대로(스키마 접두 없이). 한 회차가 같은 표를 두 번 줄이면 줄을 둘 쓰거나 합친 수로 한 줄.
 - 보관 기간 정리 표(`heartbeat_report.py` `RETENTION_DAYS`)는 쓰지 않는다 — 이미 감소가 경보 밖이다.
+- 🔵 **정리 도구를 쓰면 저절로**(2026-11-23 열셋째 묶음 2): `scripts/backfill-kit.py` 계획에 지울 행을 `{"id": "<id>", "delete": true}`로 담고(합치기 = 남길 행은 `set` · 지울 행은 `delete`) `gen … --round "<우편함 회차 이름 또는 PR>"`로 지으면, test.sql · apply.sql 안에 장부 한 줄(표 · 키트가 센 지울 행 수 · 회차)이 지운 행 수 확인 **뒤** 같은 트랜잭션으로 들어간다. `--round`가 비면 짓지 않고 멈춘다. 되돌림(rollback.sql)은 지운 행을 BEFORE 행 전체로 다시 넣고 장부 줄은 그대로 둔다(그날 생존 신호 🔴 = 되돌림이 있었다는 신호). **손 SQL이면 위 한 줄을 직접** 쓴다.
+- 정리를 03:00 KST(18:00 UTC 백업) 근처에 하지 않는다 — 공개 덤프와 운영 덤프 사이(수십 초)에 커밋되면 장부 줄만 먼저 실려 그날 🔴가 날 수 있다.
 - 확인: `select table_name, expected_drop, round, at from zipfit_ops.intended_drops order by at desc limit 5;`
