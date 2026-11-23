@@ -1776,8 +1776,8 @@ try {
   const aliases = sidoAliasesOf(readFileSync(new URL('../../index.html', import.meta.url), 'utf8'))
   const [x] = await sqlRead(UNIT_SIGUNGU_SQL)
   const j = judgeUnitSigungu({ rows: x.j, geo, conf, aliases })
-  add('unit_sigungu', '세대 시군구 이름 — 공고 행·지도 경계 파일 어디에도 없는 이름(정보)', j.status, j.value,
-    '기대 0 — 0이 아니면 ℹ️(판정 0 · warn_over 가 숫자면 넘을 때 ⚠️ · 안 멈춤) · 예외·문턱 정본 unit-sigungu.json')
+  add('unit_sigungu', '세대 시군구 이름 — 공고 행·지도 경계 파일 어디에도 없는 이름', j.status, j.value,
+    '기대 0 — warn_over(지금 0 · 2026-11-23 claude.ai 판정)를 넘으면 ⚠️(안 멈춤 · health-ops-soft) · warn_over null 이면 ℹ️만 · 예외·문턱 정본 unit-sigungu.json')
 } catch (e) {
   addBlind('unit_sigungu', '세대 시군구 이름 — 점검 불능', 'warn', String(e).slice(0, 200), '세대·공고 행과 경계 파일 · index.html 을 읽는다(못 읽으면 ⚠️)')
 }

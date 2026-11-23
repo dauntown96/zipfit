@@ -32,6 +32,8 @@
 #     표에 announcement_apply_routes(정수 id) · 계획 선택 칸 셋(빠지면 종전 그대로):
 #       "source_substring": ["칸", …]  — 그 칸의 새 값이 같은 공고(행의 announcement_id)의 announcement_policies.content_raw 어느 한 행의 부분 문자열이어야 한다(원문 글자 그대로)
 #       "other_cols_same": true          — 바꾸는 칸 밖 모든 칸(행 전체 jsonb − 바꾸는 칸)의 md5 가 반영 전후 같아야 한다(대상 행 · id 순)
+#       "other_rows_same": "announcement_id" — 🔵 2026-11-23(아홉째 묶음 2) 같은 묶음 칸(보통 announcement_id) 값을 가진 **대상 밖** 행 전체의 md5 가 반영 전후 같아야 한다
+#                                          (트리거·실수로 이웃 행이 함께 바뀌면 멈춤 · 2회차 손 가드 「14공고 경로 행 다른 칸 md5 전후 같음」과 같은 뜻)
 #       "open_only": true                — 대상 행의 공고가 열려 있어야 한다(announcements.status 공고중·접수중·정정공고중 — health-ops 「열린 공고」와 같은 셋)
 #     gen 은 history.md(이력 파일 틀 — docs/history.d 꼴 첫 줄 · 행 수 · 가드 목록 · 되돌리기 한 줄)도 함께 쓴다(SQL 은 만들기만 · 보내기는 사람이 run 으로).
 # 시험: python3 scripts/backfill-kit.test.py (DB 없이 SQL 만들기만 본다)
@@ -137,6 +139,9 @@ def load_plan(path):
         for c in r["set"]:
             if not COL_RE.match(c) or c == "id" or c == g:
                 raise SystemExit(f"바꿀 칸 꼴 밖(또는 id · 가드 칸): {c!r}")
+    orc = plan.get("other_rows_same")
+    if orc is not None and not (isinstance(orc, str) and COL_RE.match(orc)):
+        raise SystemExit(f"other_rows_same 칸 이름 꼴 밖: {orc!r}")
     for c in plan.get("source_substring") or []:
         if not COL_RE.match(c):
             raise SystemExit(f"source_substring 칸 이름 꼴 밖: {c!r}")
@@ -215,13 +220,22 @@ def build_sql(plan, types, before, label):
         m = f"select md5(coalesce(string_agg((to_jsonb(t) - {drop})::text, E'\\n' order by t.id), '')) from public.{t} t where t.id = any({ids_sql})"
         extra.append(("pre", f"  {m} into m0;\n"))
         extra.append(("post", f"  {m} into m1;\n  if m1 is distinct from m0 then raise exception '다른 칸 가드 실패: 바꾸는 칸 밖 md5 전후 다름'; end if;\n"))
+    orc = plan.get("other_rows_same")
+    if orc:
+        if orc not in types:
+            raise SystemExit(f"{t} 에 other_rows_same 칸 {orc!r} 없음")
+        mo = (f"select md5(coalesce(string_agg(to_jsonb(o)::text, E'\\n' order by o.id), '')) from public.{t} o "
+              f"where o.{orc} in (select t.{orc} from public.{t} t where t.id = any({ids_sql})) and not (o.id = any({ids_sql}))")
+        extra.append(("pre", f"  {mo} into m2;\n"))
+        extra.append(("post", f"  {mo} into m3;\n  if m3 is distinct from m2 then raise exception '다른 행 가드 실패: 같은 {orc} 의 대상 밖 행 md5 전후 다름'; end if;\n"))
     pre = "".join(x for w, x in extra if w == "pre")
     post = "".join(x for w, x in extra if w == "post")
     gnames = [f"BEFORE 같은 행 = {n}", f"반영 행 = {n}"] + (["가드 칸 md5"] if g else []) + ([f"원문 부분 문자열({', '.join(subs)})"] if subs else []) \
-        + (["열린 공고"] if plan.get("open_only") else []) + (["다른 칸 md5 전후 같음"] if plan.get("other_cols_same") else [])
+        + (["열린 공고"] if plan.get("open_only") else []) + (["다른 칸 md5 전후 같음"] if plan.get("other_cols_same") else []) \
+        + ([f"같은 {plan['other_rows_same']} 대상 밖 행 md5 전후 같음"] if plan.get("other_rows_same") else [])
     head = f"-- {label} · 표 {t} · 행 {n} · 칸 {', '.join(cols)} · 가드 {g or '없음'} · 가드 목록 {' · '.join(gnames)} · scripts/backfill-kit.py gen"
     def do(final):
-        return (f"do $zfdo$\ndeclare n int := 0; k int; g int; s int; m0 text; m1 text;\nbegin\n"
+        return (f"do $zfdo$\ndeclare n int := 0; k int; g int; s int; m0 text; m1 text; m2 text; m3 text;\nbegin\n"
                 f"  select count(*) into g from public.{t} t where {guards};\n"
                 f"  if g <> {n} then raise exception '가드 실패: BEFORE 와 같은 행 %/{n} — 그사이 바뀐 행이 있다', g; end if;\n"
                 f"{pre}{body}\n"
