@@ -1132,6 +1132,8 @@ html.zf3-mapview[data-ui="d3"] #notice-list{display:none}
   html[data-ui="d3"] body:has(#main2:not(.hidden)) .zf3-sticky{left:max(24px,calc((100vw - 1232px) / 2));transform:none;width:720px;animation-name:zf3slidev}
   html[data-ui="d3"] body:has(#main2:not(.hidden)) .zf3-radar svg{max-height:calc(100vh - 300px)}
   html[data-ui="d3"] .zf-totop{right:auto;left:calc(max(24px,calc((100vw - 1232px) / 2)) + 706px)}
+  /* 판 C 8 — 추천 탭 ② 주택 매칭은 목록이 틀 폭 전부(1232)라 L+706 단추가 카드 얼마 줄 위에 선다 → 화면 오른쪽 끝 16px(1280에서 카드 오른쪽 끝 1215 < 단추 1220) */
+  html[data-ui="d3"] body:has(#main1:not(.hidden)):has(#panel2:not(.hidden)) .zf-totop{left:auto;right:16px}
 }
 @media (prefers-reduced-motion:reduce){.zf3-radar .pulse,.zf3-radar .pt{animation:none!important}}
 /* 추천(D-3 단계 e) — 노선 스텝 · 결과부터 · 1200px 두 단 · 결과 상자 토큰 */
