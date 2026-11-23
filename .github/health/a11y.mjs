@@ -74,8 +74,23 @@ export function contrastKinds (incomplete, colors = {}) {
   return kinds
 }
 
+// 🔵 2026-11-23(우편함 「표시층 — 기술 판 …」 4) — 흐르는 요소(전광판)를 멈춘 꼴로 잰다. 전광판 띠가 흐르는 동안 재면 그 순간 화면 안에 든 항목만
+//    axe 가 대비 「미완」으로 세어, 같은 화면이 재는 때마다 갈래가 켜졌다 꺼졌다 했다(11-23 a.zf3-nl — 3.1초 간격 14번 중 2번).
+//    화면에 있는 길 그대로: 멈춤 단추와 같은 zf3TogglePause(한 줄 꼴 넘김도 멈춤) → 띠 움직임(Web Animations)을 처음 자리로 되감고 멈춤.
+//    화면 함수가 없으면(옛 배포본 · 전광판 없는 상태) 아무것도 안 한다. 사용자 화면은 바꾸지 않는다(점검 브라우저 안에서만).
+export async function freezeMarquee (page) {
+  await page.evaluate(() => {
+    try { if (typeof zf3TogglePause === 'function' && typeof zf3Paused !== 'undefined' && !zf3Paused) zf3TogglePause() } catch (_) {}
+    for (const a of (document.getAnimations ? document.getAnimations() : [])) {
+      const t = a.effect && a.effect.target
+      if (t && t.closest && t.closest('.zf3-mq, .zf3-view, .zf3-track')) { try { a.pause(); a.currentTime = 0 } catch (_) {} }
+    }
+  }).catch(() => {})
+}
+
 // 한 상태를 잰다(페이지는 이미 그 상태) → { rules, contrast_incomplete }
 async function axeState (page, AxeBuilder) {
+  await freezeMarquee(page)
   const res = await new AxeBuilder({ page }).withTags(TAGS).analyze()
   const rules = {}
   for (const v of res.violations) {

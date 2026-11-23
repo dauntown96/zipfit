@@ -21,6 +21,7 @@ import { judgeApiExpiry } from './api-expiry.mjs'
 import { screenRunSql, judgeScreenRun } from './screen-run.mjs'
 import { INCOME_ROWS_SQL, judgeIncome } from './income-table.mjs'
 import { PRIVACY_MATCH_SQL, judgePrivacyMatch, v2StartOf } from './privacy-match.mjs'
+import { judgeWideFetch, SPOTS as WIDE_SPOTS } from './wide-fetch.mjs'
 import { ELIG_FORM_NULL_SQL, RENT_NULL_SQL, ROUND_MIX_SQL, LH_CLOSED_WIN_SQL, DEDUP_KEY_PAREN_SQL, UNIT_AREA_ROUND_SQL, judgeEligFormNull, judgeRentNull, judgeRoundMix, judgeLhClosedWin, judgeDedupKeyParen, judgeUnitAreaRound } from './open-gaps.mjs'
 import { readdirSync, readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
@@ -217,6 +218,8 @@ const EXPECTED_JOBS = [
   'zipfit-purge-stale-sessions',   // 로그인 세션 30일 정리(jobid 57) — 2026-11-09 사본 재추출 때 빠진 것을 더함
 ]
 
+// 🔵 2026-11-23(여섯째 묶음 2) — 아래 ③ 목록 응답의 전체 행 수(content-range)를 넓은 조회 ⚠️(wide_fetch)가 가격 요약 id 수로 쓴다(목록을 더 부르지 않는다).
+let wideListTotal = null
 // ③④ 관리 API 가 필요 없는 점검(비로그인 목록·요약 · 배포 사이트)은 DB 점검과 다른 try 로 먼저 돈다
 //    (2026-10-06 · 우편함 「코드 — 1-C …」 2) — 관리 API 가 죽어 DB 점검이 「점검 실행」(runner) 하나로 끝나도 화면 쪽 결과는 남는다.
 try {
@@ -224,6 +227,7 @@ try {
   // 🔵 2026-11-10(우편함 「코드·운영 — 목록 RPC … 운영 REST 1000행 상한」 · #941) — 전체 행 수를 함께 받는다(count=exact). 응답이 REST 상한
   //    (PostgREST max_rows)에서 잘리면 206 이고 행 수 < 전체다 — 판정은 아래 anon_list_cap(⚠️ · 안 멈춤)이 한다. anon_list 는 206 도 응답으로 친다.
   const list = await anonRpc('get_announcements_deduped', {}, 30000, { count: true })
+  wideListTotal = list.total ?? (Array.isArray(list.data) ? list.data.length : null)
   const listOk = (list.status === 200 || list.status === 206) && Array.isArray(list.data) && list.data.length > 0
   add('anon_list', '비로그인 get_announcements_deduped', listOk && list.ms <= 10000 ? 'pass' : 'fail',
     `${list.status} · ${Array.isArray(list.data) ? list.data.length : 0}행 · ${list.ms}ms${list.snippet ? ' · ' + list.snippet : ''}`,
@@ -1721,6 +1725,46 @@ try {
   add('privacy_match', '처리방침 ↔ 실물(이벤트 키 · 프로필·의견·찜 칸 · 바깥 호스트 · 시행 전 키 · 이전 판 사슬)', j.status, j.value, j.rule)
 } catch (e) {
   addBlind('privacy_match', '처리방침 ↔ 실물 대조 — 점검 불능', 'warn', String(e).slice(0, 200), 'index.html · privacy.html · 이용 기록·프로필 칸 이름을 읽는다(못 읽으면 ⚠️)')
+}
+
+// ㊺ 넓은 조회 ⚠️(2026-11-23 · 우편함 「코드·운영 — 여섯째 묶음」 2 · 백로그 「max_rows에 닿는 넓은 조회」) — 화면·화면 점검이 쪽 나눔 없이 통째로 받는 자리의
+//    지금 행 수 ≥ max_rows × 0.8 이면 ⚠️(안 멈춤 · gate.mjs HARD 밖 → health-ops-soft). 자리·판정·쪽 나눔 자리 빼기는 wide-fetch.mjs 머리 주석.
+//    max_rows = 관리 API GET …/postgrest(조회만 · 못 읽으면 wide-fetch.mjs 상수) · 가격 요약 id 수 = 위 ③ 목록 전체 행 수(마감 포함 목록이 실리는 경로 기준).
+try {
+  const [x] = await sqlRead(`select json_build_object(
+    'tier_ec', (select count(*) from public.eligibility_criteria),
+    'tier_hu', (select count(*) from public.housing_units where supply_target is not null),
+    'tier_vt', (select count(*) from public.eligibility_criteria where verification_requirements->'공급대상'->'갈래' @> '[{"조건":{"계층_중_하나":[]}}]'::jsonb),
+    'win_sched', (select count(*) from public.announcement_schedule where stage in ('결과발표','계약') or (stage = '접수' and end_date >= (now() at time zone 'Asia/Seoul')::date)),
+    'obj_render', (select count(*) from public.eligibility_criteria where verification_requirements is not null)) as j`)
+  let maxRows = null
+  try {
+    const token = process.env.SUPABASE_ACCESS_TOKEN
+    if (token) {
+      const res = await fetch(`https://api.supabase.com/v1/projects/${PROJECT_REF}/postgrest`, { headers: { Authorization: `Bearer ${token}` } })
+      if (res.ok) maxRows = Number((await res.json()).max_rows) || null
+    }
+  } catch { maxRows = null }
+  const sources = Object.fromEntries([...new Set(WIDE_SPOTS.map(s => s.file))].map(f => [f, readFileSync(new URL('../../' + f, import.meta.url), 'utf8')]))
+  const j = judgeWideFetch({ sources, counts: { ...x.j, price_ids: wideListTotal }, maxRows })
+  add('wide_fetch', '넓은 조회 — 쪽 나눔 없이 통째로 받는 자리의 행 수(max_rows × 0.8 넘으면 ⚠️)', j.status, j.value,
+    '자리마다 지금 행 수 < max_rows × 0.8 — 넘거나 셈 못 하면 ⚠️(안 멈춤 · health-ops-soft) · 쪽 나눔(offset= · zfGetAll()이 들어간 자리는 대상 밖 · 자리 목록 wide-fetch.mjs SPOTS · 값 칸 끝 「SPOTS 밖 통째 조회 n」은 ℹ️ 수치만(판정 0)')
+} catch (e) {
+  addBlind('wide_fetch', '넓은 조회 — 점검 불능', 'warn', String(e).slice(0, 200), '자격·세대·일정 표 행 수와 index.html · screen-check.mjs 를 읽는다(못 읽으면 ⚠️)')
+}
+
+// ㊻ 막힌 좌표 채움 ℹ️(2026-11-23 · 여섯째 묶음 3 · 서울 이전 마무리 회신 ⑦1) — complex_geo 에 없는데 시도 기록(complex_geo_attempts)이 picked·multi 인 주소 수.
+//    채움 대상 함수(complex_geo_targets · complex_geo_complex_targets)가 picked·multi 기록을 건너뛰므로, 이 수만큼은 채움 잡이 다시 고르지 않는다.
+//    평소 0 — 백업 덤프는 complex_geo 데이터를 담지 않아(zipfit-backup data_excluded.py COORD_EXCLUDED) 복구 뒤에만 뜬다(복구 절차 = 그 기록을 비우고 채움 잡 · zipfit-backup README 「복구 절차」 8).
+//    0 = 통과 · 그 밖 = ℹ️ 정보(판정 0 · 안 멈춤).
+try {
+  const [x] = await sqlRead(`select count(distinct t.matched_from)::int as n from public.complex_geo_attempts t
+    where t.outcome in ('picked','multi') and not exists (select 1 from public.complex_geo g where g.matched_from = t.matched_from)`)
+  add('geo_fill_blocked', '막힌 좌표 채움 — complex_geo 에 없는데 시도 기록이 picked·multi 인 주소(정보)', x.n ? 'info' : 'pass',
+    x.n ? `${x.n}주소 — 채움 잡이 다시 고르지 않는다(복구 뒤라면 시도 기록의 picked·multi 를 비우고 채움 잡 · zipfit-backup README 「복구 절차」 8)` : '0',
+    '0(평소) — 복구 뒤에만 뜬다 · ℹ️ 정보(판정 0)')
+} catch (e) {
+  addBlind('geo_fill_blocked', '막힌 좌표 채움 — 점검 불능', 'warn', String(e).slice(0, 200), 'complex_geo · complex_geo_attempts 를 읽는다(못 읽으면 ⚠️)')
 }
 
 // ㊵ 부하 규칙 근거 다시 재기(2026-11-19 · 17장 · 순위표 14위 · 💡 「부하 규칙(분 단위 줄 · 하루 회차 수 등)의 근거 실측을 주간 ℹ️로」) — ℹ️ 정보(판정 0).
