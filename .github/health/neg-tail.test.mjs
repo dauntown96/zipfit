@@ -6,7 +6,7 @@ const t = (name, c) => { if (c) ok++; else { bad++; console.log('✗', name) } }
 const conf = JSON.parse(readFileSync(new URL('./neg-tail.json', import.meta.url), 'utf8'))
 t('표지 — 못+하 · 못+받 · 못+했', isMarked('못', '하') && isMarked('못', '받') && isMarked('못', '했'))
 t('표지 — 안+되', isMarked('안', '되'))
-t('표지 밖 — 안+된(지금 빈틈 · 기준선이 거름)', !isMarked('안', '된') && conf.baseline['안'].includes('된'))
+t('표지 — 안+된·됨·될(열셋째 묶음 · 기준선에서 걷음)', ['된', '됨', '될'].every(c => isMarked('안', c) && !conf.baseline['안'].includes(c)))
 t('표지 밖 — 못+등', !isMarked('못', '등'))
 const base = [{ w: '못', c: '하', n: 734 }, { w: '못', c: '등', n: 14 }, { w: '안', c: '내', n: 4453 }, { w: '잘못', c: '작', n: 162 }]
 const j0 = judgeNegTail({ rows: base, conf })
