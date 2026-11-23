@@ -1292,6 +1292,12 @@ html.zf12 .zf12-who .zf12-res{font-weight:400;color:var(--ink-2)}
 html.zf12 .zf12-wi{margin-right:4px}
 /* 겉 ④ 얼마 — 한 줄 */
 html.zf12 .zf12-card [data-sum-for] > div[data-zf12]{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:0!important}
+/* 🔵 2026-11-22(우편함 「표시층 — 작은 판: 카드 「· 두 조건」 잘림 …」 1) — 짧은 말이 있는 줄은 금액 · 짧은 말 · 회차 꼬리를 한 덩이씩(안 끊음) 늘어놓고
+   한 줄에 다 안 들어가면 짧은 말부터 다음 줄로 내린다(줄바꿈 자리는 덩이 사이 띄어쓰기뿐 — 다 들어가면 종전과 같은 한 줄) —
+   금액 글자는 그대로(말줄임은 금액 덩이 혼자 상자보다 길 때만) · 짧은 말은 늘 다 보인다. */
+html.zf12 .zf12-card [data-sum-for] > div[data-zf12].zf12-hascond{white-space:normal;overflow:visible}
+html.zf12 .zf12-card [data-sum-for] > div.zf12-hascond > *{white-space:nowrap}
+html.zf12 .zf12-card [data-sum-for] > div.zf12-hascond > .zf12-amt{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}
 html.zf12 .zf12-cond{font-weight:500;color:var(--ink-2)}
 /* 겉 ⑤ 언제 — 노선 한 줄(● 지남 · ◉ 다음 · ○ 앞으로) */
 html.zf12 .zf12-when{display:flex;flex-wrap:wrap;align-items:center;gap:2px 6px;margin:8px 0 12px;font-size:var(--t-xs);color:var(--ink-2)}   /* 좁으면 정거장 단위로 다음 줄(글자를 자르지 않는다) */
@@ -10563,7 +10569,7 @@ function toggleBlockGroup(id, idx){
     if(groups && groups.length){
       const g = groups[0];
       const addr = g.address || g.building_name;
-      if(addr) initMapForHouse({ addr, name: g.building_name || '' }, id);
+      if(addr) initMapForHouse({ addr, name: g.building_name || '', cid: zfGrpCid(g) }, id);
     }
     return;
   }
@@ -10677,18 +10683,27 @@ function zfPolPlainOk(p){
 }
 function zfPolPlainLines(s){ return String(s || '').split(/\r?\n/).filter(l => l.trim() !== ''); }
 // 절 머리 스위치 — 끄면 그 공고(상세 하나)의 모든 행이 원문만. 🔴 저장하지 않는다(처리방침 3 「브라우저에 저장되는 정보」 밖) — 그 자리 상태뿐.
+const zfPlainOff = {};   // 정책 절 id → 요점 끔(true) · 상세 하나에 한 값 · 메모리에만(저장 안 함 · 처리방침 3 밖)
 function zfPolPlainToggle(btn){
   const wrap = btn && btn.closest('.policy-wrap');
   if(!wrap) return;
-  const on = btn.getAttribute('aria-checked') !== 'true';
-  btn.setAttribute('aria-checked', on ? 'true' : 'false');
-  wrap.classList.toggle('pol-plain-off', !on);
-  const st = zfPolState[btn.dataset.polId || ''];
-  if(st) st.plainOff = !on;
-  zfPolPlainApply(wrap, !on);
-  // 🔵 2026-11-22(우편함 「표시층 — 다음 판」 1) — 같은 상세의 2층 「꼭 볼 것」도 같은 스위치로(저장 안 함 그대로).
-  const card = wrap.closest('.hcard');
-  if(card){ card.classList.toggle('zf-plain-off', !on); card.querySelectorAll('.zf12-must details.zf12-rawd').forEach(d => { d.open = !on; }); }
+  const id = btn.dataset.polId || '';
+  zfPlainOff[id] = btn.getAttribute('aria-checked') === 'true';   // 켜져 있던 것을 누름 = 끔
+  zfPlainSync(wrap, id);
+}
+// 그 값 하나로 정책 절(스위치 · 원문 접기) · 2층 「꼭 볼 것」을 맞춘다 — 스위치를 누를 때와 정책 절을 새로 그린 뒤 같은 길(2026-11-22 작은 판 3).
+function zfPlainSync(wrap, id){
+  const off = !!zfPlainOff[id];
+  if(wrap){
+    wrap.querySelectorAll('.pol-plain-sw').forEach(b => b.setAttribute('aria-checked', off ? 'false' : 'true'));
+    wrap.classList.toggle('pol-plain-off', off);
+    zfPolPlainApply(wrap, off);
+  }
+  const st = zfPolState[id];
+  if(st) st.plainOff = off;
+  // 🔵 2026-11-22(우편함 「표시층 — 다음 판」 1) — 같은 상세의 2층 「꼭 볼 것」도 같은 값으로(저장 안 함 그대로).
+  const card = wrap && wrap.closest('.hcard');
+  if(card){ card.classList.toggle('zf-plain-off', off); card.querySelectorAll('.zf12-must details.zf12-rawd').forEach(d => { d.open = off; }); }
 }
 // 끈 상태 — 원문 접기를 펼친 채 둔다(접기 머리는 CSS 로 숨김) · 다시 켜면 접는다.
 function zfPolPlainApply(wrap, off){
@@ -10736,16 +10751,18 @@ function zfPolicyBodyHtml(rows, cls, id){
   // 한 행의 칩을 칩 순서로 — 첫 칩이 그 행이 사는 묶음이다.
   const chipsOf = p => zfPolClassOf(cls, p, 'user').filter(n => cls && cls.userOrder.has(n))
     .sort((a, b) => cls.userOrder.get(a) - cls.userOrder.get(b));
-  zfPolState[id] = { rest, pinned, chips, chipsOf, pick: null, q: '', plainOff: false };
+  // 🔵 2026-11-22(작은 판 3 · #1200 걱정 ②) — 요점 스위치 값은 상세 하나에 한 값(zfPlainOff[id]) — 정책 절을 다시 그려도 그 값으로 그린다(저장 안 함).
+  const plainOff = !!zfPlainOff[id];
+  zfPolState[id] = { rest, pinned, chips, chipsOf, pick: null, q: '', plainOff };
   // 🔴 2026-09-30(표시층·필터) — 카드 안 아코디언은 처음에 전부 접힌다(다운님 지시). 고정 행(⚠️·정정·모집일정)도
   //    맨 위 자리는 그대로 두고 펼침만 걷었다. 검색 중 맞은 행 펼침·「모두 펼치기」는 사용자 동작이라 그대로다.
   let html = '';
   // 🔵 2026-11-21 — 요점이 있는 행이 하나라도 있으면 절 머리에 표지(다운님 결정 글자 그대로) + 끄기 스위치를 한 번 둔다.
   if(rows.some(zfPolPlainOk)){
     html += `<div class="pol-plain-bar"><p class="pol-plain-note"><b>꼭집 요점</b> — 원문에서 중요한 것만 골랐어요 · 숫자·날짜·조건은 원문 그대로 · 전체는 아래 원문</p>`
-      + `<button type="button" class="pol-plain-sw" role="switch" aria-checked="true" data-pol-id="${zfAttr(id)}" onclick="event.stopPropagation();zfPolPlainToggle(this)"><i aria-hidden="true"></i>요점 먼저 보기</button></div>`;
+      + `<button type="button" class="pol-plain-sw" role="switch" aria-checked="${plainOff ? 'false' : 'true'}" data-pol-id="${zfAttr(id)}" onclick="event.stopPropagation();zfPolPlainToggle(this)"><i aria-hidden="true"></i>요점 먼저 보기</button></div>`;
   }
-  html += pinned.map(p => zfPolItemHtml(p, { pinned: true })).join('');
+  html += pinned.map(p => zfPolItemHtml(p, { pinned: true, rawOpen: plainOff })).join('');
   if(rows.length >= 10){
     html += `<span class="zf-clr-wrap zf-clr-block"><input type="search" class="pol-search" placeholder="정책 안내에서 찾기" aria-label="정책 안내 검색" data-pol-id="${zfAttr(id)}" oninput="zfPolSearch(this)" onkeydown="zfClearKey(event,this)" onclick="event.stopPropagation()"><button type="button" class="zf-clr" aria-label="검색어 지우기" onmousedown="event.preventDefault()" onclick="zfClearSearch(this,event)">×</button></span>`;
   }
@@ -11159,6 +11176,7 @@ function loadAnnouncementPolicies(annId, detailEl, id, useGroup){
         zfPolicyBodyHtml(curRows, cls, id) + otherHtml;
       const slot = document.getElementById('policy-slot-'+id);
       if(slot) slot.appendChild(wrap);
+      if(slot && zfPlainOff[id] !== undefined) zfPlainSync(wrap, id);   // 다시 그린 절도 그 상세의 한 값으로(2026-11-22 작은 판 3)
       if(slot) zfPolicyNotes(curRows, annId, id, ownerAnn, slot, wrap);
       zfDocsFromPolicies(curRows, id);   // 🔵 2026-11-04 (가) — 이번 회차 서류 칸만 「📄 이 공고의 제출서류(원문)」로
     });
@@ -11871,7 +11889,7 @@ function renderHousingGroupRows(id, visibleCount, mapOnly){
   if(mapOnly){
     const g0 = groups[0];
     const a0 = g0 && (g0.address || g0.building_name);
-    if(a0 && zfBlkMapOk(id)) initMapForHouse({ addr: a0, name: g0.building_name || '' }, mapId);
+    if(a0 && zfBlkMapOk(id)) initMapForHouse({ addr: a0, name: g0.building_name || '', cid: zfGrpCid(g0) }, mapId);
     else mapFail(mapId, '위치 정보가 없어요', '지난 회차 블록의 첫 건물에 주소·단지명이 없다');
     zfFillUnitChips(id);
     return;
@@ -11889,7 +11907,7 @@ function renderHousingGroupRows(id, visibleCount, mapOnly){
     const addr = g.address || g.building_name;
     if(addr){
       setActiveHousingGroup(id, 0);
-      if(zfBlkMapOk(id)) initMapForHouse({ addr, name: g.building_name || '' }, mapId);
+      if(zfBlkMapOk(id)) initMapForHouse({ addr, name: g.building_name || '', cid: zfGrpCid(g) }, mapId);
     } else {
       mapFail(mapId, '위치 정보가 없어요', '단일 건물에 주소·단지명이 없다');
     }
@@ -11929,7 +11947,7 @@ function renderHousingGroupRows(id, visibleCount, mapOnly){
     const addr = first.address || first.building_name;
     if(addr){
       setActiveHousingGroup(id, 0);
-      if(zfBlkMapOk(id)) initMapForHouse({ addr, name: first.building_name || '' }, mapId);
+      if(zfBlkMapOk(id)) initMapForHouse({ addr, name: first.building_name || '', cid: zfGrpCid(first) }, mapId);
     } else {
       mapFail(mapId, '위치 정보가 없어요', '첫 건물에 주소·단지명이 없다');
     }
@@ -12444,7 +12462,7 @@ function toggleHousingGroup(id, idx){
   setActiveHousingGroup(id, idx);
   const addr = g.address || g.building_name;
   const mapId = huMapTargetId[id] || id;
-  if(addr) initMapForHouse({ addr, name: g.building_name || '' }, mapId);
+  if(addr) initMapForHouse({ addr, name: g.building_name || '', cid: zfGrpCid(g) }, mapId);
 }
 
 // 여러 건물을 눌러도 지도엔 항상 마커 1개만 유지 — 현재 선택된 건물 행만 강조
@@ -12584,11 +12602,32 @@ function closeMapAsMultiRegion(id, names){
 }
 
 let zfComplexGeoP = null;   // 단지 도로명·좌표 표(complex_geo) — matched_from(원문 주소 그대로) → { lat, lng } · 실패하면 빈 표(종전 지오코딩)
+// 🔵 2026-11-22(우편함 「표시층 — 작은 판 …」 2 · 백로그 「같은 단지가 회차마다 주소 꼴」 ③) — 같은 한 번의 조회에 complex_id 칸을 더해
+//    단지 번호 → 좌표 표(.byCid)도 만든다(새 조회 0). 주소 꼴이 회차마다 달라 주소 길로 못 찾는 세대도 같은 단지 번호면 그 좌표로 선다.
+// 🔵 2026-11-22(작은 판 요청 덧) — 쪽 나눔: PostgREST max_rows(2000) 밑 1000행씩 id 차례로 받아 짧은 쪽이 오면 끝(좌표 행이 늘어도 잘리지 않게).
+//    지금처럼 행이 1000 밑이면 요청은 종전과 같은 한 번 · 어느 쪽이든 실패하면 빈 표(종전 지오코딩) — 받다 만 표로 일부만 juso 핀이 되지 않게.
+const ZF_GEO_PAGE = 1000;
 function zfComplexGeo(){
-  if(!zfComplexGeoP) zfComplexGeoP = fetch(`${SUPABASE_URL}/rest/v1/complex_geo?select=matched_from,lat,lng&lat=not.is.null&lng=not.is.null`, { headers: zfAnonHeaders() })
-    .then(r => r.ok ? r.json() : []).then(rows => new Map((Array.isArray(rows) ? rows : []).map(r => [String(r.matched_from || '').trim(), r])))
-    .catch(() => new Map());
+  if(!zfComplexGeoP) zfComplexGeoP = (async () => {
+    const list = [];
+    for(let off = 0; ; off += ZF_GEO_PAGE){
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/complex_geo?select=matched_from,complex_id,lat,lng&lat=not.is.null&lng=not.is.null&order=id&limit=${ZF_GEO_PAGE}&offset=${off}`, { headers: zfAnonHeaders() });
+      if(!r.ok) throw new Error('HTTP ' + r.status);
+      const rows = await r.json();
+      if(!Array.isArray(rows)) throw new Error('응답 꼴');
+      list.push(...rows);
+      if(rows.length < ZF_GEO_PAGE) break;
+    }
+    const m = new Map(list.map(r => [String(r.matched_from || '').trim(), r]));
+    m.byCid = new Map(list.filter(r => r.complex_id != null).map(r => [String(r.complex_id), r]));
+    return m;
+  })().catch(() => { const m = new Map(); m.byCid = new Map(); return m; });
   return zfComplexGeoP;
+}
+// 건물 묶음(g.units — 세대 행 select=*)의 단지 번호 — 첫 번째로 값이 있는 것(없으면 null)
+function zfGrpCid(g){
+  const u = ((g && g.units) || []).find(x => x && x.complex_id != null);
+  return u ? u.complex_id : null;
 }
 const zfMapSeq = {};   // 상자(카드 id)마다 지도 호출 차례 — initMapForHouse 가 마지막 호출만 그린다
 function initMapForHouse(h,id){
@@ -12659,7 +12698,8 @@ function initMapForHouse(h,id){
   //    좌표가 있으면 지오코딩 없이 그 좌표로 그린다(고창무장 「청보리로 1457」 — 카카오 ZERO_RESULT → 대략 원이던 자리). 없으면 종전대로.
   //    화면 주소 글자는 원문 그대로(이 표는 핀 자리만) · 표는 첫 지도에서 한 번만 읽는다(좌표 있는 행만 · anon 공개 읽기).
   Promise.all([loadKakao(), zfComplexGeo()]).then(([, geo])=>{
-    const cg = !h.approx && geo && geo.get(String(h.addr || '').trim());
+    // 순서 = 주소 길(matched_from) → 단지 번호 길(complex_id · 2026-11-22) → 카카오 지오코딩 → 시군구 중심
+    const cg = !h.approx && geo && (geo.get(String(h.addr || '').trim()) || (h.cid != null && geo.byCid && geo.byCid.get(String(h.cid))));
     if(cg && cg.lat != null && cg.lng != null){ renderMap([{ x: String(cg.lng), y: String(cg.lat), address_type: 'ROAD_ADDR', _zfJuso: true }], false); return; }
     const geocoder = new kakao.maps.services.Geocoder();
     // 쉼표로 이어붙은 복수 지번("지번1 , 지번2")은 지오코딩 API가 파싱하지 못해
@@ -16562,7 +16602,9 @@ function zf12Price(){
     box.dataset.zf12 = '1';
     // 🔵 5단계 시안(백로그 「디자인 2차」 11-19 ③) — 「조건별 다름」 대신 무엇이 갈리는지 짧은 말로(이름표 글자에서만 · 새 판정 0).
     const dt = dual ? dual.textContent : '', dshort = /가군/.test(dt) ? '가·나군별' : /구간/.test(dt) ? '소득 구간별' : '두 조건';
-    box.innerHTML = escapeHtml(parts.join(' · ')) + (dual ? ` <span class="zf12-cond">· ${dshort}</span>` : '');
+    // 🔵 2026-11-22(작은 판 1) — 짧은 말이 있으면 금액을 한 덩이(.zf12-amt)로 감싸 줄바꿈 자리를 금액과 짧은 말 사이 하나로(글자 그대로)
+    box.innerHTML = dual ? `<span class="zf12-amt">${escapeHtml(parts.join(' · '))}</span> <span class="zf12-cond">· ${dshort}</span>` : escapeHtml(parts.join(' · '));
+    box.classList.toggle('zf12-hascond', !!dual);
     if(round) box.appendChild(round);
     if(l2){
       let sq = l2.querySelector('.zf12-sqm');
