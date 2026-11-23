@@ -878,6 +878,11 @@ html[data-ui="d3"] .zf-ana-box a{color:var(--ink)!important}
 .hcard.zf-lo .zf3-ctop .zf3-dpill{order:2}
 html[data-ui="d3"] .hcard.zf-lo .zf3-ctop::after{background:var(--ink-2);color:var(--paper)}
 .zf-sch-stop>summary::-webkit-details-marker{display:none}
+/* 판 C 5 ② — 곁가지 역(게시 기간 「모집공고」): 노선 옆으로 한 칸 들여 작은 빈 점 + 점선 가지 · 역 차례(다음·진행 중)에 들지 않는다 */
+html[data-ui="d3"] .zf3-vline .policy-item.zf-sch-side{padding-left:46px!important}
+html[data-ui="d3"] .zf3-vline .policy-item.zf-sch-side::after{left:26px;top:5px;width:9px;height:9px;border-width:2px;border-style:dashed;border-color:var(--ink-3);background:var(--paper);box-shadow:none}
+html[data-ui="d3"] .zf3-vline .policy-item.zf-sch-side>details::before{content:"";position:absolute;left:12px;top:9px;width:14px;border-top:2px dashed var(--rail)}
+html[data-ui="d3"] .zf3-vline .policy-item.zf-sch-side .policy-content{font-size:12px!important;font-weight:600;color:var(--ink-2)!important}
 .zf-sch-stop>summary>.policy-category,.zf-sch-stop>summary>.policy-content{display:block}
 .zf-sch-stop .zf-sch-more{font-family:inherit;font-size:var(--t-xs);font-weight:600;color:var(--ink-3,#777);margin-left:8px;white-space:nowrap}
 .zf-sch-stop .zf-sch-more::after{content:" ▾"}
@@ -1132,6 +1137,8 @@ html.zf3-mapview[data-ui="d3"] #notice-list{display:none}
   html[data-ui="d3"] body:has(#main2:not(.hidden)) .zf3-sticky{left:max(24px,calc((100vw - 1232px) / 2));transform:none;width:720px;animation-name:zf3slidev}
   html[data-ui="d3"] body:has(#main2:not(.hidden)) .zf3-radar svg{max-height:calc(100vh - 300px)}
   html[data-ui="d3"] .zf-totop{right:auto;left:calc(max(24px,calc((100vw - 1232px) / 2)) + 706px)}
+  /* 판 C 8 — 추천 탭 ② 주택 매칭은 목록이 틀 폭 전부(1232)라 L+706 단추가 카드 얼마 줄 위에 선다 → 화면 오른쪽 끝 16px(1280에서 카드 오른쪽 끝 1215 < 단추 1220) */
+  html[data-ui="d3"] body:has(#main1:not(.hidden)):has(#panel2:not(.hidden)) .zf-totop{left:auto;right:16px}
 }
 @media (prefers-reduced-motion:reduce){.zf3-radar .pulse,.zf3-radar .pt{animation:none!important}}
 /* 추천(D-3 단계 e) — 노선 스텝 · 결과부터 · 1200px 두 단 · 결과 상자 토큰 */
@@ -1320,8 +1327,11 @@ html.zf12 .zf12-nu .zf-ai-lbl{display:none}
 /* 안 2층 머리 — 겉에서 내린 것 · 꼭 볼 것 · 정정 · ㎡당 */
 html.zf12 .zf12-l2{display:flex;flex-direction:column;gap:10px;margin:4px 0 12px;padding:12px;border:1px solid var(--line-2);border-radius:var(--r-2);background:var(--surface)}
 html.zf12 .zf12-l2:empty{display:none}
+.zf-match-natgrp{margin:18px 2px 8px;padding-top:12px;border-top:1px solid var(--line);font-size:var(--t-s);font-weight:700;color:var(--ink-2)}   /* 판 C 1 (나) 매칭 끝 묶음 머리 */
 html.zf12 .zf12-l2 > *{margin:0!important;order:20}
 /* 2층 차례는 도착 순서가 아니라 고정(늦게 붙는 것이 있어도 같은 그림) · 창 단추·가지 머리가 없는 카드는 노선 그림을 접는다(겉 한 줄과 같은 말) — 늦게 붙는 단추도 :has 로 따라간다 */
+/* 판 C 4 — 자식이 모두 빈 2층 머리(빈 칩 줄 · 빈 자리표) — 다자녀 전세임대처럼 세대 목록·경로·공고문 여럿이 없는 공고에서 빈 둥근 상자가 남았다(:empty 는 칩 줄의 공백 글자 때문에 못 받음) */
+html.zf12 .zf12-l2:not(:has(> .chip-row > :not(:empty))):not(:has(> :not(.chip-row):not(:empty))){display:none}   /* 칩 줄 안 빈 자리표(.zf-rentlow-slot)도 빈 것으로 */
 html.zf12 .zf12-l2 > .zf12-schedwhy{order:1}
 html.zf12 .zf12-l2 > .zf12-must{order:2}
 html.zf12 .zf12-l2 > .zf12-sqm{order:3}
@@ -9561,7 +9571,9 @@ function zfScheduleItemHTML(r, showScope){
   const d1 = r.start_date || r.end_date || '', d2 = r.end_date || r.start_date || '';
   const sc = [showScope ? r.scope_text : '', r.site_label].filter(Boolean).map(escapeHtml).join(' · ');
   const rawMark = ZF_RAW_REPEAT.test(r.stage_text || '') ? ' <span class="zf-sch-rawmark" title="공고문에 적힌 글자 그대로예요">(원문 표기)</span>' : '';
-  const head = `<span class="policy-category">${ZF_STAGE_ICON[r.stage] ? ZF_STAGE_ICON[r.stage] + ' ' : ''}${escapeHtml(r.stage_text || '')}${rawMark}${sc ? ` <span class="zf-sch-scope">${sc}</span>` : ''}</span>`;
+  // 🔵 판 C 5 ① — 카드 접수기간과 같은 기간인 역(일정 표에 접수 행이 없는 공고)은 그 역에 「접수기간」 표지를 달고 따로 역을 세우지 않는다.
+  const apMark = r._applySame ? ` <span class="zf-sch-scope">📅 접수기간</span>` : '';
+  const head = `<span class="policy-category">${ZF_STAGE_ICON[r.stage] ? ZF_STAGE_ICON[r.stage] + ' ' : ''}${escapeHtml(r.stage_text || '')}${rawMark}${sc ? ` <span class="zf-sch-scope">${sc}</span>` : ''}${apMark}</span>`;
   // 🔵 2026-11-03 — 합친 역(r._grp)은 행 id 를 모두 싣고(data-sch-ids) 「원문」 펼침을 행마다 가른다(data-sch-rid) · 경로 대상 글(_notes)은 따로 —
   //    health-screen sched_line 이 역 id·원문 글 = DB period_text 를 행마다 잰다(원칙 33).
   const grp = r._grp || null, notes = r._notes || [];
@@ -9573,7 +9585,7 @@ function zfScheduleItemHTML(r, showScope){
   const inner = dl
     ? `<summary>${head}<span class="policy-content">${escapeHtml(dl)}<span class="zf-sch-more" aria-hidden="true">원문</span></span>${rl}</summary><div class="zf-sch-raw">${raw}</div>`
     : `<summary>${head}<span class="policy-content zf-sch-nd">${raw}</span></summary>`;
-  return `<div class="policy-item" data-zf-d="${zfAttr(d1)}" data-zf-e="${zfAttr(d2)}"${r.id != null ? ` data-sch-id="${zfAttr(r.id)}"` : ''}${grp ? ` data-sch-ids="${zfAttr(grp.map(g => g.id).join(' '))}"` : ''}><details class="zf-sch-stop">${inner}</details></div>`;
+  return `<div class="policy-item${r._side ? ' zf-sch-side' : ''}" data-zf-d="${zfAttr(d1)}" data-zf-e="${zfAttr(d2)}"${r.id != null ? ` data-sch-id="${zfAttr(r.id)}"` : ''}${grp ? ` data-sch-ids="${zfAttr(grp.map(g => g.id).join(' '))}"` : ''}><details class="zf-sch-stop">${inner}</details></div>`;
 }
 // 🔵 2026-11-03(우편함 「표시층 — 다음 판 시안」 A · 백로그 「상세 「공급일정」 노선에서 현장 접수가 별 역으로 서…」) — 접수 단계에서 경로만 다른 행은 한 역.
 //    일정 표 접수 행이 이어서 둘 이상이고 날짜 창이 서로 겹치면(인터넷 11-16~18 · 현장 11-17 — …20896) 한 역으로 합치고(날짜 = 가장 이른 시작 ~ 가장 늦은 끝 ·
@@ -9589,19 +9601,22 @@ function zfSchMergeApply(list, routes){
   const out = [];
   list.forEach(x => {
     const last = out[out.length - 1];
-    if(last && x.r.stage === '접수' && last.r.stage === '접수' && (last.r.site_label || '') === (x.r.site_label || '') && zfSchOverlap(last.r, x.r)){
+    // 🔵 판 C 5 ③ — 접수 밖 단계도 같은 단계 · 같은 날짜(시작·끝 모두 같음)인 이어진 행은 한 역 + 경로 줄(김해 …21034 서류 제출 「인터넷 제출」·「방문/등기우편 제출」).
+    const sameDates = (a, b) => !!(a.start_date && a.end_date) && a.start_date === b.start_date && a.end_date === b.end_date;
+    if(last && x.r.stage === last.r.stage && (last.r.site_label || '') === (x.r.site_label || '')
+      && (x.r.stage === '접수' ? zfSchOverlap(last.r, x.r) : x.r.stage !== '공고' && sameDates(last._first || last.r, x.r))){
       const m = last.r._grp ? last.r : Object.assign({}, last.r, { _grp: [last.r] });
       m._grp.push(x.r);
       m.start_date = m._grp.map(r => r.start_date || r.end_date).sort()[0];
       m.end_date = m._grp.map(r => r.end_date || r.start_date).sort().slice(-1)[0];
       m.stage_text = [...new Set(m._grp.map(r => r.stage_text || ''))].filter(Boolean).join(' · ');
-      out[out.length - 1] = { r: m, s: false };
+      out[out.length - 1] = { r: m, s: false, _first: last._first || last.r };
       return;
     }
     out.push(x);
   });
   return out.map(x => {
-    if(x.r.stage !== '접수') return x;
+    if(x.r.stage !== '접수') return x.r._grp ? { r: Object.assign({}, x.r, { _routes: x.r._grp.map(r => ({ name: r.scope_text || r.stage_text || '', dl: zfSchDateLine(r), place: '' })) }), s: x.s } : x;
     const hit = (routes || []).filter(rt => zfSchOverlap(rt, x.r));
     let lines = null;
     if(new Set(hit.map(rt => rt.route)).size >= 2){
@@ -9616,7 +9631,8 @@ function zfSchMergeApply(list, routes){
 }
 function zfScheduleMarkLine(box){
   const today = zf3Today();
-  const items = [...box.querySelectorAll(':scope > .policy-item')];
+  box.querySelectorAll(':scope > .policy-item.zf-sch-side').forEach(it => it.classList.add('side'));   // 판 C 5 ② — 곁가지는 역 차례(지남·진행 중·다음)에 들지 않는다
+  const items = [...box.querySelectorAll(':scope > .policy-item:not(.zf-sch-side)')];
   const nextI = items.findIndex(it => (it.dataset.zfD || '') > today);
   items.forEach((it, i) => it.classList.add(!it.dataset.zfD ? 'unk' : it.dataset.zfD <= today ? ((it.dataset.zfE || '') >= today ? 'now' : 'past') : i === nextI ? 'next' : 'fut'));
   return items.some(it => (it.dataset.zfE || '') >= today);
@@ -9656,7 +9672,12 @@ function loadScheduleLine(annId, cardEl, id){
     const ord = new Map(); cur.forEach((r, i) => ord.set(r, i));
     // 접수 행이 없으면 카드 접수기간(확정값)을 첫 「접수 뒤」 단계 앞에 종전 이름으로
     const aS = cardEl.dataset.applyStart || '', aE = cardEl.dataset.applyEnd || '';
-    const extraApply = !cur.some(r => r.stage === '접수') && (aS || aE)
+    // 🔵 판 C 5 ① — 접수 행이 없고 카드 접수기간과 시작·끝이 모두 같은 일정 행이 있으면 그 행이 접수 역이다(익산제3 …20850 「동호지정 및 계약체결」 = 접수기간 — 같은 기간 두 역이 섰다).
+    const sameAp = !cur.some(r => r.stage === '접수') && aS && aE ? cur.filter(r => r.start_date === aS && r.end_date === aE) : [];
+    sameAp.forEach(r => { r._applySame = true; });
+    // 🔵 판 C 5 ② — 「공고」 단계가 기간(시작 < 끝)이고 다른 역과 겹치면(SH 「모집공고」 게시 기간이 접수·공개를 품음) 곁가지로.
+    cur.forEach(r => { r._side = r.stage === '공고' && !!(r.start_date && r.end_date) && r.start_date < r.end_date && cur.some(o => o !== r && o.stage !== '공고' && zfSchOverlap(o, r)); });
+    const extraApply = !sameAp.length && !cur.some(r => r.stage === '접수') && (aS || aE)
       ? `<div class="policy-item" data-zf-d="${zfAttr(aS || aE)}" data-zf-e="${zfAttr(aE || aS)}"><div class="policy-category">📅 접수기간</div><div class="policy-content">${escapeHtml(`${aS || '-'} ~ ${aE || '-'}`)}</div></div>` : '';
     // 🔵 2026-11-12 — 일정 표에 「공고」 단계 행이 없으면 첫 정거장 = 카드 노선과 같은 공고일(zfScheduleAnnItem · 노선마다 맨 앞)
     const annItem = cur.some(r => r.stage === '공고') ? '' : zfScheduleAnnItem(cardEl);
@@ -12057,7 +12078,8 @@ const HU_NOTE_INLINE_MAX = 28;
 const ZF_NOTE_SUB_UPDOWN = [[/증액(?=\s*(?:한도|\(|\+|[\d,]))/g, '올릴 때'], [/감액(?=\s*(?:한도|\(|-|[\d,]))/g, '낮출 때']];
 const ZF_NOTE_SUB_SIGN = [[/(^|[\s/])\(\+\)/g, '$1올릴 때(+)'], [/(^|[\s/])\(-\)/g, '$1낮출 때(-)']];
 const ZF_NOTE_HEADS = [
-  { t: '모집 수', re: /^건설\s*(?:호수|세대수)(?=\s*[:\d])/, to: '건설 호수' },
+  // 🔵 판 C 3(2026-11-23) — 건설 호수는 그 단지에 지은 집 수(이번 모집 수 아님) — 세대 줄 모집 수와 헷갈리지 않게 머리에 「(단지 전체)」 · 「건설 180호」(머리 낱말 없음) 꼴도 같은 머리로.
+  { t: '모집 수', re: /^건설(?:\s*(?:호수|세대수))?(?=\s*[:\d])/, to: '건설 호수(단지 전체)' },
   { t: '모집 수', re: /^공급호수(?=\s+(?:계\s|우선))/, to: '공급호수', sub: [[/우선\s*공급|우선(?=\s*[\d,])/g, '우선 공급'], [/일반\s*공급|일반(?=\s*[\d,])/g, '일반 공급']] },
   { t: '계약금', re: /^계약금\s*:(?=\s*[\d,])/, to: '계약금' },
   { t: '전환', re: /^전환\s*:(?=\s*증액|\s*감액)/, to: '보증금 전환 —', sub: ZF_NOTE_SUB_UPDOWN },
@@ -12065,9 +12087,12 @@ const ZF_NOTE_HEADS = [
   { t: '전환', re: /^최대\s*전환\s*시\s*임대조건\s*(?=\((?:\+|-)\))/, to: '보증금 전환 — ', sub: ZF_NOTE_SUB_SIGN },
   { t: '전환', re: /^최대\s*전환\s*시\s*(?=\((?:\+|-)\))/, to: '보증금 전환 — ', sub: ZF_NOTE_SUB_SIGN },
   { t: '전환', re: /^최대\s*전환\s*시\s*임대조건(?=\s+\((?:\+|-)\))/, to: '보증금 전환 —', sub: ZF_NOTE_SUB_SIGN },
+  // 🔵 판 C 2 — 방향(증액·감액 · (+)/(-))이 없는 「최대전환시 — 보증금 …」·「최대전환시 임대조건 보증금 …」(값은 그대로 · 괄호 「전환가능 보증금 한도액」도 그대로).
+  { t: '전환', re: /^최대\s*전환\s*시\s*(?:임대조건\s*|—\s*)(?=보증금)/, to: '보증금 전환 — 최대로 바꾸면 ' },
   { t: '전환', re: /^무보증전환임대료(?=\s*[\d,])/, to: '보증금 없이(무보증 전환) 임대료' },
-  { t: '입주 시기', re: /^최초\s*입주(?:월|시기)?(?=\s*[:‘’'\d])/, to: '처음 입주한 때' },
-  { t: '입주 시기', re: /^(?:입주예정|당첨자\s*입주\s*예정)(?=\s*[:‘’'\d])/, to: '입주 예정' },
+  // 🔵 판 C 2(2026-11-23) — 원문이 따옴표 대신 백틱(「최초입주 `17.12.」)을 쓴 꼴 · 「입주예정월」(「월」이 붙음)도 같은 머리로.
+  { t: '입주 시기', re: /^최초\s*입주(?:월|시기)?(?=\s*[:‘’'`\d])/, to: '처음 입주한 때' },
+  { t: '입주 시기', re: /^(?:입주\s*예정\s*월?|당첨자\s*입주\s*예정)(?=\s*[:‘’'`\d])/, to: '입주 예정' },
   { t: '면적', re: /^세대\s*(?:당|별)\s*계약면적(?:\s*합계)?(?=\s*[:\d])/, to: '계약면적', sub: [[/주거전용/g, '전용'], [/주거공용/g, '공용']] },
   { t: '구조·난방', re: /^(?:구조\s*및\s*난방(?:방식)?|구조\s*\/\s*난방|구조\s*,\s*난방|난방\s*·\s*구조)(?=\s*:|\s)/, to: '구조·난방' },
   { t: '거주기간', re: /^최대거주기간/, to: '최대 거주기간' },
@@ -12079,7 +12104,8 @@ function zfNoteHeadStd(seg){
     if(!m) continue;
     let rest = seg.slice(m[0].length);
     (h.sub || []).forEach(([re, to]) => { rest = rest.replace(re, to); });
-    const text = (h.to + rest).replace(/\s{2,}/g, ' ');
+    // 🔵 판 C 2 — 전환 「올릴 때 (+)」·「올릴 때(+)」 두 꼴을 붙인 꼴 하나로(띄어쓰기만 · 글자 그대로).
+    const text = (h.to + rest).replace(/\s{2,}/g, ' ').replace(/(올릴|낮출) 때\s+\(([+-])\)/g, '$1 때($2)');
     return text === seg ? { text: seg, topic: null } : { text, topic: h.t };
   }
   return { text: seg, topic: null };
@@ -13014,6 +13040,12 @@ function renderMatchResults(rows){
     return;
   }
 
+  // 🔵 판 C 1 (나)(2026-11-23) — 전국 수시모집 전세임대(지역 「… 외」 · 제목 「수시모집」·「상시」)는 매칭 목록 끝 묶음으로 — 특정 단지 공고가 먼저 오게.
+  //    순서만 옮긴다(거르기 0 · 건수 그대로) · 묶음 머리 글은 지도 칸 「전세임대는 미리 정해진 단지가 없어요」 풀이와 같은 말.
+  const natJ = n => /전세임대/.test(String(n.housing_type || '')) && /수시\s*모집|상시/.test(String(n.title || '')) && /외$/.test(String(n.region || '').trim());
+  const natN = rows.filter(natJ).length;
+  if(natN && natN < rows.length) rows = rows.filter(n => !natJ(n)).concat(rows.filter(natJ));
+  const natFrom = natN && natN < rows.length ? rows.length - natN : -1;
   const shown = rows.slice(0, visibleCount);
   let html = matchNoTypeFilter
     ? `<div class="rbox warn" style="margin-bottom:6px"><p class="rdesc" style="margin:0">신청 가능한 유형이 확인되지 않아 전체 공고를 보여드려요.</p></div>`
@@ -13035,6 +13067,7 @@ function renderMatchResults(rows){
     const annDate     = n.announcement_date||'';
     const dateLine    = applyDateLine(n, annDate, applyStart, applyEnd, n.url||'');
     const cardId = 'mcard-' + zfCardKey(n.announcement_id || idx);
+    if(idx === natFrom) html += `<p class="zf-match-natgrp">🏠 전국 수시모집 전세임대 ${natN}건 — 입주자가 조건에 맞는 주택을 직접 찾아 계약하는 유형이에요</p>`;
 
     const detailRows = [];
     if(n.supply_org) detailRows.push(['공급기관', escapeHtml(n.supply_org)]);
@@ -16493,6 +16526,27 @@ async function zf12Load(rows){
       });
       zf12Info.set(id, { ids, heads, res: ep.length ? zf12Res(ep[0].content_raw) : '', sched });
     });
+    // 🔵 판 C 1 (가)(2026-11-23 · 「처음 온 사람」 걷기 두 번 모두 🅰 첫 칸 함정) — 세대 행이 없는 공고(전세임대 등)는 「누가」 재료가 없어 👥 줄이 서지 않았다.
+    //    세대 계층도 거주 조각도 없을 때만 자격 행 공급대상 키(분석이 원문 대상 낱말로 쓴 값 — 매칭 판정과 같은 키)의 「대상」을 쓴다 ·
+    //    「조건.계층_중_하나」가 있으면 괄호로(원문 「아래 1순위 유형 중 어느 하나」 — 청년 전세임대 1순위). 낱말은 키 값 그대로 · 새 말 0.
+    const bare = grp.filter(([id]) => { const I = zf12Info.get(id); return I && !I.heads.length && !I.res; });
+    if(bare.length){
+      const bIds = [...new Set(bare.flatMap(g => g[1]))];
+      const ek = await fetch(`${SUPABASE_URL}/rest/v1/eligibility_criteria?select=announcement_id,gk:verification_requirements-%3E${encodeURIComponent('공급대상')}&${idFilterFor(bIds)}&verification_requirements-%3E${encodeURIComponent('공급대상')}=not.is.null`, { headers: zfAnonHeaders() }).then(r => r.ok ? r.json() : []).catch(() => []);
+      bare.forEach(([id, ids]) => {
+        const set = new Set(ids), out = [];
+        (Array.isArray(ek) ? ek : []).filter(r => set.has(String(r.announcement_id))).forEach(r => {
+          const br = r.gk && Array.isArray(r.gk['갈래']) ? r.gk['갈래'] : [];
+          br.forEach(b => {
+            const who = String((b && b['대상']) || '').trim(); if(!who || /^(계층|일반)$/.test(who)) return;   // 「계층」·「일반」은 매칭 갈래 이름(원문 대상 낱말 아님 — …21117 철거민 우선공급)
+            const tier = b['조건'] && Array.isArray(b['조건']['계층_중_하나']) ? b['조건']['계층_중_하나'].map(x => String(x).trim()).filter(Boolean) : [];
+            const h = tier.length ? `${who}(${tier.join('·')})` : who;
+            if(!out.includes(h)) out.push(h);
+          });
+        });
+        if(out.length) zf12Info.get(id).heads = out;
+      });
+    }
     return true;
   }catch(e){ console.warn('시안 「누가」 재료 실패', e); return false; }
   finally{ need.forEach(id => zf12Pend.delete(id)); done(); }
