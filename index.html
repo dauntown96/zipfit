@@ -1277,8 +1277,10 @@ html[data-ui="d3"] .pg-btn{min-width:var(--hit);height:var(--hit);font-size:var(
 html.zf12 .zf12-off{display:none!important}
 html.zf12 .hcard.zf-ana-pending :is(.zf12-when,.zf12-badges){display:none!important}   /* 분석 전 카드 — 「분석 중」만(수집값 날짜·상태·경고 칩 0 — 종전 .zf-ana-pending 규칙과 같은 거름) */
 /* 겉 ① 유형 · (지역) · 상태 알약 · 경고 배지(빨강 하나 — 경고만) */
-html.zf12 .zf12-card .zf3-ctop{flex-wrap:wrap;row-gap:6px}
+html.zf12 .zf12-card .zf3-ctop{flex-wrap:wrap;row-gap:var(--sp-1)}
 html.zf12 .zf12-badges{display:contents}
+html.zf12 .zf12-badges button.zf12-sched{font-family:inherit;line-height:inherit;cursor:pointer}   /* 판 B ⑤ — 누를 수 있는 배지(단추) · 모양은 종전 칩 그대로 */
+html.zf12 .zf12-badges button.zf12-sched:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 html.zf12 .zf12-badges .chip{display:inline-flex;align-items:center;min-height:24px;padding:2px 8px!important;border-radius:var(--r-1);font-size:var(--t-xs)!important;font-weight:700;background:var(--warn-bg)!important;border:1px solid var(--warn)!important;color:var(--warn)!important;cursor:default}
 html.zf12 .zf12-cov{font-size:var(--t-xs);color:var(--ink-3)}
 html.zf12 .zf12-badges .chip.zf-chip-new{background:var(--ink)!important;border-color:var(--ink)!important;color:var(--paper)!important}   /* NEW = 재편 전 겉 꼴 그대로(경고 색 아님) */
@@ -1289,7 +1291,7 @@ html.zf12 .zf12-cov::before{content:"· ";color:var(--ink-3)}
 /* 겉 ② 제목 최대 2줄 */
 html.zf12 .zf12-card .hname{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 /* 겉 ③ 누가(원문 칸 글자) */
-html.zf12 .zf12-who{margin:2px 0 8px;font-size:var(--t-s);font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html.zf12 .zf12-who{margin:var(--sp-1) 0 var(--sp-2);font-size:var(--t-s);font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 html.zf12 .zf12-who .zf12-res{font-weight:400;color:var(--ink-2)}
 html.zf12 .zf12-wi{margin-right:4px}
 /* 겉 ④ 얼마 — 한 줄 */
@@ -1302,7 +1304,7 @@ html.zf12 .zf12-card [data-sum-for] > div.zf12-hascond > *{white-space:nowrap}
 html.zf12 .zf12-card [data-sum-for] > div.zf12-hascond > .zf12-amt{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}
 html.zf12 .zf12-cond{font-weight:500;color:var(--ink-2)}
 /* 겉 ⑤ 언제 — 노선 한 줄(● 지남 · ◉ 다음 · ○ 앞으로) */
-html.zf12 .zf12-when{display:flex;flex-wrap:wrap;align-items:center;gap:2px 6px;margin:8px 0 12px;font-size:var(--t-xs);color:var(--ink-2)}   /* 좁으면 정거장 단위로 다음 줄(글자를 자르지 않는다) */
+html.zf12 .zf12-when{display:flex;flex-wrap:wrap;align-items:center;gap:2px 6px;margin:var(--sp-2) 0 var(--sp-3);font-size:var(--t-xs);color:var(--ink-2)}   /* 좁으면 정거장 단위로 다음 줄(글자를 자르지 않는다) */
 html.zf12 .zf12-w{display:inline-flex;align-items:baseline;gap:3px;font-family:var(--f-ui);white-space:nowrap}
 html.zf12 .zf12-w .zf12-k{color:var(--ink-3)}
 html.zf12 .zf12-w.past{color:var(--ink-3)}
@@ -1387,8 +1389,15 @@ html.zf12 .zf12-card .detail-grid .zf-dcell-apply:not(:has(.zf-win-other)){displ
   html.zf12 #notice-list .zf12-card > .htop{grid-column:1;grid-row:2}
   html.zf12 #notice-list .zf12-card > .haddr,html.zf12 #notice-list .zf12-card > .zf12-who{grid-column:1;grid-row:3}
   html.zf12 #notice-list .zf12-card > [data-sum-for]{grid-column:2;grid-row:2;align-self:start}
-  html.zf12 #notice-list .zf12-card > .zf12-when{grid-column:2;grid-row:3;margin:6px 0 10px}
+  html.zf12 #notice-list .zf12-card > .zf12-when{grid-column:2;grid-row:3;margin:var(--sp-1) 0 var(--sp-2)}   /* 판 B ② — 6/10 → 4/8(토큰) */
+  html.zf12 #notice-list .zf12-card > .zf12-who{margin-top:0}   /* 판 B ② — 그리드 칸끼리는 여백이 겹치지 않아 제목 아래 4(.htop)만 둔다 */
   html.zf12 #notice-list .zf12-card > [id^="ncard-"]{grid-column:1 / -1}
+  /* 🔵 2026-11-23(우편함 「표시층 — 실사용 판 B 시안」 ① · 사전 조사 docs/panb-preresearch.md 1장 후보 B) — 펼침 「›」(.zf3-gotop)를 제목 줄 끝(카드 가운데쯤 x 266)에서
+     카드 오른쪽 끝 · 세로 가운데로(오른쪽 안쪽 8px — 맨 위로 단추와 맞닿지 않게). 단추는 DOM 자리 그대로(.htop 안 — 키보드 차례 그대로) · 자리만 absolute.
+     오른쪽 46px를 비워(카드 안쪽 여백 14 → 60) 얼마·언제 칸이 단추와 겹치지 않게 하고 · ① 줄(알약)과 상세는 그만큼 되돌려(-46) 알약은 오른쪽 위 끝 그대로. 390~1199 는 그대로. */
+  html[data-ui="d3"].zf12 #notice-list .hcard.zf3-card.zf12-card{position:relative;padding-right:60px}   /* 카드 여백 규칙(:is(#notice-list,#match-result) .hcard.zf3-card)보다 앞서게 */
+  html.zf12 #notice-list .zf12-card > .zf3-ctop,html.zf12 #notice-list .zf12-card > [id^="ncard-"]{margin-right:-46px}
+  html.zf12 #notice-list .zf12-card > .htop > .zf3-gotop{position:absolute;right:8px;top:50%;margin:0;transform:translateY(-50%)}
 }
 /* 자격 절 — 짧은 머리(누르면 원문 머리 전체) */
 html.zf12 .zf12-eh summary{cursor:pointer;list-style:none;font-weight:700;color:var(--ink);min-height:var(--hit);display:flex;align-items:center;flex-wrap:wrap}
@@ -1500,7 +1509,7 @@ html[data-ui="d3"] #zf3NoticeHead .zf3-tq .zf3-tq-mine span{font-size:var(--t-bo
 /* ⑦ 대비 — 「다른 회차」 접기 머리(hu-past-title)의 날값 회색(흰 바탕 4.48:1 — 4.5 밑)을 토큰 --ink-3 으로(어둡게도 같은 토큰) */
 html[data-ui="d3"] .hu-past-title{color:var(--ink-3)}
 /* ④ 카드 겉 칩 줄 — 알약·⚠️ 칩이 유형 줄 아래로 꺾일 때 줄 틈 6 → 4(칩 높이·글자 그대로) */
-html.zf12 .zf12-card .zf3-ctop{row-gap:4px}
+html.zf12 .zf12-card .zf3-ctop{row-gap:var(--sp-1)}
 html[data-ui="d3"] #zf3NoticeHead .zf3-ctl .zf3-vseg{margin-left:auto;padding:0}
 html[data-ui="d3"] #zf3NoticeHead .zf3-ctl .zf3-vseg button{padding:0 10px}
 /* ③ 오늘 판 네 칸 — 숫자 위 · 이름 아래 한 줄(꺾지 않음) → 네 칸 높이가 같다(종전 「7일 안 접수 시작」만 세 줄 51px) */
@@ -1550,7 +1559,10 @@ html.zf12 .zf12-card .zf3-ctop:has(> .zf13-cl){display:grid;grid-template-column
 html.zf12 .zf3-ctop .zf3-dpill.zf13-wait{background:var(--paper);border-color:var(--ink);color:var(--ink)}   /* 기준 위반 고침 2 — 끝 시각 지난 차수 알약: 대기(검은 바탕 걷음) */
 html.zf12 .zf3-ctop .zf3-dpill.closed{background:transparent;border-color:var(--line);color:var(--ink-3)}
 html.zf12 .zf12-cov.zf13-lead::before{content:none}   /* 줄 첫머리 지역 — 앞 가운뎃점 꾸밈만 숨김 */
-html.zf12 .zf13-cl{display:flex;flex-wrap:wrap;align-items:center;gap:0 6px;min-width:0}   /* 줄 틈 0 — 지역이 올라와 배지가 둘째 줄로 꺾여도 걷은 지역 줄 높이와 같게(첫 화면 카드 2장) */
+html.zf12 .zf13-cl{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-1) 6px;min-width:0}   /* 🔵 2026-11-23(판 B ② · 다운님 지적) — 꺾인 배지 줄 사이 0 → 4(배지 묶음 .zf12-badges 는 display:contents 라 이 줄 틈을 쓴다) · 종전 0은 「첫 화면 카드 2장」 때문이었다 — 회신 셈 */
+/* 🔵 2026-11-23(우편함 「표시층 — 실사용 판 B 시안」 ② · docs/card-spacing.md) — 카드 안 세로 간격 세 값: 딸린 줄 4(--sp-1) · 묶음 사이 8(--sp-2) · 칸 사이 16(--sp-4) · 카드 아래 끝만 12(--sp-3 · 높이 유지) */
+html.zf12 .zf12-card > .zf3-ctop{margin-bottom:var(--sp-2)}   /* ① 줄 → 제목 6 → 8 */
+html.zf12 .zf3-card.zf12-card > .htop{margin-bottom:var(--sp-1)}   /* 제목 → 딸린 줄(누구 · 얼마) 2 → 4 */
 html.zf12 .zf12-card .zf3-ctop > .zf3-dpill{margin-left:0;align-self:start}
 /* 4단계 2 — 자격 절 목(가·나목 …)마다 한 줄 · 펼치면 원문 문장(구역 머리 꼴: 제목 + ›) */
 html.zf12 .zf13-moks{list-style:none;margin:2px 0 6px;padding:0;font-size:var(--t-body);color:var(--ink)}
@@ -6081,6 +6093,39 @@ function zfLoadRentStats(){
     if(zfRentStats.size) zfFillSummarySlots();
   }).catch(err => { zfRentStatsState = 2; console.warn('ZipFit ㎡당 통계 로드 실패(줄 없이 그린다):', err); });
 }
+// 🔵 2026-11-23(판 B ④ ①) — 단지 여럿(매입임대 빼고)이면 ㎡당 줄에 「단지마다 ○~○원」 범위. 카드 값(공고 전체 중앙값) 하나가 단지 차이를 가렸다(사전 조사 — 열린 30장).
+//    재료 = 상세를 열면 오는 이번 회차 세대 행(huGroupsCache — 건물 묶음) · 묶음마다 월세 ÷ 전용면적 중앙값을 RPC rent_per_sqm_med 와 같은 거름으로
+//    (월세 > 0 · 면적 > 0 · 영구임대는 「나군」 표기 행만) · 값이 선 묶음이 둘 이상일 때만 그 최솟값~최댓값. 새 요청 0(상세가 이미 받는 행).
+const zfRentRange = new Map();   // announcement_id → [lo, hi]
+const ZF_NA_RE = /나[\s「」『』'"]{0,2}군/;
+function zfRentRangeHtml(rg){ return `<span class="zf-rent-range"> · 단지마다 ${Math.round(rg[0]).toLocaleString()}~${Math.round(rg[1]).toLocaleString()}원</span>`; }
+// 범위를 셀 카드인가 — 유형을 알고 매입임대가 아닐 때만(매입은 「단지」가 주택 하나하나라 범위가 넓어져 뜻이 옅다 · 사전 조사 4장)
+function zfRentRangeWanted(annId){
+  const row = (noticeData || []).find(n => String(n['announcement_id']) === String(annId));
+  const tk = row ? zfRentTypeKey(row, '') : '';
+  return !!tk && !/매입/.test(tk);
+}
+function zfRentRangeFromGroups(annId, groups){
+  if(!zfRentRangeWanted(annId)) return;
+  const row = (noticeData || []).find(n => String(n['announcement_id']) === String(annId));
+  const tk = zfRentTypeKey(row, '');
+  const perm = /^영구임대/.test(tk);
+  const meds = [];
+  (groups || []).forEach(g => {
+    const v = ((g && g.units) || []).filter(u => u && Number(u.monthly_rent) > 0 && Number(u.area_sqm) > 0
+        && (!perm || ZF_NA_RE.test([u.unit_group, u.supply_target, u.unit_type].filter(Boolean).join(' '))))
+      .map(u => Number(u.monthly_rent) / Number(u.area_sqm)).sort((a, b) => a - b);
+    if(v.length) meds.push(zfQuantile(v, 0.5));
+  });
+  if(meds.length < 2) return;
+  const rg = [Math.min(...meds), Math.max(...meds)];
+  zfRentRange.set(String(annId), rg);
+  // 이미 그려진 줄에도 붙인다(줄은 목록 때 섰고 세대 행은 상세를 열 때 온다)
+  document.querySelectorAll(`[data-sum-for="${CSS.escape(String(annId))}"]`).forEach(el => {
+    const card = el.closest('.hcard'); if(!card) return;
+    card.querySelectorAll('.zf-rent-line').forEach(l => { if(l.querySelector('.zf-rent-range')) return; const b = l.querySelector('.zf-rent-basis'); if(b) b.insertAdjacentHTML('afterend', zfRentRangeHtml(rg)); });
+  });
+}
 function zfRentLineHtml(id, s){
   if(!s || s.round_state !== 'current' || s.rent_per_sqm_med == null || !zfRentStats.size) return '';
   const row = (noticeData || []).find(n => String(n['announcement_id']) === String(id));
@@ -6092,10 +6137,13 @@ function zfRentLineHtml(id, s){
   const st = stS || (tk && zfRentStats.get(tk));
   if(!st) return '';
   const v = Number(s.rent_per_sqm_med);
-  const pos = v < st.q1 ? '낮은 편' : (v > st.q3 ? '높은 편' : '비슷');
+  // 🔴 2026-11-23(우편함 「표시층 — 실사용 판 B 시안」 ④ ② · 다운님 14:31 「같은 시·도 비교일 때만 판정어 · 전국 비교는 숫자만」 · 사전 조사 4장) —
+  //    전국 비교는 서울 행복주택을 지방 표본과 견주는 꼴이라(…21098) 「높은 편」이 공고가 비싼지가 아니라 지역 집값 차이를 말했다. 전국 줄은 중앙값·곳 수까지만.
+  const pos = stS ? (v < st.q1 ? '낮은 편' : (v > st.q3 ? '높은 편' : '비슷')) : '';
   const won = x => Math.round(x).toLocaleString() + '원';
   const where = stS ? zf3ShortSido(sd.split(' ')[0]) : '전국';
-  return `<div class="zf-rent-line" data-zf-rent="${zfAttr(pos)}">㎡당 월 ${won(v)}${s.rent_basis === 'na' ? '(나군)' : ''}<span class="zf-rent-basis"> · 기본 임대조건 중앙값</span> · ${escapeHtml(where)} 같은 유형 열린 공고 중앙값 ${won(st.med)}(${st.n}곳) — <b>${pos}</b></div>`;
+  const rg = zfRentRange.get(String(id));
+  return `<div class="zf-rent-line" data-zf-rent="${zfAttr(pos || 'none')}">㎡당 월 ${won(v)}${s.rent_basis === 'na' ? '(나군)' : ''}<span class="zf-rent-basis"> · 기본 임대조건 중앙값</span>${rg ? zfRentRangeHtml(rg) : ''} · ${escapeHtml(where)} 같은 유형 열린 공고 중앙값 ${won(st.med)}(${st.n}곳)${pos ? ` — <b>${pos}</b>` : ''}</div>`;
 }
 function zfFillSummarySlots(){
   document.querySelectorAll('[data-sum-for]').forEach(el => {
@@ -6311,14 +6359,14 @@ async function zfRenderCutoffDetail(annId, id){
       const n = num(r.rqpr_cnt), sup = num(r.spl_rmno), cr = num(r.competition_ratio);
       const over = (n != null && sup != null) ? n - sup : null;
       const raw = [`${n != null ? n : 0}명 신청`, sup != null ? `${sup}호` : null].filter(Boolean).join(' · ');
-      const tail = [(cr != null && n) ? `· ${cr} : 1` : null, (over != null && over >= 1) ? `→ 넘침 ${over}명` : null].filter(Boolean);
+      const tail = [(cr != null && n) ? `· ${cr}\u00a0:\u00a01` : null, (over != null && over >= 1) ? `→ 넘침 ${over}명` : null].filter(Boolean);
       return escapeHtml(raw) + (tail.length ? ' ' + calc(escapeHtml(tail.join(' '))) : '');
     };
     // 예비자만 있는 주택형(예비입주자 모집) — 신청 · 정원(원문) + 경쟁률(계산 · 1 이상일 때만).
     const waitOnlyCell = r => {
       const n = num(r.rqpr_cnt), sup = num(r.spl_rmno), cr = num(r.competition_ratio);
       const raw = [`신청 ${n != null ? n : 0}명`, sup != null ? `정원 ${sup}명` : null].filter(Boolean).join(' · ');
-      return escapeHtml(raw) + ((cr != null && cr >= 1 && n) ? ' ' + calc(escapeHtml(`${cr} : 1`)) : '');
+      return escapeHtml(raw) + ((cr != null && cr >= 1 && n) ? ' ' + calc(escapeHtml(`${cr}\u00a0:\u00a01`)) : '');   // 판 B ③ — 「n : 1」이 줄 끝에서 꺾이지 않게(붙는 빈칸)
     };
     // 지난 신청 추이(주택형마다) — history = 같은 단지·주택형·신청유형의 회차별 {d 모집공고일 · n 신청 · s 공급(spl_rmno)} (RPC).
     // 🔵 2026-11-19(우편함 「표시층 — 디자인 2차 4단계」 1) — 회차마다 「신청/공급」(예비자 행은 이 표의 다른 칸처럼 「정원」 — 같은 spl_rmno) ·
@@ -6340,11 +6388,14 @@ async function zfRenderCutoffDetail(annId, id){
         + `<details class="zf-cut-all"><summary>전체 ${h.length}회 보기</summary><ol>${all}</ol></details>`;
     };
     const ncol = 1 + (waitOnlyAll ? 1 : 2) + (dropCut ? 0 : 1);   // 둘째 줄(좁은 칸) 열 수 — 추이 열은 좁을 때 숨는다
+    let noGenRow = false;   // 판 B ③ — 이 단지 표에 일반공급 행 없는 주택형이 있으면 표 아래 범례 한 줄
     const trs = types.map(g => {
       const dot = mine.has(ukey(g.name)) ? '●\u00a0' : '';   // 점과 주택형이 갈라지지 않게
       let mid;
       if(waitOnlyAll) mid = `<td style="${td}">${waitOnlyCell(g.wait)}</td>`;
-      else if(!g.gen) mid = `<td style="${td}" colspan="2">예비입주자 모집 — ${waitOnlyCell(g.wait)}</td>`;
+      // 🔵 2026-11-23(우편함 「표시층 — 실사용 판 B 시안」 ③ · 사전 조사 3장) — 예비자만 있는 주택형도 두 칸을 합치지 않는다(종전 colspan 「예비입주자 모집 — …」은
+      //    「일반공급」 머리 아래에서 시작해 「일반공급 = 예비입주자 모집」으로 읽혔다 · 인천논현 …21121 44A/A1). 일반공급 칸 「—」 + 표 아래 범례 · 예비자 칸에 값.
+      else if(!g.gen){ noGenRow = true; mid = `<td style="${td}">—</td><td style="${td};word-break:keep-all">${waitOnlyCell(g.wait)}</td>`; }
       else {
         // 🔵 2026-11-09(우편함 「… 봇 걸러내기 · 미달 주택형 예비자 칸」 3 · 다운님 승인 2026-11-09) — 일반공급 신청 ≤ 공급이면 넘친 사람이 없다 → 「넘친 신청 없음(정원 n)」(n = 예비자 행 공급).
         const gn = num(g.gen.rqpr_cnt), gs = num(g.gen.spl_rmno), ws = g.wait ? num(g.wait.spl_rmno) : null;
@@ -6376,8 +6427,9 @@ async function zfRenderCutoffDetail(annId, id){
     const above = (date ? `<p class="zf-cut-date" style="${note}">모집공고 ${date}</p>` : '')
       + (dropCut ? `<p class="zf-cut-why" style="${note}">행복주택은 추첨이라 LH가 커트라인을 공개하지 않아요</p>` : '')
       + (anyMine ? `<p class="zf-cut-legend" style="${note}">● 이번 공고와 같은 주택형</p>` : '');
-    const below = whyTypes.size
-      ? `<p class="zf-cut-why" style="${note}">— : ${[...whyTypes].map(([w, t]) => `${escapeHtml(w)}(${[...t].map(escapeHtml).join(' · ')})`).join(' / ')}</p>` : '';
+    const below = (whyTypes.size
+      ? `<p class="zf-cut-why" style="${note}">— : ${[...whyTypes].map(([w, t]) => `${escapeHtml(w)}(${[...t].map(escapeHtml).join(' · ')})`).join(' / ')}</p>` : '')
+      + (noGenRow ? `<p class="zf-cut-nogen" style="${note}">일반공급 칸 — = 그 회차 일반공급 행 없음</p>` : '');   // 판 B ③ — LH 자료에 그 회차 일반공급 행이 없다는 사실만
     // 계층(특별공급) 행 — 주택형마다 「계층 n명」 · 신청 많은 순 · 공급·경쟁률은 쓰지 않는다.
     // 🔵 2026-11-11(우편함 「표시층 — 커트라인 칸 셋」 2) — 신청 0인 계층은 빼고 · 그 회차 계층 신청이 전부 0이면 접힘 자체를 숨긴다 · 「(특별공급)」은 원천에 없는 말이라 걷는다.
     const clsLines = [...types, ...clsOnly].map(g => ({ ...g, cls: g.cls.filter(r => (num(r.rqpr_cnt) || 0) > 0) })).filter(g => g.cls.length).map(g => {
@@ -10418,6 +10470,12 @@ function loadAnnouncementBlocks(annId, id, detailEl){
       return;
     }
     blockAnnIds[id] = blocks.map(b => b.announcement_id);
+    // 🔵 2026-11-23(판 B ④ ①) — 블록(단지·자리) 둘 이상 카드의 「단지마다 ㎡당」 범위 재료 — 블록 세대 행은 블록을 펼칠 때만 오므로, 상세를 열 때 블록 id 전부의
+    //    세대 행에서 중앙값에 드는 칸만 한 번 받는다(블록 카드 상세 한 번에 요청 +1 · 실패하면 범위 없이 종전 줄).
+    //    단지 = 세대 행 building_name(같은 공고 id 안에 자리가 여럿인 블록도 이것으로 갈린다 · 이름 없는 행은 빼고 셈).
+    if(!zfRentRange.has(String(annId)) && zfRentRangeWanted(annId)) zfGetAll(`housing_units?select=announcement_id,building_name,monthly_rent,area_sqm,unit_group,supply_target,unit_type&${idFilterFor([...new Set(blockAnnIds[id])])}`, { order: 'id' })
+      .then(rows => { const by = new Map(); rows.forEach(u => { const k = String(u.building_name || '').trim(); if(!k) return; if(!by.has(k)) by.set(k, []); by.get(k).push(u); }); zfRentRangeFromGroups(annId, [...by.values()].map(units => ({ units }))); })
+      .catch(() => {});
     blockSites[id] = blocks.map(b => String(b.site_label || ''));
     blockInfo[id] = blocks;
     blockHuFallback[id] = false;
@@ -11802,6 +11860,7 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
     { const mv = zfCardMoveIn.get(String(annId)) || null; (units || []).concat(pastUnits || []).forEach(u => { if(u) u.zfCardMoveIn = mv; }); }   // 🔵 2026-11-09 표기 1차 ⓓ
     const groups = groupHousingUnits(huUnitsCache[id]);
     huGroupsCache[id] = groups;
+    if(!pastOnly && !huIsBlock) zfRentRangeFromGroups(annId, groups);   // 🔵 판 B ④ ① — 단지마다 ㎡당 범위(이번 회차 행 · 블록 본문은 빼고)
     const wrap = document.createElement('details');
     wrap.className = 'hu-wrap';
     // 접힌 안에서도 회차 배지를 그대로 단다 — 지난 회차가 여럿이면 그 안에서 또 갈려야 한다.
@@ -16611,13 +16670,23 @@ function zf12SchedBadge(card, rows){
   if(card.querySelector('.zf12-sched')) return;
   const b = card.querySelector('.zf12-badges'); if(!b) return;
   // 「일정 확인 필요」 — 설계 14절 규칙 5(다운님 판정 2026-11-12 ①) · 근거는 펼치면 2층 첫 자리에
-  b.insertAdjacentHTML('beforeend', `<span class="chip sel zf-chip-warn zf12-sched">⚠️ 일정 확인 필요</span>`);
+  // 🔵 2026-11-23(우편함 「표시층 — 실사용 판 B 시안」 ⑤ · 판 A ⑦1) — 배지를 누르면 상세를 열고 첫 배너 줄과 같은 동작(zf12SchedGo) — 목록에서 한 번에 근거 행까지.
+  b.insertAdjacentHTML('beforeend', `<button type="button" class="chip sel zf-chip-warn zf12-sched" aria-label="일정 확인 필요 — 근거 행 보기" onclick="event.stopPropagation();zf12SchedBadgeGo(this)">⚠️ 일정 확인 필요</button>`);
   const l2 = card.querySelector('.zf12-l2');
   // 🔴 2026-11-23(우편함 「표시층 — 실사용 판 A」 2 ②③ · 다운님 승인 13:06 「배너 문구 = ⚠️ 행 첫 문장 그대로」) — 종전 일괄 문장 「원문에 같은 단계 날짜가 둘 적혀 있어요」는
   //    요일만 다름 · 날짜 하나가 깨짐 · 시각만 다름(수원당수 …21119 현장접수 16시 ↔ 17시)에서 틀린 말이었다. 이제 행마다 그 ⚠️ 행 원문 첫 문장 한 줄(글자 그대로) ·
   //    한 줄을 누르면 그 행(「⚠️ 특이사항 안내」 안 정책 행)을 펼치고 그리로 옮겨 초점을 둔다(zf12SchedGo).
   if(l2) l2.insertAdjacentHTML('afterbegin', `<div class="zf12-schedwhy" role="group" aria-label="일정 확인 필요"><p class="zf12-schedh">⚠️ 일정 확인 필요</p>`
     + rows.map(r => `<button type="button" class="zf12-schedgo" data-pid="${zfAttr(r.pid)}" onclick="event.stopPropagation();zf12SchedGo(this)">${escapeHtml(r.first)}</button>`).join('') + `</div>`);
+}
+// 1층 배지 → 상세가 닫혀 있으면 펴고(카드 펼침 단추 그대로) · 2층 첫 배너 줄이 서면 그 줄과 같은 동작. 배너는 배지와 함께 서므로 대개 바로 있다 · 없으면 잠깐(최대 약 4초) 기다린다.
+function zf12SchedBadgeGo(el){
+  const card = el && el.closest('.hcard'); if(!card) return;
+  const g = card.querySelector('.zf3-gotop');
+  if(g && g.getAttribute('aria-expanded') !== 'true') g.click();
+  let n = 0;
+  const go = () => { const first = card.querySelector('.zf12-schedgo'); if(first) zf12SchedGo(first); else if(++n < 14) setTimeout(go, 300); };
+  setTimeout(go, 50);
 }
 // 배너 한 줄 → 그 ⚠️ 정책 행: 감싼 접기(<details> — 「⚠️ 특이사항 안내」·더 보기)를 모두 펴고 · 행을 펴고 · 화면 가운데로 · 머리에 초점.
 //    정책 행은 상세를 연 뒤 늦게 올 수 있어 잠깐(최대 약 4초) 기다린다 · 끝내 없으면 아무것도 하지 않는다(배너 글자가 이미 그 행의 첫 문장).
