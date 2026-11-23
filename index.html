@@ -2329,6 +2329,16 @@ function dateKey(d){
   const p2 = n => String(n).padStart(2,'0');
   return `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;
 }
+// 🔴 2026-11-23(우편함 「표시층 — 기술 판 …」 3 · 백로그 「화면 「오늘」·접수 상태 판정이 브라우저 로컬 시간대 축」) — 「지금」 한 벌(KST).
+//    로컬 축(parseDate · startOfLocalDay · dateKey — 날짜 글자를 로컬 자정으로 읽는다)이 「오늘」을 셀 때 new Date() 대신 이것을 쓴다.
+//    돌려주는 Date 의 로컬 칸(연·월·일·시·분·초)이 지금 KST 벽시계와 같다 — 그래서 startOfLocalDay(zfNowLocal()) = KST 오늘의 로컬 자정이고,
+//    KST 고정 축(zf3Today · zfKstDay · zfEndHmAt)과 같은 날을 가리킨다. 🔴 한국 브라우저에서는 new Date() 와 밀리초까지 같다(값 바뀜 0).
+//    해외·UTC 기기에서만 다르다 — 종전엔 KST 00:00~09:00 사이 UTC 기기가 「어제」로 세었다(접수 상태 · D-n · 오늘 마감 · 내일 접수 시작).
+//    절대 시각(Date.now() 비교 · 기록용 toISOString)에는 쓰지 않는다 — 이 Date 의 getTime() 은 실제 지금이 아니다(UTC 기기에서 9시간 앞).
+function zfNowLocal(){
+  const k = new Date(Date.now() + 9 * 3600e3);
+  return new Date(k.getUTCFullYear(), k.getUTCMonth(), k.getUTCDate(), k.getUTCHours(), k.getUTCMinutes(), k.getUTCSeconds(), k.getUTCMilliseconds());
+}
 // 로컬 자정(00:00:00.000). 날짜 비교에서 시각을 제거하는 데 쓴다.
 function startOfLocalDay(d){
   const x = new Date(d);
@@ -2402,7 +2412,7 @@ function isNewNotice(row){
   );
   // 🔵 2026-10-13(우편함 「표시층 — 실사용 1회차 반영」 1 · D5) — 「새 공고」 기간을 한 벌로: 공고일이 오늘부터 3일 전까지(날짜 단위).
   //    종전에는 NEW 표지 48시간 · 공고 탭 「새 공고 · 3일」 · 인사이트 「최근 7일 신규」로 자리마다 달랐다.
-  return d ? Math.round((startOfLocalDay(new Date()) - startOfLocalDay(d)) / 86400000) <= ZF_FRESH_DAYS : false;
+  return d ? Math.round((startOfLocalDay(zfNowLocal()) - startOfLocalDay(d)) / 86400000) <= ZF_FRESH_DAYS : false;
 }
 const ZF_FRESH_DAYS = 3;
 // 🔵 2026-10-20(다운님 실사용 10-20 ④) — 「마감 임박」이 재는 마감일을 한 곳에서 낸다(판정은 종전 isClosingSoon 그대로 — 옮기기만 했다).
@@ -2423,7 +2433,7 @@ function isClosingSoon(row){
   // 예전에는 마감일 23:59(UTC 자정 파싱분이라 KST 09:00 기준)와 「지금 시각」을 뺐다.
   // 그래서 3일째 날의 diff가 3을 넘어(KST에서는 하루 종일 3.4~4.0) 통째로 잘렸다
   // — 2026-09-05 실측 화면 18 vs SQL 27, 차이 9건이 정확히 3일째 날 전부였다.
-  const diff = Math.round((startOfLocalDay(d) - startOfLocalDay(new Date())) / (1000*60*60*24));
+  const diff = Math.round((startOfLocalDay(d) - startOfLocalDay(zfNowLocal())) / (1000*60*60*24));
   return diff >= 0 && diff <= 3;
 }
 // 「지금 접수 가능한가」는 status 문자열이 아니라 접수기간 날짜로 판정한다.
@@ -2493,7 +2503,7 @@ function zfRouteWinsAll(row){
   if(!row || !zfSide.routesReady || row['apply_period_check'] === true || zfEarlyClosed(row)) return null;
   const S = parseNoticeDate(row['신청시작일'] || row['apply_start'] || ''), E = parseNoticeDate(row['신청마감일'] || row['apply_end'] || '');
   if(!S || !E) return null;
-  const day = d => startOfLocalDay(d).getTime(), s0 = day(S), e0 = day(E), today = day(new Date());
+  const day = d => startOfLocalDay(d).getTime(), s0 = day(S), e0 = day(E), today = day(zfNowLocal());
   const rows = zfSide.routesByKey.get(zfDedupKey(row['공고명'] ?? row.title)) || [];
   const wins = [];
   for(const r of rows){
@@ -2674,7 +2684,7 @@ function zfEarlyClosed(row){
 const ZF_WINDOW_RANK = { open: 0, before: 1, unknown: 2, closed: 3 };
 // 🔵 2026-10-22(우편함 「표시층 C 묶음 5」 4) — hmKey: 마감 날 끝 시각(zfEndHmAt)을 찾을 제목 키. 생략 = 그 행 제목 · null = 시각을 보지 않는다(날짜만 — 종전).
 function zfWindowStateOne(row, hmKey){
-  const today = startOfLocalDay(new Date());
+  const today = startOfLocalDay(zfNowLocal());
   // 🔴 당첨발표일이 지났으면 그 공고의 접수는 끝났다 — 업스트림의 상태·마감일보다 이 관계가 우선이다.
   //    계기: MYHOME 이 2025.09.15 울산 정례모집(과 그 정정공고)을 「모집중」으로 돌려주고
   //    apply_end 를 2029-10-01 로 준다. 실제로는 2026-01-30 에 당첨발표가 끝난 공고다.
@@ -2842,7 +2852,7 @@ function isHiddenAsClosed(row){
   if(st === 'closed') return true;
   if(st !== 'unknown') return false;
   const e = parseNoticeDate(row['신청마감일']||row['apply_end']||'');
-  if(e && startOfLocalDay(e) >= startOfLocalDay(new Date())) return false;
+  if(e && startOfLocalDay(e) >= startOfLocalDay(zfNowLocal())) return false;
   return statusSaysClosed(row);
 }
 // 🔵 2026-10-08(표시층 — 숫자가 말하는 「지금」) — 사용자가 「지금 신청할 수 있는 것」으로 읽는 수의 모수는 「지금 열린 공고」 한 정의다:
@@ -2919,7 +2929,7 @@ function zfNullLast(a, b, fn, desc){
 function applyDateGroup(row, koKey, enKey){
   const v = parseNoticeDate(row[koKey]||row[enKey]||'');
   if(!v) return 2;
-  return startOfLocalDay(v) < startOfLocalDay(new Date()) ? 1 : 0;
+  return startOfLocalDay(v) < startOfLocalDay(zfNowLocal()) ? 1 : 0;
 }
 
 // 🔴 공고 탭 상태 칩은 업스트림 `status` 문자열이 아니라 **날짜 판정**으로 간다(2026-09-16).
@@ -3032,21 +3042,33 @@ const zfSide = {
 };
 // 🔵 2026-10-18(우편함 「표시층 — 첫 로드 2차」 1) — 같은 게시물 링크 표를 곁 데이터(zfLoadCardSide)와 공고문(zfLoadPostNotices)이 따로 받던 것을
 //    한 번으로 — 두 쪽이 쓰는 칸을 다 받는다(1,000행 쪽). 실패는 각자 종전대로(곁 데이터는 표 없이 · 공고문은 조용히 끝).
+// 🔵 2026-11-23(우편함 「표시층 — 기술 판 …」 1 · 백로그 「max_rows에 닿는 넓은 조회」) — 넓은 REST 조회(표 전체 · 여러 공고 한 번에)의 쪽 나눔 한 헬퍼.
+//    path = 'rest/v1/' 뒤(질의 포함) · order = 유일한 차례(쪽 사이에 행이 밀리거나 겹치지 않게 — 대개 id) · body 를 주면 POST(RPC) · headers 없으면 anon.
+//    ZF_PAGE 행씩 &limit=&offset= 으로 받아 ZF_PAGE 미만의 쪽이 오면 끝 — 지금처럼 행이 ZF_PAGE 밑이면 요청은 하나.
+//    🔴 가정: PostgREST max_rows 가 ZF_PAGE(1000)의 배수이고 1000 이상(2026-11-22 13:10부터 2000 · ⑩ 「지도 — 핀 주소와 실패 경로」).
+//       1000 밑으로 내리면 첫 쪽이 짧게 와 「끝」으로 읽혀 조용히 잘린다 — max_rows 를 바꾸는 날 이 줄을 먼저 본다.
+//    끝 판정을 Prefer: count=exact 로 하지 않는 까닭: 셈은 요청마다 표를 한 번 더 훑는다(목록 함수처럼 무거운 RPC 는 두 배) · 짧은 쪽 판정은 추가 비용 0.
+//    어느 쪽이든 실패하면 throw — 받다 만 표를 돌려주지 않는다(부르는 쪽이 종전 실패 동작을 그대로 한다).
+//    목록 RPC(zfListRpc)는 이 헬퍼를 쓰지 않는다 — 첫 요청 글자를 바꾸지 않고(쪽 조건 없음) 5xx 한 번 다시 부름 · announcement_id 로 겹침 거름이 따로 있다.
+const ZF_PAGE = 1000;
+async function zfGetAll(path, { order = '', body, headers } = {}){
+  const h = headers || zfAnonHeaders(), name = path.split('?')[0];
+  const sep = path.includes('?') ? '&' : '?';
+  const out = [];
+  for(let off = 0; ; off += ZF_PAGE){
+    const url = `${SUPABASE_URL}/rest/v1/${path}${sep}${order ? 'order=' + order + '&' : ''}limit=${ZF_PAGE}&offset=${off}`;
+    const r = await fetch(url, body === undefined ? { headers: h } : { method: 'POST', headers: { ...h, 'Content-Type': 'application/json' }, body });
+    if(!r.ok) throw new Error(name + ' HTTP ' + r.status);
+    const j = await r.json();
+    if(!Array.isArray(j)) throw new Error(name + ' 응답 형식');
+    out.push(...j);
+    if(j.length < ZF_PAGE) return out;
+  }
+}
 let zfPostLinksP = null;
 function zfPostLinksAll(){
   if(zfPostLinksP) return zfPostLinksP;
-  const h = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
-  const p = (async () => {
-    const out = [];
-    for(let off = 0; ; off += 1000){
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/announcement_post_links?select=lh_announcement_id,linked_announcement_id,linked_group_key&order=lh_announcement_id,linked_announcement_id&limit=1000&offset=${off}`, { headers: h });
-      if(!r.ok) throw new Error('announcement_post_links HTTP ' + r.status);
-      const j = await r.json();
-      if(!Array.isArray(j)) throw new Error('announcement_post_links 응답 형식');
-      out.push(...j);
-      if(j.length < 1000) return out;
-    }
-  })();
+  const p = zfGetAll('announcement_post_links?select=lh_announcement_id,linked_announcement_id,linked_group_key', { order: 'lh_announcement_id,linked_announcement_id' });
   zfPostLinksP = p;
   p.catch(() => { if(zfPostLinksP === p) zfPostLinksP = null; });
   return p;
@@ -3060,21 +3082,9 @@ function zfSafeHref(u){ return zfAttr(zfSafeUrl(u)); }
 function zfLoadCardSide(){
   if(zfSidePromise) return zfSidePromise;
   const h = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
-  const get = path => fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers: h })
-    .then(r => r.ok ? r.json() : Promise.reject(new Error(path.split('?')[0] + ' HTTP ' + r.status)))
-    .then(j => Array.isArray(j) ? j : Promise.reject(new Error(path.split('?')[0] + ' 응답 형식')))
-    .catch(err => { console.error('ZipFit 곁 데이터 로드 실패:', err); return null; });
   // 🔵 2026-10-09(고지 회차 1 · 8 ⑤) — 세 표를 쪽(1,000행)으로 받는다. 한 번에 받으면 REST 응답 상한(1,000행)에 닿는 날 조용히 잘린다
   //    (지금 77 · 34 · 42행 — 동작은 같다). 꼴은 zfLoadPolicyClasses 의 paged 와 같다 · 실패는 종전대로 null(그 표 없이 그린다).
-  const paged = async (path, order) => {
-    const out = [];
-    for(let off = 0; ; off += 1000){
-      const j = await get(`${path}&order=${order}&limit=1000&offset=${off}`);
-      if(!j) return null;
-      out.push(...j);
-      if(j.length < 1000) return out;
-    }
-  };
+  const paged = (path, order) => zfGetAll(path, { order, headers: h }).catch(err => { console.error('ZipFit 곁 데이터 로드 실패:', err); return null; });   // 쪽 나눔 = zfGetAll(2026-11-23 한 헬퍼)
   // 🔵 2026-10-18(우편함 「표시층 — 첫 로드 2차」 1) — 동네 가격(하위 3분의 1)은 판정 없이 칩만 단다 → 첫 목록 응답 뒤에 받는다(아래 lowLoaded).
   //    같은 게시물 링크 표는 zfLoadPostNotices 와 한 번만 받는다(zfPostLinksAll).
   zfAfterFirstList().then(() => paged('kukmin_rent_per_sqm_rank?is_low=eq.true&select=announcement_id,title,complex_key,area_label,area_complexes', 'announcement_id,complex_key,area_label')).then(low => {
@@ -3101,7 +3111,7 @@ function zfLoadCardSide(){
     if(zfSchedRows) zfSchedRows.forEach(rs => rs.forEach(r => { if(r.stage === '접수') sched.push(r); }));
     const ids = [...new Set(routes.map(r => r.announcement_id).concat(links.map(l => l.lh_announcement_id), sched.map(r => r.announcement_id)))].filter(Boolean);
     // 🔴 2026-10-27(우편함 「표시층 — G3 회차 섞임 고침」) — apply_end 를 함께 받아 경로 행에 출처 공고 마감(_srcEnd)을 싣는다(zfRoundRows 가 카드 회차로 거른다 · 같은 요청).
-    const anns = ids.length ? (await get(`announcements?select=announcement_id,title,url,apply_end&${idFilterFor(ids)}`)) || [] : [];
+    const anns = ids.length ? (await paged(`announcements?select=announcement_id,title,url,apply_end&${idFilterFor(ids)}`, 'announcement_id')) || [] : [];   // 쪽 나눔(2026-11-23) — id 가 ZF_PAGE 를 넘는 날도 잘리지 않게
     const annById = new Map(anns.map(a => [a.announcement_id, a]));
     sched.forEach(r => {
       const a = annById.get(r.announcement_id);
@@ -3211,9 +3221,7 @@ function zfPostNoticeFor(row){
 function zfLoadPostNotices(){
   if(zfPostNoticesPromise) return zfPostNoticesPromise;
   const h = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
-  const get = path => fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers: h })
-    .then(r => r.ok ? r.json() : Promise.reject(new Error(path.split('?')[0] + ' HTTP ' + r.status)))
-    .then(j => Array.isArray(j) ? j : Promise.reject(new Error(path.split('?')[0] + ' 응답 형식')));
+  const get = path => zfGetAll(path, { order: 'announcement_id', headers: h });   // 쪽 나눔(2026-11-23 한 헬퍼 · 실패는 종전대로 throw) — 같은 날 MYHOME(날짜만 꼴)은 수백 행
   const cols = 'announcement_id,title,announcement_date,apply_start,apply_end,status,winner_announce_date,hidden_from_listing';
   zfPostNoticesPromise = (async () => {
     try{
@@ -3328,7 +3336,7 @@ function zfWithSoonestEnd(row){
 function zfNoticeStateText(state, end){
   if(state === 'open'){
     const e = parseNoticeDate(end || '');
-    return (e && startOfLocalDay(e).getTime() === startOfLocalDay(new Date()).getTime()) ? '오늘 마감' : '접수 중';
+    return (e && startOfLocalDay(e).getTime() === startOfLocalDay(zfNowLocal()).getTime()) ? '오늘 마감' : '접수 중';
   }
   return state === 'before' ? '접수 예정' : state === 'closed' ? '마감' : '기간 미상';
 }
@@ -3513,7 +3521,7 @@ function zfRouteVerdict(rows, today){
   if(rs.every(r => r.route === '현장')){
     const wins = zfRouteWindows(rs);
     if(wins.length >= 2){
-      const t0 = startOfLocalDay(today || new Date());
+      const t0 = startOfLocalDay(today || zfNowLocal());
       const day = d => startOfLocalDay(parseNoticeDate(d));
       const cur = wins.find(w => day(w.s) <= t0 && t0 <= day(w.e)), nxt = wins.find(w => day(w.s) > t0);
       // 제외 조각 — period_text 괄호 조각(zfRouteExcludeOf)이 없으면 note_text 의 접수 안 받는 날 문장을 **원문 그대로** 하나(「…토요일·일요일·법정공휴일에는 신청접수 받지 않습니다」).
@@ -3540,7 +3548,7 @@ function zfRouteVerdict(rows, today){
     });
     const OE = parseNoticeDate(oe);
     if(!os || !OE) return { kind: '없음', text: '' };
-    if(startOfLocalDay(OE) < startOfLocalDay(today || new Date())) return { kind: '②-라(지남)', text: '' };
+    if(startOfLocalDay(OE) < startOfLocalDay(today || zfNowLocal())) return { kind: '②-라(지남)', text: '' };
     // 🔵 2026-10-02 — 요일·날짜 제외 조각이 있으면 날짜 뒤에 원문 그대로 덧붙인다(…0825 금요일 허탕).
     const ex = zfRouteExcludeOf(rs);
     return { kind: '②-라', ex, text: (zfMd(os) === zfMd(oe)
@@ -3553,7 +3561,7 @@ function zfRouteVerdict(rows, today){
   rs.forEach(r => { if(r.route === '인터넷·모바일' && r.end_date && r.end_date > ie) ie = r.end_date; });
   if(hes.length === 1 && ie && hes[0] < ie){
     const M = parseNoticeDate(hes[0]);
-    const t = startOfLocalDay(today || new Date());
+    const t = startOfLocalDay(today || zfNowLocal());
     // 🔴 2026-10-01 — 현장 접수 시작일 = 마감일이면 「까지」가 아니라 하루다(인천석남 …0858 10/14 하루를 「까지」로 읽혔다).
     const hss = [...new Set(groups.map(g => g.hs).filter(Boolean))];
     const oneDay = hss.length === 1 && hss[0] === hes[0];
@@ -3567,7 +3575,7 @@ function zfRouteVerdict(rows, today){
   if(hes.length === 1 && ie && rs.some(r => r.route === '현장')){
     const hss = [...new Set(groups.map(g => g.hs).filter(Boolean))];
     const M = parseNoticeDate(hes[0]);
-    if(M && hss.length === 1 && startOfLocalDay(M) >= startOfLocalDay(today || new Date())){
+    if(M && hss.length === 1 && startOfLocalDay(M) >= startOfLocalDay(today || zfNowLocal())){
       const ex = zfRouteExcludeOf(rs);
       return { kind: '②-바', ex, text: zfRouteInetLead(rs) + `현장 접수 ${hss[0] === hes[0] ? zfMdDow(hes[0]) + ' 하루' : zfMdDow(hss[0]) + '~' + zfMdDow(hes[0])}` + zfRouteTargetTail(rs) + (ex ? ` · ${ex}` : '') };
     }
@@ -4624,11 +4632,13 @@ function zfLoadTierTags(){
   const h = zfAnonHeaders();
   const get = q => fetch(`${SUPABASE_URL}/rest/v1/${q}`, { headers: h }).then(r => { if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
   zfTierTagsP = Promise.all([
-    get('eligibility_criteria?select=announcement_id,supply_form,age_min,age_max,gk:verification_requirements->공급대상&limit=10000'),
-    get('housing_units?select=announcement_id,supply_target&supply_target=not.is.null&limit=10000'),
+    // 🔵 2026-11-23(우편함 「표시층 — 기술 판 …」 1) — 세 요청을 쪽 나눔(zfGetAll · id 차례)으로. 종전 limit=10000 은 max_rows(2000)에서 조용히 잘렸다
+    //    (11-22 셈: 자격 행 1,325 · supply_target 세대 1,199 — 1,000 시절엔 이미 잘렸던 자리). 실패는 종전대로(앞 둘은 전체 실패 · 셋째는 빈 목록).
+    zfGetAll('eligibility_criteria?select=announcement_id,supply_form,age_min,age_max,gk:verification_requirements->공급대상', { order: 'id' }),
+    zfGetAll('housing_units?select=announcement_id,supply_target&supply_target=not.is.null', { order: 'id' }),
     // 🔵 2026-11-20(같은 회차 판정 ③ · 다운님 「걸러 받는 요청 하나」) — 갈래 조건에 계층_중_하나가 있는 자격 행만 원문 칸 전체(약 10KB). supply_form 에 계층 낱말이 없는 행(SH …313268 「홀몸어르신」)의
     //    원문 조건 한 줄 재료 — 같은 요청에 칸을 더하면 전 행이 실려 약 14배가 된다. 실패해도 나머지는 그대로(그 한 줄만 안 선다).
-    get('eligibility_criteria?select=announcement_id,supply_form,vr:verification_requirements&verification_requirements->공급대상->갈래=cs.' + encodeURIComponent('[{"조건":{"계층_중_하나":[]}}]') + '&limit=10000').catch(() => []),
+    zfGetAll('eligibility_criteria?select=announcement_id,supply_form,vr:verification_requirements&verification_requirements->공급대상->갈래=cs.' + encodeURIComponent('[{"조건":{"계층_중_하나":[]}}]'), { order: 'id' }).catch(() => []),
   ]).then(([ec, hu, vt]) => {
     const vrByRow = new Map();
     (vt || []).forEach(r => { if(r && r.announcement_id && r.vr && typeof r.vr === 'object') vrByRow.set(String(r.announcement_id) + '\u0001' + String(r.supply_form || ''), r.vr); });
@@ -6379,23 +6389,22 @@ async function zfEnsurePriceSummaries(ids){
   if(!need.length) return false;
   need.forEach(id => zfPriceCache.set(id, undefined));   // 같은 id로 두 번 나가지 않게 자리를 잡는다
   // 두 임대조건 표지 재료(위 zfDualIds) — 실패해도 요약은 그대로(표지만 없음)
-  const dualP = fetch(`${SUPABASE_URL}/rest/v1/housing_units?select=announcement_id&${idFilterFor(need)}&or=(deposit_priority1.not.is.null,rent_priority1.not.is.null)`, { headers: zfAnonHeaders() })
-    .then(r => r.ok ? r.json() : null).then(rows => { if(Array.isArray(rows)) rows.forEach(r => r && r.announcement_id && zfDualIds.add(String(r.announcement_id))); }).catch(() => {});
+  //    🔵 2026-11-23(우편함 「표시층 — 기술 판 …」 1) — 두 세대 행 요청·요약 RPC 모두 쪽 나눔(zfGetAll · 세대 행은 id 차례 · RPC 는 announcement_id 차례).
+  const dualP = zfGetAll(`housing_units?select=announcement_id&${idFilterFor(need)}&or=(deposit_priority1.not.is.null,rent_priority1.not.is.null)`, { order: 'id' })
+    .then(rows => { if(Array.isArray(rows)) rows.forEach(r => r && r.announcement_id && zfDualIds.add(String(r.announcement_id))); }).catch(() => {});
   // 가군·나군 · 소득 구간 이름표 재료(위 zfGroupTag · 2026-10-21) — 공급대상 글자에 「군」·「구간」이 든 행만. 실패해도 요약은 그대로(이름표만 없음).
-  const groupP = fetch(`${SUPABASE_URL}/rest/v1/housing_units?select=announcement_id,supply_target&${idFilterFor(need)}&or=(supply_target.like.*군*,supply_target.like.*구간*)`, { headers: zfAnonHeaders() })
-    .then(r => r.ok ? r.json() : null).then(rows => {
+  const groupP = zfGetAll(`housing_units?select=announcement_id,supply_target&${idFilterFor(need)}&or=(supply_target.like.*군*,supply_target.like.*구간*)`, { order: 'id' })
+    .then(rows => {
       if(!Array.isArray(rows)) return;
       const tg = new Map();
       rows.forEach(r => { if(r && r.announcement_id){ const a = String(r.announcement_id); if(!tg.has(a)) tg.set(a, []); tg.get(a).push(r.supply_target); } });
       tg.forEach((t, a) => { const g = zfGroupTagOf(t); if(g) zfGroupTag.set(a, g); });
     }).catch(() => {});
   try{
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_announcement_price_summary`,
-      {method:'POST', headers: zfAnonHeaders(), body: JSON.stringify({p_ids: need})});
-    if(!res.ok) throw new Error('HTTP ' + res.status);
-    const rows = await res.json();
-    if(!Array.isArray(rows)) throw new Error('예상치 못한 응답');
-    need.forEach(id => zfPriceCache.set(id, null));      // 응답에 없으면 세대정보가 없는 것이다
+    // 🔴 2026-11-23 — 종전 한 번 요청은 id 가 max_rows(2000)를 넘으면 뒤가 잘렸고, 잘린 id 를 아래 null(「세대정보 없음」)로 두어 틀린 문구가 났다
+    //    (11-22 조사: 마감 포함 전체 1,066 id — 1,000 시절 66장). 이제 모든 쪽을 다 받은 뒤에만 null 을 두고, 한 쪽이라도 실패하면 catch(자리 비움 — 종전).
+    const rows = await zfGetAll('rpc/get_announcement_price_summary', { order: 'announcement_id', body: JSON.stringify({p_ids: need}) });
+    need.forEach(id => zfPriceCache.set(id, null));      // 전 쪽을 받은 뒤 — 응답에 없으면 세대정보가 없는 것이다
     rows.forEach(r => { if(r && r.announcement_id) zfPriceCache.set(String(r.announcement_id), r); });
     await dualP; await groupP;
     return true;
@@ -7230,7 +7239,7 @@ function toggleRegionRest(btn){
 }
 
 function renderInsight(rows, wrap, statsRows){
-  const today = new Date();
+  const today = zfNowLocal();
   const todayStr = dateKey(today);
 
   // ① KPI
@@ -10611,17 +10620,7 @@ let zfPolClsPromise = null;
 function zfLoadPolicyClasses(){
   if(zfPolClsPromise) return zfPolClsPromise;
   const h = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
-  const paged = async (path, order) => {
-    const out = [];
-    for(let off = 0; ; off += 1000){
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}&order=${order}&limit=1000&offset=${off}`, { headers: h });
-      if(!r.ok) throw new Error(path.split('?')[0] + ' HTTP ' + r.status);
-      const j = await r.json();
-      if(!Array.isArray(j)) throw new Error(path.split('?')[0] + ' 응답 형식');
-      out.push(...j);
-      if(j.length < 1000) return out;
-    }
-  };
+  const paged = (path, order) => zfGetAll(path, { order, headers: h });   // 쪽 나눔 = zfGetAll(2026-11-23 한 헬퍼 · 실패는 종전대로 throw)
   zfPolClsPromise = Promise.all([
     paged('policy_classes?select=axis,name,sort_order', 'axis,sort_order'),
     paged('policy_category_classes?select=category,axis,class_name', 'category,axis,class_name'),
@@ -12606,18 +12605,9 @@ let zfComplexGeoP = null;   // 단지 도로명·좌표 표(complex_geo) — mat
 //    단지 번호 → 좌표 표(.byCid)도 만든다(새 조회 0). 주소 꼴이 회차마다 달라 주소 길로 못 찾는 세대도 같은 단지 번호면 그 좌표로 선다.
 // 🔵 2026-11-22(작은 판 요청 덧) — 쪽 나눔: PostgREST max_rows(2000) 밑 1000행씩 id 차례로 받아 짧은 쪽이 오면 끝(좌표 행이 늘어도 잘리지 않게).
 //    지금처럼 행이 1000 밑이면 요청은 종전과 같은 한 번 · 어느 쪽이든 실패하면 빈 표(종전 지오코딩) — 받다 만 표로 일부만 juso 핀이 되지 않게.
-const ZF_GEO_PAGE = 1000;
 function zfComplexGeo(){
   if(!zfComplexGeoP) zfComplexGeoP = (async () => {
-    const list = [];
-    for(let off = 0; ; off += ZF_GEO_PAGE){
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/complex_geo?select=matched_from,complex_id,lat,lng&lat=not.is.null&lng=not.is.null&order=id&limit=${ZF_GEO_PAGE}&offset=${off}`, { headers: zfAnonHeaders() });
-      if(!r.ok) throw new Error('HTTP ' + r.status);
-      const rows = await r.json();
-      if(!Array.isArray(rows)) throw new Error('응답 꼴');
-      list.push(...rows);
-      if(rows.length < ZF_GEO_PAGE) break;
-    }
+    const list = await zfGetAll('complex_geo?select=matched_from,complex_id,lat,lng&lat=not.is.null&lng=not.is.null', { order: 'id' });   // 쪽 나눔 = zfGetAll(2026-11-23 한 헬퍼 · 같은 URL 꼴)
     const m = new Map(list.map(r => [String(r.matched_from || '').trim(), r]));
     m.byCid = new Map(list.filter(r => r.complex_id != null).map(r => [String(r.complex_id), r]));
     return m;
@@ -14365,7 +14355,7 @@ function zf3On(){ return document.documentElement.getAttribute('data-ui') === 'd
 const zf3RM = () => { try{ return matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){ return false; } };
 function zf3DayTo(str){
   const d = parseNoticeDate(str || '');
-  return d ? Math.round((startOfLocalDay(d) - startOfLocalDay(new Date())) / 864e5) : null;
+  return d ? Math.round((startOfLocalDay(d) - startOfLocalDay(zfNowLocal())) / 864e5) : null;
 }
 // 전량(인자 없는 목록 RPC · 60초 공유)을 화면 행으로 — 공고 탭의 지역·유형 칩은 서버 인자라 noticeData 가 좁을 수 있다(원칙 26: 매핑을 거친 행).
 let zf3Rows = null, zf3RowsP = null;
@@ -14741,8 +14731,9 @@ let zfWinSched = null, zfWinSchedP = null, zfWinSchedRedrawn = false;
 let zfSchedRows = null;   // 🔵 2026-10-19 — 결과발표 + 계약 행(scope_text 포함) · 공고 id → 행들(기본 창 발표·계약 · zfRouteSchedOf) · 2026-10-22 접수 행도(zfLoadCardSide 가 제목 키로 옮긴다)
 function zfLoadWinSched(){
   // 🔵 2026-10-22(우편함 「표시층 C 묶음 5」 2) — 같은 요청에 접수 행(끝이 오늘 이후 · 지금 약 55행)을 함께 받는다 — 마감 날 끝 시각 보강(zfSide.schedByKey). 요청 수 그대로.
-  if(!zfWinSchedP) zfWinSchedP = fetch(`${SUPABASE_URL}/rest/v1/announcement_schedule?select=announcement_id,stage,scope_text,start_date,end_date,period_text&or=${encodeURIComponent(`(stage.in.(결과발표,계약),and(stage.eq.접수,end_date.gte.${zf3Today()}))`)}`, { headers: zfAnonHeaders() })
-    .then(r => r.ok ? r.json() : null).then(rows => {
+  // 🔵 2026-11-23(우편함 「표시층 — 기술 판 …」 1) — 쪽 나눔(zfGetAll · id 차례 · 11-22 셈 558행). 실패는 종전대로(경고 · 다음에 다시).
+  if(!zfWinSchedP) zfWinSchedP = zfGetAll(`announcement_schedule?select=announcement_id,stage,scope_text,start_date,end_date,period_text&or=${encodeURIComponent(`(stage.in.(결과발표,계약),and(stage.eq.접수,end_date.gte.${zf3Today()}))`)}`, { order: 'id' })
+    .then(rows => {
       if(!Array.isArray(rows)) throw new Error('응답 없음');
       const m = new Map(), all = new Map();
       rows.forEach(r => { const k = String(r.announcement_id || '');
@@ -15018,7 +15009,7 @@ function zf3DecorateIn(list, rowsMap, isMatch){
       //    (기본 창이 그 일을 한다 — 창 사이면 다음 창 · 창 안이면 그 창). 이 블록이 카드마다 마지막이라 돌아가도 남은 일 0.
       if(zf3WinMount(card, n)) return;
       const rows = zfRoutesForCard(zfDedupKey(n['공고명']), n['apply_end']);   // 🔴 2026-10-27 — 카드 회차 행만(zfRoundRows)
-      const vk = rows && rows.length ? (zfRouteVerdict(rows, new Date()) || {}).kind || '' : '';
+      const vk = rows && rows.length ? (zfRouteVerdict(rows, zfNowLocal()) || {}).kind || '' : '';
       const wins = /^②-마/.test(vk) ? zfRouteWindows(rows) : [];   // 순위·단지로 갈린 창(②-가·나)은 반복 창이 아니다
       if(wins.length >= 2 && n['apply_period_check'] !== true){
         const today = zf3Today();

@@ -507,10 +507,18 @@ try {
   const objVisible = await page.evaluate(() => (document.body.innerText.match(/\[object Object\]/g) || []).length)
   const objRender = await page.evaluate(async () => {
     if (typeof zfEligVrEntries !== 'function' || typeof renderEligValue !== 'function') return { err: '화면 함수 없음' }
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/eligibility_criteria?select=id,announcement_id,verification_requirements&verification_requirements=not.is.null&limit=10000`,
-      { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } })
-    if (!r.ok) return { err: `REST ${r.status}` }
-    const rows = await r.json(), bad = []
+    // 🔵 2026-11-23(우편함 「표시층 — 기술 판 …」 1) — 쪽 나눔(1000행씩 id 차례 · 짧은 쪽이면 끝). 종전 limit=10000 은 max_rows(2000)에서 잘렸다(11-22 셈 1,241행).
+    //    화면 헬퍼(zfGetAll)와 같은 꼴을 여기 둔다 — 배포본에 그 함수가 없던 날(옛 판)도 이 점검이 돌게.
+    const rows = [], bad = []
+    for (let off = 0; ; off += 1000) {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/eligibility_criteria?select=id,announcement_id,verification_requirements&verification_requirements=not.is.null&order=id&limit=1000&offset=${off}`,
+        { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } })
+      if (!r.ok) return { err: `REST ${r.status}` }
+      const j = await r.json()
+      if (!Array.isArray(j)) return { err: 'REST 응답 꼴' }
+      rows.push(...j)
+      if (j.length < 1000) break
+    }
     for (const x of rows) {
       const d = document.createElement('div')
       d.innerHTML = zfEligVrEntries(x.verification_requirements).map(([k, v]) => `<span>${prettifyEligKey(k)}</span>${renderEligValue(v)}`).join('')
