@@ -1389,6 +1389,12 @@ html.zf12 .zf12-card .detail-grid .zf-dcell-apply:not(:has(.zf-win-other)){displ
   html.zf12 #notice-list .zf12-card > [data-sum-for]{grid-column:2;grid-row:2;align-self:start}
   html.zf12 #notice-list .zf12-card > .zf12-when{grid-column:2;grid-row:3;margin:6px 0 10px}
   html.zf12 #notice-list .zf12-card > [id^="ncard-"]{grid-column:1 / -1}
+  /* 🔵 2026-11-23(우편함 「표시층 — 실사용 판 B 시안」 ① · 사전 조사 docs/panb-preresearch.md 1장 후보 B) — 펼침 「›」(.zf3-gotop)를 제목 줄 끝(카드 가운데쯤 x 266)에서
+     카드 오른쪽 끝 · 세로 가운데로(오른쪽 안쪽 8px — 맨 위로 단추와 맞닿지 않게). 단추는 DOM 자리 그대로(.htop 안 — 키보드 차례 그대로) · 자리만 absolute.
+     오른쪽 46px를 비워(카드 안쪽 여백 14 → 60) 얼마·언제 칸이 단추와 겹치지 않게 하고 · ① 줄(알약)과 상세는 그만큼 되돌려(-46) 알약은 오른쪽 위 끝 그대로. 390~1199 는 그대로. */
+  html[data-ui="d3"].zf12 #notice-list .hcard.zf3-card.zf12-card{position:relative;padding-right:60px}   /* 카드 여백 규칙(:is(#notice-list,#match-result) .hcard.zf3-card)보다 앞서게 */
+  html.zf12 #notice-list .zf12-card > .zf3-ctop,html.zf12 #notice-list .zf12-card > [id^="ncard-"]{margin-right:-46px}
+  html.zf12 #notice-list .zf12-card > .htop > .zf3-gotop{position:absolute;right:8px;top:50%;margin:0;transform:translateY(-50%)}
 }
 /* 자격 절 — 짧은 머리(누르면 원문 머리 전체) */
 html.zf12 .zf12-eh summary{cursor:pointer;list-style:none;font-weight:700;color:var(--ink);min-height:var(--hit);display:flex;align-items:center;flex-wrap:wrap}
