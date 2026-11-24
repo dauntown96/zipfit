@@ -16712,7 +16712,7 @@ async function zf12Load(rows){
     const cats = ZF12_ELIG_CATS.map(c => `"${c}"`).join(',');
     const [hu, pol] = await Promise.all([
       fetch(`${SUPABASE_URL}/rest/v1/housing_units?select=announcement_id,supply_target,seq&${idFilterFor(all)}&order=seq`, { headers: zfAnonHeaders() }).then(r => r.ok ? r.json() : []),
-      fetch(`${SUPABASE_URL}/rest/v1/announcement_policies?select=id,announcement_id,category,seq,content_raw&${idFilterFor(all)}&or=(category.in.(${encodeURIComponent(cats)}),category.like.${encodeURIComponent('⚠️*')},content_raw.like.${encodeURIComponent('*동일*유형*매입임대*')},content_raw.like.${encodeURIComponent('*1개*단지*')},content_raw.like.${encodeURIComponent('*1건에*한하여*')},content_raw.like.${encodeURIComponent('*조사*기준일*')})&order=seq`, { headers: zfAnonHeaders() }).then(r => r.ok ? r.json() : [])
+      fetch(`${SUPABASE_URL}/rest/v1/announcement_policies?select=id,announcement_id,category,seq,content_raw&${idFilterFor(all)}&or=(category.in.(${encodeURIComponent(cats)}),category.like.${encodeURIComponent('⚠️*')},content_raw.like.${encodeURIComponent('*동일*유형*매입임대*')},content_raw.like.${encodeURIComponent('*1개*단지*')},content_raw.like.${encodeURIComponent('*1건에*한하여*')},content_raw.like.${encodeURIComponent('*조사*기준일*')},content_raw.like.${encodeURIComponent('*도착*추첨*')})&order=seq`, { headers: zfAnonHeaders() }).then(r => r.ok ? r.json() : [])
     ]);
     grp.forEach(([id, ids]) => {
       const set = new Set(ids), mine = r => set.has(String(r.announcement_id));
@@ -16731,7 +16731,9 @@ async function zf12Load(rows){
       const oneRow = P.find(r => zfPickOneSentence(r.content_raw));
       // 🔵 2026-11-24(판 F O4 · 💡 「판단기준일 이원화 안내」) — 「… 산정시점은 입주자모집공고일이며, 금융자산 및 금융부채의 산정시점은 조사기준일」 원문 문장
       const basisRow = P.find(r => zfBasisDateSentence(r.content_raw));
-      zf12Info.set(id, { ids, heads, res: ep.length ? zf12Res(ep[0].content_raw) : '', sched, dup: dupRow ? { pid: String(dupRow.id || ''), sent: zfDupTypeSentence(dupRow.content_raw) } : null, one: oneRow ? { sent: zfPickOneSentence(oneRow.content_raw) } : null, basis: basisRow ? zfBasisDateSentence(basisRow.content_raw) : '' });
+      // 🔵 2026-11-24(판 F O4 · 💡 선착순 「첫날 10시 전 대기자는 추첨」) — 「… 이전 도착자 … 추첨」 원문 문장
+      const earlyRow = P.find(r => zfEarlyDrawSentence(r.content_raw));
+      zf12Info.set(id, { ids, heads, res: ep.length ? zf12Res(ep[0].content_raw) : '', sched, dup: dupRow ? { pid: String(dupRow.id || ''), sent: zfDupTypeSentence(dupRow.content_raw) } : null, one: oneRow ? { sent: zfPickOneSentence(oneRow.content_raw) } : null, basis: basisRow ? zfBasisDateSentence(basisRow.content_raw) : '', early: earlyRow ? zfEarlyDrawSentence(earlyRow.content_raw) : '' });
     });
     // 🔵 판 C 1 (가)(2026-11-23 · 「처음 온 사람」 걷기 두 번 모두 🅰 첫 칸 함정) — 세대 행이 없는 공고(전세임대 등)는 「누가」 재료가 없어 👥 줄이 서지 않았다.
     //    세대 계층도 거주 조각도 없을 때만 자격 행 공급대상 키(분석이 원문 대상 낱말로 쓴 값 — 매칭 판정과 같은 키)의 「대상」을 쓴다 ·
@@ -16917,6 +16919,7 @@ function zf12FillWho(){
     const card = p.closest('.hcard'); if(!card || card.dataset.zf12Who === '1') return;
     I.dup && zf12DupBadge(card, I.dup);
     I.one && zf12OneBadge(card, I.one);
+    I.early && zf12EarlyBadge(card, I.early);
     I.basis && zf12BasisLine(card, I.basis);
     I.sched.length && zf12SchedBadge(card, I.sched);
     // 🔵 2차 시안 1(claude.ai 의견 2 · 다운님 11-16) — 군·목 꼴(가군·나군 · 가목 …) 카드는 겉에 거주 조각만 · 군 이름은 안 자격 절(원문 괄호 뜻과 함께)
@@ -16949,6 +16952,27 @@ function zfPickOneSentence(t){
 }
 // 🔵 2026-11-24(우편함 「표시층 — 판 F」 O4 더함 · 💡 「판단기준일 이원화 안내」) — 자격 판단 날이 둘(모집공고일 · 조사기준일)인 공고. 열린 공고 절반 넘게라 1층 칩이 아니라
 //    상세 2층 한 줄(접힘) — 머리 「📅 판단 기준일이 둘이에요(모집공고일 · 조사기준일)」 · 펼치면 원문 문장 그대로.
+// 🔵 2026-11-24(우편함 「표시층 — 판 F」 O4 · 💡 선착순 「첫날 10시 전 대기자는 추첨」) — 일찍 와도 도착 순서가 아니라 추첨으로 순번을 정하는 공고(선착순 방문 접수·동호지정).
+//    판정 = 원문 문장에 「(시각) 이전/전 … 도착」과 「추첨」 · 칩 「⏰ 시작 전 도착자는 추첨으로 순번」 · 누르면 원문 문장 그대로.
+function zfEarlyDrawSentence(t){
+  const parts = String(t || '').replace(/\s+/g, ' ').split(/(?<=[다요]\.)\s+|(?<=[.。])\s+(?=[-•ㅇ·▪①-⑳(\[]|[가-힣A-Z0-9])|\s(?=[•▪]\s)/);
+  const hit = parts.find(x => /(이전|전)\s*(까지\s*)?(에\s*)?도착[^.。]{0,120}추첨/.test(x));
+  if(!hit) return '';
+  // 일정 표 글처럼 한 문장이 길면 「도착 … 추첨」 조각만(앞 60자 · 뒤 60자 안 — 글자는 그대로 잘라 냄)
+  const m = hit.match(/[^.。•▪]{0,60}(이전|전)\s*(까지\s*)?(에\s*)?도착[^.。]{0,120}?추첨[^.。•▪]{0,60}/);
+  let frag = m ? m[0] : hit;
+  // 앞머리는 마지막 항목 표지(「·」·「 - 」·「☞」·「)」) 뒤부터 — 「(12:00~13:00 제외) ·10시 이전 도착자 …」에서 앞 조각을 떼어 낸다(글자는 그대로)
+  const core = frag.search(/\d{0,2}\s*(:\s*\d{2})?\s*시?\s*(이전|전)\s*(까지\s*)?(에\s*)?도착/);
+  const head = core > 0 ? frag.slice(0, core) : '';
+  const cut = Math.max(head.lastIndexOf('·'), head.lastIndexOf(' - '), head.lastIndexOf('☞'), head.lastIndexOf(')'));
+  if(cut >= 0) frag = frag.slice(cut + 1);
+  return frag.replace(/^[-•ㅇ·▪\s:]+/, '').trim();
+}
+function zf12EarlyBadge(card, sent){
+  if(card.querySelector('.zf12-early')) return;
+  const b = card.querySelector('.zf12-badges'); if(!b) return;
+  b.insertAdjacentHTML('beforeend', `<span class="chip sel zf-chip-warn zf12-dup zf12-early" title="${zfAttr(sent)}" data-zf-tip tabindex="0" role="button" aria-expanded="false">⏰ 시작 전 도착자는 추첨으로 순번</span>`);
+}
 function zfCarNoneSentence(vr){
   const txt = (function walk(v){ return v == null ? '' : typeof v === 'object' ? Object.values(v).map(walk).join(' ') : String(v); })(vr).replace(/\s+/g, ' ');
   const parts = txt.split(/(?<=[다요것]\.?)\s+(?=[①-⑳㉮-㉿▪•*-]|[가-힣(])|(?<=[.。])\s+/);
