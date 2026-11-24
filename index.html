@@ -864,6 +864,7 @@ html[data-ui="d3"] .zf-sch .policy-content{white-space:normal;overflow-wrap:anyw
 .hcard.zf-ana-pending .zf-ai-lbl,.hcard.zf-ana-no .zf-ai-lbl,.zf-ai-off .zf-ai-lbl{display:none}
 /* 🔵 2026-11-24(판 E 3) — 회차 추이 한 줄(「다른 회차」 머리) */
 .zf-round-trend{margin:10px 0 0;padding-top:10px;border-top:1px dashed var(--line,#e0e0d8);font-size:var(--t-xs);font-weight:600;color:var(--ink-2,#444)}
+.zf-round-cycle + .zf-round-trend{border-top:0;margin-top:2px;padding-top:0}
 .zf-round-trend + .hu-past{border-top:0;margin-top:4px;padding-top:4px}
 /* 🔵 2026-11-24(판 D ② (나)) — 같은 금액 다른 동 접힘 표지 */
 .hu-same-amt>summary{cursor:pointer;list-style:none}
@@ -12025,7 +12026,7 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
       : '';
     const pastLineCount = countHousingUnitLines(diffPast);
     // 🔵 2026-11-24(판 E 3 (나)) — 「다른 회차」 머리에 회차 추이 한 줄(같은 단지 같은 형 · 이번 회차 + 지난 회차 세대 행 — 새 요청 0).
-    const trendHtml = !pastOnly && pastUnits.length && units.length ? zfRoundTrendHtml(units.concat(pastUnits)) : '';
+    const trendHtml = (pastUnits.length ? zfRoundCycleHtml(pastUnits, units) : '') + (!pastOnly && pastUnits.length && units.length ? zfRoundTrendHtml(units.concat(pastUnits)) : '');
     const pastHtml = trendHtml + (diffPast.length
       ? `<details class="hu-past"><summary class="hu-past-title">🕘 다른 회차 보기 (${pastLineCount}건)</summary>`
         + `<div class="hu-past-list">${renderHousingUnitList(diffPast)}</div></details>`
@@ -12104,6 +12105,19 @@ function zfRoundTrend(all){
   const common = [...P[0].keys()].find(k => P.every(m => m.has(k))) || '';
   const series = common ? P.map((m, i) => { const [dep, rent] = m.get(common).split('/'); return { d: dates[i], dep: dep === 'null' ? null : Number(dep), rent: rent === 'null' ? null : Number(rent) }; }) : [];
   return { n: dates.length, dates, changes: compared ? changes : null, counts: commonG.size && counts.every(c => c != null) ? counts : null, series, axis: common };
+}
+// 🔵 2026-11-24(우편함 「표시층 — 판 F」 · 💡 「단지 모집 주기 한 줄」 — 상세 안만) — 「🗓️ 이 단지는 지난 n회 ○월·○월에 모집」.
+//    재료 = 상세가 이미 받은 지난 회차 세대 행의 회차 날짜(zfRoundDate — 회차 공고일) · 새 요청 0. 단지(building_name)가 하나일 때만(여러 단지 공고는 「이 단지」가 아니다).
+//    달 = 회차 공고일의 달(올해면 「5월」 · 아니면 「2025년 11월」) · 같은 달은 한 번.
+function zfRoundCycleHtml(past, cur){
+  const all = (past || []).concat(cur || []);
+  const blds = new Set(all.map(u => String((u && u.building_name) || '').trim()).filter(Boolean));
+  if(blds.size !== 1) return '';
+  const dates = [...new Set((past || []).map(u => u && u.zfRoundDate).filter(Boolean))].sort();
+  if(!dates.length) return '';
+  const yr = zf3Today().slice(0, 4);
+  const months = [...new Set(dates.map(d => (d.slice(0, 4) === yr ? '' : d.slice(0, 4) + '년 ') + Number(d.slice(5, 7)) + '월'))];
+  return `<p class="zf-round-trend zf-round-cycle" data-zf-rounds="${zfAttr(dates.join(' '))}">🗓️ 이 단지는 지난 ${dates.length}회 ${escapeHtml(months.join('·'))}에 모집</p>`;
 }
 function zfRoundTrendHtml(all){
   const t = zfRoundTrend(all);
