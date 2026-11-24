@@ -3749,7 +3749,7 @@ function zfFillSideSlots(){
     if(el.dataset.filled === '1') return;
     el.dataset.filled = '1';
     const rows = zfSide.rentLowByKey.get(el.getAttribute('data-rentlow-key'));
-    if(rows && rows.length) el.outerHTML = zfRentLowChip(rows[0]);
+    if(rows && rows.length) el.outerHTML = el.dataset.rentlowMulti === '1' ? zfRentLowMultiChip(rows) : zfRentLowChip(rows[0]);
   });
   zfTitleClippedChips();
   if(typeof zf3DecorateCards === 'function') zf3DecorateCards();   // 🔵 D-3 — 경로 행이 도착하면 반복 접수 창을 노선 카드에
@@ -3811,8 +3811,16 @@ function zfRentLowChip(r){
 }
 // 단일 단지 카드에만 자리를 둔다 — 여러 단지 카드는 상세의 해당 단지 머리에 단다(renderHousingGroupRows).
 function zfRentLowSlotHtml(row, title){
-  if(zfComplexCount(row) !== 1) return '';
-  return `<span class="zf-rentlow-slot" data-rentlow-key="${zfAttr(zfDedupKey(title))}"></span>`;
+  const cc = zfComplexCount(row);
+  // 🔵 2026-11-24(판 E 4-② · 💡 「㎡당 월세 낮은 순 · 여러 단지 카드 1층 「낮은 편 단지 N곳」」) — 여러 단지 카드도 자리를 둔다(단지 이름은 칩 설명에 · 단지 머리 칩은 상세 그대로).
+  if(cc !== 1 && !(cc >= 2)) return '';
+  return `<span class="zf-rentlow-slot" data-rentlow-key="${zfAttr(zfDedupKey(title))}"${cc >= 2 ? ' data-rentlow-multi="1"' : ''}></span>`;
+}
+function zfRentLowMultiChip(rows){
+  const names = [...new Set(rows.map(r => String(r.complex_key || '').trim()).filter(Boolean))];
+  if(!names.length) return '';
+  const tip = names.map(k => { const r = rows.find(x => String(x.complex_key || '').trim() === k); return `${k} — 같은 시·군 국민임대 ${r.area_complexes}곳 중 ㎡당 월임대료 기준`; }).join(' / ');
+  return `<span class="chip zf-rentlow-multi" title="${zfAttr(tip)}" data-zf-tip tabindex="0" role="button" aria-expanded="false" style="cursor:pointer;padding:4px 10px;font-size:var(--t-xs);background:#EEF6F2;border-color:#CFE6DA;color:#1F5E4A">💰 ㎡당 월세 낮은 편 단지 ${names.length}곳</span>`;
 }
 
 // ── ④ 같은 게시물 링크 — MYHOME 카드가 미분석이면 함께 정리된 LH 카드로 보낸다 ──
