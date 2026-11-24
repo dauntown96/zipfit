@@ -4902,7 +4902,12 @@ function applyNoticeFiltersAndRender(keepPage){
         if(sa !== sb) return sa - sb;
       }
       // 🔵 2026-11-17(우편함 「표시층 — 작은 판」 1 · 다운님 실사용 11-16 3) — 지난 마감 묶음은 최근 마감부터(내림) — 「마감 포함」에서 1년 전 공고가 먼저 서지 않게.
-      return nullLast(a,b,n=>zfDeadline(n),ga === 1);
+      // 🔵 2026-11-24(판 E 4-③ · 💡 「마감 시각 더 쓰기」) — 앞으로 올 마감 묶음에서 같은 날 마감끼리는 원문 끝 시각 이른 순(zfEndHmOf — 카드 알약 끝 시각과 같은 재료 · 시각 모르면 그날 뒤).
+      //    「오늘 마감」 칩(마감 임박순)을 누르면 17시 마감이 18시 마감 앞에 선다.
+      const dc = nullLast(a,b,n=>zfDeadline(n),ga === 1);
+      if(dc || ga !== 0) return dc;
+      const hmOf = n => { const d = zfDeadline(n); const e = d ? zfEndHmOf(zfDedupKey(n['공고명']), String(d).slice(0, 10)) : null; return e ? e.hm : null; };
+      return nullLast(a,b,hmOf,false);
     }
     // 🔴 접수 시작순도 같은 3분기를 탄다(2026-09-16) — 종전에는 맨 위가 작년 시작일 공고였다
     //    (apply_start 가 있는 594건 중 518건이 이미 지난 날짜, 최솟값 2025-07-28).
