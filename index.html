@@ -11885,7 +11885,9 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
         //    다른 회차의 같은 값 세대는 따로 남아 「다른 회차 보기」에 원문 행 수대로 보인다(종전에는 이번 회차 행에
         //    합쳐져 지난 회차 쪽에서 사라졌다 · 익산제3 …20850 ↔ 4월 …19778 36B 고령자). 이번 회차 쪽 행 수는 그대로다.
         const rd = roundDateOf(u);
-        const key = [rd, u.building_name, u.address, u.floor_info, u.unit_type, u.area_sqm, u.deposit, u.monthly_rent, u.deposit_priority1, u.rent_priority1, u.unit_group, u.supply_target, u.group_recruit_count].join('|');
+        // 🔵 2026-11-24(판 D ② · 국면 C 계속 회신 1 ②·⑦2) — 비고의 계약면적 · 건설 세대수(zfNoteFacts)도 키에 — 같은 금액의 다른 동(충주연수2 206동 38.56㎡·239호 ↔
+        //    201~205동 39.10㎡·955호 · 207 ↔ 208)이 「중복 백필」로 보여 한 행만 남았다(다른 행 비고가 통째로 숨음). 같은 공고 형제 ID 의 같은 행은 그대로 합친다.
+        const key = [rd, u.building_name, u.address, u.floor_info, u.unit_type, u.area_sqm, u.deposit, u.monthly_rent, u.deposit_priority1, u.rent_priority1, u.unit_group, u.supply_target, u.group_recruit_count, zfNoteFacts(u)].join('|');
         if(seenHu.has(key)) return;
         u.zfRoundDate = rd;
         seenHu.set(key, u);
@@ -12421,10 +12423,18 @@ function huPriceText(u){
 //    보면 그 칸이 비고 unit_type 으로 갈리는 행들이 한 줄로 뭉쳐 라벨 하나만 남는다.
 // 🔵 동호수(floor_info)를 키에 넣는다. 비고가 빠진 자리를 메우는 것이 아니라, 이 칸도 줄마다
 //    따로 그려지므로 다르면 합칠 수 없기 때문이다(종전에는 빠져 있었다).
+// 🔵 2026-11-24(판 D ②) — 비고 원문 안의 계약면적(㎡)·건설 세대수(호) — 같은 금액이라도 이 둘이 다르면 다른 동이다(원문 표가 동마다 따로 줄).
+//    값을 고치지 않는다 — 가르는 키로만 쓴다(없으면 '').
+function zfNoteFacts(u){
+  const t = String((u && u.extra_note) || '');
+  const a = t.match(/계약면적[^0-9]*([0-9.]+)\s*㎡/), b = t.match(/건설\s*세대수[^0-9]*([0-9,]+)\s*호/);
+  return (a ? a[1] : '') + '/' + (b ? b[1] : '');
+}
 function buildUnitGroupLines(g){
+  // 🔵 판 D ② (가) — 계약면적·건설 호수가 다르면 한 줄로 접지 않는다(동마다 따로 줄).
   const lineKey = u => [u.supply_target || u.unit_type || '', u.deposit, u.monthly_rent,
                         u.deposit_priority1, u.rent_priority1, u.floor_info || '',
-                        u.zfRoundLabel || '', u.zfPastOnly ? '1' : ''].join('|');
+                        u.zfRoundLabel || '', u.zfPastOnly ? '1' : '', zfNoteFacts(u)].join('|');
   const byLine = new Map();
   const lines = [];
   g.units.forEach(u => {
