@@ -384,6 +384,8 @@ body.theme-dark .extras-missing-note{color:#d8c48a;background:#2a2721;border-col
 .hu-note-block + .hu-note-block{margin-top:6px;padding-top:6px;border-top:1px dotted #ddd}
 .hu-note-long{flex:1 1 100%;font-size:var(--t-xs);color:#555;line-height:1.55}
 .hu-note-badge{padding:2px 8px;font-size:var(--t-xs);cursor:default;display:inline-block;margin:2px 4px 2px 0}
+.hu-ug-shared{border:1px dashed var(--line,#d8d8d0);border-radius:var(--r-1,6px);padding:2px 8px 4px;margin:4px 0}
+.hu-ug-shared-h{margin:4px 0 0;font-size:var(--t-xs);font-weight:700;color:var(--ink-2)}
 .hu-recruit-badge{padding:2px 9px;font-size:var(--t-xs);cursor:default;display:inline-block;margin-left:6px;background:var(--surface-2);color:var(--ink-2);border-color:var(--line);font-weight:600}
 /* 회차 배지 — 대표(이번) 회차는 초록 테두리, 지난 회차는 주의색 채움으로 눈에 갈리게 한다.
    모집 배지(초록 채움)와 겹치지 않도록 이번 회차는 흰 바탕 + 초록 테두리로 둔다. */
@@ -12638,7 +12640,12 @@ function renderHousingUnitGroup(g, mode){
   const headReserveOnly = headPick && zfReserveOnly(headPick, headTotal);
   const headCount = headReserveOnly ? ` · 예비 ${Number(headPick.value).toLocaleString()}명 모집`
     : (headTotal != null ? ` · 모집 ${Number(headTotal).toLocaleString()}세대` : '') + (headPick ? ` · 예비 ${Number(headPick.value).toLocaleString()}명` : '');
-  const body = lines.map(ln => {
+  // 🔵 2026-11-24(우편함 「표시층 — 판 G」 O1 ⑩ · 💡 3f38aaa7e15581caaa22) — 한 병합 칸(group_recruit_count)을 계층 둘 이상이 함께 쓰고 같은 형에 따로 칸(recruit_count)도 있으면
+  //    머리 「모집 N세대」(병합 + 따로)만으로는 나눠 갖는 몫이 안 보인다(창녕영산 …20854 25A 40 = 대학생·청년 30 함께 + 주거급여 10) → 병합 칸 줄들을 한 테두리로 묶고 「함께 모집 30세대」.
+  //    값은 병합 칸 값 그대로(원문 「통합 추첨」 낱말은 쓰지 않는다 — 공고마다 문장이 다르다).
+  const sharedOf = ln => g.recruit != null && g.extraN > 0 && ln.u && ln.u.group_recruit_count != null;
+  const sharedN = new Set(lines.filter(sharedOf).map(ln => ln.u.supply_target || ln.u.unit_type || '')).size;
+  const body0 = lines.map(ln => {
     const u = ln.u;
     // 줄 면적은 **그룹 안에 면적이 둘 이상이고 이 줄이 그 전부를 덮지 않을 때만** 적는다.
     // 합쳐진 줄(A1·A2 전부)은 머리줄이 이미 두 면적을 말하므로 되풀이하지 않는다.
@@ -12682,7 +12689,16 @@ function renderHousingUnitGroup(g, mode){
       ${renderHuDiffHtml(u.zfDiff)}
       ${note}
     </div>`;
-  }).join('');
+  });
+  let body = '';
+  for(let i = 0; i < lines.length; i++){
+    if(sharedN >= 2 && sharedOf(lines[i])){
+      let j = i, inner = '';
+      while(j < lines.length && sharedOf(lines[j])){ inner += body0[j]; j++; }
+      body += `<div class="hu-ug-shared"><p class="hu-ug-shared-h">함께 모집 ${Number(g.recruit).toLocaleString()}세대</p>${inner}</div>`;
+      i = j - 1;
+    } else body += body0[i];
+  }
   // 🔵 2026-11-17(우편함 「표시층 — 작은 판 2」 3) — 행이 하나뿐인 묶음은 접고 펴는 칸 없이 그 행을 바로 보인다(머리 줄은 그대로 · 칩 자리 키도 묶음 키 그대로).
   const head = `<span class="hu-ug-name">${escapeHtml(zfUgHeadLabel(g.group, g.units[0] && g.units[0].building_name))}</span><span class="hu-ug-meta"${headPick ? ` title="${zfAttr('원문: ' + headPick.texts.join(' / '))}"` : ''}>${escapeHtml(headAreas + headCount)}</span>${headWait ? zfWaitReserveHtml(g.units) : ''}${zfUnitChipSlot(zfUnitTypeKey(g.units[0], g.group))}`;
   // 🔵 5단계 시안 — 묶음이 둘 이상인 목록(mode 'fold')에서는 행 하나뿐인 묶음도 접는다 · 묶음이 하나면(mode 'open') 펼친 채.
