@@ -4,6 +4,7 @@
 //    🔵 예외 둘: recordFindings 가 경고·실패를 public.ops_health_record(jsonb) 한 함수로만 넘긴다(2026-10-06 · 우편함 「코드 — 1-B …」 6)
 //    · recordInstanceMetrics 가 인스턴스 지표 숫자를 zipfit_ops.instance_metrics_record(jsonb) 한 함수로만 넘긴다(2026-10-17 · 「인스턴스 지표 정기 기록」 1).
 // 🔴 비밀값은 SUPABASE_ACCESS_TOKEN(기존 Actions Secret) 하나 · 공개 anon 키. 어떤 값도 출력하지 않는다.
+import { redactSecrets } from './redact.mjs'
 import { writeFileSync, appendFileSync, readFileSync } from 'node:fs'
 
 // 🔵 2026-11-19(우편함 「코드·운영 — 서울 이전 준비 ①」) — 프로젝트 ref 는 supabase/config.toml 의 project_id 한 곳에서 읽는다.
@@ -53,7 +54,8 @@ export async function sqlRead(query) {
 // 점검 스크립트의 유일한 쓰기 — public.ops_health_record(jsonb) 한 함수만 부른다(경고·실패 1행씩 · 30일 보관 · 2026-10-06 1-B 6).
 // payload = { at, run_url, checks:[{id, name, status, value}] } · 넣은 행 수를 돌려준다. 실패하면 던진다(부르는 쪽이 ⚠️ 로 남긴다).
 export async function recordFindings(payload) {
-  return callJsonbFn('public.ops_health_record', payload)
+  // 🔵 2026-11-24(열아홉째 1) — DB 기록(ops_health_findings)도 가린 글로(redact.mjs).
+  return callJsonbFn('public.ops_health_record', JSON.parse(redactSecrets(JSON.stringify(payload))))
 }
 
 // 인스턴스 지표 숫자 한 행 — payload = { scraped_at, mem_total, … }(instance.mjs SERIES 의 키 · 숫자만) · 넣은 행 id 를 돌려준다. 실패하면 던진다.
@@ -122,6 +124,9 @@ export function report(kind, title, checks, extra = {}) {
     run_url: process.env.GITHUB_SERVER_URL && process.env.GITHUB_RUN_ID
       ? `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}` : null,
   }
+  // 🔵 2026-11-24(우편함 「코드·운영 — 열아홉째」 1) — 비밀값 가림(redact.mjs): 결과 파일·요약·로그·작업 요약 모두 가린 뒤 글이다(공개 저장소 이슈 #1277).
+  const safe = JSON.parse(redactSecrets(JSON.stringify(result)))
+  Object.assign(result, safe); checks = safe.checks
   writeFileSync('health-result.json', JSON.stringify(result, null, 2))
   const cell = v => String(v ?? '').replace(/\u001b\[[0-9;]*m/g, '').replace(/\s*\n\s*/g, ' ').replace(/\|/g, '/').slice(0, 400)
   const icon = s => (s === 'pass' ? '✅' : s === 'fail' ? '❌' : s === 'skip' ? '⏭' : s === 'warn' ? '⚠️' : 'ℹ️')

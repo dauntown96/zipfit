@@ -68,6 +68,15 @@ if [ -n "$SOFT_LABEL" ]; then read -r OPEN_SOFT _ _ < <(open_of "$SOFT_LABEL"); 
   echo
   echo "결과 파일은 이 실행의 아티팩트 \`health-result\`(health-result.json)에 있다."
 } > /tmp/issue_body.md
+# 🔵 2026-11-24(우편함 「코드·운영 — 열아홉째」 1) — 이슈 글 마지막 문: 토큰 꼴 값 가림(redact.mjs SECRET_RE 와 같은 식 · 공개 저장소 #1277).
+#    결과 파일·요약은 lib.mjs report() 가 이미 가린다 — 여기는 그 밖 길(손으로 쓴 health-summary.md 등)까지 막는 덧.
+python3 -c '
+import re, sys
+p = sys.argv[1]; s = open(p, encoding="utf-8").read()
+r = re.compile(r"((?:access_token|refresh_token|token|apikey)=|Bearer\s+)([A-Za-z0-9._~+/=%-]{12,})")
+t, n = r.subn(lambda m: m.group(1) + "***", s)
+if n: open(p, "w", encoding="utf-8").write(t); print(f"이슈 글 토큰 꼴 가림 {n}")
+' /tmp/issue_body.md
 # 🔵 2026-10-08(우편함 「코드 — 운영 기반 후속」 3) — 열 때·실패 재발 댓글에는 다운님 직접 언급을 맨 앞에 둔다.
 #    봇이 연 이슈의 Watching 알림은 휴대폰에 오지 않았다(#407) — 언급 알림은 앱 푸시 기본값이 켜져 있다. 회복 닫힘 댓글에는 넣지 않는다(알림 피로).
 MENTION="${ISSUE_MENTION-@dauntown96}"
