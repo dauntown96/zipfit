@@ -16704,7 +16704,7 @@ async function zf12Load(rows){
     const cats = ZF12_ELIG_CATS.map(c => `"${c}"`).join(',');
     const [hu, pol] = await Promise.all([
       fetch(`${SUPABASE_URL}/rest/v1/housing_units?select=announcement_id,supply_target,seq&${idFilterFor(all)}&order=seq`, { headers: zfAnonHeaders() }).then(r => r.ok ? r.json() : []),
-      fetch(`${SUPABASE_URL}/rest/v1/announcement_policies?select=id,announcement_id,category,seq,content_raw&${idFilterFor(all)}&or=(category.in.(${encodeURIComponent(cats)}),category.like.${encodeURIComponent('⚠️*')},content_raw.like.${encodeURIComponent('*동일*유형*매입임대*')})&order=seq`, { headers: zfAnonHeaders() }).then(r => r.ok ? r.json() : [])
+      fetch(`${SUPABASE_URL}/rest/v1/announcement_policies?select=id,announcement_id,category,seq,content_raw&${idFilterFor(all)}&or=(category.in.(${encodeURIComponent(cats)}),category.like.${encodeURIComponent('⚠️*')},content_raw.like.${encodeURIComponent('*동일*유형*매입임대*')},content_raw.like.${encodeURIComponent('*1개*단지*')},content_raw.like.${encodeURIComponent('*1건에*한하여*')})&order=seq`, { headers: zfAnonHeaders() }).then(r => r.ok ? r.json() : [])
     ]);
     grp.forEach(([id, ids]) => {
       const set = new Set(ids), mine = r => set.has(String(r.announcement_id));
@@ -16719,7 +16719,9 @@ async function zf12Load(rows){
       });
       // 🔵 2026-11-24(판 E 5) — 매입 「서류제출까지 완료하면 … 동일 유형 타 매입임대주택 공고의 신청이 불가」 원문 문장(같은 요청에 조건 하나 · 새 요청 0)
       const dupRow = P.find(r => zfDupTypeSentence(r.content_raw));
-      zf12Info.set(id, { ids, heads, res: ep.length ? zf12Res(ep[0].content_raw) : '', sched, dup: dupRow ? { pid: String(dupRow.id || ''), sent: zfDupTypeSentence(dupRow.content_raw) } : null });
+      // 🔵 2026-11-24(판 F O4 · 💡 「여러 블록 중 택1, 중복 시 전부 무효」) — 「1개 단지 1개 형(평형)만 신청 · 중복 신청 시 무효」 · 「공고 2건 중 1건에 한하여 신청」 원문 문장
+      const oneRow = P.find(r => zfPickOneSentence(r.content_raw));
+      zf12Info.set(id, { ids, heads, res: ep.length ? zf12Res(ep[0].content_raw) : '', sched, dup: dupRow ? { pid: String(dupRow.id || ''), sent: zfDupTypeSentence(dupRow.content_raw) } : null, one: oneRow ? { sent: zfPickOneSentence(oneRow.content_raw) } : null });
     });
     // 🔵 판 C 1 (가)(2026-11-23 · 「처음 온 사람」 걷기 두 번 모두 🅰 첫 칸 함정) — 세대 행이 없는 공고(전세임대 등)는 「누가」 재료가 없어 👥 줄이 서지 않았다.
     //    세대 계층도 거주 조각도 없을 때만 자격 행 공급대상 키(분석이 원문 대상 낱말로 쓴 값 — 매칭 판정과 같은 키)의 「대상」을 쓴다 ·
@@ -16904,6 +16906,7 @@ function zf12FillWho(){
     if(!I) return;
     const card = p.closest('.hcard'); if(!card || card.dataset.zf12Who === '1') return;
     I.dup && zf12DupBadge(card, I.dup);
+    I.one && zf12OneBadge(card, I.one);
     I.sched.length && zf12SchedBadge(card, I.sched);
     // 🔵 2차 시안 1(claude.ai 의견 2 · 다운님 11-16) — 군·목 꼴(가군·나군 · 가목 …) 카드는 겉에 거주 조각만 · 군 이름은 안 자격 절(원문 괄호 뜻과 함께)
     const heads = I.heads.some(h => /(^|\s)[가-하](군|목)$/.test(h)) ? [] : I.heads;
@@ -16924,6 +16927,20 @@ function zfDupTypeSentence(t){
   const parts = String(t || '').replace(/\s+/g, ' ').split(/(?<=[다요]\.)\s+|(?<=[.。])\s+(?=[-•ㅇ·(\[]|[가-힣A-Z])/);
   const hit = parts.find(x => ZF_DUP_TYPE_RE.test(x) && /신청이?\s*불가/.test(x));
   return hit ? hit.replace(/^[-•ㅇ·\s]+/, '').trim() : '';
+}
+// 🔵 2026-11-24(우편함 「표시층 — 판 F」 O4 더함 · 💡 「여러 블록 중 택1, 중복 시 전부 무효」) — 한 세대가 여러 단지·형(또는 같이 나온 공고 둘)에 넣으면 무효가 되는 공고.
+//    판정 = 원문 문장에 「1개 단지 … 1개 (평)형(에)만 … 신청」 또는 「… 중 1건에 한하여 신청」 · 칩 글은 꼭집 말 「한 곳만 신청 가능」 · 누르면 그 원문 문장 그대로.
+//    넓은 꼴 「중복 신청 시 전부 무효」 단독(337공고 · 열린 92 — 거의 모든 공고)은 걸지 않는다(칩이 소음이 된다).
+function zfPickOneSentence(t){
+  const parts = String(t || '').replace(/\s+/g, ' ').split(/(?<=[다요]\.)\s+|(?<=[.。])\s+(?=[-•ㅇ·▪(\[]|[가-힣A-Z])/);
+  const hit = parts.find(x => /1\s*개\s*단지\s*1\s*개\s*(평\s*)?형(에)?만[^.。]{0,10}신청/.test(x) || /중\s*1\s*건에\s*한하여\s*신청/.test(x));
+  return hit ? hit.replace(/^[-•ㅇ·▪\s(]+/, '').replace(/\)$/, '').trim() : '';
+}
+function zf12OneBadge(card, one){
+  if(card.querySelector('.zf12-one')) return;
+  const b = card.querySelector('.zf12-badges'); if(!b) return;
+  const d = b.querySelector('.zf12-dup');
+  (d || b).insertAdjacentHTML(d ? 'afterend' : 'afterbegin', `<span class="chip sel zf-chip-warn zf12-dup zf12-one" title="${zfAttr(one.sent)}" data-zf-tip tabindex="0" role="button" aria-expanded="false">⚠️ 한 곳만 신청 가능</span>`);
 }
 function zf12DupBadge(card, dup){
   if(card.querySelector('.zf12-dup')) return;
