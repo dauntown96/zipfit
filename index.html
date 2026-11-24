@@ -15595,6 +15595,12 @@ async function zf3LoadCollected(){
   document.querySelectorAll('[data-zf3-coll]').forEach(e => { e.textContent = zf3CollText(); });
   document.querySelectorAll('[data-zf3-colls]').forEach(e => { const c = zf3CollNote(); e.textContent = c.s; e.setAttribute('aria-label', c.full); e.title = c.full; });
 }
+// 🔵 2026-11-24(우편함 「표시층 — 판 G」 O3 ⑥ · 💡 3ec8aaa7e15581ae98a0) — 오늘(KST) 처음 수집한 공고 수 — 목록 행 first_seen_at(수집이 처음 본 시각) 기준 ·
+//    공고일 기준 「NEW」 배지와 다른 축(오늘 올라온 옛 공고일 공고도 센다) · 0이면 쓰지 않는다 · 새 요청 0.
+function zf3NewToday(rows){
+  const t = zf3Today();
+  return (rows || []).filter(n => { const f = n['first_seen_at']; if(!f) return false; const d = new Date(f); return !isNaN(d) && new Date(d.getTime() + 9 * 3600 * 1000).toISOString().slice(0, 10) === t; }).length;
+}
 function zf3RenderNoticeHead(filtered){
   if(!zf3On()) return;
   if(!zf3CollectedT){ zf3CollectedT = setInterval(zf3LoadCollected, 10 * 60 * 1000); zf3LoadCollected(); }
@@ -15625,7 +15631,7 @@ function zf3RenderNoticeHead(filtered){
   //    결과 수 · 갈래(접수 중 · 예정 · 미상) · 마지막 수집을 글자 한 줄(.zf3-lsum)에 · 목록/지도 단추는 필터·정렬 줄 오른쪽 끝으로. 글자·숫자·링크는 종전 그대로(자리만).
 //    마지막 수집은 짧은 꼴 「오늘 10:50 수집」(전문 「마지막 수집 오늘 10:50 KST」는 aria-label · title) — 기본 머리가 Windows 글꼴에서도 한 줄(검증 2026-11-19 · 종전 꼴은 두 줄 40px로 꺾여 카드 2장이 깨졌다).
   el.innerHTML = zf3TypeRow() + zf3StatChips(filtered, chips)
-    + `<div class="zf3-lsum"><p class="zf3-lh">${head}</p><p class="zf3-lsub"><span>${closedExcluded ? '' : `열린 ${o.n.toLocaleString()}건: `}${zf3StLink('접수 중', '접수 중', o.a)} · ${zf3StLink('예정', '접수 예정', o.b)}${o.k ? ` · ${zf3StLink('미상', '접수기간 미상', o.k)}` : ''}</span></p>${(c => `<span class="zf3-coll" role="note" data-zf3-colls aria-label="${zfAttr(c.full)}" title="${zfAttr(c.full)}">${escapeHtml(c.s)}</span>`)(zf3CollNote())}</div>`
+    + `<div class="zf3-lsum"><p class="zf3-lh">${head}</p><p class="zf3-lsub"><span>${closedExcluded ? '' : `열린 ${o.n.toLocaleString()}건: `}${zf3StLink('접수 중', '접수 중', o.a)} · ${zf3StLink('예정', '접수 예정', o.b)}${o.k ? ` · ${zf3StLink('미상', '접수기간 미상', o.k)}` : ''}</span>${(k => k ? `<span class="zf3-newtoday" title="오늘 새로 들어온 공고 ${k}건"> · 오늘 새로 ${k}</span>` : '')(zf3NewToday(all))}</p>${(c => `<span class="zf3-coll" role="note" data-zf3-colls aria-label="${zfAttr(c.full)}" title="${zfAttr(c.full)}">${escapeHtml(c.s)}</span>`)(zf3CollNote())}</div>`
     + `<div class="zf3-ctl"><button type="button" class="zf3-chip add zf3-fbtn" data-act="sheet" aria-expanded="${sheetOpen}" aria-controls="noticeFilterPanel">${ZF3_ICO_FILTER}필터${chips.length ? ` <b>${chips.length}</b>` : ''}</button>`
     + (sortOpts ? `<span class="zf3-sortsel">${ZF3_ICO_SORT}<select data-act="sortsel" autocomplete="off" aria-label="정렬">${sortOpts}</select><span class="cv" aria-hidden="true">▾</span></span>` : '')
     + `<span class="zf3-vseg" role="group" aria-label="보기"><button type="button" data-act="view" data-v="list" aria-pressed="${zf3View !== 'map'}">목록</button><button type="button" data-act="view" data-v="map" aria-pressed="${zf3View === 'map'}">지도</button></span></div>`
