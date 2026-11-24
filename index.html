@@ -3578,7 +3578,8 @@ function zfRouteVerdict(rows, today){
     });
     return out;
   };
-  const lineOf = list => list.map(x => `${x.names.join(', ')} ${x.span}`.trim()).join(' · ');
+  // 🔵 2026-11-24(우편함 「표시층 — 판 G」 O3 ⑦ · 💡 3ea8aaa7e155810193b2) — 「날짜 단지」 순: 단지명이 긴 공고(보성 …0667 · 울산 …0745)에서 첫 날짜가 줄 끝으로 밀렸다.
+  const lineOf = list => list.map(x => `${x.span} ${x.names.filter(Boolean).join(', ')}`.trim()).join(' · ');
   if(groups.length >= 2){
     const spans = merge(groups, g => (g.s || '') + '|' + (g.e || ''), g => zfSpanText(g.s, g.e));
     if(spans.length > 1) return { kind: '②-가', text: '접수일이 나뉘어 있어요 · ' + lineOf(spans) };
