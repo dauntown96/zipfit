@@ -869,6 +869,7 @@ html[data-ui="d3"] .zf-sch .policy-content{white-space:normal;overflow-wrap:anyw
 .hu-same-amt[open] .hu-same-chip{background:var(--ink,#222);color:var(--paper,#fff);border-color:var(--ink,#222)}
 /* 🔵 2026-11-24(판 D ①) — 재확인 대기 칩은 「분석 중」·간단 줄 카드에서 접는다 */
 .hcard:is(.zf-ana-pending,.zf-lite) .zf-recheck{display:none!important}
+/* 🔵 2026-11-24(판 E 6) — 간단 줄 카드에도 머리 표지 「꼭집 미분석」(.zf-lo 와 같은 규칙 · 아래 ::after) — 분석된 닫힌 카드와 겉 차이가 줄 길이뿐이던 자리 */
 /* 🔵 2026-11-24(판 D ⑤·④) — 닫힌 미분석 카드 간단 줄: 머리(유형·곳 · 제목·상태)와 줄 하나만 · 펼침 꺾쇠 없음 */
 .hcard.zf-lite>:not(.htop):not(.zf3-ctop):not([data-sum-for]){display:none!important}
 .hcard.zf-lite :is(.zf3-go,.zf3-dpill){display:none!important}
@@ -887,9 +888,9 @@ html[data-ui="d3"] .zf-ana-org{color:var(--ink)}
 html[data-ui="d3"] .zf-ana-box a{color:var(--ink)!important}
 /* 🔵 2026-10-22(우편함 「표시층 — A(G2): 「링크만」 카드에 사실대로의 표지」) — 첨부 0 · 분석 없음 카드(zf-lo): 머리 줄 상태 알약 앞에 「꼭집 미분석」 표지.
    카드 그림과 요약 도착 순서에 기대지 않게 CSS 로 단다(머리 줄은 flex — 표지 order 1 · 알약 order 2). 날짜·상태는 수집값 그대로 둔다. */
-.hcard.zf-lo .zf3-ctop::after{content:'꼭집 미분석';order:1;font-size:var(--t-xs);font-weight:700;border-radius:var(--r-pill);padding:1px 8px;color:#fff;background:#6B6B63}
+.hcard:is(.zf-lo,.zf-lite) .zf3-ctop::after{content:'꼭집 미분석';order:1;font-size:var(--t-xs);font-weight:700;border-radius:var(--r-pill);padding:1px 8px;color:#fff;background:#6B6B63}
 .hcard.zf-lo .zf3-ctop .zf3-dpill{order:2}
-html[data-ui="d3"] .hcard.zf-lo .zf3-ctop::after{background:var(--ink-2);color:var(--paper)}
+html[data-ui="d3"] .hcard:is(.zf-lo,.zf-lite) .zf3-ctop::after{background:var(--ink-2);color:var(--paper)}
 .zf-sch-stop>summary::-webkit-details-marker{display:none}
 /* 판 C 5 ② — 곁가지 역(게시 기간 「모집공고」): 노선 옆으로 한 칸 들여 작은 빈 점 + 점선 가지 · 역 차례(다음·진행 중)에 들지 않는다 */
 html[data-ui="d3"] .zf3-vline .policy-item.zf-sch-side{padding-left:46px!important}
