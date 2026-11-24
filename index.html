@@ -9736,6 +9736,20 @@ function loadScheduleLine(annId, cardEl, id){
     sameAp.forEach(r => { r._applySame = true; });
     // 🔵 판 C 5 ② — 「공고」 단계가 기간(시작 < 끝)이고 다른 역과 겹치면(SH 「모집공고」 게시 기간이 접수·공개를 품음) 곁가지로.
     cur.forEach(r => { r._side = r.stage === '공고' && !!(r.start_date && r.end_date) && r.start_date < r.end_date && cur.some(o => o !== r && o.stage !== '공고' && zfSchOverlap(o, r)); });
+    // 🔵 2026-11-24(우편함 「표시층 — 판 D 시안」 ③ · 판 C ⑦2) — 같은 기간 · 다른 단계: 접수 행과 시작·끝이 모두 같은(같은 범위) 공고·접수 밖 단계 행은
+    //    따로 역을 세우지 않고 그 접수 역 바로 뒤 곁가지로(판 C ② 게시 기간 곁가지와 같은 꼴 · 역 차례 밖). 단계 이름·날짜는 원문 그대로.
+    //    SH_313227 주택사전공개 · 치매검사 = 신청접수 11-24~12-07 — 같은 날짜 역 셋이 노선에 나란히 섰다.
+    {
+      const apRows = cur.filter(r => r.stage === '접수' && r.start_date && r.end_date);
+      const apOf = r => r.stage !== '접수' && r.stage !== '공고' && apRows.find(a => a.start_date === r.start_date && a.end_date === r.end_date && (a.scope_text || '') === (r.scope_text || '') && (a.site_label || '') === (r.site_label || ''));
+      const moved = cur.filter(r => apOf(r));
+      if(moved.length){
+        moved.forEach(r => { r._side = true; });
+        const out = [];
+        cur.filter(r => !moved.includes(r)).forEach(r => { out.push(r); if(r.stage === '접수') out.push(...moved.filter(m => apOf(m) === r)); });
+        cur = out;
+      }
+    }
     const extraApply = !sameAp.length && !cur.some(r => r.stage === '접수') && (aS || aE)
       ? `<div class="policy-item" data-zf-d="${zfAttr(aS || aE)}" data-zf-e="${zfAttr(aE || aS)}"><div class="policy-category">📅 접수기간</div><div class="policy-content">${escapeHtml(`${aS || '-'} ~ ${aE || '-'}`)}</div></div>` : '';
     // 🔵 2026-11-12 — 일정 표에 「공고」 단계 행이 없으면 첫 정거장 = 카드 노선과 같은 공고일(zfScheduleAnnItem · 노선마다 맨 앞)
