@@ -1354,7 +1354,8 @@ html.zf12 .zf12-l2 > *{margin:0!important;order:20}
 /* 판 C 4 — 자식이 모두 빈 2층 머리(빈 칩 줄 · 빈 자리표) — 다자녀 전세임대처럼 세대 목록·경로·공고문 여럿이 없는 공고에서 빈 둥근 상자가 남았다(:empty 는 칩 줄의 공백 글자 때문에 못 받음) */
 html.zf12 .zf12-l2:not(:has(> .chip-row > :not(:empty))):not(:has(> :not(.chip-row):not(:empty))){display:none}   /* 칩 줄 안 빈 자리표(.zf-rentlow-slot)도 빈 것으로 */
 html.zf12 .zf12-l2 > .zf12-schedwhy{order:1}
-html.zf12 .zf12-l2 > .zf12-basis{order:2}   /* 판 F — 판단 기준일 둘 한 줄(일정 확인 필요 배너 다음) */
+html.zf12 .zf12-l2 > .zf12-basis{order:2}
+html.zf12 .zf12-l2 > .zf12-basis.zf12-dupsel{order:2}   /* 판 F — 판단 기준일 둘 한 줄(일정 확인 필요 배너 다음) */
 .zf12-basis{font-size:var(--t-s);color:var(--ink-2,#444);border:1px solid var(--line,#e0e0d8);border-radius:var(--r-1,6px);padding:6px 10px;background:var(--surface,#fafaf6)}
 .zf12-basis>summary{cursor:pointer;font-weight:600;min-height:var(--hit,44px);display:flex;align-items:center}
 .zf12-basis-raw{margin:4px 0 2px;font-size:var(--t-xs);line-height:1.6;color:var(--ink-2,#444)}
@@ -16712,7 +16713,7 @@ async function zf12Load(rows){
     const cats = ZF12_ELIG_CATS.map(c => `"${c}"`).join(',');
     const [hu, pol] = await Promise.all([
       fetch(`${SUPABASE_URL}/rest/v1/housing_units?select=announcement_id,supply_target,seq&${idFilterFor(all)}&order=seq`, { headers: zfAnonHeaders() }).then(r => r.ok ? r.json() : []),
-      fetch(`${SUPABASE_URL}/rest/v1/announcement_policies?select=id,announcement_id,category,seq,content_raw&${idFilterFor(all)}&or=(category.in.(${encodeURIComponent(cats)}),category.like.${encodeURIComponent('⚠️*')},content_raw.like.${encodeURIComponent('*동일*유형*매입임대*')},content_raw.like.${encodeURIComponent('*1개*단지*')},content_raw.like.${encodeURIComponent('*1건에*한하여*')},content_raw.like.${encodeURIComponent('*조사*기준일*')},content_raw.like.${encodeURIComponent('*도착*추첨*')})&order=seq`, { headers: zfAnonHeaders() }).then(r => r.ok ? r.json() : [])
+      fetch(`${SUPABASE_URL}/rest/v1/announcement_policies?select=id,announcement_id,category,seq,content_raw&${idFilterFor(all)}&or=(category.in.(${encodeURIComponent(cats)}),category.like.${encodeURIComponent('⚠️*')},content_raw.like.${encodeURIComponent('*동일*유형*매입임대*')},content_raw.like.${encodeURIComponent('*1개*단지*')},content_raw.like.${encodeURIComponent('*1건에*한하여*')},content_raw.like.${encodeURIComponent('*조사*기준일*')},content_raw.like.${encodeURIComponent('*도착*추첨*')},content_raw.like.${encodeURIComponent('*동일*유형*중복*선정*')})&order=seq`, { headers: zfAnonHeaders() }).then(r => r.ok ? r.json() : [])
     ]);
     grp.forEach(([id, ids]) => {
       const set = new Set(ids), mine = r => set.has(String(r.announcement_id));
@@ -16733,7 +16734,9 @@ async function zf12Load(rows){
       const basisRow = P.find(r => zfBasisDateSentence(r.content_raw));
       // 🔵 2026-11-24(판 F O4 · 💡 선착순 「첫날 10시 전 대기자는 추첨」) — 「… 이전 도착자 … 추첨」 원문 문장
       const earlyRow = P.find(r => zfEarlyDrawSentence(r.content_raw));
-      zf12Info.set(id, { ids, heads, res: ep.length ? zf12Res(ep[0].content_raw) : '', sched, dup: dupRow ? { pid: String(dupRow.id || ''), sent: zfDupTypeSentence(dupRow.content_raw) } : null, one: oneRow ? { sent: zfPickOneSentence(oneRow.content_raw) } : null, basis: basisRow ? zfBasisDateSentence(basisRow.content_raw) : '', early: earlyRow ? zfEarlyDrawSentence(earlyRow.content_raw) : '' });
+      // 🔵 2026-11-24(판 F O4 · 💡 「동일유형 중복선정」 — 국민·영구 예비 지위) — 「… 동일유형의 임대주택 예비 입주자로 중복선정이 되지 않으며 …」 원문 문장
+      const dupSelRow = P.find(r => zfDupSelSentence(r.content_raw));
+      zf12Info.set(id, { ids, heads, res: ep.length ? zf12Res(ep[0].content_raw) : '', sched, dup: dupRow ? { pid: String(dupRow.id || ''), sent: zfDupTypeSentence(dupRow.content_raw) } : null, one: oneRow ? { sent: zfPickOneSentence(oneRow.content_raw) } : null, basis: basisRow ? zfBasisDateSentence(basisRow.content_raw) : '', early: earlyRow ? zfEarlyDrawSentence(earlyRow.content_raw) : '', dupSel: dupSelRow ? zfDupSelSentence(dupSelRow.content_raw) : '' });
     });
     // 🔵 판 C 1 (가)(2026-11-23 · 「처음 온 사람」 걷기 두 번 모두 🅰 첫 칸 함정) — 세대 행이 없는 공고(전세임대 등)는 「누가」 재료가 없어 👥 줄이 서지 않았다.
     //    세대 계층도 거주 조각도 없을 때만 자격 행 공급대상 키(분석이 원문 대상 낱말로 쓴 값 — 매칭 판정과 같은 키)의 「대상」을 쓴다 ·
@@ -16921,6 +16924,7 @@ function zf12FillWho(){
     I.one && zf12OneBadge(card, I.one);
     I.early && zf12EarlyBadge(card, I.early);
     I.basis && zf12BasisLine(card, I.basis);
+    I.dupSel && !I.dup && zf12DupSelLine(card, I.dupSel);
     I.sched.length && zf12SchedBadge(card, I.sched);
     // 🔵 2차 시안 1(claude.ai 의견 2 · 다운님 11-16) — 군·목 꼴(가군·나군 · 가목 …) 카드는 겉에 거주 조각만 · 군 이름은 안 자격 절(원문 괄호 뜻과 함께)
     const heads = I.heads.some(h => /(^|\s)[가-하](군|목)$/.test(h)) ? [] : I.heads;
@@ -16983,6 +16987,19 @@ function zfBasisDateSentence(t){
   const parts = String(t || '').replace(/\s+/g, ' ').split(/(?<=[다요]\.)\s+|(?<=[.。])\s+(?=[-•ㅇ·▪(\[]|[가-힣A-Z])/);
   const hit = parts.find(x => /조사\s*기준일/.test(x) && /(모집\s*)?공고일/.test(x) && /(산정|판단|기준)/.test(x));
   return hit ? hit.replace(/^[-•ㅇ·▪\s]+/, '').trim() : '';
+}
+// 🔵 2026-11-24(우편함 「표시층 — 판 F」 O4 · 💡 「동일유형 중복선정 고정문구」를 원문 경로로) — 국민·영구·행복 예비입주자 공고의 「동일유형 예비 입주자 중복선정 안 됨」.
+//    매입 「동일 유형 … 신청 불가」(판 E 칩)와 다른 규칙(예비 지위 — 새로 선정되면 앞 지위가 빠짐) · 열린 공고 70여 장이라 1층 칩이 아니라 상세 2층 접힌 한 줄 ·
+//    머리 「🔒 동일 유형 예비입주자 중복 선정 안 됨」 · 펼치면 원문 문장 그대로. 고정 문구로 짓지 않는다(원문에 있을 때만).
+function zfDupSelSentence(t){
+  const parts = String(t || '').replace(/\s+/g, ' ').split(/(?<=[다요]\.)\s+|(?<=[.。])\s+(?=[-•ㅇ·▪(\[]|[가-힣A-Z])/);
+  const hit = parts.find(x => /동일\s*유형[^.。]{0,20}예비\s*입주자[^.。]{0,10}중복\s*선정/.test(x));
+  return hit ? hit.replace(/^[-•ㅇ·▪\s]+/, '').trim() : '';
+}
+function zf12DupSelLine(card, sent){
+  const l2 = card.querySelector('.zf12-l2');
+  if(!l2 || l2.querySelector('.zf12-dupsel')) return;
+  l2.insertAdjacentHTML('afterbegin', `<details class="zf12-basis zf12-dupsel" onclick="event.stopPropagation()"><summary>🔒 동일 유형 예비입주자 중복 선정 안 됨</summary><p class="zf12-basis-raw">${escapeHtml(sent)}</p></details>`);
 }
 function zf12BasisLine(card, sent){
   const l2 = card.querySelector('.zf12-l2');
