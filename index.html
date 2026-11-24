@@ -6033,7 +6033,8 @@ function zfAnaPendingHtml(url, org){
 //    제목 · 공고일 · 마감 · 원문 링크 · 상세 펼침 없음. 데이터·거름·셈은 그대로(표시만 · 마감 목록 단추 건수 · 인사이트 누적 영향 0).
 //    「미분석」은 카드 요약 자리와 같은 RPC 칸(get_announcement_price_summary analysis_done)으로만 가른다 — 새 판정 0.
 //    ⑤ = 「분석 중」(zfAnaPending)이던 닫힌 카드(그 말이 틀린 말이라 걷는다).
-function zfClosedLiteKind(s, key){ return zfAnaPending(s, key); }
+//    ④ = 닫힌 미분석 전부 — 「AI 정리」를 접는 판정(zfAiOff: analysis_done 거짓 ∧ 같은 게시물 LH 정리 없음)과 같다 = 「분석 중」 ∪ 첨부 0(「꼭집이 아직 분석하지 않은 공고예요」).
+function zfClosedLiteKind(s, key){ return zfAiOff(s, key); }
 function zfClosedLiteRow(id, s, key){
   if(!s || !zfClosedLiteKind(s, key)) return null;
   const row = (noticeData || []).find(n => String(n['announcement_id']) === String(id));
