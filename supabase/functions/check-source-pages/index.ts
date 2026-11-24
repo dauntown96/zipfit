@@ -88,7 +88,7 @@ async function checkLh(t: Target, runId: number) {
   return {
     ...baseRow(t, runId), page_url: url, http_status: r.status, page_form: p.form, page_status: p.status,
     page_apply_start: p.applyStart, page_apply_end: p.applyEnd, page_schedules: p.schedules,
-    ...compareLh(p, { apply_start: t.card_apply_start, apply_end: t.card_apply_end }, t.card_phases ?? []),
+    ...compareLh(p, { apply_start: t.card_apply_start, apply_end: t.card_apply_end, apply_end_confirmed: t.card_apply_end_confirmed }, t.card_phases ?? []),
   }
 }
 

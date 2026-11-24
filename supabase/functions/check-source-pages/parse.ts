@@ -155,9 +155,16 @@ export function matchFollowups(annTitle: string, annDate: string | null, posts: 
 //   다름에서 뺀다(기록 칸 phase_match 에 차수 이름을 남긴다). 매입 공고는 페이지가 첫 차수(1순위 (우선)) 창만 주고
 //   카드 확정값은 공고 전체 창이다 — 카드가 맞다(…20737 · …20875 · …20882 · 2026-10-08 경로 표 대조).
 export type Phase = { phase: string | null; start: string | null; end: string | null }
-export function compareLh(p: LhPage, card: { apply_start: string | null; apply_end: string | null }, phases: Phase[] = []) {
+// 🔵 2026-11-24(우편함 「코드·운영 — 열일곱째 묶음 A장」 2) — 차수 일치의 사각: 카드에 확정값이 없고 카드 끝이 페이지 끝도 아니고
+//   어느 차수 창(경로 표 · 일정 표 접수 단계)의 끝도 아니면 「카드 끝이 원문 어디에도 없다」 — 차수 일치여도 end_diff 참.
+//   …21036(11-24): 페이지 12-07~12-09 = 일정 표 접수 창 → 차수 일치로 걸러졌고 카드는 LH 목록 값 12-11(확정값 없음)이었다.
+//   다회 창 카드(확정값 있음 · 페이지가 1순위 창만 보임 — …20882 꼴)는 지금처럼 거른다.
+export function compareLh(p: LhPage, card: { apply_start: string | null; apply_end: string | null; apply_end_confirmed?: string | null }, phases: Phase[] = []) {
   const ph = (p.applyStart && p.applyEnd) ? phases.find(x => x.start === p.applyStart && x.end === p.applyEnd) : undefined
-  if (ph) return { closed_mismatch: p.status === '접수마감', end_diff: false, start_diff: false, phase_match: ph.phase ?? '' }
+  if (ph) {
+    const nowhere = !card.apply_end_confirmed && !!card.apply_end && card.apply_end !== p.applyEnd && !phases.some(x => x.end === card.apply_end)
+    return { closed_mismatch: p.status === '접수마감', end_diff: nowhere, start_diff: false, phase_match: ph.phase ?? '' }
+  }
   return {
     closed_mismatch: p.status === '접수마감',
     end_diff: !!p.applyEnd && p.applyEnd !== card.apply_end,
