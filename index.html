@@ -1311,6 +1311,8 @@ html.zf12 .zf12-cov{font-size:var(--t-xs);color:var(--ink-3)}
 html.zf12 .zf12-badges .chip.zf-chip-new{background:var(--ink)!important;border-color:var(--ink)!important;color:var(--paper)!important}   /* NEW = 재편 전 겉 꼴 그대로(경고 색 아님) */
 html.zf12 .zf12-badges .chip.zf12-dup[aria-expanded="true"]{flex-wrap:wrap;max-width:100%}   /* 판 E 5 — 펼치면 원문 문장이 칩 아래 줄로(이름 옆에 끼지 않게) */
 html.zf12 .zf12-badges .chip.zf12-dup .zf-tip-txt{flex-basis:100%;font-weight:500}
+html.zf12 .zf12-badges > .zf-tip-out{flex-basis:100%;box-sizing:border-box;padding:6px 10px;border-radius:var(--r-1);background:var(--warn-bg);border:1px solid var(--warn-line,var(--warn));color:var(--ink);font-size:var(--t-xs);font-weight:500;line-height:1.5;white-space:normal}   /* 🔵 판 G 고장 1 — 배지 설명은 배지 줄 밖 한 줄(카드 폭) */
+html.zf12 .zf12-badges .chip[data-zf-tip][aria-expanded="true"]{box-shadow:inset 0 -2px 0 var(--warn)}   /* 펼친 칩 표지(높이 그대로) */
 html.zf12 .zf12-badges .chip.zf-recheck{background:var(--surface-2)!important;border-color:var(--line)!important;color:var(--ink-2)!important;font-weight:600}   /* 🔵 판 D ① 재확인 대기 = 정보(경고 색 아님) */
 html.zf12 .zf12-badges .chip[role=button]{position:relative}
 html.zf12 .zf12-badges .chip[role=button]::after{content:"";position:absolute;left:0;right:0;top:-10px;bottom:-10px}   /* 누르는 자리 44px(보이는 높이 24 + 위아래 10) */
@@ -2327,6 +2329,7 @@ function zfRelaxKind(title, detail){
   if(/추가\s*모집/.test(t)) return { label: '자격완화 추가모집', text: '이 공고는 입주자격을 완화한 추가모집입니다.' };
   return { label: '자격완화', text: '이 공고는 입주자격을 완화해 모집합니다.' };
 }
+const ZF_CONTRACT_VERIFY_TIP = '자격 검증 전에 먼저 계약을 체결합니다. 계약 후 부적격으로 판명되면 계약이 직권 해제될 수 있어요.';
 // 신청 편의도 미니뱃지 생성 (mymy/supply_form/application_method/recruit_multiplier/완화모집/선정방식)
 function buildConvBadges(mymy, supplyForm, appMethod, recruitMult, isRelaxed, selectionMethod, title, relaxDetail){
   const badges = [];
@@ -2349,7 +2352,9 @@ function buildConvBadges(mymy, supplyForm, appMethod, recruitMult, isRelaxed, se
   if(selectionMethod === '선착순방문'){
     badges.push('<span class="chip sel zf-chip-warn" style="cursor:default;padding:3px 8px;font-size:var(--t-xs)">🏃 선착순 방문접수</span>');
   } else if(selectionMethod === '선계약후검증'){
-    badges.push('<span class="chip sel zf-chip-warn" style="cursor:default;padding:3px 8px;font-size:var(--t-xs);background:#EF9F27;border-color:#EF9F27">⚠️ 선계약후검증</span>');
+    // 🔵 2026-11-24(우편함 「표시층 — 판 G」 고장 1) — selection_method 경로의 같은 경고가 설명 없이(누를 수 없는 칩) 「선계약후검증」으로 섰다 —
+    //    zfWarnBadges(contract_before_verification 경로)와 같은 이름 · 같은 설명 글(title) · 같은 누름(data-zf-tip)으로 한 벌.
+    badges.push('<span class="chip sel zf-chip-warn" title="' + ZF_CONTRACT_VERIFY_TIP + '" data-zf-tip tabindex="0" role="button" aria-expanded="false" style="cursor:pointer;padding:3px 8px;font-size:var(--t-xs);background:#EF9F27;border-color:#EF9F27">⚠️ 선계약 후검증</span>');
   } else if(selectionMethod === '우선순위추첨'){
     badges.push('<span class="chip sel" style="cursor:default;padding:3px 8px;font-size:var(--t-xs);background:#7F77DD;border-color:#7F77DD">🎲 우선순위+추첨</span>');
   }
@@ -5943,8 +5948,24 @@ function zfRoundTagHtml(s){
 
 // 🔵 2026-10-28(우편함 「S1 표현 고침 여덟」 7) — 설명이 마우스 올리기(title)에만 있던 칩(접수기간 미상·확인 · 취소 · 경고 · 임대료 면제 · ㎡당 월세 낮은 편)은
 //    누르거나(터치) Enter·Space 로 칩 안에 설명을 펼친다 · 한 번 더 누르면 접는다. 설명 글은 title 그대로(새 문구 0) · 카드 펼침으로 번지지 않는다(캡처 단계에서 멈춤).
+// 🔵 2026-11-24(우편함 「표시층 — 판 G」 고장 1) — 카드 1층 배지 줄(.zf12-badges) 안 칩은 설명을 칩 안이 아니라 배지 줄 밖 한 줄(카드 폭 · .zf-tip-out)에 편다 —
+//    칩 안에 펴면 PC 에서 칩이 두 줄로 두꺼워져 옆 배지(「일정 확인 필요」)를 아랫줄로 밀었다. 한 줄에 하나만(다른 칩을 누르면 그 설명으로 바뀐다) · 설명 글은 title 그대로.
+function zfTipOut(el, open){
+  const row = el.closest('.zf12-badges');
+  row.querySelectorAll(':scope > .zf-tip-out').forEach(x => x.remove());
+  row.querySelectorAll('[data-zf-tip][aria-expanded="true"]').forEach(x => { if(x !== el) x.setAttribute('aria-expanded', 'false'); });
+  if(!open){
+    const t = document.createElement('span');
+    t.className = 'zf-tip-out';
+    t.setAttribute('role', 'note');
+    t.textContent = el.getAttribute('title') || '';
+    row.appendChild(t);
+  }
+  el.setAttribute('aria-expanded', open ? 'false' : 'true');
+}
 function zfTipToggle(el){
   const open = el.getAttribute('aria-expanded') === 'true';
+  if(document.documentElement.classList.contains('zf12') && el.closest('.zf12-badges')) return zfTipOut(el, open);
   const old = el.querySelector(':scope > .zf-tip-txt');
   if(old) old.remove();
   if(!open){
@@ -6613,7 +6634,7 @@ function zfWarnBadges(o){
   const b = [];
   const at = s => escapeHtml(String(s || ''));
   if(o.contractVerify && o.selectionMethod !== '선계약후검증'){
-    b.push('<span class="chip sel zf-chip-warn" title="자격 검증 전에 먼저 계약을 체결합니다. 계약 후 부적격으로 판명되면 계약이 직권 해제될 수 있어요." data-zf-tip tabindex="0" role="button" aria-expanded="false" style="cursor:pointer;padding:4px 10px;font-size:var(--t-xs)">⚠️ 선계약 후검증</span>');
+    b.push('<span class="chip sel zf-chip-warn" title="' + ZF_CONTRACT_VERIFY_TIP + '" data-zf-tip tabindex="0" role="button" aria-expanded="false" style="cursor:pointer;padding:4px 10px;font-size:var(--t-xs)">⚠️ 선계약 후검증</span>');
   }
   if(o.rentExemptUntil){
     b.push(`<span class="chip sel zf-chip-info" title="${at('~' + o.rentExemptUntil + '까지 월임대료 면제' + (o.rentExemptNote ? ' / ' + o.rentExemptNote : ''))}" data-zf-tip tabindex="0" role="button" aria-expanded="false" style="cursor:pointer;padding:4px 10px;font-size:var(--t-xs)">🎁 임대료 면제</span>`);
