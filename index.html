@@ -864,10 +864,6 @@ html[data-ui="d3"] .zf-sch .policy-content{white-space:normal;overflow-wrap:anyw
 .hcard.zf-ana-pending .zf-ai-lbl,.hcard.zf-ana-no .zf-ai-lbl,.zf-ai-off .zf-ai-lbl{display:none}
 /* 🔵 2026-11-24(판 E 3) — 회차 추이 한 줄(「다른 회차」 머리) */
 .zf-round-trend{margin:10px 0 0;padding-top:10px;border-top:1px dashed var(--line,#e0e0d8);font-size:var(--t-xs);font-weight:600;color:var(--ink-2,#444)}
-.zf-round-chart{display:flex;flex-direction:column;gap:4px;margin:6px 0 2px;color:var(--ink-2,#444)}
-.zf-round-chart svg{flex:none;overflow:visible}
-.zf-rc-txt{font-size:var(--t-xs);line-height:1.5;color:var(--ink-3,#5a616b);min-width:0;overflow-wrap:anywhere}
-.zf-round-chart + .hu-past{border-top:0;margin-top:4px;padding-top:4px}
 .zf-round-trend + .hu-past{border-top:0;margin-top:4px;padding-top:4px}
 /* 🔵 2026-11-24(판 D ② (나)) — 같은 금액 다른 동 접힘 표지 */
 .hu-same-amt>summary{cursor:pointer;list-style:none}
@@ -12106,28 +12102,7 @@ function zfRoundTrendHtml(all){
   const parts = [`지난 ${t.n - 1}회차`];
   if(t.changes != null) parts.push(`가격 변동 ${t.changes}번`);
   if(t.counts) parts.push(`모집 ${t.counts.map(c => c.toLocaleString()).join('→')}세대`);
-  return `<p class="zf-round-trend" data-zf-rounds="${zfAttr(t.dates.join(' '))}">🕘 ${escapeHtml(parts.join(' · '))}</p>` + zfRoundChartHtml(t);
-}
-// 🔵 2026-11-24(판 E 3 (가)) — 같은 축(모든 회차에 있는 첫 단지·형·계층)의 회차가 셋 이상이면 작은 꺾은선 둘(보증금 실선 · 월 점선 · 각자 최솟값~최댓값으로 높이).
-//    값은 원문 그대로 읽기 글(aria-label)과 아래 한 줄에 · 축 이름은 계층(supply_target) 글자 그대로.
-function zfRoundChartHtml(t){
-  const S = (t && t.series) || [];
-  if(S.length < 3) return '';
-  const W = 150, H = 34, pad = 4;
-  const line = (k, dash) => {
-    const v = S.map(p => p[k]); if(v.some(x => x == null || !isFinite(x))) return '';
-    const lo = Math.min(...v), hi = Math.max(...v);
-    const pts = v.map((x, i) => `${(pad + i * (W - 2 * pad) / (v.length - 1)).toFixed(1)},${(hi === lo ? H / 2 : H - pad - (x - lo) * (H - 2 * pad) / (hi - lo)).toFixed(1)}`).join(' ');
-    return `<polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="1.8"${dash ? ' stroke-dasharray="3 3"' : ''}/>` + v.map((x, i) => `<circle cx="${pts.split(' ')[i].split(',')[0]}" cy="${pts.split(' ')[i].split(',')[1]}" r="2" fill="currentColor"/>`).join('');
-  };
-  const won = x => x == null ? '모름' : Number(x).toLocaleString() + '원';
-  // 이어서 같은 값은 한 번(「34,920,000원 3회」) — 값 글자는 그대로
-  const runs = a => { const out = []; a.forEach(x => { const l = out[out.length - 1]; if(l && l.v === x) l.n++; else out.push({ v: x, n: 1 }); }); return out.map(r => r.n > 1 ? `${r.v} ${r.n}회` : r.v).join(' → '); };
-  const dep = runs(S.map(p => won(p.dep))), rent = runs(S.map(p => p.rent === 0 ? '월세없음' : won(p.rent)));
-  const axis = String(t.axis || '').split('|').filter(Boolean).slice(1).filter((x, i, a) => a.indexOf(x) === i).join(' · ');
-  const label = `${axis ? axis + ' — ' : ''}보증금 ${dep} · 월 ${rent}`;
-  return `<div class="zf-round-chart" role="img" aria-label="${zfAttr(label)}"><svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">${line('dep', false)}${line('rent', true)}</svg>`
-    + `<span class="zf-rc-txt">${escapeHtml(S.map(p => p.d.slice(2)).join(' · '))}<br>— 보증금 ${escapeHtml(dep)}<br>┈ 월 ${escapeHtml(rent)}${axis ? `<br>${escapeHtml(axis)}` : ''}</span></div>`;
+  return `<p class="zf-round-trend" data-zf-rounds="${zfAttr(t.dates.join(' '))}">🕘 ${escapeHtml(parts.join(' · '))}</p>`;
 }
 function groupHousingUnits(units){
   const map = new Map();
