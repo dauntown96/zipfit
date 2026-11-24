@@ -21,6 +21,7 @@ import { judgeApiExpiry } from './api-expiry.mjs'
 import { screenRunSql, judgeScreenRun } from './screen-run.mjs'
 import { INCOME_ROWS_SQL, judgeIncome } from './income-table.mjs'
 import { INCOME_PCT_SQL, judgeIncomePct } from './income-pct.mjs'
+import { PAGE_UNITS_SQL, judgePageUnits } from './page-units.mjs'
 import { PRIVACY_MATCH_SQL, judgePrivacyMatch, v2StartOf } from './privacy-match.mjs'
 import { judgeWideFetch, SPOTS as WIDE_SPOTS } from './wide-fetch.mjs'
 import { judgeUnitUnknown, sidoAliasesOf } from './unit-sigungu.mjs'
@@ -1624,6 +1625,17 @@ try {
   add('income_pct_pair', '소득표 비율 줄 사이 바탕값 어긋남(70%·100% 등 · 1인 +20%p · 2인 +10%p)', j.status, j.value, j.rule)
 } catch (e) {
   add('income_pct_pair', '소득표 비율 줄 사이 바탕값 어긋남(셈)', 'info', String(e).slice(0, 200), '정책 표를 읽는다(실패면 ℹ️)')
+}
+
+// ㊼ LH 「주택형 안내」 표 ↔ 세대 행(2026-11-24 · 열일곱째 묶음 A장 3) — 판정·SQL 은 page-units.mjs 머리 주석. ⚠️ 값 다름만(안 멈춤 · HARD 밖).
+//    칸 source_page_checks.page_units 가 없으면(적용 전) · 아직 채운 회차가 없으면 ℹ️.
+try {
+  const [x] = await sqlRead(PAGE_UNITS_SQL)
+  const j = judgePageUnits(x.j)
+  if (!(x.j.cards || []).length) add('source_units_diff', 'LH 공고 페이지 「주택형 안내」 ↔ 세대 행(전용면적)', 'info', '대조할 회차 0(page_units 채운 행 없음)', j.rule)
+  else add('source_units_diff', 'LH 공고 페이지 「주택형 안내」 ↔ 세대 행(전용면적)', j.status, j.value, j.rule)
+} catch (e) {
+  add('source_units_diff', 'LH 공고 페이지 「주택형 안내」 ↔ 세대 행(전용면적)', 'info', String(e).slice(0, 200), '칸이 없으면(적용 전) ℹ️')
 }
 
 // ㊺ 선순위 마감 공지 감지(2026-11-24 · 열여섯째 묶음 1) — collect-lh-notices 가 wave_cutoff_targets() 카드마다 「앞 창 끝 뒤 ~ 이 창 시작 전」 LH 공지를
