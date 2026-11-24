@@ -862,6 +862,11 @@ html[data-ui="d3"] .zf-sch .policy-content{white-space:normal;overflow-wrap:anyw
 .zf-sch-stop>summary{list-style:none;cursor:pointer;display:block}
 .hcard.zf-ana-pending :is(.zf3-dpill,.htag,.chip-row,.zf-dateline,.zf-rec-date,.zf3-route,.zf3-dl-tags,.zf-route-slot,.zf-notices-slot,.zf-dcell-date,[id^="schedule-slot-"]){display:none!important}
 .hcard.zf-ana-pending .zf-ai-lbl,.hcard.zf-ana-no .zf-ai-lbl,.zf-ai-off .zf-ai-lbl{display:none}
+/* 🔵 2026-11-24(판 D ② (나)) — 같은 금액 다른 동 접힘 표지 */
+.hu-same-amt>summary{cursor:pointer;list-style:none}
+.hu-same-amt>summary::-webkit-details-marker{display:none}
+.hu-same-chip{display:inline-block;padding:2px 9px;font-size:var(--t-xs);cursor:pointer;background:var(--surface-2,#f0efe9);color:var(--ink-2,#444);border-color:var(--line,#ddd);margin-left:6px}
+.hu-same-amt[open] .hu-same-chip{background:var(--ink,#222);color:var(--paper,#fff);border-color:var(--ink,#222)}
 /* 🔵 2026-11-24(판 D ①) — 재확인 대기 칩은 「분석 중」·간단 줄 카드에서 접는다 */
 .hcard:is(.zf-ana-pending,.zf-lite) .zf-recheck{display:none!important}
 /* 🔵 2026-11-24(판 D ⑤·④) — 닫힌 미분석 카드 간단 줄: 머리(유형·곳 · 제목·상태)와 줄 하나만 · 펼침 꺾쇠 없음 */
@@ -12431,10 +12436,10 @@ function zfNoteFacts(u){
   return (a ? a[1] : '') + '/' + (b ? b[1] : '');
 }
 function buildUnitGroupLines(g){
-  // 🔵 판 D ② (가) — 계약면적·건설 호수가 다르면 한 줄로 접지 않는다(동마다 따로 줄).
+  // 🔵 판 D ② (나) — 계약면적·건설 호수가 달라도 같은 금액이면 한 줄로 접되, 줄에 「같은 금액 N행」 표지 + 동별 비고는 펼쳐서(renderHousingUnitGroup).
   const lineKey = u => [u.supply_target || u.unit_type || '', u.deposit, u.monthly_rent,
                         u.deposit_priority1, u.rent_priority1, u.floor_info || '',
-                        u.zfRoundLabel || '', u.zfPastOnly ? '1' : '', zfNoteFacts(u)].join('|');
+                        u.zfRoundLabel || '', u.zfPastOnly ? '1' : ''].join('|');
   const byLine = new Map();
   const lines = [];
   g.units.forEach(u => {
@@ -12492,11 +12497,13 @@ function renderHousingUnitGroup(g, mode){
     const rowPick = headPick ? null : zfReserveCommon(ln.units || [u], '모집예비자수');
     const noteCtx = zfNoteCtxOf(ln.units || [u], [headTotal, u.recruit_count], (headPick || rowPick || {}).value);
     const noteBlocks = ln.notes.map(n => renderExtraNoteHtml(n, noteCtx)).filter(Boolean);
-    const note = noteBlocks.length
-      ? `<div class="hu-note-wrap"><span class="hu-label">비고</span>`
-        + noteBlocks.map(h => `<div class="hu-note-block">${h}</div>`).join('')
-        + `</div>`
-      : '';
+    // 🔵 판 D ② (나) — 한 줄에 접힌 행이 계약면적·건설 호수로 갈리면(다른 동) 「같은 금액 N행」 · 비고는 접어 두고 펼치면 행(동)마다.
+    const sameN = new Set((ln.units || [u]).map(zfNoteFacts)).size;
+    const noteInner = noteBlocks.map(h => `<div class="hu-note-block">${h}</div>`).join('');
+    const note = !noteBlocks.length ? ''
+      : sameN > 1
+        ? `<details class="hu-note-wrap hu-same-amt"><summary><span class="hu-label">비고</span> <span class="chip hu-same-chip">같은 금액 ${sameN}행 · 동별 보기</span></summary>${noteInner}</details>`
+        : `<div class="hu-note-wrap"><span class="hu-label">비고</span>${noteInner}</div>`;
     return `<div class="hu-ug-row">
       <div class="hu-ug-line">
         <span class="hu-ug-target">${escapeHtml(u.supply_target || u.unit_type || '')}</span>
