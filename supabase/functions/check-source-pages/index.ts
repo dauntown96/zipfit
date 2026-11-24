@@ -16,7 +16,7 @@
 //   (SH_311349 — 09:00 수집 · 첫 대조 20:30 예정). 이미 대조된 키는 정기 회차 몫 그대로라 과거 공고가 몰려 들어오지 않는다.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2.116.0'
-import { parseLhPage, compareLh, parseShList, parseShBoard, matchFollowups, type ShPost, type Phase } from './parse.ts'
+import { parseLhPage, parseLhUnits, compareLh, parseShList, parseShBoard, matchFollowups, type ShPost, type Phase } from './parse.ts'
 
 const requireEnv = (key: string): string => {
   const v = Deno.env.get(key)
@@ -88,6 +88,7 @@ async function checkLh(t: Target, runId: number) {
   return {
     ...baseRow(t, runId), page_url: url, http_status: r.status, page_form: p.form, page_status: p.status,
     page_apply_start: p.applyStart, page_apply_end: p.applyEnd, page_schedules: p.schedules,
+    page_units: parseLhUnits(r.text),  // 🔵 2026-11-24(열일곱째 묶음 A장 3) — 같은 GET 응답의 「주택형 안내」 표(호출 +0)
     ...compareLh(p, { apply_start: t.card_apply_start, apply_end: t.card_apply_end, apply_end_confirmed: t.card_apply_end_confirmed }, t.card_phases ?? []),
   }
 }

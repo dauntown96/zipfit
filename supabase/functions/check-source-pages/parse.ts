@@ -172,3 +172,36 @@ export function compareLh(p: LhPage, card: { apply_start: string | null; apply_e
     phase_match: null,
   }
 }
+
+// ── LH 「주택형 안내」 표(2026-11-24 · 우편함 「코드·운영 — 열일곱째 묶음 A장」 3 · 조사 「두 가지(읽기만)」 ⑦1) ──────────────
+// 같은 GET 응답의 단지 탭마다 서버가 그려 둔 표(`<h4 class="tit2">주택형 안내</h4>` 뒤 첫 table) — 호출 +0 · 「상세보기」 팝업은 부르지 않는다.
+//   탭 이름 = `li#tabliN > a` 글자(표 순서 = 탭 순서 · 2026-11-24 표본 10쪽 실측) · 탭 없는 페이지는 표 하나(tab null).
+//   칸은 머리 글자로 고른다(꼴이 둘 — 8칸 「주택형 · 전용면적 · 세대수 · 금회공급 세대수(예비자 포함) · …」 · 7칸 행복·신혼희망 「세대수」 없음).
+//   행 칸 수가 머리와 다르면 short(읽지 않음) · 「주택형 데이터가 없습니다」는 nodata · 매입 꼴(표 없음)은 [].
+export type PageUnitRow = { hty: string; area: number | null; households: number | null; supply: number | null; short?: boolean }
+export type PageUnitTab = { tab: string | null; nodata: boolean; rows: PageUnitRow[] }
+const num = (s: string | undefined): number | null => {
+  const t = (s ?? '').replace(/,/g, '').trim()
+  return /^\d+(\.\d+)?$/.test(t) ? Number(t) : null
+}
+export function parseLhUnits(html: string): PageUnitTab[] {
+  const tabs = [...html.matchAll(/id="tabli(\d+)"[^>]*>\s*<a[^>]*>([\s\S]*?)<\/a>/g)].map(m => stripTags(m[2]))
+  const out: PageUnitTab[] = []
+  const secs = [...html.matchAll(/<h4 class="tit2">\s*주택형 안내\s*<\/h4>[\s\S]*?(<table>[\s\S]*?<\/table>)/g)].map(m => m[1])
+  secs.forEach((t, i) => {
+    const head = (t.match(/<thead>([\s\S]*?)<\/thead>/) ?? [, ''])[1] ?? ''
+    const cols = [...head.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/g)].map(x => stripTags(x[1].replace(/<br\s*\/?>/g, ' ')))
+    const ci = (re: RegExp) => cols.findIndex(c => re.test(c))
+    const iH = ci(/^주택형$/), iA = ci(/전용면적/), iN = ci(/^세대수$/), iS = ci(/금회공급/)
+    const body = (t.match(/<tbody>([\s\S]*?)<\/tbody>/) ?? [, ''])[1] ?? ''
+    const tab: PageUnitTab = { tab: tabs.length ? (tabs[i] ?? null) : null, nodata: /주택형 데이터가 없습니다/.test(body), rows: [] }
+    for (const tr of body.replace(/<!--[\s\S]*?-->/g, '').matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/g)) {
+      const cells = [...tr[1].matchAll(/<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/g)].map(x => stripTags(x[1]))
+      if (cells.length === 1 && tab.nodata) continue
+      if (iH < 0 || iA < 0 || cells.length !== cols.length) { tab.rows.push({ hty: cells[0] ?? '', area: null, households: null, supply: null, short: true }); continue }
+      tab.rows.push({ hty: cells[iH], area: num(cells[iA]), households: iN >= 0 ? num(cells[iN]) : null, supply: iS >= 0 ? num(cells[iS]) : null })
+    }
+    out.push(tab)
+  })
+  return out
+}
