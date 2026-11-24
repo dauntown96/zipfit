@@ -5,6 +5,9 @@
 //       ② 대상 0 이면 API 호출 0 — 런 기록만 남긴다 ③ 있으면 창 오늘−3 ~ 오늘(KST) · PG_SZ=100 으로 부른다(ALL_CNT 가 100 넘으면 3쪽까지)
 //       ④ 받은 목록을 lh_notice_ingest 에 넘긴다(맞춤 규칙 = lh_notice_pick · 맞은 것만 저장 · 런 기록 한 행).
 // 🔴 대기열에 넣지 않는다 — analysis_dispatch_tick #차수 갈래가 켜기 칸(wave_notice_enabled)을 보고 넣는다.
+// 🔵 2026-11-24(우편함 「코드·운영 — 열여섯째 묶음」 1) — 선순위 마감 공지도 본다: wave_cutoff_targets()(둘째 이후 창 카드 · 앞 창 끝남 · ⚠️ 선순위 마감 행 없음)가
+//    있으면 받는 창을 「가장 이른 앞 창 끝 다음 날(오늘−35 아래로는 안 감) ~ 오늘」로 넓힌다 · 맞춤·저장은 lh_notice_ingest(lh_cutoff_notice_pick → lh_cutoff_notice_matches).
+//    🔴 대기열에 넣지 않는다(셈만 — health-ops ℹ️ lh_cutoff_notice).
 // 호출:  ?mode=collect(pg_cron zipfit-collect-lh-notices · 하루 4회 KST 10·13·16·19시) · ?mode=authcheck(인증만 · 호출 0)
 // 인증: x-cron-secret(Vault cron_secret_v2) — JWT 없음(config.toml verify_jwt=false).
 import { createClient } from 'jsr:@supabase/supabase-js@2.116.0'
@@ -37,7 +40,8 @@ const scrubSecrets = (text: string): string => {
 
 const ENDPOINT = 'https://apis.data.go.kr/B552555/lhNoticeInfo1/getNoticeInfo1'
 const PAGE_SIZE = 100
-const MAX_PAGES = 3
+const MAX_PAGES = 5           // 선순위 마감 창(최대 35일)까지 — 10-24~11-24 한 달 142건 = 2쪽
+const CUTOFF_MAX_DAYS = 35
 const TRIES = 4             // apis.data.go.kr 은 절반쯤 연결을 끊는다(docs/network-allowlist.md) — 4번까지
 const CALL_TIMEOUT_MS = 20000
 
@@ -77,11 +81,21 @@ async function collect() {
   const { data: tg, error: te } = await supabase.rpc('wave_notice_targets')
   if (te) throw new Error(`wave_notice_targets: ${te.message}`)
   const targets = (tg ?? []).filter((t: Record<string, unknown>) => t.due === true && t.has_warn === false && t.scope_text)
-  const from = kstYmd(-3), to = kstYmd(0)
+  const { data: ct, error: ce } = await supabase.rpc('wave_cutoff_targets')
+  if (ce) throw new Error(`wave_cutoff_targets: ${ce.message}`)
+  const cutoff = (ct ?? []) as Record<string, unknown>[]
+  const floor = kstYmd(-CUTOFF_MAX_DAYS)
+  // 앞 창 끝 다음 날 — 'YYYY-MM-DD' 글자 비교로 가장 이른 것(오늘−35 아래로는 안 감)
+  const cutFrom = cutoff.map(c => String(c.prev_to ?? '')).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d))
+    .map(d => { const x = new Date(`${d}T00:00:00Z`); x.setUTCDate(x.getUTCDate() + 1); return x.toISOString().slice(0, 10) })
+    .reduce((a, b) => (a && a < b ? a : b), '')
+  const to = kstYmd(0)
+  let from = targets.length ? kstYmd(-3) : to
+  if (cutFrom) { const f = cutFrom < floor ? floor : cutFrom; if (!targets.length || f < from) from = f }
   const errors: string[] = []
   let calls = 0, ok = 0
   const notices: Notice[] = []
-  if (targets.length) {
+  if (targets.length || cutoff.length) {
     for (let page = 1; page <= MAX_PAGES; page++) {
       calls++
       try {
@@ -95,7 +109,7 @@ async function collect() {
       }
     }
   }
-  const run = { targets: targets.length, calls, ok_calls: ok, errors, duration_ms: Date.now() - t0, window_from: from, window_to: to }
+  const run = { targets: targets.length, cutoff_targets: cutoff.length, calls, ok_calls: ok, errors, duration_ms: Date.now() - t0, window_from: from, window_to: to }
   const { data, error } = await supabase.rpc('lh_notice_ingest', { p_notices: notices, p_run: run })
   if (error) throw new Error(`lh_notice_ingest: ${error.message}`)
   return { mode: 'collect', window: `${from}~${to}`, calls, ok_calls: ok, errors: errors.length, ...(data as Record<string, unknown>) }
