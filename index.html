@@ -16967,10 +16967,10 @@ function zf12PillTidy(card){
   // 🔴 2026-11-17 — 남은 날이 「D-n」 하나뿐이면 ◉ 날짜로 다시 센다(겉 줄의 접수일 기준 · 알약은 카드 행 시작일로 셌다 — …21044 D-14 ↔ ◉ 11-30)
   const dn = nd ? zf3Days(today, nd) : null;
   let txt = same ? (m ? 'D-' + m[1] : left) : (/^D-\d+$/.test(left) && dn != null && dn > 0 ? 'D-' + dn : left);
-  // 🔵 2026-11-24(우편함 「표시층 — 판 G」 고장 2) — D 앞에 무엇까지 세는지 낱말 — ◉ 접수 옆 「시작 D-n」 · ◉ 마감 옆 「마감 D-n」(◉ 날짜와 같을 때만 · 다르면 낱말 없이 종전대로).
+  // 🔵 2026-11-24(우편함 「표시층 — 판 G」 고장 2) — D 앞에 무엇까지 세는지 낱말 — ◉ 접수 옆 「시작 D-n」(◉ 날짜와 같을 때만) · ◉ 마감 옆은 역 이름이 이미 「마감」이라 낱말 없이.
   //    「이번 차수 …」는 차수 창 끝을 세는 말이라 ◉ 역에 붙이지 않고 노선 끝에 둔다(◉ 마감 12-15 옆에 「이번 차수 오늘 16:00까지」가 붙어 마감일로 읽혔다).
   const k = nx && nx.dataset.zf12K;
-  if(/^D-\d+$/.test(txt) && nd && zf3Days(today, nd) === Number(txt.slice(2))) txt = (k === '접수' ? '시작 ' : k === '마감' ? '마감 ' : '') + txt;
+  if(/^D-\d+$/.test(txt) && nd && zf3Days(today, nd) === Number(txt.slice(2))) txt = (k === '접수' ? '시작 ' : '') + txt;   // ◉ 마감 옆은 낱말 없이(「마감 12-07(월) 마감 D-13」 겹말)
   const tail = /^이번 차수/.test(txt);
   let dd = when.querySelector('.zf12-dd');
   if(!dd){ dd = document.createElement('span'); dd.className = 'zf12-dd'; }
