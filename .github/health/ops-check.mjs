@@ -20,6 +20,7 @@ import { RENT_ARITH_SQL, rentArith, rentArithValue, rentWarnMissingSql } from '.
 import { judgeApiExpiry } from './api-expiry.mjs'
 import { screenRunSql, judgeScreenRun } from './screen-run.mjs'
 import { INCOME_ROWS_SQL, judgeIncome } from './income-table.mjs'
+import { INCOME_PCT_SQL, judgeIncomePct } from './income-pct.mjs'
 import { PRIVACY_MATCH_SQL, judgePrivacyMatch, v2StartOf } from './privacy-match.mjs'
 import { judgeWideFetch, SPOTS as WIDE_SPOTS } from './wide-fetch.mjs'
 import { judgeUnitUnknown, sidoAliasesOf } from './unit-sigungu.mjs'
@@ -1567,6 +1568,60 @@ select json_build_object(
     '≤ 60분 — 넘으면 ⚠️(안 멈춤 · 목록 칸 recheck_pending 을 화면이 읽기 전 유일한 눈)')
 } catch (e) {
   add('round_chain_unanalyzed', '회차 고리 미분석 · 분석 행 없는 산물 · 재확인 체류(셋)', 'warn', String(e).slice(0, 200), '목록 RPC · 회차 고리 · 분석 · 대기열 표를 읽는다(못 읽으면 ⚠️)')
+}
+
+// ㊸ 분석 행 자리 어긋남(2026-11-24 · 우편함 「코드·운영 — 열여섯째 묶음」 3(가) · 근거 국면 C 계속 회신 2 ⑦2) — ℹ️ 셈만(판정 0 · 안 멈춤 · HARD 밖).
+//    세대·정책 행이 있는데 분석 행이 없는 공고 A(㊱ⓑ 과 같은 정의) 중, 같은 그룹(get_announcement_group_ids(A))에 「분석 행은 있고 세대·정책 행은 0」인 블록이 있는 것 —
+//    분석 행이 산물 없는 블록에 붙어 있는 꼴(산물 쪽 대표가 미분석으로 보인다). 그룹 수(그룹 id 최솟값으로 묶음).
+//    기준선 2026-11-24 09:4x(요청서): …20365 · …20331 둘 → 첫 실측 10:3x 1(…20331 · …20365 는 같은 날 분석 묶음 「국면C계속6」이 분석 행을 붙여 풀림).
+try {
+  const [x] = await sqlRead(`with pr as (select a.announcement_id from public.announcements a
+        where not exists (select 1 from public.announcement_analysis aa where aa.announcement_id = a.announcement_id)
+          and (exists (select 1 from public.housing_units h where h.announcement_id = a.announcement_id)
+               or exists (select 1 from public.announcement_policies p where p.announcement_id = a.announcement_id))),
+g as (select pr.announcement_id a, x.announcement_id b from pr cross join lateral public.get_announcement_group_ids(pr.announcement_id) x
+       where x.announcement_id <> pr.announcement_id),
+m as (select g.a, g.b from g
+       where exists (select 1 from public.announcement_analysis aa where aa.announcement_id = g.b)
+         and not exists (select 1 from public.housing_units h where h.announcement_id = g.b)
+         and not exists (select 1 from public.announcement_policies p where p.announcement_id = g.b)),
+k as (select m.a, (select min(z.announcement_id) from public.get_announcement_group_ids(m.a) z) gk from m group by m.a)
+select json_build_object('pr', (select count(*) from pr), 'groups', (select count(distinct gk) from k),
+  'list', (select coalesce(json_agg(a order by a), '[]'::json) from k)) j`)
+  const c = x.j
+  add('analysis_row_misplaced', '분석 행 자리 어긋남 — 산물 있는 공고는 미분석 ∧ 같은 그룹 산물 0 블록에 분석 행(셈)', 'info',
+    `${c.groups}그룹${c.list.length ? ': ' + c.list.slice(0, 5).join(', ') + (c.list.length > 5 ? ` 외 ${c.list.length - 5}` : '') : ''}(산물 있고 분석 행 없는 공고 ${c.pr})`,
+    'ℹ️ 숫자만(판정 0 · 안 멈춤) — 기준선 2026-11-24 2(…20365 · …20331) → 같은 날 …20365 풀림')
+} catch (e) {
+  add('analysis_row_misplaced', '분석 행 자리 어긋남(셈)', 'info', String(e).slice(0, 200), '공고·분석·세대·정책 표를 읽는다(실패면 ℹ️)')
+}
+
+// ㊹ 소득표 줄 사이 검산(2026-11-24 · 열여섯째 묶음 3(나)) — 판정·SQL 은 income-pct.mjs 머리 주석. ℹ️ 셈만(판정 0 · 안 멈춤 · HARD 밖).
+try {
+  const [x] = await sqlRead(INCOME_PCT_SQL)
+  const j = judgeIncomePct(x.j)
+  add('income_pct_pair', '소득표 비율 줄 사이 바탕값 어긋남(70%·100% 등 · 1인 +20%p · 2인 +10%p)', j.status, j.value, j.rule)
+} catch (e) {
+  add('income_pct_pair', '소득표 비율 줄 사이 바탕값 어긋남(셈)', 'info', String(e).slice(0, 200), '정책 표를 읽는다(실패면 ℹ️)')
+}
+
+// ㊺ 선순위 마감 공지 감지(2026-11-24 · 열여섯째 묶음 1) — collect-lh-notices 가 wave_cutoff_targets() 카드마다 「앞 창 끝 뒤 ~ 이 창 시작 전」 LH 공지를
+//    lh_cutoff_notice_pick 으로 맞춰 lh_cutoff_notice_matches 에 남긴다. ℹ️ 셈만(판정 0 · 안 멈춤 · HARD 밖) — 🔴 대기열 진입은 0이 정상
+//    (새 갈래를 루틴 v2.24 · reverify v5.10 이 모른다 · 개정 뒤 발송기 갈래를 연다). 표가 없으면(적용 전) ℹ️ 그 문구.
+try {
+  const [x] = await sqlRead(`select json_build_object(
+    'n', (select count(*) from public.lh_cutoff_notice_matches),
+    'd30', (select count(*) from public.lh_cutoff_notice_matches where matched_at > now() - interval '30 days'),
+    'ids', (select coalesce(json_agg(distinct announcement_id), '[]'::json) from public.lh_cutoff_notice_matches),
+    'last', (select json_build_object('at', to_char(r.run_at at time zone 'Asia/Seoul', 'MM-DD HH24:MI'), 't', r.cutoff_targets, 'm', r.cutoff_matched,
+                    'from', r.window_from, 'to', r.window_to) from public.lh_notice_run_log r order by r.run_at desc limit 1),
+    'q', (select count(*) from public.analysis_dispatch_queue q where q.group_key ~ '#선순위')) j`)
+  const c = x.j, l = c.last || {}
+  add('lh_cutoff_notice', '선순위 마감 공지 감지 — 맞은 공지 · 대기열 진입(셈)', 'info',
+    `맞은 공지 ${c.n}(30일 ${c.d30})${c.ids.length ? ': ' + c.ids.slice(0, 5).join(', ') : ''} · 대기열 진입 ${c.q} · 마지막 런 ${l.at ?? '—'} 대상 ${l.t ?? '—'} · 맞음 ${l.m ?? '—'}(창 ${l.from ?? '—'}~${l.to ?? '—'})`,
+    'ℹ️ 숫자만(판정 0 · 안 멈춤) — 대기열 진입은 0이 정상(루틴·스킬 개정 전) · 대상 = 둘째 이후 창 카드 중 앞 창 끝남 ∧ ⚠️ 선순위 마감 행 없음')
+} catch (e) {
+  add('lh_cutoff_notice', '선순위 마감 공지 감지(셈)', 'info', String(e).slice(0, 200), 'lh_cutoff_notice_matches · lh_notice_run_log 를 읽는다(적용 전이면 표 없음 · 실패면 ℹ️)')
 }
 
 // ⑱ 비밀값 만료(2026-10-17 · 우편함 「코드·운영 — 인스턴스 지표 정기 기록 · Vault 밖 만료 표 · 비밀값 30일 전 ⚠️ …」 3) — zipfit_ops.secret_expiry_list() 한 정의
