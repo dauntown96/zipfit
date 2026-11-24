@@ -864,6 +864,7 @@ html[data-ui="d3"] .zf-sch .policy-content{white-space:normal;overflow-wrap:anyw
 .hcard.zf-ana-pending .zf-ai-lbl,.hcard.zf-ana-no .zf-ai-lbl,.zf-ai-off .zf-ai-lbl{display:none}
 /* 🔵 2026-11-24(판 E 3) — 회차 추이 한 줄(「다른 회차」 머리) */
 .zf-round-trend{margin:10px 0 0;padding-top:10px;border-top:1px dashed var(--line,#e0e0d8);font-size:var(--t-xs);font-weight:600;color:var(--ink-2,#444)}
+.zf-round-cycle + .zf-round-trend{border-top:0;margin-top:2px;padding-top:0}
 .zf-round-trend + .hu-past{border-top:0;margin-top:4px;padding-top:4px}
 /* 🔵 2026-11-24(판 D ② (나)) — 같은 금액 다른 동 접힘 표지 */
 .hu-same-amt>summary{cursor:pointer;list-style:none}
@@ -1353,6 +1354,11 @@ html.zf12 .zf12-l2 > *{margin:0!important;order:20}
 /* 판 C 4 — 자식이 모두 빈 2층 머리(빈 칩 줄 · 빈 자리표) — 다자녀 전세임대처럼 세대 목록·경로·공고문 여럿이 없는 공고에서 빈 둥근 상자가 남았다(:empty 는 칩 줄의 공백 글자 때문에 못 받음) */
 html.zf12 .zf12-l2:not(:has(> .chip-row > :not(:empty))):not(:has(> :not(.chip-row):not(:empty))){display:none}   /* 칩 줄 안 빈 자리표(.zf-rentlow-slot)도 빈 것으로 */
 html.zf12 .zf12-l2 > .zf12-schedwhy{order:1}
+html.zf12 .zf12-l2 > .zf12-basis{order:2}
+html.zf12 .zf12-l2 > .zf12-basis.zf12-dupsel{order:2}   /* 판 F — 판단 기준일 둘 한 줄(일정 확인 필요 배너 다음) */
+.zf12-basis{font-size:var(--t-s);color:var(--ink-2,#444);border:1px solid var(--line,#e0e0d8);border-radius:var(--r-1,6px);padding:6px 10px;background:var(--surface,#fafaf6)}
+.zf12-basis>summary{cursor:pointer;font-weight:600;min-height:var(--hit,44px);display:flex;align-items:center}
+.zf12-basis-raw{margin:4px 0 2px;font-size:var(--t-xs);line-height:1.6;color:var(--ink-2,#444)}
 html.zf12 .zf12-l2 > .zf12-must{order:2}
 html.zf12 .zf12-l2 > .zf12-sqm{order:3}
 html.zf12 .zf12-l2 > .chip-row{order:4}
@@ -3493,6 +3499,16 @@ function zfRouteWindows(rows){
   for(let i = 1; i < out.length; i++) if(out[i].s <= out[i - 1].e) return [];
   return out;
 }
+// 🔵 2026-11-24(우편함 「표시층 — 판 F」 · 💡 「마감 시각 더 쓰기」 나머지 — 차수 창별 끝 시각) — ① 차수 줄의 차수마다, 그 차수 마지막 날(end_date = 창 끝) 경로 행이
+//    모두 원문 끝 시각을 적었고 그 시각이 하나면 「 HH:MM까지」(zf3EndHm — 카드 알약·마감 시각순과 같은 읽기). 시각이 갈리거나 하나라도 없으면 붙이지 않는다
+//    (한 경로의 시각을 다른 경로 사용자에게 말하지 않게 — zfEndHmOf 와 같은 거름). 날짜·차수 이름은 그대로.
+function zfPhaseEndHm(rs, pick, e){
+  const last = (rs || []).filter(r => pick(r) && String(r.end_date || '').slice(0, 10) === String(e || '').slice(0, 10));
+  if(!last.length) return '';
+  const hms = last.map(r => zf3EndHm(r.period_text));
+  if(hms.some(h => !h) || new Set(hms).size !== 1) return '';
+  return ` ${hms[0]}까지`;
+}
 function zfRouteVerdict(rows, today){
   if(!Array.isArray(rows) || !rows.length) return { kind: '없음', text: '' };
   const rs = rows.slice().sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
@@ -3528,12 +3544,12 @@ function zfRouteVerdict(rows, today){
       // 🔵 2026-11-17(우편함 「표시층 — 작은 판 2」 7) — 같은 단지 조각은 한데 모은다: 「단지 이름 · 1순위 12/1 · 2,3순위 12/2」(낱말 그대로 · 차례만 — 단지 차례 = 그 단지 첫 접수).
       const locs = [];
       parts.forEach(p => { let L = locs.find(x => x.loc === p.loc); if(!L){ L = { loc: p.loc, ps: [] }; locs.push(L); } L.ps.push(p); });
-      return { kind: '①', text: lead2 + ' · ' + locs.map(L => [L.loc, ...L.ps.map(p => `${p.ph} ${zfSpanText(p.s, p.e)}`.trim())].filter(Boolean).join(' · ')).join(' · ') + zfRouteOnsiteTail(rs) };
+      return { kind: '①', text: lead2 + ' · ' + locs.map(L => [L.loc, ...L.ps.map(p => `${p.ph} ${zfSpanText(p.s, p.e)}${zfPhaseEndHm(rs, r => r.phase_text === p.ph && loc(r) === p.loc, p.e)}`.trim())].filter(Boolean).join(' · ')).join(' · ') + zfRouteOnsiteTail(rs) };
     }
     // 🔵 2026-10-21(우편함 「표시층 — S1 묶음 3」 ⑥ · 조사 「표본 정확도 2차」 ⑦ 2) — 차수 이름에 「순위」가 하나도 없으면(…19312 첫날 · 2일차 ~ 마감일 —
     //    순위가 아니라 접수 차수) 「순위별로」라 하지 않는다. 순위 차수는 그대로.
     const lead = phases.some(p => /순위/.test(p.name)) ? '순위별로 접수일이 달라요' : '접수일이 나뉘어 있어요';
-    return { kind: '①', text: lead + ' · ' + phases.map(p => `${p.name} ${zfSpanText(p.s, p.e)}`.trim()).join(' · ') + zfRouteOnsiteTail(rs) };
+    return { kind: '①', text: lead + ' · ' + phases.map(p => `${p.name} ${zfSpanText(p.s, p.e)}${zfPhaseEndHm(rs, r => r.phase_text === p.name, p.e)}`.trim()).join(' · ') + zfRouteOnsiteTail(rs) };
   }
   // 묶음 — site_text 로 묶는다. site_text 가 NULL 인 행은 공통 행이라 **모든 묶음**에 들어간다.
   const names = [];
@@ -11495,6 +11511,9 @@ function loadPreciseEligibility(annId, detailEl, id, useGroup){
         // 🔴 (v/10000).toLocaleString() 은 만원 미만을 **조용히 반올림**한다 — manwonText 가 그 자리다.
         const asset = assetExempt ? '자산기준 배제' : (r.asset_limit ? `자산 ${manwonText(r.asset_limit)}` : '');
         const car = r.car_limit ? `차량가액 ${manwonText(r.car_limit)}` : '';
+        // 🔵 2026-11-24(우편함 「표시층 — 판 F」 O4 · 💡 「🚗 자동차 소유 불가」) — car_limit 0 은 종전 조건(참 값만)에서 아무것도 안 그렸다. 0 이고 원문(자격 행 글)에
+        //    「자동차 … 소유하고 있지 않을 것」·「소유 불가」 문장이 있을 때만 칩 「🚗 자동차 소유 불가」 · 누르면 그 원문 문장 그대로(0 만으로는 짓지 않는다).
+        const carNone = (Number(r.car_limit) === 0 && r.car_limit !== null) ? zfCarNoneSentence(r.verification_requirements) : '';
         // verification_requirements(jsonb, 키가 공고마다 다름) — 하드코딩 없이 Object.entries()로 범용 순회.
         // 중첩 객체(예: 자녀수별 자산기준표)는 raw JSON 대신 들여쓴 하위 목록으로, 숫자는 만원 단위로 변환.
         let vr = '';
@@ -11511,6 +11530,7 @@ function loadPreciseEligibility(annId, detailEl, id, useGroup){
           ${income ? `<div class="elig-row"><span>소득기준</span><span>${income}${dual}</span></div>` : ''}
           ${asset ? `<div class="elig-row"><span>자산기준</span><span>${asset}</span></div>` : ''}
           ${car ? `<div class="elig-row"><span>차량가액</span><span>${car}</span></div>` : ''}
+          ${carNone ? `<div class="elig-row"><span>차량가액</span><span><span class="chip sel zf-chip-warn zf-car-none" title="${zfAttr(carNone)}" data-zf-tip tabindex="0" role="button" aria-expanded="false" style="cursor:pointer;padding:3px 9px;font-size:var(--t-xs)">🚗 자동차 소유 불가</span></span></div>` : ''}
           ${vr}
         </div>`;
       };
@@ -12015,7 +12035,7 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
       : '';
     const pastLineCount = countHousingUnitLines(diffPast);
     // 🔵 2026-11-24(판 E 3 (나)) — 「다른 회차」 머리에 회차 추이 한 줄(같은 단지 같은 형 · 이번 회차 + 지난 회차 세대 행 — 새 요청 0).
-    const trendHtml = !pastOnly && pastUnits.length && units.length ? zfRoundTrendHtml(units.concat(pastUnits)) : '';
+    const trendHtml = (pastUnits.length ? zfRoundCycleHtml(pastUnits, units) : '') + (!pastOnly && pastUnits.length && units.length ? zfRoundTrendHtml(units.concat(pastUnits)) : '');
     const pastHtml = trendHtml + (diffPast.length
       ? `<details class="hu-past"><summary class="hu-past-title">🕘 다른 회차 보기 (${pastLineCount}건)</summary>`
         + `<div class="hu-past-list">${renderHousingUnitList(diffPast)}</div></details>`
@@ -12094,6 +12114,19 @@ function zfRoundTrend(all){
   const common = [...P[0].keys()].find(k => P.every(m => m.has(k))) || '';
   const series = common ? P.map((m, i) => { const [dep, rent] = m.get(common).split('/'); return { d: dates[i], dep: dep === 'null' ? null : Number(dep), rent: rent === 'null' ? null : Number(rent) }; }) : [];
   return { n: dates.length, dates, changes: compared ? changes : null, counts: commonG.size && counts.every(c => c != null) ? counts : null, series, axis: common };
+}
+// 🔵 2026-11-24(우편함 「표시층 — 판 F」 · 💡 「단지 모집 주기 한 줄」 — 상세 안만) — 「🗓️ 이 단지는 지난 n회 ○월·○월에 모집」.
+//    재료 = 상세가 이미 받은 지난 회차 세대 행의 회차 날짜(zfRoundDate — 회차 공고일) · 새 요청 0. 단지(building_name)가 하나일 때만(여러 단지 공고는 「이 단지」가 아니다).
+//    달 = 회차 공고일의 달(올해면 「5월」 · 아니면 「2025년 11월」) · 같은 달은 한 번.
+function zfRoundCycleHtml(past, cur){
+  const all = (past || []).concat(cur || []);
+  const blds = new Set(all.map(u => String((u && u.building_name) || '').trim()).filter(Boolean));
+  if(blds.size !== 1) return '';
+  const dates = [...new Set((past || []).map(u => u && u.zfRoundDate).filter(Boolean))].sort();
+  if(!dates.length) return '';
+  const yr = zf3Today().slice(0, 4);
+  const months = [...new Set(dates.map(d => (d.slice(0, 4) === yr ? '' : d.slice(0, 4) + '년 ') + Number(d.slice(5, 7)) + '월'))];
+  return `<p class="zf-round-trend zf-round-cycle" data-zf-rounds="${zfAttr(dates.join(' '))}">🗓️ 이 단지는 지난 ${dates.length}회 ${escapeHtml(months.join('·'))}에 모집</p>`;
 }
 function zfRoundTrendHtml(all){
   const t = zfRoundTrend(all);
@@ -16680,7 +16713,7 @@ async function zf12Load(rows){
     const cats = ZF12_ELIG_CATS.map(c => `"${c}"`).join(',');
     const [hu, pol] = await Promise.all([
       fetch(`${SUPABASE_URL}/rest/v1/housing_units?select=announcement_id,supply_target,seq&${idFilterFor(all)}&order=seq`, { headers: zfAnonHeaders() }).then(r => r.ok ? r.json() : []),
-      fetch(`${SUPABASE_URL}/rest/v1/announcement_policies?select=id,announcement_id,category,seq,content_raw&${idFilterFor(all)}&or=(category.in.(${encodeURIComponent(cats)}),category.like.${encodeURIComponent('⚠️*')},content_raw.like.${encodeURIComponent('*동일*유형*매입임대*')})&order=seq`, { headers: zfAnonHeaders() }).then(r => r.ok ? r.json() : [])
+      fetch(`${SUPABASE_URL}/rest/v1/announcement_policies?select=id,announcement_id,category,seq,content_raw&${idFilterFor(all)}&or=(category.in.(${encodeURIComponent(cats)}),category.like.${encodeURIComponent('⚠️*')},content_raw.like.${encodeURIComponent('*동일*유형*매입임대*')},content_raw.like.${encodeURIComponent('*1개*단지*')},content_raw.like.${encodeURIComponent('*1건에*한하여*')},content_raw.like.${encodeURIComponent('*조사*기준일*')},content_raw.like.${encodeURIComponent('*도착*추첨*')},content_raw.like.${encodeURIComponent('*동일*유형*중복*선정*')})&order=seq`, { headers: zfAnonHeaders() }).then(r => r.ok ? r.json() : [])
     ]);
     grp.forEach(([id, ids]) => {
       const set = new Set(ids), mine = r => set.has(String(r.announcement_id));
@@ -16695,7 +16728,15 @@ async function zf12Load(rows){
       });
       // 🔵 2026-11-24(판 E 5) — 매입 「서류제출까지 완료하면 … 동일 유형 타 매입임대주택 공고의 신청이 불가」 원문 문장(같은 요청에 조건 하나 · 새 요청 0)
       const dupRow = P.find(r => zfDupTypeSentence(r.content_raw));
-      zf12Info.set(id, { ids, heads, res: ep.length ? zf12Res(ep[0].content_raw) : '', sched, dup: dupRow ? { pid: String(dupRow.id || ''), sent: zfDupTypeSentence(dupRow.content_raw) } : null });
+      // 🔵 2026-11-24(판 F O4 · 💡 「여러 블록 중 택1, 중복 시 전부 무효」) — 「1개 단지 1개 형(평형)만 신청 · 중복 신청 시 무효」 · 「공고 2건 중 1건에 한하여 신청」 원문 문장
+      const oneRow = P.find(r => zfPickOneSentence(r.content_raw));
+      // 🔵 2026-11-24(판 F O4 · 💡 「판단기준일 이원화 안내」) — 「… 산정시점은 입주자모집공고일이며, 금융자산 및 금융부채의 산정시점은 조사기준일」 원문 문장
+      const basisRow = P.find(r => zfBasisDateSentence(r.content_raw));
+      // 🔵 2026-11-24(판 F O4 · 💡 선착순 「첫날 10시 전 대기자는 추첨」) — 「… 이전 도착자 … 추첨」 원문 문장
+      const earlyRow = P.find(r => zfEarlyDrawSentence(r.content_raw));
+      // 🔵 2026-11-24(판 F O4 · 💡 「동일유형 중복선정」 — 국민·영구 예비 지위) — 「… 동일유형의 임대주택 예비 입주자로 중복선정이 되지 않으며 …」 원문 문장
+      const dupSelRow = P.find(r => zfDupSelSentence(r.content_raw));
+      zf12Info.set(id, { ids, heads, res: ep.length ? zf12Res(ep[0].content_raw) : '', sched, dup: dupRow ? { pid: String(dupRow.id || ''), sent: zfDupTypeSentence(dupRow.content_raw) } : null, one: oneRow ? { sent: zfPickOneSentence(oneRow.content_raw) } : null, basis: basisRow ? zfBasisDateSentence(basisRow.content_raw) : '', early: earlyRow ? zfEarlyDrawSentence(earlyRow.content_raw) : '', dupSel: dupSelRow ? zfDupSelSentence(dupSelRow.content_raw) : '' });
     });
     // 🔵 판 C 1 (가)(2026-11-23 · 「처음 온 사람」 걷기 두 번 모두 🅰 첫 칸 함정) — 세대 행이 없는 공고(전세임대 등)는 「누가」 재료가 없어 👥 줄이 서지 않았다.
     //    세대 계층도 거주 조각도 없을 때만 자격 행 공급대상 키(분석이 원문 대상 낱말로 쓴 값 — 매칭 판정과 같은 키)의 「대상」을 쓴다 ·
@@ -16880,6 +16921,10 @@ function zf12FillWho(){
     if(!I) return;
     const card = p.closest('.hcard'); if(!card || card.dataset.zf12Who === '1') return;
     I.dup && zf12DupBadge(card, I.dup);
+    I.one && zf12OneBadge(card, I.one);
+    I.early && zf12EarlyBadge(card, I.early);
+    I.basis && zf12BasisLine(card, I.basis);
+    I.dupSel && !I.dup && zf12DupSelLine(card, I.dupSel);
     I.sched.length && zf12SchedBadge(card, I.sched);
     // 🔵 2차 시안 1(claude.ai 의견 2 · 다운님 11-16) — 군·목 꼴(가군·나군 · 가목 …) 카드는 겉에 거주 조각만 · 군 이름은 안 자격 절(원문 괄호 뜻과 함께)
     const heads = I.heads.some(h => /(^|\s)[가-하](군|목)$/.test(h)) ? [] : I.heads;
@@ -16900,6 +16945,72 @@ function zfDupTypeSentence(t){
   const parts = String(t || '').replace(/\s+/g, ' ').split(/(?<=[다요]\.)\s+|(?<=[.。])\s+(?=[-•ㅇ·(\[]|[가-힣A-Z])/);
   const hit = parts.find(x => ZF_DUP_TYPE_RE.test(x) && /신청이?\s*불가/.test(x));
   return hit ? hit.replace(/^[-•ㅇ·\s]+/, '').trim() : '';
+}
+// 🔵 2026-11-24(우편함 「표시층 — 판 F」 O4 더함 · 💡 「여러 블록 중 택1, 중복 시 전부 무효」) — 한 세대가 여러 단지·형(또는 같이 나온 공고 둘)에 넣으면 무효가 되는 공고.
+//    판정 = 원문 문장에 「1개 단지 … 1개 (평)형(에)만 … 신청」 또는 「… 중 1건에 한하여 신청」 · 칩 글은 꼭집 말 「한 곳만 신청 가능」 · 누르면 그 원문 문장 그대로.
+//    넓은 꼴 「중복 신청 시 전부 무효」 단독(337공고 · 열린 92 — 거의 모든 공고)은 걸지 않는다(칩이 소음이 된다).
+function zfPickOneSentence(t){
+  const parts = String(t || '').replace(/\s+/g, ' ').split(/(?<=[다요]\.)\s+|(?<=[.。])\s+(?=[-•ㅇ·▪(\[]|[가-힣A-Z])/);
+  const hit = parts.find(x => /1\s*개\s*단지\s*1\s*개\s*(평\s*)?형(에)?만[^.。]{0,10}신청/.test(x) || /중\s*1\s*건에\s*한하여\s*신청/.test(x));
+  return hit ? hit.replace(/^[-•ㅇ·▪\s(]+/, '').replace(/\)$/, '').trim() : '';
+}
+// 🔵 2026-11-24(우편함 「표시층 — 판 F」 O4 더함 · 💡 「판단기준일 이원화 안내」) — 자격 판단 날이 둘(모집공고일 · 조사기준일)인 공고. 열린 공고 절반 넘게라 1층 칩이 아니라
+//    상세 2층 한 줄(접힘) — 머리 「📅 판단 기준일이 둘이에요(모집공고일 · 조사기준일)」 · 펼치면 원문 문장 그대로.
+// 🔵 2026-11-24(우편함 「표시층 — 판 F」 O4 · 💡 선착순 「첫날 10시 전 대기자는 추첨」) — 일찍 와도 도착 순서가 아니라 추첨으로 순번을 정하는 공고(선착순 방문 접수·동호지정).
+//    판정 = 원문 문장에 「(시각) 이전/전 … 도착」과 「추첨」 · 칩 「⏰ 시작 전 도착자는 추첨으로 순번」 · 누르면 원문 문장 그대로.
+function zfEarlyDrawSentence(t){
+  const parts = String(t || '').replace(/\s+/g, ' ').split(/(?<=[다요]\.)\s+|(?<=[.。])\s+(?=[-•ㅇ·▪①-⑳(\[]|[가-힣A-Z0-9])|\s(?=[•▪]\s)/);
+  const hit = parts.find(x => /(이전|전)\s*(까지\s*)?(에\s*)?도착[^.。]{0,120}추첨/.test(x));
+  if(!hit) return '';
+  // 일정 표 글처럼 한 문장이 길면 「도착 … 추첨」 조각만(앞 60자 · 뒤 60자 안 — 글자는 그대로 잘라 냄)
+  const m = hit.match(/[^.。•▪]{0,60}(이전|전)\s*(까지\s*)?(에\s*)?도착[^.。]{0,120}?추첨[^.。•▪]{0,60}/);
+  let frag = m ? m[0] : hit;
+  // 앞머리는 마지막 항목 표지(「·」·「 - 」·「☞」·「)」) 뒤부터 — 「(12:00~13:00 제외) ·10시 이전 도착자 …」에서 앞 조각을 떼어 낸다(글자는 그대로)
+  const core = frag.search(/\d{0,2}\s*(:\s*\d{2})?\s*시?\s*(이전|전)\s*(까지\s*)?(에\s*)?도착/);
+  const head = core > 0 ? frag.slice(0, core) : '';
+  const cut = Math.max(head.lastIndexOf('·'), head.lastIndexOf(' - '), head.lastIndexOf('☞'), head.lastIndexOf(')'));
+  if(cut >= 0) frag = frag.slice(cut + 1);
+  return frag.replace(/^[-•ㅇ·▪\s:]+/, '').trim();
+}
+function zf12EarlyBadge(card, sent){
+  if(card.querySelector('.zf12-early')) return;
+  const b = card.querySelector('.zf12-badges'); if(!b) return;
+  b.insertAdjacentHTML('beforeend', `<span class="chip sel zf-chip-warn zf12-dup zf12-early" title="${zfAttr(sent)}" data-zf-tip tabindex="0" role="button" aria-expanded="false">⏰ 시작 전 도착자는 추첨으로 순번</span>`);
+}
+function zfCarNoneSentence(vr){
+  const txt = (function walk(v){ return v == null ? '' : typeof v === 'object' ? Object.values(v).map(walk).join(' ') : String(v); })(vr).replace(/\s+/g, ' ');
+  const parts = txt.split(/(?<=[다요것]\.?)\s+(?=[①-⑳㉮-㉿▪•*-]|[가-힣(])|(?<=[.。])\s+/);
+  const hit = parts.find(x => /자동차[^.。]{0,40}(소유하고\s*있지\s*않|소유\s*불가|미소유|보유하지\s*않)/.test(x));
+  return hit ? hit.trim() : '';
+}
+function zfBasisDateSentence(t){
+  const parts = String(t || '').replace(/\s+/g, ' ').split(/(?<=[다요]\.)\s+|(?<=[.。])\s+(?=[-•ㅇ·▪(\[]|[가-힣A-Z])/);
+  const hit = parts.find(x => /조사\s*기준일/.test(x) && /(모집\s*)?공고일/.test(x) && /(산정|판단|기준)/.test(x));
+  return hit ? hit.replace(/^[-•ㅇ·▪\s]+/, '').trim() : '';
+}
+// 🔵 2026-11-24(우편함 「표시층 — 판 F」 O4 · 💡 「동일유형 중복선정 고정문구」를 원문 경로로) — 국민·영구·행복 예비입주자 공고의 「동일유형 예비 입주자 중복선정 안 됨」.
+//    매입 「동일 유형 … 신청 불가」(판 E 칩)와 다른 규칙(예비 지위 — 새로 선정되면 앞 지위가 빠짐) · 열린 공고 70여 장이라 1층 칩이 아니라 상세 2층 접힌 한 줄 ·
+//    머리 「🔒 동일 유형 예비입주자 중복 선정 안 됨」 · 펼치면 원문 문장 그대로. 고정 문구로 짓지 않는다(원문에 있을 때만).
+function zfDupSelSentence(t){
+  const parts = String(t || '').replace(/\s+/g, ' ').split(/(?<=[다요]\.)\s+|(?<=[.。])\s+(?=[-•ㅇ·▪(\[]|[가-힣A-Z])/);
+  const hit = parts.find(x => /동일\s*유형[^.。]{0,20}예비\s*입주자[^.。]{0,10}중복\s*선정/.test(x));
+  return hit ? hit.replace(/^[-•ㅇ·▪\s]+/, '').trim() : '';
+}
+function zf12DupSelLine(card, sent){
+  const l2 = card.querySelector('.zf12-l2');
+  if(!l2 || l2.querySelector('.zf12-dupsel')) return;
+  l2.insertAdjacentHTML('afterbegin', `<details class="zf12-basis zf12-dupsel" onclick="event.stopPropagation()"><summary>🔒 동일 유형 예비입주자 중복 선정 안 됨</summary><p class="zf12-basis-raw">${escapeHtml(sent)}</p></details>`);
+}
+function zf12BasisLine(card, sent){
+  const l2 = card.querySelector('.zf12-l2');
+  if(!l2 || l2.querySelector('.zf12-basis')) return;
+  l2.insertAdjacentHTML('afterbegin', `<details class="zf12-basis" onclick="event.stopPropagation()"><summary>📅 판단 기준일이 둘이에요(모집공고일 · 조사기준일)</summary><p class="zf12-basis-raw">${escapeHtml(sent)}</p></details>`);
+}
+function zf12OneBadge(card, one){
+  if(card.querySelector('.zf12-one')) return;
+  const b = card.querySelector('.zf12-badges'); if(!b) return;
+  const d = b.querySelector('.zf12-dup');
+  (d || b).insertAdjacentHTML(d ? 'afterend' : 'afterbegin', `<span class="chip sel zf-chip-warn zf12-dup zf12-one" title="${zfAttr(one.sent)}" data-zf-tip tabindex="0" role="button" aria-expanded="false">⚠️ 한 곳만 신청 가능</span>`);
 }
 function zf12DupBadge(card, dup){
   if(card.querySelector('.zf12-dup')) return;
