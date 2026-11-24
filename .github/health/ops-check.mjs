@@ -1285,6 +1285,27 @@ try {
   add('lh_list_end_early', 'LH 목록 마감 < 상세 청약 마감 — 열린 LH 행', 'info', String(e).slice(0, 200), '칸이 없으면(적용 전) ℹ️')
 }
 
+// ㊻ LH 목록 마감 > 상세 청약 마감(2026-11-24 · 우편함 「코드·운영 — 열일곱째 묶음 A장」 1) — lh_list_end_early 의 반대쪽. ⚠️(안 멈춤 · gate.mjs HARD 밖).
+//    왜: …21036 대전 유성 국임 — 11-24 06:30 KST 쯤 LH 목록 CLSG_DT 가 12-11 로 늦어졌고(상세 SBSC_ACP_CLSG_DT 는 세 단지 모두 12-09 ·
+//    10·11단지 ACP_DTTM 「12.09 10:00 ~ 12.11 16:30」의 끝과 같다 · probe 2026-11-24) 보호 트리거는 「목록 < 상세」만 상세를 세워 카드가 12-11 이 됐다.
+//    트리거로 상세를 세우지 않는 까닭: 다회 창 공고는 상세 가장 늦은 날이 진짜 끝보다 이르다(…20975 상세 11-24 · 확정·일정 표 11-25).
+//    ⚠️ = 확정값 없음 ∧ 게시물에 다른 공고문 없음(announcement_post_links 양쪽 0 — B53 꼴 아님). 확정값 있는 행·B53 꼴은 값 칸에 ℹ️ 꼴로만 적는다.
+//    첫 값 2026-11-24 ⚠️ 0(목록 > 상세 열린 행 2 — …20975 · …21036 둘 다 확정값 있음).
+try {
+  const rows = await sqlRead(`select a.announcement_id id, a.apply_end_list l, a.apply_end_detail d, a.apply_end e, a.apply_end_confirmed c,
+        exists (select 1 from public.announcement_post_links p where p.lh_announcement_id = a.announcement_id or p.linked_announcement_id = a.announcement_id) linked
+      from public.announcements a where a.source = 'LH' and a.status <> '접수마감' and a.apply_end >= (now() at time zone 'Asia/Seoul')::date
+       and a.apply_end_list is not null and a.apply_end_detail is not null and a.apply_end_list > a.apply_end_detail
+     order by a.announcement_id desc limit 20`)
+  const bad = rows.filter(r => !r.c && !r.linked)
+  const fmt = r => `…${String(r.id).slice(-5)} 목록 ${String(r.l).slice(5)} · 상세 ${String(r.d).slice(5)} → 카드 ${String(r.e).slice(5)}${r.c ? '(확정)' : r.linked ? '(한 게시물 공고문 둘)' : ''}`
+  add('lh_list_end_late', 'LH 목록 마감 > 상세 청약 마감 — 열린 LH 행(확정값 없음 · 공고문 하나)', bad.length ? 'warn' : 'pass',
+    `⚠️ ${bad.length}${bad.length ? ': ' + bad.map(fmt).join(' / ') : ''} · 목록 > 상세 전체 ${rows.length}${rows.length - bad.length ? ' (' + rows.filter(r => !bad.includes(r)).map(fmt).join(' / ') + ')' : ''}`,
+    '0 — 넘으면 ⚠️(안 멈춤) · 카드 끝이 목록 값(상세·공고문보다 늦음)일 수 있다 → 원문 접수 끝으로 확정값을 넣는다(운영 데이터 쓰기) · 확정값 있는 행·B53 꼴(게시물 공고문 둘)은 세지 않는다')
+} catch (e) {
+  add('lh_list_end_late', 'LH 목록 마감 > 상세 청약 마감 — 열린 LH 행(확정값 없음 · 공고문 하나)', 'info', String(e).slice(0, 200), '칸이 없으면(적용 전) ℹ️')
+}
+
 // ㊳ 사용자 글 칸 속 영문 식별자(2026-11-12 · 우편함 「코드·운영 — 🔴 LH 목록 마감 … + 0장」 5 · 백로그 「다른 회차 세대 비고에 DB 칸 이름」) — ℹ️ 셈만(판정하지 않는다).
 //    칸 = housing_units.extra_note · announcement_policies.content_raw · eligibility_criteria.manual_check_note · age_exception_note(화면이 그대로 보여 주는 글).
 //    셈 = 낱말 [a-z]+_[a-z_0-9]+(DB 칸 이름 꼴 — area_sqm · revision_note 등) 이 든 행 · 단독 낱말 null 이 든 행. 첫 값 2026-11-12 세대 비고 27(null 11 · 모두 식별자 행과 겹침) · 정책 1 · 자격 0.
