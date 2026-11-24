@@ -1311,6 +1311,7 @@ html.zf12 .zf12-cov{font-size:var(--t-xs);color:var(--ink-3)}
 html.zf12 .zf12-badges .chip.zf-chip-new{background:var(--ink)!important;border-color:var(--ink)!important;color:var(--paper)!important}   /* NEW = 재편 전 겉 꼴 그대로(경고 색 아님) */
 html.zf12 .zf12-badges .chip.zf12-dup[aria-expanded="true"]{flex-wrap:wrap;max-width:100%}   /* 판 E 5 — 펼치면 원문 문장이 칩 아래 줄로(이름 옆에 끼지 않게) */
 html.zf12 .zf12-badges .chip.zf12-dup .zf-tip-txt{flex-basis:100%;font-weight:500}
+.zf-route-link{color:inherit;text-decoration:underline;text-underline-offset:2px;word-break:break-all}
 html.zf12 .zf12-badges > .zf-tip-out{flex-basis:100%;box-sizing:border-box;padding:6px 10px;border-radius:var(--r-1);background:var(--warn-bg);border:1px solid var(--warn-line,var(--warn));color:var(--ink);font-size:var(--t-xs);font-weight:500;line-height:1.5;white-space:normal}   /* 🔵 판 G 고장 1 — 배지 설명은 배지 줄 밖 한 줄(카드 폭) */
 html.zf12 .zf12-badges .chip[data-zf-tip][aria-expanded="true"]{box-shadow:inset 0 -2px 0 var(--warn)}   /* 펼친 칩 표지(높이 그대로) */
 html.zf12 .zf12-badges .chip.zf-recheck{background:var(--surface-2)!important;border-color:var(--line)!important;color:var(--ink-2)!important;font-weight:600}   /* 🔵 판 D ① 재확인 대기 = 정보(경고 색 아님) */
@@ -3706,6 +3707,23 @@ function zfRouteMethodOf(rows){
   }).filter(Boolean))];
   return txt.length ? { kind: '④', text: '접수 방법 · ' + txt.join(' / ') } : null;
 }
+// 🔵 2026-11-24(우편함 「표시층 — 판 G」 O3 ④ · 💡 4008aaa7e1558144affa) — 접수 방법 줄 글자 안 이메일 주소 · 누리집 주소만 mailto · 링크로 감싼다(글자는 그대로).
+//    허용 꼴만: 이메일 = 낱말@도메인 · 누리집 = http(s):// 또는 www./점 둘 이상 도메인(한글·공백 없음) → https:// 를 붙여 zfSafeUrl 과 같은 판(http/https 만).
+function zfLinkifyMethod(text){
+  const re = /([A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+)|((?:https?:\/\/)?(?:www\.)?[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+){1,}(?:\/[^\s,)·/]*)*)/g;
+  let out = '', last = 0, m;
+  const s = String(text || '');
+  while((m = re.exec(s))){
+    const raw = m[0];
+    let href = '';
+    if(m[1]) href = 'mailto:' + m[1];
+    else if(/^https?:\/\//i.test(raw) || /\.(kr|com|net|org)(\/|$)/i.test(raw)) href = zfSafeUrl(/^https?:\/\//i.test(raw) ? raw : 'https://' + raw);
+    out += escapeHtml(s.slice(last, m.index));
+    out += href ? `<a class="zf-route-link" href="${zfAttr(href)}"${m[1] ? '' : ' target="_blank" rel="noopener noreferrer"'} onclick="event.stopPropagation()">${escapeHtml(raw)}</a>` : escapeHtml(raw);
+    last = m.index + raw.length;
+  }
+  return out + escapeHtml(s.slice(last));
+}
 // 🔵 2026-11-03(우편함 「표시층 — 다음 판 시안」 C · 💡 새 문구 — 다운님 승인 전 시안) — 경로 표가 우편뿐인 카드 1층에 「📮 우편으로만 받아요」 한 줄.
 //    🔴 토막은 그 공고 원문(정책 행 content_raw)에 있을 때만: 「등기」 = 접수를 등기우편에 한한다는 문장 · 「소인」 = 마감일(경로 행 end_date)과 같은 날짜 + 소인 문장.
 //    🔴 「만」 = 원문이 접수 방법을 여러 곳에서 다르게 적었다는 정책 행(분석 주의 문장)이 있으면 뺀다(「우편으로 받아요」) — 우리가 「만」이라 단정하지 않는다.
@@ -3754,7 +3772,7 @@ function zfFillSideSlots(){
       ? [...new Set((rows || []).map(r => String(r.place_text || '').trim()).filter(Boolean))] : [];
     const pl = places.length ? ` · 접수 장소 ${places.join(' / ')}` : '';
     // 두 줄을 넘치면 말줄임 · 전문은 툴팁(누르면 펼친다 — 손가락으로는 툴팁을 못 본다) · ▾는 말줄임 밖 칸
-    el.innerHTML = `<p class="zf-route-line" data-route-kind="${zfAttr(v.kind)}" title="${zfAttr(v.text + pl)}" onclick="event.stopPropagation();this.classList.toggle('open')"><span class="zf-route-text">📅 ${v.ex ? escapeHtml(v.text.slice(0, -(v.ex.length + 3))) + `<span class="zf-route-ex"> · ${escapeHtml(v.ex)}</span>` : escapeHtml(v.text)}${pl ? `<span class="zf-route-place">${escapeHtml(pl)}</span>` : ''}</span><span class="zf-route-more" aria-hidden="true"></span></p>`;
+    el.innerHTML = `<p class="zf-route-line" data-route-kind="${zfAttr(v.kind)}" title="${zfAttr(v.text + pl)}" onclick="event.stopPropagation();this.classList.toggle('open')"><span class="zf-route-text">📅 ${v.ex ? escapeHtml(v.text.slice(0, -(v.ex.length + 3))) + `<span class="zf-route-ex"> · ${escapeHtml(v.ex)}</span>` : v.kind === '④' ? zfLinkifyMethod(v.text) : escapeHtml(v.text)}${pl ? `<span class="zf-route-place">${escapeHtml(pl)}</span>` : ''}</span><span class="zf-route-more" aria-hidden="true"></span></p>`;
     zfMarkRouteFits(el.firstElementChild);
     // 🔴 같은 뜻을 두 번 말하지 않는다 — 단지 갈래 줄(②-가)이 「단지마다 일정이 달라요」 배지를 대신한다.
     //    🔵 2026-10-21 — 단지 갈래가 아닌 줄(현장 접수 등)은 대신하지 못한다 — 원문이 단지를 가르는데 그 줄이 서면 배지를 남긴다(위에서 원문 갈래 없음은 이미 숨김).
