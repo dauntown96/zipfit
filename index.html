@@ -1923,6 +1923,7 @@ html.zf12 .zf13-mok-s{margin:0 0 10px;font-size:var(--t-sub);color:var(--ink-2);
         <option value="deposit-asc">보증금 낮은순</option>
         <option value="rent-asc">월임대료 낮은순</option>
         <option value="area-desc">전용면적 넓은순</option>
+        <option value="sqm-asc">㎡당 월세 낮은순</option>
         <option value="region-asc">지역명순</option>
       </select>
     </div>
@@ -4866,7 +4867,7 @@ function applyNoticeFiltersAndRender(keepPage){
   //    접수 중 공고보다 앞에 섰다(태백 …020645 8/31). 취소공고끼리는 고른 정렬 그대로다.
   const cancelLast = (a,b) => (zfIsCancelRow(a['공고명']) ? 1 : 0) - (zfIsCancelRow(b['공고명']) ? 1 : 0);
   filtered = [...filtered].sort((a,b) => cancelLast(a,b) || noticeSortCmp(a,b));
-  if(sortVal==='deposit-asc' || sortVal==='rent-asc' || sortVal==='area-desc') zfSortPriceFill(filtered);   // 🔵 2026-11-04 — 재료 없는 행만 한 번 물어 다시 줄 세운다(아래)
+  if(sortVal==='deposit-asc' || sortVal==='rent-asc' || sortVal==='area-desc' || sortVal==='sqm-asc') zfSortPriceFill(filtered);   // 🔵 2026-11-04 — 재료 없는 행만 한 번 물어 다시 줄 세운다(아래)
   function noticeSortCmp(a,b){
     // 🔴 접수 단계 그룹 선비교(applyWindowRank)를 **공고 탭에서 걷었다**(2026-09-16).
     //    「최신 공고순」을 골랐는데 최신 공고가 위에 안 오던 것이 이것이었다 — 정렬 위에
@@ -4907,13 +4908,15 @@ function applyNoticeFiltersAndRender(keepPage){
     // 🔵 2026-11-04(우편함 「표시층 — 실사용 7회차 고침」 1 · 기준 위반) — 보증금·월임대료는 카드 머리 가격 줄과 같은 재료(get_announcement_price_summary 최솟값)로 줄 세운다.
     //    종전 공고 칸 deposit_min·rent_min 은 열린 57 중 4만 차 있어 순서가 틀렸다(강릉 매입 58만이 영등포 4,650만 아래). 가격 없는 카드는 뒤(종전 그대로).
     // 🔵 2026-11-17(우편함 「표시층 — 작은 판」 1) — 세 값 정렬은 열린 묶음 → 마감 묶음(isHiddenAsClosed · 「마감」 칩과 같은 술어) · 묶음 안은 값 순.
-    if(sortVal==='deposit-asc' || sortVal==='rent-asc' || sortVal==='area-desc'){
+    if(sortVal==='deposit-asc' || sortVal==='rent-asc' || sortVal==='area-desc' || sortVal==='sqm-asc'){
       const ca = isHiddenAsClosed(a) ? 1 : 0, cb = isHiddenAsClosed(b) ? 1 : 0;
       if(ca !== cb) return ca - cb;
     }
     if(sortVal==='deposit-asc')   return nullLast(a,b,n=>zfSortPriceOf(n,'deposit_min'),false);
     if(sortVal==='rent-asc')      return nullLast(a,b,n=>zfSortPriceOf(n,'rent_min'),false);
     if(sortVal==='area-desc')     return nullLast(a,b,n=>zfSortPriceOf(n,'area_max'),true);   // 🔵 2026-11-05 — 카드 머리 「전용」 재료(가격 요약 area_max · 목록 RPC area_max 는 분석분이 빈다)
+    // 🔵 2026-11-24(판 E 4 · 💡 「㎡당 월세 낮은 순」) — 카드 ㎡당 줄과 같은 값(가격 요약 rent_per_sqm_med · 이번 회차 값만) · 열린 묶음 → 마감 묶음 · 값 없는 카드 뒤.
+    if(sortVal==='sqm-asc')       return nullLast(a,b,n=>zfSqmOf(n),false);
     if(sortVal==='region-asc'){
       const regionA = (a['sido_nm']||a['지역']||'') + ' ' + (a['sigungu_nm']||'');
       const regionB = (b['sido_nm']||b['지역']||'') + ' ' + (b['sigungu_nm']||'');
@@ -6106,6 +6109,13 @@ function zfQuantile(sorted, q){
 // 🔵 2026-11-04(같은 회차 1) — 정렬 재료. 아래 ㎡당 통계가 열린 공고 전부의 가격 요약을 한 번에 받으므로 그 응답의 최솟값을 남겨 쓴다(새 호출 0).
 //    카드 요약 캐시(zfPriceCache — 보이는 카드)가 있으면 그쪽이 먼저(같은 RPC · 같은 값) · 둘 다 없으면 모름(뒤로).
 const zfSortPrice = new Map();   // announcement_id → { deposit_min, rent_min }
+function zfSqmOf(n){
+  const id = String((n && n['announcement_id']) || '');
+  const s = zfPriceCache.get(id);
+  if(s && typeof s === 'object') return s.round_state === 'current' ? zfNumOrNull(s.rent_per_sqm_med) : null;
+  const p = zfSortPrice.get(id);
+  return p ? zfNumOrNull(p.sqm) : null;
+}
 function zfSortPriceOf(n, k){
   const id = String((n && n['announcement_id']) || '');
   const s = zfPriceCache.get(id);
@@ -6123,7 +6133,7 @@ function zfSortPriceFill(rows){
   need.forEach(id => zfSortPriceAsked.add(id));
   zfEnsurePriceSummaries(need).then(ok => {
     const sv = (document.getElementById('noticeSortSel') || {}).value;
-    if(ok && (sv === 'deposit-asc' || sv === 'rent-asc' || sv === 'area-desc')) applyNoticeFiltersAndRender(noticePage);
+    if(ok && (sv === 'deposit-asc' || sv === 'rent-asc' || sv === 'area-desc' || sv === 'sqm-asc')) applyNoticeFiltersAndRender(noticePage);
   });
 }
 function zfLoadRentStats(){
@@ -6145,9 +6155,9 @@ function zfLoadRentStats(){
     const vals = new Map();
     // 🔵 2026-11-03(우편함 「표시층 — 다운님 실사용 넷」 D ③ · 다운님 승인 2026-11-04) — 같은 시·도 같은 유형 묶음도 함께 센다(키 끝에 「\u0002시·도」) · 그리는 쪽이 표본 5곳 이상이면 그쪽을 먼저.
     const push = (k, v) => { if(!vals.has(k)) vals.set(k, []); vals.get(k).push(v); };
-    out.forEach(r => { if(r && r.announcement_id) zfSortPrice.set(String(r.announcement_id), { deposit_min: r.deposit_min, rent_min: r.rent_min, area_max: r.area_max }); });   // 🔵 2026-11-05 area_max — 전용면적 정렬 재료
+    out.forEach(r => { if(r && r.announcement_id) zfSortPrice.set(String(r.announcement_id), { deposit_min: r.deposit_min, rent_min: r.rent_min, area_max: r.area_max, sqm: r.round_state === 'current' ? r.rent_per_sqm_med : null }); });   // 🔵 판 E 4 sqm — ㎡당 정렬 재료(카드 줄과 같은 거름)   // 🔵 2026-11-05 area_max — 전용면적 정렬 재료
     // 가격 정렬을 고른 채 재료가 늦게 왔으면 한 번만 다시 줄 세운다(쪽은 그대로) — 그 뒤로는 흔들리지 않는다.
-    { const sv = (document.getElementById('noticeSortSel') || {}).value; if(noticeLoaded && (sv === 'deposit-asc' || sv === 'rent-asc' || sv === 'area-desc')) applyNoticeFiltersAndRender(noticePage); }
+    { const sv = (document.getElementById('noticeSortSel') || {}).value; if(noticeLoaded && (sv === 'deposit-asc' || sv === 'rent-asc' || sv === 'area-desc' || sv === 'sqm-asc')) applyNoticeFiltersAndRender(noticePage); }
     out.forEach(r => {
       if(!r || r.round_state !== 'current' || r.rent_per_sqm_med == null) return;
       const row = byId.get(String(r.announcement_id));
