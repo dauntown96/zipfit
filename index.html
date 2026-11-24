@@ -862,6 +862,9 @@ html[data-ui="d3"] .zf-sch .policy-content{white-space:normal;overflow-wrap:anyw
 .zf-sch-stop>summary{list-style:none;cursor:pointer;display:block}
 .hcard.zf-ana-pending :is(.zf3-dpill,.htag,.chip-row,.zf-dateline,.zf-rec-date,.zf3-route,.zf3-dl-tags,.zf-route-slot,.zf-notices-slot,.zf-dcell-date,[id^="schedule-slot-"]){display:none!important}
 .hcard.zf-ana-pending .zf-ai-lbl,.hcard.zf-ana-no .zf-ai-lbl,.zf-ai-off .zf-ai-lbl{display:none}
+/* 🔵 2026-11-24(판 E 3) — 회차 추이 한 줄(「다른 회차」 머리) */
+.zf-round-trend{margin:10px 0 0;padding-top:10px;border-top:1px dashed var(--line,#e0e0d8);font-size:var(--t-xs);font-weight:600;color:var(--ink-2,#444)}
+.zf-round-trend + .hu-past{border-top:0;margin-top:4px;padding-top:4px}
 /* 🔵 2026-11-24(판 D ② (나)) — 같은 금액 다른 동 접힘 표지 */
 .hu-same-amt>summary{cursor:pointer;list-style:none}
 .hu-same-amt>summary::-webkit-details-marker{display:none}
@@ -11988,7 +11991,9 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
         + `<div class="hu-past-list">${renderHousingUnitList(samePast)}</div></details>`
       : '';
     const pastLineCount = countHousingUnitLines(diffPast);
-    const pastHtml = (diffPast.length
+    // 🔵 2026-11-24(판 E 3 (나)) — 「다른 회차」 머리에 회차 추이 한 줄(같은 단지 같은 형 · 이번 회차 + 지난 회차 세대 행 — 새 요청 0).
+    const trendHtml = !pastOnly && pastUnits.length && units.length ? zfRoundTrendHtml(units.concat(pastUnits)) : '';
+    const pastHtml = trendHtml + (diffPast.length
       ? `<details class="hu-past"><summary class="hu-past-title">🕘 다른 회차 보기 (${pastLineCount}건)</summary>`
         + `<div class="hu-past-list">${renderHousingUnitList(diffPast)}</div></details>`
       : '') + sameHtml;
@@ -12029,6 +12034,53 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
 }
 
 // 같은 건물(building_name 우선, 없으면 address)로 세대를 묶어서 2단 아코디언 구성
+// 🔵 2026-11-24(우편함 「표시층 — 판 E 시안」 3 · 💡 「같은 단지 회차별 보증금·월세·모집 호수 추이」) — 회차 추이.
+//    재료 = 상세가 이미 받은 세대 행(이번 회차 + 지난 회차 · zfRoundDate). 비교 축 = 같은 단지·같은 형·같은 계층(building_name · unit_group(없으면 unit_type) · supply_target).
+//    가격 변동 = 이어진 두 회차에서 같은 축의 기본 임대조건(보증금·월)이 하나라도 다르면 1번 · 모집 세대 = 회차마다 묶음 모집(group_recruit_count · 묶음마다 한 번) + 따로 칸(recruit_count) —
+//    한 회차라도 모르면 세대 수는 쓰지 않는다. 값은 원문 그대로(반올림 0) · 회차가 둘 미만이면 아무것도 그리지 않는다.
+function zfRoundTrend(all){
+  const by = new Map();
+  (all || []).forEach(u => { const d = u && u.zfRoundDate; if(!d) return; if(!by.has(d)) by.set(d, []); by.get(d).push(u); });
+  const dates = [...by.keys()].sort();
+  if(dates.length < 2) return null;
+  const key = u => [String(u.building_name || '').trim(), u.unit_group || u.unit_type || '', u.supply_target || u.unit_type || ''].join('|');
+  const price = rows => { const m = new Map(); rows.forEach(u => { if(u.deposit == null && u.monthly_rent == null) return; m.set(key(u), `${u.deposit}/${u.monthly_rent}`); }); return m; };
+  const P = dates.map(d => price(by.get(d)));
+  // 이어진 두 회차에 같은 축이 하나도 없으면 그 쌍은 견주지 않는다(평형이 바뀐 회차 — …20974 26.37 ↔ 31.32) · 견준 쌍이 0이면 가격 말을 하지 않는다.
+  let changes = 0, compared = 0;
+  for(let i = 1; i < P.length; i++){
+    const both = [...P[i]].filter(([k]) => P[i - 1].has(k));
+    if(!both.length) continue;
+    compared++;
+    if(both.some(([k, v]) => P[i - 1].get(k) !== v)) changes++;
+  }
+  // 모집 세대는 모든 회차에 있는 형(단지·형)만 센다 — 다른 형끼리 합계를 견주지 않는다.
+  const gk = u => [String(u.building_name || '').trim(), u.unit_group || u.unit_type || ''].join('|');
+  const allG = dates.map(d => new Set(by.get(d).map(gk)));
+  const commonG = new Set([...allG[0]].filter(k => allG.every(S => S.has(k))));
+  const count = rows => {
+    let n = 0, known = false; const seen = new Set();
+    rows.filter(u => commonG.has(gk(u))).forEach(u => {
+      if(u.group_recruit_count != null){ const k = [u.building_name || '', u.unit_group || u.unit_type || ''].join('|'); if(!seen.has(k)){ seen.add(k); n += Number(u.group_recruit_count); known = true; } }
+      else if(u.recruit_count != null){ n += Number(u.recruit_count); known = true; }
+    });
+    return known ? n : null;
+  };
+  const counts = dates.map(d => count(by.get(d)));
+  // 같은 축 하나의 회차별 값(차트 재료) — 모든 회차에 있는 축 중 첫째
+  const common = [...P[0].keys()].find(k => P.every(m => m.has(k))) || '';
+  const series = common ? P.map((m, i) => { const [dep, rent] = m.get(common).split('/'); return { d: dates[i], dep: dep === 'null' ? null : Number(dep), rent: rent === 'null' ? null : Number(rent) }; }) : [];
+  return { n: dates.length, dates, changes: compared ? changes : null, counts: commonG.size && counts.every(c => c != null) ? counts : null, series, axis: common };
+}
+function zfRoundTrendHtml(all){
+  const t = zfRoundTrend(all);
+  if(!t) return '';
+  if(t.changes == null && !t.counts) return '';   // 같은 형이 이어지지 않으면 말할 것이 없다
+  const parts = [`지난 ${t.n - 1}회차`];
+  if(t.changes != null) parts.push(`가격 변동 ${t.changes}번`);
+  if(t.counts) parts.push(`모집 ${t.counts.map(c => c.toLocaleString()).join('→')}세대`);
+  return `<p class="zf-round-trend" data-zf-rounds="${zfAttr(t.dates.join(' '))}">🕘 ${escapeHtml(parts.join(' · '))}</p>`;
+}
 function groupHousingUnits(units){
   const map = new Map();
   units.forEach(u => {
