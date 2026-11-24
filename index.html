@@ -1305,6 +1305,8 @@ html.zf12 .zf12-badges button.zf12-sched:focus-visible{outline:2px solid var(--f
 html.zf12 .zf12-badges .chip{display:inline-flex;align-items:center;min-height:24px;padding:2px 8px!important;border-radius:var(--r-1);font-size:var(--t-xs)!important;font-weight:700;background:var(--warn-bg)!important;border:1px solid var(--warn)!important;color:var(--warn)!important;cursor:default}
 html.zf12 .zf12-cov{font-size:var(--t-xs);color:var(--ink-3)}
 html.zf12 .zf12-badges .chip.zf-chip-new{background:var(--ink)!important;border-color:var(--ink)!important;color:var(--paper)!important}   /* NEW = 재편 전 겉 꼴 그대로(경고 색 아님) */
+html.zf12 .zf12-badges .chip.zf12-dup[aria-expanded="true"]{flex-wrap:wrap;max-width:100%}   /* 판 E 5 — 펼치면 원문 문장이 칩 아래 줄로(이름 옆에 끼지 않게) */
+html.zf12 .zf12-badges .chip.zf12-dup .zf-tip-txt{flex-basis:100%;font-weight:500}
 html.zf12 .zf12-badges .chip.zf-recheck{background:var(--surface-2)!important;border-color:var(--line)!important;color:var(--ink-2)!important;font-weight:600}   /* 🔵 판 D ① 재확인 대기 = 정보(경고 색 아님) */
 html.zf12 .zf12-badges .chip[role=button]{position:relative}
 html.zf12 .zf12-badges .chip[role=button]::after{content:"";position:absolute;left:0;right:0;top:-10px;bottom:-10px}   /* 누르는 자리 44px(보이는 높이 24 + 위아래 10) */
@@ -16603,7 +16605,7 @@ async function zf12Load(rows){
     const cats = ZF12_ELIG_CATS.map(c => `"${c}"`).join(',');
     const [hu, pol] = await Promise.all([
       fetch(`${SUPABASE_URL}/rest/v1/housing_units?select=announcement_id,supply_target,seq&${idFilterFor(all)}&order=seq`, { headers: zfAnonHeaders() }).then(r => r.ok ? r.json() : []),
-      fetch(`${SUPABASE_URL}/rest/v1/announcement_policies?select=id,announcement_id,category,seq,content_raw&${idFilterFor(all)}&or=(category.in.(${encodeURIComponent(cats)}),category.like.${encodeURIComponent('⚠️*')})&order=seq`, { headers: zfAnonHeaders() }).then(r => r.ok ? r.json() : [])
+      fetch(`${SUPABASE_URL}/rest/v1/announcement_policies?select=id,announcement_id,category,seq,content_raw&${idFilterFor(all)}&or=(category.in.(${encodeURIComponent(cats)}),category.like.${encodeURIComponent('⚠️*')},content_raw.like.${encodeURIComponent('*동일*유형*매입임대*')})&order=seq`, { headers: zfAnonHeaders() }).then(r => r.ok ? r.json() : [])
     ]);
     grp.forEach(([id, ids]) => {
       const set = new Set(ids), mine = r => set.has(String(r.announcement_id));
@@ -16616,7 +16618,9 @@ async function zf12Load(rows){
         const first = zf12FirstSentence(r.content_raw).trim() || String(r.category || '').replace(/^\s*⚠️\s*/, '');
         if(!sched.some(x => x.first === first)) sched.push({ pid: String(r.id || ''), cat: r.category, first });
       });
-      zf12Info.set(id, { ids, heads, res: ep.length ? zf12Res(ep[0].content_raw) : '', sched });
+      // 🔵 2026-11-24(판 E 5) — 매입 「서류제출까지 완료하면 … 동일 유형 타 매입임대주택 공고의 신청이 불가」 원문 문장(같은 요청에 조건 하나 · 새 요청 0)
+      const dupRow = P.find(r => zfDupTypeSentence(r.content_raw));
+      zf12Info.set(id, { ids, heads, res: ep.length ? zf12Res(ep[0].content_raw) : '', sched, dup: dupRow ? { pid: String(dupRow.id || ''), sent: zfDupTypeSentence(dupRow.content_raw) } : null });
     });
     // 🔵 판 C 1 (가)(2026-11-23 · 「처음 온 사람」 걷기 두 번 모두 🅰 첫 칸 함정) — 세대 행이 없는 공고(전세임대 등)는 「누가」 재료가 없어 👥 줄이 서지 않았다.
     //    세대 계층도 거주 조각도 없을 때만 자격 행 공급대상 키(분석이 원문 대상 낱말로 쓴 값 — 매칭 판정과 같은 키)의 「대상」을 쓴다 ·
@@ -16800,6 +16804,7 @@ function zf12FillWho(){
     const I = zf12Info.get(p.dataset.zf12Ann);
     if(!I) return;
     const card = p.closest('.hcard'); if(!card || card.dataset.zf12Who === '1') return;
+    I.dup && zf12DupBadge(card, I.dup);
     I.sched.length && zf12SchedBadge(card, I.sched);
     // 🔵 2차 시안 1(claude.ai 의견 2 · 다운님 11-16) — 군·목 꼴(가군·나군 · 가목 …) 카드는 겉에 거주 조각만 · 군 이름은 안 자격 절(원문 괄호 뜻과 함께)
     const heads = I.heads.some(h => /(^|\s)[가-하](군|목)$/.test(h)) ? [] : I.heads;
@@ -16811,6 +16816,20 @@ function zf12FillWho(){
     const cov = card.querySelector('.haddr .zf-cover'), top = card.querySelector('.zf3-ctop');
     if(cov && top){ cov.classList.add('zf12-cov'); top.insertBefore(cov, top.querySelector('.zf3-dpill')); card.querySelector('.haddr').classList.add('zf12-off'); }
   });
+}
+// 🔵 2026-11-24(우편함 「표시층 — 판 E 시안」 5 · 사용자 공포 1순위 「잘못 넣는 것」) — 매입임대 「동일 유형 타 매입임대주택 공고 신청 불가」 조항이 있는 카드 1층 ⚠️ 칩.
+//    판정 = 정책 행 원문에 「동일 유형 … 매입임대」와 「신청(이) 불가」가 함께 있는 문장(국민·영구 「동일유형 예비입주자 중복선정이 되지 않으며」는 다른 규칙이라 걸리지 않는다).
+//    칩 글은 원문 낱말(동일 유형 · 신청 불가) · 누르면 칩 안에 그 원문 문장 그대로(zfTipToggle · title) — 새 요청 0(zf12Load 정책 요청에 조건 하나).
+const ZF_DUP_TYPE_RE = /동일\s*유형[^.。]{0,40}매입임대/;
+function zfDupTypeSentence(t){
+  const parts = String(t || '').replace(/\s+/g, ' ').split(/(?<=[다요]\.)\s+|(?<=[.。])\s+(?=[-•ㅇ·(\[]|[가-힣A-Z])/);
+  const hit = parts.find(x => ZF_DUP_TYPE_RE.test(x) && /신청이?\s*불가/.test(x));
+  return hit ? hit.replace(/^[-•ㅇ·\s]+/, '').trim() : '';
+}
+function zf12DupBadge(card, dup){
+  if(card.querySelector('.zf12-dup')) return;
+  const b = card.querySelector('.zf12-badges'); if(!b) return;
+  b.insertAdjacentHTML('afterbegin', `<span class="chip sel zf-chip-warn zf12-dup" title="${zfAttr(dup.sent)}" data-zf-tip tabindex="0" role="button" aria-expanded="false" data-pid="${zfAttr(dup.pid)}">⚠️ 동일 유형 중복 신청 불가</span>`);
 }
 function zf12SchedBadge(card, rows){
   if(card.querySelector('.zf12-sched')) return;
