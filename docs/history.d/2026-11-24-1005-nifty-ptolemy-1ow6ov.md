@@ -7,5 +7,5 @@
 - 3 health-ops ℹ️: `analysis_row_misplaced`(첫 값 1그룹 …20331 — 기준선 2 중 …20365는 같은 날 분석 묶음이 풀음) · `income_pct_pair`(`.github/health/income-pct.mjs` · 시험 9 · 첫 값 1 = 20750 경북 5인 · 비율 줄 둘 이상 행 13).
 - 4 「금회 한정 순위」 조사(쓰기 0) — 확정 한정 5공고(…21098 열림 · …20366 · …20625 · …20786 · …20874 닫힘) · 조건부(1순위 초과 시) 5 · 사후 공지 1(…20972) · 「예를 들면 … 접수하지 않고」 거짓 걸림 다수. …20874는 「금회모집은 1순위에 한합니다」인데 2순위 자격 행 3.
 - 5 ② 「테이블별 역할」 — 실물 79(public 63 · zipfit_ops 16 — 뷰 넷 포함) 이름 대조 · 빠진 것 `intended_drops` · `irreplaceable_counts` 둘 + 이 PR 새 표 하나(Notion 쓰기는 병합 뒤).
-- 6 주거 사전 재계산 — `scripts/dictionary-recheck.py` 결과는 회신.
+- 6 주거 사전 재계산(10:05~10:09 KST · 기준선 11-18 10:29) — 49파일: 값·결론이 바뀜 5(conversion-rate-lh · income-baseline · permanent-group-ga-na · permanent-vacancy-wait · rent-per-sqm) · 같음 6 · 수만 늘어남 35 · 줄어듦 3(move-in-date · relaxed-recruitment · renewal-eligibility) · 기준선은 고치지 않음.
 - `index.html`·`sw.js` 0 · DB 데이터 쓰기 0.
