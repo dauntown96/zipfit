@@ -6536,7 +6536,9 @@ async function zfRenderCutoffDetail(annId, id){
         const under = gn != null && gs != null && gn <= gs;
         const wn = g.wait ? num(g.wait.rqpr_cnt) : null, over = (gn != null && gs != null) ? gn - gs : null;
         const wcell = !g.wait ? '—'
-          : under ? calc('넘친 신청 없음') + (ws != null ? `(정원 ${ws})` : '')
+          // 🔵 2026-11-24(우편함 「표시층 — 판 G」 고장 3) — 예비자 행 원천 값(정원 · 신청 — LH 공공데이터 신청유형 「예비자」 행 그대로)을 먼저 쓰고,
+          //    「넘친 신청 없음」(일반공급 신청 ≤ 공급에서 꼭집이 센 말)은 회색 계산 꼬리로만 — 종전 「넘친 신청 없음(정원 78)」은 예비자 행의 신청 수를 감췄다.
+          : under ? (ws != null ? `정원 ${ws}명` + (wn != null ? ` · 신청 ${wn}명` : '') + ' ' : '') + calc('· 넘친 신청 없음')
           : ws == null ? '—'
           : `정원 ${ws}명` + ((wn && wn !== over) ? ` · 신청 ${wn}명` : '');   // LH 예비자 신청이 0이 아니고 넘친 수와 다를 때만 원문 신청 수
         mid = `<td style="${td}">${genCell(g.gen)}</td>`
