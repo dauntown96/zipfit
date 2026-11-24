@@ -14993,7 +14993,18 @@ async function zf3GoCard(aid){
   const go = async () => {
     goMain(2);
     for(let i = 0; i < 150 && !noticeLoaded; i++) await new Promise(r => setTimeout(r, 100));
-    const el = await zf3GoCard(id);
+    let el = await zf3GoCard(id);
+    // 🔵 2026-11-24(우편함 「표시층 — 판 G」 덧 ① · 💡 4228aaa7e1558195abb6) — 목록에 없는 id 면 묶음(get_announcement_group_ids)에서 목록에 있는 대표를 찾아 연다 —
+    //    정정 뒤 원공고 id 로 된 옛 공유 링크(…21098 → 대표 …21131)가 첫 화면으로 떨어졌다. 목록에 없을 때만 요청 1(그 밖 0).
+    if(!el && noticeLoaded && !noticeData.some(n => String(n['announcement_id'] || '') === id)){
+      try{
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_announcement_group_ids`, { method: 'POST', headers: zfAnonHeaders(), body: JSON.stringify({ p_announcement_id: id }) });
+        const gids = res.ok ? await res.json() : [];
+        const ids = new Set((Array.isArray(gids) ? gids : []).map(g => String(typeof g === 'string' ? g : (g && g.announcement_id) || '')));
+        const rep = noticeData.find(n => ids.has(String(n['announcement_id'] || '')));
+        if(rep) el = await zf3GoCard(String(rep['announcement_id']));
+      }catch(e){ console.warn('ZipFit: ?n= 묶음 대표 찾기 실패', e); }
+    }
     // 🔵 2026-10-21 뒤로가기 안 2 — 첫 로드의 ?n= 은 지금 칸을 고쳐 쓴다(쌓지 않는다 — 공유 링크로 와서 뒤로 = 왔던 곳). 없는 id(닫힌 공고 · 오타)는 주소에서 걷는다.
     if(!el){ zfNavReplace({ t: 2, open: null }, null); return; }
     const det = document.getElementById(el.getAttribute('data-card-id'));
