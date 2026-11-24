@@ -862,6 +862,19 @@ html[data-ui="d3"] .zf-sch .policy-content{white-space:normal;overflow-wrap:anyw
 .zf-sch-stop>summary{list-style:none;cursor:pointer;display:block}
 .hcard.zf-ana-pending :is(.zf3-dpill,.htag,.chip-row,.zf-dateline,.zf-rec-date,.zf3-route,.zf3-dl-tags,.zf-route-slot,.zf-notices-slot,.zf-dcell-date,[id^="schedule-slot-"]){display:none!important}
 .hcard.zf-ana-pending .zf-ai-lbl,.hcard.zf-ana-no .zf-ai-lbl,.zf-ai-off .zf-ai-lbl{display:none}
+/* 🔵 2026-11-24(판 D ② (나)) — 같은 금액 다른 동 접힘 표지 */
+.hu-same-amt>summary{cursor:pointer;list-style:none}
+.hu-same-amt>summary::-webkit-details-marker{display:none}
+.hu-same-chip{display:inline-block;padding:2px 9px;font-size:var(--t-xs);cursor:pointer;background:var(--surface-2,#f0efe9);color:var(--ink-2,#444);border-color:var(--line,#ddd);margin-left:6px}
+.hu-same-amt[open] .hu-same-chip{background:var(--ink,#222);color:var(--paper,#fff);border-color:var(--ink,#222)}
+/* 🔵 2026-11-24(판 D ①) — 재확인 대기 칩은 「분석 중」·간단 줄 카드에서 접는다 */
+.hcard:is(.zf-ana-pending,.zf-lite) .zf-recheck{display:none!important}
+/* 🔵 2026-11-24(판 D ⑤·④) — 닫힌 미분석 카드 간단 줄: 머리(유형·곳 · 제목·상태)와 줄 하나만 · 펼침 꺾쇠 없음 */
+.hcard.zf-lite>:not(.htop):not(.zf3-ctop):not([data-sum-for]){display:none!important}
+.hcard.zf-lite :is(.zf3-go,.zf3-dpill){display:none!important}
+.hcard.zf-lite{cursor:default!important}
+.zf-lite-line{font-size:12px;color:var(--ink-3,#6B6B63);margin:4px 0 0;line-height:1.6}
+.zf-lite-line a{color:var(--ink-2,#444);font-weight:600;text-decoration:underline}
 .zf-ops-hide{margin-top:14px;padding:10px 12px;border:1px dashed #C0392B;border-radius:var(--r-s);font-size:13px;background:#fff}
 .zf-ops-hide input{width:100%;box-sizing:border-box;margin:6px 0;padding:8px;font:inherit;font-size:13px}
 .zf-ops-hide .zf-ops-hide-msg{font-size:12px;color:#888;margin:4px 0 0}
@@ -1291,6 +1304,7 @@ html.zf12 .zf12-badges button.zf12-sched:focus-visible{outline:2px solid var(--f
 html.zf12 .zf12-badges .chip{display:inline-flex;align-items:center;min-height:24px;padding:2px 8px!important;border-radius:var(--r-1);font-size:var(--t-xs)!important;font-weight:700;background:var(--warn-bg)!important;border:1px solid var(--warn)!important;color:var(--warn)!important;cursor:default}
 html.zf12 .zf12-cov{font-size:var(--t-xs);color:var(--ink-3)}
 html.zf12 .zf12-badges .chip.zf-chip-new{background:var(--ink)!important;border-color:var(--ink)!important;color:var(--paper)!important}   /* NEW = 재편 전 겉 꼴 그대로(경고 색 아님) */
+html.zf12 .zf12-badges .chip.zf-recheck{background:var(--surface-2)!important;border-color:var(--line)!important;color:var(--ink-2)!important;font-weight:600}   /* 🔵 판 D ① 재확인 대기 = 정보(경고 색 아님) */
 html.zf12 .zf12-badges .chip[role=button]{position:relative}
 html.zf12 .zf12-badges .chip[role=button]::after{content:"";position:absolute;left:0;right:0;top:-10px;bottom:-10px}   /* 누르는 자리 44px(보이는 높이 24 + 위아래 10) */
 html.zf12 .zf3-ctop .zf3-dpill:is(.hot,.zf12-soon){background:var(--ink);border-color:var(--ink);color:var(--paper)}   /* 2차 2 — 알약은 상태만 · 임박 경고는 일정 줄 남은 날 조각(.zf12-dd.hot)이 맡는다 */
@@ -5007,6 +5021,8 @@ function zfMapNoticeRows(rows){
     // 🔴 같은 이름의 [취소공고]가 따로 있는 그룹이다(RPC가 dedup 키로 판정한다).
     // 취소행은 접수마감이라 기본 목록에서 빠지므로 프론트가 목록만 보고는 알 수 없다.
     'has_cancel_notice': r.has_cancel_notice===true,
+    // 🔵 2026-11-24(판 D ① · 열넷째 #1235 칸) — 재확인 몫 대기 갈래(「정정」·「첨부」·「차수」 · 둘 이상이면 쉼표 · 없으면 null). 매핑에 없으면 화면이 영영 못 본다(원칙 26).
+    'recheck_pending': r.recheck_pending ?? null,
   }));
   // 🔴 짝 원공고가 있는 [취소공고] 행을 목록에서 뺀다(2026-09-16). noticeData 에서 빼므로
   //    목록·상태 칩 건수·검색·「전체 N건」이 **한 자리에서 함께** 줄어든다(사본 없음).
@@ -6023,6 +6039,43 @@ function zfAnaPendingHtml(url, org){
     : '';
   return `<div class="zf-ana-box"><span class="zf-ana-pill">분석 중</span>${org ? `<span class="zf-ana-org">${escapeHtml(org)}</span>` : ''}<span class="zf-ana-t">공고 원문을 정리하고 있어요 · 일정·자격은 원문에서 확인해 주세요</span>${link}</div>`;
 }
+// 🔵 2026-11-24(우편함 「표시층 — 판 D 시안」 ① · 백로그 「분석 전 공고는 「새 공고 — 분석 중」으로만 보인다」 표시층 몫) — 재확인 대기 표시.
+//    재료 = 목록 RPC recheck_pending(열넷째 #1235 — 끝나지 않은 재확인 몫의 갈래) · 칸이 비면 아무것도 그리지 않는다(새 요청 0).
+//    문구 시안 둘(다운님이 고른다): 'branch' = 갈래마다 한 문장(둘 이상이면 하나로 묶은 문장) · 'one' = 늘 하나로 묶은 문장.
+//    「분석 중」·간단 줄 카드에서는 접는다(CSS) — 그 카드는 이미 「원문을 보라」고 말한다.
+const ZF_RECHECK_MODE = 'branch';
+const ZF_RECHECK_TEXT = { '정정': '정정된 내용을 반영하는 중이에요', '첨부': '새 첨부를 확인하는 중이에요', '차수': '다음 차수 내용을 확인하는 중이에요' };
+const ZF_RECHECK_ONE = '원문이 바뀌어 다시 확인하는 중이에요';
+function zfRecheckChip(v){
+  const br = [...new Set(String(v || '').split(',').map(x => x.trim()).filter(Boolean))];
+  if(!br.length) return '';
+  const t = ZF_RECHECK_MODE === 'branch' && br.length === 1 && ZF_RECHECK_TEXT[br[0]] ? ZF_RECHECK_TEXT[br[0]] : ZF_RECHECK_ONE;
+  return `<span class="chip sel zf-chip-info zf-recheck" data-zf-recheck="${zfAttr(br.join(','))}" style="cursor:default;padding:4px 10px;font-size:var(--t-xs)">🔁 ${escapeHtml(t)}</span>`;
+}
+// 🔵 2026-11-24(우편함 「표시층 — 판 D 시안」 ⑤ · ④) — 닫힌(isHiddenAsClosed — 숨기기·「마감」 칩과 같은 술어) 미분석 카드는 간단 줄 하나:
+//    제목 · 공고일 · 마감 · 원문 링크 · 상세 펼침 없음. 데이터·거름·셈은 그대로(표시만 · 마감 목록 단추 건수 · 인사이트 누적 영향 0).
+//    「미분석」은 카드 요약 자리와 같은 RPC 칸(get_announcement_price_summary analysis_done)으로만 가른다 — 새 판정 0.
+//    ⑤ = 「분석 중」(zfAnaPending)이던 닫힌 카드(그 말이 틀린 말이라 걷는다).
+//    ④ = 닫힌 미분석 전부 — 「AI 정리」를 접는 판정(zfAiOff: analysis_done 거짓 ∧ 같은 게시물 LH 정리 없음)과 같다 = 「분석 중」 ∪ 첨부 0(「꼭집이 아직 분석하지 않은 공고예요」).
+function zfClosedLiteKind(s, key){ return zfAiOff(s, key); }
+function zfClosedLiteRow(id, s, key){
+  if(!s || !zfClosedLiteKind(s, key)) return null;
+  const row = (noticeData || []).find(n => String(n['announcement_id']) === String(id));
+  return row && isHiddenAsClosed(row) && !zfIsCancelRow(row['공고명']) ? row : null;
+}
+function zfClosedLiteHtml(row, url){
+  const d = zfNoticeDate(row) || row['announcement_date'] || '', e = row['신청마감일'] || row['apply_end'] || '';
+  const parts = [d ? '공고일 ' + escapeHtml(d) : '', e ? '마감 ' + escapeHtml(e) : ''].filter(Boolean);
+  if(zfSafeUrl(url)) parts.push(`<a href="${zfSafeHref(url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">원문 보기 →</a>`);
+  return `<p class="zf-lite-line">${parts.join(' · ')}</p>`;
+}
+// 간단 줄 카드는 펼치지 않는다 — 열려 있었으면 접고 · 누름·꺾쇠는 toggleDetail 이 막는다(.zf-lite).
+function zfClosedLiteApply(card, on){
+  card.classList.toggle('zf-lite', on);
+  if(!on) return;
+  const det = document.getElementById(card.getAttribute('data-card-id'));
+  if(det && det.style.display === 'block'){ det.style.display = 'none'; card.classList.remove('zf3-open'); card.style.borderColor = ''; }
+}
 // 🔵 2026-11-02(우편함 「표시층 — ㎡당 월세 중앙값 …」 A) — 카드 가격 요약 아래 한 줄 「㎡당 월 ○원 · 전국 같은 유형 열린 공고 중앙값 ○원(N곳) — 낮은 편/비슷/높은 편」.
 //    카드 값 = RPC rent_per_sqm_med(가격 범위와 같은 pick 행 · 주 조건 월세 ÷ 전용면적 중앙값 · 영구임대는 나군 행만 — rent_basis 'na').
 //    전국 값 = 목록 응답 뒤 한 번, 열린 카드 전부의 같은 RPC 를 받아 유형(표준 유형 · 영구임대 나군은 나군끼리)마다 카드 값의 중앙값·사분위.
@@ -6162,7 +6215,12 @@ function zfFillSummarySlots(){
     const s = zfPriceCache.get(id);
     if(s === undefined) return;                    // 조회 중 — 아직 아무것도 적지 않는다
     const url = el.getAttribute('data-sum-url') || '';
-    const pend = zfAnaPending(s, el.getAttribute('data-sum-key')), card = el.closest('.hcard');
+    const card = el.closest('.hcard');
+    // 🔵 2026-11-24(판 D ⑤ · 열다섯째 B장 회신 ② — 기준 ① 틀린 정보) — 닫힌 카드는 「분석 중」이라 하지 않는다 · 간단 줄(zfClosedLiteHtml) 꼴로.
+    const liteRow = zfClosedLiteRow(id, s, el.getAttribute('data-sum-key'));
+    const pend = !liteRow && zfAnaPending(s, el.getAttribute('data-sum-key'));
+    if(card) zfClosedLiteApply(card, !!liteRow);
+    if(liteRow){ el.innerHTML = zfClosedLiteHtml(liteRow, url); if(card){ card.classList.remove('zf-ana-pending', 'zf-lo'); card.classList.toggle('zf-ana-no', zfAiOff(s, el.getAttribute('data-sum-key'))); } return; }
     if(card) card.classList.toggle('zf-ana-pending', pend);
     if(card) card.classList.toggle('zf-ana-no', zfAiOff(s, el.getAttribute('data-sum-key')));   // 🔵 2026-10-16 — 분석 없으면 「AI 정리 · 」 접음
     // 🔵 2026-10-22 — 첨부 0 · 분석 없음(요약 줄도 없고 같은 게시물 LH 정리도 없음) 카드에 머리 줄 표지(.zf-lo)
@@ -6664,6 +6722,7 @@ function zfNoticeCardHtml(n, idx){
         ${hasCancel?cancelNoticeBadge(n['공고명']||'', n['apply_end']):''}
         ${n['building_name']?`<span class="chip" style="cursor:default;padding:4px 10px;font-size:var(--t-xs)">🏢 ${zfBuildingLabel(n['building_name'], zfComplexCount(n))}</span>`:''}
         ${isAmended?'<span class="chip sel zf-chip-warn" style="cursor:default;padding:4px 10px;font-size:var(--t-xs);background:#7B5EA7;border-color:#7B5EA7">🔄 정정</span>':''}
+        ${zfRecheckChip(n['recheck_pending'])}
         ${isNew?'<span class="chip sel zf-chip-new" style="cursor:default;padding:4px 10px;font-size:var(--t-xs);background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
         ${closingSoon?'<span class="chip sel zf-chip-warn" style="cursor:default;padding:4px 10px;font-size:var(--t-xs);background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
         ${applyUnknownChip(n)}
@@ -9009,6 +9068,8 @@ function toggleDetail(id, card, from){
   const detailEl = document.getElementById(id);
   if(!detailEl) return;
   const open = detailEl.style.display === 'block';
+  // 🔵 2026-11-24(판 D ⑤ · ④) — 닫힌 미분석 간단 줄 카드는 펼치지 않는다(zfClosedLiteApply)
+  { const c0 = card || document.querySelector(`[data-card-id="${id}"]`); if(!open && c0 && c0.classList && c0.classList.contains('zf-lite')) return; }
   detailEl.style.display = open ? 'none' : 'block';
   const cardEl = card || document.querySelector(`[data-card-id="${id}"]`);
   // 사용 로그: 펼칠 때만 보낸다(접는 것은 열람이 아니다).
@@ -9680,6 +9741,20 @@ function loadScheduleLine(annId, cardEl, id){
     sameAp.forEach(r => { r._applySame = true; });
     // 🔵 판 C 5 ② — 「공고」 단계가 기간(시작 < 끝)이고 다른 역과 겹치면(SH 「모집공고」 게시 기간이 접수·공개를 품음) 곁가지로.
     cur.forEach(r => { r._side = r.stage === '공고' && !!(r.start_date && r.end_date) && r.start_date < r.end_date && cur.some(o => o !== r && o.stage !== '공고' && zfSchOverlap(o, r)); });
+    // 🔵 2026-11-24(우편함 「표시층 — 판 D 시안」 ③ · 판 C ⑦2) — 같은 기간 · 다른 단계: 접수 행과 시작·끝이 모두 같은(같은 범위) 공고·접수 밖 단계 행은
+    //    따로 역을 세우지 않고 그 접수 역 바로 뒤 곁가지로(판 C ② 게시 기간 곁가지와 같은 꼴 · 역 차례 밖). 단계 이름·날짜는 원문 그대로.
+    //    SH_313227 주택사전공개 · 치매검사 = 신청접수 11-24~12-07 — 같은 날짜 역 셋이 노선에 나란히 섰다.
+    {
+      const apRows = cur.filter(r => r.stage === '접수' && r.start_date && r.end_date);
+      const apOf = r => r.stage !== '접수' && r.stage !== '공고' && apRows.find(a => a.start_date === r.start_date && a.end_date === r.end_date && (a.scope_text || '') === (r.scope_text || '') && (a.site_label || '') === (r.site_label || ''));
+      const moved = cur.filter(r => apOf(r));
+      if(moved.length){
+        moved.forEach(r => { r._side = true; });
+        const out = [];
+        cur.filter(r => !moved.includes(r)).forEach(r => { out.push(r); if(r.stage === '접수') out.push(...moved.filter(m => apOf(m) === r)); });
+        cur = out;
+      }
+    }
     const extraApply = !sameAp.length && !cur.some(r => r.stage === '접수') && (aS || aE)
       ? `<div class="policy-item" data-zf-d="${zfAttr(aS || aE)}" data-zf-e="${zfAttr(aE || aS)}"><div class="policy-category">📅 접수기간</div><div class="policy-content">${escapeHtml(`${aS || '-'} ~ ${aE || '-'}`)}</div></div>` : '';
     // 🔵 2026-11-12 — 일정 표에 「공고」 단계 행이 없으면 첫 정거장 = 카드 노선과 같은 공고일(zfScheduleAnnItem · 노선마다 맨 앞)
@@ -11815,7 +11890,9 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
         //    다른 회차의 같은 값 세대는 따로 남아 「다른 회차 보기」에 원문 행 수대로 보인다(종전에는 이번 회차 행에
         //    합쳐져 지난 회차 쪽에서 사라졌다 · 익산제3 …20850 ↔ 4월 …19778 36B 고령자). 이번 회차 쪽 행 수는 그대로다.
         const rd = roundDateOf(u);
-        const key = [rd, u.building_name, u.address, u.floor_info, u.unit_type, u.area_sqm, u.deposit, u.monthly_rent, u.deposit_priority1, u.rent_priority1, u.unit_group, u.supply_target, u.group_recruit_count].join('|');
+        // 🔵 2026-11-24(판 D ② · 국면 C 계속 회신 1 ②·⑦2) — 비고의 계약면적 · 건설 세대수(zfNoteFacts)도 키에 — 같은 금액의 다른 동(충주연수2 206동 38.56㎡·239호 ↔
+        //    201~205동 39.10㎡·955호 · 207 ↔ 208)이 「중복 백필」로 보여 한 행만 남았다(다른 행 비고가 통째로 숨음). 같은 공고 형제 ID 의 같은 행은 그대로 합친다.
+        const key = [rd, u.building_name, u.address, u.floor_info, u.unit_type, u.area_sqm, u.deposit, u.monthly_rent, u.deposit_priority1, u.rent_priority1, u.unit_group, u.supply_target, u.group_recruit_count, zfNoteFacts(u)].join('|');
         if(seenHu.has(key)) return;
         u.zfRoundDate = rd;
         seenHu.set(key, u);
@@ -12351,7 +12428,15 @@ function huPriceText(u){
 //    보면 그 칸이 비고 unit_type 으로 갈리는 행들이 한 줄로 뭉쳐 라벨 하나만 남는다.
 // 🔵 동호수(floor_info)를 키에 넣는다. 비고가 빠진 자리를 메우는 것이 아니라, 이 칸도 줄마다
 //    따로 그려지므로 다르면 합칠 수 없기 때문이다(종전에는 빠져 있었다).
+// 🔵 2026-11-24(판 D ②) — 비고 원문 안의 계약면적(㎡)·건설 세대수(호) — 같은 금액이라도 이 둘이 다르면 다른 동이다(원문 표가 동마다 따로 줄).
+//    값을 고치지 않는다 — 가르는 키로만 쓴다(없으면 '').
+function zfNoteFacts(u){
+  const t = String((u && u.extra_note) || '');
+  const a = t.match(/계약면적[^0-9]*([0-9.]+)\s*㎡/), b = t.match(/건설\s*세대수[^0-9]*([0-9,]+)\s*호/);
+  return (a ? a[1] : '') + '/' + (b ? b[1] : '');
+}
 function buildUnitGroupLines(g){
+  // 🔵 판 D ② (나) — 계약면적·건설 호수가 달라도 같은 금액이면 한 줄로 접되, 줄에 「같은 금액 N행」 표지 + 동별 비고는 펼쳐서(renderHousingUnitGroup).
   const lineKey = u => [u.supply_target || u.unit_type || '', u.deposit, u.monthly_rent,
                         u.deposit_priority1, u.rent_priority1, u.floor_info || '',
                         u.zfRoundLabel || '', u.zfPastOnly ? '1' : ''].join('|');
@@ -12412,11 +12497,13 @@ function renderHousingUnitGroup(g, mode){
     const rowPick = headPick ? null : zfReserveCommon(ln.units || [u], '모집예비자수');
     const noteCtx = zfNoteCtxOf(ln.units || [u], [headTotal, u.recruit_count], (headPick || rowPick || {}).value);
     const noteBlocks = ln.notes.map(n => renderExtraNoteHtml(n, noteCtx)).filter(Boolean);
-    const note = noteBlocks.length
-      ? `<div class="hu-note-wrap"><span class="hu-label">비고</span>`
-        + noteBlocks.map(h => `<div class="hu-note-block">${h}</div>`).join('')
-        + `</div>`
-      : '';
+    // 🔵 판 D ② (나) — 한 줄에 접힌 행이 계약면적·건설 호수로 갈리면(다른 동) 「같은 금액 N행」 · 비고는 접어 두고 펼치면 행(동)마다.
+    const sameN = new Set((ln.units || [u]).map(zfNoteFacts)).size;
+    const noteInner = noteBlocks.map(h => `<div class="hu-note-block">${h}</div>`).join('');
+    const note = !noteBlocks.length ? ''
+      : sameN > 1
+        ? `<details class="hu-note-wrap hu-same-amt"><summary><span class="hu-label">비고</span> <span class="chip hu-same-chip">같은 금액 ${sameN}행 · 동별 보기</span></summary>${noteInner}</details>`
+        : `<div class="hu-note-wrap"><span class="hu-label">비고</span>${noteInner}</div>`;
     return `<div class="hu-ug-row">
       <div class="hu-ug-line">
         <span class="hu-ug-target">${escapeHtml(u.supply_target || u.unit_type || '')}</span>
@@ -13117,6 +13204,7 @@ function renderMatchResults(rows){
         ${hasCancel?cancelNoticeBadge(n.title||'', n.apply_end):''}
         ${n.building_name?`<span class="chip" style="cursor:default;padding:4px 10px;font-size:var(--t-xs)">🏢 ${zfBuildingLabel(n.building_name, zfComplexCount(n))}</span>`:''}
         ${isAmended?'<span class="chip sel zf-chip-warn" style="cursor:default;padding:4px 10px;font-size:var(--t-xs);background:#7B5EA7;border-color:#7B5EA7">🔄 정정</span>':''}
+        ${zfRecheckChip(n.recheck_pending)}
         ${isNew?'<span class="chip sel zf-chip-new" style="cursor:default;padding:4px 10px;font-size:var(--t-xs);background:#D85A30;border-color:#D85A30">🆕 NEW</span>':''}
         ${closingSoon?'<span class="chip sel zf-chip-warn" style="cursor:default;padding:4px 10px;font-size:var(--t-xs);background:#EF9F27;border-color:#EF9F27">⏰ 마감임박</span>':''}
         ${applyUnknownChip(n)}
@@ -16595,7 +16683,7 @@ function zf12Sweep(card){
     twin ? twin.replaceWith(el) : l2.appendChild(el);
   });
   card.querySelectorAll('.zf12-badges').forEach(b => {   // 늦게 붙은 경고 칩도 ①로
-    card.querySelectorAll('.zf12-l2 .chip-row .zf-chip-warn, .zf12-l2 .chip-row .zf-chip-new').forEach(x => b.appendChild(x));
+    card.querySelectorAll('.zf12-l2 .chip-row .zf-chip-warn, .zf12-l2 .chip-row .zf-chip-new, .zf12-l2 .chip-row .zf-recheck').forEach(x => b.appendChild(x));
   });
 }
 function zf12Front(card, n){
@@ -16611,7 +16699,7 @@ function zf12Front(card, n){
   const det = document.getElementById(card.getAttribute('data-card-id'));
   const top = card.querySelector('.zf3-ctop');
   const bw = document.createElement('span'); bw.className = 'zf12-badges';
-  card.querySelectorAll('.chip-row .zf-chip-warn, .chip-row .zf-chip-new').forEach(x => {   // 「🆕 NEW」도 ①로(재편 전처럼 겉 — 2026-11-19 회귀 고침 2)
+  card.querySelectorAll('.chip-row .zf-chip-warn, .chip-row .zf-chip-new, .chip-row .zf-recheck').forEach(x => {   // 「🆕 NEW」도 ①로(재편 전처럼 겉 — 2026-11-19 회귀 고침 2) · 🔵 판 D ① 재확인 대기 칩도 ①로
     // 「⏰ 마감임박」은 상태 알약(D-n)과 같은 사실 — 알약을 경고 모양으로 하고 배지는 접는다(한 사실 한 자리)
     if(/마감임박/.test(x.textContent) && top && top.querySelector('.zf3-dpill')){ top.querySelector('.zf3-dpill').classList.add('zf12-soon'); x.classList.add('zf12-off'); return; }
     bw.appendChild(x);
