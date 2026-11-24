@@ -3493,6 +3493,16 @@ function zfRouteWindows(rows){
   for(let i = 1; i < out.length; i++) if(out[i].s <= out[i - 1].e) return [];
   return out;
 }
+// 🔵 2026-11-24(우편함 「표시층 — 판 F」 · 💡 「마감 시각 더 쓰기」 나머지 — 차수 창별 끝 시각) — ① 차수 줄의 차수마다, 그 차수 마지막 날(end_date = 창 끝) 경로 행이
+//    모두 원문 끝 시각을 적었고 그 시각이 하나면 「 HH:MM까지」(zf3EndHm — 카드 알약·마감 시각순과 같은 읽기). 시각이 갈리거나 하나라도 없으면 붙이지 않는다
+//    (한 경로의 시각을 다른 경로 사용자에게 말하지 않게 — zfEndHmOf 와 같은 거름). 날짜·차수 이름은 그대로.
+function zfPhaseEndHm(rs, pick, e){
+  const last = (rs || []).filter(r => pick(r) && String(r.end_date || '').slice(0, 10) === String(e || '').slice(0, 10));
+  if(!last.length) return '';
+  const hms = last.map(r => zf3EndHm(r.period_text));
+  if(hms.some(h => !h) || new Set(hms).size !== 1) return '';
+  return ` ${hms[0]}까지`;
+}
 function zfRouteVerdict(rows, today){
   if(!Array.isArray(rows) || !rows.length) return { kind: '없음', text: '' };
   const rs = rows.slice().sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
@@ -3528,12 +3538,12 @@ function zfRouteVerdict(rows, today){
       // 🔵 2026-11-17(우편함 「표시층 — 작은 판 2」 7) — 같은 단지 조각은 한데 모은다: 「단지 이름 · 1순위 12/1 · 2,3순위 12/2」(낱말 그대로 · 차례만 — 단지 차례 = 그 단지 첫 접수).
       const locs = [];
       parts.forEach(p => { let L = locs.find(x => x.loc === p.loc); if(!L){ L = { loc: p.loc, ps: [] }; locs.push(L); } L.ps.push(p); });
-      return { kind: '①', text: lead2 + ' · ' + locs.map(L => [L.loc, ...L.ps.map(p => `${p.ph} ${zfSpanText(p.s, p.e)}`.trim())].filter(Boolean).join(' · ')).join(' · ') + zfRouteOnsiteTail(rs) };
+      return { kind: '①', text: lead2 + ' · ' + locs.map(L => [L.loc, ...L.ps.map(p => `${p.ph} ${zfSpanText(p.s, p.e)}${zfPhaseEndHm(rs, r => r.phase_text === p.ph && loc(r) === p.loc, p.e)}`.trim())].filter(Boolean).join(' · ')).join(' · ') + zfRouteOnsiteTail(rs) };
     }
     // 🔵 2026-10-21(우편함 「표시층 — S1 묶음 3」 ⑥ · 조사 「표본 정확도 2차」 ⑦ 2) — 차수 이름에 「순위」가 하나도 없으면(…19312 첫날 · 2일차 ~ 마감일 —
     //    순위가 아니라 접수 차수) 「순위별로」라 하지 않는다. 순위 차수는 그대로.
     const lead = phases.some(p => /순위/.test(p.name)) ? '순위별로 접수일이 달라요' : '접수일이 나뉘어 있어요';
-    return { kind: '①', text: lead + ' · ' + phases.map(p => `${p.name} ${zfSpanText(p.s, p.e)}`.trim()).join(' · ') + zfRouteOnsiteTail(rs) };
+    return { kind: '①', text: lead + ' · ' + phases.map(p => `${p.name} ${zfSpanText(p.s, p.e)}${zfPhaseEndHm(rs, r => r.phase_text === p.name, p.e)}`.trim()).join(' · ') + zfRouteOnsiteTail(rs) };
   }
   // 묶음 — site_text 로 묶는다. site_text 가 NULL 인 행은 공통 행이라 **모든 묶음**에 들어간다.
   const names = [];
