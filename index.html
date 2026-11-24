@@ -11510,6 +11510,9 @@ function loadPreciseEligibility(annId, detailEl, id, useGroup){
         // 🔴 (v/10000).toLocaleString() 은 만원 미만을 **조용히 반올림**한다 — manwonText 가 그 자리다.
         const asset = assetExempt ? '자산기준 배제' : (r.asset_limit ? `자산 ${manwonText(r.asset_limit)}` : '');
         const car = r.car_limit ? `차량가액 ${manwonText(r.car_limit)}` : '';
+        // 🔵 2026-11-24(우편함 「표시층 — 판 F」 O4 · 💡 「🚗 자동차 소유 불가」) — car_limit 0 은 종전 조건(참 값만)에서 아무것도 안 그렸다. 0 이고 원문(자격 행 글)에
+        //    「자동차 … 소유하고 있지 않을 것」·「소유 불가」 문장이 있을 때만 칩 「🚗 자동차 소유 불가」 · 누르면 그 원문 문장 그대로(0 만으로는 짓지 않는다).
+        const carNone = (Number(r.car_limit) === 0 && r.car_limit !== null) ? zfCarNoneSentence(r.verification_requirements) : '';
         // verification_requirements(jsonb, 키가 공고마다 다름) — 하드코딩 없이 Object.entries()로 범용 순회.
         // 중첩 객체(예: 자녀수별 자산기준표)는 raw JSON 대신 들여쓴 하위 목록으로, 숫자는 만원 단위로 변환.
         let vr = '';
@@ -11526,6 +11529,7 @@ function loadPreciseEligibility(annId, detailEl, id, useGroup){
           ${income ? `<div class="elig-row"><span>소득기준</span><span>${income}${dual}</span></div>` : ''}
           ${asset ? `<div class="elig-row"><span>자산기준</span><span>${asset}</span></div>` : ''}
           ${car ? `<div class="elig-row"><span>차량가액</span><span>${car}</span></div>` : ''}
+          ${carNone ? `<div class="elig-row"><span>차량가액</span><span><span class="chip sel zf-chip-warn zf-car-none" title="${zfAttr(carNone)}" data-zf-tip tabindex="0" role="button" aria-expanded="false" style="cursor:pointer;padding:3px 9px;font-size:var(--t-xs)">🚗 자동차 소유 불가</span></span></div>` : ''}
           ${vr}
         </div>`;
       };
@@ -16945,6 +16949,12 @@ function zfPickOneSentence(t){
 }
 // 🔵 2026-11-24(우편함 「표시층 — 판 F」 O4 더함 · 💡 「판단기준일 이원화 안내」) — 자격 판단 날이 둘(모집공고일 · 조사기준일)인 공고. 열린 공고 절반 넘게라 1층 칩이 아니라
 //    상세 2층 한 줄(접힘) — 머리 「📅 판단 기준일이 둘이에요(모집공고일 · 조사기준일)」 · 펼치면 원문 문장 그대로.
+function zfCarNoneSentence(vr){
+  const txt = (function walk(v){ return v == null ? '' : typeof v === 'object' ? Object.values(v).map(walk).join(' ') : String(v); })(vr).replace(/\s+/g, ' ');
+  const parts = txt.split(/(?<=[다요것]\.?)\s+(?=[①-⑳㉮-㉿▪•*-]|[가-힣(])|(?<=[.。])\s+/);
+  const hit = parts.find(x => /자동차[^.。]{0,40}(소유하고\s*있지\s*않|소유\s*불가|미소유|보유하지\s*않)/.test(x));
+  return hit ? hit.trim() : '';
+}
 function zfBasisDateSentence(t){
   const parts = String(t || '').replace(/\s+/g, ' ').split(/(?<=[다요]\.)\s+|(?<=[.。])\s+(?=[-•ㅇ·▪(\[]|[가-힣A-Z])/);
   const hit = parts.find(x => /조사\s*기준일/.test(x) && /(모집\s*)?공고일/.test(x) && /(산정|판단|기준)/.test(x));
