@@ -13,7 +13,8 @@
 
 | 파일 | 무엇 |
 |---|---|
-| **`v3.32.sql`** | **현행.** v3.31 + `allow_exec_funcs`에 `get_rent_per_sqm_quartiles`(화면이 anon으로 부를 ㎡당 사분위 스냅숏 읽기 · 2026-11-25 스무째) · 그 밖 한 글자도 같음 · V26 꺼 둔 채(켜는 판은 v3.33 이후) |
+| **`v3.33.sql`** | **현행.** v3.32 + **V27** 「금회 한정」 정책 행(「금회 모집은 n순위에 한함」 · 「n순위 : 이번 공고는 모집하지 않음」)이 있는 공고에서 순위 있는 자격 행의 `this_round_open`이 모두 NULL(2026-11-25 스물셋째 · 첫 값 0 · 소급 전 2) · 그 밖 한 글자도 같음 · V26 꺼 둔 채(켜는 판은 v3.34 이후) |
+| `v3.32.sql` | v3.31 + `allow_exec_funcs`에 `get_rent_per_sqm_quartiles`(화면이 anon으로 부를 ㎡당 사분위 스냅숏 읽기 · 2026-11-25 스무째) · 그 밖 한 글자도 같음 · V26 꺼 둔 채 |
 | `v3.31.sql` | v3.30 + `allow_exec_funcs`에 `listing_pending_rechecks`(목록 RPC가 anon으로 부르는 재확인 몫 목록 · 2026-11-23 열넷째 묶음) · 그 밖 한 글자도 같음 · V26 꺼 둔 채 |
 | `v3.30.sql` | v3.29 + V10c · V16 「열린 공고」 오늘을 KST로(`(now() at time zone 'Asia/Seoul')::date` — 종전 `current_date`는 DB 세션 시간대 UTC · 2026-11-22 넷째 묶음 D) · 그 밖 한 글자도 같음 · V26 꺼 둔 채 |
 | `v3.29.sql` | v3.28 + **V26** 블록 ID 상태 행(`announcement_analysis` 행이 LH 아닌 ID 에 있고 원문 ID `zipfit_ops.original_lh_id` 가 따로 있음 — 규약 29) · 예외 `v13_keep` · `zipfit_ops.linked_separate_notices`(같은 게시물에 링크로 접힌 마감일 다른 별개 공고문 — 마이그레이션 `2026-11-11_04`) · 🔴 **꺼 둔 채**(`v26_on = false` — 역전파 9회차 블록 상태 행 이전 뒤 켠다 · 2026-11-11 켜면 7) |
