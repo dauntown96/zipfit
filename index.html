@@ -3417,6 +3417,24 @@ function zfSoonestOpenEnd(row){
   const ends = list.filter(x => x.state === 'open' || x.state === 'before').map(x => x.end).filter(Boolean).sort();
   return ends[0] || own;
 }
+// 🔴 2026-11-25(우편함 「표시층 — 판 K」 덧 1 · 기준 ① · 다운님 판정 17:33) — 시작·끝을 함께 보이는 자리(목록 날짜 줄 · 상세 「접수기간」 · 상세 머리 접수·마감)는
+//    끝이 같은 게시물 다른 공고문의 「가장 이른 열린 마감」(zfSoonestOpenEnd)이면 **게시물 전체 범위** — 카드 겉 줄(zf12WhenHTML · 판 K 할 일 1)과 같은 규칙:
+//    끝 = 마지막 벌 끝 · 시작 = 알약 「접수 중」이고 오늘이 벌 안이면 모든 벌 중 가장 이른 시작, 아니면 끝나지 않은 벌 중 가장 이른 시작.
+//    종전은 시작 = 카드 행(…21044 12-01) · 끝 = 다른 공고문(영암용앙1 11-30)이라 「2026-12-01 ~ 2026-11-30」(시작 > 끝)이 섰다.
+//    🔴 카드 상태·알약·D-n·「마감 임박순」·필터는 종전 값(zfSoonestOpenEnd · 카드 행 시작 — 10-07 「가장 이른 열린 마감」 축) 그대로 — 이 함수는 글자 짝만 고른다.
+function zfShownApplySpan(row){
+  const s0 = String((row && (row['신청시작일'] || row['apply_start'])) || '');
+  const e = String(zfSoonestOpenEnd(row) || '');
+  const own = String((row && (row['신청마감일'] || row['apply_end'])) || '');
+  if(!e || e === own) return { s: s0, e };
+  const d = v => String(v || '').slice(0, 10);
+  const bands = (zfPostNoticeList(row) || []).filter(x => x.state !== 'closed' && x.start && x.end).map(x => [d(x.start), d(x.end)]);
+  if(!bands.length) return s0 && s0 > e ? { s: s0, e: own } : { s: s0, e };   // 벌을 못 읽으면 시작 > 끝을 만들지 않는다(카드 행 자기 짝)
+  const t0 = zf3Today(), live = bands.filter(b => b[1] >= t0), pool = live.length ? live : bands;
+  const pl = typeof zf3Pill === 'function' ? zf3Pill(row) : null;
+  const inBand = !!pl && /^open/.test(pl.cls || '') && bands.some(b => b[0] <= t0 && t0 <= b[1]);
+  return { s: (inBand ? bands : pool).map(b => b[0]).sort()[0], e: bands.map(b => b[1]).sort().slice(-1)[0] };
+}
 function zfWithSoonestEnd(row){
   const e = zfSoonestOpenEnd(row);
   const own = (row && (row['신청마감일'] || row['apply_end'])) || '';
@@ -6761,8 +6779,7 @@ function zfNoticeCardHtml(n, idx){
     // 정정 사유는 펼친 안 「📝 정정 사유」에만 보인다 — 겉의 「ℹ️ 정정사유」 마우스 올리기 칩은 터치에선 안 뜨고
     // 「🔄 정정」 배지와 같은 말이라 뺐다(2026-10-14 · 공고 탭·매칭 카드·그룹 뒤늦은 끼워 넣기 셋 다).
     const revisionNoteEsc = (n['revision_note']||'').replace(/"/g,'&quot;');
-    const applyStart = n['신청시작일']||n['apply_start']||'';
-    const applyEnd   = zfSoonestOpenEnd(n);
+    const { s: applyStart, e: applyEnd } = zfShownApplySpan(n);   // 판 K 덧 1 — 같은 출처의 시작·끝 짝
     const annDate    = n['announcement_date']||'';
     // 모집공고일 = 접수시작일이면 중복 제거. unknown이면 '미상'+원문 링크(applyDateLine).
     // 🔴 B31 — 취소공고 행은 모집공고일과 원문 링크만 적는다. 취소 대상 회차는 추정해서 적지 않는다(원문으로 보낸다).
@@ -7277,8 +7294,7 @@ function renderPersonalizedRecommendations(){
   let html='';
   shown.forEach((n,idx)=>{
     const announcementDate=n['모집공고일']||n['announcement_date']||'';
-    const applyStart=n['신청시작일']||n['apply_start']||'';
-    const applyEnd=zfSoonestOpenEnd(n);
+    const { s: applyStart, e: applyEnd } = zfShownApplySpan(n);   // 판 K 덧 1
     const dateLine=applyDateLine(n, announcementDate, applyStart, applyEnd, n['공고URL']||n['url']||'');
     const closingSoon=isClosingSoon(zfWithSoonestEnd(n));
     const hasCancel=n['has_cancel_notice']===true;
@@ -9820,6 +9836,7 @@ function zfSchDateLine(r){
 //    「(원문 표기)」 꼬리만 단다 — 우리 오타로 읽혔다. 🔴 낱말을 고치지 않는다(원문 그대로 · 위 주석). 대상은 한글 두 글자 이상이 바로 되풀이되는 꼴만.
 const ZF_RAW_REPEAT = /([가-힣]{2,})\1/;
 function zfScheduleItemHTML(r, showScope){
+  if(r._annPt && r.end_date && r.end_date !== r.start_date) r = Object.assign({}, r, { end_date: r.start_date });   // 판 K 2 ① — 공고 = 시작일 한 점(원문 기간은 「원문」 펼침 period_text 그대로)
   const d1 = r.start_date || r.end_date || '', d2 = r.end_date || r.start_date || '';
   const sc = [showScope ? r.scope_text : '', r.site_label].filter(Boolean).map(escapeHtml).join(' · ');
   const rawMark = ZF_RAW_REPEAT.test(r.stage_text || '') ? ' <span class="zf-sch-rawmark" title="공고문에 적힌 글자 그대로예요">(원문 표기)</span>' : '';
@@ -9927,8 +9944,18 @@ function loadScheduleLine(annId, cardEl, id){
     // 🔵 판 C 5 ① — 접수 행이 없고 카드 접수기간과 시작·끝이 모두 같은 일정 행이 있으면 그 행이 접수 역이다(익산제3 …20850 「동호지정 및 계약체결」 = 접수기간 — 같은 기간 두 역이 섰다).
     const sameAp = !cur.some(r => r.stage === '접수') && aS && aE ? cur.filter(r => r.start_date === aS && r.end_date === aE) : [];
     sameAp.forEach(r => { r._applySame = true; });
-    // 🔵 판 C 5 ② — 「공고」 단계가 기간(시작 < 끝)이고 다른 역과 겹치면(SH 「모집공고」 게시 기간이 접수·공개를 품음) 곁가지로.
-    cur.forEach(r => { r._side = r.stage === '공고' && !!(r.start_date && r.end_date) && r.start_date < r.end_date && cur.some(o => o !== r && o.stage !== '공고' && zfSchOverlap(o, r)); });
+    // 🔵 2026-11-25(우편함 「표시층 — 판 K」 2 ①) — 「공고」 단계는 노선에서 시작일 한 점(기간 막대·곁가지 없이). 원문 기간 글자(period_text)는 「원문」 펼침에 그대로.
+    //    종전(판 C 5 ②)은 기간이 다른 역과 겹치면 곁가지로 보내 첫 역이 곁가지 꼴이었다(SH_313225 「모집공고 '26.11.19.~'26.12.7.」 — 원문이 게시 기간으로 적음).
+    cur.forEach(r => { r._side = false; r._annPt = r.stage === '공고' && !!r.start_date; });
+    // 🔵 판 K 2 ② — 역 차례 = 시작일(공고는 그 한 점 · 시작이 없으면 끝) → 같으면 원문 차례(sort_order). 날짜 없는 역은 제자리에 둔다.
+    //    종전은 원문 차례 그대로라 원문 표 밖 문장 「주택사전공개」(11-24~11-26 · sort_order 8)가 입주 뒤 맨 끝에 섰다(SH_313225).
+    {
+      const dk = r => r.start_date || r.end_date || '';
+      const slots = cur.map((r, i) => dk(r) ? i : -1).filter(i => i >= 0);
+      //    같은 날이면 단지 꼬리(site_label) 없는 공통 행 먼저 — 겹치는 공통 접수 행(인터넷 · 현장)이 이어져 한 역으로 합쳐지게(zfSchMergeApply · …21067 전주효자1이 사이에 끼어 두 역으로 갈렸다).
+      const dated = slots.map(i => cur[i]).sort((a, b) => dk(a) < dk(b) ? -1 : dk(a) > dk(b) ? 1 : (!!a.site_label - !!b.site_label) || ord.get(a) - ord.get(b));
+      const re = cur.slice(); slots.forEach((i, k) => { re[i] = dated[k]; }); cur = re;
+    }
     // 🔵 2026-11-24(우편함 「표시층 — 판 D 시안」 ③ · 판 C ⑦2) — 같은 기간 · 다른 단계: 접수 행과 시작·끝이 모두 같은(같은 범위) 공고·접수 밖 단계 행은
     //    따로 역을 세우지 않고 그 접수 역 바로 뒤 곁가지로(판 C ② 게시 기간 곁가지와 같은 꼴 · 역 차례 밖). 단계 이름·날짜는 원문 그대로.
     //    SH_313227 주택사전공개 · 치매검사 = 신청접수 11-24~12-07 — 같은 날짜 역 셋이 노선에 나란히 섰다.
@@ -13099,6 +13126,9 @@ function stripCommaLotNumbers(addr){
 function toGeocodeAddress(addr){
   if(!addr) return addr;
   addr = stripCommaLotNumbers(addr);
+  // 🔵 2026-11-25(우편함 「표시층 — 판 K」 3) — 「32/30」처럼 번호 둘을 「/」로 이은 꼴은 앞 번호만(지오코딩 묻는 글자만 · 화면 주소 글자는 원문 그대로).
+  //    열린 카드 건물 주소 중 Lv1·Lv2 둘 다 실패한 유일한 꼴(SH_313227 「금천구 시흥대로149가길 32/30」 → 시·군·구 중심 「대략의 위치」).
+  addr = addr.replace(/(\d+(?:-\d+)?)\s*\/\s*\d+(?:-\d+)?/, '$1');
   // 1) 괄호(법정동 표기) 이후는 전부 제거 — 건물명/호수가 괄호 뒤에 오는 케이스 커버
   let a = addr.split('(')[0].trim();
   if(a !== addr.trim()){
@@ -13564,8 +13594,7 @@ function renderMatchResults(rows){
     const convBadgesM = buildConvBadges(n.mymy_applicable, n.supply_form, n.application_method, n.recruit_multiplier, n.is_relaxed_recruitment, n.selection_method, n.title, n.relaxation_detail);
     const pairKeyM    = n.pair_announcement_key||'';
     const revisionNoteEscM = (n.revision_note||'').replace(/"/g,'&quot;');
-    const applyStart  = n.apply_start||'';
-    const applyEnd    = zfSoonestOpenEnd(n);
+    const { s: applyStart, e: applyEnd } = zfShownApplySpan(n);   // 판 K 덧 1
     const annDate     = n.announcement_date||'';
     const dateLine    = applyDateLine(n, annDate, applyStart, applyEnd, n.url||'');
     const cardId = 'mcard-' + zfCardKey(n.announcement_id || idx);
@@ -15408,7 +15437,7 @@ function zfWinFromSchedule(aid){
 }
 function zf3Stations(n){
   const ann = zf3Real(zfNoticeDate(n) || n['announcement_date']), rev = zfRevisedDate(n);
-  const s = zf3Real(n['신청시작일'] || n['apply_start']), e = zf3Real(zfSoonestOpenEnd(n));
+  const sp = zfShownApplySpan(n), s = zf3Real(sp.s), e = zf3Real(sp.e);   // 판 K 덧 1 — 같은 출처의 시작·끝 짝
   const ds = zfRouteDefaultSched(n);   // 🔵 2026-10-19 — 순위별 창 카드는 기본 창의 결과발표(일정 표 scope = 그 창 phase)
   // 🔵 S1 PR-2 — 단추 카드는 접수·마감·발표 역이 고른 창(기본 = 오늘 날짜의 창)을 따른다. 기본 창의 발표는 종전 식 그대로(위 ds · 카드 칸 대체) ·
   //    기본 밖 창은 그 창 일정 표 결과발표만(없으면 「원문 확인」 — 카드 발표 칸은 다른 창 날일 수 있어 쓰지 않는다).
@@ -17100,22 +17129,37 @@ function zf12WhenHTML(n){
   const bands = [];
   if(W) W.merged.forEach(m => bands.push([m.d, m.de]));
   (zfPostNoticeList(n) || []).filter(x => x.state !== 'closed' && x.start && x.end).forEach(x => bands.push([String(x.start).slice(0, 10), String(x.end).slice(0, 10)]));
-  if(bands.length >= 2 && !(zfWinSwitch(n) && zfWinPick.has(String(n['announcement_id'] || '')))){
+  const picked = zfWinSwitch(n) && zfWinPick.has(String(n['announcement_id'] || ''));
+  let inBand = false;
+  // 알약과 같은 판정 — 날짜로는 창 안이어도 끝 시각·조기 마감으로 「다음 접수」인 카드(…21022 · …20997 11-24)는 벌 사이로 본다.
+  const pl = typeof zf3Pill === 'function' ? zf3Pill(n) : null, plOpen = !!pl && /^open/.test(pl.cls || '');
+  if(bands.length >= 2 && !picked){
     const t0 = zf3Today(), live = bands.filter(b => b[1] >= t0), pool = live.length ? live : bands;
-    s = pool.map(b => b[0]).sort()[0];
+    // 🔵 2026-11-25(우편함 「표시층 — 판 K」 1) — 오늘이 어느 벌 안이면 접수 = 전체 접수 기간의 시작(모든 벌 중 가장 이른 시작).
+    //    종전 「끝나지 않은 벌 중 가장 이른 시작」은 하루 차수 마지막 날에 접수 = 마감(「접수 11-25 › 마감 11-25」 · 남원노암 …21022 · 제천장락1 …20975 · GH_850)이 섰다.
+    //    벌 사이(오늘 벌 없음)는 종전 그대로 — 다음 벌 시작(◉ 접수 · 다음 접수).
+    inBand = plOpen && bands.some(b => b[0] <= t0 && t0 <= b[1]);
+    s = (inBand ? bands : pool).map(b => b[0]).sort()[0];
     e = bands.map(b => b[1]).sort().slice(-1)[0];
   }
   const items = [['접수', s], ['마감', e], ['발표', st[3].d, st[3].u]];
   if(!items[0][1] && !items[1][1]) return '';
   const today = zf3Today();
+  // 🔵 판 K 1 — 오늘이 마지막이 아닌 차수 창 안이면(zfRouteCurEnd — 알약 「이번 차수 …」와 같은 날) 접수와 마감 사이에 「이번 차수 마감」 역을 둔다.
+  //    「오늘 …까지」·「D-n」은 그 역 한 곳에 붙는다(zf12PillTidy) — 종전에는 줄 끝(발표 뒤)에 떨어져 어느 날을 세는지 흐렸다(장성 …21071).
+  const curEnd = !picked && plOpen && /^이번 차수/.test(pl.t || '') && typeof zfRouteCurEnd === 'function' ? zfRouteCurEnd(n) : null;
+  if(curEnd && curEnd >= today && items[1][1] && curEnd < items[1][1]) items.splice(1, 0, ['차수', curEnd]);
+  // 🔵 판 K 1 — 접수 = 마감(하루 접수)이면 한 역 「접수·마감」(같은 날을 두 번 말하지 않는다). 역 키는 「마감」(점검 「접수 ≤ 마감」은 그대로 비교 0).
+  else if(items[0][1] && items[0][1] === items[1][1]) items.splice(0, 2, ['마감', items[1][1], '', '접수·마감']);
   // 🔵 2026-11-24(우편함 「표시층 — 판 G」 고장 2) — 강조 역 규칙 하나: 접수 예정이면 ◉ 접수(시작) · 접수 중이면 ◉ 마감. 종전에는 오늘이 접수 첫날이면
   //    ◉ 가 접수 역에 서고 그 옆 D 가 마감까지를 세어(「◉ 접수 11-24(화) D-13」) 시작까지로 읽혔다. 첫날(마감이 오늘보다 뒤)은 접수 역을 지난 역(●)으로.
-  const startedToday = items[0][1] === today && items[1][1] && items[1][1] > today;
+  const startedToday = items[0][0] === '접수' && items[0][1] === today && items.slice(1).some(x => x[0] !== '발표' && x[1] && (x[1] > today || x[0] === '차수'));   // 첫날 — 뒤에 이번 차수·마감이 남았으면 접수 역은 지난 역(●)
   const nextI = items.findIndex((x, i) => x[1] && x[1] >= today && !(i === 0 && startedToday));
-  return items.map(([k, d, u], i) => {
+  return items.map(([k, d, u, nm], i) => {
     const cls = !d ? 'unk' : (d < today || (i === 0 && startedToday)) ? 'past' : i === nextI ? 'next' : 'fut';
     const mark = cls === 'past' ? '●' : cls === 'next' ? '◉' : '○';
-    return `<span class="zf12-w ${cls}" data-zf12-k="${k}"${d ? ` data-zf12-d="${escapeHtml(d)}"` : ''}><span class="zf12-m" aria-hidden="true">${mark}</span><span class="zf12-k">${k}</span> ${d ? escapeHtml(cls === 'next' ? zf3Md(d) : zf3Md(d).replace(/\(.\)$/, '')) : escapeHtml(u || '원문 확인')}</span>`;   // ◉ 밖 정거장은 요일을 뺀다(2층 노선에 그대로)
+    const lb = nm || (k === '차수' ? '이번 차수 마감' : k);
+    return `<span class="zf12-w ${cls}" data-zf12-k="${k}"${d ? ` data-zf12-d="${escapeHtml(d)}"` : ''}><span class="zf12-m" aria-hidden="true">${mark}</span><span class="zf12-k">${lb}</span> <span class="zf12-dt">${d ? escapeHtml(cls === 'next' ? zf3Md(d) : zf3Md(d).replace(/\(.\)$/, '')) : escapeHtml(u || '원문 확인')}</span></span>`;   // ◉ 밖 정거장은 요일을 뺀다(2층 노선에 그대로)
   }).join('<span class="zf12-sep" aria-hidden="true">›</span>');
 }
 // 🔵 2026-11-18(디자인 2차 1단계 5) — 이번 회차는 카드 겉 요소를 더하거나 빼지 않았다(유형 바로가기 줄·오늘 판·공지 한 줄은 카드 밖 공고 탭 머리) → 목록 그대로.
@@ -17236,13 +17280,19 @@ function zf12PillTidy(card){
   //    「이번 차수 …」는 차수 창 끝을 세는 말이라 ◉ 역에 붙이지 않고 노선 끝에 둔다(◉ 마감 12-15 옆에 「이번 차수 오늘 16:00까지」가 붙어 마감일로 읽혔다).
   const k = nx && nx.dataset.zf12K;
   if(/^D-\d+$/.test(txt) && nd && zf3Days(today, nd) === Number(txt.slice(2))) txt = (k === '접수' ? '시작 ' : '') + txt;   // ◉ 마감 옆은 낱말 없이(「마감 12-07(월) 마감 D-13」 겹말)
-  const tail = /^이번 차수/.test(txt);
+  // 🔵 2026-11-25(우편함 「표시층 — 판 K」 1) — 「이번 차수 …」는 겉 줄의 「이번 차수 마감」 역(zf12WhenHTML)이 있으면 그 역 옆에 붙인다(역 이름이 이미
+  //    「이번 차수 마감」이라 앞말 「이번 차수 」·「마감」 낱말은 뺀다 — 「오늘 마감」 → 「오늘」 · 「마감 D-2」 → 「D-2」 · 「오늘 16:00까지 · …」 그대로).
+  //    「오늘 …」이면 역의 날짜(오늘)를 감춘다(같은 날을 두 번 말하지 않는다). 역이 없으면 종전대로 줄 끝.
+  const cw = /^이번 차수/.test(txt) ? when.querySelector('.zf12-w[data-zf12-k="차수"]') : null;
+  if(cw) txt = txt.replace(/^이번 차수\s*/, '').replace(/^마감\s+/, '').replace(/^오늘 마감$/, '오늘');
+  if(cw){ const dt = cw.querySelector('.zf12-dt'); if(dt) dt.hidden = /^오늘/.test(txt); }
+  const tail = !cw && /^이번 차수/.test(txt);
   let dd = when.querySelector('.zf12-dd');
   if(!dd){ dd = document.createElement('span'); dd.className = 'zf12-dd'; }
   dd.classList.toggle('hot', cls.contains('hot') || pill.classList.contains('zf12-soon'));
   dd.textContent = txt;
   dd.classList.toggle('zf12-dd-tail', tail);
-  ((tail ? null : nx) || [...when.querySelectorAll('.zf12-w')].pop() || when.lastElementChild).after(dd);
+  (cw || (tail ? null : nx) || [...when.querySelectorAll('.zf12-w')].pop() || when.lastElementChild).after(dd);
 }
 // 🔵 2026-11-19(4단계 판정 — 다운님 17:09 · claude.ai 검증 고침) — 지역이 꺾여 줄 첫머리에 서면 앞 가운뎃점(「· 」 꾸밈)만 숨긴다(글자 값 그대로 · 꼴만).
 //    줄 첫머리는 CSS 로 알 수 없어 배치 뒤 앞 요소와 높이를 견준다 · 창 크기·글꼴이 바뀌면 다시 잰다.
