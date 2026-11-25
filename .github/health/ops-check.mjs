@@ -29,6 +29,7 @@ import { NEG_TAIL_SQL, judgeNegTail, inSlot as negTailSlot } from './neg-tail.mj
 import { ELIG_FORM_NULL_SQL, RENT_NULL_SQL, ROUND_MIX_SQL, LH_CLOSED_WIN_SQL, DEDUP_KEY_PAREN_SQL, UNIT_AREA_ROUND_SQL, judgeEligFormNull, judgeRentNull, judgeRoundMix, judgeLhClosedWin, judgeDedupKeyParen, judgeUnitAreaRound } from './open-gaps.mjs'
 import { readdirSync, readFileSync } from 'node:fs'
 import { ROUND_GAP_SQL, judgeRoundGap } from './round-gap.mjs'
+import { thisRoundSql, judgeThisRound } from './this-round.mjs'
 import { createHash } from 'node:crypto'
 
 const now = new Date()
@@ -1540,6 +1541,16 @@ select jsonb_build_object(
       add('neg_tail', ntName, 'info', '셈 불능: ' + String(e).slice(0, 160), ntRule)
     }
   }
+}
+
+// ㊿ 「금회 한정」 공고 순위 행 this_round_open 빔(2026-11-25 · 우편함 「코드·운영 — 스물넷째」 1 · ⚠️ 안 멈춤 · HARD 밖) — this-round.mjs.
+//    불변식 V27(v3.33)을 v3.34 에서 걷고 여기로 옮겼다 — 분석 쓰기를 막지 않고 알리기만.
+try {
+  const [x] = await sqlRead(thisRoundSql(false))
+  const j = judgeThisRound(x.j)
+  add('this_round_open_null', '「금회 한정」 공고 순위 행 this_round_open 빔', j.status, j.value, j.rule)
+} catch (e) {
+  add('this_round_open_null', '「금회 한정」 공고 순위 행 this_round_open 빔', 'warn', String(e).slice(0, 200), '정책·자격 표를 읽는다(못 읽으면 ⚠️)')
 }
 
 // ㊾ ㎡당 사분위 스냅숏 신선도(2026-11-25 · 우편함 「코드·운영 — 스물두째」 5 · 스무째 #1282 · ⚠️ 안 멈춤) — zipfit_ops.rent_sqm_quartiles 마지막 채움 경과 · 행 수.
