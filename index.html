@@ -9936,7 +9936,8 @@ function loadScheduleLine(annId, cardEl, id){
     {
       const dk = r => r.start_date || r.end_date || '';
       const slots = cur.map((r, i) => dk(r) ? i : -1).filter(i => i >= 0);
-      const dated = slots.map(i => cur[i]).sort((a, b) => dk(a) < dk(b) ? -1 : dk(a) > dk(b) ? 1 : ord.get(a) - ord.get(b));
+      //    같은 날이면 단지 꼬리(site_label) 없는 공통 행 먼저 — 겹치는 공통 접수 행(인터넷 · 현장)이 이어져 한 역으로 합쳐지게(zfSchMergeApply · …21067 전주효자1이 사이에 끼어 두 역으로 갈렸다).
+      const dated = slots.map(i => cur[i]).sort((a, b) => dk(a) < dk(b) ? -1 : dk(a) > dk(b) ? 1 : (!!a.site_label - !!b.site_label) || ord.get(a) - ord.get(b));
       const re = cur.slice(); slots.forEach((i, k) => { re[i] = dated[k]; }); cur = re;
     }
     // 🔵 2026-11-24(우편함 「표시층 — 판 D 시안」 ③ · 판 C ⑦2) — 같은 기간 · 다른 단계: 접수 행과 시작·끝이 모두 같은(같은 범위) 공고·접수 밖 단계 행은
