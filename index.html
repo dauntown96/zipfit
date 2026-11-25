@@ -3417,6 +3417,19 @@ function zfSoonestOpenEnd(row){
   const ends = list.filter(x => x.state === 'open' || x.state === 'before').map(x => x.end).filter(Boolean).sort();
   return ends[0] || own;
 }
+// 🔴 2026-11-25(우편함 「표시층 — 판 K」 덧 1 · 기준 ①) — 시작·끝을 함께 보이는 자리(목록 날짜 줄 · 상세 「접수기간」 · 상세 머리 접수·마감)는
+//    같은 출처의 짝을 쓴다. 끝이 다른 공고문의 「가장 이른 열린 마감」(zfSoonestOpenEnd)이면 시작도 그 공고문의 시작이다.
+//    종전은 시작 = 카드 행(…21044 12-01) · 끝 = 같은 게시물 다른 공고문(영암용앙1 11-30)이라 「2026-12-01 ~ 2026-11-30」(시작 > 끝)이 섰다.
+//    카드 상태·「마감 임박순」·필터는 종전 값(zfSoonestOpenEnd · 카드 행 시작) 그대로 — 이 함수는 글자 짝만 고른다.
+function zfShownApplySpan(row){
+  const s0 = String((row && (row['신청시작일'] || row['apply_start'])) || '');
+  const e = String(zfSoonestOpenEnd(row) || '');
+  const own = String((row && (row['신청마감일'] || row['apply_end'])) || '');
+  const list = e && e !== own ? zfPostNoticeList(row) : null;
+  const x = list && list.filter(q => (q.state === 'open' || q.state === 'before') && q.end === e && q.start).sort((a, b) => String(a.start).localeCompare(String(b.start)))[0];
+  if(!x && s0 && e && s0 > e) return { s: s0, e: own };   // 짝을 못 찾고 시작 > 끝이면 카드 행 자기 짝(시작 > 끝을 만들지 않는다)
+  return { s: x ? String(x.start) : s0, e };
+}
 function zfWithSoonestEnd(row){
   const e = zfSoonestOpenEnd(row);
   const own = (row && (row['신청마감일'] || row['apply_end'])) || '';
@@ -6761,8 +6774,7 @@ function zfNoticeCardHtml(n, idx){
     // 정정 사유는 펼친 안 「📝 정정 사유」에만 보인다 — 겉의 「ℹ️ 정정사유」 마우스 올리기 칩은 터치에선 안 뜨고
     // 「🔄 정정」 배지와 같은 말이라 뺐다(2026-10-14 · 공고 탭·매칭 카드·그룹 뒤늦은 끼워 넣기 셋 다).
     const revisionNoteEsc = (n['revision_note']||'').replace(/"/g,'&quot;');
-    const applyStart = n['신청시작일']||n['apply_start']||'';
-    const applyEnd   = zfSoonestOpenEnd(n);
+    const { s: applyStart, e: applyEnd } = zfShownApplySpan(n);   // 판 K 덧 1 — 같은 출처의 시작·끝 짝
     const annDate    = n['announcement_date']||'';
     // 모집공고일 = 접수시작일이면 중복 제거. unknown이면 '미상'+원문 링크(applyDateLine).
     // 🔴 B31 — 취소공고 행은 모집공고일과 원문 링크만 적는다. 취소 대상 회차는 추정해서 적지 않는다(원문으로 보낸다).
@@ -7277,8 +7289,7 @@ function renderPersonalizedRecommendations(){
   let html='';
   shown.forEach((n,idx)=>{
     const announcementDate=n['모집공고일']||n['announcement_date']||'';
-    const applyStart=n['신청시작일']||n['apply_start']||'';
-    const applyEnd=zfSoonestOpenEnd(n);
+    const { s: applyStart, e: applyEnd } = zfShownApplySpan(n);   // 판 K 덧 1
     const dateLine=applyDateLine(n, announcementDate, applyStart, applyEnd, n['공고URL']||n['url']||'');
     const closingSoon=isClosingSoon(zfWithSoonestEnd(n));
     const hasCancel=n['has_cancel_notice']===true;
@@ -13578,8 +13589,7 @@ function renderMatchResults(rows){
     const convBadgesM = buildConvBadges(n.mymy_applicable, n.supply_form, n.application_method, n.recruit_multiplier, n.is_relaxed_recruitment, n.selection_method, n.title, n.relaxation_detail);
     const pairKeyM    = n.pair_announcement_key||'';
     const revisionNoteEscM = (n.revision_note||'').replace(/"/g,'&quot;');
-    const applyStart  = n.apply_start||'';
-    const applyEnd    = zfSoonestOpenEnd(n);
+    const { s: applyStart, e: applyEnd } = zfShownApplySpan(n);   // 판 K 덧 1
     const annDate     = n.announcement_date||'';
     const dateLine    = applyDateLine(n, annDate, applyStart, applyEnd, n.url||'');
     const cardId = 'mcard-' + zfCardKey(n.announcement_id || idx);
@@ -15422,7 +15432,7 @@ function zfWinFromSchedule(aid){
 }
 function zf3Stations(n){
   const ann = zf3Real(zfNoticeDate(n) || n['announcement_date']), rev = zfRevisedDate(n);
-  const s = zf3Real(n['신청시작일'] || n['apply_start']), e = zf3Real(zfSoonestOpenEnd(n));
+  const sp = zfShownApplySpan(n), s = zf3Real(sp.s), e = zf3Real(sp.e);   // 판 K 덧 1 — 같은 출처의 시작·끝 짝
   const ds = zfRouteDefaultSched(n);   // 🔵 2026-10-19 — 순위별 창 카드는 기본 창의 결과발표(일정 표 scope = 그 창 phase)
   // 🔵 S1 PR-2 — 단추 카드는 접수·마감·발표 역이 고른 창(기본 = 오늘 날짜의 창)을 따른다. 기본 창의 발표는 종전 식 그대로(위 ds · 카드 칸 대체) ·
   //    기본 밖 창은 그 창 일정 표 결과발표만(없으면 「원문 확인」 — 카드 발표 칸은 다른 창 날일 수 있어 쓰지 않는다).
