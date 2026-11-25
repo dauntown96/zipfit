@@ -30,6 +30,7 @@ import { ELIG_FORM_NULL_SQL, RENT_NULL_SQL, ROUND_MIX_SQL, LH_CLOSED_WIN_SQL, DE
 import { readdirSync, readFileSync } from 'node:fs'
 import { ROUND_GAP_SQL, judgeRoundGap } from './round-gap.mjs'
 import { thisRoundSql, judgeThisRound } from './this-round.mjs'
+import { URBAN_TOP_SQL, judgeIncomeYear } from './income-year.mjs'
 import { createHash } from 'node:crypto'
 
 const now = new Date()
@@ -1551,6 +1552,31 @@ try {
   add('this_round_open_null', '「금회 한정」 공고 순위 행 this_round_open 빔', j.status, j.value, j.rule)
 } catch (e) {
   add('this_round_open_null', '「금회 한정」 공고 순위 행 this_round_open 빔', 'warn', String(e).slice(0, 200), '정책·자격 표를 읽는다(못 읽으면 ⚠️)')
+}
+
+// (51) 닫힌 LH ∧ 첨부 목록 빔(2026-11-25 · 우편함 「코드·운영 — 스물다섯째」 2 · ℹ️ 셈만 · HARD 밖) — 목록에 보이는(hidden 밖) LH 행 중 마감이 지났는데
+//    attachment_urls 가 비었거나 배열이 아닌 행 수. 취소공고(제목 「[취소」로 시작 — 첨부가 원래 없다)는 따로 센다.
+//    다시 채우는 길은 scripts/lh-page-attachments.mjs(공고 페이지 GET 만 · 파일 받기 0) → 운영 데이터 쓰기 회차. 기준선 2026-11-25: 2(둘 다 취소공고 …20011 · …20645).
+try {
+  const [x] = await sqlRead(`select json_build_object('n', count(*), 'cancel', count(*) filter (where title ~ '^\\s*\\[\\s*취소'),
+      'ids', coalesce(json_agg(announcement_id order by announcement_id) filter (where title !~ '^\\s*\\[\\s*취소'), '[]'::json)) j
+    from public.announcements where source = 'LH' and hidden_from_listing is not true and apply_end < (now() at time zone 'Asia/Seoul')::date
+     and (attachment_urls is null or jsonb_typeof(attachment_urls) <> 'array' or jsonb_array_length(attachment_urls) = 0)`)
+  const j = x.j, other = j.ids || []
+  add('lh_closed_attach_empty', '닫힌 LH 공고 첨부 목록 빔(셈)', 'info',
+    `${j.n}(취소공고 ${j.cancel} · 그 밖 ${other.length}${other.length ? ': ' + other.slice(0, 5).map(a => '…' + String(a).slice(-5)).join(', ') : ''})`,
+    '정보 — 마감 지난 LH 행(hidden 밖) 중 attachment_urls 빔·배열 아님 · 취소공고(제목 「[취소」)는 따로 · 그 밖이 생기면 scripts/lh-page-attachments.mjs 로 페이지 첨부를 떼어 운영 데이터 쓰기 회차에서 채운다 · 판정하지 않는다')
+} catch (e) {
+  add('lh_closed_attach_empty', '닫힌 LH 공고 첨부 목록 빔(셈)', 'info', '셈 불능: ' + String(e).slice(0, 160), '공고 표를 읽는다(실패면 ℹ️)')
+}
+
+// (52) 원문 소득표 금액 ↔ 도시근로자 기준표 가장 큰 통계 연도(2026-11-25 · 우편함 「코드·운영 — 스물다섯째」 5 · ℹ️ 셈만 · HARD 밖) — income-year.mjs.
+try {
+  const [x] = await sqlRead(INCOME_ROWS_SQL), [u] = await sqlRead(URBAN_TOP_SQL)
+  const j = judgeIncomeYear(x.j.rows, u.j)
+  add('income_urban_year', '원문 소득표 금액이 도시근로자 기준표 최신 통계 연도와 다른 공고(셈)', j.status, j.value, j.rule)
+} catch (e) {
+  add('income_urban_year', '원문 소득표 금액이 도시근로자 기준표 최신 통계 연도와 다른 공고(셈)', 'info', '셈 불능: ' + String(e).slice(0, 160), '정책·기준표를 읽는다(실패면 ℹ️)')
 }
 
 // ㊾ ㎡당 사분위 스냅숏 신선도(2026-11-25 · 우편함 「코드·운영 — 스물두째」 5 · 스무째 #1282 · ⚠️ 안 멈춤) — zipfit_ops.rent_sqm_quartiles 마지막 채움 경과 · 행 수.
