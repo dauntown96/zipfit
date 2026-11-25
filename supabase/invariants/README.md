@@ -13,7 +13,8 @@
 
 | 파일 | 무엇 |
 |---|---|
-| **`v3.31.sql`** | **현행.** v3.30 + `allow_exec_funcs`에 `listing_pending_rechecks`(목록 RPC가 anon으로 부르는 재확인 몫 목록 · 2026-11-23 열넷째 묶음) · 그 밖 한 글자도 같음 · V26 꺼 둔 채(켜는 판은 v3.32 이후) |
+| **`v3.32.sql`** | **현행.** v3.31 + `allow_exec_funcs`에 `get_rent_per_sqm_quartiles`(화면이 anon으로 부를 ㎡당 사분위 스냅숏 읽기 · 2026-11-25 스무째) · 그 밖 한 글자도 같음 · V26 꺼 둔 채(켜는 판은 v3.33 이후) |
+| `v3.31.sql` | v3.30 + `allow_exec_funcs`에 `listing_pending_rechecks`(목록 RPC가 anon으로 부르는 재확인 몫 목록 · 2026-11-23 열넷째 묶음) · 그 밖 한 글자도 같음 · V26 꺼 둔 채 |
 | `v3.30.sql` | v3.29 + V10c · V16 「열린 공고」 오늘을 KST로(`(now() at time zone 'Asia/Seoul')::date` — 종전 `current_date`는 DB 세션 시간대 UTC · 2026-11-22 넷째 묶음 D) · 그 밖 한 글자도 같음 · V26 꺼 둔 채 |
 | `v3.29.sql` | v3.28 + **V26** 블록 ID 상태 행(`announcement_analysis` 행이 LH 아닌 ID 에 있고 원문 ID `zipfit_ops.original_lh_id` 가 따로 있음 — 규약 29) · 예외 `v13_keep` · `zipfit_ops.linked_separate_notices`(같은 게시물에 링크로 접힌 마감일 다른 별개 공고문 — 마이그레이션 `2026-11-11_04`) · 🔴 **꺼 둔 채**(`v26_on = false` — 역전파 9회차 블록 상태 행 이전 뒤 켠다 · 2026-11-11 켜면 7) |
 | `v3.28.sql` | v3.27 + 단지 키(마이그레이션 `2026-11-11_02`) 세 줄 — **V25a** 같은 `road_key`(시도 포함)로 묶인 `complexes`의 시군구가 둘 이상 · **V25b** `housing_units.complex_id`의 단지 `kind`와 그 행 공고 매입 축 어긋남(매입 → build · 매입 아님 → buy) · **V25c** LH 단지 코드 꼴(C/D + 숫자 5자리) 아님 — 표가 비어 있어 2026-11-11 0 |

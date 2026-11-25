@@ -193,6 +193,7 @@ const add =(id, name, status, value, rule) => checks.push({ id, name, status, va
 const addBlind = (id, name, status, value, rule) => checks.push({ id, name, status, value, rule, blind: true })
 
 const EXPECTED_JOBS = [
+  'zipfit-rent-sqm-quartiles',    // 2026-11-25 ㎡당 월세 시·도×유형 사분위 스냅숏 30분(마이그레이션 2026-11-25_01 · 스무째)
   'zipfit-host-probe',            // 2026-11-21 지방공사 호스트 매일 관측(마이그레이션 2026-11-21_03 · 둘째 묶음 B)
   'zipfit-collect-announcements', 'zipfit-collect-announcements-warmup', 'zipfit-collect-announcements-night',
   'zipfit-collect-sh-announcements', 'zipfit-sh-close-missing', 'zipfit-collect-rental-stats',
