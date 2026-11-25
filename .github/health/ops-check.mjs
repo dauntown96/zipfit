@@ -221,7 +221,7 @@ const EXPECTED_JOBS = [
   'zipfit-purge-lh-file-fetch-log', // 2026-11-09 LH 첨부 문지기 기록 90일 보관(마이그레이션 2026-11-09_01)
   'zipfit-complex-link-pending', // 2026-11-12 새 분석 공고 단지 잇기 안전망(마이그레이션 2026-11-12_04)
   'zipfit-complex-geo-fill', // 2026-11-17 단지 도로명·좌표 자동 채움(마이그레이션 2026-11-17_04 · EF complex-geo-fill)
-  'zipfit-complex-geo-fill-complex', // 2026-11-22 단지 좌표 전 단지 채움 KST 09~20시(마이그레이션 2026-11-22_01 · EF complex-geo-fill ?mode=complex)
+  'zipfit-complex-geo-fill-complex', // 2026-11-22 단지 좌표 전 단지 채움(마이그레이션 2026-11-22_01 · EF complex-geo-fill ?mode=complex) · 2026-11-25 하루 내내(2026-11-25_07)
   'zipfit-gh-observe',             // 2026-11-03 GH 공고 목록 관찰(마이그레이션 2026-11-03_04) — 2026-11-09 사본 재추출 때 빠진 것을 더함
   'zipfit-collect-gh-announcements', // 2026-11-17 GH 들이기 — 마감일 있는 열린 GH 공고 쓰기(마이그레이션 2026-11-17_01 · gh_collect)
   'zipfit-purge-stale-sessions',   // 로그인 세션 30일 정리(jobid 57) — 2026-11-09 사본 재추출 때 빠진 것을 더함
