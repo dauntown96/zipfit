@@ -28,6 +28,7 @@ import { judgeUnitUnknown, sidoAliasesOf } from './unit-sigungu.mjs'
 import { NEG_TAIL_SQL, judgeNegTail, inSlot as negTailSlot } from './neg-tail.mjs'
 import { ELIG_FORM_NULL_SQL, RENT_NULL_SQL, ROUND_MIX_SQL, LH_CLOSED_WIN_SQL, DEDUP_KEY_PAREN_SQL, UNIT_AREA_ROUND_SQL, judgeEligFormNull, judgeRentNull, judgeRoundMix, judgeLhClosedWin, judgeDedupKeyParen, judgeUnitAreaRound } from './open-gaps.mjs'
 import { readdirSync, readFileSync } from 'node:fs'
+import { ROUND_GAP_SQL, judgeRoundGap } from './round-gap.mjs'
 import { createHash } from 'node:crypto'
 
 const now = new Date()
@@ -1541,19 +1542,43 @@ select jsonb_build_object(
   }
 }
 
+// ㊾ ㎡당 사분위 스냅숏 신선도(2026-11-25 · 우편함 「코드·운영 — 스물두째」 5 · 스무째 #1282 · ⚠️ 안 멈춤) — zipfit_ops.rent_sqm_quartiles 마지막 채움 경과 · 행 수.
+//    채움 cron zipfit-rent-sqm-quartiles '19,49' · 이 점검 :25·:55 → 평소 약 6분 · 한 번 빠지면 36분 · 두 번 연속 빠지면 66분 → 문턱 70분(두 번 연속 빠짐부터).
+//    cron 「실패」는 cron_fail_24h 가 보지만 「성공했는데 0행」·「잡이 꺼짐」은 여기서만 보인다.
+try {
+  const [x] = await sqlRead(`select count(*)::int n, round(extract(epoch from now() - max(refreshed_at)) / 60)::int age from zipfit_ops.rent_sqm_quartiles`)
+  const bad = !x.n || x.age === null || x.age > 70
+  add('rent_sqm_fresh', '㎡당 사분위 스냅숏 — 마지막 채움 경과(분) · 행', bad ? 'warn' : 'pass', `${x.age ?? '-'}분 전 · ${x.n}행`,
+    '경과 ≤ 70분 ∧ 행 > 0 — 넘으면 ⚠️(안 멈춤 · 화면이 읽을 비교 숫자가 낡음 · 채움 cron 19·49분 두 번 연속 빠짐부터) · zipfit_ops.rent_sqm_quartiles')
+} catch (e) {
+  add('rent_sqm_fresh', '㎡당 사분위 스냅숏 — 마지막 채움 경과(분) · 행', 'warn', String(e).slice(0, 200), 'zipfit_ops.rent_sqm_quartiles 를 읽는다(못 읽으면 ⚠️)')
+}
+
+// ㊽ 열린 카드 회차 고리 밖 같은 단지 닫힌 미분석(2026-11-25 · 우편함 「코드·운영 — 스물두째」 4 · 백로그 국면 C · ℹ️ 판정 0 · 이슈 0) — round-gap.mjs.
+//    국면 C (라) 1판·2판 0장 규칙 그대로(묶음은 제목 키로 바로 — 2판 시간 초과 피함) · 예외(원문으로 다른 단지) = round-gap.json.
+try {
+  const [x] = await sqlRead(ROUND_GAP_SQL)
+  const ex = new Set(JSON.parse(readFileSync(new URL('./round-gap.json', import.meta.url), 'utf8')).excluded.map(e => e.id))
+  const j = judgeRoundGap(x.j || [], ex)
+  add('round_gap_same_site', '열린 카드 회차 고리 밖 같은 단지 닫힌 미분석(셈)', 'info', j.value,
+    'ℹ️ 숫자만(판정 0 · 안 멈춤) — 열린 대표 세대 단지명(3자 이상) → 같은 시·도 닫힌 대표 · 묶음 분석 0 · 제목에 단지명 · 대상 = 짝 마감 > 오늘+7 ∧ 고리 밖(분석 묶음 국면 C 몫) · 예외 round-gap.json · 기준선 2026-11-25 대상 0 · 임박 10 · 예외 4')
+} catch (e) {
+  add('round_gap_same_site', '열린 카드 회차 고리 밖 같은 단지 닫힌 미분석(셈)', 'info', `못 셈(${String(e).slice(0, 160)})`, 'ℹ️ 숫자만 — 못 세도 판정 0')
+}
+
 // ㉟ 장부 없이 줄어든 재생산 불가 표(2026-11-23 · 우편함 「코드·운영 — 열다섯째 A장」 3 · ⚠️ 안 멈춤) — zipfit_ops.irreplaceable_drop_record 가
 //    재생산 불가 23표(zipfit-backup heartbeat_report.py IRREPLACEABLE 와 같게)의 count 를 직전 회차 스냅숏과 견주고 그 사이 의도된 감소 장부 합을 붙인다.
-//    감소 ≠ 장부 합인 표가 있으면 ⚠️(생존 신호보다 먼저 — 다음 날 아침이 아니라 30분 안에). 첫 회차(스냅숏 없음)는 통과 + 「첫 스냅숏」.
+//    감소 > 장부 합인 표가 있으면 ⚠️(생존 신호보다 먼저 — 다음 날 아침이 아니라 30분 안에 · 2026-11-25 「≠」에서 바꿈 — 스물두째 2 · zipfit-backup #48 과 같은 규칙). 첫 회차(스냅숏 없음)는 통과 + 「첫 스냅숏」.
 try {
   const j = (await callRecord('zipfit_ops.irreplaceable_drop_record', {})) || {}
   const drops = j.drops || []
-  add('irreplaceable_drop', '재생산 불가 표 행 감소가 의도된 감소 장부와 다름(직전 회차 대비)', (j.unmatched || 0) > 0 ? 'warn' : 'pass',
+  add('irreplaceable_drop', '재생산 불가 표 행 감소가 의도된 감소 장부보다 큼(직전 회차 대비)', (j.unmatched || 0) > 0 ? 'warn' : 'pass',
     !j.prev_at ? `첫 스냅숏(${j.tables}표)` : (drops.length
-      ? drops.map(d => `${d.t} −${d.drop}(장부 ${d.ledger})`).join(' · ') + ` · 어긋남 ${j.unmatched}`
+      ? drops.map(d => `${d.t} −${d.drop}(장부 ${d.ledger})`).join(' · ') + ` · 장부보다 더 줄어듦 ${j.unmatched}`
       : `줄어든 표 0/${j.tables}`),
-    '0 — 직전 health-ops 회차 뒤 줄어든 재생산 불가 표의 감소가 그 사이 zipfit_ops.intended_drops 합과 다르면 ⚠️(안 멈춤 · 생존 신호와 같은 「정확히 같음」) · count(*) · 보관 정리 표 밖')
+    '0 — 직전 health-ops 회차 뒤 줄어든 재생산 불가 표의 감소가 그 사이 zipfit_ops.intended_drops 합보다 크면 ⚠️(안 멈춤 · 생존 신호와 같은 「장부보다 더 줄었나」 · 장부 이하는 섞임·덜 지움을 못 가름) · count(*) · 보관 정리 표 밖')
 } catch (e) {
-  add('irreplaceable_drop', '재생산 불가 표 행 감소가 의도된 감소 장부와 다름(직전 회차 대비)', 'warn', String(e).slice(0, 200), 'zipfit_ops.irreplaceable_drop_record 를 부른다(못 부르면 ⚠️)')
+  add('irreplaceable_drop', '재생산 불가 표 행 감소가 의도된 감소 장부보다 큼(직전 회차 대비)', 'warn', String(e).slice(0, 200), 'zipfit_ops.irreplaceable_drop_record 를 부른다(못 부르면 ⚠️)')
 }
 
 // ㊱ 회차 고리 미분석 · 분석 행 없는 산물 · 재확인 대기 체류(2026-11-23 · 열다섯째 A장 4·5) — 한 쿼리.
