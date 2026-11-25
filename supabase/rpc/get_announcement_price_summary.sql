@@ -1,5 +1,5 @@
 CREATE OR REPLACE FUNCTION public.get_announcement_price_summary(p_ids text[])
- RETURNS TABLE(announcement_id text, deposit_min bigint, deposit_max bigint, rent_min bigint, rent_max bigint, area_min numeric, area_max numeric, round_state text, source_round date, analysis_done boolean, has_attachments boolean, unit_places jsonb, rent_per_sqm_med bigint, rent_basis text)
+ RETURNS TABLE(announcement_id text, deposit_min bigint, deposit_max bigint, rent_min bigint, rent_max bigint, area_min numeric, area_max numeric, round_state text, source_round date, analysis_done boolean, has_attachments boolean, unit_places jsonb, rent_per_sqm_med bigint, rent_basis text, rent_basis_label text)
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
@@ -176,6 +176,35 @@ AS $function$
     left join public.housing_type_map mp
       on mp.source_table = 'announcements' and mp.source = a.source and mp.housing_type = a.housing_type
   ),
+  -- 🔵 2026-11-25(우편함 「코드·운영 — 스물여섯째」 덧 1 할 일 4 · claude.ai 판정 원칙 37 「값은 셈 · 「나군」 이름은 원문 글자가 있을 때만」 · 다운님 16:44 권장 ①) —
+  --    영구임대 ㎡당 갈래를 셋으로(차례대로 · 가격 있는 행 = 면적 > 0 ∧ 월세 > 0):
+  --      ① 'na'     — 「나군」 글자 행이 있으면 그 행만(종전 그대로) · 이름표 「나군」
+  --      ② 'target' — 없고, supply_target 이 둘 이상으로 갈리며 「수급자」 갈래(「수급자」 든 · 「수급자 외」 아님)와 그 밖 갈래가 둘 다 있으면 그 밖 갈래 행만
+  --                   · 이름표 = 그 행 supply_target 원문 글자(여럿이면 「 · 」로 · 예 「일반 등」 · 「수급자 외」)
+  --      ③ 'all'    — 대상 글자로 안 갈리는 한 등급 공고 → 가격 있는 전 행 · 이름표 NULL
+  --    rent_basis 는 ① 'na' · ②③ 'perm'(새 값 — 화면이 'na'에만 「(나군)」을 붙이므로 ②③에 원문에 없는 「(나군)」이 붙지 않게 · 표시층 판 L 이 rent_basis_label 을 읽을 때까지
+  --    화면 비교 키는 'perm' 을 따로 세어 표본 5곳 미만이면 ㎡당 줄을 그리지 않는다) · 스냅숏(rent_sqm_quartiles_refresh)은 'perm' 을 'na' 묶음에 넣는다.
+  --    영구 아닌 공고는 종전 그대로('primary' · 이름표 NULL).
+  pmode as (
+    select p.aid,
+           case
+             when not coalesce(pm.is_perm, false) then 'primary'
+             when count(*) filter (where h.area_sqm > 0 and h.monthly_rent > 0
+                                     and concat_ws(' ', h.unit_group, h.supply_target, h.unit_type) ~ '나[\s「」『』''"]{0,2}군') > 0 then 'na'
+             when count(distinct nullif(btrim(h.supply_target), '')) filter (where h.area_sqm > 0 and h.monthly_rent > 0) >= 2
+              and bool_or(coalesce(h.supply_target, '') ~ '수급자' and coalesce(h.supply_target, '') !~ '수급자\s*외') filter (where h.area_sqm > 0 and h.monthly_rent > 0)
+              and bool_or(not (coalesce(h.supply_target, '') ~ '수급자' and coalesce(h.supply_target, '') !~ '수급자\s*외')) filter (where h.area_sqm > 0 and h.monthly_rent > 0)
+               then 'target'
+             else 'all'
+           end as mode,
+           string_agg(distinct nullif(btrim(h.supply_target), ''), ' · ')
+             filter (where h.area_sqm > 0 and h.monthly_rent > 0
+                       and not (coalesce(h.supply_target, '') ~ '수급자' and coalesce(h.supply_target, '') !~ '수급자\s*외')) as target_label
+    from pick p
+    join public.housing_units h on h.announcement_id = p.gid
+    left join perm pm on pm.aid = p.aid
+    group by p.aid, pm.is_perm
+  ),
   agg as (
   select p.aid,
          -- 🔵 2026-09-29 코드 회차 — 세대 하나에 임대조건 두 벌(deposit/monthly_rent + deposit_priority1/rent_priority1)이면
@@ -199,21 +228,30 @@ AS $function$
          end as source_round,
          round(percentile_cont(0.5) within group (order by h.monthly_rent::numeric / h.area_sqm)
                filter (where h.area_sqm > 0 and h.monthly_rent > 0
-                         and (not coalesce(pm.is_perm, false)
-                              or concat_ws(' ', h.unit_group, h.supply_target, h.unit_type) ~ '나[\s「」『』''"]{0,2}군')))::bigint as rent_per_sqm_med,
+                         and (md.mode in ('primary', 'all')
+                              or (md.mode = 'na' and concat_ws(' ', h.unit_group, h.supply_target, h.unit_type) ~ '나[\s「」『』''"]{0,2}군')
+                              or (md.mode = 'target' and not (coalesce(h.supply_target, '') ~ '수급자' and coalesce(h.supply_target, '') !~ '수급자\s*외')))))::bigint as rent_per_sqm_med,
          case
            when count(*) filter (where h.area_sqm > 0 and h.monthly_rent > 0
-                                   and (not coalesce(pm.is_perm, false)
-                                        or concat_ws(' ', h.unit_group, h.supply_target, h.unit_type) ~ '나[\s「」『』''"]{0,2}군')) = 0 then null
-           when coalesce(pm.is_perm, false) then 'na'
-           else 'primary'
-         end as rent_basis
+                                   and (md.mode in ('primary', 'all')
+                                        or (md.mode = 'na' and concat_ws(' ', h.unit_group, h.supply_target, h.unit_type) ~ '나[\s「」『』''"]{0,2}군')
+                                        or (md.mode = 'target' and not (coalesce(h.supply_target, '') ~ '수급자' and coalesce(h.supply_target, '') !~ '수급자\s*외')))) = 0 then null
+           when md.mode = 'primary' then 'primary'
+           when md.mode = 'na' then 'na'
+           else 'perm'
+         end as rent_basis,
+         case
+           when count(*) filter (where h.area_sqm > 0 and h.monthly_rent > 0) = 0 then null
+           when md.mode = 'na' then '나군'
+           when md.mode = 'target' then max(md.target_label)
+           else null
+         end as rent_basis_label
   from pick p
   join public.housing_units h on h.announcement_id = p.gid
   join own o on o.aid = p.aid
   left join cur_has ch on ch.aid = p.aid
-  left join perm pm on pm.aid = p.aid
-  group by p.aid, o.own_date, ch.aid, pm.is_perm
+  left join pmode md on md.aid = p.aid
+  group by p.aid, o.own_date, ch.aid, md.mode
   )
   -- 🔴 2026-09-29 코드 회차 2 — 세대정보가 없는 카드도 한 행을 돌려준다(값 칸은 전부 NULL · round_state NULL).
   --   그래야 analysis_done·has_attachments 가 그 카드에 닿는다. 세대정보가 있는 카드의 값 칸은 종전과 한 글자도 같다.
@@ -223,7 +261,7 @@ AS $function$
          g.round_state, g.source_round,
          coalesce(f.analysis_done, false), coalesce(f.has_attachments, false),
          pa.unit_places,
-         g.rent_per_sqm_med, g.rent_basis
+         g.rent_per_sqm_med, g.rent_basis, g.rent_basis_label
   from (select distinct aid from target) t
   left join agg g   on g.aid = t.aid
   left join flags f on f.aid = t.aid
