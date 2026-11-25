@@ -15,19 +15,23 @@ AS $function$
           where ok.mem_ok and g.source = 'juso' and g.lat is null and g.adm_cd ~ '^[0-9]{10}$' and g.rn_mgt_sn is not null and g.buld_mnnm is not null
             and (g.note !~ '좌표 다시 채움' or g.checked_at < now() - interval '7 days')
           order by g.id limit (select n from lim)),
-  cx as (select c.id, c.sido_nm, c.sigungu_nm, c.road_key, c.display_name, a.address
+  -- 🔵 2026-11-25(우편함 「코드·운영 — 스물다섯째」 덧 1 · 할 일 6) — 차례 = 열린 카드 단지 먼저(그 단지 세대 행의 공고 마감 ≥ 오늘 KST) → 새 단지(id 큰 것) 먼저.
+  --    종전 id 오름차순이라 새 단지(대개 열린 카드의 것 · id 8089~)가 가장 늦게 채워졌다(11-25 열린 카드 단지 296 중 197 좌표 0). 한도·간격·출구 지역은 그대로.
+  cx as (select c.id, c.sido_nm, c.sigungu_nm, c.road_key, c.display_name, a.address, o.open_
            from public.complexes c cross join ok
            cross join lateral (select h.address from public.housing_units h
                                 where h.complex_id = c.id and h.address ~ '[0-9]'
                                   and not exists (select 1 from public.complex_geo g2 where g2.matched_from = h.address)
                                 group by h.address order by count(*) desc, h.address limit 1) a
+           cross join lateral (select exists (select 1 from public.housing_units h2 join public.announcements an on an.announcement_id = h2.announcement_id
+                                               where h2.complex_id = c.id and an.apply_end >= (now() at time zone 'Asia/Seoul')::date) as open_) o
           where ok.mem_ok and c.road_key is not null
             and not exists (select 1 from public.complex_geo g where g.complex_id = c.id)
             and not exists (select 1 from public.complex_geo_attempts t where t.matched_from = a.address
                               and (t.outcome in ('picked', 'multi')
                                    or (t.outcome = 'none' and t.tried_at > now() - interval '30 days')
                                    or (t.outcome = 'error' and t.tried_at > now() - interval '50 minutes')))
-          order by c.id limit greatest(0, (select n from lim) - (select count(*) from rf)))
+          order by o.open_ desc, c.id desc limit greatest(0, (select n from lim) - (select count(*) from rf)))
   select jsonb_build_object(
     'mem_ok', (select mem_ok from ok), 'mem_available_mb', (select mb from ok),
     'refill', coalesce((select jsonb_agg(to_jsonb(rf) order by rf.id) from rf), '[]'::jsonb),
@@ -35,5 +39,5 @@ AS $function$
                                     'road_key', cx.road_key,
                                     'names', array_remove(array[nullif(btrim(cx.display_name), '')]
                                                || array(select distinct nullif(btrim(h.building_name), '') from public.housing_units h where h.complex_id = cx.id), null))
-                                  order by cx.id) from cx), '[]'::jsonb))
+                                  order by cx.open_ desc, cx.id desc) from cx), '[]'::jsonb))
 $function$
