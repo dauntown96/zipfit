@@ -230,7 +230,7 @@ details.pol-item>.policy-content{padding:0 12px 10px}
 .pol-plain-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 10px;margin:0 0 8px;padding:8px 10px;border:1px solid var(--line-2);border-radius:var(--r-s);background:var(--surface)}
 .pol-plain-note{margin:0;flex:1 1 220px;min-width:0;font-size:var(--t-xs);line-height:1.5;color:var(--ink-2)}
 .pol-plain-note b{color:var(--ink);font-weight:700}
-.pol-plain-sw{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;min-height:var(--hit);box-sizing:border-box;padding:0 4px;border:0;background:none;font:inherit;font-size:var(--t-xs);font-weight:600;color:var(--ink);cursor:pointer}
+.pol-plain-sw{flex:0 0 auto;margin-left:auto;display:inline-flex;align-items:center;gap:6px;min-height:var(--hit);box-sizing:border-box;padding:0 4px;border:0;background:none;font:inherit;font-size:var(--t-xs);font-weight:600;color:var(--ink);cursor:pointer}
 .pol-plain-sw i{position:relative;width:32px;height:18px;border-radius:var(--r-pill);background:var(--ink);transition:background .15s}
 .pol-plain-sw i::after{content:"";position:absolute;top:2px;left:16px;width:14px;height:14px;border-radius:var(--r-round);background:var(--paper);transition:left .15s}
 .pol-plain-sw[aria-checked="false"] i{background:var(--paper);box-shadow:inset 0 0 0 2px var(--ink-3)}   /* 꺼짐 — 테두리·손잡이 --ink-3(글자 아닌 요소 3:1 · WCAG 1.4.11) */
@@ -246,7 +246,10 @@ details.pol-item>.policy-content{padding:0 12px 10px}
 .pol-raw>summary::after{content:' ▾';margin-left:4px;font-weight:400}
 .pol-raw[open]>summary::after{content:' ▴'}
 .pol-raw>.policy-content{padding:0 0 2px}
-.pol-plain-off .pol-pl,.pol-plain-off .pol-raw>summary,.pol-plain-off .pol-plain-note{display:none}
+.pol-plain-off .pol-pl,.pol-plain-off .pol-raw>summary{display:none}
+/* 🔵 2026-11-25(판 I 3 · 다운님 실사용 11-25 10:22) — 끄면 설명 글을 숨기지 않고 글만 바꾼다(스위치가 같은 자리에 남게 · 스위치는 margin-left:auto로 오른쪽 고정) */
+.pol-plain-note .pol-plain-t-off,.pol-plain-off .pol-plain-note .pol-plain-t-on{display:none}
+.pol-plain-off .pol-plain-note .pol-plain-t-off{display:inline}
 .pol-plain-off .pol-raw{margin:0;border-top:0}
 .pol-plain-off .pol-raw>.policy-content{padding:0 12px 10px}
 .pol-site{display:inline-block;margin-right:6px;padding:0 6px;border-radius:var(--r-pill);background:#EEF2FA;color:#3D5A99;font-size:var(--t-xs);font-weight:600;vertical-align:1px}
@@ -1589,6 +1592,8 @@ html.zf12 .zf13-tcond-k{font-weight:700;color:var(--ink);margin-right:4px}
 html.zf12 .zf13-anyc-k{display:inline-block;margin-right:6px;padding:1px 8px;border:1px solid var(--line);border-radius:999px;font-size:var(--t-xs);font-weight:700;color:var(--ink-2);background:var(--paper)}
 .zf13-tsplit{margin:2px 0 0;font-size:var(--t-sub);color:var(--ink-2);line-height:1.45}
 .zf13-tsplit-s{color:var(--ink-3)}
+.zf13-tsplit-a{display:inline;min-height:0;margin:0;padding:0;border:0;background:none;font:inherit;color:var(--ink);font-weight:600;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.zf13-tsplit-a:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 /* 5단계 시안 — 필터 시트 안 「공고 유형」 칸: 목록 위 유형 바로가기 줄이 서 있으면 칩을 숨기고 한 줄 안내(칩은 DOM에 남는다 — 바로가기가 그 칩을 누른다 · 필터 개수 배지·✕ 그대로) */
 .zf13-type-note{display:none;margin:0;font-size:var(--t-s);color:var(--ink-2)}
 html.zf12:has(.zf3-tq [data-act="type"]) #noticeFilterPanel .field:has(> #noticeTypeChips) > :is(.label, #noticeTypeChips){display:none}
@@ -2215,6 +2220,7 @@ let activeNoticeRegion = null;
 let activeNoticeType   = null;
 let activeNoticeStatus = null;
 let activeNoticeTarget = null;
+let zfTargetOrigOnly = null;   // 🔵 2026-11-25(판 I 2) — 「원문 표시만」을 건 계층 이름(그 칩이 걸려 있을 때만 먹는다 · 칩이 바뀌면 저절로 풀림)
 
 // 필터 칩 목록 (DB에서 한 번만 가져옴)
 let noticeFilterOptions = { regions:[], types:[], statuses:[] };
@@ -4864,7 +4870,9 @@ function applyNoticeSubFilters(rows, opts){
     if(!zfTierTagsReady) zfLoadTierTags().then(ok => { if(ok) applyNoticeFiltersAndRender(); });
     // 🔵 2026-11-25(우편함 「표시층 — 판 H」 1 · 다운님 승인 11-24 23:02) — 계층 칩 결과 = 원문에 그 계층이 적힌 공고(zfTargetOrig) + 누구나형(zfAnyoneState 'anyone') 한 목록.
     //    영구임대('perm')·자격 행 0('unknown')은 넣지 않는다(11-19 판정 그대로) · 세부 요건(소득·자산)으로 거르지 않는다 · 정렬은 섞어서 평소대로(다운님 11-25 09:16).
-    out = out.filter(n => zfTargetOrig(n) || (zfTierTagsReady && zfAnyoneState(n) === 'anyone'));
+    //    🔵 2026-11-25(판 I 2 · 다운님 결정 11-25 10:14) — 「원문 표시만」(zfTargetOrigOnly === 지금 칩)이면 원문 갈래만. 기본은 종전 한 목록.
+    const origOnly = zfTargetOrigOnly === activeNoticeTarget;
+    out = out.filter(n => zfTargetOrig(n) || (!origOnly && zfTierTagsReady && zfAnyoneState(n) === 'anyone'));
   }
   // opts.q — 검색어를 칸 대신 넘길 때(0건 화면 「빼면 N건」 · 칸 value 를 건드리지 않게)
   // 🔵 2026-10-16(A3 · N16) — 한글 조합 중에는 끝의 낱자모(「장ㅇ」의 ㅇ)를 떼고 거른다 — 칠 때마다 「0건」이 깜빡이던 자리. 조합이 끝나거나 음절이 되면 그대로.
@@ -6830,10 +6838,21 @@ function zfNoticeAfterRender(shown){
 
 // 🔵 2026-11-25(우편함 「표시층 — 판 H」 2) — 계층 칩 결과 머리 한 줄: 「원문에 ○○ 표시 a건 · 계층 구분 없이 누구나 b건」 + 「소득·자산·무주택 조건은 공고마다 달라요」.
 //    a + b = 결과 수(같은 목록을 둘로 셀 뿐). 종전 접힌 「누구나 N건」 묶음(zfAnyoneMount)은 걷었다 — 카드는 결과 안에 섞여 선다.
+//    🔵 2026-11-25(판 I 2) — 「원문에 ○○ 표시 a건」은 누르면 원문 갈래만 보는 단추(a·b 둘 다 있을 때만) · 거는 중이면 그 사실만 한 줄(푸는 길은 조건 칩 「원문 표시만 ✕」 하나).
 function zfTargetSplitHTML(rows, cls){
   if(!activeNoticeTarget || !(rows || []).length) return '';   // 0건이면 빈 결과 문구가 같은 말을 한다
+  const g = escapeHtml(activeNoticeTarget);
+  if(zfTargetOrigOnly === activeNoticeTarget) return `<p class="${cls} zf13-tsplit">원문에 ${g} 표시된 ${(rows || []).length.toLocaleString()}건만 보는 중 <span class="zf13-tsplit-s">— 누구나 신청하는 공고는 「원문 표시만 ✕」로 다시 함께</span></p>`;
   const a = (rows || []).filter(n => zfTargetOrig(n)).length, b = (rows || []).length - a;
-  return `<p class="${cls} zf13-tsplit">원문에 ${escapeHtml(activeNoticeTarget)} 표시 ${a.toLocaleString()}건 · 계층 구분 없이 누구나 ${b.toLocaleString()}건${b ? ' <span class="zf13-tsplit-s">— 소득·자산·무주택 조건은 공고마다 달라요</span>' : ''}</p>`;
+  const aTxt = `원문에 ${g} 표시 ${a.toLocaleString()}건`;
+  const aEl = (a && b) ? `<button type="button" class="zf13-tsplit-a" onclick="zfTargetOrigOnlyOn()" aria-label="${zfAttr(aTxt)}만 보기">${aTxt}</button>` : aTxt;
+  return `<p class="${cls} zf13-tsplit">${aEl} · 계층 구분 없이 누구나 ${b.toLocaleString()}건${b ? ' <span class="zf13-tsplit-s">— 소득·자산·무주택 조건은 공고마다 달라요</span>' : ''}</p>`;
+}
+function zfTargetOrigOnlyOn(){
+  if(!activeNoticeTarget) return;
+  zfTargetOrigOnly = activeNoticeTarget;
+  if(typeof updateFilterToggleBtn === 'function') updateFilterToggleBtn();
+  applyNoticeFiltersAndRender();
 }
 // 페이저 — 「‹ 이전 · 1 … 4 5 6 … 12 · 다음 ›」. 현재 쪽 좌우 1칸과 양 끝을 늘 보여주고
 // 사이가 벌어지면 「…」로 접는다. 🔵 한 쪽뿐이면 아무것도 그리지 않는다.
@@ -11009,7 +11028,7 @@ function zfPolicyBodyHtml(rows, cls, id){
   let html = '';
   // 🔵 2026-11-21 — 요점이 있는 행이 하나라도 있으면 절 머리에 표지(다운님 결정 글자 그대로) + 끄기 스위치를 한 번 둔다.
   if(rows.some(zfPolPlainOk)){
-    html += `<div class="pol-plain-bar"><p class="pol-plain-note"><b>꼭집 요점</b> — 원문에서 중요한 것만 골랐어요 · 숫자·날짜·조건은 원문 그대로 · 전체는 아래 원문</p>`
+    html += `<div class="pol-plain-bar"><p class="pol-plain-note"><span class="pol-plain-t-on"><b>꼭집 요점</b> — 원문에서 중요한 것만 골랐어요 · 숫자·날짜·조건은 원문 그대로 · 전체는 아래 원문</span><span class="pol-plain-t-off"><b>꼭집 요점 꺼짐</b> — 아래는 공고 원문 그대로예요 · 다시 켜면 요점이 먼저 보여요</span></p>`
       + `<button type="button" class="pol-plain-sw" role="switch" aria-checked="${plainOff ? 'false' : 'true'}" data-pol-id="${zfAttr(id)}" onclick="event.stopPropagation();zfPolPlainToggle(this)"><i aria-hidden="true"></i>요점 먼저 보기</button></div>`;
   }
   html += pinned.map(p => zfPolItemHtml(p, { pinned: true, rawOpen: plainOff })).join('');
@@ -11991,8 +12010,18 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
     let pastUnits = [];
     let pastOnly = false;
     if(rounds && Array.isArray(units)){
-      const past = units.filter(u => u.zfRoundLabel && !u.zfRoundCurrent);
+      let past = units.filter(u => u.zfRoundLabel && !u.zfRoundCurrent);
       const cur  = units.filter(u => !(u.zfRoundLabel && !u.zfRoundCurrent));
+      // 🔴 2026-11-25(판 I 1 · 기준 위반 고침) — 다른 회차 세대는 이 카드 세대 행의 단지(complex_id)와 같은 행만. 회차 사슬이 이은 지난 공고가
+      //    여러 단지를 함께 모집했으면 다른 단지 행이 표지 없이 섞였다(…21128 「다른 회차 보기 84건」 중 완주삼봉 55). 단지 번호가 없는 행은 남긴다(가를 근거 없음) ·
+      //    카드 행에 단지 번호가 하나도 없으면 종전 그대로 · 블록 경로는 zfBlockUnits 가 따로 고른다.
+      if(!huIsBlock && past.length && cur.length){
+        const cids = new Set(cur.map(u => u && u.complex_id).filter(v => v != null).map(String));
+        if(cids.size){
+          const kept = past.filter(u => u.complex_id == null || cids.has(String(u.complex_id)));
+          if(kept.length !== past.length){ past = kept; units = cur.concat(kept); }   // 걸러 낸 행이 아래 「나누지 않음」 갈래로 되돌아 본문에 서지 않게
+        }
+      }
       if(past.length > 0 && cur.length > 0){
         attachRoundDiffs(cur, past);
         // 지난 회차가 여럿이면 최근 것이 위로 온다 — 직전 회차를 먼저 보게 한다.
@@ -15468,23 +15497,25 @@ function zf3EmptyChips(){
   if(activeNoticeType) conds.push(['type', activeNoticeType]);
   if(activeNoticeStatus) conds.push(['status', activeNoticeStatus]);
   if(activeNoticeTarget) conds.push(['target', activeNoticeTarget]);
+  if(activeNoticeTarget && zfTargetOrigOnly === activeNoticeTarget) conds.push(['origonly', '원문 표시만']);
   if(q && q.value.trim()) conds.push(['q', `검색 「${q.value.trim()}」`]);
   if(!conds.length) return '';
   const clientCount = (rows, drop) => {
     // 🔴 2026-10-13(우편함 「코드 — 한글 중복 입력 …」 1) — 검색어를 뺀 건수는 칸의 value 를 비웠다 되돌리지 않고 인자로 센다.
     //    종전에는 q.value = '' → 복원을 했는데, 한글 조합 중(「ㅂ」 = 0건 → 이 화면)에 value 를 다시 쓰면 조합이 깨져
     //    「부산」이 「ㅂ부붓부사산」이 됐다(CDP 조합 이벤트로 재현 · 이 두 줄만 뺀 사본에서 「부산」 그대로).
-    const save = { g: activeNoticeTarget };
+    const save = { g: activeNoticeTarget, o: zfTargetOrigOnly };
     try{
       if(drop === 'target') activeNoticeTarget = null;
+      if(drop === 'origonly') zfTargetOrigOnly = null;
       const hide = document.getElementById('hideClosedChk')?.checked;
       const sta = drop === 'status' ? null : activeNoticeStatus;
       let base = (hide && !sta) ? rows.filter(n => !isHiddenAsClosed(n)) : rows;
       if(sta) base = base.filter(n => noticeStateLabel(n) === sta);
       return applyNoticeSubFilters(base, drop === 'q' ? { q: '' } : undefined).length;
-    }finally{ activeNoticeTarget = save.g; }
+    }finally{ activeNoticeTarget = save.g; zfTargetOrigOnly = save.o; }
   };
-  const key = JSON.stringify([activeNoticeRegion, activeNoticeType, activeNoticeStatus, activeNoticeTarget, q ? q.value : '']);
+  const key = JSON.stringify([activeNoticeRegion, activeNoticeType, activeNoticeStatus, activeNoticeTarget, zfTargetOrigOnly, q ? q.value : '']);
   conds.forEach(([k]) => {
     const put = cnt => {
       const el = document.querySelector(`#notice-status [data-zf3-clear="${k}"]`);
@@ -15562,6 +15593,7 @@ function zf3CondChips(){
   if(activeNoticeType) out.push(['type', activeNoticeType]);
   if(activeNoticeStatus) out.push(['status', activeNoticeStatus]);
   if(activeNoticeTarget) out.push(['target', `대상 ${activeNoticeTarget}`]);
+  if(activeNoticeTarget && zfTargetOrigOnly === activeNoticeTarget) out.push(['origonly', '원문 표시만']);   // 🔵 2026-11-25(판 I 2)
   const q = (document.getElementById('noticeSearchInput')?.value || '').trim();
   if(q) out.push(['q', `검색 「${q}」`]);
   const chk = document.getElementById('hideClosedChk');
@@ -15682,7 +15714,8 @@ function zf3ClearCond(k){
   if(k === 'region'){ activeNoticeRegion = null; refreshChipSel('noticeRegionChips', null); updateFilterToggleBtn(); loadNoticeData(); return; }
   if(k === 'type'){ activeNoticeType = null; refreshChipSel('noticeTypeChips', null); updateFilterToggleBtn(); loadNoticeData(); return; }
   if(k === 'status'){ activeNoticeStatus = null; refreshChipSel('noticeStatusChips', null); }
-  if(k === 'target'){ activeNoticeTarget = null; refreshChipSel('noticeTargetChips', null); }
+  if(k === 'target'){ activeNoticeTarget = null; zfTargetOrigOnly = null; refreshChipSel('noticeTargetChips', null); }
+  if(k === 'origonly') zfTargetOrigOnly = null;   // 🔵 2026-11-25(판 I 2) — 한 목록으로 되돌림
   if(k === 'q'){ const q = document.getElementById('noticeSearchInput'); if(q) q.value = ''; }
   if(k === 'closed'){ const c = document.getElementById('hideClosedChk'); if(c) c.checked = true; }
   if(k === 'place'){ zf3PlaceSel = null; zf3PlaceName = ''; }
