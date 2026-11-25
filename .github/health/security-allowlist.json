@@ -27,6 +27,16 @@
    "why": "화면 「정정 전 공고 기준」 배너(rpc/get_revision_analysis_done) · announcement_analysis 를 읽어 참/거짓 하나만 돌려준다 · search_path 고정"
   },
   {
+   "key": "anon_security_definer_function_executable_public_get_rent_per_sqm_quartiles_",
+   "kind": "intended",
+   "why": "㎡당 월세 비교 사분위(rpc/get_rent_per_sqm_quartiles · 2026-11-25 스무째) · 클라이언트 권한 0 인 스냅숏 표(zipfit_ops.rent_sqm_quartiles)에서 시·도 × 유형 집계 숫자(표본 n · 사분위)만 돌려준다 · 공고 id·개인정보 없음 · 인자 없음 · search_path 고정"
+  },
+  {
+   "key": "authenticated_security_definer_function_executable_public_get_rent_per_sqm_quartiles_",
+   "kind": "intended",
+   "why": "㎡당 월세 비교 사분위(rpc/get_rent_per_sqm_quartiles · 2026-11-25 스무째) · 클라이언트 권한 0 인 스냅숏 표(zipfit_ops.rent_sqm_quartiles)에서 시·도 × 유형 집계 숫자(표본 n · 사분위)만 돌려준다 · 공고 id·개인정보 없음 · 인자 없음 · search_path 고정 · 로그인 사용자도 같은 화면을 본다"
+  },
+  {
    "key": "anon_security_definer_function_executable_public_get_last_collected_at_",
    "kind": "intended",
    "why": "화면 「기준」 시각 재료(rpc/get_last_collected_at · 2026-10-13 국면 B′ ③) · anon 이 못 읽는 런 기록 표에서 출처별 마지막 성공 수집 시각 셋만 돌려준다 · 개인정보 없음 · search_path 고정"
