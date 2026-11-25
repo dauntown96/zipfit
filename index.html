@@ -220,11 +220,34 @@ body.theme-dark .zf-clr{color:#aaa}
 .pol-toggle-all{font-size:var(--t-xs);color:var(--ink-2);background:none;border:none;text-decoration:underline;cursor:pointer;padding:2px 0}
 .pol-group-head{font-size:12px;font-weight:700;color:#444;margin:10px 0 6px}
 details.pol-item{padding:0}
-details.pol-item>summary{list-style:none;cursor:pointer;padding:9px 12px;font-size:12px;font-weight:600;color:var(--ink-2)}
+details.pol-item>summary{list-style:none;cursor:pointer;padding:10px 12px;font-size:var(--t-body);font-weight:600;color:var(--ink);line-height:1.45}
 details.pol-item>summary::-webkit-details-marker{display:none}
 details.pol-item>summary::after{content:' ▾';color:#aaa;font-weight:400}
 details.pol-item[open]>summary::after{content:' ▴'}
 details.pol-item>.policy-content{padding:0 12px 10px}
+/* 🔵 2026-11-25(판 J 1) — 글자 층: 절 머리 18(--t-xl) 700 ↔ 행 머리 14(--t-body) 600 ↔ 원문 본문 14(d3 종전 그대로) · 붙는 절 탭 · 원문이 꼽은 중요 사항 */
+.pol-sec-head{margin:20px 0 8px;padding:0 0 6px;border-bottom:2px solid var(--ink);font-size:var(--t-xl);font-weight:700;color:var(--ink);line-height:1.3}
+.pol-sec-n{font-size:var(--t-s);font-weight:600;color:var(--ink-3);margin-left:4px}
+.pol-nav{position:sticky;top:0;z-index:3;display:flex;align-items:center;gap:4px;overflow-x:auto;scrollbar-width:none;margin:4px -2px 0;padding:6px 2px;background:var(--paper);border-bottom:1px solid var(--line-2)}
+.pol-nav::-webkit-scrollbar{display:none}
+.pol-nav button{all:unset;box-sizing:border-box;flex:none;min-height:var(--hit);padding:0 10px;border-radius:var(--r-pill);font-size:var(--t-s);font-weight:700;color:var(--ink-2);cursor:pointer;display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.pol-nav button b{font-weight:600;color:var(--ink-3)}
+.pol-nav button:hover{background:var(--surface);color:var(--ink)}
+.pol-nav button:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+.pol-nav-ai{flex:none;font-size:var(--t-xs);font-weight:600;color:var(--ink-3);padding:2px 6px;border:1px solid var(--line-2);border-radius:var(--r-pill);margin-right:2px}
+.pol-keybox{margin:0 0 10px;padding:10px 10px 2px;border:2px solid var(--ink);border-radius:var(--r-s)}
+.pol-keybox-h{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;margin:0 2px 8px;font-size:var(--t-l);font-weight:700;color:var(--ink)}
+.pol-keybox-n{font-size:var(--t-s);color:var(--ink-3);font-weight:600}
+.pol-keybox-s{flex-basis:100%;font-size:var(--t-xs);font-weight:400;color:var(--ink-2)}
+.pol-seq-note{margin:8px 2px;font-size:var(--t-xs);color:var(--ink-2)}
+.pol-tools{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px}
+.pol-seq-sw{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;min-height:var(--hit);box-sizing:border-box;padding:0 4px;border:0;background:none;font:inherit;font-size:var(--t-xs);font-weight:600;color:var(--ink);cursor:pointer}
+.pol-seq-sw i{position:relative;width:32px;height:18px;border-radius:var(--r-pill);background:var(--paper);box-shadow:inset 0 0 0 2px var(--ink-3);transition:background .15s}
+.pol-seq-sw i::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:var(--r-round);background:var(--ink-3);transition:left .15s}
+.pol-seq-sw[aria-checked="true"] i{background:var(--ink);box-shadow:none}
+.pol-seq-sw[aria-checked="true"] i::after{left:16px;background:var(--paper)}
+.pol-seq-sw:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.pol-seq-sw i,.pol-seq-sw i::after{transition:none}}
 /* 🔵 2026-11-21(우편함 「표시층 — 쉽게 쓴 말(요점) 화면 켜기」) — 정책 행 요점 층: 요점(content_plain · 줄 = 한 칸) 먼저 · 원문(content_raw)은 바로 아래 접기.
    글자는 DB 그대로(점은 CSS 표지라 글자가 아니다) · 절 머리 스위치로 끄면 그 공고의 모든 행이 원문만(.pol-plain-off — 저장하지 않는다 · 처리방침 3). */
 .pol-plain-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 10px;margin:0 0 8px;padding:8px 10px;border:1px solid var(--line-2);border-radius:var(--r-s);background:var(--surface)}
@@ -10139,6 +10162,33 @@ function zfRowsSameRoundAsCard(rawRows, roundMap, cardEl){
   });
 }
 
+// 🔴 2026-11-25(우편함 「표시층 — 판 J」 2 · 기준 위반 고침) — 다른 회차 자격기준·안내 행 중 site_label(그 회차 단지 글자)이 이 카드 단지가 아닌 행을 뺀다.
+//    잇는 길 = 같은 공고 세대 행 building_name → complex_id(11-25 열린 카드 적중 39/39) · 카드 단지 = 이번 회차 공고 id 들의 세대 행 complex_id.
+//    site_label 없는 행(공통) · 이어지지 않는 행 · 카드 단지 번호를 모르는 카드는 그대로 둔다(가를 근거 없음). 판정 재료 = 회차 조회(마감 축)와 같은 것.
+const zfHuCidMemo = new Map();
+function zfHuCids(ids){
+  const key = [...ids].sort().join(',');
+  if(!zfHuCidMemo.has(key)) zfHuCidMemo.set(key, zfGetAll(`housing_units?select=announcement_id,building_name,complex_id&${idFilterFor(ids)}&complex_id=not.is.null`, { order: 'id' }).catch(() => { zfHuCidMemo.delete(key); return null; }));
+  return zfHuCidMemo.get(key);
+}
+function zfDropOtherSiteRows(rows, ids, roundMap, cardEnd){
+  if(!Array.isArray(rows) || !rows.length || !roundMap || !cardEnd || !Array.isArray(ids)) return Promise.resolve(rows);
+  const endOf = aid => { const a = roundMap[aid]; return a && a.apply_end ? a.apply_end : null; };
+  const isOther = r => { const e = endOf(r && r.announcement_id); return !!e && e !== cardEnd; };
+  if(!rows.some(r => isOther(r) && String(r.site_label || '').trim())) return Promise.resolve(rows);
+  const curIds = new Set(ids.filter(x => { const e = endOf(x); return !e || e === cardEnd; }).map(String));
+  return zfHuCids(ids).then(hu => {
+    if(!Array.isArray(hu)) return rows;
+    const card = new Set(hu.filter(u => curIds.has(String(u.announcement_id))).map(u => String(u.complex_id)));
+    if(!card.size) return rows;
+    return rows.filter(r => {
+      const s = String(r.site_label || '').trim();
+      if(!s || !isOther(r)) return true;
+      const m = hu.filter(u => String(u.announcement_id) === String(r.announcement_id) && String(u.building_name || '').trim() === s).map(u => String(u.complex_id));
+      return !m.length || m.some(c => card.has(c));
+    });
+  }).catch(() => rows);
+}
 // 🔵 2026-10-19 — 정밀 자격기준·첨부 사진을 정책 안내(B46)와 같은 축으로 가른다: 다른 회차 = 행의 출처 공고 apply_end 가 카드 apply_end 와 다르다.
 //    get_announcement_group_ids 는 제목만 보아 재공고(다른 회차·같은 제목)까지 묶는다 — 열린 카드 넷의 자격기준에 지난 회차 행이 이번 회차처럼 섞였다
 //    (남원노암 …20649 ← …20249 19행 · 김제하동 …20908 · 제주 …20922 · 익산한스빌 …20893 — 2026-10-19 실측).
@@ -10927,9 +10977,33 @@ function zfPolPinRank(cls, p){
   if(/^\s*⚠️/.test(cat)) return 0;
   const std = zfPolClassOf(cls, p, 'standard');
   if(cat.trim() === '정정 내용' || std.indexOf('정정 내용') !== -1) return 1;
-  if(std.indexOf('모집 일정') !== -1) return 2;
+  // 🔵 2026-11-25(판 J 1) — 모집 일정은 고정에서 빼 「언제」 절에 원문 차례로 둔다(절 차례: 누가 → 어떤 집·얼마 → 언제 …).
   return -1;
 }
+// 🔵 2026-11-25(우편함 「표시층 — 판 J」 1 · 조사 「상세 읽기 재설계 1」 6장 안) — 고정 절. 표준 분류(policy_classes axis standard · 38종) → 절.
+//    절 이름은 꼭집 말(「AI 정리」 표시) · 절 안 행은 원문 차례(seq) · 행 머리·본문은 원문 그대로. 표준 분류가 없는 행은 맨 뒤 「그 밖의 안내」.
+const ZF_POL_SECS = [
+  ['who',   '누가 신청하나',     ['신청 자격(일반)', '대상별 자격(청년·신혼·고령·주거약자 등)', '무주택·세대구성원', '소득·자산 기준', '완화 모집', '2세 미만·출생 자녀']],
+  ['what',  '어떤 집 · 얼마',    ['모집 대상·공급 개요', '단지 개요', '임대조건', '보증금 전환', '단지·지구 여건', '편의시설']],
+  ['when',  '언제',             ['모집 일정']],
+  ['how',   '어떻게 신청하나',   ['신청 방법·장소', '서류제출 방법', 'MyMy·전자서명']],
+  ['docs',  '서류',             ['제출서류·증명서']],
+  ['pick',  '어떻게 뽑나',       ['선정 절차', '순위', '배점·가점', '중복선정·중복신청', '예비입주자 유효기간·순번', '동호 지정·배정']],
+  ['after', '발표 · 계약 · 입주', ['당첨·발표', '계약 안내', '입주 안내', '재계약 자격·특례', '최대 거주기간·임대기간', '갱신 할증', '이주·주거상향']],
+  ['warn',  '주의',             ['불법전대·부정', '공통 유의사항', '기타', '⚠️ 원문 주의', '정정 내용']],
+  ['ref',   '붙임 · 산정 방법',  ['소득·자산 산정방법', '금융자산 조회']],
+  ['ask',   '문의처',           ['문의처']],
+  ['etc',   '그 밖의 안내',      []]
+];
+const ZF_POL_SEC_OF = new Map(ZF_POL_SECS.flatMap(([k, , std], i) => std.map(n => [n, i])));
+function zfPolSecIdx(cls, p){
+  const idx = zfPolClassOf(cls, p, 'standard').map(n => ZF_POL_SEC_OF.get(n)).filter(i => i != null);
+  return idx.length ? Math.min(...idx) : ZF_POL_SECS.length - 1;
+}
+// 원문이 스스로 「매우 중요한 사항」으로 묶은 절(첫 장 요약 상자) — 절 목차 위 한 묶음 · 본문 절에서는 뺀다(두 번 보이지 않게).
+const zfPolIsKeyBox = p => /매우\s*중요한\s*사항/.test(String((p && p.category) || ''));
+const zfPolSeqCmp = (a, b) => (Number(a.seq) || 0) - (Number(b.seq) || 0) || String(a.id || '').localeCompare(String(b.id || ''));
+const zfPolSeqMode = {};   // 정책 절 id → 「원문 차례로 보기」(true) · 상세 하나에 한 값 · 메모리에만
 const zfPolState = {};
 function zfPolItemHtml(p, opts){
   const o = opts || {};
@@ -11012,17 +11086,19 @@ function zfRowSite(siteLabel, r){
   return String(r.site_label || '').trim() || siteLabel.get(r.announcement_id) || '';
 }
 function zfPolicyBodyHtml(rows, cls, id){
-  const ko = (a, b) => String(a.category || '').localeCompare(String(b.category || ''), 'ko');
+  // 🔵 2026-11-25(판 J 1) — 가나다(category) 정렬을 걷고 원문 차례(seq)로. 고정 행(⚠️ · 정정)도 원문 차례.
   const pinned = rows.filter(p => zfPolPinRank(cls, p) >= 0)
-    .sort((a, b) => zfPolPinRank(cls, a) - zfPolPinRank(cls, b) || ko(a, b));
-  const rest = rows.filter(p => zfPolPinRank(cls, p) < 0).sort(ko);
+    .sort((a, b) => zfPolPinRank(cls, a) - zfPolPinRank(cls, b) || zfPolSeqCmp(a, b));
+  const keyBox = rows.filter(p => zfPolPinRank(cls, p) < 0 && zfPolIsKeyBox(p)).sort(zfPolSeqCmp);
+  const rest = rows.filter(p => zfPolPinRank(cls, p) < 0 && !zfPolIsKeyBox(p)).sort(zfPolSeqCmp);
+  rest.forEach(p => { p._zfSec = zfPolSecIdx(cls, p); });
   const chips = cls ? [...cls.userOrder.entries()].sort((a, b) => a[1] - b[1]).map(e => e[0]) : [];
   // 한 행의 칩을 칩 순서로 — 첫 칩이 그 행이 사는 묶음이다.
   const chipsOf = p => zfPolClassOf(cls, p, 'user').filter(n => cls && cls.userOrder.has(n))
     .sort((a, b) => cls.userOrder.get(a) - cls.userOrder.get(b));
   // 🔵 2026-11-22(작은 판 3 · #1200 걱정 ②) — 요점 스위치 값은 상세 하나에 한 값(zfPlainOff[id]) — 정책 절을 다시 그려도 그 값으로 그린다(저장 안 함).
   const plainOff = !!zfPlainOff[id];
-  zfPolState[id] = { rest, pinned, chips, chipsOf, pick: null, q: '', plainOff };
+  zfPolState[id] = { rest, pinned, keyBox, chips, chipsOf, pick: null, q: '', plainOff, cls };
   // 🔴 2026-09-30(표시층·필터) — 카드 안 아코디언은 처음에 전부 접힌다(다운님 지시). 고정 행(⚠️·정정·모집일정)도
   //    맨 위 자리는 그대로 두고 펼침만 걷었다. 검색 중 맞은 행 펼침·「모두 펼치기」는 사용자 동작이라 그대로다.
   let html = '';
@@ -11032,19 +11108,19 @@ function zfPolicyBodyHtml(rows, cls, id){
       + `<button type="button" class="pol-plain-sw" role="switch" aria-checked="${plainOff ? 'false' : 'true'}" data-pol-id="${zfAttr(id)}" onclick="event.stopPropagation();zfPolPlainToggle(this)"><i aria-hidden="true"></i>요점 먼저 보기</button></div>`;
   }
   html += pinned.map(p => zfPolItemHtml(p, { pinned: true, rawOpen: plainOff })).join('');
+  // 🔵 2026-11-25(판 J 1) — 원문이 꼽은 중요 사항(원문 절 「모집 신청과 관련하여 매우 중요한 사항」) — 절 목차 위 한 묶음.
+  if(keyBox.length){
+    html += `<div class="pol-keybox"><div class="pol-keybox-h">원문이 꼽은 중요 사항 <span class="pol-keybox-n">${keyBox.length}</span><span class="pol-keybox-s">공고문 첫 장 「매우 중요한 사항」 그대로</span></div>`
+      + keyBox.map(p => zfPolItemHtml(p, { rawOpen: plainOff })).join('') + `</div>`;
+  }
   if(rows.length >= 10){
     html += `<span class="zf-clr-wrap zf-clr-block"><input type="search" class="pol-search" placeholder="정책 안내에서 찾기" aria-label="정책 안내 검색" data-pol-id="${zfAttr(id)}" oninput="zfPolSearch(this)" onkeydown="zfClearKey(event,this)" onclick="event.stopPropagation()"><button type="button" class="zf-clr" aria-label="검색어 지우기" onmousedown="event.preventDefault()" onclick="zfClearSearch(this,event)">×</button></span>`;
   }
-  if(chips.length){
-    const cnt = n => rest.filter(p => chipsOf(p).indexOf(n) !== -1).length;
-    html += `<div class="pol-chips" data-pol-id="${zfAttr(id)}">`
-      + `<button type="button" class="chip pol-chip sel" data-chip="" onclick="event.stopPropagation();zfPolPick(this)">전체 ${rest.length}</button>`
-      + chips.map(n => { const c = cnt(n);
-          return `<button type="button" class="chip pol-chip" data-chip="${zfAttr(n)}"${c ? '' : ' disabled'} onclick="event.stopPropagation();zfPolPick(this)">${escapeHtml(n)} ${c}</button>`; }).join('')
-      + `</div>`;
-  }
+  // 🔵 2026-11-25(판 J 1) — 칩 9종 거름을 걷고 절 목차(아래 붙는 탭)로. 「원문 차례로 보기」 스위치 = 절 없이 seq 한 줄.
   if(rest.length){
-    html += `<div class="pol-tools"><button type="button" class="pol-toggle-all" data-pol-id="${zfAttr(id)}" onclick="event.stopPropagation();zfPolToggleAll(this)">모두 펼치기</button></div>`;
+    const seqOn = !!zfPolSeqMode[id];
+    html += `<div class="pol-tools"><button type="button" class="pol-seq-sw" role="switch" aria-checked="${seqOn ? 'true' : 'false'}" data-pol-id="${zfAttr(id)}" onclick="event.stopPropagation();zfPolSeqToggle(this)"><i aria-hidden="true"></i>원문 차례로 보기</button>`
+      + `<button type="button" class="pol-toggle-all" data-pol-id="${zfAttr(id)}" onclick="event.stopPropagation();zfPolToggleAll(this)">모두 펼치기</button></div>`;
   }
   html += `<div class="pol-list" data-pol-list="${zfAttr(id)}">${zfPolListHtml(id)}</div>`;
   return html;
@@ -11058,7 +11134,20 @@ function zfPolListHtml(id){
   const rawOpen = !!st.plainOff;   // 요점을 끈 상세는 원문 접기를 펼친 채 그린다
   const rows = st.rest.filter(hit);
   // 🔵 2026-10-02 — 맞은 글자가 위 고정 행에만 있으면 「없어요」라고 하지 않는다(고정 행은 펼쳐져 강조돼 있다).
-  if(!rows.length) return `<p class="pol-empty">${q ? ((st.pinned || []).some(hit) ? '위 고정 안내에서 찾았어요.' : '찾는 말이 들어간 안내가 없어요.') : ''}</p>`;
+  if(!rows.length) return `<p class="pol-empty">${q ? ((st.pinned || []).concat(st.keyBox || []).some(hit) ? '위 고정 안내에서 찾았어요.' : '찾는 말이 들어간 안내가 없어요.') : ''}</p>`;
+  // 🔵 2026-11-25(판 J 1) — 원문 차례 보기 = 절 없이 seq 한 줄 · 기본 = 고정 절(붙는 절 탭 + 절 머리 · 절 안은 seq).
+  if(zfPolSeqMode[id]) return `<div class="pol-seq-note">공고문에 적힌 차례 그대로예요</div>` + rows.map(p => zfPolItemHtml(p, { open, rawOpen })).join('');
+  if(st.rest.every(p => p._zfSec != null)){
+    const secs = ZF_POL_SECS.map(([k, name], i) => ({ k, name, rows: rows.filter(p => p._zfSec === i) })).filter(g => g.rows.length);
+    const sid = k => 'polsec-' + String(id).replace(/[^\w-]/g, '_') + '-' + k;
+    let out = `<nav class="pol-nav" aria-label="정책 안내 절"><span class="pol-nav-ai" title="절 나눔과 절 이름은 꼭집이 붙였어요 · 각 안내의 제목과 글은 원문 그대로">AI 정리</span>`
+      + secs.map(g => `<button type="button" data-target="${zfAttr(sid(g.k))}" onclick="event.stopPropagation();zfPolGoSec(this)">${escapeHtml(g.name)} <b>${g.rows.length}</b></button>`).join('') + `</nav>`;
+    secs.forEach(g => {
+      out += `<h4 class="pol-sec-head" id="${zfAttr(sid(g.k))}">${escapeHtml(g.name)} <span class="pol-sec-n">${g.rows.length}</span></h4>`
+        + g.rows.map(p => zfPolItemHtml(p, { open, rawOpen })).join('');
+    });
+    return out;
+  }
   if(st.pick){
     const list = rows.filter(p => st.chipsOf(p).indexOf(st.pick) !== -1);
     return list.length
@@ -11124,6 +11213,40 @@ function zfPolHighlight(id){
       if(m && m.scrollIntoView) m.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }, 400);
   }
+}
+function zfPolSeqToggle(btn){
+  const id = btn.dataset.polId || '';
+  zfPolSeqMode[id] = btn.getAttribute('aria-checked') !== 'true';
+  btn.setAttribute('aria-checked', zfPolSeqMode[id] ? 'true' : 'false');
+  zfPolRerender(id);
+  zfPolNavTop(btn.closest('.policy-wrap'));
+}
+// 붙는 절 탭의 top — 상세 판(넓은 화면 오른쪽 패널)은 위 고정 머리(.zf3-dtop) 높이 · 좁은 화면은 위 고정 줄(.zf3-sticky) 높이.
+function zfPolNavTop(wrap){
+  const nav = wrap && wrap.querySelector('.pol-nav');
+  if(!nav) return;
+  const sc = zfPolScroller(nav);
+  let top = 0;
+  if(sc){ const dt = sc.querySelector(':scope > .zf3-dtop'); top = dt ? dt.offsetHeight : 0; }
+  else { const st = document.getElementById('zf3Sticky'); top = st ? (st.offsetHeight || 52) : 0; }
+  nav.style.top = top + 'px';
+}
+function zfPolScroller(el){
+  for(let e = el && el.parentElement; e && e !== document.body; e = e.parentElement){
+    const o = getComputedStyle(e).overflowY;
+    if((o === 'auto' || o === 'scroll') && e.scrollHeight > e.clientHeight) return e;
+  }
+  return null;
+}
+function zfPolGoSec(btn){
+  const head = document.getElementById(btn.dataset.target || '');
+  const nav = btn.closest('.pol-nav');
+  if(!head || !nav) return;
+  const sc = zfPolScroller(nav);
+  const off = (parseFloat(nav.style.top) || 0) + nav.offsetHeight + 6;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+  if(sc) sc.scrollBy({ top: head.getBoundingClientRect().top - sc.getBoundingClientRect().top - off, behavior: reduce });
+  else window.scrollBy({ top: head.getBoundingClientRect().top - off, behavior: reduce });
 }
 function zfPolPick(btn){
   const box = btn.closest('.pol-chips');
@@ -11333,8 +11456,10 @@ function loadAnnouncementPolicies(annId, detailEl, id, useGroup){
     fetch(`${SUPABASE_URL}/rest/v1/announcement_policies?${idFilterFor(ids)}&order=category,seq`, {
       headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
     }).then(r => r.ok ? r.json() : null),
-    fetchGroupRounds(ids, useGroup && Array.isArray(ids) && ids.length >= 2)
-  ])).then(([policies, roundMap]) => {
+    fetchGroupRounds(ids, useGroup && Array.isArray(ids) && ids.length >= 2),
+    ids
+  ])).then(([policies, roundMap, ids]) => zfDropOtherSiteRows(policies, ids, roundMap, ((cardElFor(id) || {}).dataset || {}).applyEnd || '').then(p => [p, roundMap]))
+  .then(([policies, roundMap]) => {
     if(!zfStillOurs(id, ownerAnn)) return;
     // 🔴 요청 실패(null)는 여기서 끝낸다 — 정상 0행([])만 아래에서 안내를 받는다.
     if(policies === null) return;
@@ -11446,6 +11571,7 @@ function loadAnnouncementPolicies(annId, detailEl, id, useGroup){
       const slot = document.getElementById('policy-slot-'+id);
       if(slot) slot.appendChild(wrap);
       if(slot && zfPlainOff[id] !== undefined) zfPlainSync(wrap, id);   // 다시 그린 절도 그 상세의 한 값으로(2026-11-22 작은 판 3)
+      if(slot){ wrap.addEventListener('toggle', () => { if(wrap.open) zfPolNavTop(wrap); }); zfPolNavTop(wrap); }   // 🔵 판 J 1 — 붙는 절 탭 자리
       if(slot) zfPolicyNotes(curRows, annId, id, ownerAnn, slot, wrap);
       zfDocsFromPolicies(curRows, id);   // 🔵 2026-11-04 (가) — 이번 회차 서류 칸만 「📄 이 공고의 제출서류(원문)」로
     });
@@ -11489,7 +11615,7 @@ function loadPreciseEligibility(annId, detailEl, id, useGroup){
     zfRoundsIfOrphan(rows, annId, ids, useGroup, id),
     // 🔵 2026-10-02 — 묶인 카드만 ID → 단지명(정책 칩과 같은 함수). 아니면 null — 종전 화면 그대로다.
     (Array.isArray(rows) && zfIsPostMerged(annId)) ? zfPolicySiteLabels(rows, annId) : Promise.resolve(null)
-  ]).then(([roundMap, siteLabel]) => [rows, roundMap, siteLabel])))
+  ]).then(([roundMap, siteLabel]) => zfDropOtherSiteRows(rows, ids, roundMap, ((cardElFor(id) || {}).dataset || {}).applyEnd || '').then(r2 => [r2, roundMap, siteLabel]))))
   .then(([rows, roundMap, siteLabel]) => {
     if(!zfStillOurs(id, ownerAnn)) return;
     // 🔴 요청 실패(null)는 여기서 끝낸다 — 정상 0행([])만 아래에서 안내를 받는다.
@@ -12093,9 +12219,36 @@ function loadHousingUnits(annId, detailEl, id, useGroup, mapId){
     const pastLineCount = countHousingUnitLines(diffPast);
     // 🔵 2026-11-24(판 E 3 (나)) — 「다른 회차」 머리에 회차 추이 한 줄(같은 단지 같은 형 · 이번 회차 + 지난 회차 세대 행 — 새 요청 0).
     const trendHtml = (pastUnits.length ? zfRoundCycleHtml(pastUnits, units) : '') + (!pastOnly && pastUnits.length && units.length ? zfRoundTrendHtml(units.concat(pastUnits)) : '');
+    // 🔵 2026-11-25(우편함 「표시층 — 판 J」 3 · 판 I ⑦ 1) — 회차(출처 공고 마감)별 소제목(공고일 · 접수기간 — 원문 값만) · 자격기준·안내 접기와 같은 꼴·같은 규칙.
+    //    회차 조회가 없으면 종전 한 목록 그대로.
+    const pastListHtml = rows => {
+      if(!roundMap || !rows.length) return renderHousingUnitList(rows);
+      const byRound = new Map();
+      rows.forEach(u => {
+        const k = (roundMap[u.announcement_id] || {}).apply_end || '';
+        if(!byRound.has(k)) byRound.set(k, { end: k, start: '', date: '', rows: [] });
+        byRound.get(k).rows.push(u);
+      });
+      Object.values(roundMap).forEach(a => {
+        const g = a && byRound.get(a.apply_end || '');
+        if(!g) return;
+        const d = zfNoticeDate(a);
+        if(d && (!g.date || d < g.date)) g.date = d;
+        if(a.apply_start && (!g.start || a.apply_start < g.start)) g.start = a.apply_start;
+      });
+      const headOf = g => {
+        const parts = [];
+        if(g.date) parts.push(`${g.date} 공고`);
+        if(g.start && g.end) parts.push(`접수 ${g.start} ~ ${g.end}`);
+        else if(g.end) parts.push(`접수 마감 ${g.end}`);
+        return parts.length ? parts.join(' · ') : '회차 정보 없음';
+      };
+      return Array.from(byRound.values()).sort((a, b) => (b.end || '').localeCompare(a.end || ''))
+        .map(g => `<div class="policy-round-head">${escapeHtml(headOf(g))}</div>` + renderHousingUnitList(g.rows)).join('');
+    };
     const pastHtml = trendHtml + (diffPast.length
       ? `<details class="hu-past"><summary class="hu-past-title">🕘 다른 회차 보기 (${pastLineCount}건)</summary>`
-        + `<div class="hu-past-list">${renderHousingUnitList(diffPast)}</div></details>`
+        + `<div class="hu-past-list">${pastListHtml(diffPast)}</div></details>`
       : '') + sameHtml;
     // 🔵 2026-11-05(우편함 「표시층 — 세대 안내 배너 …」 ① · 다운님 승인 2026-11-05) — 지난 회차가 전부 「같은 조건」으로 접혀 「다른 회차 보기」가 없으면
     //    배너가 가리키는 이름을 그 접힘 줄로(N·기간은 접힘 줄과 같은 값). 「다른 회차 보기」가 함께 있으면 종전 문구 그대로.
