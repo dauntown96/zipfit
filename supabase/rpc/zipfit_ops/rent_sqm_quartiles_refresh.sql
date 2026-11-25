@@ -32,7 +32,7 @@ begin
   ),
   v as (
     select coalesce(m.std_type, nullif(l.housing_type, '')) as type_std,
-           s.rent_basis as basis,
+           case when s.rent_basis = 'perm' then 'na' else s.rent_basis end as basis,   -- 🔵 2026-11-25(스물여섯째 덧 1) — 영구 ②③('perm' — 나군 글자 없는 영구)도 영구 na 묶음에
            nullif(array_to_string(case
              when t.a[1] in ('광주광역시', '전라남도') then array['전남광주통합특별시'] || t.a[2:]
              when t.a[1] = '강원도' then array['강원특별자치도'] || t.a[2:]
