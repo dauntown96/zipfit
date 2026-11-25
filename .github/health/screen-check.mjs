@@ -14,6 +14,14 @@ import { chromium } from 'playwright'
 import { sqlRead, report, recordFindings, SITE } from './lib.mjs'
 import { readFileSync } from 'node:fs'
 import { ANA_DATE_RE } from './ana-date-re.mjs'
+import { phraseCaseSql, anaPendingSql } from './phrase-expect.mjs'
+import { SORT_OPTS, judgeSortTop } from './sort-top.mjs'
+// 같은 게시물 링크가 있다 — 카드 id(aid) 행 제목의 묶음 키가 링크 표 linked_group_key 와 같다(LH 행이 있는 링크만 · 종전 phrase 식 그대로)
+const PHRASE_LINK_SQL = aid => `exists (select 1 from announcement_post_links l
+                            join announcements lh on lh.announcement_id = l.lh_announcement_id
+                            join announcements a on a.announcement_id = ${aid}
+                           where l.linked_group_key is not null
+                             and announcement_dedup_key(l.linked_group_key) = announcement_dedup_key(a.title))`
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join as pjoin } from 'node:path'
@@ -348,17 +356,7 @@ try {
       with t as (select unnest(${arr}) aid),
       p as (select * from get_announcement_price_summary(${arr}))
       select json_agg(json_build_object('aid', t.aid, 'expected',
-        case when p.announcement_id is null then '빈칸'
-             when p.deposit_min is not null or p.rent_min is not null or p.area_min is not null then '요약'
-             when exists (select 1 from announcement_post_links l
-                            join announcements lh on lh.announcement_id = l.lh_announcement_id
-                            join announcements a on a.announcement_id = t.aid
-                           where l.linked_group_key is not null
-                             and announcement_dedup_key(l.linked_group_key) = announcement_dedup_key(a.title)) then '④링크'
-             when p.analysis_done then '목록없음'
-             when p.has_attachments = false then '링크만'
-             when p.analysis_done is false then '분석중'
-             else '미정리' end)) j
+        ${phraseCaseSql('p', PHRASE_LINK_SQL('t.aid'))})) j
       from t left join p on p.announcement_id = t.aid`)
     const expected = new Map((row.j || []).map(x => [x.aid, x.expected]))
     if (process.env.SIMULATE === 'fail') expected.set(ids[0], '없는문구(시험)')
@@ -1065,6 +1063,41 @@ try {
     add('rev_date', '정정일 — 카드 표지 「· 정정 MM-DD」와 최신순 자리가 DB 로 따로 셈한 정정일과 같다', ok ? 'pass' : 'fail', value,
       '열린 정정 대표 전부 — 정정일 = user_verified ∨ LH 게시일(공고일 > 원공고일) ∨ 관측(원공고 LH 행을 5분 넘게 먼저 본 정정의 첫 수집일) · 회차 날짜보다 뒤만 · 표지·정렬이 그 값')
   }
+  // ⑦-1s 정렬마다 위 10장(2026-11-25 · 우편함 「코드·운영 — 스물두째」 3 · 백로그 「승인된 점검 항목 셋」 ③) — sort-top.mjs.
+  //    정렬 칸을 넷(보증금 · 월임대료 · 전용면적 · ㎡당)으로 바꿔 가며 화면 목록(noticeFiltered)의 집합과 위 10장을 받고,
+  //    같은 집합을 DB 가격 요약 값으로 따로 줄 세운 위 10장의 값 줄과 견준다. 끝나면 정렬 칸을 처음 값으로 되돌린다. 경고만(⚠️).
+  {
+    let value, status = 'pass'
+    try {
+      const got = await page.evaluate(async (opts) => {
+        const sel = document.getElementById('noticeSortSel')
+        if (!sel) return { err: '정렬 칸 없음' }
+        for (let i = 0; i < 120 && typeof zfRentStatsState !== 'undefined' && zfRentStatsState !== 2; i++) await new Promise(r => setTimeout(r, 250))
+        const prev = sel.value, out = {}
+        for (const v of opts) {
+          sel.value = v; sel.dispatchEvent(new Event('change', { bubbles: true }))
+          await new Promise(r => setTimeout(r, 300))
+          out[v] = { set: (noticeFiltered || []).map(n => String(n.announcement_id)), top: (noticeFiltered || []).slice(0, 10).map(n => String(n.announcement_id)) }
+        }
+        sel.value = prev; sel.dispatchEvent(new Event('change', { bubbles: true }))
+        return { out }
+      }, SORT_OPTS.map(o => o[0]))
+      if (got.err) { status = 'warn'; value = `못 잼(${got.err})` }
+      else {
+        const ids = [...new Set(Object.values(got.out).flatMap(o => o.set))]
+        const arr = 'array[' + ids.map(i => `'${String(i).replace(/'/g, "''")}'`).join(',') + ']::text[]'
+        const [r] = ids.length ? await sqlRead(`select coalesce(json_agg(p), '[]'::json) j from get_announcement_price_summary(${arr}) p`) : [{ j: [] }]
+        const rows = new Map((r.j || []).map(x => [String(x.announcement_id), x]))
+        if (process.env.SIMULATE === 'sort_top') { const o = got.out['deposit-asc']; if (o && o.top.length > 1) o.top = [...o.top].reverse() }
+        const { bad, seen } = judgeSortTop(got.out, rows)
+        extra.sort_top_bad = bad
+        status = bad.length ? 'warn' : 'pass'
+        value = `정렬 ${SORT_OPTS.length}개 · 카드 ${ids.length} · 위 ${Object.values(seen).join('·')}장${bad.length ? ` · 어긋남 ${bad.length}: ${bad.slice(0, 2).join(' / ')}` : ' · 어긋남 0'}`
+      }
+    } catch (e) { status = 'warn'; value = `못 잼(${String(e).slice(0, 160)})` }
+    add('sort_top', '정렬마다 위 10장 — 화면 차례가 정렬 키(DB 가격 요약 값) 차례와 같다', status, value,
+      '보증금·월임대료 낮은순 · 전용면적 넓은순 · ㎡당 월세 낮은순(이번 회차 값만) — 화면 목록 집합을 DB 값으로 따로 줄 세운 위 10장 값 줄 = 화면 위 10장 값 줄(빈 값 뒤 · 동률 차례 무관) · 어긋나면 ⚠️ · 최신·마감·시작 정렬은 키가 화면 판정이라 밖')
+  }
   // ⑦-1a2 분석 전 카드(2026-10-16 · 같은 우편함 3·4) — 열린 대표 중 카드 회차 분석이 없고(analysis_done=false) 첨부가 있고 같은 게시물 링크가 없는 카드는
   //    「분석 중」 상자만 말하고 수집값 날짜·접수 상태·D-day·마감을 보이지 않는다(제목 글자는 빼고 잰다 — 제목에 날짜가 든 공고가 있다).
   //    기대 목록은 DB 에서 따로 — phrase 의 「분석중」 갈래와 같은 식. 0장이면 해당 없음(통과).
@@ -1073,10 +1106,7 @@ try {
       with c as (select d.announcement_id aid, d.title from get_announcements_deduped() d where d.apply_end >= (now() at time zone 'Asia/Seoul')::date),
       p as (select * from get_announcement_price_summary((select array_agg(aid) from c)))
       select coalesce(json_agg(c.aid order by c.aid), '[]'::json) j from c join p on p.announcement_id = c.aid
-       where p.analysis_done is false and p.has_attachments is not false
-         and p.deposit_min is null and p.rent_min is null and p.area_min is null
-         and not exists (select 1 from announcement_post_links l where l.linked_group_key is not null
-                          and announcement_dedup_key(l.linked_group_key) = announcement_dedup_key(c.title))`)
+       where ${anaPendingSql('p', PHRASE_LINK_SQL('c.aid'))}`)
     // SIMULATE=ana_pending 인데 분석 전 카드가 0장이면 열린 첫 카드로 잰다(일부러 넣은 날짜 글자로 실패해야 맞다)
     const want = (aq.j || []).length || process.env.SIMULATE !== 'ana_pending' ? (aq.j || [])
       : await page.evaluate(() => [String((zfOpenNotices(noticeData)[0] || {}).announcement_id || '')].filter(Boolean))

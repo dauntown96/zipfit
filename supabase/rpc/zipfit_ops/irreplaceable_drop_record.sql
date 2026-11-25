@@ -6,7 +6,9 @@ AS $function$
 -- 🔵 2026-11-23(우편함 「코드·운영 — 열다섯째 A장」 3 · 열셋째 ⑦1) — 장부 없이 줄어든 재생산 불가 표를 30분 안에(health-ops 회차마다 한 번).
 --   재생산 불가 표(zipfit-backup scripts/heartbeat_report.py IRREPLACEABLE 와 같은 23표 — 그쪽에 더하면 여기도 같은 날 한 줄)의 count(*)(reltuples 아님)를 세어
 --   직전 스냅숏(zipfit_ops.irreplaceable_counts 마지막 행)과 견준다. 줄어든 표마다 그 사이(직전 스냅숏 뒤) 의도된 감소 장부(zipfit_ops.intended_drops) 합을 붙이고,
---   감소 ≠ 장부 합인 표 수를 unmatched 로 낸다(생존 신호와 같은 「정확히 같음」 규칙). 새 스냅숏을 남기고 2일 넘은 스냅숏은 지운다.
+--   감소 > 장부 합인 표 수를 unmatched 로 낸다(「장부보다 더 줄었나」 — 생존 신호와 같은 규칙 · 2026-11-25 우편함 「코드·운영 — 스물두째」 2 ·
+--   zipfit-backup #48 과 짝 · 종전 「≠」는 같은 30분 창에 추가가 섞여 감소가 장부보다 작으면 손실 없이 ⚠️ 였다). 새 스냅숏을 남기고 2일 넘은 스냅숏은 지운다.
+--   ⚠️ 「장부 이하」는 「장부대로 지워졌다」가 아니다 — 행 수로는 섞임과 덜 지움을 가르지 못한다(drops 의 drop · ledger 는 그대로 보인다).
 --   p 는 비워 둔다(향후 칸 · 지금은 읽지 않음). 결과: {prev_at, tables, drops: [{t, drop, ledger}], unmatched}.
 declare
   v_tabs text[] := array['housing_units','announcements','announcement_extras','announcement_policies','eligibility_criteria','document_templates',
@@ -25,7 +27,7 @@ begin
       if v_prev ? v_t and (v_cur->>v_t)::bigint < (v_prev->>v_t)::bigint then
         select coalesce(sum(d.expected_drop), 0) into v_led from zipfit_ops.intended_drops d where d.table_name = v_t and d.at > v_prev_at;
         v_drops := v_drops || jsonb_build_object('t', v_t, 'drop', (v_prev->>v_t)::bigint - (v_cur->>v_t)::bigint, 'ledger', v_led);
-        if v_led <> (v_prev->>v_t)::bigint - (v_cur->>v_t)::bigint then v_un := v_un + 1; end if;
+        if (v_prev->>v_t)::bigint - (v_cur->>v_t)::bigint > v_led then v_un := v_un + 1; end if;
       end if;
     end loop;
   end if;
