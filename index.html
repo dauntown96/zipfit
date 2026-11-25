@@ -8850,8 +8850,46 @@ function zfLoadTargetRows(){
           return true;
         });
     })
+    .then(ok => zfLoadRankOnly().then(() => ok))   // 🔵 2026-11-25(판 J 9) — 「1순위만 모집」 행도 같은 약속 안에서(매칭·추천이 이 약속을 기다린다)
     .catch(() => { zfTargetRowsP = null; return false; });
   return zfTargetRowsP;
+}
+// 🔴 2026-11-25(우편함 「표시층 — 판 J」 덧 2 할 일 9 · 기준 ① · 다운님 12:28 결정) — 원문 정책 행이 「2(·3)순위 … 모집하지 않」 또는 「금회 … 1순위 … 한함」인 공고는
+//    1순위(대개 해당·연접 지역 거주 등)만 받는다. 꼭집은 거주지를 묻지 않으므로 「대상 조건에 맞아요」로 두지 않고 「확인 필요」로 내린다(아님으로 빼지 않음).
+//    이유 = 그 행의 원문 「1순위 …」 줄 그대로(줄 하나 · 고쳐 쓰지 않음) + 원문 「2,3순위 …」 줄. 행은 같은 그룹 키(zfDedupKey) 형제에 있어도 잡는다(…21131 ← …21098).
+const ZF_RANK_ONLY_RES = ['[23２３]\\s*(,|·|및)?\\s*(3\\s*)?순위[^\\n]{0,30}모집하지\\s*않', '금회[^\\n]{0,60}1\\s*순위[^\\n]{0,60}(한함|한하여|한정|한한다|만\\s*모집)'];
+const zfRankOnlyByAnn = new Map(), zfRankOnlyByKey = new Map();
+function zfLoadRankOnly(){
+  const h = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
+  return Promise.all(ZF_RANK_ONLY_RES.map(re => zfGetAll(`announcement_policies?select=announcement_id,category,content_raw&content_raw=match.${encodeURIComponent(re)}`, { order: 'id', headers: h }).catch(() => [])))
+    .then(lists => {
+      const rows = [].concat(...lists);
+      const res = ZF_RANK_ONLY_RES.map(r => new RegExp(r));
+      rows.forEach(r => {
+        const t = String((r && r.content_raw) || '');
+        if(!res.some(re => re.test(t))) return;
+        const first = (t.match(/^[ \t]*1\s*순위\s*[:：][^\n]*/m) || [])[0];
+        const rest = (t.match(/^[ \t]*[23２３][^\n]{0,8}순위[^\n]*모집하지\s*않[^\n]*/m) || t.match(/[^\n]*금회[^\n]*1\s*순위[^\n]*/) || [])[0];
+        if(!first && !rest) return;
+        const a = String(r.announcement_id);
+        if(!zfRankOnlyByAnn.has(a)) zfRankOnlyByAnn.set(a, []);
+        const list = zfRankOnlyByAnn.get(a);
+        const item = { cat: String(r.category || ''), first: first ? first.trim() : '', rest: rest ? rest.trim() : '' };
+        if(!list.some(x => x.first === item.first && x.rest === item.rest && x.cat === item.cat)) list.push(item);
+      });
+      const ids = [...zfRankOnlyByAnn.keys()];
+      if(!ids.length) return;
+      return zfGetAll(`announcements?select=announcement_id,title&${idFilterFor(ids)}`, { order: 'announcement_id', headers: h }).then(ts => {
+        (ts || []).forEach(t => { const k = zfDedupKey(t.title); if(k) zfRankOnlyByKey.set(k, (zfRankOnlyByKey.get(k) || []).concat(zfRankOnlyByAnn.get(String(t.announcement_id)) || [])); });
+      }).catch(() => {});
+    }).catch(err => { console.warn('ZipFit 1순위만 모집 행 로드 실패:', err); });
+}
+// 그 카드의 「1순위만」 원문 — 맞은 대상 이름(v.names)이 category 에 든 행을 먼저 · 없으면 첫 행. 없으면 null.
+function zfRankOnlyFor(annId, title, names){
+  const list = zfRankOnlyByAnn.get(String(annId)) || (title ? zfRankOnlyByKey.get(zfDedupKey(title)) : null);
+  if(!list || !list.length) return null;
+  const nm = (names || []).map(n => String(n).replace(/·.*$/, ''));
+  return list.find(x => nm.some(n => n && x.cat.includes(n))) || list[0];
 }
 function zfTargetRowsFor(annId, title){
   return zfTargetRowsByAnn.get(String(annId)) || (title ? zfTargetRowsByKey.get(zfDedupKey(title)) : undefined);
@@ -8866,6 +8904,8 @@ function zfTargetVerdictFor(annId, f, title){
 //    m = zfDiagMoneyInputs() · tables = { 도시근로자, 기준중위소득 } 표(null 이면 계산 불가).
 function zfTargetIncomeGate(v, annId, title, f, m, tables){
   if(!v || v.state !== 'ok') return v;
+  const ro = zfRankOnlyFor(annId, title, v.names);   // 🔴 2026-11-25(판 J 9) — 1순위만 모집 공고는 「맞아요」로 두지 않는다(거주지를 묻지 않음)
+  if(ro) return Object.assign({}, v, { state: 'check', rankOnly: ro });
   const gk = zfTargetRowsFor(annId, title), money = gk && zfTargetMoneyOf.get(gk);
   const okRows = (gk && money) ? gk.map((g, i) => zfTargetRowState(g, f) === 'ok' ? money[i] : null).filter(Boolean) : [];
   if(okRows.some(c => c.income_limit_exempt === true)) return zfTargetAssetGate(v, okRows, m);
@@ -8936,6 +8976,12 @@ function zfTargetNoteHtml(v){
   // 🔵 2026-10-15(우편함 「코드 — 공급대상 안내 이름 빈칸 …」 1) — 대상 이름이 없는 갈래(`{조건:{혼인:"혼인 중"}}` — Ⅱ 5순위 「그 밖의 혼인가구」)만으로
   //    판정되면 이름 자리를 뺀다(우리 말로 이름을 짓지 않는다). 종전에는 「👥 대상 모집 — …」처럼 빈 이름이 그대로 그려졌다.
   if(v.state === 'ok') return `<p class="zf-target-ok" style="font-size:var(--t-body);border-radius:var(--r-2);padding:6px 10px;margin:0 0 8px">👥 ${nm ? `${nm} 대상 모집 — ` : ''}입력하신 정보로는 대상 조건에 맞아요</p>`;
+  if(v.state === 'check' && v.rankOnly){
+    // 🔴 2026-11-25(판 J 9) — 대상은 맞는데 이 공고가 1순위(지역 조건)만 받는다. 원문 줄 그대로 · 꼭집이 묻지 않은 조건이라 「확인 필요」.
+    const r = v.rankOnly;
+    const q = [r.first, r.rest].filter(Boolean).map(t => `「${escapeHtml(t)}」`).join(' · ');
+    return `<p class="zf-check-note zf-rank-only" style="font-size:var(--t-body);border-radius:var(--r-2);padding:6px 10px;margin:0 0 8px">📄 ${nm ? `${nm} ` : ''}대상 조건은 맞지만 이 공고는 1순위만 받아요 · 원문 ${q} · 꼭집은 거주지를 묻지 않아 이 조건은 확인하지 못했어요 — 신청할 수 있는지 공고문에서 확인해 주세요</p>`;
+  }
   if(v.state === 'check' && v.asset){
     // 🔵 2026-11-09(우편함 「표시층 — 카드 ✓ 관문 자산 축」) — 대상·소득은 맞는데 자산·자동차가 이 공고 기준을 넘거나(출산 가산 금액을 몰라) 못 잰 카드.
     const a = v.asset, prof = a.src === 'profile', what = a.kind === 'car' ? '자동차가액' : '자산';
