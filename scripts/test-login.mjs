@@ -14,6 +14,7 @@
 //   5. 운영 표지: 배포본 redirect_to 가 ?ops=1 이고, 모든 쪽에 localStorage zf_ops=1 을 미리 심는다 → usage_events 에 props.ops=1(집계에서 빠진다).
 // DB 는 관리 API(api.supabase.com · 프록시가 인증을 넣는다)로만 부른다 — 이 파일이 내는 SQL 은 아래 셋뿐이다(링크 받기 · 정리 · 확인).
 
+import { redactSecrets } from '../.github/health/redact.mjs'
 import { readFileSync } from 'node:fs'
 // 🔵 2026-11-19(우편함 「코드·운영 — 서울 이전 준비 ①」) — 프로젝트 ref 는 supabase/config.toml 의 project_id 한 곳에서 읽는다.
 const PROJECT = (readFileSync(new URL('../supabase/config.toml', import.meta.url), 'utf8').match(/^project_id\s*=\s*"([a-z0-9]+)"\s*$/m) || [])[1]
@@ -141,7 +142,13 @@ export async function openLoggedIn(context, link, { base = DEPLOYED, timeout = 3
       return route.fulfill({ status: 303, headers: { location: to } })
     })
   }
-  await page.goto(link.reveal(), { waitUntil: 'domcontentloaded', timeout })
+  // 🔵 2026-11-24(우편함 「코드·운영 — 열아홉째」 1) — page.goto 시간 초과 오류문은 「navigating to "<주소>"」로 1회용 링크를 통째로 싣는다
+  //    (공개 저장소 이슈 #1277·#1184 본문에 그대로 실렸다). 오류문에서 링크를 「[가림]」으로 바꾸고 남은 토큰 꼴도 가린 새 오류로 던진다.
+  try {
+    await page.goto(link.reveal(), { waitUntil: 'domcontentloaded', timeout })
+  } catch (e) {
+    throw new Error(redactSecrets(String(e?.message ?? e).split(link.reveal()).join('[가림]')))
+  }
   // 세션이 들어오면 설정 탭 본체가 열린다(이메일 로그인 사용자는 알림 이메일 게이트를 거치지 않는다).
   await page.waitForFunction(() => {
     const b = document.getElementById('settingsBody')
