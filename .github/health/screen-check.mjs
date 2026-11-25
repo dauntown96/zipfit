@@ -67,6 +67,10 @@ const ROUTE_GUARD_SQL = `lg as (select aid, max(gid) gid, max(wd) wd from g grou
                  then (select array_agg(n || substring(q.p from '^[0-9,.·]+(순위.*)$')) from regexp_split_to_table(substring(q.p from '^([0-9,.·]+)순위'), '[,.·]') n where n <> '')
                  else array[q.p] end) t(tk) where t.tk <> ''),
       bys as (select distinct aid from tk group by aid, tk having count(distinct wid) > 1),`
+// 🔵 2026-11-24(우편함 「코드·운영 — 열아홉째」 2) — 화면 zfRouteGap 의 「첫 창 안 ∧ 창 둘 이상 ∧ LH ∧ 상태 「…마감」 → 다음 창을 기다림」 규칙 사본.
+//    LH 는 첫 창 끝 시각 직후 상태를 「접수마감」으로 바꾼다(…21022 · 11-24 1,2순위 10:00∼16:00 → 19시 실행에서 화면 「다음 접수 11-25」 · 기대값은 「이번 차수 오늘 마감」이라 ❌).
+//    isl2 = isl + 카드의 lhc(LH ∧ 상태 끝 「마감」) + 첫 창 시작(fx). route_gap 은 이 카드를 차수 사이로 · route_cur 는 'gap' 으로 센다. SIMULATE=route_cur_lh 면 종전(규칙 없음).
+const ROUTE_LHC_SQL = `isl2 as (select i.*, c.lhc, min(i.x) over (partition by i.aid) fx from isl i join c on c.aid = i.aid),`
 // 🔴 2026-11-17(우편함 「표시층 — 작은 판 2」 1) — bys = 단지별 창 카드(화면 zfPhaseTokens · zfWinsBySite 사본): 같은 순위 낱말이 서로 다른 창에 다시 나옴.
 //    창(wid)은 화면 zfRouteWinsAll 묶음 사본 — 겹치면 한 창 · 하루 차로 붙으면 순위 글자가 빈 행이거나 앞 창에 같은 순위 글자가 있을 때만 한 창(zfSameWave).
 //    route_gap · route_cur 는 이 카드를 창 판정에서 뺀다(화면 zfRouteWins 가 null).
@@ -812,7 +816,8 @@ try {
   {
     const [gq] = await sqlRead(`
       with today as (select (now() at time zone 'Asia/Seoul')::date d),
-      c as (select d.announcement_id aid, d.title, d.apply_start s, d.apply_end e, d.winner_announce_date wd
+      c as (select d.announcement_id aid, d.title, d.apply_start s, d.apply_end e, d.winner_announce_date wd,
+                   (d.source = 'LH' and coalesce(d.status, '') ~ '마감\\s*$') lhc
               from get_announcements_deduped() d, today t
              where d.apply_period_check is not true and d.apply_start <= t.d and t.d <= d.apply_end
                and not (d.title ~ '^\\s*(\\[[^]]*\\]\\s*)*\\[\\s*조기\\s*(접수)?\\s*마감\\s*\\]' or coalesce(d.revision_note, '') ~ '조기\\s*(접수\\s*)?마감')),
@@ -823,8 +828,11 @@ try {
       ${WAVE_G_SQL('wd, rid')}
       ${ROUTE_GUARD_SQL}
       isl as (select aid, gid, min(x) x, max(y) y from g where aid in (select aid from gd where gd is null or gd >= (select d from today)) and aid not in (select aid from bys) group by aid, gid),
-      agg as (select aid, count(*) n, bool_or(x <= t.d and t.d <= y) inwin, min(x) filter (where x > t.d) nxt from isl, today t group by aid)
-      select coalesce(json_agg(json_build_object('aid', aid, 'next', nxt) order by aid), '[]'::json) j from agg where n >= 2 and not inwin`)
+      ${ROUTE_LHC_SQL}
+      agg as (select aid, count(*) n, bool_or(x <= t.d and t.d <= y) inwin, bool_or(x <= t.d and t.d <= y and x = fx) infirst, bool_or(lhc) lhc,
+                     min(x) filter (where x > t.d) nxt from isl2, today t group by aid)
+      select coalesce(json_agg(json_build_object('aid', aid, 'next', nxt) order by aid), '[]'::json) j from agg
+       where n >= 2 and (not inwin or (${process.env.SIMULATE === 'route_cur_lh' ? 'false' : 'true'} and infirst and lhc and nxt is not null))`)
     const want = gq.j || []
     const got = await page.evaluate(([want, sim]) => {
       if (typeof zfRouteGap !== 'function') return { err: 'zfRouteGap 없음' }
@@ -861,7 +869,8 @@ try {
   {
     const [cq] = await sqlRead(`
       with today as (select (now() at time zone 'Asia/Seoul')::date d),
-      c as (select d.announcement_id aid, d.title, d.apply_start s, d.apply_end e, d.winner_announce_date wd
+      c as (select d.announcement_id aid, d.title, d.apply_start s, d.apply_end e, d.winner_announce_date wd,
+                   (d.source = 'LH' and coalesce(d.status, '') ~ '마감\\s*$') lhc
               from get_announcements_deduped() d, today t
              where d.apply_period_check is not true and d.apply_start <= t.d and t.d <= d.apply_end
                and not (d.title ~ '^\\s*(\\[[^]]*\\]\\s*)*\\[\\s*조기\\s*(접수)?\\s*마감\\s*\\]' or coalesce(d.revision_note, '') ~ '조기\\s*(접수\\s*)?마감')),
@@ -872,8 +881,12 @@ try {
       ${WAVE_G_SQL('wd, rid')}
       ${ROUTE_GUARD_SQL}
       isl as (select aid, gid, min(x) x, max(y) y from g where aid in (select aid from gd where gd is null or gd >= (select d from today)) and aid not in (select aid from bys) group by aid, gid),
-      agg as (select aid, count(*) n, bool_or(x <= t.d and t.d <= y) inwin, max(y) filter (where x <= t.d and t.d <= y) cur, max(y) lst, (select d from today) td from isl, today t group by aid)
-      select coalesce(json_agg(json_build_object('aid', aid, 'kind', case when inwin then 'in' else 'gap' end, 'cur', cur, 'days', cur - td) order by aid), '[]'::json) j
+      ${ROUTE_LHC_SQL}
+      agg as (select aid, count(*) n, bool_or(x <= t.d and t.d <= y) inwin, bool_or(x <= t.d and t.d <= y and x = fx) infirst, bool_or(lhc) lhc,
+                     max(y) filter (where x <= t.d and t.d <= y) cur, max(y) lst, (select d from today) td from isl2, today t group by aid)
+      select coalesce(json_agg(json_build_object('aid', aid,
+               'kind', case when inwin and not (${process.env.SIMULATE === 'route_cur_lh' ? 'false' : 'true'} and infirst and lhc) then 'in' else 'gap' end,
+               'cur', cur, 'days', cur - td) order by aid), '[]'::json) j
         from agg where n >= 2 and (not inwin or cur < lst)`)
     const want = cq.j || []
     const got = await page.evaluate(([want, sim]) => {
