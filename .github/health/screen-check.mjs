@@ -16,6 +16,7 @@ import { readFileSync } from 'node:fs'
 import { ANA_DATE_RE } from './ana-date-re.mjs'
 import { phraseCaseSql, anaPendingSql } from './phrase-expect.mjs'
 import { SORT_OPTS, judgeSortTop } from './sort-top.mjs'
+import { RANK_ONLY_SQL, judgeRankOnly } from './this-round.mjs'
 // 같은 게시물 링크가 있다 — 카드 id(aid) 행 제목의 묶음 키가 링크 표 linked_group_key 와 같다(LH 행이 있는 링크만 · 종전 phrase 식 그대로)
 const PHRASE_LINK_SQL = aid => `exists (select 1 from announcement_post_links l
                             join announcements lh on lh.announcement_id = l.lh_announcement_id
@@ -1097,6 +1098,30 @@ try {
     } catch (e) { status = 'warn'; value = `못 잼(${String(e).slice(0, 160)})` }
     add('sort_top', '정렬마다 위 10장 — 화면 차례가 정렬 키(DB 가격 요약 값) 차례와 같다', status, value,
       '보증금·월임대료 낮은순 · 전용면적 넓은순 · ㎡당 월세 낮은순(이번 회차 값만) — 화면 목록 집합을 DB 값으로 따로 줄 세운 위 10장 값 줄 = 화면 위 10장 값 줄(빈 값 뒤 · 동률 차례 무관) · 어긋나면 ⚠️ · 최신·마감·시작 정렬은 키가 화면 판정이라 밖')
+  }
+  // ⑦-1s2 「금회 한정」 순위 행 화면 집합(2026-11-25 · 우편함 「코드·운영 — 스물다섯째」 1) — this-round.mjs judgeRankOnly.
+  //    배포본 zfLoadRankOnly() 를 불러 zfRankOnlyByAnn 키(공고 id)와 zfRankOnlyFailed 를 받고, health-ops this_round_open_null 의 KUMHOE_RE 로
+  //    DB 에서 따로 센 공고 집합(⚠️ 행 뺌 — 화면과 같은 재료)과 견준다. 어긋나거나 받기 실패면 ⚠️(안 멈춤).
+  //    SIMULATE=rank_only 면 화면 집합에서 하나를 빼고 잰다(⚠️ 가 떠야 맞다).
+  {
+    let value, status = 'pass'
+    try {
+      const got = await page.evaluate(async () => {
+        if (typeof zfLoadRankOnly !== 'function') return { err: 'zfLoadRankOnly 없음' }
+        await zfLoadRankOnly()
+        return { ids: [...zfRankOnlyByAnn.keys()], failed: !!zfRankOnlyFailed }
+      })
+      if (got.err) { status = 'warn'; value = `못 잼(${got.err})` }
+      else {
+        if (process.env.SIMULATE === 'rank_only') got.ids = got.ids.slice(1)
+        const [r] = await sqlRead(RANK_ONLY_SQL)
+        const j = judgeRankOnly(got, r.j)
+        status = j.status; value = j.value
+        extra.rank_only = { miss: j.miss, extra: j.extra, failed: got.failed }
+      }
+    } catch (e) { status = 'warn'; value = `못 잼(${String(e).slice(0, 160)})` }
+    add('rank_only', '「금회 한정」 순위 행 — 화면이 받은 공고 집합 = DB 정책 행 집합', status, value,
+      '배포본 zfLoadRankOnly → zfRankOnlyByAnn 키 = announcement_policies.content_raw ~ KUMHOE_RE(this-round.mjs · health-ops this_round_open_null 과 같은 식) ∧ category ⚠️ 밖 공고 집합 · 어긋남·받기 실패(zfRankOnlyFailed)면 ⚠️(안 멈춤)')
   }
   // ⑦-1a2 분석 전 카드(2026-10-16 · 같은 우편함 3·4) — 열린 대표 중 카드 회차 분석이 없고(analysis_done=false) 첨부가 있고 같은 게시물 링크가 없는 카드는
   //    「분석 중」 상자만 말하고 수집값 날짜·접수 상태·D-day·마감을 보이지 않는다(제목 글자는 빼고 잰다 — 제목에 날짜가 든 공고가 있다).

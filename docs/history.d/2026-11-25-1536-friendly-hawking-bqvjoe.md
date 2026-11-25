@@ -1,0 +1,8 @@
+# 2026-11-25 — 코드·운영 스물다섯째 1·2·5 (금회 한정 화면 집합 점검 · 닫힌 LH 첨부 빔 ℹ️ + 페이지 첨부 떼기 스크립트 · 도시근로자 연도 대조 ℹ️)
+
+우편함 「코드·운영 — 스물다섯째」 할 일 1·2·5. 할 일 3(정정이 마감을 바꾼 정정본도 #정정 몫)은 앞 PR #1300 · 할 일 4(영구 ㎡당 나군 규칙)는 조사만(쓰기 0 · 회신에).
+
+- 1 · health-screen `rank_only`(⚠️ 안 멈춤): 배포본 `zfLoadRankOnly()` → `zfRankOnlyByAnn` 키 집합과 `zfRankOnlyFailed` 를 받아, `this-round.mjs` `KUMHOE_RE`(health-ops `this_round_open_null` 과 같은 식)로 DB 에서 따로 센 공고 집합(category ⚠️ 행 뺌 — 화면과 같은 재료)과 견준다. 어긋남·받기 실패면 ⚠️. `RANK_ONLY_SQL` · `judgeRankOnly` 는 `this-round.mjs` · 시험 `this-round.test.mjs` 10/10(어긋남 셋 꼴 + DB 5공고). 배포본 실측 화면 5 = DB 5(…20366 · …20625 · …20786 · …20874 · …21098). 모의 `simulate=rank_only`(화면 집합에서 하나 뺌 → ⚠️).
+- 2 · health-ops ℹ️ `lh_closed_attach_empty` — 목록에 보이는 마감 지난 LH 행 중 `attachment_urls` 빔·배열 아님 수 · 취소공고(제목 「[취소」) 따로. 기준선 2(둘 다 취소공고 …20011 · …20645 · 그 밖 0).
+- 2 · `scripts/lh-page-attachments.mjs` — 공고 id 로 anon REST 에서 공고 페이지 url·`attachment_urls` 를 읽고 공고 페이지(selectWrtancInfo.do)만 GET(하나씩 · 5초 사이 · UA ZipFitBot · 비-2xx 두 번 잇따르면 멈춤) · 「bbsV_atchmnfl」 상자의 「공고문」(확장자 → 공고문(hwp)·공고문(PDF)·공고문) · 「다운로드」(→ 첨부파일) 묶음만 떼어 DB 와 같은 꼴 `{url, label, filename}` 로 낸다 · `--compare` 는 DB 목록과 집합 대조. 🔴 `lhFile.do` 호출 0 · DB 쓰기 0 · EF 0. 시험 `scripts/lh-page-attachments.test.mjs` 10/10(지어 낸 조각) · 스물넷째 덧 1 의 저장 21쪽에서 옛 파이썬 떼기와 21/21 같음 · 실제 5쪽(0000061062 · 0000061087 · 0000061103 · 0000061132 · 0000061156) 페이지 목록 = DB 목록 5/5(다름 0).
+- 5 · health-ops ℹ️ `income_urban_year` — `income-year.mjs`: 소득 정책 행(⚠️ 밖 · 「도시근로자」 든)의 「N인가구 : 금액」 줄 금액이 하나도 `urban_worker_monthly_income` 가장 큰 통계 연도(지금 2025) income_100 × p%(10~300 · ±1.5원)와 안 맞는 공고 수 · 인용 연도는 값에만(「2026년도」 적용 표 = 2025 통계 — SH_313610). 기준선 0(도시근로자 표 공고 16 · 열린 5) · 시험 `income-year.test.mjs` 6/6(2024 값 지어 넣으면 1).
