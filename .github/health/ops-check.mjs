@@ -31,6 +31,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { ROUND_GAP_SQL, judgeRoundGap } from './round-gap.mjs'
 import { thisRoundSql, judgeThisRound } from './this-round.mjs'
 import { URBAN_TOP_SQL, judgeIncomeYear } from './income-year.mjs'
+import { GROUP_MEMBER_GAP_SQL, judgeGroupMemberGap } from './group-member-gap.mjs'
 import { createHash } from 'node:crypto'
 
 const now = new Date()
@@ -220,7 +221,7 @@ const EXPECTED_JOBS = [
   'zipfit-purge-lh-file-fetch-log', // 2026-11-09 LH 첨부 문지기 기록 90일 보관(마이그레이션 2026-11-09_01)
   'zipfit-complex-link-pending', // 2026-11-12 새 분석 공고 단지 잇기 안전망(마이그레이션 2026-11-12_04)
   'zipfit-complex-geo-fill', // 2026-11-17 단지 도로명·좌표 자동 채움(마이그레이션 2026-11-17_04 · EF complex-geo-fill)
-  'zipfit-complex-geo-fill-complex', // 2026-11-22 단지 좌표 전 단지 채움 KST 09~20시(마이그레이션 2026-11-22_01 · EF complex-geo-fill ?mode=complex)
+  'zipfit-complex-geo-fill-complex', // 2026-11-22 단지 좌표 전 단지 채움(마이그레이션 2026-11-22_01 · EF complex-geo-fill ?mode=complex) · 2026-11-25 하루 내내(2026-11-25_07)
   'zipfit-gh-observe',             // 2026-11-03 GH 공고 목록 관찰(마이그레이션 2026-11-03_04) — 2026-11-09 사본 재추출 때 빠진 것을 더함
   'zipfit-collect-gh-announcements', // 2026-11-17 GH 들이기 — 마감일 있는 열린 GH 공고 쓰기(마이그레이션 2026-11-17_01 · gh_collect)
   'zipfit-purge-stale-sessions',   // 로그인 세션 30일 정리(jobid 57) — 2026-11-09 사본 재추출 때 빠진 것을 더함
@@ -1577,6 +1578,30 @@ try {
   add('income_urban_year', '원문 소득표 금액이 도시근로자 기준표 최신 통계 연도와 다른 공고(셈)', j.status, j.value, j.rule)
 } catch (e) {
   add('income_urban_year', '원문 소득표 금액이 도시근로자 기준표 최신 통계 연도와 다른 공고(셈)', 'info', '셈 불능: ' + String(e).slice(0, 160), '정책·기준표를 읽는다(실패면 ℹ️)')
+}
+
+// (53) 묶음 안 분석 빠진 열린 구성원(2026-11-25 · 우편함 「코드·운영 — 스물일곱째」 2 · ⚠️ 안 멈춤 · HARD 밖) — group-member-gap.mjs.
+try {
+  const [x] = await sqlRead(GROUP_MEMBER_GAP_SQL)
+  const j = judgeGroupMemberGap(x.j)
+  add('group_member_gap', '묶음 안 열린 구성원 단지가 세대 행에 없음(분석 빠짐)', j.status, j.value, j.rule)
+} catch (e) {
+  add('group_member_gap', '묶음 안 열린 구성원 단지가 세대 행에 없음(분석 빠짐)', 'warn', String(e).slice(0, 200), '공고·세대 표를 읽는다(못 읽으면 ⚠️)')
+}
+
+// (54) juso E0007(짧은 시간 다량 요청) 24시간(2026-11-25 · 우편함 「코드·운영 — 스물일곱째」 1 · ℹ️ 셈만 · HARD 밖).
+//    좌표 채움 cron 을 하루 내내로 넓힌 첫 주를 지켜보는 자리다. E0007 은 complex_geo_attempts(outcome error · note)에 남는다(EF complex-geo-fill 이 그 런을 멈춘다).
+//    시도 기록은 주소마다 한 행을 덮어쓰므로, 같은 주소를 다시 시도하면 앞 E0007 은 지워진다(하한 셈).
+//    하루 1건이라도 나면 낮 창으로 되돌린다(docs/data-sources.md 후보 9 줄).
+try {
+  const [x] = await sqlRead(`select count(*) filter (where note ~ 'E0007' and tried_at > now() - interval '24 hours')::int n,
+      count(*) filter (where outcome = 'error' and tried_at > now() - interval '24 hours')::int err,
+      to_char(max(tried_at) filter (where note ~ 'E0007') at time zone 'Asia/Seoul', 'MM-DD HH24:MI') last
+    from public.complex_geo_attempts`)
+  add('juso_e0007_24h', 'juso E0007(짧은 시간 다량 요청) 24시간(셈)', 'info', `${x.n} · 시도 오류 ${x.err} · 마지막 E0007 ${x.last || '없음'}`,
+    '정보 — complex_geo_attempts note ~ E0007 ∧ 24시간 안(주소마다 덮어쓰는 기록이라 하한) · 1 이상이면 좌표 채움 cron 을 낮 창(0-11 UTC)으로 되돌린다(docs/data-sources.md) · 판정하지 않는다')
+} catch (e) {
+  add('juso_e0007_24h', 'juso E0007(짧은 시간 다량 요청) 24시간(셈)', 'info', '셈 불능: ' + String(e).slice(0, 160), '시도 기록 표를 읽는다(실패면 ℹ️)')
 }
 
 // ㊾ ㎡당 사분위 스냅숏 신선도(2026-11-25 · 우편함 「코드·운영 — 스물두째」 5 · 스무째 #1282 · ⚠️ 안 멈춤) — zipfit_ops.rent_sqm_quartiles 마지막 채움 경과 · 행 수.

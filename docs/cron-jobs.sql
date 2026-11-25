@@ -287,10 +287,12 @@ select cron.schedule('zipfit-complex-geo-fill', '34 * * * *', $cmd$
   );
 $cmd$);
 
--- jobid ? · zipfit-complex-geo-fill-complex · '8,28,44 0-11 * * *' = KST 09~20시 :08·:28·:44 · active=true
+-- jobid ? · zipfit-complex-geo-fill-complex · '8,28,44 * * * *' = 하루 내내 :08·:28·:44 · active=true
+--   🔵 2026-11-25(supabase/migrations/2026-11-25_07_complex_geo_fill_all_day.sql) — 낮 창(0-11 UTC = KST 09~20시)을 하루 내내로 넓힘 · E0007 이 하루 1건이라도 나면 낮 창으로 되돌린다
+--     (health-ops ℹ️ juso_e0007_24h · docs/data-sources.md 후보 9). 명령 안 주석 「KST 09~20시」는 명령 md5 대조를 지키려고 그대로 둔다(옛 창 표기).
 --   2026-11-22 신설(supabase/migrations/2026-11-22_01_complex_geo_all_complexes.sql) — 단지 좌표 전 단지 채움(EF complex-geo-fill ?mode=complex ·
 --   런마다 단지 ≤ 20 · 순차 3초 · 메모리 가용 300MB 아래면 대상 0) · 다 채우면 대상 0 으로 바깥 호출 0.
-select cron.schedule('zipfit-complex-geo-fill-complex', '8,28,44 0-11 * * *', $cmd$
+select cron.schedule('zipfit-complex-geo-fill-complex', '8,28,44 * * * *', $cmd$
   -- 단지 좌표 전 단지 채움(2026-11-22) — KST 09~20시 시간당 3번 · 대상 0 이면 EF 가 바깥을 부르지 않는다. 시크릿은 Vault 에서 실행 시점에.
   SELECT net.http_post(
     url := public.ops_project_url() || '/functions/v1/complex-geo-fill?mode=complex',
