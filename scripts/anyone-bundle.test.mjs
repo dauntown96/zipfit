@@ -1,6 +1,8 @@
-// 「계층 구분 없이 누구나」 묶음 판정 시험 — node scripts/anyone-bundle.test.mjs (실패하면 종료 코드 1)
+// 「계층 구분 없이 누구나」 판정(zfAnyoneState) 시험 — node scripts/anyone-bundle.test.mjs (실패하면 종료 코드 1)
 // 2026-11-19(우편함 「표시층 — 계층 칩(청년 등) 결과에 「계층 구분 없이 누구나」 접힌 묶음」 4) — index.html 의 판정 함수를 그대로 떠서 다섯 꼴을 댄다:
-//   누구나형 / 영구임대 / 나이 칸 있음 / 계층 키(공급대상 갈래) 있음 / 자격 행 0(판단 못 함 = 묶음에 넣지 않음).
+//   누구나형 / 영구임대 / 나이 칸 있음 / 계층 키(공급대상 갈래) 있음 / 자격 행 0(판단 못 함 = 칩 결과에 넣지 않음).
+// 🔵 2026-11-25(우편함 「표시층 — 판 H」) — 접힌 묶음은 걷혔다. 이제 'anyone' 은 계층 칩 결과에 섞여 들어간다(applyNoticeSubFilters ·
+//    원문 표시 zfTargetOrig ∨ 'anyone'). 판정 함수는 그대로라 이 시험도 그대로 유효하다 — 파일 이름은 옛 회차 그대로 둔다.
 // 🔴 규칙을 여기 다시 쓰지 않는다 — 함수 본문은 index.html 에서 떠 온다(사본 0). 자격 행 표(zfEcByKey)와 제목 키(zfDedupKey)만 대역.
 import { readFileSync } from 'node:fs'
 
