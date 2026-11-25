@@ -8888,8 +8888,10 @@ function zfLoadRankOnly(){
 function zfRankOnlyFor(annId, title, names){
   const list = zfRankOnlyByAnn.get(String(annId)) || (title ? zfRankOnlyByKey.get(zfDedupKey(title)) : null);
   if(!list || !list.length) return null;
-  const nm = (names || []).map(n => String(n).replace(/·.*$/, ''));
-  return list.find(x => nm.some(n => n && x.cat.includes(n))) || list[0];
+  //    이름 차례대로 · 「계층」 같은 두루 말은 건너뛴다(「청년·계층」의 「계층」이 「3-1. 대학생 계층」에 먼저 걸렸다).
+  const nm = (names || []).flatMap(n => String(n).split('·')).map(n => n.trim()).filter(n => n && n !== '계층');
+  for(const n of nm){ const hit = list.find(x => x.cat.includes(n)); if(hit) return hit; }
+  return list[0];
 }
 function zfTargetRowsFor(annId, title){
   return zfTargetRowsByAnn.get(String(annId)) || (title ? zfTargetRowsByKey.get(zfDedupKey(title)) : undefined);
