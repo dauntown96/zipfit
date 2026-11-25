@@ -238,7 +238,9 @@ begin
   ),
   keyed as materialized (
     select a.announcement_id, a.apply_end, a.attachment_urls,
-           coalesce(lm.lh_key, announcement_dedup_key(a.title)) as k, (lm.aid is not null) as linked
+           coalesce(lm.lh_key, announcement_dedup_key(a.title)) as k, (lm.aid is not null) as linked,
+           -- 🔵 2026-11-25 — 회차 날짜(정정이면 첫 공고일 · 아니면 공고일 — get_announcement_price_summary · 화면 zfNoticeDate 와 같은 축) · rcand 만 읽는다
+           case when a.is_revised is true and a.first_announcement_date is not null then a.first_announcement_date else a.announcement_date end as rd
     from public.announcements a
     left join link_map lm on lm.aid = a.announcement_id
     where a.title is not null and a.hidden_from_listing is not true
@@ -276,6 +278,10 @@ begin
             join public.announcement_analysis aa on aa.announcement_id = g.announcement_id
            where g.k = r.k
              and (g.apply_end = r.apply_end or g.linked
+                  -- 🔵 2026-11-25(우편함 「코드·운영 — 스물다섯째」 3 · 자동 run 516 ⑦ …21135 ← …21036) — 정정이 마감을 바꾸면(12-09 → 12-14)
+                  --   원공고의 완료 분석이 「같은 마감」에 안 걸려 정정본이 일반 몫(cand · 신규 분석)으로 갔다. 같은 회차 날짜(rd)인 구성원도 같은 회차로 본다
+                  --   (LH PAN_DT 는 정정에서도 원공고일 — 2026-09-17 실측) · 회차 날짜가 다른 같은 제목 다른 회차는 그대로 안 걸린다.
+                  or (g.rd is not null and g.rd = (select rk.rd from keyed rk where rk.announcement_id = r.announcement_id))
                   or exists (select 1 from public.analysis_dispatch_queue dq
                               where dq.state = 'done' and dq.group_key = r.k and dq.apply_end = r.apply_end
                                 and dq.announcement_id = g.announcement_id))
