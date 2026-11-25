@@ -46,5 +46,4 @@ AS $function$
                                     'names', array_remove(array[nullif(btrim(cx.display_name), '')]
                                                || array(select distinct nullif(btrim(h.building_name), '') from public.housing_units h where h.complex_id = cx.id), null))
                                   order by cx.open_ desc, cx.id desc) from cx), '[]'::jsonb))
-$function$
-;
+$function$;
