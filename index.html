@@ -3417,18 +3417,23 @@ function zfSoonestOpenEnd(row){
   const ends = list.filter(x => x.state === 'open' || x.state === 'before').map(x => x.end).filter(Boolean).sort();
   return ends[0] || own;
 }
-// 🔴 2026-11-25(우편함 「표시층 — 판 K」 덧 1 · 기준 ①) — 시작·끝을 함께 보이는 자리(목록 날짜 줄 · 상세 「접수기간」 · 상세 머리 접수·마감)는
-//    같은 출처의 짝을 쓴다. 끝이 다른 공고문의 「가장 이른 열린 마감」(zfSoonestOpenEnd)이면 시작도 그 공고문의 시작이다.
-//    종전은 시작 = 카드 행(…21044 12-01) · 끝 = 같은 게시물 다른 공고문(영암용앙1 11-30)이라 「2026-12-01 ~ 2026-11-30」(시작 > 끝)이 섰다.
-//    카드 상태·「마감 임박순」·필터는 종전 값(zfSoonestOpenEnd · 카드 행 시작) 그대로 — 이 함수는 글자 짝만 고른다.
+// 🔴 2026-11-25(우편함 「표시층 — 판 K」 덧 1 · 기준 ① · 다운님 판정 17:33) — 시작·끝을 함께 보이는 자리(목록 날짜 줄 · 상세 「접수기간」 · 상세 머리 접수·마감)는
+//    끝이 같은 게시물 다른 공고문의 「가장 이른 열린 마감」(zfSoonestOpenEnd)이면 **게시물 전체 범위** — 카드 겉 줄(zf12WhenHTML · 판 K 할 일 1)과 같은 규칙:
+//    끝 = 마지막 벌 끝 · 시작 = 알약 「접수 중」이고 오늘이 벌 안이면 모든 벌 중 가장 이른 시작, 아니면 끝나지 않은 벌 중 가장 이른 시작.
+//    종전은 시작 = 카드 행(…21044 12-01) · 끝 = 다른 공고문(영암용앙1 11-30)이라 「2026-12-01 ~ 2026-11-30」(시작 > 끝)이 섰다.
+//    🔴 카드 상태·알약·D-n·「마감 임박순」·필터는 종전 값(zfSoonestOpenEnd · 카드 행 시작 — 10-07 「가장 이른 열린 마감」 축) 그대로 — 이 함수는 글자 짝만 고른다.
 function zfShownApplySpan(row){
   const s0 = String((row && (row['신청시작일'] || row['apply_start'])) || '');
   const e = String(zfSoonestOpenEnd(row) || '');
   const own = String((row && (row['신청마감일'] || row['apply_end'])) || '');
-  const list = e && e !== own ? zfPostNoticeList(row) : null;
-  const x = list && list.filter(q => (q.state === 'open' || q.state === 'before') && q.end === e && q.start).sort((a, b) => String(a.start).localeCompare(String(b.start)))[0];
-  if(!x && s0 && e && s0 > e) return { s: s0, e: own };   // 짝을 못 찾고 시작 > 끝이면 카드 행 자기 짝(시작 > 끝을 만들지 않는다)
-  return { s: x ? String(x.start) : s0, e };
+  if(!e || e === own) return { s: s0, e };
+  const d = v => String(v || '').slice(0, 10);
+  const bands = (zfPostNoticeList(row) || []).filter(x => x.state !== 'closed' && x.start && x.end).map(x => [d(x.start), d(x.end)]);
+  if(!bands.length) return s0 && s0 > e ? { s: s0, e: own } : { s: s0, e };   // 벌을 못 읽으면 시작 > 끝을 만들지 않는다(카드 행 자기 짝)
+  const t0 = zf3Today(), live = bands.filter(b => b[1] >= t0), pool = live.length ? live : bands;
+  const pl = typeof zf3Pill === 'function' ? zf3Pill(row) : null;
+  const inBand = !!pl && /^open/.test(pl.cls || '') && bands.some(b => b[0] <= t0 && t0 <= b[1]);
+  return { s: (inBand ? bands : pool).map(b => b[0]).sort()[0], e: bands.map(b => b[1]).sort().slice(-1)[0] };
 }
 function zfWithSoonestEnd(row){
   const e = zfSoonestOpenEnd(row);
