@@ -1,7 +1,9 @@
-const CACHE_NAME = 'zipfit-v343';
+const CACHE_NAME = 'zipfit-v344';
 // 코딩원칙 17번 ③: 외부 CDN 스크립트는 PRECACHE에 포함(오프라인/캐시 일관성)
 // 경로는 sw.js 위치 기준 상대 — 2026-10-06 도메인 전환 ①: /zipfit/(github.io)와 /(kkokzip.com) 어디서나 같은 파일을 가리킨다.
-const PRECACHE = ['./', './index.html', './privacy.html', './terms.html'];
+// 🔵 2026-11-26(우편함 「표시층 — 판 L」 5) — './index.html' 을 뺐다. './' 와 같은 문서(456KB)를 다른 주소로 한 번 더 받았다(배포본 실측: 문서 1 + 설치 2).
+//    './' 는 방금 받은 문서가 HTTP 캐시에 있어 그대로 쓴다(force-cache) — 설치가 문서를 다시 받지 않는다. 오프라인 폴백은 종전대로 './'.
+const PRECACHE = ['./', './privacy.html', './terms.html'];
 // 외부 CDN은 별도로 캐싱한다. addAll에 함께 넣으면 CDN 일시 장애 시
 // install 전체가 거부되어 오프라인 캐시가 통째로 사라진다.
 const PRECACHE_EXTERNAL = [
@@ -11,7 +13,7 @@ const PRECACHE_EXTERNAL = [
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE_NAME).then(c =>
-      c.addAll(PRECACHE).then(() =>
+      c.addAll(PRECACHE.map(u => new Request(u, { cache: u === './' ? 'force-cache' : 'default' }))).then(() =>
         Promise.all(PRECACHE_EXTERNAL.map(u => c.add(u).catch(() => null)))
       )
     ).then(() => self.skipWaiting())

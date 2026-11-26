@@ -534,7 +534,7 @@ body.theme-dark .hu-ug-name,body.theme-dark .hu-ug-target,body.theme-dark .hu-ug
 /* 시·도까지만 아는 공고 — 지도 대신 문구로 닫는다. 빈 상자를 만들지 않는다 */
 .map-closed{display:flex;flex-direction:column;justify-content:center;height:100%;margin:0;padding:0 18px;text-align:center;font-size:13px;line-height:1.6;color:#666}
 .map-closed strong{display:block;margin-bottom:6px;font-size:13px;color:#444}
-.map-closed .sub{font-size:12px;color:#888}
+.map-closed .sub,body.theme-dark .map-closed .sub{font-size:12px;color:#5f5f57}   /* 🔵 2026-11-26(판 L 4) — 지도 자리 바탕은 두 모드 모두 밝은 #f0f0e8 — #888 3.09:1 · 어둡게 #9aa0aa 2.3:1 → #5f5f57(AA 4.5:1 넘음) */
 .zf-footer{margin-top:1.5rem;padding-top:1rem;border-top:1px solid #e8e8e0;text-align:center}
 /* 🔵 2026-10-07(Z-2 ③ 1 · AI기본법 투명성 고지 · 다운님 승인 4) — 첫 화면(히어로 배지 자리 — 정적 글자는 「경기북부 2차 공고 6.30~7.2」였고 updateBannerFromDB 가 공고 하나로 덮어썼다. 배지를 걷어 그 함수는 할 일이 없다)과 푸터에 같은 문장. 줄바꿈 허용(배지는 한 줄 말줄임이라 문장이 잘렸다). */
 .zf-ai-note{margin:0.75rem 0 0;font-size:12px;line-height:1.6;color:#5F5F57;word-break:keep-all}
@@ -852,6 +852,11 @@ html[data-ui="d3"] .hcard .zf3-dup{display:none!important}   /* 🔴 2026-10-19(
 .zf3-sk{display:block;height:12px;border-radius:var(--r-s);background:var(--surface-2);animation:zf3breath 1.2s ease-in-out infinite alternate}
 html[data-ui="d3"] #notice-status.warn,html[data-ui="d3"] #notice-status.err{background:var(--paper);border:1px solid var(--line);border-radius:var(--r-3);color:var(--ink);padding:16px}
 html[data-ui="d3"] #notice-status.err{border-color:var(--warn)}
+/* 🔵 2026-11-26(우편함 「표시층 — 판 L」 5 · CLS) — 첫 목록 전 「불러오는 중」 상자가 머리(#zf3NoticeHead · 390 폭 154px)보다 낮아,
+   목록이 오며 머리로 바뀔 때 목록 전체가 88px 밀렸다(배포본 CLS 0.67 한 번 · 첫 화면). 머리가 숨은 동안만 같은 높이를 잡아 둔다(글자·뜻 그대로). */
+html[data-ui="d3"] #panel4:has(#zf3NoticeHead[hidden]) #notice-status.warn{min-height:154px;box-sizing:border-box}
+/* 같은 동안 목록 자리도 한 화면 높이로 — 바닥(footer)이 첫 화면에 떴다가 목록이 오며 밀려 내려가던 이동(같은 0.67 묶음)을 없앤다. */
+html[data-ui="d3"] #panel4:has(#zf3NoticeHead[hidden]) #notice-list{min-height:100vh}
 html[data-ui="d3"] #notice-status .rtitle{color:var(--ink);font-weight:700}
 html[data-ui="d3"] #notice-status .rdesc{color:var(--ink-2)}
 html[data-ui="d3"] #notice-status .btn{min-height:var(--hit);padding:0 16px;border-radius:var(--r-2);background:var(--board);color:var(--board-ink);border:0;font-weight:700}
@@ -6204,7 +6209,9 @@ let zfRentStatsState = 0;        // 0 아직 · 1 받는 중 · 2 끝
 function zfRentTypeKey(row, basis){
   const raw = (row && row['공급유형']) || '';
   const std = zfTypeStd.get(String((row && row['source']) || '') + '\u0001' + raw) || raw;
-  return std ? std + (basis === 'na' ? '\u0001na' : '') : '';
+  // 🔵 2026-11-26(우편함 「표시층 — 판 L」 2) — 영구 'perm'(나군 글자 없는 영구 · 가격 요약 스물여섯째 덧 1)도 영구 na 묶음에 센다(스냅숏 rent_sqm_quartiles_refresh 와 같은 묶음).
+  //    종전엔 'perm' 이 따로 세져 표본 5곳 미만 → ㎡당 줄이 사라졌다(SH_313610 「일반 등」).
+  return std ? std + (basis === 'na' || basis === 'perm' ? '\u0001na' : '') : '';
 }
 function zfQuantile(sorted, q){
   if(!sorted.length) return null;
@@ -6331,7 +6338,9 @@ function zfRentLineHtml(id, s){
   const won = x => Math.round(x).toLocaleString() + '원';
   const where = stS ? zf3ShortSido(sd.split(' ')[0]) : '전국';
   const rg = zfRentRange.get(String(id));
-  return `<div class="zf-rent-line" data-zf-rent="${zfAttr(pos || 'none')}">㎡당 월 ${won(v)}${s.rent_basis === 'na' ? '(나군)' : ''}<span class="zf-rent-basis"> · 기본 임대조건 중앙값</span>${rg ? zfRentRangeHtml(rg) : ''} · ${escapeHtml(where)} 같은 유형 열린 공고 중앙값 ${won(st.med)}(${st.n}곳)${pos ? ` — <b>${pos}</b>` : ''}</div>`;
+  // 🔵 2026-11-26(판 L 2) — 영구 이름표 = 가격 요약 rent_basis_label(원문 글자 그대로 — 「나군」 · supply_target 원문 「일반 등」) · 없으면(한 등급 영구 'all') 붙이지 않는다.
+  const bl = (s.rent_basis === 'na' || s.rent_basis === 'perm') ? String(s.rent_basis_label || (s.rent_basis === 'na' ? '나군' : '')).trim() : '';
+  return `<div class="zf-rent-line" data-zf-rent="${zfAttr(pos || 'none')}">㎡당 월 ${won(v)}${bl ? '(' + escapeHtml(bl) + ')' : ''}<span class="zf-rent-basis"> · 기본 임대조건 중앙값</span>${rg ? zfRentRangeHtml(rg) : ''} · ${escapeHtml(where)} 같은 유형 열린 공고 중앙값 ${won(st.med)}(${st.n}곳)${pos ? ` — <b>${pos}</b>` : ''}</div>`;
 }
 function zfFillSummarySlots(){
   document.querySelectorAll('[data-sum-for]').forEach(el => {
