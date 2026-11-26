@@ -1011,6 +1011,18 @@
      "ratio": null,
      "bg": null,
      "why": "pseudoContent"
+    },
+    "span.sub|#5f5f57": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
+    },
+    "span.zf-ai-lbl|#5f5f57": {
+     "nodes": 1,
+     "ratio": null,
+     "bg": null,
+     "why": "pseudoContent"
     }
    }
   },
@@ -2006,5 +2018,5 @@
  "_note_2026_11_24": "우편함 「표시층 — 판 E 시안」 1(백로그 「화면 점검 a11y ⚠️ — 11-23 16:29부터 처음 보는 대비 미완 꼴 6」) — 처음 본 꼴 10 더함(모두 pseudoContent · 고침 0 · 페이지에서 글자색 ↔ 실제 배경으로 잰 대비 · 미달 0): button.chip|#b3261e(판 B ⑤ 「⚠️ 일정 확인 필요」가 span → button이 되며 새 꼴 · #B3261E/#FCEDEB 5.74) — notices-390 · detail-390 · notices-1280 · match-390 · notices-390-dark button.chip|#ff8a80(#FF8A80/#3A1A18 6.86) · detail-390 span.zf-rent-range|#4f6b62(판 B ④ ① 「단지마다 ○~○원」 · 부모 ㎡당 줄과 같은 색 · 5.11 이상) · div.extras-linked-note|#3d424a · button.zf-extras-goto-hu|#3d424a(사진 절 「세대 목록 보기」 줄 · 9.35 · 어둡게 10.04) · match-390 p.zf12-who|#15171b · span.zf12-dd|#15171b(매칭 카드 👥·날짜 · 17.94 · 날짜 강조 #b3261e 6.54) · 배포본 v334 axe 실측 2026-11-24 10:2x KST · claude.ai 판정 대기 · 덧(PR #1255 첫 화면 점검): notices-390-dark span.zf12-amt|#ecedef(카드 「얼마」 줄 · 매칭 상태에서 이미 아는 요소의 어둡게 토큰 색 · #ECEDEF/#16171B 15.29 · 그날 첫 쪽 카드에 따라 잡힘)",
  "_note_2026_11_24b": "우편함 「표시층 — 판 G」 고장 2 — 접수 첫날 카드는 접수 역이 지난 역(● · .zf12-w.past · --ink-3)이 되어 어둡게 첫 쪽에 처음 보는 꼴 둘: notices-390-dark span.zf12-w|#9ea4ad · span.zf12-m|#9ea4ad(각 2 · 매칭 상태에서 이미 아는 지난 역 꼴의 어둡게 토큰 색 · #9EA4AD/#16171B 7.14 · 고침 0) · PR #1272 첫 화면 점검",
  "_note_2026_11_25": "우편함 「표시층 — 판 H」 3 — 11-25 08:54 health-screen 처음 본 꼴 3(요소 4) 더함(모두 pseudoContent · axe 4.13.0 로컬 재현 같은 이유 · 페이지에서 글자색 ↔ 실제 배경으로 잰 대비 · 미달 0): detail-390 p.zf12-schedh|#b3261e(「⚠️ 일정 확인 필요」 머리 · 배경 #fcedeb · 5.74) · button.zf12-schedgo|#b3261e(일정 어긋남 한 줄 단추 · 같은 배경 · 5.74) · summary|#3d424a(클래스 없는 펼침 머리 — 「모집일정」 등 원문 절 · 배경 #f7f6f2 · 9.35) · 색 고침 0(AA 4.5 넘음 — ::before/::after 장식 때문에 axe 가 판정을 미룬 것) · claude.ai 검증 · 다운님 판정 대기",
- "_note_2026_11_26": "판 L 4 — 배포본 v343 대비 미완 새 꼴 9를 더함(꼴마다 실측 대비: zf12-dt 6.26~17.94 · 어둡게 7.14~15.29 · zf12-nu 16.59/14.23 · a.zf-ai-lbl #15171b·#ecedef(같은 글자색 zf12-dt 실측 17.94/15.29와 같은 바탕) — 모두 AA 통과 · axe 미완 까닭 pseudoContent) · span.zf-ai-lbl|#888888(3.09:1 · 지도 닫힘 안내)은 더하지 않고 색을 고침"
+ "_note_2026_11_26": "판 L 4 — 배포본 v343 대비 미완 새 꼴 9를 더함(꼴마다 실측 대비: zf12-dt 6.26~17.94 · 어둡게 7.14~15.29 · zf12-nu 16.59/14.23 · a.zf-ai-lbl #15171b·#ecedef(같은 글자색 zf12-dt 실측 17.94/15.29와 같은 바탕) — 모두 AA 통과 · axe 미완 까닭 pseudoContent) · span.zf-ai-lbl|#888888(3.09:1 · 지도 닫힘 안내)은 더하지 않고 색을 고침 · 고친 색 span.sub|#5f5f57 · span.zf-ai-lbl|#5f5f57(지도 닫힘 안내 · #f0f0e8 바탕 5.62:1)을 detail-390 에 더함"
 }
