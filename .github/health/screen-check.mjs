@@ -17,6 +17,7 @@ import { ANA_DATE_RE } from './ana-date-re.mjs'
 import { phraseCaseSql, anaPendingSql } from './phrase-expect.mjs'
 import { SORT_OPTS, judgeSortTop } from './sort-top.mjs'
 import { RANK_ONLY_SQL, judgeRankOnly } from './this-round.mjs'
+import { WHEN_LINE_FN, WHEN_LINE_BREAK_FN, judgeWhenLines, whenLineSummary } from './when-line.mjs'
 // 같은 게시물 링크가 있다 — 카드 id(aid) 행 제목의 묶음 키가 링크 표 linked_group_key 와 같다(LH 행이 있는 링크만 · 종전 phrase 식 그대로)
 const PHRASE_LINK_SQL = aid => `exists (select 1 from announcement_post_links l
                             join announcements lh on lh.announcement_id = l.lh_announcement_id
@@ -1688,6 +1689,43 @@ try {
       `${ok}/${rows.length}${bad.length ? ' · ' + bad.slice(0, 3).join(' ') : ''}`, '무작위 10장 중 image/* 200 이 8장 이상 — 미만이면 경고만')
   } catch (e) {
     add('drive_thumb', '첨부 미리보기(Drive 썸네일 끝점)가 그림을 주나', 'warn', '못 잼: ' + String(e).slice(0, 200), '경고만')
+  }
+  // 🔵 2026-11-26(우편함 「코드·운영 — 스물여덟째」 1 · 원칙 33) — 겉 일정 줄 세 꼴(같은 날짜 역 두 번 0 · 「오늘 …까지」는 ◉ 옆 한 곳 · 「YYYY-MM-DD ~ YYYY-MM-DD」 시작 > 끝 0)을
+  //    시계 두 벌로 잰다 — 접수 끝 시각 앞(오늘 10:00 KST)과 뒤(오늘 23:30 KST). #1311 「끝 시각 뒤 차수 역 걷기」 고장은 뒤 벌에서만 났다.
+  //    기대값은 셋 다 0(when-line.mjs · 시험 when-line.test.mjs). 걸리면 ⚠️(경고만 · gate.mjs 밖 · 이슈 0) · 못 재면 ⚠️. SIMULATE=when_line 이면 앞 벌 첫 쪽에 세 꼴을 넣는다(⚠️ 여야 맞다).
+  try {
+    const kd = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10)
+    const passes = []
+    for (const [label, hm] of [['앞', '10:00'], ['뒤', '23:30']]) {
+      const wctx = await browser.newContext({ viewport: VIEWPORT, serviceWorkers: 'block', locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+      await wctx.route(/\/rest\/v1\/usage_events(\?|$)/, r => r.fulfill({ status: 201, body: '' }))
+      await stubCtx(wctx)
+      const wp = await wctx.newPage()
+      await wp.clock.setFixedTime(new Date(`${kd}T${hm}:00+09:00`))
+      await wp.goto(SITE + '?when=' + Date.now(), { waitUntil: 'networkidle', timeout: 90000 })
+      await wp.waitForFunction(() => typeof noticeData !== 'undefined' && noticeData.length > 0, null, { timeout: 60000 })
+      await wp.evaluate(() => goMain(2)); await wp.waitForTimeout(3000)
+      const rows = []
+      for (let pg = 1; pg <= MAX_PAGES; pg++) {
+        if (pg > 1) {
+          const ok = await wp.evaluate(pg => { const b = [...document.querySelectorAll('button')].find(b => b.offsetParent !== null && b.innerText.trim() === String(pg)); if (!b) return false; b.click(); return true }, pg)
+          if (!ok) break
+          await wp.waitForTimeout(1500)
+        }
+        await wp.waitForFunction(() => typeof zfPostNotices === 'undefined' || zfPostNotices.loaded, null, { timeout: 20000 }).catch(() => {})
+        await wp.waitForTimeout(500)
+        if (process.env.SIMULATE === 'when_line' && label === '앞' && pg === 1) await wp.evaluate(WHEN_LINE_BREAK_FN)
+        rows.push(...await wp.evaluate(WHEN_LINE_FN))
+      }
+      await wctx.close()
+      passes.push({ label, at: `${kd.slice(5)} ${hm}`, j: judgeWhenLines(rows) })
+    }
+    extra.when_line = passes
+    const s = whenLineSummary(passes)
+    add('when_line', '겉 일정 줄 — 같은 날짜 두 번 · 오늘 자리 · 거꾸로 기간(시계 앞·뒤 두 벌)', s.status, s.value,
+      '0 · 0 · 0(열린 카드 · 두 벌 모두) — 날짜 보이는 역끼리 같은 날짜 0 · 「오늘 …까지」는 ◉ 역 바로 옆 한 곳 · 「YYYY-MM-DD ~ YYYY-MM-DD」 시작 ≤ 끝 · 시계 = 오늘 10:00 · 23:30 KST · 걸리면 ⚠️(경고만)')
+  } catch (e) {
+    add('when_line', '겉 일정 줄 — 같은 날짜 두 번 · 오늘 자리 · 거꾸로 기간(시계 앞·뒤 두 벌)', 'warn', '못 잼: ' + String(e).slice(0, 160), '경고만')
   }
   // ⑪ 빈 탭(2026-10-18 · 우편함 「코드·운영 — 게이트 재는 장치」 ② · 런칭 게이트 G5 「다섯 탭 중 빈 탭 0」) — 비로그인으로 새 쪽을 열고
   //    다섯 탭을 goMain(i)로 하나씩 연다. 3초 뒤 #main{i}의 보이는 글자가 없으면 빈 탭이다. 「없어요·없습니다」 꼴(빈 상태)이면
